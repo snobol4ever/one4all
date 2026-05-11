@@ -886,19 +886,35 @@ static void lower_prolog_child(const AST_t *t)
 }
 
 /*── Statement lowering ──────────────────────────────────────────────────────
- * SI-3: lower_stmt reads AST_STMT / AST_END (pure node encoding).
+ * SI-3 (pure tree): lower_stmt reads AST_STMT / AST_END.
  *
- * AST_STMT children layout (fixed 6 slots):
- *   [0] subject      — NULL slot means absent
- *   [1] pattern      — NULL slot means absent
- *   [2] replacement  — NULL slot means no '=' (has_eq false)
- *                      non-NULL means has '=' (has_eq true)
- *                      AST_NUL  means '=' with empty replacement
- *   [3] AST_GOTO_S   — sval=label or NULL; nchildren=1 for computed
- *   [4] AST_GOTO_F   — same
- *   [5] AST_GOTO_U   — same
- * Scalars: sval=label, ival=lang, a[0].i=lineno, a[1].i=stno
+ * Pure tree shape: t/v/n/c (kind/sval-or-ival-or-dval/nchildren/children[]).
+ * AST_STMT children are tagged attribute nodes (kind=AST_ATTR, sval=tag).
+ * Access via stmt_attr_find(s, ":tag") → attr node; stmt_attr_expr(attr) → expr.
+ *
+ * Tags: :lbl :lang :line :stno :subj :pat :eq :repl :goS :goF :go
  *────────────────────────────────────────────────────────────────────────────*/
+
+/* Scan s->children for attribute tag; return expr child or NULL. */
+static AST_t *attr_expr_of(const AST_t *s, const char *tag)
+{
+    AST_t *a = stmt_attr_find(s, tag);
+    return a ? stmt_attr_expr(a) : NULL;
+}
+
+/* Return attribute string value (first child's sval), or NULL. */
+static const char *attr_str_of(const AST_t *s, const char *tag)
+{
+    AST_t *a = stmt_attr_find(s, tag);
+    return stmt_attr_str(a);
+}
+
+/* Return attribute integer value (parse first child's sval), or 0. */
+static int attr_int_of(const AST_t *s, const char *tag)
+{
+    const char *sv = attr_str_of(s, tag);
+    return sv ? atoi(sv) : 0;
+}
 
 void lower_stmt(const AST_t *s)
 {
@@ -907,56 +923,58 @@ void lower_stmt(const AST_t *s)
 
     /* AST_END — the END statement */
     if (s->kind == AST_END) {
-        if (s->sval && s->sval[0]) {
-            int lbl_idx = sm_label_named(p, s->sval);
-            labtab_define(tbl, s->sval, lbl_idx);
+        const char *lbl = attr_str_of(s, ":lbl");
+        if (lbl && lbl[0]) {
+            int lbl_idx = sm_label_named(p, lbl);
+            labtab_define(tbl, lbl, lbl_idx);
         }
-        sm_emit_ii(p, SM_STNO, (int64_t)s->a[1].i, (int64_t)s->a[0].i);
+        int stno   = attr_int_of(s, ":stno");
+        int lineno = attr_int_of(s, ":line");
+        sm_emit_ii(p, SM_STNO, (int64_t)stno, (int64_t)lineno);
         sm_emit(p, SM_HALT);
         return;
     }
 
-    /* AST_STMT — read children via fixed-slot indices */
-    AST_t *subject     = s->nchildren > 0 ? s->children[0] : NULL;
-    AST_t *pattern     = s->nchildren > 1 ? s->children[1] : NULL;
-    AST_t *replacement = s->nchildren > 2 ? s->children[2] : NULL;
-    AST_t *goto_s_arm  = s->nchildren > 3 ? s->children[3] : NULL;
-    AST_t *goto_f_arm  = s->nchildren > 4 ? s->children[4] : NULL;
-    AST_t *goto_u_arm  = s->nchildren > 5 ? s->children[5] : NULL;
+    /* AST_STMT — read tagged attributes */
+    const char *label   = attr_str_of(s, ":lbl");
+    int         lang    = attr_int_of(s, ":lang");   /* 0 = LANG_SNO if absent */
+    int         stno    = attr_int_of(s, ":stno");
+    int         lineno  = attr_int_of(s, ":line");
+    AST_t      *subject = attr_expr_of(s, ":subj");
+    AST_t      *pattern = attr_expr_of(s, ":pat");
+    int         has_eq  = (stmt_attr_find(s, ":eq") != NULL);
+    AST_t      *replacement = attr_expr_of(s, ":repl");
 
-    int has_eq = (replacement != NULL);  /* non-NULL slot → has '=' */
-    int lang   = (int)s->ival;
+    /* Goto arms */
+    AST_t      *go_s_attr = stmt_attr_find(s, ":goS");
+    AST_t      *go_f_attr = stmt_attr_find(s, ":goF");
+    AST_t      *go_u_attr = stmt_attr_find(s, ":go");
 
-    /* Goto arm accessors */
-    const char *goto_s      = (goto_s_arm && goto_s_arm->sval) ? goto_s_arm->sval : NULL;
-    const char *goto_f      = (goto_f_arm && goto_f_arm->sval) ? goto_f_arm->sval : NULL;
-    const char *goto_u      = (goto_u_arm && goto_u_arm->sval) ? goto_u_arm->sval : NULL;
-    AST_t      *goto_s_expr = (goto_s_arm && goto_s_arm->nchildren > 0) ? goto_s_arm->children[0] : NULL;
-    AST_t      *goto_f_expr = (goto_f_arm && goto_f_arm->nchildren > 0) ? goto_f_arm->children[0] : NULL;
-    AST_t      *goto_u_expr = (goto_u_arm && goto_u_arm->nchildren > 0) ? goto_u_arm->children[0] : NULL;
-
-    /* Suppress AST_NUL replacement sentinel: has_eq stays true, expr is empty */
-    if (replacement && replacement->kind == AST_NUL)
-        replacement = NULL;
+    const char *goto_s      = go_s_attr ? stmt_attr_str(go_s_attr)  : NULL;
+    const char *goto_f      = go_f_attr ? stmt_attr_str(go_f_attr)  : NULL;
+    const char *goto_u      = go_u_attr ? stmt_attr_str(go_u_attr)  : NULL;
+    AST_t      *goto_s_expr = go_s_attr ? stmt_attr_expr(go_s_attr) : NULL;
+    AST_t      *goto_f_expr = go_f_attr ? stmt_attr_expr(go_f_attr) : NULL;
+    AST_t      *goto_u_expr = go_u_attr ? stmt_attr_expr(go_u_attr) : NULL;
 
     /* Skip blank lines entirely */
-    if ((!s->sval || !s->sval[0])
-            && !subject && !pattern && !replacement && !has_eq
+    if ((!label || !label[0])
+            && !subject && !pattern && !has_eq
             && !goto_u && !goto_u_expr
             && !goto_s && !goto_s_expr
             && !goto_f && !goto_f_expr)
         return;
 
-    if (s->sval && s->sval[0]) {
-        int lbl_idx = sm_label_named(p, s->sval);
-        labtab_define(tbl, s->sval, lbl_idx);
-        if (FUNC_IS_ENTRY_LABEL(s->sval)) {
+    if (label && label[0]) {
+        int lbl_idx = sm_label_named(p, label);
+        labtab_define(tbl, label, lbl_idx);
+        if (FUNC_IS_ENTRY_LABEL(label)) {
             p->instrs[p->count - 1].a[2].i = 1;
             sm_emit(p, SM_DEFINE_ENTRY);
         }
     }
 
-    sm_emit_ii(p, SM_STNO, (int64_t)s->a[1].i, (int64_t)s->a[0].i);
+    sm_emit_ii(p, SM_STNO, (int64_t)stno, (int64_t)lineno);
     if (lang == LANG_ICN) return;
 
     if (lang == LANG_PL) {
@@ -1216,14 +1234,16 @@ SM_Program *lower(const AST_t *prog)
         const AST_t *s = prog->children[ci];
         if (!s) continue;
         /* Icon defs are registered by polyglot_init; skip SM emission */
-        if (s->kind == AST_STMT && (int)s->ival == LANG_ICN) {
+        int s_lang = (s->kind == AST_STMT) ? attr_int_of(s, ":lang") : 0;
+        if (s->kind == AST_STMT && s_lang == LANG_ICN) {
             has_icn = 1;
             sm_stno_label_record(g_p, ++stno, NULL);
             continue;
         }
         lower_stmt(s);
-        const char *lbl = (s->sval && s->sval[0]) ? s->sval : NULL;
-        sm_stno_label_record(g_p, ++stno, lbl);
+        const char *lbl = (s->kind == AST_STMT || s->kind == AST_END)
+                          ? attr_str_of(s, ":lbl") : NULL;
+        sm_stno_label_record(g_p, ++stno, (lbl && lbl[0]) ? lbl : NULL);
     }
 
     if (has_icn) sm_emit_si(g_p, SM_BB_PUMP_PROC, "main", 0);

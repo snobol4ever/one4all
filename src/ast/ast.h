@@ -222,33 +222,41 @@ typedef enum AST_e {
      * Until SI-6, the shim helpers stmt_to_ast / code_to_ast produce these
      * from the old structs; lower() and lower_stmt() consume them.
      *
-     * AST_PROGRAM  — was CODE_t: children[] = list of AST_STMT / AST_END nodes
-     * AST_STMT     — was STMT_t (non-END):
-     *                  sval     = label (NULL if none)
-     *                  ival     = lang  (LANG_SNO / LANG_ICN / …)
-     *                  a[0].i   = lineno
-     *                  a[1].i   = stno
-     *                  children[0] = subject     (NULL slot if absent)
-     *                  children[1] = pattern     (NULL slot if absent)
-     *                  children[2] = replacement (NULL slot → no '=';
-     *                                             non-NULL → has_eq=true,
-     *                                             AST_NUL node → '=' with
-     *                                             empty replacement)
-     *                  children[3] = AST_GOTO_S  (sval=label or NULL;
-     *                                             nchildren=0 or 1 for expr)
-     *                  children[4] = AST_GOTO_F  (same)
-     *                  children[5] = AST_GOTO_U  (same)
-     * AST_END      — was STMT_t with is_end=1: sval=label, a[0].i=lineno,
-     *                a[1].i=stno; no children
-     * AST_GOTO_S/F/U — goto arm: sval=target label (NULL = absent);
-     *                  nchildren=0 (static) or 1 (computed expr child)
+     * Pure tree shape — four logical fields per node: t(kind) v(sval/ival/dval)
+     * n(nchildren) c(children[]).  Matches Snocone `tree` datatype exactly.
+     *
+     * AST_PROGRAM  kind=AST_PROGRAM  v=""  children = AST_STMT/AST_END nodes
+     *
+     * AST_STMT     kind=AST_STMT  v=""  children = tagged attribute nodes:
+     *   tree(':lbl',  label_str)          — label (omitted if none)
+     *   tree(':lang', lang_int_as_str)    — lang code (omitted if LANG_SNO=0)
+     *   tree(':line', lineno_str)         — source line number
+     *   tree(':stno', stno_str)           — source statement number
+     *   tree(':subj', subject_expr)       — subject (omitted if absent)
+     *   tree(':pat',  pattern_expr)       — pattern (omitted if absent)
+     *   tree(':eq',   '')                 — presence signals has_eq=true
+     *   tree(':repl', repl_expr_or_NUL)   — replacement (omitted if !has_eq)
+     *   tree(':goS',  label_or_expr)      — success goto (omitted if absent)
+     *   tree(':goF',  label_or_expr)      — failure goto (omitted if absent)
+     *   tree(':go',   label_or_expr)      — unconditional goto (omitted if absent)
+     *
+     * AST_END      kind=AST_END  v=""  children: [:lbl] [:line] [:stno]
+     *
+     * Attribute tag kinds (sval = the tag string, v = payload or child):
+     *   ':lbl' ':lang' ':line' ':stno' ':subj' ':pat' ':eq' ':repl'
+     *   ':goS' ':goF' ':go'
+     * Each tag node: kind=AST_ATTR, sval=tag_name, nchildren=0 (leaf with
+     * sval payload) or nchildren=1 (tree payload in children[0]).
+     *
+     * Matches parser_snobol4.sc STMT shape byte-for-byte.
      * ----------------------------------------------------------------------- */
     AST_PROGRAM,
     AST_STMT,
     AST_END,      /* END statement — structurally distinct from AST_STMT    */
-    AST_GOTO_S,   /* success goto arm   */
-    AST_GOTO_F,   /* failure goto arm   */
-    AST_GOTO_U,   /* unconditional goto */
+    AST_ATTR,     /* attribute tag node: sval=":lbl"/":subj"/etc.           */
+    AST_GOTO_S,   /* kept for lower_stmt goto arm compat during SI-3..SI-5 */
+    AST_GOTO_F,
+    AST_GOTO_U,
 
     /* --- Sentinel -------------------------------------------------------- */
 
@@ -318,22 +326,17 @@ typedef enum {
  */
 typedef struct AST_t AST_t;
 
-/* Auxiliary slot union — three per node, zero-initialized by calloc.
- * Used by AST_STMT (SI-1+): a[0].i=lineno, a[1].i=stno, a[2].i=flags.
- * Available for future node kinds; not used by expression nodes today. */
-typedef union { int i; const char *s; } AST_aux;
+typedef struct AST_t AST_t;
 
 struct AST_t {
-    AST_e    kind;          /* node kind from AST_e enum above              */
-    char    *sval;          /* string payload (see comment above)           */
-    long long ival;         /* integer payload                              */
-    double   dval;          /* float payload (named dval throughout codebase) */
-    AST_t **children;      /* child nodes — realloc-grown array            */
-    int      nchildren;     /* number of valid entries in children[]        */
-    int      nalloc;        /* allocated capacity of children[]             */
-    int      id;            /* unique node id — assigned at emit time       */
-    AST_aux  a[3];          /* auxiliary: a[0].i=lineno, a[1].i=stno,
-                             * a[2].i=flags (AST_STMT); zero elsewhere     */
+    AST_e    kind;          /* t — node type/kind                           */
+    char    *sval;          /* v — string value (QLIT text, VAR/FNC name,   */
+    long long ival;         /*     integer value for ILIT, or               */
+    double   dval;          /*     float value for FLIT)                    */
+    AST_t **children;      /* c — child nodes (realloc-grown array)        */
+    int      nchildren;     /* n — number of valid children                 */
+    int      nalloc;        /* C impl detail: allocated capacity (not part of logical tree) */
+    int      id;            /* C impl detail: node id for INITIAL dedup     */
 };
 
 /* =========================================================================
@@ -460,6 +463,7 @@ static const char * const ast_e_name[AST_KIND_COUNT] = {
     [AST_PROGRAM]      = "AST_PROGRAM",
     [AST_STMT]         = "AST_STMT",
     [AST_END]          = "AST_END",
+    [AST_ATTR]         = "AST_ATTR",
     [AST_GOTO_S]       = "AST_GOTO_S",
     [AST_GOTO_F]       = "AST_GOTO_F",
     [AST_GOTO_U]       = "AST_GOTO_U",

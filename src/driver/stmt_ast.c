@@ -1,60 +1,37 @@
 /*
- * stmt_ast.c — SI-2 (revised): shim helpers bridging CODE_t/STMT_t → AST_t
+ * stmt_ast.c — SI-2/SI-3 shim: CODE_t/STMT_t → pure AST tree
  *
- * During Phase 5 (SI-1..SI-6) frontends still emit CODE_t/STMT_t.  These
- * shims translate to AST_PROGRAM / AST_STMT / AST_END so that lower() and
- * lower_stmt() can be migrated (SI-3) without touching any frontend.
+ * Produces AST_PROGRAM / AST_STMT / AST_END trees whose shape matches
+ * the Snocone `tree` datatype: four logical fields t/v/n/c (kind, value,
+ * nchildren, children[]).  No side-channel fields (no a[], no flags).
  *
- * Once all six frontends emit AST_STMT directly (SI-4..SI-5) these shims
- * become dead code and are deleted in SI-6.
+ * AST_STMT uses tagged attribute children matching parser_snobol4.sc output:
+ *   tree(':lbl',  label)   — label (omitted if empty)
+ *   tree(':lang', langstr) — lang (omitted if LANG_SNO=0)
+ *   tree(':line', linestr) — source lineno
+ *   tree(':stno', stnostr) — source stno
+ *   tree(':subj', expr)    — subject (omitted if absent)
+ *   tree(':pat',  expr)    — pattern (omitted if absent)
+ *   tree(':eq',   '')      — presence signals has_eq=true
+ *   tree(':repl', expr)    — replacement (omitted if !has_eq)
+ *   tree(':goS',  label)   — success goto (omitted if absent)
+ *   tree(':goF',  label)   — failure goto (omitted if absent)
+ *   tree(':go',   label)   — unconditional goto (omitted if absent)
  *
- * ── Pure AST encoding ──────────────────────────────────────────────────────
+ * Attribute tag nodes: kind=AST_ATTR, sval=tag_name, nchildren=0 (leaf
+ * payload in sval) or nchildren=1 (expr payload in children[0]).
  *
- * Every node is characterised solely by:
- *   kind  — what the node IS
- *   sval  — string value  (name / label / literal text)
- *   ival  — integer value (lang for STMT, literal for ILIT, etc.)
- *   dval  — float value   (float literals only)
- *   nchildren / children[] — structural children
- *   a[0..1] — small integer metadata (lineno, stno); not tree structure
- *
- * No boolean flags in a[].  Structural distinctions are expressed as kinds
- * or as the presence/absence of a children[] slot.
- *
- * AST_PROGRAM   children[0..n-1] = AST_STMT or AST_END nodes
- *
- * AST_STMT      sval     = label (NULL if none)
- *               ival     = lang  (LANG_SNO / LANG_ICN / …)
- *               a[0].i   = lineno
- *               a[1].i   = stno
- *               children[0] = subject      (NULL slot if absent)
- *               children[1] = pattern      (NULL slot if absent)
- *               children[2] = replacement  NULL slot → no '=' (has_eq false)
- *                                          non-NULL  → has '=' (has_eq true)
- *                                          AST_NUL   → '=' with empty repl
- *               children[3] = AST_GOTO_S   arm
- *               children[4] = AST_GOTO_F   arm
- *               children[5] = AST_GOTO_U   arm
- *
- * AST_END       sval     = label (NULL if none)
- *               a[0].i   = lineno
- *               a[1].i   = stno
- *               nchildren = 0
- *
- * AST_GOTO_S/F/U sval   = static label (NULL if arm absent)
- *                nchildren = 0   static label (or absent)
- *                nchildren = 1   computed goto: children[0] = expr
- * ──────────────────────────────────────────────────────────────────────────
+ * lower_stmt() reads attributes by scanning for sval tag match.
  */
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include "ast/ast.h"
 #include "frontend/snobol4/scrip_cc.h"
 
-/* ── internal helpers ───────────────────────────────────────────────────── */
+/* ── helpers ────────────────────────────────────────────────────────────── */
 
-/* Allocate a zero-filled AST_t of the given kind. */
 static AST_t *sa_new(AST_e kind)
 {
     AST_t *n = calloc(1, sizeof *n);
@@ -62,13 +39,9 @@ static AST_t *sa_new(AST_e kind)
     return n;
 }
 
-/*
- * Append one child slot to a node.  child may be NULL — a NULL slot is a
- * valid, meaningful "absent" entry in the fixed-layout children[] of AST_STMT.
- * The nchildren count is always incremented so slot indices are stable.
- */
 static void sa_add(AST_t *parent, AST_t *child)
 {
+    if (!child) return;  /* tagged encoding: never add NULL children */
     if (parent->nchildren >= parent->nalloc) {
         parent->nalloc = parent->nalloc ? parent->nalloc * 2 : 8;
         parent->children = realloc(parent->children,
@@ -78,89 +51,154 @@ static void sa_add(AST_t *parent, AST_t *child)
 }
 
 /*
- * Build one goto-arm node.
- *   label  — static target label string, or NULL if arm is absent
- *   expr   — computed-goto expression, or NULL for static/absent arm
- * A NULL label AND NULL expr → arm is absent (sval=NULL, nchildren=0).
- * A non-empty label         → sval=label, nchildren=0.
- * A non-NULL expr           → sval=NULL, nchildren=1, children[0]=expr.
+ * attr_leaf — tag node with string value in sval, no children.
+ * Matches tree(':tag', string_value) in Snocone.
  */
-static AST_t *make_goto_arm(AST_e kind, const char *label, AST_t *expr)
+static AST_t *attr_leaf(const char *tag, const char *val)
 {
-    AST_t *arm = sa_new(kind);
-    if (expr) {
-        /* computed goto — expr takes precedence; label is ignored */
-        sa_add(arm, expr);
-    } else if (label && label[0]) {
-        arm->sval = strdup(label);
+    AST_t *n = sa_new(AST_ATTR);
+    n->sval = strdup(tag);
+    /* Store payload as first child if val non-empty, else leaf with no child */
+    if (val && val[0]) {
+        AST_t *leaf = sa_new(AST_QLIT);
+        leaf->sval = strdup(val);
+        sa_add(n, leaf);
     }
-    /* else: absent arm — sval=NULL, nchildren=0 */
-    return arm;
+    return n;
+}
+
+/*
+ * attr_int — tag node with integer value (stored as string in sval of child).
+ */
+static AST_t *attr_int(const char *tag, int ival)
+{
+    char buf[32];
+    snprintf(buf, sizeof buf, "%d", ival);
+    return attr_leaf(tag, buf);
+}
+
+/*
+ * attr_expr — tag node with one AST_t* expression child.
+ * Matches tree(':tag', '', 1, expr) in Snocone.
+ */
+static AST_t *attr_expr(const char *tag, AST_t *expr)
+{
+    AST_t *n = sa_new(AST_ATTR);
+    n->sval = strdup(tag);
+    sa_add(n, expr);
+    return n;
+}
+
+/*
+ * make_goto_attr — build a goto attribute node.
+ * Static label → attr_leaf(':goX', label)
+ * Computed expr → attr_expr(':goX', expr)
+ * Absent → NULL (caller skips adding it)
+ */
+static AST_t *make_goto_attr(const char *tag, const char *label, AST_t *expr)
+{
+    if (expr)                   return attr_expr(tag, expr);
+    if (label && label[0])      return attr_leaf(tag, label);
+    return NULL;  /* absent: not added */
 }
 
 /* ── public API ─────────────────────────────────────────────────────────── */
 
-/*
- * stmt_to_ast — convert one STMT_t into AST_STMT or AST_END.
- *
- * END statements become AST_END (structurally distinct kind — not a flag).
- * All other statements become AST_STMT with exactly 6 children.
- *
- * The STMT_t's AST_t child pointers (subject, pattern, replacement,
- * goto_*_expr) are moved into the new node — not copied.
- */
 AST_t *stmt_to_ast(const STMT_t *s)
 {
     if (s->is_end) {
         AST_t *node = sa_new(AST_END);
-        node->sval   = (s->label && s->label[0]) ? strdup(s->label) : NULL;
-        node->a[0].i = s->lineno;
-        node->a[1].i = s->stno;
+        if (s->label && s->label[0])
+            sa_add(node, attr_leaf(":lbl",  s->label));
+        sa_add(node, attr_int(":line", s->lineno));
+        sa_add(node, attr_int(":stno", s->stno));
         return node;
     }
 
     AST_t *node = sa_new(AST_STMT);
 
-    /* Scalar fields — no boolean flags */
-    node->sval   = (s->label && s->label[0]) ? strdup(s->label) : NULL;
-    node->ival   = (long long)s->lang;
-    node->a[0].i = s->lineno;
-    node->a[1].i = s->stno;
+    /* Label */
+    if (s->label && s->label[0])
+        sa_add(node, attr_leaf(":lbl",  s->label));
 
-    /* children[0]: subject (NULL slot if absent) */
-    sa_add(node, s->subject);
+    /* Lang (omit for LANG_SNO=0 — default, most common) */
+    if (s->lang != 0)
+        sa_add(node, attr_int(":lang", s->lang));
 
-    /* children[1]: pattern (NULL slot if absent) */
-    sa_add(node, s->pattern);
+    /* Source location */
+    sa_add(node, attr_int(":line", s->lineno));
+    sa_add(node, attr_int(":stno", s->stno));
 
-    /*
-     * children[2]: replacement
-     *   NULL slot → has_eq false (no '=' in source)
-     *   non-NULL  → has_eq true  (AST_NUL means '=' with empty replacement)
-     */
-    if (s->has_eq)
-        sa_add(node, s->replacement ? s->replacement : sa_new(AST_NUL));
-    else
-        sa_add(node, (AST_t *)NULL);
+    /* Subject */
+    if (s->subject)
+        sa_add(node, attr_expr(":subj", s->subject));
 
-    /* children[3..5]: goto arms */
-    sa_add(node, make_goto_arm(AST_GOTO_S, s->goto_s, s->goto_s_expr));
-    sa_add(node, make_goto_arm(AST_GOTO_F, s->goto_f, s->goto_f_expr));
-    sa_add(node, make_goto_arm(AST_GOTO_U, s->goto_u, s->goto_u_expr));
+    /* Pattern */
+    if (s->pattern)
+        sa_add(node, attr_expr(":pat",  s->pattern));
+
+    /* has_eq + replacement */
+    if (s->has_eq) {
+        sa_add(node, attr_leaf(":eq", ""));
+        if (s->replacement)
+            sa_add(node, attr_expr(":repl", s->replacement));
+        else {
+            /* has_eq=true with no replacement → empty string replacement */
+            AST_t *empty = sa_new(AST_QLIT);
+            empty->sval = strdup("");
+            sa_add(node, attr_expr(":repl", empty));
+        }
+    }
+
+    /* Goto arms (omitted when absent) */
+    sa_add(node, make_goto_attr(":goS", s->goto_s, s->goto_s_expr));
+    sa_add(node, make_goto_attr(":goF", s->goto_f, s->goto_f_expr));
+    sa_add(node, make_goto_attr(":go",  s->goto_u, s->goto_u_expr));
 
     return node;
 }
 
-/*
- * code_to_ast — convert a full CODE_t program into an AST_PROGRAM node.
- *
- * Each STMT_t in the linked list becomes one child (AST_STMT or AST_END).
- * The CODE_t itself is not freed; caller's responsibility.
- */
 AST_t *code_to_ast(const CODE_t *prog)
 {
     AST_t *root = sa_new(AST_PROGRAM);
     for (const STMT_t *s = prog->head; s; s = s->next)
         sa_add(root, stmt_to_ast(s));
     return root;
+}
+
+/*
+ * stmt_attr_find — find the first attribute child with tag sval==tag.
+ * Returns the AST_ATTR node, or NULL if not present.
+ * Used by lower_stmt() to read tagged fields.
+ */
+AST_t *stmt_attr_find(const AST_t *stmt, const char *tag)
+{
+    for (int i = 0; i < stmt->nchildren; i++) {
+        AST_t *ch = stmt->children[i];
+        if (ch && ch->kind == AST_ATTR && ch->sval && strcmp(ch->sval, tag) == 0)
+            return ch;
+    }
+    return NULL;
+}
+
+/*
+ * stmt_attr_expr — get the expression child of an attribute node.
+ * Returns children[0] if present, NULL otherwise.
+ */
+AST_t *stmt_attr_expr(const AST_t *attr)
+{
+    if (!attr || attr->nchildren == 0) return NULL;
+    return attr->children[0];
+}
+
+/*
+ * stmt_attr_str — get the string value of an attribute leaf node.
+ * For leaf attrs: children[0]->sval; for childless attrs: attr->sval payload.
+ */
+const char *stmt_attr_str(const AST_t *attr)
+{
+    if (!attr) return NULL;
+    if (attr->nchildren > 0 && attr->children[0])
+        return attr->children[0]->sval;
+    return NULL;
 }
