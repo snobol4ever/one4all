@@ -151,6 +151,231 @@ static void text_fprintf_raw(emitter_t *e, const char *fmt, ...)
 /* ── pos ───────────────────────────────────────────────────────────────────── */
 static int text_pos(emitter_t *e) { return CTX(e)->pos; }
 
+/* ── EM-MODE4-IS-MODE3-DUMP-b: new surface for SM templates ──────────────────
+ *
+ * Each method below corresponds to one entry in the design-doc vtable
+ * (MIGRATION-MODE4-IS-MODE3-DUMP.md §"The vtable surface").  Text-backend
+ * implementations emit GAS asm directly.  No template calls these yet —
+ * sub-rung -c is the first caller (SM_HALT).  Implementations here are
+ * faithful to the design but trivially small until they have real
+ * callers; revisit if a caller demands different shape. */
+
+/* ── structural markers ────────────────────────────────────────────────── */
+
+static void text_label_name(emitter_t *e, const char *name)
+{
+    char lbuf[256]; snprintf(lbuf, sizeof(lbuf), "%s:", name ? name : "");
+    bb3c_format(outf(e), lbuf, "", "");
+}
+
+static void text_pc_label(emitter_t *e, int pc)
+{
+    char lbuf[64]; snprintf(lbuf, sizeof(lbuf), ".L%d:", pc);
+    bb3c_format(outf(e), lbuf, "", "");
+}
+
+static void text_section(emitter_t *e, const char *name)
+{
+    /* Canonical short forms: .text / .data / .rodata / .bss go in
+     * directly; anything else gets ".section <name>" wrapping. */
+    if (!name) return;
+    bb3c_flush_pending_cjmp_only();
+    if (name[0] == '.' &&
+        (strcmp(name, ".text") == 0 || strcmp(name, ".data") == 0 ||
+         strcmp(name, ".rodata") == 0 || strcmp(name, ".bss") == 0))
+    {
+        fprintf(outf(e), "%s\n", name);
+    } else {
+        fprintf(outf(e), ".section %s\n", name);
+    }
+}
+
+static void text_directive(emitter_t *e, const char *line)
+{
+    if (!line) return;
+    bb3c_flush_pending_cjmp_only();
+    fprintf(outf(e), "    %s\n", line);
+}
+
+static void text_data_quad(emitter_t *e, uint64_t val)
+{
+    char buf[40]; snprintf(buf, sizeof(buf), "0x%llx", (unsigned long long)val);
+    bb3c_format(outf(e), "", ".quad", buf);
+}
+
+static void text_data_quad_sym(emitter_t *e, const char *sym)
+{
+    bb3c_format(outf(e), "", ".quad", sym ? sym : "0");
+}
+
+static void text_data_string(emitter_t *e, const char *bytes, size_t len)
+{
+    /* Emit as ".ascii \"...\"" with C-style escaping for non-printable
+     * bytes and the four reserved characters \\ " \n \t. */
+    if (!bytes) return;
+    bb3c_flush_pending_cjmp_only();
+    FILE *f = outf(e);
+    fputs("    .ascii \"", f);
+    for (size_t i = 0; i < len; i++) {
+        unsigned char c = (unsigned char)bytes[i];
+        switch (c) {
+        case '\\': fputs("\\\\", f); break;
+        case '"' : fputs("\\\"", f); break;
+        case '\n': fputs("\\n",  f); break;
+        case '\t': fputs("\\t",  f); break;
+        default:
+            if (c >= 0x20 && c < 0x7f) fputc(c, f);
+            else                       fprintf(f, "\\x%02x", c);
+            break;
+        }
+    }
+    fputs("\"\n", f);
+}
+
+static void text_pad_to_blob_size(emitter_t *e)
+{
+    /* TEXT: no-op (text size is not byte-counted by GAS in any way that
+     * affects the asm output).  Templates may call this freely. */
+    (void)e;
+}
+
+/* ── BB-port primitives (Greek-port semantic labels α/β/γ/ω) ──────────── */
+
+static const char *greek_for_port(char port)
+{
+    /* Accept ASCII a/b/g/o as canonical inputs (templates pass these as
+     * char constants; UTF-8 Greek can't fit in a char anyway).  Map to
+     * the UTF-8 Greek glyphs in the emitted label. */
+    switch (port) {
+    case 'a': return "α";    /* alpha — try */
+    case 'b': return "β";    /* beta — retry */
+    case 'g': return "γ";    /* gamma — succeed */
+    case 'o': return "ω";    /* omega — fail */
+    default:  return "?";
+    }
+}
+
+static void text_bb_port_label(emitter_t *e, const char *box_prefix, char port)
+{
+    char lbuf[256];
+    snprintf(lbuf, sizeof(lbuf), "%s_%s:",
+             box_prefix ? box_prefix : "", greek_for_port(port));
+    bb3c_format(outf(e), lbuf, "", "");
+}
+
+static void text_bb_port_jmp(emitter_t *e, const char *box_prefix, char port)
+{
+    char tbuf[256];
+    snprintf(tbuf, sizeof(tbuf), "%s_%s",
+             box_prefix ? box_prefix : "", greek_for_port(port));
+    bb3c_emit_jmp(outf(e), "jmp", tbuf);
+    CTX(e)->pos += 5;
+}
+
+static void text_bb_box_banner(emitter_t *e, const char *kind, const char *args)
+{
+    /* 120-char minor rule + "    # BOX <kind>(<args>)" line.  The
+     * existing flat_emit_banner_rule shape (sess 2026-05-10
+     * EM-FORMAT-BANNER-COLLAPSE-SPACE) drops the space between # and
+     * the rule character; match it. */
+    bb3c_flush_pending_cjmp_only();
+    FILE *f = outf(e);
+    fputs("#", f);
+    for (int i = 1; i < 120; i++) fputc('-', f);
+    fputc('\n', f);
+    fprintf(f, "    # BOX %s(%s)\n",
+            kind ? kind : "?", args ? args : "");
+}
+
+/* ── formatting / readability ──────────────────────────────────────────── */
+
+static void text_comment(emitter_t *e, const char *text)
+{
+    bb3c_flush_pending_cjmp_only();
+    fprintf(outf(e), "    # %s\n", text ? text : "");
+}
+
+static void text_banner(emitter_t *e, const char *text)
+{
+    bb3c_flush_pending_cjmp_only();
+    FILE *f = outf(e);
+    fputs("#", f);
+    for (int i = 1; i < 120; i++) fputc('=', f);
+    fputc('\n', f);
+    fprintf(f, "    # %s\n", text ? text : "");
+    fputs("#", f);
+    for (int i = 1; i < 120; i++) fputc('=', f);
+    fputc('\n', f);
+}
+
+static void text_minor_break(emitter_t *e, const char *text)
+{
+    bb3c_flush_pending_cjmp_only();
+    FILE *f = outf(e);
+    fputs("#", f);
+    for (int i = 1; i < 120; i++) fputc('-', f);
+    fputc('\n', f);
+    if (text && *text) fprintf(f, "    # %s\n", text);
+}
+
+static void text_blank_line(emitter_t *e)
+{
+    bb3c_flush_pending_cjmp_only();
+    fputc('\n', outf(e));
+}
+
+/* ── macro_def hooks (text-INVOCATION mode: emit macro call + suppress body)
+ *    (text-DEFINITION mode: emit .macro NAME … .endm) ──────────────────── */
+
+/* Body-suppression flag for INVOCATION mode lives in text_ctx_t.suppress.
+ * Extending the context here would require a struct-layout change to
+ * text_ctx_t — for sub-rung -b we keep the suppress flag as a backend-
+ * private static, since this surface has no caller yet.  Sub-rung -c
+ * will revisit if needed (e.g. if SM_HALT's template wants the
+ * INVOCATION+suppress behaviour).  TODO: promote to ctx field if -c
+ * needs per-emitter state. */
+static int g_text_macro_suppress = 0;
+
+static void text_macro_begin(emitter_t *e, const char *name,
+                             const char *const *params, int nparams)
+{
+    bb3c_flush_pending_cjmp_only();
+    FILE *f = outf(e);
+    if (e->text_mode == TEXT_MODE_DEFINITION) {
+        fprintf(f, ".macro %s", name ? name : "?");
+        for (int i = 0; i < nparams; i++) {
+            fprintf(f, " %s", params[i] ? params[i] : "?");
+        }
+        fputc('\n', f);
+    } else {
+        /* INVOCATION mode: emit just the call site, body suppressed. */
+        fprintf(f, "    %s", name ? name : "?");
+        for (int i = 0; i < nparams; i++) {
+            fprintf(f, "%s%s", (i == 0 ? " " : ", "),
+                    params[i] ? params[i] : "?");
+        }
+        fputc('\n', f);
+        g_text_macro_suppress = 1;
+    }
+}
+
+static void text_macro_param_ref(emitter_t *e, const char *name)
+{
+    /* Only meaningful inside a macro body when DEFINITION mode. */
+    if (e->text_mode != TEXT_MODE_DEFINITION) return;
+    fprintf(outf(e), "\\%s", name ? name : "?");
+}
+
+static void text_macro_end(emitter_t *e)
+{
+    if (e->text_mode == TEXT_MODE_DEFINITION) {
+        bb3c_flush_pending_cjmp_only();
+        fputs(".endm\n", outf(e));
+    } else {
+        g_text_macro_suppress = 0;
+    }
+}
+
 /* ── constructor ───────────────────────────────────────────────────────────── */
 static const emitter_t text_tmpl = {
     .emit_insn    = text_emit_insn,
@@ -160,15 +385,41 @@ static const emitter_t text_tmpl = {
     .fprintf_raw  = text_fprintf_raw,
     .pos          = text_pos,
     .intern_str   = NULL,   /* set by bb_build_flat_text when strtab is available */
+    /* EM-MODE4-IS-MODE3-DUMP-b extensions */
+    .label_name       = text_label_name,
+    .pc_label         = text_pc_label,
+    .section          = text_section,
+    .directive        = text_directive,
+    .data_quad        = text_data_quad,
+    .data_quad_sym    = text_data_quad_sym,
+    .data_string      = text_data_string,
+    .pad_to_blob_size = text_pad_to_blob_size,
+    .bb_port_label    = text_bb_port_label,
+    .bb_port_jmp      = text_bb_port_jmp,
+    .bb_box_banner    = text_bb_box_banner,
+    .comment          = text_comment,
+    .banner           = text_banner,
+    .minor_break      = text_minor_break,
+    .blank_line       = text_blank_line,
+    .macro_begin      = text_macro_begin,
+    .macro_param_ref  = text_macro_param_ref,
+    .macro_end        = text_macro_end,
+    .text_mode    = TEXT_MODE_INVOCATION,
     .is_text      = 1,
     .ctx          = NULL,
 };
 
 emitter_t *emitter_text_new(FILE *out)
 {
+    return emitter_text_new_mode(out, TEXT_MODE_INVOCATION);
+}
+
+emitter_t *emitter_text_new_mode(FILE *out, emitter_text_mode_t mode)
+{
     emitter_t *e = malloc(sizeof(emitter_t));
     if (!e) return NULL;
     *e = text_tmpl;
+    e->text_mode = mode;
     text_ctx_t *ctx = calloc(1, sizeof(text_ctx_t));
     if (!ctx) { free(e); return NULL; }
     ctx->out = out; ctx->pos = 0;

@@ -42,6 +42,30 @@ typedef enum {
     JMP_JG,
 } jmp_kind_t;
 
+/* ── EM-MODE4-IS-MODE3-DUMP-b ────────────────────────────────────────────── */
+/*
+ * Text-emitter mode (sess 2026-05-11 sub-rung -b).
+ *
+ * The text backend produces two distinct outputs from the same template
+ * walk:
+ *
+ *   TEXT_MODE_INVOCATION — emit a single macro invocation line per call
+ *                          site, e.g. "PUSH_INT 42".  This is what
+ *                          mode-4's per-call-site `.s` emission uses.
+ *
+ *   TEXT_MODE_DEFINITION — emit the full body of the macro the template
+ *                          describes, e.g. ".macro PUSH_INT v / mov rdi,
+ *                          \\v / call rt_push_int@PLT / .endm".  This is
+ *                          what `sm_macros.s` regeneration uses.
+ *
+ * One boolean flag on the text backend, not a fourth backend.
+ * Defaults to TEXT_MODE_INVOCATION for backward compatibility.
+ */
+typedef enum {
+    TEXT_MODE_INVOCATION = 0,    /* macro invocation per call site (default) */
+    TEXT_MODE_DEFINITION = 1,    /* full macro body for sm_macros.s regen */
+} emitter_text_mode_t;
+
 /* ── instruction kinds ────────────────────────────────────────────────────── */
 /*
  * Every distinct instruction form used by bb_flat.c.  TEXT renders a
@@ -148,9 +172,145 @@ struct emitter_t {
      */
     const char *(*intern_str)(emitter_t *e, const char *s);
 
-    /* is_text — 1 if this is a TEXT emitter, 0 if BINARY.
-     * Callers that need to know the mode at the call site use this flag
-     * rather than comparing function pointers. */
+    /*
+     * ── EM-MODE4-IS-MODE3-DUMP-b surface extensions ──────────────────────
+     *
+     * The methods below are the NEW surface added for SM-side templates.
+     * Per the design doc (MIGRATION-MODE4-IS-MODE3-DUMP.md §"The vtable
+     * surface" and §"Three-call-site discipline"): templates call any of
+     * these freely; each backend implements or no-ops per its semantics.
+     *
+     * Sub-rung -b adds the surface only.  No template calls them yet;
+     * mode-3 and mode-4 still use their pre-existing emission paths.
+     * Sub-rung -c (SM_HALT, the first template) will be the first
+     * caller.
+     *
+     * All pointers may be NULL initially in a backend; callers MUST
+     * tolerate NULL via the EMIT_OPT(...) helper macros below.
+     */
+
+    /* — structural markers — */
+
+    /* label_name — plant a named label at the current position.
+     *   TEXT:   emits "name:\n".
+     *   BINARY: records (name, offset) for later resolution.
+     * Simpler convenience over label_define which takes bb_label_t*. */
+    void (*label_name)     (emitter_t *e, const char *name);
+
+    /* pc_label — plant a ".L<pc>:" label.  Used by SM templates that
+     *   address SM_Program pc directly. */
+    void (*pc_label)       (emitter_t *e, int pc);
+
+    /* section — switch to a named GAS section.
+     *   TEXT:   emits ".section name\n" (or ".text", ".data", ".rodata"
+     *           when name is one of those canonical short forms).
+     *   BINARY: no-op (in-process JIT has one code region). */
+    void (*section)        (emitter_t *e, const char *name);
+
+    /* directive — arbitrary GAS directive line (single line of text).
+     *   TEXT:   emits "    <line>\n" (no column shaping; this is for
+     *           directives like ".align 16" / ".size foo, .-foo").
+     *   BINARY: no-op. */
+    void (*directive)      (emitter_t *e, const char *line);
+
+    /* data_quad — emit ".quad <imm64>".
+     *   TEXT:   emits ".quad 0x...\n" (in current section).
+     *   BINARY: writes 8 bytes at current position. */
+    void (*data_quad)      (emitter_t *e, uint64_t val);
+
+    /* data_quad_sym — emit ".quad <symbol>".
+     *   TEXT:   emits ".quad <sym>\n".
+     *   BINARY: in-process JIT writes the resolved address (zero stub
+     *           if unresolved; caller is expected to use this only in
+     *           text-side aux sections, not SEG_CODE). */
+    void (*data_quad_sym)  (emitter_t *e, const char *sym);
+
+    /* data_string — emit a literal byte string (no null terminator
+     *   added; use the explicit length for control).
+     *   TEXT:   emits ".ascii \"...\"\n" with escaping.
+     *   BINARY: writes the raw bytes at current position. */
+    void (*data_string)    (emitter_t *e, const char *bytes, size_t len);
+
+    /* pad_to_blob_size — pad current emission to the canonical blob size.
+     *   TEXT:   no-op (text size has no fixed-blob constraint).
+     *   BINARY: writes 0x90 (NOP) bytes until alignment is reached. */
+    void (*pad_to_blob_size)(emitter_t *e);
+
+    /* — BB-port primitives (Greek-port semantic labels α/β/γ/ω) — */
+
+    /* bb_port_label — plant a port label for a BB box.
+     *   port ∈ {'a','b','g','o'} (ASCII for α β γ ω in template source).
+     *   TEXT:   emits "<box_prefix>_<greek>:\n".
+     *   BINARY: records offset; patches forward refs. */
+    void (*bb_port_label)  (emitter_t *e, const char *box_prefix, char port);
+
+    /* bb_port_jmp — emit a jump to a port label on a BB box.
+     *   TEXT:   emits "    jmp <box_prefix>_<greek>\n".
+     *   BINARY: opcode + forward-ref patch. */
+    void (*bb_port_jmp)    (emitter_t *e, const char *box_prefix, char port);
+
+    /* bb_box_banner — emit a "# BOX <kind>(<args>) [<prefix>]" banner.
+     *   TEXT:   emits 120-char #---- rule + the banner line.
+     *   BINARY: no-op. */
+    void (*bb_box_banner)  (emitter_t *e, const char *kind, const char *args);
+
+    /* — formatting / readability — */
+
+    /* comment — emit a one-line "# ..." comment.
+     *   TEXT:   emits "# <text>\n".
+     *   BINARY: no-op. */
+    void (*comment)        (emitter_t *e, const char *text);
+
+    /* banner — emit a major "stmt N (line L): ..." style stmt banner.
+     *   TEXT:   emits a 120-char #==== rule + the text + another rule.
+     *   BINARY: no-op. */
+    void (*banner)         (emitter_t *e, const char *text);
+
+    /* minor_break — emit a minor section break within a stmt.
+     *   TEXT:   emits a 120-char #---- rule + the text.
+     *   BINARY: no-op. */
+    void (*minor_break)    (emitter_t *e, const char *text);
+
+    /* blank_line — emit a single blank line.
+     *   TEXT:   emits "\n".
+     *   BINARY: no-op. */
+    void (*blank_line)     (emitter_t *e);
+
+    /* — macro_def-only hooks (binary + text invocation-mode no-op) — */
+
+    /* macro_begin — open a .macro NAME params block.
+     *   macro_def:           emits ".macro NAME p1 p2 ...\n".
+     *   text-invocation:     emits "NAME p1 p2 ..." invocation line and
+     *                        sets a flag so subsequent body emissions are
+     *                        suppressed until macro_end.
+     *   binary:              no-op.
+     */
+    void (*macro_begin)    (emitter_t *e, const char *name,
+                            const char *const *params, int nparams);
+
+    /* macro_param_ref — emit a "\param" reference inside a macro body.
+     *   macro_def:           emits "\<param>".
+     *   text-invocation:     no-op (body suppressed).
+     *   binary:              no-op.
+     */
+    void (*macro_param_ref)(emitter_t *e, const char *name);
+
+    /* macro_end — close a .macro block.
+     *   macro_def:           emits ".endm\n".
+     *   text-invocation:     clears the body-suppression flag.
+     *   binary:              no-op.
+     */
+    void (*macro_end)      (emitter_t *e);
+
+    /* — backend identity / mode — */
+
+    /* text_mode — for text backends, which mode (INVOCATION/DEFINITION).
+     *   Ignored by binary backend. */
+    emitter_text_mode_t text_mode;
+
+    /* is_text — 1 if this is a TEXT-family emitter (text or macro_def),
+     * 0 if BINARY.  Callers that need to know the mode at the call site
+     * use this flag rather than comparing function pointers. */
     int is_text;
 
     void *ctx;
@@ -162,6 +322,33 @@ emitter_t *emitter_text_new  (FILE *out);
 emitter_t *emitter_binary_new(bb_buf_t buf, int size);
 void       emitter_free      (emitter_t *e);
 int        emitter_end       (emitter_t *e);
+
+/* EM-MODE4-IS-MODE3-DUMP-b: text emitter with explicit mode selection.
+ *   emitter_text_new(out) — keeps prior behaviour; uses INVOCATION mode.
+ *   emitter_text_new_mode(out, mode) — explicit INVOCATION or DEFINITION. */
+emitter_t *emitter_text_new_mode(FILE *out, emitter_text_mode_t mode);
+
+/* EM-MODE4-IS-MODE3-DUMP-b: macro-definition backend.  Thin wrapper that
+ * constructs a text emitter in DEFINITION mode, suitable for regenerating
+ * sm_macros.s from per-opcode templates.  See emitter_macro_def.c. */
+emitter_t *emitter_macro_def_new(FILE *out);
+
+/* EM-MODE4-IS-MODE3-DUMP-b: NULL-safe optional-method invoker.
+ *
+ * The EM-MODE4-IS-MODE3-DUMP-b surface is intentionally permissive — a
+ * template may call any vtable method; each backend either implements
+ * or no-ops the call.  During the staged retrofit, a backend may
+ * temporarily leave a pointer NULL.  Use EMIT_OPT to invoke a method
+ * only if non-NULL.
+ *
+ * Usage:
+ *   EMIT_OPT(e, comment,  e, "hello");
+ *   EMIT_OPT(e, data_quad, e, 0x1234);
+ *
+ * For methods that always have a definition in every backend (e.g.
+ * emit_insn, label_define), invoke directly: e->emit_insn(e, &d). */
+#define EMIT_OPT(e, method, ...) \
+    do { if ((e) && (e)->method) (e)->method(__VA_ARGS__); } while (0)
 
 /* EM-FORMAT-BB lone-label fusion (2026-05-09):
  * Returns the FILE* that a TEXT-mode emitter writes to (for callers

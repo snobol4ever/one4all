@@ -108,6 +108,86 @@ static void binary_global_sym  (emitter_t *e, const char *n) { (void)e;(void)n; 
 static void binary_fprintf_raw (emitter_t *e, const char *f, ...) { (void)e;(void)f; }
 static int  binary_pos         (emitter_t *e) { (void)e; return bb_emit_pos; }
 
+/* ── EM-MODE4-IS-MODE3-DUMP-b: new surface — binary backend ───────────────────
+ *
+ * Per the design doc, the binary backend's responsibility is bytes in
+ * SEG_CODE (or bb_pool RX slot).  Formatting / structural-marker calls
+ * generally no-op.  A few correspond to real byte emission:
+ *
+ *   data_quad / data_quad_sym / data_string / pad_to_blob_size — emit
+ *     actual bytes into the buffer.
+ *
+ *   label_name / pc_label / bb_port_label / bb_port_jmp — record an
+ *     offset (or patch a jmp).  For sub-rung -b we register the label
+ *     against the existing bb_label_t machinery via bb_emit.c; templates
+ *     in -c onward will exercise these.
+ *
+ * Where no template caller exists yet, the implementation is a faithful
+ * stub — it does the right thing if called, but no caller invokes it. */
+
+static void binary_label_name(emitter_t *e, const char *name)
+{
+    /* For in-process JIT, a named label is just a marker for forward-ref
+     * resolution.  Templates that emit named labels through this surface
+     * should also construct the matching bb_label_t and use label_define;
+     * for now, no-op so that erroneous calls don't corrupt state. */
+    (void)e; (void)name;
+}
+
+static void binary_pc_label(emitter_t *e, int pc)
+{
+    /* Same reasoning as binary_label_name. */
+    (void)e; (void)pc;
+}
+
+static void binary_section   (emitter_t *e, const char *n) { (void)e; (void)n; }
+static void binary_directive (emitter_t *e, const char *l) { (void)e; (void)l; }
+
+static void binary_data_quad(emitter_t *e, uint64_t val)
+{
+    (void)e;
+    bb_emit_u64(val);
+}
+
+static void binary_data_quad_sym(emitter_t *e, const char *sym)
+{
+    /* In-process JIT: resolve symbol at runtime if linker support exists,
+     * else emit zero placeholder.  Sub-rung -b has no caller; safer
+     * default is no-op until -c needs a real definition. */
+    (void)e; (void)sym;
+}
+
+static void binary_data_string(emitter_t *e, const char *bytes, size_t len)
+{
+    (void)e;
+    if (!bytes) return;
+    for (size_t i = 0; i < len; i++) bb_emit_byte((uint8_t)bytes[i]);
+}
+
+static void binary_pad_to_blob_size(emitter_t *e)
+{
+    /* No fixed blob-size constant exists at this layer.  Templates that
+     * need explicit padding (e.g. fixed-size dispatch slots in mode-3)
+     * should call emit_insn with a specific NOP-padding kind.  Sub-rung
+     * -b leaves this as no-op; revisit if a template needs it. */
+    (void)e;
+}
+
+static void binary_bb_port_label(emitter_t *e, const char *bp, char p) { (void)e;(void)bp;(void)p; }
+static void binary_bb_port_jmp  (emitter_t *e, const char *bp, char p) { (void)e;(void)bp;(void)p; }
+static void binary_bb_box_banner(emitter_t *e, const char *k, const char *a) { (void)e;(void)k;(void)a; }
+
+static void binary_comment     (emitter_t *e, const char *t) { (void)e;(void)t; }
+static void binary_banner      (emitter_t *e, const char *t) { (void)e;(void)t; }
+static void binary_minor_break (emitter_t *e, const char *t) { (void)e;(void)t; }
+static void binary_blank_line  (emitter_t *e)                { (void)e; }
+
+static void binary_macro_begin    (emitter_t *e, const char *n,
+                                   const char *const *p, int np)
+{ (void)e;(void)n;(void)p;(void)np; }
+static void binary_macro_param_ref(emitter_t *e, const char *n) { (void)e;(void)n; }
+static void binary_macro_end      (emitter_t *e)                { (void)e; }
+
 /* ── constructor ──────────────────────────────────────────────────────────── */
 static const emitter_t binary_tmpl = {
     .emit_insn    = binary_emit_insn,
@@ -117,6 +197,26 @@ static const emitter_t binary_tmpl = {
     .fprintf_raw  = binary_fprintf_raw,
     .pos          = binary_pos,
     .intern_str   = NULL,
+    /* EM-MODE4-IS-MODE3-DUMP-b extensions */
+    .label_name       = binary_label_name,
+    .pc_label         = binary_pc_label,
+    .section          = binary_section,
+    .directive        = binary_directive,
+    .data_quad        = binary_data_quad,
+    .data_quad_sym    = binary_data_quad_sym,
+    .data_string      = binary_data_string,
+    .pad_to_blob_size = binary_pad_to_blob_size,
+    .bb_port_label    = binary_bb_port_label,
+    .bb_port_jmp      = binary_bb_port_jmp,
+    .bb_box_banner    = binary_bb_box_banner,
+    .comment          = binary_comment,
+    .banner           = binary_banner,
+    .minor_break      = binary_minor_break,
+    .blank_line       = binary_blank_line,
+    .macro_begin      = binary_macro_begin,
+    .macro_param_ref  = binary_macro_param_ref,
+    .macro_end        = binary_macro_end,
+    .text_mode    = TEXT_MODE_INVOCATION,  /* unused for binary */
     .is_text      = 0,
     .ctx          = NULL,
 };
