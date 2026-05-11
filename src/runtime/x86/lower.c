@@ -144,30 +144,10 @@ void lower_expr(LowerCtx *c, const AST_t *e)
 
 /* ── Public entry point ─────────────────────────────────────────────────── */
 
-SM_Program *lower(const CODE_t *prog)
+static void lower_proc_skeletons(LowerCtx *c)
 {
-    if (!prog) return NULL;
+    SM_Program *p = c->p;
 
-    LowerCtx ctx;
-    ctx.p                        = sm_prog_new();
-    ctx.expression_body_lowering = 0;
-    ctx.expression_scope         = NULL;
-    labtab_init(&ctx.labtab);
-
-    LowerCtx   *c      = &ctx;
-    SM_Program *p      = ctx.p;
-    LabelTable *labtab = &ctx.labtab;
-
-    /* Emit named-expression skeletons for every Icon/Raku proc.
-     *
-     * Each proc body is lowered with expression_body_lowering=1, which
-     * silences "unhandled kind" warnings (proc bodies are currently
-     * unreachable for generator kinds via the SM path) and causes
-     * AST_VAR / AST_ASSIGN to emit SM_LOAD_FRAME / SM_STORE_FRAME for
-     * in-scope names via the per-proc IcnScope built below.
-     *
-     * Slot order matches icn_scope_patch: params first, then
-     * AST_GLOBAL-decl names, then AST_VARs encountered in body order. */
     for (int pi = 0; pi < proc_count; pi++) {
         const char *nm = proc_table[pi].name;
         if (!nm || !*nm) continue;
@@ -188,19 +168,8 @@ SM_Program *lower(const CODE_t *prog)
             for (int bi = body_start; bi < proc->nchildren; bi++)
                 expression_scope_walk(&expression_sc, proc->children[bi]);
 
-            /* GOAL-ICON-BB-COMPLETE: AST_INITIAL once-flag fix (part 2).
-             *
-             * Variables assigned inside `initial { ... }` MUST be stored
-             * in NV (persistent), not frame slots (reset each call).
-             * The expression_scope_walk skip in lower_ctx.c prevented the
-             * init subtree from contributing slots, but a var like `x`
-             * also appears outside the initial block (e.g. `x := x + 1`)
-             * — that outer use added a frame slot.  Remove those names
-             * from expression_sc so all uses route to NV.
-             *
-             * Walk every AST_INITIAL child's AST_ASSIGN LHS; if LHS is an
-             * AST_VAR, remove its name from expression_sc by compacting
-             * the array. */
+            /* AST_INITIAL once-flag fix (part 2): vars assigned inside initial {}
+             * must use NV not frame slots. Remove their names from expression_sc. */
             for (int bi = body_start; bi < proc->nchildren; bi++) {
                 AST_t *child = proc->children[bi];
                 if (!child || child->kind != AST_INITIAL) continue;
@@ -209,19 +178,14 @@ SM_Program *lower(const CODE_t *prog)
                     if (!as || as->kind != AST_ASSIGN || as->nchildren < 1) continue;
                     AST_t *lhs = as->children[0];
                     if (!lhs || lhs->kind != AST_VAR || !lhs->sval) continue;
-                    const char *nm = lhs->sval;
+                    const char *iname = lhs->sval;
                     int w = 0;
                     for (int r = 0; r < expression_sc.n; r++) {
                         if (expression_sc.e[r].name &&
-                            strcmp(expression_sc.e[r].name, nm) == 0)
-                            continue;  /* drop this entry */
+                            strcmp(expression_sc.e[r].name, iname) == 0) continue;
                         if (w != r) expression_sc.e[w] = expression_sc.e[r];
                         w++;
                     }
-                    /* Reassign slot numbers densely so SM_LOAD_FRAME indices
-                     * remain valid (slot field must match position).  Frame
-                     * env_n is set at call time from scope.n, so densifying
-                     * is required. */
                     expression_sc.n = w;
                     for (int s = 0; s < expression_sc.n; s++)
                         expression_sc.e[s].slot = s;
@@ -245,8 +209,7 @@ SM_Program *lower(const CODE_t *prog)
         sm_patch_jump(p, skip_jump, skip_lbl);
     }
 
-    /* Emit named-expression skeletons for every Prolog predicate.
-     * Symmetrical to the Icon/Raku loop; body lowering is deferred. */
+    /* Prolog predicate skeletons: JUMP/label/RETURN stubs for the broker. */
     for (int b = 0; b < PL_PRED_TABLE_SIZE_FWD; b++) {
         for (Pl_PredEntry *e = g_pl_pred_table.buckets[b]; e; e = e->next) {
             if (!e->key || !*e->key) continue;
@@ -257,6 +220,23 @@ SM_Program *lower(const CODE_t *prog)
             sm_patch_jump(p, skip_jump_pl, skip_lbl_pl);
         }
     }
+}
+
+SM_Program *lower(const CODE_t *prog)
+{
+    if (!prog) return NULL;
+
+    LowerCtx ctx;
+    ctx.p                        = sm_prog_new();
+    ctx.expression_body_lowering = 0;
+    ctx.expression_scope         = NULL;
+    labtab_init(&ctx.labtab);
+
+    LowerCtx   *c      = &ctx;
+    SM_Program *p      = ctx.p;
+    LabelTable *labtab = &ctx.labtab;
+
+    lower_proc_skeletons(c);
 
     int stno = 0;
     int has_icn = 0;
@@ -270,7 +250,6 @@ SM_Program *lower(const CODE_t *prog)
         sm_stno_label_record(p, ++stno, (s->label && s->label[0]) ? s->label : NULL);
     }
 
-    /* Icon programs: synthesise top-level main() pump. */
     if (has_icn) sm_emit_si(p, SM_BB_PUMP_PROC, "main", 0);
 
     if (p->count == 0 || p->instrs[p->count - 1].op != SM_HALT)
