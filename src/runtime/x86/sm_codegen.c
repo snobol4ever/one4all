@@ -868,6 +868,38 @@ int me11_exec_stmt(DESCR_t *r12, const char *sn, int64_t has_repl)
     return exec_stmt(sn, &subj, pat, has_repl ? &repl : NULL, (int)has_repl);
 }
 
+/* ME-12 — SM_BB_PUMP / SM_BB_ONCE thin helpers.
+ *
+ * Each pops one DESCR_t (AST_t* in .ptr) and drives the Byrd-box broker.
+ * Mirror of h_bb_pump / h_bb_once in this file; the only difference is
+ * that the inline-blob version takes the DESCR_t by value (passed in
+ * rdi:rsi by the calling blob) instead of popping it from STATE->stack.
+ *
+ * NO r12<->sp sync needed: bb_broker does not touch STATE->stack itself,
+ * and the recursion paths it CAN reach (`_usercall_hook`, bb_eval_value,
+ * bb_exec_stmt) either use a separate nested SM_State (the SM
+ * dispatcher in _usercall_hook) or do not manipulate the SM value
+ * stack at all (coro adapters).  This is the main correctness
+ * difference vs ME-11's SM_EXEC_STMT path: exec_stmt does mutate the
+ * caller's STATE->stack via PUSH(FAILDESCR) etc., so it needs sync;
+ * bb_broker does not.
+ */
+int me12_bb_pump(DESCR_t expr_d) {
+    AST_t *expr = (AST_t *)expr_d.ptr;
+    if (!expr) return 0;
+    bb_node_t node = coro_eval(expr);
+    int ticks = bb_broker(node, BB_PUMP, jit_pump_print, NULL);
+    return ticks > 0;
+}
+
+int me12_bb_once(DESCR_t expr_d) {
+    AST_t *expr = (AST_t *)expr_d.ptr;
+    if (!expr) return 0;
+    bb_node_t node = coro_eval(expr);
+    int ticks = bb_broker(node, BB_ONCE, NULL, NULL);
+    return ticks > 0;
+}
+
 static void h_pat_lit(void)
 {
     PUSH(pat_lit(CUR_INS->a[0].s ? CUR_INS->a[0].s : ""));
@@ -2899,6 +2931,63 @@ static void emit_me11_exec_stmt_blob(const char *sn, int64_t has_repl,
     emit_jmp_trampoline(trampoline_abs_off);                       /* 5 */
 }
 
+/*------------------------------------------------------------------------*/
+/* ME-12 — SM_BB_PUMP / SM_BB_ONCE.                                       */
+/*                                                                        */
+/* Both opcodes share an identical shape: pop one DESCR_t (AST_t* in     */
+/* .ptr), call the runtime helper, write the int result to last_ok.      */
+/* Net stack delta: -1.  Single emitter parameterized by helper fn.      */
+/*                                                                        */
+/* SM_SUSPEND_VALUE intentionally stays on emit_standard_blob fallback   */
+/* (matching the ME-10 precedent for opcodes with conditional stack     */
+/* delta): h_suspend_value's no-coroutine path calls PUSH(v) which       */
+/* mutates STATE->stack, so any inline blob would need the r12<->sp    */
+/* sync protocol — same code size and call shape as standard_blob.     */
+/*                                                                        */
+/* NO r12<->sp sync needed: bb_broker does not touch STATE->stack       */
+/* itself; the _usercall_hook recursion path uses a separate nested    */
+/* SM_State; coro adapters (bb_eval_value / bb_exec_stmt) don't touch  */
+/* STATE->sp.  Contrast ME-11 SM_EXEC_STMT which DOES need sync         */
+/* because exec_stmt mutates the caller's STATE->stack.                */
+/*                                                                        */
+/* Layout (47 bytes):                                                     */
+/*    inc  dword [r13+20]      ; pc++                          4          */
+/*    mov  rdi, [r12-16]       ; arg.lo (DESCR_t v+slen)       5          */
+/*    mov  rsi, [r12-8]        ; arg.hi (DESCR_t union)        5          */
+/*    aligned-call helper      ; returns int in eax           20          */
+/*    sub  r12, 16             ; pop 1 DESCR_t                 4          */
+/*    mov  [r13+16], eax       ; last_ok = result              4          */
+/*    jmp  rel32 trampoline                                    5          */
+/*                                                          = 47          */
+/*------------------------------------------------------------------------*/
+static void emit_me12_bb_blob(void *helper_fn, size_t trampoline_abs_off)
+{
+    /* pc++                            (41 ff 45 14)                4 */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x14);
+
+    /* Load TOS DESCR_t into rdi:rsi (first 16-byte struct arg per SysV ABI) */
+    /* mov rdi, [r12-16]               (49 8b 7c 24 f0)              5 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x7c); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0xf0);
+    /* mov rsi, [r12-8]                (49 8b 74 24 f8)              5 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x74); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0xf8);
+
+    /* aligned call helper (me12_bb_pump or me12_bb_once)            20 */
+    emit_aligned_call_imm64(helper_fn);
+
+    /* sub r12, 16   (pop 1 DESCR_t)   (49 83 ec 10)                 4 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x83);
+    seg_byte(SEG_CODE, 0xec); seg_byte(SEG_CODE, 0x10);
+
+    /* mov [r13+16], eax   (last_ok = result)  (41 89 45 10)         4 */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x10);
+
+    emit_jmp_trampoline(trampoline_abs_off);                       /* 5 */
+}
+
 /* ── Main codegen entry point ─────────────────────────────────────────── */
 
 /*
@@ -3185,6 +3274,15 @@ int sm_codegen(SM_Program *prog)
                 prog->instrs[i].a[0].s,
                 prog->instrs[i].a[1].i,
                 g_trampoline_offset);
+        } else if (op == SM_BB_PUMP || op == SM_BB_ONCE) {
+            /* ME-12: inline-native Byrd-box broker drive.  Pop one DESCR_t
+             * (AST_t* in .ptr), call me12_bb_pump or me12_bb_once which
+             * forwards to coro_eval + bb_broker.  Net delta: -1.
+             * SM_SUSPEND_VALUE stays on emit_standard_blob fallback —
+             * see emit_me12_bb_blob comment for rationale. */
+            void *helper = (op == SM_BB_PUMP) ? (void *)&me12_bb_pump
+                                              : (void *)&me12_bb_once;
+            emit_me12_bb_blob(helper, g_trampoline_offset);
         } else {
             emit_standard_blob(g_handlers[op], g_trampoline_offset);
         }
