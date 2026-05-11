@@ -66,7 +66,7 @@ static int g_flat_slot_count = 0;
  *                           switched the main stream out of `.text`)
  *   flat_intel_syntax()  -> if was deferred just now, no-op (stayed in text)
  *
- * At end of `flat_emit_body_v`: `flat_data_consolidate_flush(e)` emits ONE
+ * At end of `flat_emit_body`: `flat_data_consolidate_flush(e)` emits ONE
  * `.section .data` directive, dumps the buffer, restores `.section .text`
  * and `.intel_syntax noprefix`, then resets state.
  *
@@ -1542,7 +1542,7 @@ static int flat_is_eligible(PATND_t *p)
 }
 
 /* ── shared emission body ─────────────────────────────────────────────────── */
-static int flat_emit_body_v(emitter_t *e, PATND_t *p,
+static int flat_emit_body(emitter_t *e, PATND_t *p,
                             const char *prefix, int text_externalise)
 {
     bb_label_t lbl_α, lbl_α_body, lbl_succ, lbl_fail, lbl_β;
@@ -1634,7 +1634,7 @@ bb_box_fn bb_build_flat(PATND_t *p)
     g_flat_slot_count = 0; g_flat_node_id = 0;
     emitter_t *e = emitter_binary_new(buf, FLAT_BUF_MAX);
     if (!e) { bb_free(buf, FLAT_BUF_MAX); return NULL; }
-    flat_emit_body_v(e, p, "pat_flat", 0);
+    flat_emit_body(e, p, "pat_flat", 0);
     int nbytes = emitter_end(e);
     emitter_free(e);
     if (nbytes <= 0 || nbytes > FLAT_BUF_MAX) { bb_free(buf, FLAT_BUF_MAX); return NULL; }
@@ -1652,7 +1652,7 @@ int bb_build_flat_text(PATND_t *p, FILE *out, const char *prefix)
     emitter_t *e = emitter_text_new(out);
     if (!e) return -1;
     e->intern_str = g_flat_intern_str;  /* wire strtab callback if set */
-    int rc = flat_emit_body_v(e, p, prefix, 1);
+    int rc = flat_emit_body(e, p, prefix, 1);
     emitter_end(e);
     emitter_free(e);
     /* EM-FORMAT-BB lone-label fusion: flush any pending label before returning,

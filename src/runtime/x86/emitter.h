@@ -373,56 +373,21 @@ FILE *emitter_text_file(emitter_t *e);
  *   LABEL:                   ; ACTION           ; GOTO
  *   col 1 (24 wide)          ; col 2 (16 wide)  ; col 3 (free)
  *
- * For TEXT-mode emitters; no-op (well, still routes through fprintf_raw)
- * when called from BB-mode contexts.  The GAS `;` is a statement
- * separator on x86 — empty fields parse as empty statements (legal).
+ * The `ev3c*` family that previously lived here (one base function + three
+ * convenience wrappers) was DELETED in the _v survivors purge (sess
+ * 2026-05-11 final pass), per Lon's fourth-pass directive "Scrap the use
+ * of the character V or v for this concept here. ... Eradicate it from
+ * docs and source. I do not want to see it ever again."  The family
+ * carried the `ev` prefix (emitter-vtable, banned) and two of the four
+ * also carried the `_v` suffix (banned).  Static-analysis at handoff
+ * confirmed zero external callers — pure dead code — so eradication
+ * via deletion is cleaner than rename.
+ *
+ * The bb_flat.c three-column emissions use `bb3c_format` (in bb_emit.c)
+ * directly, with no detour through the deleted family.  If a future
+ * emitter wants generic three-column formatting it should add named
+ * helpers (`emit3c_label`, etc.) to this header at that time.
  */
-
-/* EM-7c-s-file-beautify (2026-05-09): removed the literal `;` separators
- * that the prior PARTIAL rung introduced.  Shape matches SM-side
- * `emit_three_column_line` — one printf format shared across the
- * entire `.s` file. */
-static inline void ev3c(emitter_t *e, const char *lbl, const char *act, const char *got)
-{
-    /* EM-7c-no-trailing-ws (2026-05-09): build + right-trim before write. */
-    char line[768];
-    int n = snprintf(line, sizeof(line), "%-24s%-16s %s",
-                     lbl ? lbl : "", act ? act : "", got ? got : "");
-    if (n < 0) return;
-    if (n >= (int)sizeof(line)) n = (int)sizeof(line) - 1;
-    while (n > 0 && (line[n-1] == ' ' || line[n-1] == '\t')) n--;
-    line[n] = '\0';
-    e->fprintf_raw(e, "%s\n", line);
-}
-
-/* Action-only line (cols 1+3 empty). */
-static inline void ev3c_action_v(emitter_t *e, const char *fmt, ...)
-{
-    char buf[256];
-    va_list ap;
-    va_start(ap, fmt);
-    vsnprintf(buf, sizeof(buf), fmt, ap);
-    va_end(ap);
-    ev3c(e, "", buf, "");
-}
-
-/* Label-only line (cols 2+3 empty); appends `:` to the name. */
-static inline void ev3c_label(emitter_t *e, const char *name)
-{
-    char buf[256]; snprintf(buf, sizeof(buf), "%s:", name);
-    ev3c(e, buf, "", "");
-}
-
-/* Goto-only line (cols 1+2 empty). */
-static inline void ev3c_goto_v(emitter_t *e, const char *fmt, ...)
-{
-    char buf[256];
-    va_list ap;
-    va_start(ap, fmt);
-    vsnprintf(buf, sizeof(buf), fmt, ap);
-    va_end(ap);
-    ev3c(e, "", "", buf);
-}
 
 /* ── inline named helpers — the only API bb_flat.c uses ──────────────────── */
 /*
