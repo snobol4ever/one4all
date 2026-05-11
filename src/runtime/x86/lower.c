@@ -59,6 +59,8 @@ static void init_handlers(void)
     lower_icn_ctrl_register(g_handlers);
     lower_icn_data_register(g_handlers);
     lower_icn_sect_register(g_handlers);
+    lower_icn_gen_register(g_handlers);
+    lower_prolog_register(g_handlers);
     g_handlers_initialized = 1;
 }
 
@@ -121,142 +123,10 @@ void lower_expr(LowerCtx *c, const AST_t *e)
 
     /* AST_MAKELIST, AST_RECORD, AST_FIELD, AST_GLOBAL, AST_INITIAL → lower_icn_data (SR-10) */
 
-    /* ── Generator: integer range lo to hi (step 1) ── */
-    case AST_TO: {
-        /* glocal[0]=lo, glocal[1]=hi, glocal[2]=cur.
-         * Loop: while cur <= hi, yield cur, cur++. */
-        const AST_t *lo_expr = (e->nchildren > 0) ? e->children[0] : NULL;
-        const AST_t *hi_expr = (e->nchildren > 1) ? e->children[1] : NULL;
-        int skip_jump = sm_emit_i(p, SM_JUMP, 0);
-        int entry_pc  = sm_label(p);
-        sm_emit(p, SM_RESUME);
-        if (lo_expr) lower_expr(c, lo_expr); else sm_emit_i(p, SM_PUSH_LIT_I, 0);
-        sm_emit_i(p, SM_STORE_GLOCAL, 0); sm_emit(p, SM_VOID_POP);
-        if (hi_expr) lower_expr(c, hi_expr); else sm_emit_i(p, SM_PUSH_LIT_I, 0);
-        sm_emit_i(p, SM_STORE_GLOCAL, 1); sm_emit(p, SM_VOID_POP);
-        sm_emit_i(p, SM_LOAD_GLOCAL, 0);
-        sm_emit_i(p, SM_STORE_GLOCAL, 2); sm_emit(p, SM_VOID_POP);
-        int loop_pc = sm_label(p);
-        sm_emit_i(p, SM_LOAD_GLOCAL, 2); sm_emit_i(p, SM_LOAD_GLOCAL, 1);
-        sm_emit(p, SM_ICMP_GT);
-        int exit_jump = sm_emit_i(p, SM_JUMP_S, 0);
-        sm_emit_i(p, SM_LOAD_GLOCAL, 2);
-        sm_emit(p, SM_SUSPEND);
-        sm_emit_i(p, SM_LOAD_GLOCAL, 2); sm_emit_i(p, SM_INCR, 1);
-        sm_emit_i(p, SM_STORE_GLOCAL, 2); sm_emit(p, SM_VOID_POP);
-        sm_emit_i(p, SM_JUMP, loop_pc);
-        int exit_pc_here = sm_label(p);
-        sm_patch_jump(p, exit_jump, exit_pc_here);
-        sm_emit(p, SM_PUSH_NULL); sm_emit(p, SM_RETURN);
-        int skip_pc = sm_label(p);
-        sm_patch_jump(p, skip_jump, skip_pc);
-        sm_emit_ii(p, SM_PUSH_EXPRESSION, (int64_t)entry_pc, 0);
-        sm_emit(p, SM_BB_PUMP_SM);
-        return;
-    }
-
-    /* ── Generator: integer range lo to hi by step ── */
-    case AST_TO_BY: {
-        /* glocal[0]=lo, glocal[1]=hi, glocal[2]=cur, glocal[3]=step.
-         * step>0: exit when cur>hi; step<0: exit when cur<hi. */
-        const AST_t *lo_expr   = (e->nchildren > 0) ? e->children[0] : NULL;
-        const AST_t *hi_expr   = (e->nchildren > 1) ? e->children[1] : NULL;
-        const AST_t *step_expr = (e->nchildren > 2) ? e->children[2] : NULL;
-        int skip_jump = sm_emit_i(p, SM_JUMP, 0);
-        int entry_pc  = sm_label(p);
-        sm_emit(p, SM_RESUME);
-        if (lo_expr) lower_expr(c, lo_expr); else sm_emit_i(p, SM_PUSH_LIT_I, 0);
-        sm_emit_i(p, SM_STORE_GLOCAL, 0); sm_emit(p, SM_VOID_POP);
-        if (hi_expr) lower_expr(c, hi_expr); else sm_emit_i(p, SM_PUSH_LIT_I, 0);
-        sm_emit_i(p, SM_STORE_GLOCAL, 1); sm_emit(p, SM_VOID_POP);
-        if (step_expr) lower_expr(c, step_expr); else sm_emit_i(p, SM_PUSH_LIT_I, 1);
-        sm_emit_i(p, SM_STORE_GLOCAL, 3); sm_emit(p, SM_VOID_POP);
-        sm_emit_i(p, SM_LOAD_GLOCAL, 0);
-        sm_emit_i(p, SM_STORE_GLOCAL, 2); sm_emit(p, SM_VOID_POP);
-        int loop_pc = sm_label(p);
-        sm_emit_i(p, SM_LOAD_GLOCAL, 3); sm_emit_i(p, SM_PUSH_LIT_I, 0);
-        sm_emit(p, SM_ICMP_LT);
-        int neg_branch = sm_emit_i(p, SM_JUMP_S, 0);
-        sm_emit_i(p, SM_LOAD_GLOCAL, 2); sm_emit_i(p, SM_LOAD_GLOCAL, 1);
-        sm_emit(p, SM_ICMP_GT);
-        int exit_jump_pos = sm_emit_i(p, SM_JUMP_S, 0);
-        int body_jump = sm_emit_i(p, SM_JUMP, 0);
-        int neg_pc = sm_label(p);
-        sm_patch_jump(p, neg_branch, neg_pc);
-        sm_emit_i(p, SM_LOAD_GLOCAL, 2); sm_emit_i(p, SM_LOAD_GLOCAL, 1);
-        sm_emit(p, SM_ICMP_LT);
-        int exit_jump_neg = sm_emit_i(p, SM_JUMP_S, 0);
-        int body_pc = sm_label(p);
-        sm_patch_jump(p, body_jump, body_pc);
-        sm_emit_i(p, SM_LOAD_GLOCAL, 2);
-        sm_emit(p, SM_SUSPEND);
-        sm_emit_i(p, SM_LOAD_GLOCAL, 2); sm_emit_i(p, SM_LOAD_GLOCAL, 3);
-        sm_emit(p, SM_ADD);
-        sm_emit_i(p, SM_STORE_GLOCAL, 2); sm_emit(p, SM_VOID_POP);
-        sm_emit_i(p, SM_JUMP, loop_pc);
-        int exit_pc_here = sm_label(p);
-        sm_patch_jump(p, exit_jump_pos, exit_pc_here);
-        sm_patch_jump(p, exit_jump_neg, exit_pc_here);
-        sm_emit(p, SM_PUSH_NULL); sm_emit(p, SM_RETURN);
-        int skip_pc = sm_label(p);
-        sm_patch_jump(p, skip_jump, skip_pc);
-        sm_emit_ii(p, SM_PUSH_EXPRESSION, (int64_t)entry_pc, 0);
-        sm_emit(p, SM_BB_PUMP_SM);
-        return;
-    }
-
-    case AST_EVERY: {
-        int every_id = every_table_register((AST_t *)e);
-        sm_emit_i(p, SM_BB_PUMP_EVERY, (int64_t)every_id);
-        return;
-    }
-
-    case AST_SUSPEND: {
-        /* Yield value expression; run optional do-clause on resume.
-         * If value fails, skip yield+do-clause and leave failed descriptor on stack.
-         * On success, push NULVCL so the outer proc-body SM_VOID_POP balances. */
-        if (e->nchildren > 0 && e->children[0]) lower_expr(c, e->children[0]);
-        else sm_emit(p, SM_PUSH_NULL);
-        int j_end = sm_emit_i(p, SM_JUMP_F, 0);
-        sm_emit(p, SM_SUSPEND_VALUE);
-        if (e->nchildren > 1 && e->children[1]) {
-            lower_expr(c, e->children[1]);
-            sm_emit(p, SM_VOID_POP);
-        }
-        sm_emit(p, SM_PUSH_NULL);
-        int j_done = sm_emit_i(p, SM_JUMP, 0);
-        int lbl_end = sm_label(p);
-        sm_patch_jump(p, j_end, lbl_end);
-        int lbl_finally = sm_label(p);
-        sm_patch_jump(p, j_done, lbl_finally);
-        return;
-    }
-
-    /* AST_LCONCAT → lower_icn_cset (SR-9) */
-    /* AST_BANG_BINARY, AST_SECTION/PLUS/MINUS → lower_icn_sect (SR-10) */
-    /* AST_ITERATE, AST_ALTERNATE, AST_LIMIT → lower_icn_gen (SR-11) */
-/* ── Prolog backtracking nodes ── */
-    case AST_CHOICE:
-        if (e->sval) {
-            const char *key = e->sval;
-            int arity = 0;
-            const char *sl = strrchr(key, '/');
-            if (sl) arity = atoi(sl + 1);
-            sm_emit_si(p, SM_BB_ONCE_PROC, key, (int64_t)arity);
-        } else {
-            emit_push_expr(c, e);
-            sm_emit(p, SM_BB_ONCE);
-        }
-        return;
-    case AST_CLAUSE:
-    case AST_CUT:
-    case AST_UNIFY:
-    case AST_TRAIL_MARK:
-    case AST_TRAIL_UNWIND:
-        /* Children of AST_CHOICE walked by the broker; rarely lowered standalone. */
-        emit_push_expr(c, e);
-        sm_emit(p, SM_BB_ONCE);
-        return;
+    /* AST_TO, AST_TO_BY, AST_EVERY, AST_SUSPEND,
+     * AST_ITERATE, AST_ALTERNATE, AST_LIMIT → lower_icn_gen (SR-11) */
+    /* AST_CHOICE, AST_CLAUSE, AST_CUT, AST_UNIFY,
+     * AST_TRAIL_MARK, AST_TRAIL_UNWIND → lower_prolog (SR-11) */
 
     /* AST_CASE → lower_icn_ctrl (SR-10) */
 

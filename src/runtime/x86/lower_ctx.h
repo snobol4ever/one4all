@@ -149,6 +149,8 @@ void lower_icn_unary_register(LowerHandler tbl[AST_KIND_COUNT]);
 void lower_icn_ctrl_register (LowerHandler tbl[AST_KIND_COUNT]);
 void lower_icn_data_register (LowerHandler tbl[AST_KIND_COUNT]);
 void lower_icn_sect_register (LowerHandler tbl[AST_KIND_COUNT]);
+void lower_icn_gen_register  (LowerHandler tbl[AST_KIND_COUNT]);
+void lower_prolog_register   (LowerHandler tbl[AST_KIND_COUNT]);
 
 #include "../common/ast_clone.h"   /* ast_gc_clone — used by emit_push_expr */
 
