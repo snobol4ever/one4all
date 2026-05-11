@@ -855,6 +855,19 @@ DESCR_t me10_pat_usercall(const char *fname) {
     return pat_user_call(fname ? fname : "", NULL, 0);
 }
 
+/* ME-11 — SM_EXEC_STMT thin helper.
+ * Called from native blob with r12 (TOS pointer, past top), baked sn, baked has_repl.
+ * Stack layout (top-to-bottom): repl=[r12-16], subj=[r12-32], pat=[r12-48].
+ * Calls exec_stmt; returns ok (1=success, 0=fail).
+ * The blob pops 3 slots (sub r12, 48) and writes eax to STATE->last_ok. */
+int me11_exec_stmt(DESCR_t *r12, const char *sn, int64_t has_repl)
+{
+    DESCR_t repl = r12[-1];    /* TOS   — replacement or INTVAL(0) */
+    DESCR_t subj = r12[-2];    /* TOS-1 — subject descriptor        */
+    DESCR_t pat  = r12[-3];    /* TOS-2 — pattern (DT_P)            */
+    return exec_stmt(sn, &subj, pat, has_repl ? &repl : NULL, (int)has_repl);
+}
+
 static void h_pat_lit(void)
 {
     PUSH(pat_lit(CUR_INS->a[0].s ? CUR_INS->a[0].s : ""));
@@ -2786,6 +2799,106 @@ static void emit_me10_pat_capture_fn_blob(const char *fname, int64_t is_imm,
     emit_jmp_trampoline(trampoline_abs_off);                       /* 5 */
 }
 
+/*------------------------------------------------------------------------*/
+/* ME-11 — SM_EXEC_STMT.                                                  */
+/*                                                                        */
+/* Stack (top-to-bottom at entry): repl, subj, pat (3 DESCR_t = 48 B).  */
+/* Pass r12 (TOS ptr) + baked sn + baked has_repl to me11_exec_stmt;     */
+/* helper reads the 3 slots, calls exec_stmt, returns ok (int in eax).   */
+/*                                                                        */
+/* CRITICAL: exec_stmt can recurse into the SM interpreter via            */
+/* _usercall_hook (pattern *func() calls), capture-fn callbacks, etc.    */
+/* Those downstream paths read/write STATE->stack via STATE->sp.  We    */
+/* MUST sync r12 → sp BEFORE the call so they see the current TOS,      */
+/* and sync sp → r12 AFTER (recursion is balanced so sp_out == sp_in,   */
+/* but defensively reload anyway).  The sp→r12 sync clobbers rax, so   */
+/* the return value (eax) must be saved into r11 first; r11 is C-ABI    */
+/* scratch and unused by sm-blob land.  Then pop 3 slots (sub r12, 48). */
+/*                                                                        */
+/* Layout (~93 bytes):                                                    */
+/*    inc  dword [r13+20]          ; pc++                     4          */
+/*    -- sync r12 → sp --                                    15          */
+/*    mov  rdi, r12                ; arg1 = TOS ptr            3          */
+/*    mov  rsi, imm64(sn)          ; arg2 = subject name      10          */
+/*    mov  rdx, imm64(has_repl)    ; arg3 = has_repl flag     10          */
+/*    aligned-call me11_exec_stmt                             20          */
+/*    mov  r11d, eax               ; save return val          3          */
+/*    -- sync sp → r12 --                                    15          */
+/*    sub  r12, 48                 ; pop 3 slots               4          */
+/*    mov  [r13+16], r11d          ; last_ok = saved result    4          */
+/*    jmp  rel32 trampoline                                    5          */
+/*                                                          = 93          */
+/*------------------------------------------------------------------------*/
+static void emit_me11_exec_stmt_blob(const char *sn, int64_t has_repl,
+                                     size_t trampoline_abs_off)
+{
+    /* pc++                                    (41 ff 45 14)           4 */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x14);
+
+    /* ── sync r12 → st->sp ────────────────────────────────────────── 15
+     *   mov rax, r12            (4c 89 e0)       3 bytes
+     *   sub rax, [r13]          (49 2b 45 00)    4 bytes
+     *   sar rax, 4              (48 c1 f8 04)    4 bytes
+     *   mov [r13+8], eax        (41 89 45 08)    4 bytes
+     */
+    seg_byte(SEG_CODE, 0x4c); seg_byte(SEG_CODE, 0x89); seg_byte(SEG_CODE, 0xe0);
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x2b);
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x00);
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xc1);
+    seg_byte(SEG_CODE, 0xf8); seg_byte(SEG_CODE, 0x04);
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x08);
+
+    /* mov rdi, r12                            (4c 89 e7)              3 */
+    seg_byte(SEG_CODE, 0x4c); seg_byte(SEG_CODE, 0x89); seg_byte(SEG_CODE, 0xe7);
+
+    /* mov rsi, imm64(sn)                      (48 be <imm64>)        10 */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xbe);
+    seg_u64(SEG_CODE, (uint64_t)(uintptr_t)sn);
+
+    /* mov rdx, imm64(has_repl)                (48 ba <imm64>)        10 */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xba);
+    seg_u64(SEG_CODE, (uint64_t)has_repl);
+
+    /* aligned call me11_exec_stmt                                     20 */
+    emit_aligned_call_imm64((void *)&me11_exec_stmt);
+
+    /* Save return value (eax) in r11 before sp→r12 sync clobbers rax.
+     * r11 is C-ABI scratch (caller-saved) — not used by sm-blob land.
+     *   mov r11d, eax                          (41 89 c3)              3 */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x89); seg_byte(SEG_CODE, 0xc3);
+
+    /* ── sync st->sp → r12 ────────────────────────────────────────── 15
+     *   mov eax, [r13+8]        (41 8b 45 08)    4 bytes
+     *   shl rax, 4              (48 c1 e0 04)    4 bytes
+     *   add rax, [r13]          (49 03 45 00)    4 bytes
+     *   mov r12, rax            (49 89 c4)       3 bytes
+     *
+     * Defensive reload — exec_stmt's recursion is balanced (sp_in ==
+     * sp_out) so this normally re-derives the pre-call r12, but any
+     * future change to balance discipline would silently corrupt r12
+     * without this reload.
+     */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x08);
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xc1);
+    seg_byte(SEG_CODE, 0xe0); seg_byte(SEG_CODE, 0x04);
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x03);
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x00);
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89); seg_byte(SEG_CODE, 0xc4);
+
+    /* sub r12, 48   (pop 3 DESCR_t slots)     (49 83 ec 30)           4 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x83);
+    seg_byte(SEG_CODE, 0xec); seg_byte(SEG_CODE, 0x30);
+
+    /* mov [r13+16], r11d   (last_ok = saved result) (45 89 5d 10)     4 */
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x5d); seg_byte(SEG_CODE, 0x10);
+
+    emit_jmp_trampoline(trampoline_abs_off);                       /* 5 */
+}
+
 /* ── Main codegen entry point ─────────────────────────────────────────── */
 
 /*
@@ -3062,6 +3175,16 @@ int sm_codegen(SM_Program *prog)
             default: break;
             }
             emit_me9_pat_nullary_blob(rt_fn, g_trampoline_offset);
+        } else if (op == SM_EXEC_STMT) {
+            /* ME-11: inline-native statement execution boundary.
+             * Pop pat (TOS-2), subj (TOS-1), repl (TOS) from r12 stack;
+             * bake sn (a[0].s) and has_repl (a[1].i) as imm64 args;
+             * call me11_exec_stmt which forwards to exec_stmt.
+             * Net delta: -3 (pop 3 DESCR_t slots). */
+            emit_me11_exec_stmt_blob(
+                prog->instrs[i].a[0].s,
+                prog->instrs[i].a[1].i,
+                g_trampoline_offset);
         } else {
             emit_standard_blob(g_handlers[op], g_trampoline_offset);
         }
