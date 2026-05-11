@@ -1082,12 +1082,71 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
     }
 
     /* ── augmented assignment (+=, -=, ||=, etc.) ──────────────────────── */
-    case AST_AUGOP:
-        lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
-        lower_expr(p, lt, e->nchildren > 1 ? e->children[1] : NULL);
-        sm_emit_i(p, SM_PUSH_LIT_I, (int64_t)(e->ival));  /* operator token */
+    case AST_AUGOP: {
+        /* Inline lowering for simple lhs (AST_VAR local/global, AST_KEYWORD).
+         * Pattern: load lhs value, push rhs, emit SM arithmetic/compare op,
+         * store result back to lhs slot.  Falls through to AUGOP call for
+         * computed lhs (subscripts, field access, etc.).
+         * op = e->ival (IcnTkKind token from icon_lex.h). */
+        const AST_t *lhs = e->nchildren > 0 ? e->children[0] : NULL;
+        const AST_t *rhs = e->nchildren > 1 ? e->children[1] : NULL;
+        int op = (int)e->ival;
+
+        /* Determine lhs slot / name for writeback */
+        int lhs_slot  = -1;
+        const char *lhs_name = NULL;
+        int lhs_is_kw = 0;
+        if (lhs && lhs->kind == AST_VAR && lhs->sval) {
+            const char *vn = lhs->sval;
+            if (g_expression_body_lowering && g_expression_scope && vn[0] && vn[0] != '&') {
+                lhs_slot = scope_get(g_expression_scope, vn);
+            }
+            if (lhs_slot < 0) lhs_name = vn;  /* NV store */
+        } else if (lhs && lhs->kind == AST_KEYWORD && lhs->sval) {
+            lhs_name = lhs->sval;
+            lhs_is_kw = 1;
+        }
+
+        if (lhs_slot >= 0 || lhs_name) {
+            /* Load lhs value */
+            if (lhs_slot >= 0)    sm_emit_i(p, SM_LOAD_FRAME, lhs_slot);
+            else if (lhs_is_kw) { char ku[64]; int ki=0;
+                while (lhs_name[ki]&&ki<63){ku[ki]=(char)toupper((unsigned char)lhs_name[ki]);ki++;}
+                ku[ki]='\0'; sm_emit_s(p, SM_PUSH_VAR, ku); }
+            else                  sm_emit_s(p, SM_PUSH_VAR, lhs_name);
+            /* Push rhs */
+            lower_expr(p, lt, rhs);
+            /* Emit operator */
+            #include "../../frontend/icon/icon_lex.h"  /* IcnTkKind */
+            switch (op) {
+            case TK_AUGPLUS:   sm_emit(p, SM_ADD);    break;
+            case TK_AUGMINUS:  sm_emit(p, SM_SUB);    break;
+            case TK_AUGSTAR:   sm_emit(p, SM_MUL);    break;
+            case TK_AUGSLASH:  sm_emit(p, SM_DIV);    break;
+            case TK_AUGMOD:    sm_emit(p, SM_MOD);    break;
+            case TK_AUGCONCAT: sm_emit(p, SM_CONCAT); break;
+            default:
+                /* Unsupported augop — fall back to INVOKE; stack is lhs,rhs;
+                 * push op token and delegate (no writeback for rare ops). */
+                sm_emit_i(p, SM_PUSH_LIT_I, (int64_t)op);
+                sm_emit_si(p, SM_CALL_FN, "AUGOP", 3);
+                return;
+            }
+            /* Store result back to lhs (value stays on stack per AST_ASSIGN discipline) */
+            if (lhs_slot >= 0)  sm_emit_i(p, SM_STORE_FRAME, lhs_slot);
+            else if (lhs_is_kw) { char ku[64]; int ki=0;
+                while (lhs_name[ki]&&ki<63){ku[ki]=(char)toupper((unsigned char)lhs_name[ki]);ki++;}
+                ku[ki]='\0'; sm_emit_s(p, SM_STORE_VAR, ku); }
+            else                sm_emit_s(p, SM_STORE_VAR, lhs_name);
+            return;
+        }
+        /* Complex lhs — fall back to AUGOP call */
+        lower_expr(p, lt, lhs);
+        lower_expr(p, lt, rhs);
+        sm_emit_i(p, SM_PUSH_LIT_I, (int64_t)op);
         sm_emit_si(p, SM_CALL_FN, "AUGOP", 3);
         return;
+    }
 
     /* ── string/list size *e ────────────────────────────────────────────── */
     case AST_SIZE:
