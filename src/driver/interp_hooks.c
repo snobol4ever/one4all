@@ -268,36 +268,34 @@ DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
 }
 
 
-/* ── ir_print_stmt — print one STMT_t as IR sexp for comparison sweep ──────
- * Emits: (STMT [:lbl L] [:subj EXPR] [:pat EXPR] [:repl EXPR] [:go*])
- * Used by --dump-ir and --dump-ir-bison.
- * ir_print_node() is from src/ast/ast_print.c — linked via Makefile.
- * ----------------------------------------------------------------------- */
-static void ir_print_stmt(STMT_t *st, FILE *f) {
-    fprintf(f, "(STMT");
-    if (st->label)       fprintf(f, " :lbl %s", st->label);
-    if (st->has_eq)      fprintf(f, " :eq");
-    if (st->is_end)      fprintf(f, " :end");
-    if (st->subject)   { fprintf(f, " :subj ");  ir_print_node(st->subject,     f); }
-    if (st->pattern)   { fprintf(f, " :pat ");   ir_print_node(st->pattern,     f); }
-    if (st->replacement){fprintf(f, " :repl ");  ir_print_node(st->replacement, f); }
-    if (st->goto_u || st->goto_u_expr || st->goto_s || st->goto_s_expr || st->goto_f || st->goto_f_expr) {
-        /* RS-1: goto fields now flat in STMT_t */
-        if (st->goto_u)     fprintf(f, " :go %s",  st->goto_u);
-        if (st->goto_s)     fprintf(f, " :goS %s", st->goto_s);
-        if (st->goto_f)     fprintf(f, " :goF %s", st->goto_f);
-        if (st->goto_u_expr){ fprintf(f, " :go $(");  ir_print_node(st->goto_u_expr, f); fprintf(f, ")"); }
-        if (st->goto_s_expr){ fprintf(f, " :goS $("); ir_print_node(st->goto_s_expr, f); fprintf(f, ")"); }
-        if (st->goto_f_expr){ fprintf(f, " :goF $("); ir_print_node(st->goto_f_expr, f); fprintf(f, ")"); }
-    }
-    fprintf(f, ")\n");
-}
-
-/* Dump a full CODE_t* as IR sexp — one line per statement. */
-void ir_dump_program(CODE_t *prog, FILE *f) {
+/* ── ir_dump_program — print AST_PROGRAM as IR sexp — one line per statement.
+ * SI-6: walks AST_PROGRAM children, reads fields via stmt_attr_find.
+ * Accepts CODE_t* for --dump-ir-bison (callers pass sno_parse_ast CODE_t as AST*). */
+void ir_dump_program(const AST_t *prog, FILE *f) {
     if (!prog) { fprintf(f, "(NULL-PROGRAM)\n"); return; }
-    for (STMT_t *st = prog->head; st; st = st->next)
-        ir_print_stmt(st, f);
+    for (int i = 0; i < prog->nchildren; i++) {
+        const AST_t *s = prog->children[i];
+        if (!s) continue;
+        fprintf(f, "(STMT");
+        const char *lbl  = stmt_attr_str(stmt_attr_find(s, ":lbl"));
+        int has_eq = stmt_attr_find(s, ":eq") != NULL;
+        if (lbl)         fprintf(f, " :lbl %s", lbl);
+        if (has_eq)      fprintf(f, " :eq");
+        if (s->kind == AST_END) fprintf(f, " :end");
+        AST_t *subj = stmt_attr_expr(stmt_attr_find(s, ":subj"));
+        AST_t *pat  = stmt_attr_expr(stmt_attr_find(s, ":pat"));
+        AST_t *repl = stmt_attr_expr(stmt_attr_find(s, ":repl"));
+        if (subj) { fprintf(f, " :subj "); ir_print_node(subj, f); }
+        if (pat)  { fprintf(f, " :pat ");  ir_print_node(pat, f);  }
+        if (repl) { fprintf(f, " :repl "); ir_print_node(repl, f); }
+        const char *go  = stmt_attr_str(stmt_attr_find(s, ":go"));
+        const char *goS = stmt_attr_str(stmt_attr_find(s, ":goS"));
+        const char *goF = stmt_attr_str(stmt_attr_find(s, ":goF"));
+        if (go)  fprintf(f, " :go %s",  go);
+        if (goS) fprintf(f, " :goS %s", goS);
+        if (goF) fprintf(f, " :goF %s", goF);
+        fprintf(f, ")\n");
+    }
 }
 
 /* ── S-10 fix: IDENT/DIFFER wrappers for register_fn ──────────────────────

@@ -13,10 +13,9 @@
 #include <setjmp.h>
 #include "scrip_sm.h"
 #include "../runtime/x86/lower.h"
-#include "../frontend/snobol4/scrip_cc.h"  /* SI-3: code_to_ast() shim */
+#include "../frontend/snobol4/scrip_cc.h"  /* AST_t types */
 #include "../runtime/x86/sm_prog.h"           /* CH-17a: sm_label_pc_lookup */
 #include "../runtime/x86/sm_codegen.h"        /* sm_jit_unwind_call_stack */
-#include "../runtime/common/ast_clone.h"
 #include "../runtime/interp/coro_runtime.h"   /* CH-17a: proc_table */
 #include "../runtime/interp/pl_runtime.h"     /* CH-17a: g_pl_pred_table */
 #include "interp_private.h"   /* label_table_build, prescan_defines, label_table_clear_stmts */
@@ -71,14 +70,10 @@ static void sm_resolve_proc_entry_pcs(SM_Program *p)
 }
 
 /* CH-17g-irrun-lowers: lower prog to SM, resolve entry_pcs, discard SM.
- * Called by polyglot_execute when g_irrun_lowers is set, after polyglot_init
- * has already populated proc_table / g_pl_pred_table.  The SM_Program is
- * freed immediately — we only wanted the label table it built.  The IR is
- * NOT freed (polyglot_execute's BB engine needs it alive). */
-void sm_resolve_irrun_entry_pcs(void *prog_void)
+ * Called by polyglot_execute when g_irrun_lowers is set. */
+void sm_resolve_irrun_entry_pcs(const AST_t *ast_prog)
 {
-    CODE_t *prog = (CODE_t *)prog_void;
-    SM_Program *sm = lower(code_to_ast(prog));
+    SM_Program *sm = lower(ast_prog);
     if (!sm) {
         fprintf(stderr, "scrip: sm_lower failed in irrun-lowers\n");
         return;
@@ -87,26 +82,18 @@ void sm_resolve_irrun_entry_pcs(void *prog_void)
     sm_prog_free(sm);
 }
 
-SM_Program *sm_preamble(void *prog_void, void *ast_prog_void){
-    CODE_t *prog = (CODE_t *)prog_void;
-    AST_t  *ast_prog = (AST_t *)ast_prog_void;
-    label_table_build(prog);
-    prescan_defines(prog);
+SM_Program *sm_preamble(const AST_t *ast_prog){
+    label_table_build(ast_prog);
+    prescan_defines(ast_prog);
     g_sno_err_active = 1;   /* arm so sno_runtime_error longjmps safely */
 
     /* RS-26: symmetric preamble — populate proc_table (Icon/Raku) and
-     * g_pl_pred_table (Prolog) from the live IR.  For pure-SNO programs the
-     * lang_mask is just (1<<LANG_SNO) and the per-language init branches
-     * inside polyglot_init are guarded — adds no observable behaviour for
-     * SNOBOL4.  For Icon/Prolog this is what makes coro_call /
-     * pl_pred_table_lookup find their targets when SM_BB_PUMP / SM_BB_ONCE
-     * fires inside sm_interp_run. */
-    uint32_t lang_mask = polyglot_lang_mask(prog);
-    polyglot_init(prog, lang_mask);
+     * g_pl_pred_table (Prolog) from the live IR. */
+    uint32_t lang_mask = polyglot_lang_mask(ast_prog);
+    polyglot_init(ast_prog, lang_mask);
 
-    /* SI-4: prefer the pre-built ast_prog when present; fall back to
-     * code_to_ast(prog) for paths not yet migrated (Icon/Prolog/etc.). */
-    SM_Program *sm = lower(ast_prog ? ast_prog : code_to_ast(prog));
+    /* SI-6: lower takes AST_PROGRAM directly — no code_to_ast fallback. */
+    SM_Program *sm = lower(ast_prog);
     if (!sm) {
         fprintf(stderr, "scrip: sm_lower failed\n");
         return NULL;
@@ -130,10 +117,7 @@ SM_Program *sm_preamble(void *prog_void, void *ast_prog_void){
      * RS-9c: g_current_sm_prog must be set so _usercall_hook detects SM
      * bodies, regardless of whether IR is freed. */
     g_current_sm_prog = sm;
-    if (lang_mask == (1u << LANG_SNO)) {
-        code_free(prog);
-        label_table_clear_stmts();
-    }
+    /* SI-6: CODE_t is gone; AST_t nodes are GC-managed — no code_free needed. */
     return sm;
 }
 

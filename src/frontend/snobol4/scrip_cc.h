@@ -74,65 +74,49 @@
 #define LANG_REB   5   /* Rebus   */
 
 /* ---- statement ---- */
+/* SI-6 NOTE: STMT_t/CODE_t still used by snocone/prolog/raku/rebus frontends
+ * internally; full deletion deferred to SI-7 when those frontends emit AST directly. */
 typedef struct STMT_t STMT_t;
 struct STMT_t {
     char    *label;
     AST_t  *subject;
     AST_t  *pattern;
     AST_t  *replacement;
-    /* goto fields (RS-1): flattened; set from parser goto_label_expr results */
-    char    *goto_s;              /* :S(label) — on success */
-    char    *goto_f;              /* :F(label) — on failure */
-    char    *goto_u;              /* :(label)  — unconditional */
-    AST_t  *goto_s_expr;         /* :S(expr)  — computed success */
-    AST_t  *goto_f_expr;         /* :F(expr)  — computed failure */
-    AST_t  *goto_u_expr;         /* :(expr)   — computed unconditional */
-    int      lineno;
-    int      stno;    /* SN-26-bridge-coverage-j: source-statement number,
-                         1-based, sequential, including blank statements.
-                         Used as &STNO and emitted as MWK_LABEL payload.
-                         Must be set at parse time so backward gotos
-                         report the correct source stno (not a linear
-                         execution counter). */
-    int      is_end;
-    int      has_eq;
-    int      lang;    /* LANG_SNO / LANG_ICN / LANG_PL / LANG_RAKU / LANG_SCRIP / LANG_REB (U-12) */
+    char    *goto_s, *goto_f, *goto_u;
+    AST_t  *goto_s_expr, *goto_f_expr, *goto_u_expr;
+    int      lineno, stno, is_end, has_eq, lang;
     STMT_t  *next;
 };
 
 /* ---- program ---- */
-/* ---- EXPORT / IMPORT lists (linker sprint LP-4) ---- */
-
 typedef struct ExportEntry {
-    char              *name;   /* exported symbol name, e.g. "WORDCOUNT" */
+    char              *name;
     struct ExportEntry *next;
 } ExportEntry;
 
 typedef struct ImportEntry {
-    char              *lang;   /* source language prefix, e.g. "SNOBOL4"  */
-    char              *name;   /* assembly base name,     e.g. "Greet_lib" */
-    char              *method; /* exported method name,   e.g. "GREET"     */
+    char              *lang;
+    char              *name;
+    char              *method;
     struct ImportEntry *next;
 } ImportEntry;
 
-typedef struct {
+/* SI-6: CODE_t_opaque body defined here; still used by snocone/prolog/raku/rebus
+ * frontends internally. sm_preamble/execute_program no longer receive CODE_t. */
+struct CODE_t_opaque {
     STMT_t      *head;
     STMT_t      *tail;
     int          nstmts;
-    ExportEntry *exports;   /* singly-linked list of EXPORT directives */
-    ImportEntry *imports;   /* singly-linked list of IMPORT directives */
-} CODE_t;
-
-/* CODE_t — the IR for a list of statements (what CODE operates on).
- * AST_t is the IR for one expression (what EVAL operates on).
- * See eval_code.c: eval_expr / code / exec_code.
- */
+    ExportEntry *exports;
+    ImportEntry *imports;
+};
+typedef struct CODE_t_opaque CODE_t;
 
 /* ---- allocators ---- */
 static inline AST_t *expr_new(AST_e k) {
     AST_t *e = calloc(1, sizeof *e); e->kind = k; return e;
 }
-static inline STMT_t  *stmt_new(void)  { return calloc(1, sizeof(STMT_t)); }
+static inline STMT_t *stmt_new(void) { return calloc(1, sizeof(STMT_t)); }
 
 /* Append one child — the only way to grow a node's children array. */
 static inline void expr_add_child(AST_t *e, AST_t *child) {
@@ -169,6 +153,7 @@ CODE_t *sno_parse(FILE *f, const char *filename);
 AST_t  *parse_expr_from_str(const char *src);
 AST_t  *parse_expr_pat_from_str(const char *src); /* bison: bare expr -> AST_t, pattern slot */
 CODE_t *sno_parse_string(const char *src);         /* bison: multi-stmt string -> CODE_t* */
+AST_t  *sno_parse_string_ast(const char *src, CODE_t **code_out); /* SI-6: multi-stmt string -> AST_PROGRAM */
 void     c_emit(CODE_t *prog, FILE *out);
 
 /* SN-19: case-sensitivity control. Default = case-INsensitive (fold to upper).
@@ -184,7 +169,11 @@ void     sno_fold_name(char *name);
 
 /* emit_byrd.c interface now internal to emit_byrd_c.c */
 
-/* ---- SI-2/SI-3: CODE_t / STMT_t → pure AST tree shim (stmt_ast.c) ---- */
+/* ---- SI-2/SI-3 shim: kept for snocone/prolog/raku/rebus frontends ---- */
+/* These frontends still build CODE_t internally and call code_to_ast()
+ * to produce their out_ast.  SI-7 will migrate them to direct emission.
+ * stmt_to_ast / code_to_ast remain in stmt_ast.c; sm_preamble no longer
+ * uses them (SI-6). */
 AST_t       *stmt_to_ast(const STMT_t *s);
 AST_t       *code_to_ast(const CODE_t *prog);
 AST_t       *stmt_attr_find(const AST_t *stmt, const char *tag);
@@ -198,9 +187,9 @@ AST_t       *ast_attr_leaf(const char *tag, const char *val);
 AST_t       *ast_attr_int(const char *tag, int ival);
 AST_t       *ast_attr_expr(const char *tag, AST_t *expr);
 
-/* sno_parse_ast — parse a SNOBOL4 file and return an AST_PROGRAM directly,
- * with the CODE_t linked list returned via out-param for the existing
- * label_table_build / prescan_defines consumers. Single parse pass. */
+/* sno_parse_ast — parse a SNOBOL4 file and return an AST_PROGRAM directly.
+ * If code_out is non-NULL, a minimal CODE_t stub is also returned for
+ * --dump-ir-bison (parse_expr_pat_from_str internal use only). */
 AST_t       *sno_parse_ast(FILE *f, const char *filename, CODE_t **code_out);
 
 /* ---- error ---- */

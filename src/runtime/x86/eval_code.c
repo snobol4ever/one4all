@@ -430,14 +430,15 @@ DESCR_t code(const char *src)
 {
     if (!src || !*src) return FAILDESCR;
 
-    /* Use bison sno_parse_string — CMPILE fully removed (GOAL-REMOVE-CMPILE S-3). */
-    CODE_t *prog = sno_parse_string(src);
+    /* SI-6: use sno_parse_string_ast — stores AST_PROGRAM* in DT_C. */
+    extern AST_t *sno_parse_string_ast(const char *src, CODE_t **code_out);
+    AST_t *ast = sno_parse_string_ast(src, NULL);
 
-    if (!prog || !prog->head) return FAILDESCR;
+    if (!ast || ast->nchildren == 0) return FAILDESCR;
 
     DESCR_t d;
     d.v   = DT_C;
-    d.ptr = prog;          /* CODE_t* stored as generic GC pointer */
+    d.ptr = ast;           /* AST_t* stored as generic GC pointer */
     d.slen = 0;
     return d;
 }
@@ -464,37 +465,46 @@ DESCR_t code(const char *src)
 const char *exec_code(DESCR_t code_block)
 {
     if (code_block.v != DT_C || !code_block.ptr) return NULL;
-    CODE_t *prog = (CODE_t *)code_block.ptr;
+    const AST_t *prog = (const AST_t *)code_block.ptr;  /* SI-6: AST_PROGRAM* */
 
-    for (STMT_t *s = prog->head; s; s = s->next) {
-        if (s->is_end) return "";  /* END statement → fall through */
+    for (int _ci = 0; _ci < prog->nchildren; _ci++) {
+        const AST_t *s = prog->children[_ci];
+        if (!s) continue;
+        if (s->kind == AST_END) return "";
+
+        /* SI-6: read stmt fields via stmt_attr helpers */
+        int has_eq = stmt_attr_find(s, ":eq") != NULL;
+        AST_t *subject     = stmt_attr_expr(stmt_attr_find(s, ":subj"));
+        AST_t *pattern     = stmt_attr_expr(stmt_attr_find(s, ":pat"));
+        AST_t *replacement = stmt_attr_expr(stmt_attr_find(s, ":repl"));
+        const char *goto_u = stmt_attr_str(stmt_attr_find(s, ":go"));
+        const char *goto_s = stmt_attr_str(stmt_attr_find(s, ":goS"));
+        const char *goto_f = stmt_attr_str(stmt_attr_find(s, ":goF"));
 
         /* Evaluate subject */
         DESCR_t subj_val = NULVCL;
         const char *subj_name = NULL;
 
-        if (s->subject) {
-            if (s->subject->kind == AST_VAR && s->subject->sval) {
-                /* Named variable lvalue */
-                subj_name = s->subject->sval;
+        if (subject) {
+            if (subject->kind == AST_VAR && subject->sval) {
+                subj_name = subject->sval;
                 subj_val  = NV_GET_fn(subj_name);
             } else {
-                subj_val = eval_node(s->subject);
+                subj_val = eval_node(subject);
             }
         }
 
-        int succeeded = 1;   /* default: succeed (no pattern = always :S) */
+        int succeeded = 1;
 
-        if (s->pattern) {
-            /* Pattern statement: build pattern DESCR_t, call exec_stmt */
-            DESCR_t pat_d = eval_node(s->pattern);
+        if (pattern) {
+            DESCR_t pat_d = eval_node(pattern);
             if (IS_FAIL_fn(pat_d)) {
                 succeeded = 0;
             } else {
                 DESCR_t repl_val;
                 int has_repl = 0;
-                if (s->has_eq && s->replacement) {
-                    repl_val = eval_node(s->replacement);
+                if (has_eq && replacement) {
+                    repl_val = eval_node(replacement);
                     has_repl = !IS_FAIL_fn(repl_val);
                 }
                 succeeded = exec_stmt(
@@ -504,35 +514,27 @@ const char *exec_code(DESCR_t code_block)
                     has_repl ? &repl_val : NULL,
                     has_repl);
             }
-        } else if (s->has_eq && s->replacement && subj_name) {
-            /* Pure assignment: SUBJ = REPLACEMENT (no pattern) */
-            DESCR_t repl_val = eval_node(s->replacement);
+        } else if (has_eq && replacement && subj_name) {
+            DESCR_t repl_val = eval_node(replacement);
             if (IS_FAIL_fn(repl_val)) {
                 succeeded = 0;
             } else {
                 NV_SET_fn(subj_name, repl_val);
                 succeeded = 1;
             }
-        } else if (s->subject && !s->pattern && !s->has_eq) {
-            /* Expression-only statement: evaluate for side effects
-             * (e.g. OUTPUT = 'x' comes through as subject with has_eq,
-             *  but a bare function call is subject-only) */
+        } else if (subject && !pattern && !has_eq) {
             if (IS_FAIL_fn(subj_val)) succeeded = 0;
         }
 
         /* Goto resolution */
-        if (s->goto_u || s->goto_s || s->goto_f) {
-            if (s->goto_u && *s->goto_u)
-                return s->goto_u;
-            if (succeeded && s->goto_s && *s->goto_s)
-                return s->goto_s;
-            if (!succeeded && s->goto_f && *s->goto_f)
-                return s->goto_f;
+        if (goto_u || goto_s || goto_f) {
+            if (goto_u && *goto_u) return goto_u;
+            if (succeeded && goto_s && *goto_s) return goto_s;
+            if (!succeeded && goto_f && *goto_f) return goto_f;
         }
-        /* No goto match — fall through to next statement */
     }
 
-    return "";  /* ran off end of block */
+    return "";
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

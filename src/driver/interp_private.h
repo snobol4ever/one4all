@@ -26,7 +26,7 @@
 
 /* ── frontend ─────────────────────────────────────────────────────────── */
 #include "frontend/snobol4/scrip_cc.h"
-extern CODE_t *sno_parse(FILE *f, const char *filename);
+/* SI-6: sno_parse removed from IR interpreter path — use sno_parse_ast instead */
 #include "frontend/snocone/snocone_driver.h"
 #include "frontend/prolog/prolog_driver.h"
 #include "frontend/prolog/term.h"
@@ -93,7 +93,7 @@ void  raku_fh_free(int idx);
 const char *define_spec_from_expr(AST_t *subj);
 const char *define_entry_from_expr(AST_t *subj);
 #define LABEL_MAX 4096
-typedef struct { const char *name; STMT_t *stmt; } LabelEntry;
+typedef struct { const char *name; const AST_t *stmt; } LabelEntry;
 extern LabelEntry label_table[LABEL_MAX];
 extern int        label_count;
 

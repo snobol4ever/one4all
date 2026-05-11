@@ -17,21 +17,23 @@
 LabelEntry label_table[LABEL_MAX];
 int label_count = 0;
 
-void label_table_build(CODE_t *prog)
+void label_table_build(const AST_t *prog)
 {
     label_count = 0;
-    for (STMT_t *s = prog->head; s; s = s->next) {
-        if (s->label && *s->label && label_count < LABEL_MAX) {
-            /* RS-9b: strdup so label_table survives code_free(prog).
-             * s->stmt is kept for --ir-run only; --sm-run uses sm_label_pc_lookup. */
-            label_table[label_count].name = strdup(s->label);
+    if (!prog) return;
+    for (int i = 0; i < prog->nchildren && label_count < LABEL_MAX; i++) {
+        const AST_t *s = prog->children[i];
+        if (!s || (s->kind != AST_STMT && s->kind != AST_END)) continue;
+        const char *lbl = stmt_attr_str(stmt_attr_find(s, ":lbl"));
+        if (lbl && *lbl) {
+            label_table[label_count].name = strdup(lbl);
             label_table[label_count].stmt = s;
             label_count++;
         }
     }
 }
 
-STMT_t *label_lookup(const char *name)
+const AST_t *label_lookup(const char *name)
 {
     if (!name || !*name) return NULL;
     for (int i = 0; i < label_count; i++)
@@ -89,27 +91,23 @@ const char *define_entry_from_expr(AST_t *subj)
 }
 
 /* ── Pre-scan program and register all DEFINE'd functions ── */
-void prescan_defines(CODE_t *prog)
+void prescan_defines(const AST_t *prog)
 {
-    for (STMT_t *s = prog->head; s; s = s->next) {
-        if (!s->subject) continue;
-        const char *spec = define_spec_from_expr(s->subject);
+    if (!prog) return;
+    for (int i = 0; i < prog->nchildren; i++) {
+        const AST_t *s = prog->children[i];
+        if (!s || s->kind != AST_STMT) continue;
+        AST_t *subj = stmt_attr_expr(stmt_attr_find(s, ":subj"));
+        if (!subj) continue;
+        const char *spec = define_spec_from_expr(subj);
         if (spec && *spec) {
-            /* RS-9b: strdup so the func registry survives code_free(prog).
-             * define_spec_from_expr may return arg->sval (direct IR pointer)
-             * or flatbuf (static buffer) — strdup is correct in both cases. */
             char *spec_copy = strdup(spec);
-            const char *entry = define_entry_from_expr(s->subject);
+            const char *entry = define_entry_from_expr(subj);
             if (entry) DEFINE_fn_entry(spec_copy, NULL, strdup(entry));
             else       DEFINE_fn(spec_copy, NULL);
         }
     }
 }
 
-/* RS-9b: null out STMT_t* pointers in label_table after code_free so
- * any residual label_lookup calls return NULL rather than a dangling ptr. */
-void label_table_clear_stmts(void)
-{
-    for (int i = 0; i < label_count; i++)
-        label_table[i].stmt = NULL;
-}
+/* SI-6: label_table_clear_stmts removed — GC owns AST_t nodes; no dangling
+ * pointer hazard after AST_PROGRAM is freed. */

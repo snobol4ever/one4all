@@ -26,32 +26,24 @@
 
 #include "../runtime/x86/sm_prog.h"
 #include "../runtime/x86/sm_interp.h"
+#include "../ast/ast.h"  /* AST_t */
 
 /* `prog` is a CODE_t* — declared opaque here to avoid coupling driver
  * orchestration to frontend/snobol4/scrip_cc.h. The implementation casts. */
 
-/* Build label table, prescan DEFINEs, lower IR to SM_Program, then free
- * the IR tree and clear stmt pointers in the label table. After this call:
+/* Build label table, prescan DEFINEs, lower IR to SM_Program.
+ * SI-6: takes AST_PROGRAM directly — CODE_t is gone.
+ * After this call:
  *   - g_current_sm_prog is set to the returned SM_Program*
- *   - the IR CODE_t has been freed (caller's prog pointer should be set NULL)
- *   - label_lookup() returns NULL for all entries
  *   - g_sno_err_active is armed for sno_runtime_error longjmp safety
  *
  * Returns NULL on failure (sm_lower error). On success, returned pointer
  * must be freed with sm_prog_free() after run completes. */
-/* sm_preamble(prog, ast_prog)
- * prog:     CODE_t* — label_table_build / prescan_defines / polyglot_init consumers.
- * ast_prog: AST_t*  — preferred input to lower() when non-NULL (SI-4 SNOBOL4 path).
- *                     When NULL, falls back to code_to_ast(prog). */
-SM_Program *sm_preamble(void *prog, void *ast_prog);
+SM_Program *sm_preamble(const AST_t *ast_prog);
 
-/* CH-17g-irrun-lowers: run sm_lower + sm_resolve_proc_entry_pcs on prog
- * (which must already have been initialised by polyglot_init) and then free
- * the SM_Program.  After this call every proc_table[i].entry_pc and every
- * g_pl_pred_table entry has a valid pc (>= 0) for procs that sm_lower
- * emitted named expressions for; others remain -1.  Does NOT free the IR
- * (polyglot_execute needs the IR alive for the BB engine). */
-void sm_resolve_irrun_entry_pcs(void *prog);
+/* CH-17g-irrun-lowers: run sm_lower + sm_resolve_proc_entry_pcs on ast_prog
+ * and then free the SM_Program. */
+void sm_resolve_irrun_entry_pcs(const AST_t *ast_prog);
 
 /* Driver-mode runner signature: takes program + state, returns
  *   0  = normal halt

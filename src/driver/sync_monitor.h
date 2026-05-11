@@ -74,7 +74,7 @@ void exec_snapshot_free(ExecSnapshot *s);
 struct Program_s;   /* forward decl — scrip_cc.h typedef'd as CODE_t */
 typedef struct Program_s Program_im6_fwd;
 /* Use void* to avoid pulling in scrip_cc.h here; sync_monitor.c casts. */
-int sync_monitor_run(void *prog, int verbose, const char *sno_path);
+int sync_monitor_run(const AST_t *prog, int verbose, const char *sno_path);
 
 /* IM-15b: CSNOBOL4 4th executor interface lives in csnobol4_shim.c (WITH_CSNOBOL4 build).
  * Normal builds use inline stubs in sync_monitor.c — no public declarations needed. */

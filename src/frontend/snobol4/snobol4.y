@@ -335,14 +335,24 @@ AST_t *parse_expr_pat_from_str(const char *src) {
     Lex lx = {0};
     lex_open_str(&lx, buf, slen + 1, 0);
     CODE_t *prog = calloc(1, sizeof(CODE_t));
-    PP p = {prog, NULL};
+    PP p = {prog, NULL, NULL};
     g_lx = &lx;
     snobol4_parse(&p);
     free(buf);
-    if (!prog->head) return NULL;
+    /* SI-6: read from AST_PROGRAM if available, else fall back to CODE_t */
+    if (p.ast_prog && p.ast_prog->nchildren > 0) {
+        const AST_t *s = p.ast_prog->children[0];
+        if (s) {
+            AST_t *pat = stmt_attr_expr(stmt_attr_find(s, ":pat"));
+            if (pat) { free(prog); return pat; }
+            return stmt_attr_expr(stmt_attr_find(s, ":subj"));
+        }
+    }
+    if (!prog->head) { free(prog); return NULL; }
     STMT_t *s = prog->head;
-    if (s->pattern) return s->pattern;
-    return s->subject;
+    AST_t *res = s->pattern ? s->pattern : s->subject;
+    free(prog);
+    return res;
 }
 /* sno_parse_string — parse a multi-statement SNOBOL4 string via bison.
  * Uses lex_open_str_initial (INITIAL/col-1 start) so indented and labelled
@@ -359,9 +369,33 @@ CODE_t *sno_parse_string(const char *src) {
     Lex lx = {0};
     lex_open_str_initial(&lx, buf, slen + 1, 0);
     CODE_t *prog = calloc(1, sizeof(CODE_t));
-    PP p = {prog, NULL};
+    PP p = {prog, NULL, NULL};
     g_lx = &lx;
     snobol4_parse(&p);
     free(buf);
     return prog;
+}
+
+/* SI-6: sno_parse_string_ast — parse a SNOBOL4 string and return AST_PROGRAM.
+ * Mirrors sno_parse_string but also builds the ast_prog tree.
+ * If code_out is non-NULL, the CODE_t* is also returned there. */
+AST_t *sno_parse_string_ast(const char *src, CODE_t **code_out) {
+    if (!src) { if (code_out) *code_out = calloc(1, sizeof(CODE_t)); return NULL; }
+    int slen = (int)strlen(src);
+    char *buf = malloc(slen + 2);
+    if (!buf) { if (code_out) *code_out = calloc(1, sizeof(CODE_t)); return NULL; }
+    memcpy(buf, src, slen);
+    buf[slen]   = '\n';
+    buf[slen+1] = '\0';
+    Lex lx = {0};
+    lex_open_str_initial(&lx, buf, slen + 1, 0);
+    CODE_t *prog = calloc(1, sizeof(CODE_t));
+    AST_t  *ast  = NULL;
+    PP p = {prog, NULL, NULL};
+    g_lx = &lx;
+    snobol4_parse(&p);
+    ast = p.ast_prog;
+    free(buf);
+    if (code_out) *code_out = prog; else free(prog);
+    return ast;
 }

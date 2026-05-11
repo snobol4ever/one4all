@@ -284,10 +284,9 @@ static int snap_diff(const ExecSnapshot *a, const char *a_name,
  *
  * verbose: 0=silent on agreement, 1=print per-stmt progress, 2=full diff.
  *----------------------------------------------------------------------*/
-int sync_monitor_run(void *prog_arg, int verbose, const char *sno_path) {
-    CODE_t *prog = (CODE_t *)prog_arg;
+int sync_monitor_run(const AST_t *prog, int verbose, const char *sno_path) {
     /* ── Build SM_Program once ── */
-    SM_Program *sm_prog = lower(code_to_ast(prog));
+    SM_Program *sm_prog = lower(prog);
     if (!sm_prog) { fprintf(stderr, "sync_monitor: sm_lower failed\n"); return -1; }
 
     /* ── Initialise JIT image once ── */
@@ -304,11 +303,13 @@ int sync_monitor_run(void *prog_arg, int verbose, const char *sno_path) {
     ExecSnapshot baseline = {0};
     exec_snapshot_take(&baseline);
 
-    /* IM-9: build IR label index — walk linked list once to array */
-    int nstmts = prog->nstmts;
+    /* SI-6: build IR label index — walk AST_PROGRAM children */
+    int nstmts = prog ? prog->nchildren : 0;
     const char **ir_labels = calloc((size_t)(nstmts + 1), sizeof(const char *));
-    { int i = 1; for (STMT_t *s = prog->head; s && i <= nstmts; s = s->next, i++)
-        ir_labels[i] = (s->label && s->label[0]) ? s->label : NULL; }
+    { for (int i = 0; i < nstmts; i++) {
+        const AST_t *s = prog->children[i];
+        const char *lbl = s ? stmt_attr_str(stmt_attr_find(s, ":lbl")) : NULL;
+        ir_labels[i+1] = (lbl && lbl[0]) ? lbl : NULL; } }
 
     /* IM-9: persistent label path accumulators (grow as we step) */
     ExecSnapshot ir_path  = {0};
@@ -385,9 +386,10 @@ int sync_monitor_run(void *prog_arg, int verbose, const char *sno_path) {
             /* IM-8: rich diverge header — stmt, label, line */
             const char *hdr_lbl = ir_labels[n] ? ir_labels[n] : "-";
             int lineno = 0;
-            { int wi = 1; STMT_t *ws = prog->head;
-              for (; ws && wi < n; ws = ws->next, wi++) {}
-              if (ws) lineno = ws->lineno; }
+            { if (n-1 < prog->nchildren) {
+                const AST_t *ws = prog->children[n-1];
+                const char *lv = ws ? stmt_attr_str(stmt_attr_find(ws, ":line")) : NULL;
+                if (lv) lineno = atoi(lv); } }
             fprintf(stderr, "DIVERGE at stmt %d [label: %s, line %d]\n", n, hdr_lbl, lineno);
 
             /* IM-9: label paths */

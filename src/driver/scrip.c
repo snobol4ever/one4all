@@ -42,7 +42,6 @@
 /* ── frontend ─────────────────────────────────────────────────────────── */
 #include "../frontend/snobol4/scrip_cc.h"
 /* CMPILE.h removed — bison/flex path only (GOAL-REMOVE-CMPILE S-5) */
-extern CODE_t *sno_parse(FILE *f, const char *filename);
 #include "../frontend/snocone/snocone_driver.h"
 #include "../frontend/prolog/prolog_driver.h"
 #include "../frontend/prolog/term.h"            /* Term — needed by Prolog globals block */
@@ -101,7 +100,6 @@ extern int         Δ;
 #include "../runtime/interp/coro_runtime.h"
 #include "../runtime/interp/pl_runtime.h"
 #include "interp.h"   /* FI-6: interp loop extracted to interp.c */
-#include "../runtime/common/ast_clone.h"  /* RS-9b: code_free */
 
 #include "driver/polyglot.h"   /* FI-7: polyglot layer extracted to polyglot.c */
 
@@ -282,8 +280,30 @@ int main(int argc, char **argv)
             has_non_sno = 1;
     }
 
-    CODE_t *prog = NULL;
-    AST_t  *ast_prog = NULL;  /* SI-4: parallel AST_PROGRAM for SNOBOL4 path */
+    CODE_t *prog = NULL;  /* SI-6: kept only for sno_parse_ast out-param; not used for execution */
+    AST_t  *ast_prog = NULL;
+
+    /* Helper: append one AST_PROGRAM's children into ast_prog, stripping trailing AST_END. */
+    #define MERGE_AST(sub_ast) do { \
+        if (sub_ast) { \
+            if (!ast_prog) { ast_prog = sub_ast; } \
+            else { \
+                if (ast_prog->nchildren > 0) { \
+                    AST_t *_last = ast_prog->children[ast_prog->nchildren-1]; \
+                    if (_last && _last->kind == AST_END) ast_prog->nchildren--; \
+                } \
+                for (int _i = 0; _i < (sub_ast)->nchildren; _i++) { \
+                    if (ast_prog->nchildren >= ast_prog->nalloc) { \
+                        ast_prog->nalloc = ast_prog->nalloc ? ast_prog->nalloc*2 : 64; \
+                        ast_prog->children = realloc(ast_prog->children, \
+                            (size_t)ast_prog->nalloc * sizeof(AST_t*)); \
+                    } \
+                    ast_prog->children[ast_prog->nchildren++] = (sub_ast)->children[_i]; \
+                } \
+                free((sub_ast)->children); free(sub_ast); \
+            } \
+        } \
+    } while(0)
 
     for (; argi < argc; argi++) {
         const char *input_path = argv[argi];
@@ -325,7 +345,7 @@ int main(int argc, char **argv)
         int lang_rebus    = dot && strcmp(dot, ".reb")  == 0;
         int lang_polyglot = dot && (strcmp(dot, ".scrip") == 0 || strcmp(dot, ".md") == 0);
 
-        CODE_t *sub = NULL;
+        CODE_t *sub = NULL;  /* kept only for sno_parse_ast out-param; not used for execution */
 
         if (lang_polyglot) {
             g_polyglot = 1;
@@ -335,8 +355,9 @@ int main(int argc, char **argv)
             char *src = malloc(flen + 1);
             if (!src) { fprintf(stderr, "scrip: out of memory\n"); return 1; }
             fread(src, 1, flen, f); src[flen] = '\0'; fclose(f);
-            sub = parse_scrip_polyglot(src, input_path);
+            AST_t *sub_ast = parse_scrip_polyglot(src, input_path);
             free(src);
+            MERGE_AST(sub_ast);
         } else if (lang_snocone || lang_prolog || lang_icon || lang_raku || lang_rebus) {
             FILE *f = fopen(input_path, "r");
             if (!f) { fprintf(stderr, "scrip: cannot open '%s'\n", input_path); return 1; }
@@ -345,127 +366,46 @@ int main(int argc, char **argv)
             if (!src) { fprintf(stderr, "scrip: out of memory\n"); return 1; }
             fread(src, 1, flen, f); src[flen] = '\0'; fclose(f);
             AST_t *sub_ast = NULL;
-            if (lang_icon) {
-                sub = icon_compile(src, input_path, &sub_ast);
-            } else if (lang_raku) {
-                sub = raku_compile(src, input_path, &sub_ast);
-            } else if (lang_prolog) {
-                sub = prolog_compile(src, input_path, &sub_ast);
-            } else if (lang_rebus) {
-                sub = rebus_compile(src, input_path, &sub_ast);
-            } else {
-                sub = snocone_compile(src, input_path, &sub_ast);
-            }
+            if (lang_icon)         icon_compile(src, input_path, &sub_ast);
+            else if (lang_raku)    raku_compile(src, input_path, &sub_ast);
+            else if (lang_prolog)  prolog_compile(src, input_path, &sub_ast);
+            else if (lang_rebus)   rebus_compile(src, input_path, &sub_ast);
+            else                   snocone_compile(src, input_path, &sub_ast);
             free(src);
-            /* SI-5: merge sub_ast into running ast_prog (same logic as SNO path) */
-            if (sub_ast) {
-                if (!ast_prog) {
-                    ast_prog = sub_ast;
-                } else {
-                    if (ast_prog->nchildren > 0) {
-                        AST_t *last = ast_prog->children[ast_prog->nchildren - 1];
-                        if (last && last->kind == AST_END) ast_prog->nchildren--;
-                    }
-                    for (int i = 0; i < sub_ast->nchildren; i++) {
-                        if (ast_prog->nchildren >= ast_prog->nalloc) {
-                            ast_prog->nalloc = ast_prog->nalloc ? ast_prog->nalloc * 2 : 64;
-                            ast_prog->children = realloc(ast_prog->children,
-                                (size_t)ast_prog->nalloc * sizeof(AST_t *));
-                        }
-                        ast_prog->children[ast_prog->nchildren++] = sub_ast->children[i];
-                    }
-                    free(sub_ast->children); free(sub_ast);
-                }
+            if (lang_snocone && dump_ir && sub_ast) {
+                ir_dump_program(sub_ast, stdout); return 0;
             }
-            /* SC-26 investigation: allow --dump-ir on Snocone .sc files so
-             * we can diff Snocone IR vs SNOBOL4 IR for the same program. */
-            if (lang_snocone && dump_ir && sub) {
-                ir_dump_program(sub, stdout);
-                return 0;
-            }
-        } else if (dump_parse || dump_parse_flat || dump_ir) {
-            /* Dump modes only process the first file */
+            MERGE_AST(sub_ast);
+        } else if (dump_ir) {
+            /* --dump-ir: parse SNO via sno_parse_ast, dump AST_PROGRAM */
             FILE *f = fopen(input_path, "r");
             if (!f) { fprintf(stderr, "scrip: cannot open '%s'\n", input_path); return 1; }
             if (opt_bench) clock_gettime(CLOCK_MONOTONIC, &_t1);
-            CODE_t *dprog = sno_parse(f, input_path);
+            AST_t *sub_ast = sno_parse_ast(f, input_path, NULL);
             fclose(f);
-            ir_dump_program(dprog, stdout);
+            ir_dump_program(sub_ast, stdout);
             return 0;
+        } else if (dump_parse || dump_parse_flat) {
+            /* --dump-parse handled later; just parse to ast_prog */
+            FILE *f = fopen(input_path, "r");
+            if (!f) { fprintf(stderr, "scrip: cannot open '%s'\n", input_path); return 1; }
+            if (opt_bench) clock_gettime(CLOCK_MONOTONIC, &_t1);
+            AST_t *sub_ast = sno_parse_ast(f, input_path, NULL);
+            fclose(f);
+            MERGE_AST(sub_ast);
         } else {
             FILE *f = fopen(input_path, "r");
             if (!f) { fprintf(stderr, "scrip: cannot open '%s'\n", input_path); return 1; }
-            /* SI-4: sno_parse_ast builds CODE_t (for label_table_build etc.)
-             * AND AST_PROGRAM (for lower()) in a single parse pass. */
-            AST_t *sub_ast = sno_parse_ast(f, input_path, &sub);
+            /* SI-4/SI-6: sno_parse_ast builds AST_PROGRAM directly. */
+            AST_t *sub_ast = sno_parse_ast(f, input_path, dump_ir_bison ? &sub : NULL);
             fclose(f);
             if (dump_ir_bison) { ir_dump_program(sub, stdout); return 0; }
-            /* Append sub_ast's children to the running ast_prog. */
-            if (sub_ast) {
-                if (!ast_prog) {
-                    ast_prog = sub_ast;
-                } else {
-                    /* Drop trailing AST_END from running ast_prog (mirror of
-                     * CODE_t is_end stripping below). */
-                    if (ast_prog->nchildren > 0) {
-                        AST_t *last = ast_prog->children[ast_prog->nchildren - 1];
-                        if (last && last->kind == AST_END) {
-                            ast_prog->nchildren--;
-                        }
-                    }
-                    /* Append sub_ast's children to ast_prog. */
-                    for (int i = 0; i < sub_ast->nchildren; i++) {
-                        if (ast_prog->nchildren >= ast_prog->nalloc) {
-                            ast_prog->nalloc = ast_prog->nalloc
-                                ? ast_prog->nalloc * 2 : 64;
-                            ast_prog->children = realloc(ast_prog->children,
-                                (size_t)ast_prog->nalloc * sizeof(AST_t*));
-                        }
-                        ast_prog->children[ast_prog->nchildren++] = sub_ast->children[i];
-                    }
-                    free(sub_ast->children);
-                    free(sub_ast);
-                }
-            }
+            MERGE_AST(sub_ast);
         }
 
-        if (!sub || !sub->head) {
+        if (!ast_prog) {
             fprintf(stderr, "scrip: parse failed for '%s'\n", input_path);
             return 1;
-        }
-
-        /* Merge sub into accumulated prog */
-        if (!prog) {
-            prog = sub;
-        } else {
-            /* Strip trailing is_end sentinel from running prog before chaining
-             * the next sub-program.  Each frontend emits one is_end at end of
-             * its file; without this, multi-file invocations halt at the first
-             * file's END.  The very last sub's is_end stays — it terminates
-             * the merged program. */
-            if (prog->tail && prog->tail->is_end) {
-                STMT_t *t = prog->head;
-                STMT_t *prev = NULL;
-                while (t && t != prog->tail) { prev = t; t = t->next; }
-                if (prev) {
-                    prev->next = NULL;
-                    prog->tail = prev;
-                    prog->nstmts--;
-                } else {
-                    /* prog had only one stmt and it was END — drop it entirely */
-                    prog->head = prog->tail = NULL;
-                    prog->nstmts = 0;
-                }
-            }
-            if (prog->tail) {
-                prog->tail->next = sub->head;
-                prog->tail       = sub->tail;
-            } else {
-                prog->head = sub->head;
-                prog->tail = sub->tail;
-            }
-            prog->nstmts    += sub->nstmts;
-            free(sub);
         }
     }
 
@@ -476,7 +416,7 @@ int main(int argc, char **argv)
 
     if (opt_bench) clock_gettime(CLOCK_MONOTONIC, &_t2);
 
-    if (!prog || !prog->head) {
+    if (!ast_prog) {
         fprintf(stderr, "scrip: parse failed for '%s'\n", input_path);
         return 1;
     }
@@ -492,7 +432,6 @@ int main(int argc, char **argv)
     SNO_INIT_fn();
 
     stmt_init();
-    g_prog = prog;
 
     /* S-10 fix: register scrip.c-only builtins so APPLY_fn can dispatch them
      * at match time (used by *IDENT(x) / *DIFFER(x) in pattern position). */
@@ -532,12 +471,10 @@ int main(int argc, char **argv)
 
     /* ── --dump-sm with --ir-run: lower-only, no execution ─────────── */
     if (dump_sm && !mode_sm_run) {
-        label_table_build(prog);
-        prescan_defines(prog);
-        /* SI-4: use ast_prog directly when the SNOBOL4 path built it;
-         * fall back to code_to_ast(prog) for paths not yet migrated
-         * (polyglot, Icon/Prolog/Raku/Snocone/Rebus — SI-5). */
-        SM_Program *sm0 = lower(ast_prog ? ast_prog : code_to_ast(prog));
+        label_table_build(ast_prog);
+        prescan_defines(ast_prog);
+        /* SI-6: lower takes AST_PROGRAM directly. */
+        SM_Program *sm0 = lower(ast_prog);
         if (!sm0) { fprintf(stderr, "scrip: sm_lower failed\n"); return 1; }
         sm_prog_print(sm0, stdout);
         sm_prog_free(sm0);
@@ -550,7 +487,7 @@ int main(int argc, char **argv)
          * hand the program to sm_codegen_x64_emit, which writes an asm
          * source to stdout. The emitted asm is then assembled+linked
          * outside scrip (see scripts/test_smoke_jit_emit_x64.sh). */
-        SM_Program *sm = sm_preamble(prog, ast_prog);
+        SM_Program *sm = sm_preamble(ast_prog);
         if (!sm) return 1;
         prog = NULL;
         if (sm_codegen_x64_emit(sm, stdout, input_path) != 0) {
@@ -567,10 +504,10 @@ int main(int argc, char **argv)
          * Runs IR, SM, and JIT step-by-step over the same CODE_t,
          * snapshot/restoring state between each run.
          * Returns 0 if all three agree; exits non-zero on first divergence. */
-        label_table_build(prog);
-        prescan_defines(prog);
+        label_table_build(ast_prog);
+        prescan_defines(ast_prog);
         g_sno_err_active = 1;
-        int div_stmt = sync_monitor_run(prog, 1 /* verbose */, input_path);
+        int div_stmt = sync_monitor_run(ast_prog, 1 /* verbose */, input_path);
         if (div_stmt != 0) {
             fprintf(stderr, "scrip --monitor: DIVERGE at stmt %d\n", div_stmt);
             return 1;
@@ -580,14 +517,14 @@ int main(int argc, char **argv)
         /* Multi-fence .scrip/.md polyglot file: always use polyglot_execute.
          * RS-26b: single-language Icon/Prolog with --sm-run falls through to
          * the sm_preamble path below. */
-        polyglot_execute(prog);
+        polyglot_execute(ast_prog);
     } else if (mode_sm_run) {
         /* --sm-run: SM-LOWER path — IR → SM_Program → sm_interp_run.
          * RS-14: preamble + run loop extracted to scrip_sm.{c,h}.
          * RS-26: sm_preamble keeps the IR alive when lang_mask contains
          * any non-SNO bit; proc_table / pred-table pointers reference
          * live IR for the BB engine. */
-        SM_Program *sm = sm_preamble(prog, ast_prog);
+        SM_Program *sm = sm_preamble(ast_prog);
         if (!sm) return 1;
         prog = NULL;   /* SM owns its AST_t clones; for non-SNO IR stays alive via globals */
         if (dump_sm) {
@@ -600,7 +537,7 @@ int main(int argc, char **argv)
     } else if (mode_jit_run) {
         /* --jit-run: SM-LOWER → sm_codegen → sm_jit_run.
          * RS-14: shares sm_preamble + sm_run_with_recovery with --sm-run. */
-        SM_Program *sm = sm_preamble(prog, ast_prog);
+        SM_Program *sm = sm_preamble(ast_prog);
         if (!sm) return 1;
         prog = NULL;
         if (dump_sm) { sm_prog_print(sm, stdout); sm_prog_free(sm); return 0; }
@@ -618,10 +555,10 @@ int main(int argc, char **argv)
         /* CH-17g-irrun-lowers: lower to SM to resolve entry_pcs before
          * polyglot_execute dispatches through proc_table_call. */
         g_irrun_lowers = 1;
-        polyglot_execute(prog);
+        polyglot_execute(ast_prog);
         g_irrun_lowers = 0;
     } else {
-        execute_program(prog);
+        execute_program(ast_prog);
     }
     if (opt_bench) {
         clock_gettime(CLOCK_MONOTONIC, &_t3);

@@ -18,8 +18,6 @@
 #include <gc.h>
 
 #include "frontend/snobol4/scrip_cc.h"
-extern CODE_t *sno_parse(FILE *f, const char *filename);
-extern CODE_t *sno_parse_string(const char *src);
 extern int64_t kw_case;   /* &CASE: 0=fold, 1=sensitive; default 1 matches SPITBOL */
 #include "frontend/prolog/prolog_driver.h"
 #include "frontend/prolog/prolog_atom.h"
@@ -40,6 +38,12 @@ ScripModuleRegistry g_registry;   /* zero-initialised; nmod==0 for single-lang *
  * entry_pcs before proc_table_call dispatches.  Default 0. */
 int g_irrun_lowers = 0;
 
+/* SI-6: stmt_attr accessor helpers (mirrors interp_exec.c) */
+static inline int           s_int(const AST_t *s, const char *tag) {
+    const char *v = stmt_attr_str(stmt_attr_find(s, tag)); return v ? atoi(v) : 0; }
+static inline AST_t        *s_expr(const AST_t *s, const char *tag) {
+    return stmt_attr_expr(stmt_attr_find(s, tag)); }
+
 
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -49,14 +53,19 @@ int g_irrun_lowers = 0;
  * appears in at least one STMT_t.lang field.  Callers pass this into
  * polyglot_init so per-language init is skipped when not needed.
  * ══════════════════════════════════════════════════════════════════════════ */
-uint32_t polyglot_lang_mask(CODE_t *prog)
+uint32_t polyglot_lang_mask(const AST_t *prog)
 {
     uint32_t mask = 0;
     if (!prog) return mask;
-    for (STMT_t *s = prog->head; s; s = s->next) {
-        if (s->lang >= 0 && s->lang < 32)
-            mask |= (1u << s->lang);
+    for (int i = 0; i < prog->nchildren; i++) {
+        const AST_t *s = prog->children[i];
+        if (!s) continue;
+        int lang = s_int(s, ":lang");
+        if (lang >= 0 && lang < 32)
+            mask |= (1u << lang);
     }
+    /* LANG_SNO=0 is always present even when no explicit :lang attr */
+    mask |= (1u << LANG_SNO);
     return mask;
 }
 
@@ -75,7 +84,7 @@ uint32_t polyglot_lang_mask(CODE_t *prog)
 int g_fi8_icn_init_count = 0;
 int g_fi8_pl_init_count  = 0;
 
-void polyglot_init(CODE_t *prog, uint32_t lang_mask)
+void polyglot_init(const AST_t *prog, uint32_t lang_mask)
 {
     if (!prog) return;
 
@@ -113,28 +122,27 @@ void polyglot_init(CODE_t *prog, uint32_t lang_mask)
     int cur_lang = -1;   /* language of the module currently being built */
     int mod_idx  = -1;   /* index into g_registry.mods, or -1 if none open */
 
-    for (STMT_t *s = prog->head; s; s = s->next) {
+    for (int _ci = 0; _ci < prog->nchildren; _ci++) {
+        const AST_t *s = prog->children[_ci];
+        if (!s || (s->kind != AST_STMT && s->kind != AST_END)) continue;
+
+        int s_lang = s_int(s, ":lang");
 
         /* ── Registry: detect module boundary on lang change  (U-21) ── */
-        if (s->lang != cur_lang) {
-            /* Close the previous module if one is open */
-            if (mod_idx >= 0 && g_registry.mods[mod_idx].first) {
-                /* last was set on the previous iteration */
-            }
-            /* Open a new module slot */
+        if (s_lang != cur_lang) {
             if (g_registry.nmod < SCRIP_MOD_MAX) {
-                cur_lang = s->lang;
+                cur_lang = s_lang;
                 mod_idx  = g_registry.nmod++;
                 ScripModule *m = &g_registry.mods[mod_idx];
-                m->lang             = s->lang;
-                m->name             = NULL;   /* no name-tag syntax yet */
+                m->lang             = s_lang;
+                m->name             = NULL;
                 m->first            = s;
                 m->last             = s;
                 m->nstmts           = 0;
-                m->sno_label_start  = label_count;   /* labels added below */
+                m->sno_label_start  = label_count;
                 m->sno_label_count  = 0;
                 m->icn_proc_start   = proc_count;
-                m->proc_count   = 0;
+                m->proc_count       = 0;
             }
         }
 
@@ -144,20 +152,17 @@ void polyglot_init(CODE_t *prog, uint32_t lang_mask)
             g_registry.mods[mod_idx].nstmts++;
         }
 
-        if (!s->subject) continue;
+        AST_t *subj = s_expr(s, ":subj");
+        if (!subj) continue;
 
-        if (s->lang == LANG_ICN || s->lang == LANG_RAKU) {
-            /* Icon / Raku: collect AST_FNC procedure definitions.
-             * raku_lower produces same AST_FNC shape; share proc_table (RK-6). */
-            AST_t *proc = s->subject;
-            /* U-23: collect global variable names from AST_GLOBAL decl stmts */
+        if (s_lang == LANG_ICN || s_lang == LANG_RAKU) {
+            AST_t *proc = subj;
             if (proc->kind == AST_GLOBAL) {
                 for (int _gi = 0; _gi < proc->nchildren; _gi++)
                     if (proc->children[_gi] && proc->children[_gi]->sval)
                         global_register(proc->children[_gi]->sval);
             }
             if (proc->kind == AST_RECORD && proc->sval && *proc->sval) {
-                /* IC-5: record type declaration — register before main() runs */
                 char spec[256]; int pos = 0;
                 pos += snprintf(spec+pos, sizeof(spec)-pos, "%s(", proc->sval);
                 for (int _ri = 0; _ri < proc->nchildren && pos < (int)sizeof(spec)-2; _ri++) {
@@ -172,40 +177,32 @@ void polyglot_init(CODE_t *prog, uint32_t lang_mask)
             }
             if (proc->kind == AST_FNC && proc->sval && *proc->sval) {
                 const char *name = proc->sval;
-
                 if (proc_count < PROC_TABLE_MAX) {
                     proc_table[proc_count].name     = name;
                     proc_table[proc_count].proc     = proc;
-                    proc_table[proc_count].entry_pc = -1;  /* CH-17a: resolved post-sm_lower */
-                    proc_table[proc_count].nparams  = (int)proc->ival;  /* CH-17c */
+                    proc_table[proc_count].entry_pc = -1;
+                    proc_table[proc_count].nparams  = (int)proc->ival;
                     proc_count++;
                     if (mod_idx >= 0) g_registry.mods[mod_idx].proc_count++;
-                    /* Detect main module  (U-21) */
                     if (strcmp(name, "main") == 0 && g_registry.main_mod < 0)
                         g_registry.main_mod = mod_idx;
                 }
             }
-            /* RK-26: evaluate AST_RECORD immediately so class types are registered
-             * in sc_dat_types before main() calls raku_new. */
             if (proc->kind == AST_RECORD) {
                 interp_eval(proc);
             }
-        } else if (s->lang == LANG_PL) {
-            /* Prolog: collect AST_CHOICE / AST_CLAUSE predicate definitions */
-            AST_t *subj = s->subject;
-                if ((subj->kind == AST_CHOICE || subj->kind == AST_CLAUSE) && subj->sval) {
-                pl_pred_table_insert(&g_pl_pred_table, subj->sval, subj);
+        } else if (s_lang == LANG_PL) {
+            AST_t *sub = subj;
+            if ((sub->kind == AST_CHOICE || sub->kind == AST_CLAUSE) && sub->sval) {
+                pl_pred_table_insert(&g_pl_pred_table, sub->sval, sub);
                 g_pl_active = 1;
-                /* Detect main module  (U-21) */
-                if (strcmp(subj->sval, "main/0") == 0 && g_registry.main_mod < 0)
+                if (strcmp(sub->sval, "main/0") == 0 && g_registry.main_mod < 0)
                     g_registry.main_mod = mod_idx;
-                    }
-        } else if (s->lang == LANG_SNO) {
-            /* SNO label range tracking for registry  (U-21) */
-            if (mod_idx >= 0 && s->label && *s->label) {
-                /* label_table was already built above; count labels in this module */
-                g_registry.mods[mod_idx].sno_label_count++;
             }
+        } else if (s_lang == LANG_SNO) {
+            const char *lbl = stmt_attr_str(stmt_attr_find(s, ":lbl"));
+            if (mod_idx >= 0 && lbl && *lbl)
+                g_registry.mods[mod_idx].sno_label_count++;
         }
     }
 }
@@ -253,19 +250,23 @@ static int pl_directive_max_var_slot(AST_t *root)
  * For single-language programs: routes to the appropriate legacy entry point.
  * OE-8 will retire the legacy entry points entirely.
  *============================================================================================================================*/
-void polyglot_execute(CODE_t *prog) {
+void polyglot_execute(const AST_t *prog) {
     if (!prog) return;
     if (g_polyglot) {
         execute_program(prog);   /* runs SNO + U-23 ICN/PL registry dispatch */
         return;
     }
-    /* Single-language .icn or .pl — detect from first statement's lang field */
-    int slang = prog->head ? prog->head->lang : LANG_SNO;
+    /* Single-language .icn or .pl — detect from first non-empty child's :lang */
+    int slang = LANG_SNO;
+    for (int _i = 0; _i < prog->nchildren; _i++) {
+        const AST_t *ch = prog->children[_i];
+        if (ch && (ch->kind == AST_STMT || ch->kind == AST_END)) {
+            slang = s_int(ch, ":lang"); break;
+        }
+    }
     uint32_t mask = polyglot_lang_mask(prog);
     polyglot_init(prog, mask);
-    /* CH-17g-irrun-lowers: if requested, run sm_lower to resolve entry_pcs
-     * in proc_table / g_pl_pred_table before dispatch.  Enabled by scrip.c
-     * for the --ir-run non-SNO path so proc_table_call sees entry_pc >= 0. */
+    /* CH-17g-irrun-lowers: if requested, run sm_lower to resolve entry_pcs */
     if (g_irrun_lowers)
         sm_resolve_irrun_entry_pcs(prog);
     if (slang == LANG_ICN) {
@@ -279,31 +280,22 @@ void polyglot_execute(CODE_t *prog) {
         fprintf(stderr, "icon: no main procedure\n");
     } else if (slang == LANG_PL) {
         g_pl_active = 1;
-        /* Execute non-AST_CHOICE/AST_CLAUSE LANG_PL stmts as directives before main/0.
-         * PL-12 (2026-04-30 #3): each directive gets a fresh cenv sized to its
-         * largest AST_VAR slot. Without this, env=NULL caused
-         * pl_unified_term_from_expr to mint a fresh Term*var on every AST_VAR
-         * read, so two references to the same logical variable G in
-         *   :- assertz(test_g(hello)), test_g(G), write(G).
-         * could not unify (the assertz callee bound a fresh var, the write
-         * read another fresh var, both disconnected). The directive printed
-         * `_G0` instead of `hello`. Walking the lowered EXPR for the max
-         * AST_VAR ival and allocating cenv = pl_env_new(max+1) provides one
-         * shared env for the whole directive body, so unify can thread
-         * bindings the way it does for clause bodies. */
-        for (STMT_t *_s = prog->head; _s; _s = _s->next) {
-            if (_s->lang != LANG_PL) continue;
-            if (!_s->subject) continue;
-            if (_s->subject->kind == AST_CHOICE || _s->subject->kind == AST_CLAUSE) continue;
-            int _max_slot = pl_directive_max_var_slot(_s->subject);
+        /* Execute non-AST_CHOICE/AST_CLAUSE LANG_PL stmts as directives before main/0. */
+        for (int _ci = 0; _ci < prog->nchildren; _ci++) {
+            const AST_t *_s = prog->children[_ci];
+            if (!_s || _s->kind != AST_STMT) continue;
+            if (s_int(_s, ":lang") != LANG_PL) continue;
+            AST_t *_subj = s_expr(_s, ":subj");
+            if (!_subj) continue;
+            if (_subj->kind == AST_CHOICE || _subj->kind == AST_CLAUSE) continue;
+            int _max_slot = pl_directive_max_var_slot(_subj);
             Term **_dir_env = (_max_slot >= 0) ? pl_env_new(_max_slot + 1) : NULL;
             Term **_saved   = g_pl_env;
             if (_dir_env) g_pl_env = _dir_env;
-            interp_exec_pl_builtin(_s->subject, _dir_env);
+            interp_exec_pl_builtin(_subj, _dir_env);
             g_pl_env = _saved;
             if (_dir_env) free(_dir_env);
         }
-        /* CH-17e: run main/0 via SM expression when entry_pc resolved */
         Pl_PredEntry *_main_pe = pl_pred_entry_lookup("main/0");
         AST_t *main_choice = pl_pred_table_lookup(&g_pl_pred_table, "main/0");
         extern SM_Program *g_current_sm_prog;
@@ -321,20 +313,22 @@ void polyglot_execute(CODE_t *prog) {
 }
 
 /*============================================================================================================================
- * parse_scrip_polyglot — parse a fenced polyglot .scrip/.md file into one CODE_t*  (U-13)
+ * parse_scrip_polyglot — parse a fenced polyglot .scrip/.md file into one AST_PROGRAM  (U-13, SI-6)
  *
  * Scans the source for fenced code blocks:
  *   ```SNOBOL4  ...  ```
  *   ```Icon     ...  ```
  *   ```Prolog   ...  ```
- * Each block is compiled with its own frontend.  All resulting STMT_t chains
- * are appended in source order into one CODE_t*, with st->lang already set
+ * Each block is compiled with its own frontend.  All resulting AST_STMT children
+ * are appended in source order into one AST_PROGRAM, with :lang attr already set
  * by each frontend (U-12).  Unrecognised fence languages are skipped silently.
  *============================================================================================================================*/
-CODE_t *parse_scrip_polyglot(const char *src, const char *filename)
+extern AST_t *sno_parse_string_ast(const char *src, CODE_t **code_out);
+AST_t *parse_scrip_polyglot(const char *src, const char *filename)
 {
-    CODE_t *result = calloc(1, sizeof(CODE_t));
+    AST_t *result = calloc(1, sizeof(AST_t));
     if (!result) return NULL;
+    result->kind = AST_PROGRAM;
 
     const char *p = src;
 
@@ -363,64 +357,57 @@ CODE_t *parse_scrip_polyglot(const char *src, const char *filename)
         if      (tag_len == 7 && strncasecmp(tag_start, "SNOBOL4", 7) == 0) lang = LANG_SNO;
         else if (tag_len == 4 && strncasecmp(tag_start, "Icon",    4) == 0) lang = LANG_ICN;
         else if (tag_len == 6 && strncasecmp(tag_start, "Prolog",  6) == 0) lang = LANG_PL;
-        else if (tag_len == 4 && strncasecmp(tag_start, "Raku",    4) == 0) lang = LANG_RAKU; /* RK-5 */
-        else if (tag_len == 5 && strncasecmp(tag_start, "Scrip",   5) == 0) lang = LANG_SCRIP; /* U-23: shared constants */
+        else if (tag_len == 4 && strncasecmp(tag_start, "Raku",    4) == 0) lang = LANG_RAKU;
+        else if (tag_len == 5 && strncasecmp(tag_start, "Scrip",   5) == 0) lang = LANG_SCRIP;
         else if (tag_len == 6 && strncasecmp(tag_start, "SCRIP",   5) == 0) lang = LANG_SCRIP;
-        else if (tag_len == 5 && strncasecmp(tag_start, "Rebus",   5) == 0) lang = LANG_REB;  /* FI-1B */
+        else if (tag_len == 5 && strncasecmp(tag_start, "Rebus",   5) == 0) lang = LANG_REB;
 
         /* Find the matching fence close ``` */
         const char *block_start = p;
         const char *close = strstr(p, "```");
-        if (!close) break;   /* unterminated block — stop */
+        if (!close) break;
 
-        /* Extract block text */
         int   blen = (int)(close - block_start);
         char *block = malloc(blen + 1);
         if (!block) { p = close + 3; continue; }
         memcpy(block, block_start, blen);
         block[blen] = '\0';
 
-        /* Advance past fence close */
         p = close + 3;
         while (*p && *p != '\n') p++;
         if (*p == '\n') p++;
 
-        if (lang < 0) { free(block); continue; }   /* unknown language — skip */
+        if (lang < 0) { free(block); continue; }
 
-        /* Compile block with the appropriate frontend */
-        CODE_t *sub = NULL;
+        /* Compile block with the appropriate frontend, collect AST_PROGRAM */
+        AST_t *sub_ast = NULL;
         if (lang == LANG_SNO || lang == LANG_SCRIP) {
-            sub = sno_parse_string(block);
-            /* LANG_SCRIP: compiled as SNO — shared constants are SNO assignments.
-             * U-23: these execute first (SNO section), writing to NV store
-             * which Icon/Prolog can then read via icn_global / nv_get. */
+            sub_ast = sno_parse_string_ast(block, NULL);
         } else if (lang == LANG_ICN) {
-            sub = icon_compile(block, filename, NULL);
-            /* icon_driver.c sets st->lang=LANG_ICN (U-12) */
+            icon_compile(block, filename, &sub_ast);
         } else if (lang == LANG_PL) {
-            sub = prolog_compile(block, filename, NULL);
-            /* prolog_lower.c sets st->lang=LANG_PL (U-12) */
+            prolog_compile(block, filename, &sub_ast);
         } else if (lang == LANG_RAKU) {
-            sub = raku_compile(block, filename, NULL);
-            /* raku_driver.c sets st->lang=LANG_RAKU (RK-5) */
+            raku_compile(block, filename, &sub_ast);
         } else if (lang == LANG_REB) {
-            sub = rebus_compile(block, filename, NULL);
-            /* rebus_compile sets st->lang=LANG_REB (FI-1B) */
+            rebus_compile(block, filename, &sub_ast);
         }
         free(block);
 
-        if (!sub || !sub->head) { free(sub); continue; }
+        if (!sub_ast || sub_ast->nchildren == 0) { free(sub_ast); continue; }
 
-        /* Append sub's STMT_t chain to result */
-        if (!result->head) {
-            result->head = sub->head;
-            result->tail = sub->tail;
-        } else {
-            result->tail->next = sub->head;
-            result->tail       = sub->tail;
+        /* Append sub_ast's children into result */
+        for (int _i = 0; _i < sub_ast->nchildren; _i++) {
+            AST_t *ch = sub_ast->children[_i];
+            if (!ch) continue;
+            if (result->nchildren >= result->nalloc) {
+                result->nalloc = result->nalloc ? result->nalloc * 2 : 16;
+                result->children = realloc(result->children,
+                                           (size_t)result->nalloc * sizeof(AST_t *));
+            }
+            result->children[result->nchildren++] = ch;
         }
-        result->nstmts += sub->nstmts;
-        free(sub);   /* free the wrapper, not the STMT_t chain */
+        free(sub_ast->children); free(sub_ast);
     }
 
     return result;
