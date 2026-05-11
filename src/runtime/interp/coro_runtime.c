@@ -1009,6 +1009,12 @@ static DESCR_t icn_bb_assign_gen(void *zeta, int entry) {
         int slot = (int)lhs->ival;
         if (slot >= 0 && slot < FRAME.env_n) { FRAME.env[slot] = val; }
         else if (slot < 0 && lhs->sval && lhs->sval[0] != '&') NV_SET_fn(lhs->sval, val);
+    } else if (lhs && lhs->kind == AST_FIELD && lhs->sval && lhs->nchildren >= 1) {
+        /* IC-5: record field lvalue  obj.fieldname := gen_value.
+         * Use FIELD_SET_fn (declared in snobol4.h, already linked) rather than
+         * data_field_ptr (interp_private.h not included here). */
+        DESCR_t obj = bb_eval_value(lhs->children[0]);
+        if (!IS_FAIL_fn(obj)) FIELD_SET_fn(obj, lhs->sval, val);
     }
     return val;
 }

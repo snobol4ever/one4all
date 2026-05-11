@@ -2955,6 +2955,14 @@ DESCR_t interp_eval(AST_t *e)
                     FIELD_SET_fn(obj, lv->sval, val);
             }
         }
+        else if (lv && lv->kind == AST_FIELD && lv->sval && lv->nchildren >= 1) {
+            /* IC-5: record field lvalue:  obj.fieldname := val */
+            DESCR_t obj = interp_eval(lv->children[0]);
+            if (!IS_FAIL_fn(obj)) {
+                DESCR_t *cell = data_field_ptr(lv->sval, obj);
+                if (cell) *cell = val;
+            }
+        }
         else if (lv && lv->kind == AST_INDIRECT && lv->nchildren > 0) {
             AST_t *ichild = lv->children[0];
             const char *nm = NULL;
