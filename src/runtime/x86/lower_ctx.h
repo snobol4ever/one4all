@@ -3,12 +3,12 @@
  *
  * Threads the state previously carried by two file-scope globals
  * (g_expression_body_lowering, g_expression_scope) plus the explicit
- * (SM_Program *p, LabelTable *lt) parameter pair through a single
+ * (SM_Program *p, LabelTable *labtab) parameter pair through a single
  * pointer argument.  Every dataflow becomes visible at the call site.
  *
  * SR-1 is structural only: the LabelTable types still live here in
  * their original shape and are still allocated/freed with malloc/free.
- * SR-2 will move the lt_* family to lower_ctx.c and migrate to GC.
+ * SR-2 will move the labtab_* family to lower_ctx.c and migrate to GC.
  *
  * Authors: Lon Jones Cherryholmes · Claude Sonnet 4.6
  * Date: 2026-05-11
@@ -24,7 +24,7 @@
 
 /* ── Label resolution table ─────────────────────────────────────────────
  *
- * SR-1: types kept verbatim from sm_lower.c.  SR-2 moves lt_*
+ * SR-1: types kept verbatim from sm_lower.c.  SR-2 moves labtab_*
  * implementations to lower_ctx.c and migrates to GC allocation.
  */
 
@@ -54,7 +54,7 @@ typedef struct {
  * One LowerCtx is created per sm_lower() invocation.  All lowering
  * functions (lower_expr, lower_stmt, lower_pat_expr, emit helpers)
  * receive `LowerCtx *c` and reach the SM_Program via `c->p` and the
- * label table via `c->lt`.
+ * label table via `c->labtab`.
  *
  * Expression-body lowering state:
  *   When true, lower_expr is walking an Icon/Raku proc body emitted
@@ -69,7 +69,7 @@ typedef struct {
  */
 typedef struct {
     SM_Program  *p;                          /* output program (owned) */
-    LabelTable   lt;                         /* label resolution + patches */
+    LabelTable   labtab;                         /* label resolution + patches */
     int          expression_body_lowering;   /* CH-17b': set during proc-body emit */
     IcnScope    *expression_scope;           /* CH-17b'': active per-proc scope */
 } LowerCtx;

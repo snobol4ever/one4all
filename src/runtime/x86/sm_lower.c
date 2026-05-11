@@ -102,63 +102,63 @@ static void expression_scope_walk(IcnScope *sc, AST_t *e) {
 
 #define LABEL_TABLE_INIT 64
 
-static void lt_init(LabelTable *lt)
+static void labtab_init(LabelTable *labtab)
 {
-    lt->labels      = malloc(LABEL_TABLE_INIT * sizeof(LabelEntry));
-    lt->labels_cap  = LABEL_TABLE_INIT;
-    lt->nlabels     = 0;
-    lt->patches     = malloc(LABEL_TABLE_INIT * sizeof(PatchEntry));
-    lt->patches_cap = LABEL_TABLE_INIT;
-    lt->npatches    = 0;
+    labtab->labels      = malloc(LABEL_TABLE_INIT * sizeof(LabelEntry));
+    labtab->labels_cap  = LABEL_TABLE_INIT;
+    labtab->nlabels     = 0;
+    labtab->patches     = malloc(LABEL_TABLE_INIT * sizeof(PatchEntry));
+    labtab->patches_cap = LABEL_TABLE_INIT;
+    labtab->npatches    = 0;
 }
 
 /* Record a defined label → its SM_LABEL instruction index */
-static void lt_define(LabelTable *lt, const char *name, int instr_idx)
+static void labtab_define(LabelTable *labtab, const char *name, int instr_idx)
 {
-    if (lt->nlabels >= lt->labels_cap) {
-        lt->labels_cap *= 2;
-        lt->labels = realloc(lt->labels, lt->labels_cap * sizeof(LabelEntry));
-        if (!lt->labels) { fprintf(stderr, "sm_lower: label table OOM\n"); abort(); }
+    if (labtab->nlabels >= labtab->labels_cap) {
+        labtab->labels_cap *= 2;
+        labtab->labels = realloc(labtab->labels, labtab->labels_cap * sizeof(LabelEntry));
+        if (!labtab->labels) { fprintf(stderr, "sm_lower: label table OOM\n"); abort(); }
     }
-    lt->labels[lt->nlabels].name      = strdup(name);
-    lt->labels[lt->nlabels].instr_idx = instr_idx;
-    lt->nlabels++;
+    labtab->labels[labtab->nlabels].name      = strdup(name);
+    labtab->labels[labtab->nlabels].instr_idx = instr_idx;
+    labtab->nlabels++;
 }
 
 /* Find a label by name; returns instr_idx or -1 */
-static int lt_find(const LabelTable *lt, const char *name)
+static int labtab_find(const LabelTable *labtab, const char *name)
 {
     /* SN-26c-stmt637: case-SENSITIVE label compare per SN-31 (case-sensitive
      * default).  strcasecmp here collided distinct labels like `visitEnd` and
      * `VisitEnd` (both present in beauty.sno via the double-function trick),
      * sending SM gotos to the wrong target.  IR's goto resolution
      * (interp.c lookup_label_stmt) is case-sensitive — this matches that. */
-    for (int i = 0; i < lt->nlabels; i++)
-        if (strcmp(lt->labels[i].name, name) == 0)
-            return lt->labels[i].instr_idx;
+    for (int i = 0; i < labtab->nlabels; i++)
+        if (strcmp(labtab->labels[i].name, name) == 0)
+            return labtab->labels[i].instr_idx;
     return -1;
 }
 
 /* Record a forward-reference patch */
-static void lt_patch_later(LabelTable *lt, int jump_instr_idx, const char *name)
+static void labtab_patch_later(LabelTable *labtab, int jump_instr_idx, const char *name)
 {
-    if (lt->npatches >= lt->patches_cap) {
-        lt->patches_cap *= 2;
-        lt->patches = realloc(lt->patches, lt->patches_cap * sizeof(PatchEntry));
-        if (!lt->patches) { fprintf(stderr, "sm_lower: patch table OOM\n"); abort(); }
+    if (labtab->npatches >= labtab->patches_cap) {
+        labtab->patches_cap *= 2;
+        labtab->patches = realloc(labtab->patches, labtab->patches_cap * sizeof(PatchEntry));
+        if (!labtab->patches) { fprintf(stderr, "sm_lower: patch table OOM\n"); abort(); }
     }
-    lt->patches[lt->npatches].jump_instr_idx = jump_instr_idx;
-    lt->patches[lt->npatches].target_name    = strdup(name);
-    lt->npatches++;
+    labtab->patches[labtab->npatches].jump_instr_idx = jump_instr_idx;
+    labtab->patches[labtab->npatches].target_name    = strdup(name);
+    labtab->npatches++;
 }
 
 /* Resolve all forward patches; returns 0 on success, -1 on unresolved ref */
-static int lt_resolve(LabelTable *lt, SM_Program *p)
+static int labtab_resolve(LabelTable *labtab, SM_Program *p)
 {
     int ok = 0;
-    for (int i = 0; i < lt->npatches; i++) {
-        const char *name = lt->patches[i].target_name;
-        int target = lt_find(lt, name);
+    for (int i = 0; i < labtab->npatches; i++) {
+        const char *name = labtab->patches[i].target_name;
+        int target = labtab_find(labtab, name);
         if (target < 0) {
             /* SNOBOL4 convention: goto an undefined label = Error 24.
              * Patch to last instruction (SM_HALT) so execution terminates
@@ -167,17 +167,17 @@ static int lt_resolve(LabelTable *lt, SM_Program *p)
             target = (p->count > 0) ? p->count - 1 : 0;
             ok = -1;
         }
-        sm_patch_jump(p, lt->patches[i].jump_instr_idx, target);
+        sm_patch_jump(p, labtab->patches[i].jump_instr_idx, target);
     }
     return ok;
 }
 
-static void lt_free(LabelTable *lt)
+static void labtab_free(LabelTable *labtab)
 {
-    for (int i = 0; i < lt->nlabels; i++)  free(lt->labels[i].name);
-    for (int i = 0; i < lt->npatches; i++) free(lt->patches[i].target_name);
-    free(lt->labels);  lt->labels  = NULL;
-    free(lt->patches); lt->patches = NULL;
+    for (int i = 0; i < labtab->nlabels; i++)  free(labtab->labels[i].name);
+    for (int i = 0; i < labtab->npatches; i++) free(labtab->patches[i].target_name);
+    free(labtab->labels);  labtab->labels  = NULL;
+    free(labtab->patches); labtab->patches = NULL;
 }
 
 /* ── Emit a goto target (possibly forward ref) ──────────────────────────── */
@@ -192,7 +192,7 @@ static void lt_free(LabelTable *lt)
 static int emit_goto(LowerCtx *c, sm_opcode_t op, const char *target)
 {
     SM_Program *p = c->p;
-    LabelTable *lt = &c->lt;
+    LabelTable *labtab = &c->labtab;
     if (!target) return -1;
 
     /* Special names (case-insensitive per SNOBOL4 spec).
@@ -217,11 +217,11 @@ static int emit_goto(LowerCtx *c, sm_opcode_t op, const char *target)
     /* Emit the jump with a placeholder target (0) */
     int idx = sm_emit_i(p, op, 0);
 
-    int resolved = lt_find(lt, target);
+    int resolved = labtab_find(labtab, target);
     if (resolved >= 0) {
         sm_patch_jump(p, idx, resolved);
     } else {
-        lt_patch_later(lt, idx, target);
+        labtab_patch_later(labtab, idx, target);
     }
     return idx;
 }
@@ -270,7 +270,7 @@ static const char *sm_pat_capture_fn_arg_names(const AST_t *fnc)
 static void lower_pat_expr(LowerCtx *c, const AST_t *e)
 {
     SM_Program *p = c->p;
-    LabelTable *lt = &c->lt;
+    LabelTable *labtab = &c->labtab;
     if (!e) return;
 
     switch (e->kind) {
@@ -571,7 +571,7 @@ static void lower_pat_expr(LowerCtx *c, const AST_t *e)
 static void lower_expr(LowerCtx *c, const AST_t *e)
 {
     SM_Program *p = c->p;
-    LabelTable *lt = &c->lt;
+    LabelTable *labtab = &c->labtab;
     if (!e) {
         sm_emit(p, SM_PUSH_NULL);
         return;
@@ -1791,7 +1791,7 @@ static void lower_expr(LowerCtx *c, const AST_t *e)
 static void lower_stmt(LowerCtx *c, const STMT_t *s)
 {
     SM_Program *p = c->p;
-    LabelTable *lt = &c->lt;
+    LabelTable *labtab = &c->labtab;
     /* SN-32a-blank: blank source line (no label/subject/pattern/replacement/
      * goto).  Per the Green Book and SPITBOL's `stmgo` SIL: blank lines are
      * empty stmts that bump &STNO but not &STCOUNT, and do not fire LABEL
@@ -1814,7 +1814,7 @@ static void lower_stmt(LowerCtx *c, const STMT_t *s)
      * loop iterations and diverge from the IR step counter. (SN-26c-stmt153) */
     if (s->label && s->label[0]) {
         int lbl_idx = sm_label_named(p, s->label);
-        lt_define(lt, s->label, lbl_idx);
+        labtab_define(labtab, s->label, lbl_idx);
         /* ME-7: tag SM_LABEL with `a[2].i = 1` when this label is the entry
          * point of a DEFINE'd user function.  prescan_defines() (called from
          * sm_preamble before sm_lower) has already populated the function
@@ -2048,7 +2048,7 @@ SM_Program *sm_lower(const CODE_t *prog)
     if (!prog) return NULL;
 
     /* SR-1: LowerCtx threads program + label table + expression-body
-     * state through the lowering pass.  Local aliases `p`, `lt`, `c`
+     * state through the lowering pass.  Local aliases `p`, `labtab`, `c`
      * keep the body of this function textually unchanged from
      * pre-refactor; only the parameter shape of the called functions
      * changes. */
@@ -2056,11 +2056,11 @@ SM_Program *sm_lower(const CODE_t *prog)
     ctx.p                        = sm_prog_new();
     ctx.expression_body_lowering = 0;
     ctx.expression_scope         = NULL;
-    lt_init(&ctx.lt);
+    labtab_init(&ctx.labtab);
 
     LowerCtx   *c  = &ctx;
     SM_Program *p  = ctx.p;
-    LabelTable *lt = &ctx.lt;
+    LabelTable *labtab = &ctx.labtab;
 
     /* CH-17b: emit named-expression skeletons for every Icon/Raku proc.
      * CH-17b': fill the expressions with lowered body SM ops.
@@ -2112,7 +2112,7 @@ SM_Program *sm_lower(const CODE_t *prog)
      *     AST_RETURN's lower_expr case already emits SM_RETURN, after which
      *     our trailing SM_VOID_POP + SM_RETURN is dead code — harmless.
      *
-     *   - The shared LabelTable `lt` is reused.  Icon proc bodies do not use
+     *   - The shared LabelTable `labtab` is reused.  Icon proc bodies do not use
      *     SNOBOL4-style stmt labels, so collisions are not a concern in
      *     practice; if any did appear they'd be statement-scoped within the
      *     expression and resolve via the same forward-patch machinery.
@@ -2260,9 +2260,9 @@ SM_Program *sm_lower(const CODE_t *prog)
         sm_emit(p, SM_HALT);
 
     /* Second pass: resolve all forward label references */
-    /* Unresolved labels are patched to HALT (Error 24) by lt_resolve */
-    lt_resolve(lt, p);
+    /* Unresolved labels are patched to HALT (Error 24) by labtab_resolve */
+    labtab_resolve(labtab, p);
 
-    lt_free(lt);
+    labtab_free(labtab);
     return p;
 }
