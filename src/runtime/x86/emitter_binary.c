@@ -1,5 +1,5 @@
 /*
- * emitter_binary.c — binary-mode implementation of emitter_v
+ * emitter_binary.c — binary-mode implementation of emitter_t
  *
  * emit_insn renders each bb_insn_desc_t as x86-64 bytes into bb_pool.
  * Routes through bb_emit.c globals (bb_emit_buf/pos/size/patch_list).
@@ -9,7 +9,7 @@
  * Sprint:  EM-7b'' / GOAL-MODE4-EMIT
  */
 
-#include "emitter_v.h"
+#include "emitter.h"
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -30,7 +30,7 @@ static void imm64(uint64_t v) { bb_emit_u64(v); }
 
 /* ── emit_insn ──────────────────────────────────────────────────────────── */
 
-static void binary_emit_insn(emitter_v *e, const bb_insn_desc_t *d)
+static void binary_emit_insn(emitter_t *e, const bb_insn_desc_t *d)
 {
     (void)e;
     uint64_t a0 = d->a0;
@@ -82,7 +82,7 @@ static void binary_emit_insn(emitter_v *e, const bb_insn_desc_t *d)
 }
 
 /* ── label_define ─────────────────────────────────────────────────────────── */
-static void binary_label_define(emitter_v *e, bb_label_t *lbl)
+static void binary_label_define(emitter_t *e, bb_label_t *lbl)
 {
     (void)e;
     bb_emit_mode_t s = bb_emit_mode; bb_emit_mode = EMIT_BINARY;
@@ -94,7 +94,7 @@ static void binary_label_define(emitter_v *e, bb_label_t *lbl)
 static const uint8_t jmp_rel32[6][2] = {
     {0xE9,0x00},{0x0F,0x84},{0x0F,0x85},{0x0F,0x8C},{0x0F,0x8D},{0x0F,0x8F}
 };
-static void binary_emit_jmp(emitter_v *e, bb_label_t *target, jmp_kind_t kind)
+static void binary_emit_jmp(emitter_t *e, bb_label_t *target, jmp_kind_t kind)
 {
     (void)e;
     int k = (int)kind < 6 ? (int)kind : 0;
@@ -104,12 +104,12 @@ static void binary_emit_jmp(emitter_v *e, bb_label_t *target, jmp_kind_t kind)
 }
 
 /* ── no-ops ───────────────────────────────────────────────────────────────── */
-static void binary_global_sym  (emitter_v *e, const char *n) { (void)e;(void)n; }
-static void binary_fprintf_raw (emitter_v *e, const char *f, ...) { (void)e;(void)f; }
-static int  binary_pos         (emitter_v *e) { (void)e; return bb_emit_pos; }
+static void binary_global_sym  (emitter_t *e, const char *n) { (void)e;(void)n; }
+static void binary_fprintf_raw (emitter_t *e, const char *f, ...) { (void)e;(void)f; }
+static int  binary_pos         (emitter_t *e) { (void)e; return bb_emit_pos; }
 
 /* ── constructor ──────────────────────────────────────────────────────────── */
-static const emitter_v binary_tmpl = {
+static const emitter_t binary_tmpl = {
     .emit_insn    = binary_emit_insn,
     .label_define = binary_label_define,
     .emit_jmp     = binary_emit_jmp,
@@ -121,9 +121,9 @@ static const emitter_v binary_tmpl = {
     .ctx          = NULL,
 };
 
-emitter_v *emitter_binary_new(bb_buf_t buf, int size)
+emitter_t *emitter_binary_new(bb_buf_t buf, int size)
 {
-    emitter_v *e = malloc(sizeof(emitter_v));
+    emitter_t *e = malloc(sizeof(emitter_t));
     if (!e) return NULL;
     *e = binary_tmpl; e->ctx = NULL;
     bb_emit_mode = EMIT_BINARY;

@@ -5,8 +5,8 @@
  * All sub-boxes are inlined flat; control flows via direct jmp, never call/ret.
  *
  * EM-7b'': Zero byte knowledge in this file.  Every emission is a named
- * helper call (ev_load_delta, ev_mov_rax_imm64, etc.) that routes through
- * emitter_v * -> emit_insn -> TEXT (readable mnemonic) or BINARY (bytes).
+ * helper call (em_load_delta, em_mov_rax_imm64, etc.) that routes through
+ * emitter_t * -> emit_insn -> TEXT (readable mnemonic) or BINARY (bytes).
  * The walker reads as a description of pattern-matcher semantics, not x86.
  *
  * Authors: Lon Jones Cherryholmes · Claude Sonnet 4.6
@@ -15,7 +15,7 @@
 
 #include "bb_flat.h"
 #include "bb_emit.h"
-#include "emitter_v.h"
+#include "emitter.h"
 #include "snobol4.h"
 #include "bb_box.h"
 #include <string.h>
@@ -195,8 +195,8 @@ void bb_flat_set_cap_fixup_cb(void (*cb)(void *cap_ptr, const char *child_α_lab
 
 /* ── address constants — EM-7c-symbolic ──────────────────────────────────── */
 /* Symbol names for globals exported by libscrip_rt.so.                      */
-/* TEXT mode: ev_lea_rcx_sym emits  lea rcx, [rip + sym]                     */
-/* BINARY mode: ev_lea_rcx_sym emits mov rcx, imm64  (process-address)       */
+/* TEXT mode: em_lea_rcx_sym emits  lea rcx, [rip + sym]                     */
+/* BINARY mode: em_lea_rcx_sym emits mov rcx, imm64  (process-address)       */
 #define SYM_SIGMA   "\xCE\xA3"          /* UTF-8: Σ */
 #define SYM_SIGLEN  "\xCE\xA3""len"     /* UTF-8: Σlen */
 #define SYM_DELTA   "\xCE\x94"          /* UTF-8: Δ */
@@ -206,9 +206,9 @@ void bb_flat_set_cap_fixup_cb(void (*cb)(void *cap_ptr, const char *child_α_lab
 
 /* ── intern_str hook — set by sm_codegen_x64_emit before calling bb_build_flat_text */
 /* NULL = no strtab available (BINARY mode or standalone use).               */
-static const char *(*g_flat_intern_str)(emitter_v *e, const char *s) = NULL;
+static const char *(*g_flat_intern_str)(emitter_t *e, const char *s) = NULL;
 
-void bb_flat_set_intern_str(const char *(*fn)(emitter_v *, const char *))
+void bb_flat_set_intern_str(const char *(*fn)(emitter_t *, const char *))
 {
     g_flat_intern_str = fn;
 }
@@ -221,7 +221,7 @@ void bb_flat_set_intern_str(const char *(*fn)(emitter_v *, const char *))
  *
  * Shape:  LABEL(24) / OPCODE(16) / ARGS+COMMENT(free).
  *
- * flat3c_*       — three-column line emitters routed through the emitter_v's
+ * flat3c_*       — three-column line emitters routed through the emitter_t's
  *                  fprintf_raw to keep TEXT-mode shape uniform.
  * flat_data_*    — convenience wrappers for `.section .data` directives.
  * flat_text_*    — convenience wrappers for `.section .text` / `.intel_syntax`.
@@ -231,7 +231,7 @@ void bb_flat_set_intern_str(const char *(*fn)(emitter_v *, const char *))
  * `e->is_text` already; the helpers stay safe for callers that don't.
  * ──────────────────────────────────────────────────────────────────────── */
 
-static void flat3c(emitter_v *e, const char *lbl, const char *act, const char *got)
+static void flat3c(emitter_t *e, const char *lbl, const char *act, const char *got)
 {
     if (!e->is_text) return;
     /* EM-FORMAT-BB lone-label fusion (2026-05-09): route through
@@ -243,7 +243,7 @@ static void flat3c(emitter_v *e, const char *lbl, const char *act, const char *g
     bb3c_format(f, lbl ? lbl : "", act ? act : "", got ? got : "");
 }
 
-static void flat3c_action(emitter_v *e, const char *act, const char *args)
+static void flat3c_action(emitter_t *e, const char *act, const char *args)
 {
     flat3c(e, "", act, args ? args : "");
 }
@@ -252,7 +252,7 @@ static void flat3c_action(emitter_v *e, const char *act, const char *args)
  * definitions sit just after the label helper. */
 static void data_buf_remember_label(const char *name);
 
-static void flat3c_label(emitter_v *e, const char *name)
+static void flat3c_label(emitter_t *e, const char *name)
 {
     if (!e->is_text) return;
     /* EM-FORMAT-BB-DATA-CONSOLIDATE: while a deferred-data block is active,
@@ -279,13 +279,13 @@ static void data_buf_remember_label(const char *name)
     g_flat_data_block_nlbls++;
 }
 
-static void data_buf_emit_block_comment(emitter_v *e)
+static void data_buf_emit_block_comment(emitter_t *e)
 {
     (void)e;
     g_flat_data_block_nlbls = 0;
 }
 
-static void flat_data_section(emitter_v *e)
+static void flat_data_section(emitter_t *e)
 {
     if (!e->is_text) return;
     /* Begin a new deferred-data block.  The main text stream stays in `.text`;
@@ -295,7 +295,7 @@ static void flat_data_section(emitter_v *e)
     g_flat_data_block_nlbls = 0;
 }
 
-static void flat_text_section(emitter_v *e)
+static void flat_text_section(emitter_t *e)
 {
     if (!e->is_text) return;
     if (g_flat_data_active) {
@@ -314,7 +314,7 @@ static void flat_text_section(emitter_v *e)
     flat3c(e, "", ".section", ".text");
 }
 
-static void flat_intel_syntax(emitter_v *e)
+static void flat_intel_syntax(emitter_t *e)
 {
     if (!e->is_text) return;
     /* While buffering data, the main stream stayed in `.intel_syntax noprefix`
@@ -330,7 +330,7 @@ static void flat_intel_syntax(emitter_v *e)
     flat3c(e, "", ".intel_syntax", "noprefix");
 }
 
-static void flat_data_string(emitter_v *e, const char *s)
+static void flat_data_string(emitter_t *e, const char *s)
 {
     if (!e->is_text) return;
     /* Build the escaped quoted form once.  We escape only " and \, and
@@ -351,14 +351,14 @@ static void flat_data_string(emitter_v *e, const char *s)
     else                    flat3c(e, "", ".string", esc);
 }
 
-static void flat_data_quad(emitter_v *e, const char *arg)
+static void flat_data_quad(emitter_t *e, const char *arg)
 {
     if (!e->is_text) return;
     if (g_flat_data_active) data_buf_three_col("", ".quad", arg ? arg : "0");
     else                    flat3c(e, "", ".quad", arg ? arg : "0");
 }
 
-static void flat_data_quad_int(emitter_v *e, long long v)
+static void flat_data_quad_int(emitter_t *e, long long v)
 {
     if (!e->is_text) return;
     char buf[32]; snprintf(buf, sizeof(buf), "%lld", v);
@@ -366,7 +366,7 @@ static void flat_data_quad_int(emitter_v *e, long long v)
     else                    flat3c(e, "", ".quad", buf);
 }
 
-static void flat_data_long(emitter_v *e, long long v)
+static void flat_data_long(emitter_t *e, long long v)
 {
     if (!e->is_text) return;
     char buf[32]; snprintf(buf, sizeof(buf), "%lld", v);
@@ -374,7 +374,7 @@ static void flat_data_long(emitter_v *e, long long v)
     else                    flat3c(e, "", ".long", buf);
 }
 
-static void flat_data_zero(emitter_v *e, int n)
+static void flat_data_zero(emitter_t *e, int n)
 {
     if (!e->is_text) return;
     char buf[16]; snprintf(buf, sizeof(buf), "%d", n);
@@ -382,7 +382,7 @@ static void flat_data_zero(emitter_v *e, int n)
     else                    flat3c(e, "", ".zero", buf);
 }
 
-static void flat_globl(emitter_v *e, const char *name)
+static void flat_globl(emitter_t *e, const char *name)
 {
     if (!e->is_text) return;
     flat3c(e, "", ".globl", name);
@@ -393,7 +393,7 @@ static void flat_globl(emitter_v *e, const char *name)
  * now folded into `flat_box_dispatch_jne_jmp` below so the test concats
  * onto one line with the cond+uncond jmps that follow (per EM-FORMAT-BB-LAW
  * "no jmp instruction with only another jmp instruction on that line"). */
-static void flat_box_call(emitter_v *e, const char *rdi_load,
+static void flat_box_call(emitter_t *e, const char *rdi_load,
                           const char *fn, int mode)
 {
     if (!e->is_text) return;
@@ -406,7 +406,7 @@ static void flat_box_call(emitter_v *e, const char *rdi_load,
 
 /* Variant: arbno's box call uses a slot pointer dereference rather than
  * lea+rip.  Same three-line shape, different first instruction. */
-static void flat_box_call_slot(emitter_v *e, const char *slot_lbl,
+static void flat_box_call_slot(emitter_t *e, const char *slot_lbl,
                                const char *fn, int mode)
 {
     if (!e->is_text) return;
@@ -426,11 +426,11 @@ static void flat_box_call_slot(emitter_v *e, const char *slot_lbl,
  *   col-3 = "rax, rax;" + spaces to width 27
  *   col-4 = "jne <succ>; jmp <fail>"
  * Replaces the prior 3-line emission
- *   ev_test_rax_rax(e);
+ *   em_test_rax_rax(e);
  *   EV_JMP(e, lbl_succ, JMP_JNE);
  *   EV_JMP(e, lbl_fail, JMP_JMP);
  * which violated the LAW.  TEXT mode only. */
-static void flat_box_dispatch_jne_jmp(emitter_v *e,
+static void flat_box_dispatch_jne_jmp(emitter_t *e,
                                       bb_label_t *lbl_succ,
                                       bb_label_t *lbl_fail)
 {
@@ -451,7 +451,7 @@ static void flat_box_dispatch_jne_jmp(emitter_v *e,
  * as ONE line.  Used at the top of every BB child sub-proc (capture
  * children, arbno children) where mode 0 = α-entry, mode 1 = β-retry.
  * TEXT mode only. */
-static void flat_box_entry_dispatch(emitter_v *e,
+static void flat_box_entry_dispatch(emitter_t *e,
                                     bb_label_t *lbl_alpha_body,
                                     bb_label_t *lbl_beta)
 {
@@ -687,7 +687,7 @@ static void patnd_to_sno_string(const PATND_t *p, char *buf, size_t cap)
  * bb3c_format's empty-col-1 fusion path.  Result: banner first, then
  * `<label>:    <first content line>` on a single fused line.
  */
-static void flat_emit_banner_rule(emitter_v *e, char ch)
+static void flat_emit_banner_rule(emitter_t *e, char ch)
 {
     if (!e->is_text) return;
     char buf[BB_BANNER_RULE_LEN + 4];
@@ -703,7 +703,7 @@ static void flat_emit_banner_rule(emitter_v *e, char ch)
  *   # pattern <prefix>: <reconstructed source>
  *   #=====================================================================
  */
-static void flat_emit_pat_banner(emitter_v *e, const char *prefix, PATND_t *p)
+static void flat_emit_pat_banner(emitter_t *e, const char *prefix, PATND_t *p)
 {
     if (!e->is_text) return;
     (void)prefix; (void)p;
@@ -720,7 +720,7 @@ static void flat_emit_pat_banner(emitter_v *e, const char *prefix, PATND_t *p)
  * box banner for symmetry, no rule below (the box's α label-line
  * follows immediately).
  */
-static void flat_emit_box_banner(emitter_v *e, const char *kind,
+static void flat_emit_box_banner(emitter_t *e, const char *kind,
                                  const char *args, const char *label_prefix)
 {
     if (!e->is_text) return;
@@ -735,12 +735,12 @@ static void flat_emit_box_banner(emitter_v *e, const char *kind,
 }
 
 /* ── forward declarations ────────────────────────────────────────────────── */
-static void flat_emit_node(emitter_v *e, PATND_t *p,
+static void flat_emit_node(emitter_t *e, PATND_t *p,
                            bb_label_t *lbl_succ, bb_label_t *lbl_fail,
                            bb_label_t *lbl_β);
 
 /* ── XCAT ───────────────────────────────────────────────────────────────── */
-static void flat_emit_xcat(emitter_v *e, PATND_t *p,
+static void flat_emit_xcat(emitter_t *e, PATND_t *p,
                            bb_label_t *lbl_succ, bb_label_t *lbl_fail,
                            bb_label_t *lbl_β)
 {
@@ -793,7 +793,7 @@ static void flat_emit_xcat(emitter_v *e, PATND_t *p,
 }
 
 /* ── XOR (alternation) ──────────────────────────────────────────────────── */
-static void flat_emit_alt(emitter_v *e, PATND_t *p,
+static void flat_emit_alt(emitter_t *e, PATND_t *p,
                           bb_label_t *lbl_succ, bb_label_t *lbl_fail,
                           bb_label_t *lbl_β)
 {
@@ -819,20 +819,20 @@ static void flat_emit_alt(emitter_v *e, PATND_t *p,
 }
 
 /* ── leaf: literal string ───────────────────────────────────────────────── */
-static void flat_emit_lit(emitter_v *e, const char *lit, int len,
+static void flat_emit_lit(emitter_t *e, const char *lit, int len,
                           bb_label_t *lbl_succ, bb_label_t *lbl_fail,
                           bb_label_t *lbl_β)
 {
     /* α: if Δ + len > Σlen → fail */
-    ev_load_delta(e);                                    /* eax = Δ */
-    ev_add_eax_imm32(e, (uint32_t)len);                 /* eax += len */
-    ev_cmp_eax_siglen(e, ADDR_SIGLEN);                  /* cmp eax, [Σlen] */
+    em_load_delta(e);                                    /* eax = Δ */
+    em_add_eax_imm32(e, (uint32_t)len);                 /* eax += len */
+    em_cmp_eax_siglen(e, ADDR_SIGLEN);                  /* cmp eax, [Σlen] */
     EV_JMP(e, lbl_fail, JMP_JG);
 
     /* memcmp(Σ+Δ, lit, len): set up rdi=Σ+Δ, rsi=lit, rdx=len */
-    ev_sigma_plus_delta(e, ADDR_SIGMA);                 /* rax = Σ+Δ */
-    ev_mov_rdi_rax(e);                                  /* rdi = Σ+Δ */
-    ev_mov_rdx_imm64(e, (uint64_t)(uint32_t)len);       /* rdx = len */
+    em_sigma_plus_delta(e, ADDR_SIGMA);                 /* rax = Σ+Δ */
+    em_mov_rdi_rax(e);                                  /* rdi = Σ+Δ */
+    em_mov_rdx_imm64(e, (uint64_t)(uint32_t)len);       /* rdx = len */
 
     /* rsi = lit ptr: TEXT mode → use strtab label; BINARY → raw ptr */
     if (e->is_text && e->intern_str) {
@@ -852,22 +852,22 @@ static void flat_emit_lit(emitter_v *e, const char *lit, int len,
     }
 
     /* call memcmp — TEXT: call memcmp@PLT; BINARY: mov rax, ptr; call rax */
-    ev_call_sym_plt(e, "memcmp", (uint64_t)(uintptr_t)memcmp);
-    ev_test_eax_eax(e);                                 /* test eax, eax */
+    em_call_sym_plt(e, "memcmp", (uint64_t)(uintptr_t)memcmp);
+    em_test_eax_eax(e);                                 /* test eax, eax */
     EV_JMP(e, lbl_fail, JMP_JNE);
 
     /* success: Δ += len */
-    ev_add_delta_imm(e, len);
+    em_add_delta_imm(e, len);
     EV_JMP(e, lbl_succ, JMP_JMP);
 
     /* β: Δ -= len; fail */
     EV_LABEL(e, lbl_β);
-    ev_sub_delta_imm(e, len);
+    em_sub_delta_imm(e, len);
     EV_JMP(e, lbl_fail, JMP_JMP);
 }
 
 /* ── leaf: epsilon ──────────────────────────────────────────────────────── */
-static void flat_emit_eps(emitter_v *e, bb_label_t *lbl_succ,
+static void flat_emit_eps(emitter_t *e, bb_label_t *lbl_succ,
                           bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     if (e->is_text) {
@@ -886,7 +886,7 @@ static void flat_emit_eps(emitter_v *e, bb_label_t *lbl_succ,
 }
 
 /* ── leaf: always-fail ──────────────────────────────────────────────────── */
-static void flat_emit_fail(emitter_v *e, bb_label_t *lbl_succ,
+static void flat_emit_fail(emitter_t *e, bb_label_t *lbl_succ,
                            bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     (void)lbl_succ;
@@ -905,7 +905,7 @@ static void flat_emit_fail(emitter_v *e, bb_label_t *lbl_succ,
 }
 
 /* ── leaf: POS(n) ───────────────────────────────────────────────────────── */
-static void flat_emit_pos(emitter_v *e, int n, bb_label_t *lbl_succ,
+static void flat_emit_pos(emitter_t *e, int n, bb_label_t *lbl_succ,
                           bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     if (e->is_text) {
@@ -920,8 +920,8 @@ static void flat_emit_pos(emitter_v *e, int n, bb_label_t *lbl_succ,
         EV_LABEL(e, lbl_β);
         flat3c_action(e, "POS_\xCE\xB2", lbl_fail->name);  /* POS_β */
     } else {
-        ev_load_delta(e);
-        ev_cmp_eax_imm32(e, (uint32_t)n);
+        em_load_delta(e);
+        em_cmp_eax_imm32(e, (uint32_t)n);
         EV_JMP(e, lbl_fail, JMP_JNE);
         EV_JMP(e, lbl_succ, JMP_JMP);
         EV_LABEL(e, lbl_β); EV_JMP(e, lbl_fail, JMP_JMP);
@@ -929,7 +929,7 @@ static void flat_emit_pos(emitter_v *e, int n, bb_label_t *lbl_succ,
 }
 
 /* ── leaf: RPOS(n) ──────────────────────────────────────────────────────── */
-static void flat_emit_rpos(emitter_v *e, int n, bb_label_t *lbl_succ,
+static void flat_emit_rpos(emitter_t *e, int n, bb_label_t *lbl_succ,
                            bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     if (e->is_text) {
@@ -944,11 +944,11 @@ static void flat_emit_rpos(emitter_v *e, int n, bb_label_t *lbl_succ,
         EV_LABEL(e, lbl_β);
         flat3c_action(e, "RPOS_\xCE\xB2", lbl_fail->name);  /* RPOS_β */
     } else {
-        ev_load_siglen(e, ADDR_SIGLEN);     /* eax = Σlen */
-        ev_sub_eax_imm32(e, (uint32_t)n);  /* eax = Σlen - n */
-        ev_mov_ecx_eax(e);                 /* ecx = Σlen - n */
-        ev_load_delta(e);                  /* eax = Δ */
-        ev_cmp_eax_ecx(e);                 /* cmp Δ, Σlen-n */
+        em_load_siglen(e, ADDR_SIGLEN);     /* eax = Σlen */
+        em_sub_eax_imm32(e, (uint32_t)n);  /* eax = Σlen - n */
+        em_mov_ecx_eax(e);                 /* ecx = Σlen - n */
+        em_load_delta(e);                  /* eax = Δ */
+        em_cmp_eax_ecx(e);                 /* cmp Δ, Σlen-n */
         EV_JMP(e, lbl_fail, JMP_JNE);
         EV_JMP(e, lbl_succ, JMP_JMP);
         EV_LABEL(e, lbl_β); EV_JMP(e, lbl_fail, JMP_JMP);
@@ -956,7 +956,7 @@ static void flat_emit_rpos(emitter_v *e, int n, bb_label_t *lbl_succ,
 }
 
 /* ── leaf: charset (ANY/NOTANY/SPAN/BRK) ───────────────────────────────── */
-static void flat_emit_charset_call(emitter_v *e, bb_box_fn c_fn,
+static void flat_emit_charset_call(emitter_t *e, bb_box_fn c_fn,
                                    const char *c_fn_name,
                                    const char *chars,
                                    bb_label_t *lbl_succ, bb_label_t *lbl_fail,
@@ -998,29 +998,29 @@ static void flat_emit_charset_call(emitter_v *e, bb_box_fn c_fn,
         char rdi_arg[96]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", zlbl);
         flat3c_action(e, "lea", rdi_arg);
         flat3c_action(e, "mov", "esi, 0");
-        ev_call_sym_plt(e, c_fn_name, (uint64_t)(uintptr_t)c_fn);
+        em_call_sym_plt(e, c_fn_name, (uint64_t)(uintptr_t)c_fn);
         flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
         EV_LABEL(e, lbl_β);
         flat3c_action(e, "lea", rdi_arg);
         flat3c_action(e, "mov", "esi, 1");
-        ev_call_sym_plt(e, c_fn_name, (uint64_t)(uintptr_t)c_fn);
+        em_call_sym_plt(e, c_fn_name, (uint64_t)(uintptr_t)c_fn);
         flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
     } else {
         /* Binary path: heap cs_t */
         typedef struct { const char *chars; int delta; } cs_t;
         cs_t *z = calloc(1, sizeof(cs_t));
         z->chars = chars;
-        ev_mov_rdi_imm64(e, (uint64_t)(uintptr_t)z);
-        ev_mov_esi_imm32(e, 0);
-        ev_call_sym_plt(e, c_fn_name, (uint64_t)(uintptr_t)c_fn);
-        ev_test_rax_rax(e);
+        em_mov_rdi_imm64(e, (uint64_t)(uintptr_t)z);
+        em_mov_esi_imm32(e, 0);
+        em_call_sym_plt(e, c_fn_name, (uint64_t)(uintptr_t)c_fn);
+        em_test_rax_rax(e);
         EV_JMP(e, lbl_succ, JMP_JNE);
         EV_JMP(e, lbl_fail, JMP_JMP);
         EV_LABEL(e, lbl_β);
-        ev_mov_rdi_imm64(e, (uint64_t)(uintptr_t)z);
-        ev_mov_esi_imm32(e, 1);
-        ev_call_sym_plt(e, c_fn_name, (uint64_t)(uintptr_t)c_fn);
-        ev_test_rax_rax(e);
+        em_mov_rdi_imm64(e, (uint64_t)(uintptr_t)z);
+        em_mov_esi_imm32(e, 1);
+        em_call_sym_plt(e, c_fn_name, (uint64_t)(uintptr_t)c_fn);
+        em_test_rax_rax(e);
         EV_JMP(e, lbl_succ, JMP_JNE);
         EV_JMP(e, lbl_fail, JMP_JMP);
     }
@@ -1046,35 +1046,35 @@ extern DESCR_t bb_deferred_var_exported(void *zeta, int entry);
 extern int memcmp(const void *, const void *, size_t);
 
 /* Generic two-call emitter: α calls fn(ζ,0), β calls fn(ζ,1), result nonzero=success */
-static void flat_emit_box_call(emitter_v *e, bb_box_fn fn, const char *fn_name,
+static void flat_emit_box_call(emitter_t *e, bb_box_fn fn, const char *fn_name,
                                void *z,
                                bb_label_t *lbl_succ, bb_label_t *lbl_fail,
                                bb_label_t *lbl_β)
 {
-    ev_mov_rdi_imm64(e, (uint64_t)(uintptr_t)z);
-    ev_mov_esi_imm32(e, 0);
-    ev_call_sym_plt(e, fn_name, (uint64_t)(uintptr_t)fn);
+    em_mov_rdi_imm64(e, (uint64_t)(uintptr_t)z);
+    em_mov_esi_imm32(e, 0);
+    em_call_sym_plt(e, fn_name, (uint64_t)(uintptr_t)fn);
     if (e->is_text) {
         flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
     } else {
-        ev_test_rax_rax(e);
+        em_test_rax_rax(e);
         EV_JMP(e, lbl_succ, JMP_JNE);
         EV_JMP(e, lbl_fail, JMP_JMP);
     }
     EV_LABEL(e, lbl_β);
-    ev_mov_rdi_imm64(e, (uint64_t)(uintptr_t)z);
-    ev_mov_esi_imm32(e, 1);
-    ev_call_sym_plt(e, fn_name, (uint64_t)(uintptr_t)fn);
+    em_mov_rdi_imm64(e, (uint64_t)(uintptr_t)z);
+    em_mov_esi_imm32(e, 1);
+    em_call_sym_plt(e, fn_name, (uint64_t)(uintptr_t)fn);
     if (e->is_text) {
         flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
     } else {
-        ev_test_rax_rax(e);
+        em_test_rax_rax(e);
         EV_JMP(e, lbl_succ, JMP_JNE);
         EV_JMP(e, lbl_fail, JMP_JMP);
     }
 }
 
-static void flat_emit_node(emitter_v *e, PATND_t *p,
+static void flat_emit_node(emitter_t *e, PATND_t *p,
                            bb_label_t *lbl_succ, bb_label_t *lbl_fail,
                            bb_label_t *lbl_β)
 {
@@ -1370,9 +1370,9 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
             PATND_t *ch = p->nchildren > 0 ? p->children[0] : NULL;
             flat_emit_node(e, ch, &cs, &cf, &cb);
             EV_LABEL(e, &cs);
-            ev_sigma_plus_delta(e, ADDR_SIGMA); ev_mov_rdx_rax(e); ev_mov_eax_imm32(e, 1); ev_ret(e);
+            em_sigma_plus_delta(e, ADDR_SIGMA); em_mov_rdx_rax(e); em_mov_eax_imm32(e, 1); em_ret(e);
             EV_LABEL(e, &cf);
-            ev_mov_eax_imm32(e, 99); ev_xor_edx_edx(e); ev_ret(e);
+            em_mov_eax_imm32(e, 99); em_xor_edx_edx(e); em_ret(e);
             /* Register arbno startup fixup: flag=(void*)2 → rt_init_arbno */
             g_cap_fixup_cb((void*)(uintptr_t)2, α_lbl);
             /* Emit arbno box call via slot pointer (qword ptr deref, not lea+rip) */
@@ -1454,10 +1454,10 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
             flat_emit_node(e, ch, &cs, &cf, &cb);
             /* Success epilogue: return DT_S with Σ+Δ */
             EV_LABEL(e, &cs);
-            ev_sigma_plus_delta(e, ADDR_SIGMA); ev_mov_rdx_rax(e); ev_mov_eax_imm32(e, 1); ev_ret(e);
+            em_sigma_plus_delta(e, ADDR_SIGMA); em_mov_rdx_rax(e); em_mov_eax_imm32(e, 1); em_ret(e);
             /* Fail epilogue: return DT_FAIL */
             EV_LABEL(e, &cf);
-            ev_mov_eax_imm32(e, 99); ev_xor_edx_edx(e); ev_ret(e);
+            em_mov_eax_imm32(e, 99); em_xor_edx_edx(e); em_ret(e);
 
             /* Register fixup: pass cap_lbl name as (void*) — emit_file_header
              * treats NULL cap_ptr as "use symbolic label in child_label field" */
@@ -1530,7 +1530,7 @@ static int flat_is_eligible(PATND_t *p)
 }
 
 /* ── shared emission body ─────────────────────────────────────────────────── */
-static int flat_emit_body_v(emitter_v *e, PATND_t *p,
+static int flat_emit_body_v(emitter_t *e, PATND_t *p,
                             const char *prefix, int text_externalise)
 {
     bb_label_t lbl_α, lbl_α_body, lbl_succ, lbl_fail, lbl_β;
@@ -1564,7 +1564,7 @@ static int flat_emit_body_v(emitter_v *e, PATND_t *p,
 
     /* entry: r10 = &Δ; cmp esi, 0; je α_body (α path); else jmp β
      * TEXT:   lea r10, [rip + Δ]   (via BB_INSN_LEA_R10_SYM)
-     * BINARY: mov r10, imm64       (via ev_load_r10_delta_ptr)           */
+     * BINARY: mov r10, imm64       (via em_load_r10_delta_ptr)           */
     {   bb_insn_desc_t d = {BB_INSN_LEA_R10_SYM, ADDR_DELTA, 0, 0, SYM_DELTA};
         e->emit_insn(e, &d);
     }
@@ -1579,16 +1579,16 @@ static int flat_emit_body_v(emitter_v *e, PATND_t *p,
 
     /* PAT_γ: success → return DESCR_t{v=DT_S=1, rdx=Σ+Δ} */
     EV_LABEL(e, &lbl_succ);
-    ev_sigma_plus_delta(e, ADDR_SIGMA);  /* rax = Σ+Δ */
-    ev_mov_rdx_rax(e);                  /* rdx = Σ+Δ (σ) */
-    ev_mov_eax_imm32(e, 1);             /* rax = DT_S=1 */
-    ev_ret(e);
+    em_sigma_plus_delta(e, ADDR_SIGMA);  /* rax = Σ+Δ */
+    em_mov_rdx_rax(e);                  /* rdx = Σ+Δ (σ) */
+    em_mov_eax_imm32(e, 1);             /* rax = DT_S=1 */
+    em_ret(e);
 
     /* PAT_ω: failure → return DT_FAIL=99 */
     EV_LABEL(e, &lbl_fail);
-    ev_mov_eax_imm32(e, 99);
-    ev_xor_edx_edx(e);
-    ev_ret(e);
+    em_mov_eax_imm32(e, 99);
+    em_xor_edx_edx(e);
+    em_ret(e);
 
     /* EM-FORMAT-BB-DATA-CONSOLIDATE: flush all deferred data as ONE
      * `.section .data` block at end of blob, then restore `.section .text`.
@@ -1620,7 +1620,7 @@ bb_box_fn bb_build_flat(PATND_t *p)
     bb_buf_t buf = bb_alloc(FLAT_BUF_MAX);
     if (!buf) return NULL;
     g_flat_slot_count = 0; g_flat_node_id = 0;
-    emitter_v *e = emitter_binary_new(buf, FLAT_BUF_MAX);
+    emitter_t *e = emitter_binary_new(buf, FLAT_BUF_MAX);
     if (!e) { bb_free(buf, FLAT_BUF_MAX); return NULL; }
     flat_emit_body_v(e, p, "pat_flat", 0);
     int nbytes = emitter_end(e);
@@ -1637,7 +1637,7 @@ int bb_build_flat_text(PATND_t *p, FILE *out, const char *prefix)
      * emitted into the same `.s` rely on the monotonic counter to
      * avoid internal-label collisions (xcat0_mid_g, xcat1_mid_g, ...).
      * Use bb_build_flat_text_reset() between unrelated emit runs. */
-    emitter_v *e = emitter_text_new(out);
+    emitter_t *e = emitter_text_new(out);
     if (!e) return -1;
     e->intern_str = g_flat_intern_str;  /* wire strtab callback if set */
     int rc = flat_emit_body_v(e, p, prefix, 1);
@@ -1702,7 +1702,7 @@ int bb_macros_write_to_path(const char *path)
     if (!f) return -1;
     fprintf(f, "# === BEGIN bb macro library (EM-7c-bb-macros) ===\n");
     fprintf(f, "# One named .macro/.endm per leaf-box port.  Three-column shape.\n");
-    fprintf(f, "# GAS expands to byte-identical inline x86 (same as ev_* emissions).\n");
+    fprintf(f, "# GAS expands to byte-identical inline x86 (same as em_* emissions).\n");
     /* DELTA_LOAD: eax = [r10] */
     bm_macro(f, "DELTA_LOAD", "");
     bm_op   (f, "mov", "eax, [r10]");

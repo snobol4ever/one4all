@@ -37,9 +37,9 @@ side; the SM side has drifted and the retrofit brings it back.
 ```
                     ┌─────────────────────────────────┐
                     │  per-opcode template (C)        │   <-- ONE source of truth
-                    │  emit_sm_halt(emit_v *e)        │       per SM opcode
-                    │  emit_sm_push_lit_i(emit_v *e)  │
-                    │  emit_sm_jump(emit_v *e)        │
+                    │  emit_sm_halt(emitter_t *e)        │       per SM opcode
+                    │  emit_sm_push_lit_i(emitter_t *e)  │
+                    │  emit_sm_jump(emitter_t *e)        │
                     │  …                              │
                     └─────────────┬───────────────────┘
                                   │ calls e->ret(e),
@@ -48,7 +48,7 @@ side; the SM side has drifted and the retrofit brings it back.
                                   │       e->comment(e, "…")
                                   ▼
                   ┌───────────────────────────────────┐
-                  │  emit_v vtable surface (emit_v.h) │
+                  │  emitter_t vtable surface (emitter.h) │
                   └─────┬───────────┬─────────┬───────┘
                         │           │         │
               ┌─────────▼──┐  ┌─────▼────┐  ┌─▼─────────────────────┐
@@ -85,9 +85,9 @@ The three backends cover three productions of the same template:
 
 | Backend          | Output       | Consumer                       | Applies to |
 |------------------|--------------|--------------------------------|------------|
-| `emit_v_binary`  | x86-64 bytes | mode-3 in-process JIT          | SM and BB templates |
-| `emit_v_text`    | `MNEMONIC <args>` | mode-4's per-call-site `.s` line — but for now this emits **macro invocations** matching the macro names defined by `macro_def` (e.g., `PUSH_INT 42`); the underlying instruction sequence is hidden in the macro body | SM and BB templates |
-| `emit_v_macro_def` | `.macro NAME params / <body> / .endm` | `sm_macros.s` regeneration | **SM templates only** — BB has no macro layer |
+| `emitter_binary`  | x86-64 bytes | mode-3 in-process JIT          | SM and BB templates |
+| `emitter_text`    | `MNEMONIC <args>` | mode-4's per-call-site `.s` line — but for now this emits **macro invocations** matching the macro names defined by `macro_def` (e.g., `PUSH_INT 42`); the underlying instruction sequence is hidden in the macro body | SM and BB templates |
+| `emitter_macro_def` | `.macro NAME params / <body> / .endm` | `sm_macros.s` regeneration | **SM templates only** — BB has no macro layer |
 
 In practice mode-4's per-call-site emission may walk the same template
 with **text backend in "invocation mode"** (emit one line like
@@ -103,12 +103,12 @@ program describing the opcode's effect in mnemonics and comments.
 
 ```c
 /* sm_templates/halt.c — SM_HALT template.  ONE source of truth.
- * Emitted three ways via emit_v: bytes (mode-3), macro invocation
+ * Emitted three ways via emitter_t: bytes (mode-3), macro invocation
  * (mode-4 site), macro body (sm_macros.s regen). */
 
-#include "../emit_v.h"
+#include "../emitter.h"
 
-void emit_sm_halt(emit_v *e)
+void emit_sm_halt(emitter_t *e)
 {
     e->comment(e, "SM_HALT — exit sm_jit_run via ret");
 
@@ -131,17 +131,23 @@ in three productions.  No "see also sm_macros.s" footnote; no
 
 ### The vtable surface
 
-**Naming.**  The `_v` suffix on `emit_v` reads as *vtable* (table of
-function pointers).  Convention inherited from the existing BB-side
-`emitter_v.h` already in the tree (whose `emitter_text.c` and
-`emitter_binary.c` are this rung's prior art).  After the retrofit
-completes, `emitter_v.h` deletes and `emit_v.h` is the survivor.
+**Naming.**  The vtable type is `emitter_t`; the header is
+`emitter.h`.  Both names predate this rung — the existing BB-side
+`emitter_text.c` and `emitter_binary.c` use them — and this rung
+just *extends* the same vocabulary to cover the SM side and the
+new macro-definition backend.  No new vtable type is introduced.
 
-`emit_v.h` defines one C struct of function pointers plus per-backend
+(Sess 2026-05-11 housekeeping: the earlier "`_v`" suffix on the
+header and struct, plus the `ev_` prefix on inline helpers, were
+removed in the same commit that landed this third-pass amendment;
+banned project-wide.  If you find one in a comment or commit
+message, treat it as a typo and rename it.  Live source is clean.)
+
+`emitter.h` defines one C struct of function pointers plus per-backend
 opaque state.
 
 ```c
-/* emit_v.h — surface for all three backends */
+/* emitter.h — surface for all three backends */
 
 #include <stdio.h>
 #include <stdint.h>
@@ -152,87 +158,87 @@ typedef enum {
     REG_R14, REG_R15, REG_RBP, REG_RSP
 } emit_reg_t;
 
-typedef struct emit_v {
+typedef struct emitter_t {
     /* — opcode-level primitives (one x86 instruction per call) — */
-    void (*mov_reg_imm64)  (struct emit_v *e, emit_reg_t r, uint64_t imm);
-    void (*mov_reg_imm32)  (struct emit_v *e, emit_reg_t r, uint32_t imm);
-    void (*mov_reg_reg)    (struct emit_v *e, emit_reg_t dst, emit_reg_t src);
-    void (*mov_mem_imm32)  (struct emit_v *e, emit_reg_t base, int32_t disp, uint32_t imm);
-    void (*mov_reg_mem)    (struct emit_v *e, emit_reg_t dst, emit_reg_t base, int32_t disp);
-    void (*mov_mem_reg)    (struct emit_v *e, emit_reg_t base, int32_t disp, emit_reg_t src);
-    void (*inc_mem_disp8)  (struct emit_v *e, emit_reg_t base, int8_t disp);
-    void (*sub_rsp_imm8)   (struct emit_v *e, int8_t imm);
-    void (*add_rsp_imm8)   (struct emit_v *e, int8_t imm);
-    void (*cmp_reg_imm32)  (struct emit_v *e, emit_reg_t r, int32_t imm);
-    void (*test_reg_reg)   (struct emit_v *e, emit_reg_t a, emit_reg_t b);
-    void (*call_reg)       (struct emit_v *e, emit_reg_t r);
-    void (*call_plt)       (struct emit_v *e, const char *sym);
-    void (*jmp_rel32_sym)  (struct emit_v *e, const char *sym);
-    void (*jmp_rel32_pc)   (struct emit_v *e, int target_pc);
-    void (*je_rel32_sym)   (struct emit_v *e, const char *sym);
-    void (*jne_rel32_sym)  (struct emit_v *e, const char *sym);
-    void (*je_rel32_pc)    (struct emit_v *e, int target_pc);
-    void (*jne_rel32_pc)   (struct emit_v *e, int target_pc);
-    void (*ret)            (struct emit_v *e);
-    void (*push_reg)       (struct emit_v *e, emit_reg_t r);
-    void (*pop_reg)        (struct emit_v *e, emit_reg_t r);
-    void (*lea_rip_sym)    (struct emit_v *e, emit_reg_t r, const char *sym);
-    void (*xor_reg_reg)    (struct emit_v *e, emit_reg_t dst, emit_reg_t src);
+    void (*mov_reg_imm64)  (struct emitter_t *e, emit_reg_t r, uint64_t imm);
+    void (*mov_reg_imm32)  (struct emitter_t *e, emit_reg_t r, uint32_t imm);
+    void (*mov_reg_reg)    (struct emitter_t *e, emit_reg_t dst, emit_reg_t src);
+    void (*mov_mem_imm32)  (struct emitter_t *e, emit_reg_t base, int32_t disp, uint32_t imm);
+    void (*mov_reg_mem)    (struct emitter_t *e, emit_reg_t dst, emit_reg_t base, int32_t disp);
+    void (*mov_mem_reg)    (struct emitter_t *e, emit_reg_t base, int32_t disp, emit_reg_t src);
+    void (*inc_mem_disp8)  (struct emitter_t *e, emit_reg_t base, int8_t disp);
+    void (*sub_rsp_imm8)   (struct emitter_t *e, int8_t imm);
+    void (*add_rsp_imm8)   (struct emitter_t *e, int8_t imm);
+    void (*cmp_reg_imm32)  (struct emitter_t *e, emit_reg_t r, int32_t imm);
+    void (*test_reg_reg)   (struct emitter_t *e, emit_reg_t a, emit_reg_t b);
+    void (*call_reg)       (struct emitter_t *e, emit_reg_t r);
+    void (*call_plt)       (struct emitter_t *e, const char *sym);
+    void (*jmp_rel32_sym)  (struct emitter_t *e, const char *sym);
+    void (*jmp_rel32_pc)   (struct emitter_t *e, int target_pc);
+    void (*je_rel32_sym)   (struct emitter_t *e, const char *sym);
+    void (*jne_rel32_sym)  (struct emitter_t *e, const char *sym);
+    void (*je_rel32_pc)    (struct emitter_t *e, int target_pc);
+    void (*jne_rel32_pc)   (struct emitter_t *e, int target_pc);
+    void (*ret)            (struct emitter_t *e);
+    void (*push_reg)       (struct emitter_t *e, emit_reg_t r);
+    void (*pop_reg)        (struct emitter_t *e, emit_reg_t r);
+    void (*lea_rip_sym)    (struct emitter_t *e, emit_reg_t r, const char *sym);
+    void (*xor_reg_reg)    (struct emitter_t *e, emit_reg_t dst, emit_reg_t src);
 
     /* — structural (binary: records offset; text: writes line) — */
-    void (*label)          (struct emit_v *e, const char *name);
-    void (*pc_label)       (struct emit_v *e, int pc);
-    void (*pad_to_blob_size)(struct emit_v *e);
-    void (*section)        (struct emit_v *e, const char *name);   /* .text, .data, .rodata */
-    void (*directive)      (struct emit_v *e, const char *line);   /* arbitrary GAS directive */
-    void (*data_quad)      (struct emit_v *e, uint64_t val);       /* .quad imm */
-    void (*data_quad_sym)  (struct emit_v *e, const char *sym);    /* .quad sym */
-    void (*data_string)    (struct emit_v *e, const char *bytes, size_t len);
+    void (*label)          (struct emitter_t *e, const char *name);
+    void (*pc_label)       (struct emitter_t *e, int pc);
+    void (*pad_to_blob_size)(struct emitter_t *e);
+    void (*section)        (struct emitter_t *e, const char *name);   /* .text, .data, .rodata */
+    void (*directive)      (struct emitter_t *e, const char *line);   /* arbitrary GAS directive */
+    void (*data_quad)      (struct emitter_t *e, uint64_t val);       /* .quad imm */
+    void (*data_quad_sym)  (struct emitter_t *e, const char *sym);    /* .quad sym */
+    void (*data_string)    (struct emitter_t *e, const char *bytes, size_t len);
 
     /* — BB-port primitives (binary: emits jmp / label; text: writes port-named label,
      *   honors three-column LAW; both honor α/β/γ/ω as semantic ports) — */
-    void (*bb_port_label)  (struct emit_v *e, const char *box_prefix, char port);
+    void (*bb_port_label)  (struct emitter_t *e, const char *box_prefix, char port);
                                                    /* port ∈ {'α','β','γ','ω'} */
-    void (*bb_port_jmp)    (struct emit_v *e, const char *box_prefix, char port);
+    void (*bb_port_jmp)    (struct emitter_t *e, const char *box_prefix, char port);
                                                    /* jmp to <box_prefix>_<port> */
-    void (*bb_box_banner)  (struct emit_v *e, const char *kind, const char *args);
+    void (*bb_box_banner)  (struct emitter_t *e, const char *kind, const char *args);
                                                    /* text: 120-char #---- rule
                                                       + "# BOX <kind>(<args>) [<prefix>]"
                                                       binary: NO-OP */
 
     /* — formatting / readability (text honors; binary ignores) — */
-    void (*comment)        (struct emit_v *e, const char *text);
-    void (*banner)         (struct emit_v *e, const char *text);    /* 120-char #==== rule + label */
-    void (*minor_break)    (struct emit_v *e, const char *text);    /* 120-char #---- rule + label */
-    void (*column_break)   (struct emit_v *e);                       /* align next emission to next column */
-    void (*blank_line)     (struct emit_v *e);
+    void (*comment)        (struct emitter_t *e, const char *text);
+    void (*banner)         (struct emitter_t *e, const char *text);    /* 120-char #==== rule + label */
+    void (*minor_break)    (struct emitter_t *e, const char *text);    /* 120-char #---- rule + label */
+    void (*column_break)   (struct emitter_t *e);                       /* align next emission to next column */
+    void (*blank_line)     (struct emitter_t *e);
 
     /* — macro_def-only hooks (binary + text invocation-mode ignore) — */
-    void (*macro_begin)    (struct emit_v *e, const char *name,
+    void (*macro_begin)    (struct emitter_t *e, const char *name,
                             const char *const *params, int nparams);
-    void (*macro_param_ref)(struct emit_v *e, const char *name);    /* emits \param in macro body */
-    void (*macro_end)      (struct emit_v *e);
+    void (*macro_param_ref)(struct emitter_t *e, const char *name);    /* emits \param in macro body */
+    void (*macro_end)      (struct emitter_t *e);
 
     /* — opaque per-backend state — */
     void *state;
-} emit_v;
+} emitter_t;
 ```
 
 Three backend factories:
 
 ```c
-/* emit_v_binary.c */
-emit_v *emit_v_binary_create(int seg);                   /* seg = SEG_CODE typically */
-void    emit_v_binary_destroy(emit_v *e);
+/* emitter_binary.c */
+emitter_t *emitter_binary_create(int seg);                   /* seg = SEG_CODE typically */
+void    emitter_binary_destroy(emitter_t *e);
 
-/* emit_v_text.c */
-typedef enum { TEXT_MODE_INVOCATION, TEXT_MODE_DEFINITION } emit_v_text_mode;
-emit_v *emit_v_text_create(FILE *out, emit_v_text_mode mode);
-void    emit_v_text_destroy(emit_v *e);
+/* emitter_text.c */
+typedef enum { TEXT_MODE_INVOCATION, TEXT_MODE_DEFINITION } emitter_text_mode_t;
+emitter_t *emitter_text_create(FILE *out, emitter_text_mode_t mode);
+void    emitter_text_destroy(emitter_t *e);
 
-/* emit_v_macro_def.c — thin wrapper around emit_v_text in DEFINITION mode */
-emit_v *emit_v_macro_def_create(FILE *out);
-void    emit_v_macro_def_destroy(emit_v *e);
+/* emitter_macro_def.c — thin wrapper around emitter_text in DEFINITION mode */
+emitter_t *emitter_macro_def_create(FILE *out);
+void    emitter_macro_def_destroy(emitter_t *e);
 ```
 
 ### Three-call-site discipline
@@ -241,27 +247,27 @@ A template's body is the same regardless of caller:
 
 ```c
 /* mode-3 driver, in sm_codegen.c, replacing inline byte writes */
-emit_v *e = emit_v_binary_create(SEG_CODE);
+emitter_t *e = emitter_binary_create(SEG_CODE);
 emit_sm_halt(e);
-emit_v_binary_destroy(e);
+emitter_binary_destroy(e);
 
 /* mode-4 driver, in sm_codegen_x64_emit.c, per call site
  * — runs the template in invocation mode, which renders the macro
  *   invocation line `HALT` and stops (does not expand the body) */
-emit_v *e = emit_v_text_create(out, TEXT_MODE_INVOCATION);
+emitter_t *e = emitter_text_create(out, TEXT_MODE_INVOCATION);
 emit_sm_halt(e);
-emit_v_text_destroy(e);
+emitter_text_destroy(e);
 
 /* sm_macros.s regenerator, runs once per build
  * — runs every template in definition mode, which renders
  *   `.macro HALT / <full body> / .endm` */
 FILE *macs = fopen("sm_macros.s", "w");
-emit_v *e = emit_v_macro_def_create(macs);
+emitter_t *e = emitter_macro_def_create(macs);
 emit_sm_halt(e);          /* emits .macro HALT ; … ; .endm */
 emit_sm_push_lit_i(e);    /* emits .macro PUSH_INT val ; … ; .endm */
 emit_sm_push_lit_s(e);    /* emits .macro PUSH_LIT_S lbl, len ; … ; .endm */
 …
-emit_v_macro_def_destroy(e);
+emitter_macro_def_destroy(e);
 fclose(macs);
 ```
 
@@ -285,7 +291,7 @@ points: a template wraps its body in `e->macro_begin(...)` /
 no-ops while it issues one or two `e->macro_param_ref(...)` to
 declare its operands (invocation mode uses those refs to compose the
 single output line).  Detailed render rules live in
-`emit_v_text.c`'s implementation comments.
+`emitter_text.c`'s implementation comments.
 
 ### Mode-3 control flow gets fixed for free
 
@@ -322,7 +328,7 @@ is replaced by template calls.
 ### sm_macros.s regeneration
 
 A small generator program (or build-time make rule) instantiates
-`emit_v_macro_def` and invokes every per-opcode template once.  The
+`emitter_macro_def` and invokes every per-opcode template once.  The
 output IS `sm_macros.s`.  The file is committed (for build-without-
 generator portability) and `make` regenerates it when any template
 changes.
@@ -338,17 +344,17 @@ Hand-editing `sm_macros.s` is forbidden after the retrofit completes
 SM and BB are not phased — SM first, BB deferred.  They are co-equal
 from day one.  Every SM instruction gets its own template C function;
 every BB box gets its own template C function.  They share the
-`emit_v` surface, the backends, and the same one-file-per-emission-unit
+`emitter_t` surface, the backends, and the same one-file-per-emission-unit
 discipline.
 
 File-system layout:
 
 ```
 src/runtime/x86/
-    emit_v.h                          shared surface
-    emit_v_binary.c                   binary backend (writes x86 bytes)
-    emit_v_text.c                     text backend (writes GAS asm text)
-    emit_v_macro_def.c                macro-definition backend (regen sm_macros.s)
+    emitter.h                          shared surface
+    emitter_binary.c                   binary backend (writes x86 bytes)
+    emitter_text.c                     text backend (writes GAS asm text)
+    emitter_macro_def.c                macro-definition backend (regen sm_macros.s)
     templates/
         sm_halt.c                     ┐
         sm_push_lit_i.c               │
@@ -389,7 +395,7 @@ by side because they share the surface; there is no architectural
 reason to fork them into separate trees.
 
 The existing `bb_emit.c` EMIT_TEXT/EMIT_BINARY mode switch collapses
-into `emit_v_binary` / `emit_v_text` — one vtable across SM and BB.
+into `emitter_binary` / `emitter_text` — one vtable across SM and BB.
 The existing per-box C functions in `bb_boxes.c` / `bb_flat.c` migrate
 one box at a time into their per-box template file.
 
@@ -400,7 +406,7 @@ one box at a time into their per-box template file.
 ⛔ **Co-equal does not mean symmetric on every backend.**  Among the
 three backends, `macro_def` is **SM-only**.  BB box templates never
 call `macro_begin` / `macro_end` / `macro_param_ref`, and the
-`emit_v_macro_def` driver never instantiates a BB template.
+`emitter_macro_def` driver never instantiates a BB template.
 
 Why: `sm_macros.s` is a library of parameterized GAS `.macro`
 definitions (`HALT`, `PUSH_INT val`, `PUSH_LIT_S lbl, len`, …) that
@@ -425,11 +431,11 @@ Concretely:
 
 | Backend            | Invoked on SM templates | Invoked on BB templates |
 |--------------------|:-----------------------:|:-----------------------:|
-| `emit_v_binary`    | yes — mode-3            | yes — mode-3            |
-| `emit_v_text`      | yes — mode-4            | yes — mode-4            |
-| `emit_v_macro_def` | yes — sm_macros.s regen | **no — never**          |
+| `emitter_binary`    | yes — mode-3            | yes — mode-3            |
+| `emitter_text`      | yes — mode-4            | yes — mode-4            |
+| `emitter_macro_def` | yes — sm_macros.s regen | **no — never**          |
 
-The `emit_v_macro_def` driver's main loop iterates over the SM
+The `emitter_macro_def` driver's main loop iterates over the SM
 opcode-template list only.  There is no `bb_macros.s` regeneration
 counterpart; if `bb_macros.s` exists in the tree as a hand-edited
 file, it stays hand-edited (or, more likely, the BB-side
@@ -437,7 +443,7 @@ macro file goes away entirely after the retrofit since flat-glob
 emission writes everything inline).
 
 The `macro_begin / macro_end / macro_param_ref` slots on the
-`emit_v` struct exist for SM templates' use.  BB templates simply
+`emitter_t` struct exist for SM templates' use.  BB templates simply
 don't call them.  Static analysis can confirm: `grep macro_ templates/bb_*.c`
 should return zero hits at any point in the project's life.
 
@@ -445,7 +451,7 @@ should return zero hits at any point in the project's life.
 
 ## The "sprinkle" model — generous surface, per-backend ignore rights
 
-A template C function can issue *any* call on the `emit_v` surface,
+A template C function can issue *any* call on the `emitter_t` surface,
 not just instruction emission.  Comments, banners, blank lines,
 column breaks, section markers, structural assertions — all of these
 are first-class operations on the surface.  Each backend chooses
@@ -487,9 +493,9 @@ A worked example for SM_HALT showing the sprinkle:
 /* sm_halt.c — SM_HALT template.  Sprinkle: comments, banner, blob-pad.
  * Each backend implements what it cares about. */
 
-#include "../emit_v.h"
+#include "../emitter.h"
 
-void emit_sm_halt(emit_v *e)
+void emit_sm_halt(emitter_t *e)
 {
     e->macro_begin(e, "HALT", NULL, 0);          /* macro_def: emits ".macro HALT"
                                                     text/invocation: NO-OP
@@ -523,7 +529,7 @@ intent.
 ## Cross-language future
 
 Per Lon (Q5 sess 2026-05-11) and ARCH-SCRIP.md mode 4: x86 today;
-JVM, .NET, JS, WASM, C tomorrow.  When that work begins, the `emit_v`
+JVM, .NET, JS, WASM, C tomorrow.  When that work begins, the `emitter_t`
 surface raises one level: opcode-level primitives become host-neutral
 ("push int constant 42", "call runtime function rt_push_int") and
 each backend (x86, JVM, .NET, JS, WASM, C) provides its own
@@ -541,8 +547,8 @@ per opcode; mode-3 and mode-4 share it) is done now.
    amendment.  No code.
 
 2. **EM-MODE4-IS-MODE3-DUMP-b — vtable skeleton.**  Add
-   `src/runtime/x86/emit_v.h` with the struct.  Three skeleton backend
-   impls: `emit_v_binary.c`, `emit_v_text.c`, `emit_v_macro_def.c`
+   `src/runtime/x86/emitter.h` with the struct.  Three skeleton backend
+   impls: `emitter_binary.c`, `emitter_text.c`, `emitter_macro_def.c`
    (last is a thin wrapper over text in DEFINITION mode).  Create
    `src/runtime/x86/templates/` directory.  Wire into Makefile.
    Nothing calls them yet.  Gates green.
@@ -622,11 +628,11 @@ per opcode; mode-3 and mode-4 share it) is done now.
 12. **EM-MODE4-IS-MODE3-DUMP-w — rung close.**  Run
     `test_gate_em_beauty_subsystems_mode4.sh` — gate must improve from
     baseline (PASS=4 FAIL=13) since byte-identity is by construction.
-    Capture new baseline.  Delete `emitter_v.h` / `emitter_text.c` /
+    Capture new baseline.  Delete `emitter_t.h` / `emitter_text.c` /
     `emitter_binary.c` (the BB-side legacy vtable subsumed by
-    `emit_v.h`).  Delete `sm_emit_template.c` / `sm_emit_template.h`
+    `emitter.h`).  Delete `sm_emit_template.c` / `sm_emit_template.h`
     (the SM-side macro-renderer subsumed by templates +
-    `emit_v_text.c`).  File-count delta proves consolidation.
+    `emitter_text.c`).  File-count delta proves consolidation.
 
 ---
 

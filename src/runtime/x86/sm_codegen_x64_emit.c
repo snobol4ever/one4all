@@ -236,7 +236,7 @@ static void strtab_label(char *buf, size_t bufsz, const char *s)
  * Uses a static buffer — safe because callers only need the label momentarily
  * to build a bb_insn_desc_t.sym before emit_insn consumes it. */
 static char g_intern_str_buf[64];
-static const char *codegen_intern_str(emitter_v *unused, const char *s)
+static const char *codegen_intern_str(emitter_t *unused, const char *s)
 {
     (void)unused;
     if (s) strtab_intern(s);          /* ensure entry exists */

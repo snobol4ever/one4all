@@ -1,5 +1,5 @@
 /*
- * emitter_text.c — GAS/text-mode implementation of emitter_v
+ * emitter_text.c — GAS/text-mode implementation of emitter_t
  *
  * EM-7c-bb-three-column (2026-05-09):
  *   Every BB-box body line emits in three-column shape
@@ -19,7 +19,7 @@
  * Sprint:  EM-7b'' / EM-7c-bb-three-column / GOAL-MODE4-EMIT
  */
 
-#include "emitter_v.h"
+#include "emitter.h"
 #include "bb_emit.h"     /* bb3c_format */
 #include <stdlib.h>
 #include <string.h>
@@ -27,14 +27,14 @@
 
 typedef struct { FILE *out; int pos; } text_ctx_t;
 #define CTX(e) ((text_ctx_t *)((e)->ctx))
-static FILE *outf(emitter_v *e) { FILE *f = CTX(e)->out; return f ? f : stdout; }
+static FILE *outf(emitter_t *e) { FILE *f = CTX(e)->out; return f ? f : stdout; }
 
 /* ── three-column shorthands ──────────────────────────────────────────────── */
 /* EM-7c-bb-three-column-split (2026-05-09): take mnemonic and args separately,
  * so col 2 holds ONLY the mnemonic and col 3 holds the operands.  The prior
  * emit3c_action stuffed both into col 2 and overflowed the 16-wide field. */
 
-static void emit3c_op(emitter_v *e, const char *mn, const char *fmt, ...)
+static void emit3c_op(emitter_t *e, const char *mn, const char *fmt, ...)
 {
     char buf[256];
     if (fmt) {
@@ -51,14 +51,14 @@ static void emit3c_op(emitter_v *e, const char *mn, const char *fmt, ...)
 /* Goto-only: col 1 empty, col 2 = jmp/je/jne/..., col 3 = target.
  * EM-FORMAT-BB-FUSED-GOTOS: routes through bb3c_emit_jmp for cond+uncond
  * fusion (defined in bb_emit.c). */
-static void emit3c_jmp(emitter_v *e, const char *mn, const char *target)
+static void emit3c_jmp(emitter_t *e, const char *mn, const char *target)
 {
     bb3c_emit_jmp(outf(e), mn ? mn : "", target ? target : "");
 }
 
 /* ── emit_insn: one three-column line per instruction (action column) ─────── */
 
-static void text_emit_insn(emitter_v *e, const bb_insn_desc_t *d)
+static void text_emit_insn(emitter_t *e, const bb_insn_desc_t *d)
 {
     uint64_t a0 = d->a0;
     uint32_t a1 = d->a1;
@@ -113,14 +113,14 @@ static void text_emit_insn(emitter_v *e, const bb_insn_desc_t *d)
 }
 
 /* ── label_define: pure-label line (cols 2+3 empty) ──────────────────────── */
-static void text_label_define(emitter_v *e, bb_label_t *lbl)
+static void text_label_define(emitter_t *e, bb_label_t *lbl)
 {
     char lbuf[256]; snprintf(lbuf, sizeof(lbuf), "%s:", lbl->name);
     bb3c_format(outf(e), lbuf, "", "");
 }
 
 /* ── emit_jmp: jump line (col 2 = jmp/je/..., col 3 = target) ────────────── */
-static void text_emit_jmp(emitter_v *e, bb_label_t *target, jmp_kind_t kind)
+static void text_emit_jmp(emitter_t *e, bb_label_t *target, jmp_kind_t kind)
 {
     const char *mn[] = {"jmp","je","jne","jl","jge","jg"};
     emit3c_jmp(e, mn[(int)kind < 6 ? (int)kind : 0], target->name);
@@ -128,13 +128,13 @@ static void text_emit_jmp(emitter_v *e, bb_label_t *target, jmp_kind_t kind)
 }
 
 /* ── global_sym: directive line (col 2 = .global, col 3 = name) ──────────── */
-static void text_global_sym(emitter_v *e, const char *name)
+static void text_global_sym(emitter_t *e, const char *name)
 {
     bb3c_format(outf(e), "", ".global", name ? name : "");
 }
 
 /* ── fprintf_raw ───────────────────────────────────────────────────────────── */
-static void text_fprintf_raw(emitter_v *e, const char *fmt, ...)
+static void text_fprintf_raw(emitter_t *e, const char *fmt, ...)
 {
     /* EM-FORMAT-BB-FUSED-GOTOS: any raw text emission (banners, EV_TEXT
      * blocks) MUST flush any deferred cond-jmp first, otherwise the
@@ -149,10 +149,10 @@ static void text_fprintf_raw(emitter_v *e, const char *fmt, ...)
 }
 
 /* ── pos ───────────────────────────────────────────────────────────────────── */
-static int text_pos(emitter_v *e) { return CTX(e)->pos; }
+static int text_pos(emitter_t *e) { return CTX(e)->pos; }
 
 /* ── constructor ───────────────────────────────────────────────────────────── */
-static const emitter_v text_tmpl = {
+static const emitter_t text_tmpl = {
     .emit_insn    = text_emit_insn,
     .label_define = text_label_define,
     .emit_jmp     = text_emit_jmp,
@@ -164,9 +164,9 @@ static const emitter_v text_tmpl = {
     .ctx          = NULL,
 };
 
-emitter_v *emitter_text_new(FILE *out)
+emitter_t *emitter_text_new(FILE *out)
 {
-    emitter_v *e = malloc(sizeof(emitter_v));
+    emitter_t *e = malloc(sizeof(emitter_t));
     if (!e) return NULL;
     *e = text_tmpl;
     text_ctx_t *ctx = calloc(1, sizeof(text_ctx_t));
@@ -176,19 +176,19 @@ emitter_v *emitter_text_new(FILE *out)
     return e;
 }
 
-void emitter_free(emitter_v *e) { if (!e) return; free(e->ctx); free(e); }
+void emitter_free(emitter_t *e) { if (!e) return; free(e->ctx); free(e); }
 
 /* EM-FORMAT-BB lone-label fusion (2026-05-09):
  * Public accessor so callers in bb_flat.c can route their emissions
  * through bb_emit.c's `bb3c_format`, sharing the pending-label fusion
  * buffer.  Returns NULL for non-text emitters (binary mode). */
-FILE *emitter_text_file(emitter_v *e)
+FILE *emitter_text_file(emitter_t *e)
 {
     if (!e || e->emit_insn != text_emit_insn) return NULL;
     return outf(e);
 }
 
-int emitter_end(emitter_v *e)
+int emitter_end(emitter_t *e)
 {
     if (!e) return 0;
     if (e->emit_insn == text_emit_insn)

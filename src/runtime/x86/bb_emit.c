@@ -204,7 +204,7 @@ void bb_emit_byte(uint8_t b)
     if (bb_emit_mode == EMIT_TEXT) {
         /* EM-7c-bb-three-column: TEXT mode never emits .byte hex walls.
          * Every reachable instruction routes through a named bb_insn_*
-         * helper (mnemonic) or emitter_v->emit_insn (mnemonic).  A
+         * helper (mnemonic) or emitter_t->emit_insn (mnemonic).  A
          * direct bb_emit_byte from TEXT mode is a bug — caller is
          * leaking BINARY-mode byte knowledge into the text path. */
         fprintf(stderr,

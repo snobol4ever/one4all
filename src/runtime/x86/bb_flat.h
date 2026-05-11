@@ -32,7 +32,7 @@
 #include "bb_pool.h"
 #include "snobol4.h"
 #include "bb_box.h"
-#include "emitter_v.h"  /* emitter_v — for bb_flat_set_intern_str signature */
+#include "emitter.h"  /* emitter_t — for bb_flat_set_intern_str signature */
 
 /*
  * Build a flat-globbed blob for an entire invariant PATND_t tree.
@@ -75,7 +75,7 @@ int bb_build_flat_text(PATND_t *p, FILE *out, const char *prefix);
 /* EM-7c-symbolic: set the intern_str callback used by bb_build_flat_text.
  * Call before each emit run so bb_flat.c can route literal strings through
  * the SM-side strtab instead of baking raw process pointers. */
-void bb_flat_set_intern_str(const char *(*fn)(emitter_v *, const char *));
+void bb_flat_set_intern_str(const char *(*fn)(emitter_t *, const char *));
 
 /*
  * EM-7c: reset internal label/slot counters between unrelated emit runs.
