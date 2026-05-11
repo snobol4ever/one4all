@@ -1979,6 +1979,49 @@ static size_t emit_jump_blob_skeleton(int32_t target_pc)
 }
 
 /*
+ * emit_label_blob — emit a TRULY stackless SM_LABEL blob.
+ *
+ * SM_LABEL is a build-time marker; its runtime handler `h_label` is a
+ * literal no-op (see sm_interp.c case SM_LABEL: break;).  Mode-2 simply
+ * skips it; mode-3 must too.
+ *
+ * BUG HISTORY (ME-14 / 2026-05-11c):
+ * Prior to this rung, SM_LABEL routed through `emit_standard_blob_no_stack`
+ * (shared with SM_STNO).  That blob skips the pre-sync (r12→sp) but
+ * UNCONDITIONALLY runs the post-sync (sp→r12).  The post-sync was safe
+ * for SM_STNO because h_stno explicitly resets sp=0 — the reload writes
+ * a fresh value.  But for SM_LABEL the reload writes a STALE sp from
+ * wherever the previous standard_blob ran, OVERWRITING any r12 growth
+ * accumulated by inline-native blobs (SM_PUSH_VAR, SM_PAT_*, etc.) in
+ * between.  Repro: Qize_driver.sno's *assign(.part, *'X') alternatives
+ * — every alt's SM_PUSH_VAR + SM_PAT_DEREF + SM_JUMP -> SM_LABEL chain
+ * lost the SM_PUSH_VAR's r12+=16 the moment SM_LABEL's post-sync fired,
+ * leaving the per-alt pattern-build sp short by 1 slot.  Accumulated
+ * across 12 SM_PUSH_EXPRESSION + 6 SM_PAT_CAPTURE_FN_ARGS + 5 SM_PAT_ALT
+ * + 1 SM_PAT_CAT yielded STATE->sp = -3 at the closing SM_EXEC_STMT.
+ *
+ * Fix: make SM_LABEL blob a true no-op.  No C call.  No sync.  Just
+ * pc++ + jmp trampoline.  9 bytes — 35 bytes smaller than the prior
+ * standard_blob_no_stack shape (44 bytes) and faster on every fire.
+ *
+ * Shape (9 bytes):
+ *   inc dword [r13+20]      (41 ff 45 14)  4 bytes — pc++
+ *   jmp rel32 trampoline    (e9 <rel32>)   5 bytes — dispatch next
+ */
+static void emit_label_blob(size_t trampoline_abs_off)
+{
+    /* inc dword [r13+20]  (41 ff 45 14)  4 bytes — pc++ */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x14);
+
+    /* jmp rel32 trampoline (e9 <rel32>) 5 bytes */
+    size_t rel32_end_off = seg_offset(SEG_CODE) + 5;
+    int32_t rel = (int32_t)((int64_t)trampoline_abs_off - (int64_t)rel32_end_off);
+    seg_byte(SEG_CODE, 0xe9);
+    seg_u32(SEG_CODE, (uint32_t)rel);
+}
+
+/*
  * emit_me6_define_entry_blob — emit the SM_LABEL blob for a DEFINE'd
  * function entry (ME-7 flag a[2].i == 1).  Adds a single-pair native
  * prologue (`push rbp; mov rbp, rsp`) before the standard pc-bump +
@@ -3147,8 +3190,16 @@ int sm_codegen(SM_Program *prog)
             jump_indices[jump_count]    = -(fallthru_pc + 1);
             jump_rel32_offs[jump_count] = fallthru_rel32_off;
             jump_count++;
-        } else if (op == SM_LABEL || op == SM_STNO) {
-            /* ME-5: stack-neutral handlers — use the no-stack variant. */
+        } else if (op == SM_LABEL) {
+            /* ME-14: TRULY stackless no-op blob (pc++ + jmp trampoline).
+             * SM_LABEL's handler h_label is a literal no-op; emitting a
+             * C call + sp→r12 reload was destroying r12 growth from
+             * preceding inline-native blobs.  See emit_label_blob docstring. */
+            emit_label_blob(g_trampoline_offset);
+        } else if (op == SM_STNO) {
+            /* ME-5: stack-resetting handler — h_stno explicitly writes
+             * st->sp = 0, so the post-sync reload of r12 from the fresh
+             * sp value is correct and intentional. */
             emit_standard_blob_no_stack(g_handlers[op], g_trampoline_offset);
         } else if (op == SM_DEFINE_ENTRY) {
             /* ME-6a: conditional prologue blob.  Reads STATE->jit_in_call
