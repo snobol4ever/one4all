@@ -612,13 +612,18 @@ static void lower_expr(LowerCtx *c, const AST_t *e)
 
     case AST_IF: {
         if (e->nchildren < 1) { sm_emit(p, SM_PUSH_NULL); return; }
-        lower_expr(c, e->children[0]);
-        int jf = sm_emit_i(p, SM_JUMP_F, 0);
+        lower_expr(c, e->children[0]);              /* condition */
+        int jf = sm_emit_i(p, SM_JUMP_F, 0);       /* jump-if-fail to else */
+        /* Condition result left on stack (SM_JUMP_F reads last_ok, not TOS).
+           Drain it before entering then-body. */
+        sm_emit(p, SM_VOID_POP);
         if (e->nchildren > 1) lower_expr(c, e->children[1]);
         else                  sm_emit(p, SM_PUSH_NULL);
         int jend = sm_emit_i(p, SM_JUMP, 0);
         int else_lbl = sm_label(p);
         sm_patch_jump(p, jf, else_lbl);
+        /* Drain condition FAILDESCR on the else path too. */
+        sm_emit(p, SM_VOID_POP);
         if (e->nchildren > 2) lower_expr(c, e->children[2]);
         else                  sm_emit(p, SM_PUSH_NULL);
         int end_lbl = sm_label(p);
