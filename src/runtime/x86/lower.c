@@ -262,7 +262,7 @@ static void lower_opsyn(const tree_t *t)
 {
     SM_Program *p = g_p;
     const char *raw = t->v.sval ? t->v.sval : "&";
-    static char op_buf[4];
+    char op_buf[4];   /* local — lower_expr is re-entrant; static would be clobbered */
     const char *op = raw;
     const char *lp = strchr(raw, '(');
     if (lp && lp[1] && lp[2] == ')') { op_buf[0] = lp[1]; op_buf[1] = '\0'; op = op_buf; }
@@ -359,7 +359,7 @@ void lower_pat_expr(const tree_t *t)
     case TT_RPOS:   lower_expr(T0(t)); sm_emit(p, SM_PAT_RPOS);   return;
     case TT_TAB:    lower_expr(T0(t)); sm_emit(p, SM_PAT_TAB);    return;
     case TT_RTAB:   lower_expr(T0(t)); sm_emit(p, SM_PAT_RTAB);   return;
-    case TT_ARBNO:  { SM_Program *_p = p; LOWER1_PAT(SM_PAT_ARBNO); }
+    case TT_ARBNO:  lower_pat_expr(T0(t)); sm_emit(p, SM_PAT_ARBNO); return;
     case TT_SEQ:
     case TT_CAT:
         for (int i = 0; i < t->n; i++) lower_pat_expr(t->c[i]);
@@ -487,7 +487,9 @@ static void lower_scan(const tree_t *t)
 static void lower_swap(const tree_t *t)
 {
     SM_Program *p = g_p;
-    /* Inline fast path for two plain variables: save→copy→restore. */
+    /* Inline fast path for two plain variables: save→copy→restore.
+     * Uses SM_PUSH_VAR / SM_STORE_VAR (not emit_var_load/store) intentionally —
+     * __icn_swap_tmp__ is a synthetic global scratch and must never land in a frame slot. */
     if (t->n >= 2 && T0(t) && T1(t)
             && T0(t)->t == TT_VAR && T1(t)->t == TT_VAR) {
         const char *ln = T0(t)->v.sval ? T0(t)->v.sval : "";
@@ -664,6 +666,9 @@ static void lower_loop_break(const tree_t *t)
     sm_emit_i(p, SM_JUMP, p->count + 1);  /* sentinel: sm_interp detects self+1 as break */
 }
 
+/* TT_LOOP_NEXT is Icon `next` / Snocone `continue`.  The SM interp handles
+ * the actual loop-top jump via the loop frame; we just need a value on the
+ * stack to satisfy the trailing SM_VOID_POP in the proc-body loop. */
 static void lower_loop_next(const tree_t *t) { (void)t; sm_emit(g_p, SM_PUSH_NULL); }
 
 static void lower_return(const tree_t *t)
@@ -693,8 +698,9 @@ static void lower_case(const tree_t *t)
         int nc = t->n - 1, has_def = nc % 2, npairs = nc / 2;
         lower_expr(t->c[0]);
         sm_emit_s(p, SM_STORE_VAR, "__case_topic__"); sm_emit(p, SM_VOID_POP);
-        int end_jumps[64], nend = 0;
-        for (int i = 0; i < npairs && i < 32; i++) {
+        int *end_jumps = (int *)GC_MALLOC((size_t)(npairs > 0 ? npairs : 1) * sizeof(int));
+        int nend = 0;
+        for (int i = 0; i < npairs; i++) {
             sm_emit_s(p, SM_PUSH_VAR, "__case_topic__");
             lower_expr(t->c[1 + i*2]);
             sm_emit_si(p, SM_CALL_FN, "ICN_CASE_EQ", 2);
@@ -997,6 +1003,9 @@ void lower_stmt(const tree_t *s)
     }
 
     sm_emit_ii(p, SM_STNO, (int64_t)stno, (int64_t)lineno);
+    /* LANG_ICN statements are registered by polyglot_init and lowered as Icon proc
+     * skeletons in lower_proc_skeletons(); they must not reach lower_stmt.
+     * This guard is a safety net for any future code path that might slip through. */
     if (lang == LANG_ICN) return;
 
     if (lang == LANG_PL) {
@@ -1213,7 +1222,11 @@ static void lower_proc_skeletons(void)
             IcnScope sc; build_proc_scope(&sc, proc, body_start);
             proc_table[pi].lower_sc = sc;
             g_proc_scope = &sc; g_in_proc_body = 1;
-            { extern int g_lang; g_lang = LANG_ICN; }  /* Icon proc body — enable conjunction lowering */
+            /* All proc bodies use Icon conjunction-style lowering regardless of
+             * source language: TT_SEQ in a proc body means goal-directed conjunction
+             * (JUMP_F short-circuit), not SNOBOL4 string concatenation.  lower_cat_seq
+             * keys on g_lang==LANG_ICN to choose the right emission. */
+            { extern int g_lang; g_lang = LANG_ICN; }
             for (int i = body_start; i < proc->n; i++) {
                 if (!proc->c[i]) continue;
                 lower_expr( proc->c[i]); sm_emit(p, SM_VOID_POP);
