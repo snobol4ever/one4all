@@ -676,3 +676,31 @@ asm text) was hard because the bytes lose mnemonic structure, and
 recovering it requires a side-table that's almost as big as the
 template would have been.  The template approach skips the lossy
 intermediate and emits both productions directly from the source.
+
+---
+
+## BB template correct shape (sess 2026-05-11, corrected)
+
+**What the byrd-reference `.s` files show:** each box port is ONE macro invocation:
+
+```
+seq_l0_α:   RPOS_α  1, cursor, subject_len_val, seq_r0_α, P_3_ω  ; RPOS(1)
+seq_l0_β:   RPOS_β  cursor, P_3_ω
+```
+
+The macro body in `bb_macros.s` contains the actual instructions. The template does NOT emit raw instructions — it emits one port-call per port through the vtable. The binary backend emits bytes; the text backend emits the macro invocation line. Same vtable call, different backend rendering.
+
+**Correct BB template shape:**
+
+```c
+void emit_bb_xrpsi(emitter_t *e, int n,
+                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
+{
+    EMIT_OPT(e, bb_box_banner, e, "RPOS", n);        /* banner + comment */
+    e->bb_port_alpha(e, "RPOS", n, lbl_succ, lbl_fail); /* α port: one macro call */
+    EMIT_LABEL(e, lbl_β);
+    e->bb_port_beta(e,  "RPOS", lbl_fail);           /* β port: one macro call */
+}
+```
+
+**What went wrong in sub-rungs -d through -m:** templates emitted raw instructions for the binary path and delegated text to callbacks into `bb_flat.c`. This inverted the design. The fix is `EM-TEMPLATE-PURITY` in `GOAL-MODE4-EMIT.md`.
