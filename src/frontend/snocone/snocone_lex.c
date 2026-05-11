@@ -36,7 +36,7 @@
  *   had_ws      set to 1 by the leading whitespace loop if any
  *               whitespace or comment was consumed before the token.
  *   tok_start   pointer to the first byte of the current token's
- *               payload (used by EMIT_VAL).
+ *               payload (used by EMIT_V).
  *   last_value  cache of sc_kind_is_value(ctx->last_kind), used for
  *               CONCAT trigger and the {W}OP{W} bin-vs-unary test.
  *
@@ -197,7 +197,7 @@ static int classify_keyword_range(const char *start, const char *end) {
 /* ADV(n)     advance cursor by n
  * PEEK(n)    read p[n] without advancing
  * EMIT(k)    return non-value token; updates last_kind and ctx->p
- * EMIT_VAL(k)  return value token; copies tok_start..p into ctx->text
+ * EMIT_V(k)  return value token; copies tok_start..p into ctx->text
  *
  * The standard `do { ... } while (0)` macro idiom is avoided here
  * to keep the file free of loop syntax.  These are written with
@@ -222,7 +222,7 @@ static inline int emit_value(LexCtx *ctx, SC_STYPE *yylval, const char *p, const
     return kind;
 }
 #define EMIT(k)    return emit_kind(ctx, yylval, p, (k))
-#define EMIT_VAL(k)  return emit_value(ctx, yylval, p, tok_start, (k))
+#define EMIT_V(k)  return emit_value(ctx, yylval, p, tok_start, (k))
 int sc_lex(SC_STYPE *yylval, ScParseState *st) {
     LexCtx     *ctx        = st->ctx;
     const char *p          = ctx->p;
@@ -590,9 +590,9 @@ AST_UN_AMP:        EMIT(T_1AMP);
 /*--------------------------------------------------------------------------------------------------------------------*/
 AST_UN_BANG:       EMIT(T_1BANG);
 /*--------------------------------------------------------------------------------------------------------------------*/
-AST_INT:           EMIT_VAL(T_INT);
+AST_INT:           EMIT_V(T_INT);
 /*--------------------------------------------------------------------------------------------------------------------*/
-AST_REAL:          EMIT_VAL(T_REAL);
+AST_REAL:          EMIT_V(T_REAL);
 /*--------------------------------------------------------------------------------------------------------------------*/
 AST_CALL:
     /* T_CALL is the call-form token: IDENT immediately followed by `(`,
@@ -655,7 +655,7 @@ AST_STR:
         ctx->p = p; ctx->last_kind = T_STR; return T_STR;
     }
 /*--------------------------------------------------------------------------------------------------------------------*/
-AST_UNKNOWN:       EMIT_VAL(T_UNKNOWN);
+AST_UNKNOWN:       EMIT_V(T_UNKNOWN);
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
 static const char *sc_name_table[512];

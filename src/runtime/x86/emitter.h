@@ -10,7 +10,7 @@
  * Level 2 — instruction descriptions (bb_insn_desc_t + emit_insn):
  *   Named instruction kinds with typed args.  TEXT renders real GAS
  *   mnemonics; BINARY renders the corresponding bytes.  The walker
- *   calls named inline helpers (em_load_delta, em_mov_rax_imm64, ...)
+ *   calls named inline helpers (emit_load_delta, emit_mov_rax_imm64, ...)
  *   which each build a bb_insn_desc_t and call e->emit_insn(e, &d).
  *   Zero byte knowledge in bb_flat.c.
  *
@@ -238,130 +238,130 @@ static inline void ev3c_goto_v(emitter_t *e, const char *fmt, ...)
  * bb_flat.c (and future walkers) call these by name, never by byte.
  */
 
-static inline void em_insn0(emitter_t *e, bb_insn_kind_t k)
+static inline void emit_insn0(emitter_t *e, bb_insn_kind_t k)
 { bb_insn_desc_t d = {k,0,0,0,NULL}; e->emit_insn(e,&d); }
 
-static inline void em_insn_a0(emitter_t *e, bb_insn_kind_t k, uint64_t a0)
+static inline void emit_insn_a0(emitter_t *e, bb_insn_kind_t k, uint64_t a0)
 { bb_insn_desc_t d = {k,a0,0,0,NULL}; e->emit_insn(e,&d); }
 
-static inline void em_insn_a1(emitter_t *e, bb_insn_kind_t k, uint32_t a1)
+static inline void emit_insn_a1(emitter_t *e, bb_insn_kind_t k, uint32_t a1)
 { bb_insn_desc_t d = {k,0,a1,0,NULL}; e->emit_insn(e,&d); }
 
-static inline void em_insn_a2(emitter_t *e, bb_insn_kind_t k, uint8_t a2)
+static inline void emit_insn_a2(emitter_t *e, bb_insn_kind_t k, uint8_t a2)
 { bb_insn_desc_t d = {k,0,0,a2,NULL}; e->emit_insn(e,&d); }
 
 
 /* ── EM-7c-symbolic: symbolic load/call helpers ───────────────────────────── */
 /*
- * em_lea_rcx_sym — load address of a named symbol into rcx.
+ * emit_lea_rcx_sym — load address of a named symbol into rcx.
  *   TEXT:   lea rcx, [rip + sym]
  *   BINARY: mov rcx, imm64  (imm64 = process address for in-process JIT)
  */
-static inline void em_lea_rcx_sym(emitter_t *e, const char *sym, uint64_t addr_fallback)
+static inline void emit_lea_rcx_sym(emitter_t *e, const char *sym, uint64_t addr_fallback)
 {
     bb_insn_desc_t d = {BB_INSN_LEA_RCX_SYM, addr_fallback, 0, 0, sym};
     e->emit_insn(e, &d);
 }
 
 /*
- * em_call_sym_plt — call a named function via PLT.
+ * emit_call_sym_plt — call a named function via PLT.
  *   TEXT:   call sym@PLT
  *   BINARY: mov rax, imm64; call rax  (imm64 = function pointer for in-process JIT)
  */
-static inline void em_call_sym_plt(emitter_t *e, const char *sym, uint64_t fn_fallback)
+static inline void emit_call_sym_plt(emitter_t *e, const char *sym, uint64_t fn_fallback)
 {
     bb_insn_desc_t d = {BB_INSN_CALL_SYM_PLT, fn_fallback, 0, 0, sym};
     e->emit_insn(e, &d);
 }
 
 /* r10 = &Δ */
-static inline void em_load_r10_delta_ptr(emitter_t *e, uint64_t addr)
-{ em_insn_a0(e, BB_INSN_MOV_R10_IMM64, addr); }
+static inline void emit_load_r10_delta_ptr(emitter_t *e, uint64_t addr)
+{ emit_insn_a0(e, BB_INSN_MOV_R10_IMM64, addr); }
 
 /* eax = Δ  (via [r10]) */
-static inline void em_load_delta(emitter_t *e)
-{ em_insn0(e, BB_INSN_MOV_EAX_R10MEM); }
+static inline void emit_load_delta(emitter_t *e)
+{ emit_insn0(e, BB_INSN_MOV_EAX_R10MEM); }
 
 /* Δ = eax  (via [r10]) */
-static inline void em_store_delta(emitter_t *e)
-{ em_insn0(e, BB_INSN_MOV_R10MEM_EAX); }
+static inline void emit_store_delta(emitter_t *e)
+{ emit_insn0(e, BB_INSN_MOV_R10MEM_EAX); }
 
 /* rcx = imm64; rax = [rcx]  (load Σ ptr) */
-static inline void em_load_sigma(emitter_t *e, uint64_t sigma_addr) {
-    em_lea_rcx_sym(e, "\xCE\xA3", sigma_addr);      /* lea/mov rcx, &Σ */
-    em_insn0      (e, BB_INSN_MOV_RAX_RCXMEM);      /* rax = [rcx] = Σ */
+static inline void emit_load_sigma(emitter_t *e, uint64_t sigma_addr) {
+    emit_lea_rcx_sym(e, "\xCE\xA3", sigma_addr);      /* lea/mov rcx, &Σ */
+    emit_insn0      (e, BB_INSN_MOV_RAX_RCXMEM);      /* rax = [rcx] = Σ */
 }
 
 /* rcx = imm64; eax = [rcx]  (load Σlen) */
-static inline void em_load_siglen(emitter_t *e, uint64_t siglen_addr) {
-    em_lea_rcx_sym(e, "\xCE\xA3""len", siglen_addr); /* lea/mov rcx, &Σlen */
-    em_insn0      (e, BB_INSN_MOV_EAX_RCXMEM);       /* eax = [rcx] = Σlen */
+static inline void emit_load_siglen(emitter_t *e, uint64_t siglen_addr) {
+    emit_lea_rcx_sym(e, "\xCE\xA3""len", siglen_addr); /* lea/mov rcx, &Σlen */
+    emit_insn0      (e, BB_INSN_MOV_EAX_RCXMEM);       /* eax = [rcx] = Σlen */
 }
 
 /* rax = Σ+Δ  (Σ ptr + cursor) */
-static inline void em_sigma_plus_delta(emitter_t *e,
+static inline void emit_sigma_plus_delta(emitter_t *e,
                                        uint64_t sigma_addr)
 {
-    em_load_sigma(e, sigma_addr);               /* rax = Σ */
-    em_insn0(e, BB_INSN_MOVSXD_RCX_R10MEM);    /* rcx = (int64)Δ */
-    em_insn0(e, BB_INSN_LEA_RAX_RAXRCX);       /* rax = rax+rcx */
+    emit_load_sigma(e, sigma_addr);               /* rax = Σ */
+    emit_insn0(e, BB_INSN_MOVSXD_RCX_R10MEM);    /* rcx = (int64)Δ */
+    emit_insn0(e, BB_INSN_LEA_RAX_RAXRCX);       /* rax = rax+rcx */
 }
 
 /* cmp eax, [rcx] where rcx=siglen_addr */
-static inline void em_cmp_eax_siglen(emitter_t *e, uint64_t siglen_addr) {
-    em_lea_rcx_sym(e, "\xCE\xA3""len", siglen_addr); /* lea/mov rcx, &Σlen */
-    em_insn0      (e, BB_INSN_CMP_EAX_RCXMEM);
+static inline void emit_cmp_eax_siglen(emitter_t *e, uint64_t siglen_addr) {
+    emit_lea_rcx_sym(e, "\xCE\xA3""len", siglen_addr); /* lea/mov rcx, &Σlen */
+    emit_insn0      (e, BB_INSN_CMP_EAX_RCXMEM);
 }
-static inline void em_add_delta_imm(emitter_t *e, int32_t v) {
-    em_load_delta(e);
-    em_insn_a1(e, BB_INSN_ADD_EAX_IMM32, (uint32_t)v);
-    em_store_delta(e);
+static inline void emit_add_delta_imm(emitter_t *e, int32_t v) {
+    emit_load_delta(e);
+    emit_insn_a1(e, BB_INSN_ADD_EAX_IMM32, (uint32_t)v);
+    emit_store_delta(e);
 }
 
 /* eax = Δ - v; store back */
-static inline void em_sub_delta_imm(emitter_t *e, int32_t v) {
-    em_load_delta(e);
-    em_insn_a1(e, BB_INSN_SUB_EAX_IMM32, (uint32_t)v);
-    em_store_delta(e);
+static inline void emit_sub_delta_imm(emitter_t *e, int32_t v) {
+    emit_load_delta(e);
+    emit_insn_a1(e, BB_INSN_SUB_EAX_IMM32, (uint32_t)v);
+    emit_store_delta(e);
 }
 
 /* eax += imm32 */
-static inline void em_add_eax_imm32(emitter_t *e, uint32_t v)
-{ em_insn_a1(e, BB_INSN_ADD_EAX_IMM32, v); }
+static inline void emit_add_eax_imm32(emitter_t *e, uint32_t v)
+{ emit_insn_a1(e, BB_INSN_ADD_EAX_IMM32, v); }
 
-static inline void em_mov_rax_imm64(emitter_t *e, uint64_t v)
-{ em_insn_a0(e, BB_INSN_MOV_RAX_IMM64, v); }
+static inline void emit_mov_rax_imm64(emitter_t *e, uint64_t v)
+{ emit_insn_a0(e, BB_INSN_MOV_RAX_IMM64, v); }
 
-static inline void em_mov_rdi_imm64(emitter_t *e, uint64_t v)
-{ em_insn_a0(e, BB_INSN_MOV_RDI_IMM64, v); }
+static inline void emit_mov_rdi_imm64(emitter_t *e, uint64_t v)
+{ emit_insn_a0(e, BB_INSN_MOV_RDI_IMM64, v); }
 
-static inline void em_mov_rdx_imm64(emitter_t *e, uint64_t v)
-{ em_insn_a0(e, BB_INSN_MOV_RDX_IMM64, v); }
+static inline void emit_mov_rdx_imm64(emitter_t *e, uint64_t v)
+{ emit_insn_a0(e, BB_INSN_MOV_RDX_IMM64, v); }
 
-static inline void em_mov_esi_imm32(emitter_t *e, uint32_t v)
-{ em_insn_a1(e, BB_INSN_MOV_ESI_IMM32, v); }
+static inline void emit_mov_esi_imm32(emitter_t *e, uint32_t v)
+{ emit_insn_a1(e, BB_INSN_MOV_ESI_IMM32, v); }
 
-static inline void em_mov_eax_imm32(emitter_t *e, uint32_t v)
-{ em_insn_a1(e, BB_INSN_MOV_EAX_IMM32, v); }
+static inline void emit_mov_eax_imm32(emitter_t *e, uint32_t v)
+{ emit_insn_a1(e, BB_INSN_MOV_EAX_IMM32, v); }
 
-static inline void em_cmp_eax_imm32(emitter_t *e, uint32_t v)
-{ em_insn_a1(e, BB_INSN_CMP_EAX_IMM32, v); }
+static inline void emit_cmp_eax_imm32(emitter_t *e, uint32_t v)
+{ emit_insn_a1(e, BB_INSN_CMP_EAX_IMM32, v); }
 
-static inline void em_sub_eax_imm32(emitter_t *e, uint32_t v)
-{ em_insn_a1(e, BB_INSN_SUB_EAX_IMM32, v); }
+static inline void emit_sub_eax_imm32(emitter_t *e, uint32_t v)
+{ emit_insn_a1(e, BB_INSN_SUB_EAX_IMM32, v); }
 
-static inline void em_cmp_esi_imm8(emitter_t *e, uint8_t v)
-{ em_insn_a2(e, BB_INSN_CMP_ESI_IMM8, v); }
+static inline void emit_cmp_esi_imm8(emitter_t *e, uint8_t v)
+{ emit_insn_a2(e, BB_INSN_CMP_ESI_IMM8, v); }
 
-static inline void em_mov_ecx_eax(emitter_t *e)  { em_insn0(e, BB_INSN_MOV_ECX_EAX); }
-static inline void em_mov_rdi_rax(emitter_t *e)  { em_insn0(e, BB_INSN_MOV_RDI_RAX); }
-static inline void em_mov_rdx_rax(emitter_t *e)  { em_insn0(e, BB_INSN_MOV_RDX_RAX); }
-static inline void em_cmp_eax_ecx(emitter_t *e)  { em_insn0(e, BB_INSN_CMP_EAX_ECX); }
-static inline void em_test_eax_eax(emitter_t *e) { em_insn0(e, BB_INSN_TEST_EAX_EAX); }
-static inline void em_test_rax_rax(emitter_t *e) { em_insn0(e, BB_INSN_TEST_RAX_RAX); }
-static inline void em_xor_edx_edx(emitter_t *e)  { em_insn0(e, BB_INSN_XOR_EDX_EDX); }
-static inline void em_ret(emitter_t *e)           { em_insn0(e, BB_INSN_RET); }
-static inline void em_call_rax(emitter_t *e)      { em_insn0(e, BB_INSN_CALL_RAX); }
+static inline void emit_mov_ecx_eax(emitter_t *e)  { emit_insn0(e, BB_INSN_MOV_ECX_EAX); }
+static inline void emit_mov_rdi_rax(emitter_t *e)  { emit_insn0(e, BB_INSN_MOV_RDI_RAX); }
+static inline void emit_mov_rdx_rax(emitter_t *e)  { emit_insn0(e, BB_INSN_MOV_RDX_RAX); }
+static inline void emit_cmp_eax_ecx(emitter_t *e)  { emit_insn0(e, BB_INSN_CMP_EAX_ECX); }
+static inline void emit_test_eax_eax(emitter_t *e) { emit_insn0(e, BB_INSN_TEST_EAX_EAX); }
+static inline void emit_test_rax_rax(emitter_t *e) { emit_insn0(e, BB_INSN_TEST_RAX_RAX); }
+static inline void emit_xor_edx_edx(emitter_t *e)  { emit_insn0(e, BB_INSN_XOR_EDX_EDX); }
+static inline void emit_ret(emitter_t *e)           { emit_insn0(e, BB_INSN_RET); }
+static inline void emit_call_rax(emitter_t *e)      { emit_insn0(e, BB_INSN_CALL_RAX); }
 
 
 #endif /* EMITTER_H */
