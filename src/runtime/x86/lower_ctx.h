@@ -67,11 +67,17 @@ typedef struct {
  *   is 0 and expression_scope is NULL — the statement-context lowering
  *   path is unaffected.
  */
+/* SR-14: bitset tracking which AST kinds hit lower_unhandled() during lowering.
+ * Sized for AST_KIND_COUNT bits (currently ≤128; two uint64_t suffice).
+ * Post-lowering, lower() reports any set bits by name. */
+#define LOWER_UNHANDLED_WORDS 4   /* 4×64 = 256 bits — headroom for future kinds */
+
 typedef struct {
     SM_Program  *p;                          /* output program (owned) */
     LabelTable   labtab;                         /* label resolution + patches */
     int          expression_body_lowering;   /* CH-17b': set during proc-body emit */
     IcnScope    *expression_scope;           /* CH-17b'': active per-proc scope */
+    unsigned long long unhandled_kinds[LOWER_UNHANDLED_WORDS]; /* SR-14: bitset */
 } LowerCtx;
 
 /* ── Lowering primitives available to cohort files ──────────────────────
@@ -117,41 +123,24 @@ void expression_scope_walk(IcnScope *sc, AST_t *e);
 /* Emit a SM_JUMP/SM_JUMP_S/SM_JUMP_F for a named SNOBOL4 goto target. */
 int emit_goto(LowerCtx *c, sm_opcode_t op, const char *target);
 
-/* ── SR-4: handler table (cohort dispatch) ──────────────────────────────
- *
- * LowerHandler is the uniform signature for every per-kind handler.
- * g_handlers[] is indexed by AST_e; NULL entries fall through to the
- * legacy switch in lower_expr (hybrid dispatcher, SR-4 through SR-11).
- * Once all cohorts are registered (SR-11) the legacy switch is deleted.
- */
+/* SR-4: LowerHandler typedef — handler function pointer type.
+ * Defined here so lower_ctx.h is self-contained for any future split. */
 typedef void (*LowerHandler)(LowerCtx *c, const AST_t *e);
 
-/* lower_expr and lower_pat_expr: non-static since SR-5 (Phase-2 cohort promotion).
- * Cohort files that recurse (AST_INDIRECT, AST_DEFER, etc.) call lower_expr directly. */
+/* lower_expr and lower_pat_expr: non-static since SR-5.
+ * Cohort files that recursed (AST_INDIRECT, AST_DEFER, etc.) called lower_expr
+ * directly.  Now that all cohorts are merged into lower.c, these are still
+ * declared here for use by lower_pat_expr (which has a switch that calls
+ * lower_expr) and lower_stmt. */
 void lower_expr    (LowerCtx *c, const AST_t *e);
 void lower_pat_expr(LowerCtx *c, const AST_t *e);
 void lower_stmt    (LowerCtx *c, const STMT_t *s);  /* lower_stmt.c (SR-12) */
 
-/* sm_pat_capture_fn_arg_names: moved to lower_pat.c (SR-7); used by cohort_capture (SR-8). */
+/* sm_pat_capture_fn_arg_names: used by lower_pat_expr inside lower.c. */
 const char *sm_pat_capture_fn_arg_names(const AST_t *fnc);
 
-/* Each cohort file exports one registration function that fills its
- * slice of the handler table. */
-void lower_literal_register (LowerHandler tbl[AST_KIND_COUNT]);
-void lower_ref_register     (LowerHandler tbl[AST_KIND_COUNT]);
-void lower_arith_register   (LowerHandler tbl[AST_KIND_COUNT]);
-void lower_seq_register     (LowerHandler tbl[AST_KIND_COUNT]);
-void lower_pat_prim_register(LowerHandler tbl[AST_KIND_COUNT]);
-void lower_capture_register (LowerHandler tbl[AST_KIND_COUNT]);
-void lower_call_register    (LowerHandler tbl[AST_KIND_COUNT]);
-void lower_icn_relop_register(LowerHandler tbl[AST_KIND_COUNT]);
-void lower_icn_cset_register (LowerHandler tbl[AST_KIND_COUNT]);
-void lower_icn_unary_register(LowerHandler tbl[AST_KIND_COUNT]);
-void lower_icn_ctrl_register (LowerHandler tbl[AST_KIND_COUNT]);
-void lower_icn_data_register (LowerHandler tbl[AST_KIND_COUNT]);
-void lower_icn_sect_register (LowerHandler tbl[AST_KIND_COUNT]);
-void lower_icn_gen_register  (LowerHandler tbl[AST_KIND_COUNT]);
-void lower_prolog_register   (LowerHandler tbl[AST_KIND_COUNT]);
+/* SR-14: explicit fallback for kinds not yet implemented. */
+void lower_unhandled(LowerCtx *c, const AST_t *e);
 
 #include "../common/ast_clone.h"   /* ast_gc_clone — used by emit_push_expr */
 

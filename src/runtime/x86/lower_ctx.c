@@ -171,7 +171,29 @@ void expression_scope_walk(IcnScope *sc, AST_t *e)
         expression_scope_walk(sc, e->children[i]);
 }
 
-/* ── Emit a goto target (possibly forward ref) ──────────────────────────── */
+/* ── SR-14: explicit fallback for unimplemented AST kinds ───────────────── */
+
+/*
+ * lower_unhandled — called when lower_expr encounters an AST kind that has
+ * no cohort handler registered.  Emits SM_PUSH_NULL so the SM_Program is
+ * still structurally valid, and records the kind in ctx->unhandled_kinds[]
+ * for the post-lowering report in lower().
+ *
+ * Context: expression_body_lowering suppresses the stderr noise because
+ * proc-body walks intentionally visit AST_INITIAL and other structural
+ * nodes that are not true expression kinds; those are expected no-ops.
+ * Only truly unknown kinds outside proc bodies are diagnostically interesting.
+ */
+void lower_unhandled(LowerCtx *c, const AST_t *e)
+{
+    if (!c->expression_body_lowering && e->kind >= 0 && e->kind < AST_KIND_COUNT) {
+        int word = e->kind / 64;
+        int bit  = e->kind % 64;
+        if (word < LOWER_UNHANDLED_WORDS)
+            c->unhandled_kinds[word] |= (1ULL << bit);
+    }
+    sm_emit(c->p, SM_PUSH_NULL);
+}
 
 /* Emit SM_JUMP / SM_JUMP_S / SM_JUMP_F for a named SNOBOL4 goto target.
  * RETURN / FRETURN / NRETURN map to the corresponding return opcodes.

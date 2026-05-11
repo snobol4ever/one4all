@@ -234,25 +234,8 @@ scrip:
 	$(CC) $(CRT)   -c $(SRC)/runtime/common/ast_clone.c    -o $(OBJ)/ast_clone.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_prog.c    -o $(OBJ)/sm_prog.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_interp.c  -o $(OBJ)/sm_interp.o
-	$(CC) $(CRT)   -c $(RT)/x86/lower.c   -o $(OBJ)/lower.o
+	$(CC) $(CRT)   -c $(RT)/x86/lower.c      -o $(OBJ)/lower.o
 	$(CC) $(CRT)   -c $(RT)/x86/lower_ctx.c  -o $(OBJ)/lower_ctx.o
-	$(CC) $(CRT)   -c $(RT)/x86/lower_literal.c  -o $(OBJ)/lower_literal.o
-	$(CC) $(CRT)   -c $(RT)/x86/lower_ref.c      -o $(OBJ)/lower_ref.o
-	$(CC) $(CRT)   -c $(RT)/x86/lower_arith.c    -o $(OBJ)/lower_arith.o
-	$(CC) $(CRT)   -c $(RT)/x86/lower_seq.c      -o $(OBJ)/lower_seq.o
-	$(CC) $(CRT)   -c $(RT)/x86/lower_pat_prim.c -o $(OBJ)/lower_pat_prim.o
-	$(CC) $(CRT)   -c $(RT)/x86/lower_capture.c  -o $(OBJ)/lower_capture.o
-	$(CC) $(CRT)   -c $(RT)/x86/lower_call.c     -o $(OBJ)/lower_call.o
-	$(CC) $(CRT)   -c $(RT)/x86/lower_icn_relop.c -o $(OBJ)/lower_icn_relop.o
-	$(CC) $(CRT)   -c $(RT)/x86/lower_icn_cset.c  -o $(OBJ)/lower_icn_cset.o
-	$(CC) $(CRT)   -c $(RT)/x86/lower_icn_unary.c -o $(OBJ)/lower_icn_unary.o
-	$(CC) $(CRT)   -c $(RT)/x86/lower_icn_ctrl.c  -o $(OBJ)/lower_icn_ctrl.o
-	$(CC) $(CRT)   -c $(RT)/x86/lower_icn_data.c  -o $(OBJ)/lower_icn_data.o
-	$(CC) $(CRT)   -c $(RT)/x86/lower_icn_sect.c  -o $(OBJ)/lower_icn_sect.o
-	$(CC) $(CRT)   -c $(RT)/x86/lower_icn_gen.c   -o $(OBJ)/lower_icn_gen.o
-	$(CC) $(CRT)   -c $(RT)/x86/lower_prolog.c     -o $(OBJ)/lower_prolog.o
-	$(CC) $(CRT)   -c $(RT)/x86/lower_stmt.c       -o $(OBJ)/lower_stmt.o
-	$(CC) $(CRT)   -c $(RT)/x86/lower_pat.c       -o $(OBJ)/lower_pat.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_image.c   -o $(OBJ)/sm_image.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_codegen.c -o $(OBJ)/sm_codegen.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_emit_template.c -o $(OBJ)/sm_emit_template.o
