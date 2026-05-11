@@ -304,6 +304,11 @@ typedef enum {
  */
 typedef struct AST_t AST_t;
 
+/* Auxiliary slot union — three per node, zero-initialized by calloc.
+ * Used by AST_STMT (SI-1+): a[0].i=lineno, a[1].i=stno, a[2].i=flags.
+ * Available for future node kinds; not used by expression nodes today. */
+typedef union { int i; const char *s; } AST_aux;
+
 struct AST_t {
     AST_e    kind;          /* node kind from AST_e enum above              */
     char    *sval;          /* string payload (see comment above)           */
@@ -313,6 +318,8 @@ struct AST_t {
     int      nchildren;     /* number of valid entries in children[]        */
     int      nalloc;        /* allocated capacity of children[]             */
     int      id;            /* unique node id — assigned at emit time       */
+    AST_aux  a[3];          /* auxiliary: a[0].i=lineno, a[1].i=stno,
+                             * a[2].i=flags (AST_STMT); zero elsewhere     */
 };
 
 /* =========================================================================

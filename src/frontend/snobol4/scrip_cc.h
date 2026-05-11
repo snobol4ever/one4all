@@ -184,6 +184,10 @@ void     sno_fold_name(char *name);
 
 /* emit_byrd.c interface now internal to emit_byrd_c.c */
 
+/* ---- SI-2: CODE_t / STMT_t → AST_t shim (stmt_ast.c) ---- */
+AST_t *stmt_to_ast(const STMT_t *s);
+AST_t *code_to_ast(const CODE_t *prog);
+
 /* ---- error ---- */
 void sno_error(int lineno, const char *fmt, ...);
 extern int   sno_nerrors;
