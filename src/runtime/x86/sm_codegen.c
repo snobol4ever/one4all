@@ -800,6 +800,61 @@ DESCR_t me9_pat_deref(DESCR_t v) {
     return pat_ref(name ? name : "");
 }
 
+/* ME-10 helpers — capture / user-call pattern constructors.
+ * Each mirrors the matching h_pat_* handler body exactly; only the
+ * source of arguments differs (registers from the inline blob, vs
+ * CUR_INS read by the standard-blob handler).  Net stack effect is
+ * unchanged from the handler. */
+
+/* SM_PAT_CAPTURE — pop child, NAME_fn(vn), 3-way dispatch on kind:
+ *   kind == 1 → pat_assign_imm(child, var)         ($ capture, immediate)
+ *   kind == 2 → pat_cat(child, pat_at_cursor(vn))  (. cursor capture)
+ *   else      → pat_assign_cond(child, var)        (. capture, conditional)
+ * Net delta: 0 (pop 1, push 1). */
+DESCR_t me10_pat_capture(DESCR_t child, const char *vn, int64_t kind) {
+    if (!vn) vn = "";
+    DESCR_t var = NAME_fn(vn);
+    if (kind == 1) return pat_assign_imm(child, var);
+    if (kind == 2) return pat_cat(child, pat_at_cursor(vn));
+    return pat_assign_cond(child, var);
+}
+
+/* SM_PAT_CAPTURE_FN — pop child, parse optional '\t'-separated namelist,
+ * branch on is_imm.  Mirrors h_pat_capture_fn exactly.  Net delta: 0. */
+DESCR_t me10_pat_capture_fn(DESCR_t child, const char *fname, int64_t is_imm, const char *namelist) {
+    if (!fname) fname = "";
+    if (namelist && namelist[0]) {
+        int nnames = 1;
+        for (const char *q = namelist; *q; q++) if (*q == '\t') nnames++;
+        char **names = (char **)GC_MALLOC((size_t)nnames * sizeof(char *));
+        int ni = 0;
+        const char *start = namelist;
+        for (const char *q = namelist; ; q++) {
+            if (*q == '\t' || *q == '\0') {
+                size_t len = (size_t)(q - start);
+                char *nm = (char *)GC_MALLOC(len + 1);
+                memcpy(nm, start, len);
+                nm[len] = '\0';
+                names[ni++] = nm;
+                if (*q == '\0') break;
+                start = q + 1;
+            }
+        }
+        return is_imm
+            ? pat_assign_callcap_named_imm(child, fname, NULL, 0, names, nnames)
+            : pat_assign_callcap_named(child, fname, NULL, 0, names, nnames);
+    }
+    return is_imm
+        ? pat_assign_callcap_named_imm(child, fname, NULL, 0, NULL, 0)
+        : pat_assign_callcap(child, fname, NULL, 0);
+}
+
+/* SM_PAT_USERCALL — bare *func() in pattern context.  No pop; pure
+ * construction from fname.  Net delta: +1. */
+DESCR_t me10_pat_usercall(const char *fname) {
+    return pat_user_call(fname ? fname : "", NULL, 0);
+}
+
 static void h_pat_lit(void)
 {
     PUSH(pat_lit(CUR_INS->a[0].s ? CUR_INS->a[0].s : ""));
@@ -2590,6 +2645,147 @@ static void emit_me9_pat_binary_blob(void *fn, size_t trampoline_abs_off)
     emit_jmp_trampoline(trampoline_abs_off);                       /* 5 */
 }
 
+/*------------------------------------------------------------------------*/
+/* ME-10 — SM_PAT_USERCALL.                                               */
+/*                                                                        */
+/* No stack args; bakes fname as imm64, calls me10_pat_usercall(fname),  */
+/* pushes DT_P result.  Net delta +1.  Same shape as                     */
+/* emit_me9_pat_refname_blob (52 bytes), only the imm64 call target      */
+/* differs.                                                               */
+/*------------------------------------------------------------------------*/
+static void emit_me10_pat_usercall_blob(const char *fname, size_t trampoline_abs_off)
+{
+    /* pc++                            (41 ff 45 14)                4 */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x14);
+
+    /* mov rdi, imm64(fname)           (48 bf <imm64>)              10 */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xbf);
+    seg_u64(SEG_CODE, (uint64_t)(uintptr_t)fname);
+
+    /* aligned call me10_pat_usercall — DESCR_t in rax:rdx          20 */
+    emit_aligned_call_imm64((void *)&me10_pat_usercall);
+
+    /* push result on r12 stack                                         */
+    /* mov [r12], rax                  (49 89 04 24)                4 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x04); seg_byte(SEG_CODE, 0x24);
+    /* mov [r12+8], rdx                (49 89 54 24 08)              5 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x54); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x08);
+    /* add r12, 16                     (49 83 c4 10)                 4 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x83);
+    seg_byte(SEG_CODE, 0xc4); seg_byte(SEG_CODE, 0x10);
+
+    emit_jmp_trampoline(trampoline_abs_off);                       /* 5 */
+}
+
+/*------------------------------------------------------------------------*/
+/* ME-10 — SM_PAT_CAPTURE.                                                */
+/*                                                                        */
+/* Pop child (TOS) into rdi:rsi, bake vn as rdx imm64, bake kind as rcx  */
+/* imm64, call me10_pat_capture(child, vn, kind), write result back at   */
+/* TOS-1 slot.  Net delta 0 (pop 1, push 1; in-place rewrite).            */
+/*                                                                        */
+/* Layout (~67 bytes):                                                    */
+/*    inc  dword [r13+20]      ; pc++                          4          */
+/*    mov  rdi, [r12-16]       ; child.lo                      5          */
+/*    mov  rsi, [r12-8]        ; child.hi                      5          */
+/*    mov  rdx, imm64(vn)      ; arg2 (string ptr)            10          */
+/*    mov  rcx, imm64(kind)    ; arg3 (int64)                 10          */
+/*    aligned-call me10_pat_capture                           20          */
+/*    mov  [r12-16], rax       ; result.lo                     5          */
+/*    mov  [r12-8],  rdx       ; result.hi                     5          */
+/*    jmp  rel32 trampoline                                    5          */
+/*                                                          = 69          */
+/*------------------------------------------------------------------------*/
+static void emit_me10_pat_capture_blob(const char *vn, int64_t kind, size_t trampoline_abs_off)
+{
+    /* pc++                            (41 ff 45 14)                4 */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x14);
+
+    /* Load child (TOS) into rdi:rsi (first DESCR_t arg)               */
+    /* mov rdi, [r12-16]               (49 8b 7c 24 f0)              5 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x7c); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0xf0);
+    /* mov rsi, [r12-8]                (49 8b 74 24 f8)              5 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x74); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0xf8);
+
+    /* mov rdx, imm64(vn)              (48 ba <imm64>)              10 */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xba);
+    seg_u64(SEG_CODE, (uint64_t)(uintptr_t)vn);
+
+    /* mov rcx, imm64(kind)            (48 b9 <imm64>)              10 */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xb9);
+    seg_u64(SEG_CODE, (uint64_t)kind);
+
+    /* aligned call me10_pat_capture                              20 */
+    emit_aligned_call_imm64((void *)&me10_pat_capture);
+
+    /* Write result at TOS-1 slot (in-place rewrite, net delta 0)      */
+    /* mov [r12-16], rax               (49 89 44 24 f0)              5 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x44); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0xf0);
+    /* mov [r12-8], rdx                (49 89 54 24 f8)              5 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x54); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0xf8);
+
+    emit_jmp_trampoline(trampoline_abs_off);                       /* 5 */
+}
+
+/*------------------------------------------------------------------------*/
+/* ME-10 — SM_PAT_CAPTURE_FN.                                             */
+/*                                                                        */
+/* Pop child into rdi:rsi; bake fname (rdx imm64), is_imm (rcx imm64),   */
+/* namelist (r8 imm64); call me10_pat_capture_fn; write result at TOS-1. */
+/* Net delta 0.                                                            */
+/*                                                                        */
+/* Layout (~79 bytes) — same as capture_blob plus one more imm64 arg.    */
+/*------------------------------------------------------------------------*/
+static void emit_me10_pat_capture_fn_blob(const char *fname, int64_t is_imm,
+                                          const char *namelist,
+                                          size_t trampoline_abs_off)
+{
+    /* pc++                            (41 ff 45 14)                4 */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x14);
+
+    /* Load child (TOS) into rdi:rsi                                    */
+    /* mov rdi, [r12-16]               (49 8b 7c 24 f0)              5 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x7c); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0xf0);
+    /* mov rsi, [r12-8]                (49 8b 74 24 f8)              5 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x74); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0xf8);
+
+    /* mov rdx, imm64(fname)           (48 ba <imm64>)              10 */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xba);
+    seg_u64(SEG_CODE, (uint64_t)(uintptr_t)fname);
+
+    /* mov rcx, imm64(is_imm)          (48 b9 <imm64>)              10 */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xb9);
+    seg_u64(SEG_CODE, (uint64_t)is_imm);
+
+    /* mov r8, imm64(namelist)         (49 b8 <imm64>)              10 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0xb8);
+    seg_u64(SEG_CODE, (uint64_t)(uintptr_t)namelist);
+
+    /* aligned call me10_pat_capture_fn                            20 */
+    emit_aligned_call_imm64((void *)&me10_pat_capture_fn);
+
+    /* Write result at TOS-1 slot                                       */
+    /* mov [r12-16], rax               (49 89 44 24 f0)              5 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x44); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0xf0);
+    /* mov [r12-8], rdx                (49 89 54 24 f8)              5 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x54); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0xf8);
+
+    emit_jmp_trampoline(trampoline_abs_off);                       /* 5 */
+}
+
 /* ── Main codegen entry point ─────────────────────────────────────────── */
 
 /*
@@ -2818,6 +3014,33 @@ int sm_codegen(SM_Program *prog)
              * internally.  No stack args; net delta +1.  Same shape as
              * emit_me9_pat_lit_blob (different imm64 call target). */
             emit_me9_pat_refname_blob(prog->instrs[i].a[0].s, g_trampoline_offset);
+        } else if (op == SM_PAT_CAPTURE) {
+            /* ME-10: . / $ variable capture.  Pop child, build assign
+             * pattern from baked vn + kind.  Net delta 0. */
+            emit_me10_pat_capture_blob(
+                prog->instrs[i].a[0].s,
+                prog->instrs[i].a[1].i,
+                g_trampoline_offset);
+        } else if (op == SM_PAT_CAPTURE_FN) {
+            /* ME-10: . *func() / $ *func() — call-cap pattern.  Pop
+             * child, build XCALLCAP from baked fname/is_imm/namelist.
+             * Net delta 0. */
+            emit_me10_pat_capture_fn_blob(
+                prog->instrs[i].a[0].s,
+                prog->instrs[i].a[1].i,
+                prog->instrs[i].a[2].s,
+                g_trampoline_offset);
+        } else if (op == SM_PAT_USERCALL) {
+            /* ME-10: bare *func() in pattern context (no child wrapper).
+             * Build XATP deferred-usercall.  Net delta +1.  Same blob
+             * shape as emit_me9_pat_refname_blob (imm64 string arg,
+             * push 1) with me10_pat_usercall as call target. */
+            emit_me10_pat_usercall_blob(prog->instrs[i].a[0].s, g_trampoline_offset);
+        /* SM_PAT_CAPTURE_FN_ARGS, SM_PAT_USERCALL_ARGS — variadic, runtime-
+         * determined nargs.  Stay on emit_standard_blob fallback: the
+         * C handlers already manipulate STATE->stack via the sync
+         * protocol, and an inline blob would still have to sync r12↔sp
+         * around the call.  No correctness or speed win to inlining. */
         } else if (op == SM_PAT_ARB     || op == SM_PAT_REM    ||
                    op == SM_PAT_FAIL    || op == SM_PAT_SUCCEED ||
                    op == SM_PAT_EPS     || op == SM_PAT_FENCE  ||
