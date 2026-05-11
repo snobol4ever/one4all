@@ -152,35 +152,59 @@ typedef struct emit_v {
     void (*mov_reg_imm32)  (struct emit_v *e, emit_reg_t r, uint32_t imm);
     void (*mov_reg_reg)    (struct emit_v *e, emit_reg_t dst, emit_reg_t src);
     void (*mov_mem_imm32)  (struct emit_v *e, emit_reg_t base, int32_t disp, uint32_t imm);
+    void (*mov_reg_mem)    (struct emit_v *e, emit_reg_t dst, emit_reg_t base, int32_t disp);
+    void (*mov_mem_reg)    (struct emit_v *e, emit_reg_t base, int32_t disp, emit_reg_t src);
     void (*inc_mem_disp8)  (struct emit_v *e, emit_reg_t base, int8_t disp);
     void (*sub_rsp_imm8)   (struct emit_v *e, int8_t imm);
     void (*add_rsp_imm8)   (struct emit_v *e, int8_t imm);
+    void (*cmp_reg_imm32)  (struct emit_v *e, emit_reg_t r, int32_t imm);
+    void (*test_reg_reg)   (struct emit_v *e, emit_reg_t a, emit_reg_t b);
     void (*call_reg)       (struct emit_v *e, emit_reg_t r);
     void (*call_plt)       (struct emit_v *e, const char *sym);
     void (*jmp_rel32_sym)  (struct emit_v *e, const char *sym);
     void (*jmp_rel32_pc)   (struct emit_v *e, int target_pc);
+    void (*je_rel32_sym)   (struct emit_v *e, const char *sym);
+    void (*jne_rel32_sym)  (struct emit_v *e, const char *sym);
     void (*je_rel32_pc)    (struct emit_v *e, int target_pc);
     void (*jne_rel32_pc)   (struct emit_v *e, int target_pc);
     void (*ret)            (struct emit_v *e);
     void (*push_reg)       (struct emit_v *e, emit_reg_t r);
     void (*pop_reg)        (struct emit_v *e, emit_reg_t r);
     void (*lea_rip_sym)    (struct emit_v *e, emit_reg_t r, const char *sym);
+    void (*xor_reg_reg)    (struct emit_v *e, emit_reg_t dst, emit_reg_t src);
 
     /* — structural (binary: records offset; text: writes line) — */
     void (*label)          (struct emit_v *e, const char *name);
     void (*pc_label)       (struct emit_v *e, int pc);
     void (*pad_to_blob_size)(struct emit_v *e);
+    void (*section)        (struct emit_v *e, const char *name);   /* .text, .data, .rodata */
+    void (*directive)      (struct emit_v *e, const char *line);   /* arbitrary GAS directive */
+    void (*data_quad)      (struct emit_v *e, uint64_t val);       /* .quad imm */
+    void (*data_quad_sym)  (struct emit_v *e, const char *sym);    /* .quad sym */
+    void (*data_string)    (struct emit_v *e, const char *bytes, size_t len);
 
-    /* — formatting / readability (text only; binary ignores) — */
+    /* — BB-port primitives (binary: emits jmp / label; text: writes port-named label,
+     *   honors three-column LAW; both honor α/β/γ/ω as semantic ports) — */
+    void (*bb_port_label)  (struct emit_v *e, const char *box_prefix, char port);
+                                                   /* port ∈ {'α','β','γ','ω'} */
+    void (*bb_port_jmp)    (struct emit_v *e, const char *box_prefix, char port);
+                                                   /* jmp to <box_prefix>_<port> */
+    void (*bb_box_banner)  (struct emit_v *e, const char *kind, const char *args);
+                                                   /* text: 120-char #---- rule
+                                                      + "# BOX <kind>(<args>) [<prefix>]"
+                                                      binary: NO-OP */
+
+    /* — formatting / readability (text honors; binary ignores) — */
     void (*comment)        (struct emit_v *e, const char *text);
-    void (*banner)         (struct emit_v *e, const char *text);
-    void (*column_break)   (struct emit_v *e);
+    void (*banner)         (struct emit_v *e, const char *text);    /* 120-char #==== rule + label */
+    void (*minor_break)    (struct emit_v *e, const char *text);    /* 120-char #---- rule + label */
+    void (*column_break)   (struct emit_v *e);                       /* align next emission to next column */
     void (*blank_line)     (struct emit_v *e);
 
     /* — macro_def-only hooks (binary + text invocation-mode ignore) — */
     void (*macro_begin)    (struct emit_v *e, const char *name,
                             const char *const *params, int nparams);
-    void (*macro_param_ref)(struct emit_v *e, const char *name);  /* emits \param in macro body */
+    void (*macro_param_ref)(struct emit_v *e, const char *name);    /* emits \param in macro body */
     void (*macro_end)      (struct emit_v *e);
 
     /* — opaque per-backend state — */
@@ -302,18 +326,141 @@ Hand-editing `sm_macros.s` is forbidden after the retrofit completes
 
 ---
 
-## BB-side discipline (deferred, in scope long-term)
+## SM and BB are co-equal under this architecture
 
-Per Lon (Q2 sess 2026-05-11): one C file per Byrd box.  That mirrors
-the SM side: each XCHR/XSPNC/XANYC/XBRKC/XNNYC/XLNTH/XTB/XRTB/XFNCE/
-XDSAR/XATP/XBRKX/XCALLCAP/XCAT/XOR/XSTAR/XFARB/XPOSI/XRPSI/XNME/XFNME
-becomes its own template C file calling through the same `emit_v`
-surface.  The existing `bb_emit.c` EMIT_TEXT/EMIT_BINARY mode switch
-collapses into `emit_v_binary` / `emit_v_text` — one vtable
-across SM and BB.
+**Correction to earlier framing (sess 2026-05-11, second pass with Lon):**
+SM and BB are not phased — SM first, BB deferred.  They are co-equal
+from day one.  Every SM instruction gets its own template C function;
+every BB box gets its own template C function.  They share the
+`emit_v` surface, the backends, and the same one-file-per-emission-unit
+discipline.
 
-Done not as part of this rung but as the natural follow-on once SM
-side is uniform.  Carved as a separate post-rung in the goal file.
+File-system layout:
+
+```
+src/runtime/x86/
+    emit_v.h                          shared surface
+    emit_v_binary.c                   binary backend (writes x86 bytes)
+    emit_v_text.c                     text backend (writes GAS asm text)
+    emit_v_macro_def.c                macro-definition backend (regen sm_macros.s)
+    templates/
+        sm_halt.c                     ┐
+        sm_push_lit_i.c               │
+        sm_push_lit_s.c               │  one C file per SM opcode
+        sm_jump.c                     │  (≈40 files when complete)
+        sm_jump_s.c                   │
+        sm_jump_f.c                   │
+        sm_call_fn.c                  │
+        sm_return.c                   │
+        sm_nreturn.c                  │
+        sm_freturn.c                  │
+        sm_add.c, sm_sub.c, …         │
+        sm_pat_lit.c                  │
+        sm_pat_capture.c              │
+        …                             ┘
+        bb_xchr.c                     ┐
+        bb_xspnc.c                    │
+        bb_xanyc.c                    │  one C file per BB box
+        bb_xbrkc.c                    │  (~25 files when complete)
+        bb_xnnyc.c                    │
+        bb_xlnth.c                    │
+        bb_xtb.c, bb_xrtb.c           │
+        bb_xfnce.c                    │
+        bb_xdsar.c, bb_xatp.c         │
+        bb_xbrkx.c                    │
+        bb_xcallcap.c                 │
+        bb_xcat.c, bb_xor.c           │
+        bb_xstar.c, bb_xfarb.c        │
+        bb_xposi.c, bb_xrpsi.c        │
+        bb_xnme.c, bb_xfnme.c         │
+        bb_xarbn.c, bb_xfail.c        │
+        …                             ┘
+```
+
+Naming convention `sm_<opcode>.c` / `bb_<box>.c` so a directory
+listing reads like the instruction set itself.  Both kinds live side
+by side because they share the surface; there is no architectural
+reason to fork them into separate trees.
+
+The existing `bb_emit.c` EMIT_TEXT/EMIT_BINARY mode switch collapses
+into `emit_v_binary` / `emit_v_text` — one vtable across SM and BB.
+The existing per-box C functions in `bb_boxes.c` / `bb_flat.c` migrate
+one box at a time into their per-box template file.
+
+---
+
+## The "sprinkle" model — generous surface, per-backend ignore rights
+
+A template C function can issue *any* call on the `emit_v` surface,
+not just instruction emission.  Comments, banners, blank lines,
+column breaks, section markers, structural assertions — all of these
+are first-class operations on the surface.  Each backend chooses
+which calls to implement and which to no-op:
+
+| Call category               | binary backend | text backend | macro_def backend |
+|-----------------------------|:--------------:|:------------:|:-----------------:|
+| Instruction (`mov_reg_imm64`, `call_plt`, `ret`, etc.) | emits bytes | emits mnemonic line | emits inside `.macro` body |
+| Symbolic label              | records offset | writes label line | writes label line |
+| `pc_label`                  | records offset for patching | writes `.LN:` line | n/a |
+| `comment`                   | NO-OP          | writes `# …`  | writes `# …` |
+| `banner`                    | NO-OP          | writes 120-char rule + text | usually NO-OP |
+| `blank_line`                | NO-OP          | emits blank line | NO-OP |
+| `column_break`              | NO-OP          | aligns next call to next column | NO-OP |
+| `section_marker(".text")`   | NO-OP (always SEG_CODE) | writes `.section .text` | NO-OP |
+| `pad_to_blob_size`          | emits NOPs     | NO-OP         | NO-OP |
+| `macro_begin/end`           | NO-OP          | NO-OP in invocation mode; emits `.macro/.endm` in definition mode (same as macro_def) | emits `.macro/.endm` |
+| `macro_param_ref(name)`     | substitutes the bound value | writes the bound value (invocation) or `\<name>` (definition) | writes `\<name>` |
+
+The template author writes the *full intent* of an opcode or box —
+its instructions, its commentary, its visual layout, its
+structural assertions about column alignment — in one place.  Each
+backend renders the calls it cares about and ignores the rest.  This
+is what "sprinkle" means: a template's body can have as much
+cosmetic and explanatory content as the author wants; the binary
+backend silently drops it; the text backend honors it; the macro-def
+backend selects per-call-type.
+
+Reading a template C file therefore gives a reviewer the *complete*
+picture of how the opcode is emitted in every production — including
+the comments and formatting that will appear in `.s`.  No need to
+cross-reference a separate formatting layer.
+
+A worked example for SM_HALT showing the sprinkle:
+
+```c
+/* sm_halt.c — SM_HALT template.  Sprinkle: comments, banner, blob-pad.
+ * Each backend implements what it cares about. */
+
+#include "../emit_v.h"
+
+void emit_sm_halt(emit_v *e)
+{
+    e->macro_begin(e, "HALT", NULL, 0);          /* macro_def: emits ".macro HALT"
+                                                    text/invocation: NO-OP
+                                                    binary: NO-OP */
+    e->comment(e, "SM_HALT — exit sm_jit_run via ret");
+                                                  /* text: writes "# SM_HALT — …"
+                                                    binary: NO-OP
+                                                    macro_def: writes "# SM_HALT — …" */
+
+    e->inc_mem_disp8(e, REG_R13, 20);            /* pc++ : 4 bytes / "inc dword [r13+20]"
+                                                    / "inc dword [r13+20]" inside macro body */
+
+    e->ret(e);                                    /* return to sm_jit_run's frame:
+                                                    1 byte / "ret" / "ret" */
+
+    e->pad_to_blob_size(e);                       /* binary: NOP-pads to ME3_BLOB_SIZE
+                                                    text: NO-OP
+                                                    macro_def: NO-OP */
+
+    e->macro_end(e);                              /* macro_def: emits ".endm"
+                                                    others: NO-OP */
+}
+```
+
+Read top-to-bottom that's a complete description of SM_HALT for every
+backend.  Every meaningful behavior is on the page; the layout is the
+intent.
 
 ---
 
@@ -338,55 +485,92 @@ per opcode; mode-3 and mode-4 share it) is done now.
    amendment.  No code.
 
 2. **EM-MODE4-IS-MODE3-DUMP-b — vtable skeleton.**  Add
-   `src/runtime/x86/emit_v.h` with the struct, three skeleton backend
-   impls (`emit_v_binary.c`, `emit_v_text.c`, `emit_v_macro_def.c`
-   — last is a thin wrapper over text in DEFINITION mode).  Wire into
-   Makefile.  Nothing calls them yet.  Gates green.
+   `src/runtime/x86/emit_v.h` with the struct.  Three skeleton backend
+   impls: `emit_v_binary.c`, `emit_v_text.c`, `emit_v_macro_def.c`
+   (last is a thin wrapper over text in DEFINITION mode).  Create
+   `src/runtime/x86/templates/` directory.  Wire into Makefile.
+   Nothing calls them yet.  Gates green.
 
-3. **EM-MODE4-IS-MODE3-DUMP-c — first opcode end-to-end: SM_HALT.**
-   New file `src/runtime/x86/sm_templates/halt.c`.  Wire mode-3's halt
-   blob through it (replaces `emit_halt_blob` inline writes).  Wire
-   mode-4's halt emission through it (replaces `emit_sm_halt` in
-   `sm_codegen_x64_emit.c`).  Wire `sm_macros.s` HALT macro
-   regeneration through it (new generator tool
-   `tools/regen_sm_macros.c` invoked at build time).  Gates green —
-   bytes mode-3 emits byte-for-byte unchanged; `.s` mode-4 emits
-   layout-identical or `HALT`-macro-invocation-identical; sm_macros.s
-   regenerated identical to current hand-maintained version (or with
-   a documented small formatting diff).
+3. **EM-MODE4-IS-MODE3-DUMP-c — first SM opcode end-to-end: SM_HALT.**
+   New file `src/runtime/x86/templates/sm_halt.c`.  Wire mode-3's halt
+   blob through it (replaces `emit_halt_blob` inline writes in
+   `sm_codegen.c`).  Wire mode-4's halt emission through it (replaces
+   `emit_sm_halt` in `sm_codegen_x64_emit.c`).  Wire `sm_macros.s`
+   HALT macro regeneration through it (new generator tool
+   `tools/regen_macros.c` invoked at build time).  New gate
+   `test_gate_em_template_byte_identity.sh` validates mode-3 bytes ==
+   mode-4-asm-then-bytes on a trivial HALT-exercising program.  Gates
+   green.
 
-4. **EM-MODE4-IS-MODE3-DUMP-d through -k — one opcode per rung**, in
-   this order:
-   - SM_PUSH_LIT_I
-   - SM_PUSH_LIT_S
-   - SM_VOID_POP
-   - SM_JUMP
-   - SM_JUMP_S / SM_JUMP_F
-   - SM_ADD / SM_SUB / SM_MUL / SM_DIV / SM_MOD / SM_EXP (one rung)
-   - SM_LABEL / SM_STNO
-   - SM_CALL_FN (the big one)
-   - SM_RETURN / SM_NRETURN / SM_FRETURN and conditional variants
+4. **EM-MODE4-IS-MODE3-DUMP-d — first BB box end-to-end: bb_xchr.**
+   New file `src/runtime/x86/templates/bb_xchr.c`.  Wire `bb_flat.c`'s
+   `flat_emit_*_xchr` calls through it.  XCHR is the simplest box
+   (one-character literal compare) — proves the BB-side vtable surface
+   works.  Existing `bb_emit.c` EMIT_TEXT/EMIT_BINARY mode switch
+   delegates to the new vtable for this box; once all boxes are
+   migrated the mode switch deletes.  Gates green.
 
-   Each lands its own template C file under `sm_templates/`.  Each
-   deletes the corresponding inline byte writes from `sm_codegen.c`
-   AND the corresponding per-opcode function in
-   `sm_codegen_x64_emit.c` AND the corresponding hand-maintained
-   macro in `sm_macros.s` (now regenerated from the template).
+5. **EM-MODE4-IS-MODE3-DUMP-e through -p — one emission unit per
+   rung**, alternating between SM opcodes and BB boxes so the gate
+   surface gets a workout from both directions.  Suggested order
+   (refine on entry):
 
-5. **EM-MODE4-IS-MODE3-DUMP-l — pattern opcodes** (SM_PAT_*).  Same
-   discipline.
+   | Rung | Unit | Type |
+   |------|------|------|
+   | -e | `sm_push_lit_i.c` | SM |
+   | -f | `bb_xlit.c` | BB (literal byte sequence) |
+   | -g | `sm_push_lit_s.c` | SM |
+   | -h | `bb_xspnc.c` | BB |
+   | -i | `sm_void_pop.c` | SM |
+   | -j | `bb_xanyc.c` | BB |
+   | -k | `sm_jump.c` | SM |
+   | -l | `bb_xbrkc.c` | BB |
+   | -m | `sm_jump_s.c` + `sm_jump_f.c` | SM (one rung covers both) |
+   | -n | `bb_xnnyc.c` | BB |
+   | -o | arithmetic family: `sm_add.c sm_sub.c sm_mul.c sm_div.c sm_mod.c sm_exp.c` | SM (one rung) |
+   | -p | `bb_xlnth.c`, `bb_xtb.c`, `bb_xrtb.c` | BB (one rung — they share structure) |
 
-6. **EM-MODE4-IS-MODE3-DUMP-m — `sm_macros.s` deleted from VCS;
-   regenerated at build.**  Make rule added.  Test that build from a
-   clean tree works without a checked-in `sm_macros.s`.  Drop the
-   file from git (or keep with the "DO NOT EDIT — generated" header
-   if portability concerns warrant).
+   Each rung lands its own template C file(s) under `templates/`.
+   Each deletes the corresponding inline byte writes from
+   `sm_codegen.c` (or `bb_flat.c` / `bb_boxes.c` for BB) AND the
+   corresponding per-opcode/per-box function in
+   `sm_codegen_x64_emit.c` (or `bb_emit.c`) AND the corresponding
+   hand-maintained macro in `sm_macros.s` / `bb_macros.s`.
 
-7. **EM-MODE4-IS-MODE3-DUMP-n — close the rung.**  Run
-   `test_gate_em_beauty_subsystems_mode4.sh` — gate must not regress.
-   If `EM-7d-beauty-subsystems` baseline (PASS=4 FAIL=13) improves as
-   a byproduct (likely, since mode-4 is now byte-identical to mode-3
-   on all retrofitted opcodes), capture the new baseline.
+6. **EM-MODE4-IS-MODE3-DUMP-q — SM_LABEL / SM_STNO.**  Structural
+   markers; one rung.
+
+7. **EM-MODE4-IS-MODE3-DUMP-r — SM_CALL_FN.**  The big SM rung; uses
+   `lea_rip_sym`, `call_plt`, expression-registry interaction.
+
+8. **EM-MODE4-IS-MODE3-DUMP-s — SM_RETURN / SM_NRETURN / SM_FRETURN
+   family**, including conditional variants.  Once this lands, the
+   ABI alignment work the earlier watermark cycled through (thunks,
+   `push rbp`, etc.) is decided inside ONE template file — fixing
+   alignment in one place fixes it for both mode-3 and mode-4 by
+   construction.
+
+9. **EM-MODE4-IS-MODE3-DUMP-t — remaining BB boxes.**  XFNCE, XDSAR,
+   XATP, XBRKX, XCALLCAP, XCAT, XOR, XSTAR, XFARB, XPOSI, XRPSI,
+   XNME, XFNME, XARBN, XFAIL.  Bundle in 2-3 rungs by structural
+   similarity.
+
+10. **EM-MODE4-IS-MODE3-DUMP-u — pattern SM opcodes** (`SM_PAT_*`).
+    Same discipline.
+
+11. **EM-MODE4-IS-MODE3-DUMP-v — `sm_macros.s` and `bb_macros.s`
+    become generated artifacts**, make rule added, files dropped from
+    git in favor of build-time regen (or kept with a "DO NOT EDIT —
+    generated" header).
+
+12. **EM-MODE4-IS-MODE3-DUMP-w — rung close.**  Run
+    `test_gate_em_beauty_subsystems_mode4.sh` — gate must improve from
+    baseline (PASS=4 FAIL=13) since byte-identity is by construction.
+    Capture new baseline.  Delete `emitter_v.h` / `emitter_text.c` /
+    `emitter_binary.c` (the BB-side legacy vtable subsumed by
+    `emit_v.h`).  Delete `sm_emit_template.c` / `sm_emit_template.h`
+    (the SM-side macro-renderer subsumed by templates +
+    `emit_v_text.c`).  File-count delta proves consolidation.
 
 ---
 
