@@ -140,6 +140,8 @@ void t_emit_jmp(bb_label_t *target, jmp_kind_t kind);
  *   BINARY:    no-op (label placement is the caller's job via bb_label_define)
  *   TEXT:      bb3c_format("", macro_name, "")
  *   MACRO_DEF: same as TEXT */
+void t_lea_rdi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr);
+void t_mov_esi_imm32(int val);
 void t_noop_macro(const char *macro_name);
 
 /* t_banner_stno — emit the SM_STNO major banner.

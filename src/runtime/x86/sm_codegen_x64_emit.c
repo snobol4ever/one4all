@@ -1071,16 +1071,32 @@ static int emit_sm_coerce_num_dispatch(FILE *out, int pc)
 /* SM_CALL_FN: general function call.  All dispatch (pseudo-calls, builtins,
  * user-defined) lives in rt_call(name, nargs).
  *   a[0].s = function name (interned in strtab)
- *   a[1].i = nargs                                                       */
-static int emit_sm_call(FILE *out, const SM_Instr *ins, int pc)
+ *   a[1].i = nargs
+ * EM-MODE4-IS-MODE3-DUMP-p: TEXT invocation uses sm_emit_lbl_int32 (proven
+ * path — same as PUSH_STR, STORE_VAR, etc.).  The per-opcode template
+ * emit_sm_call_fn covers MACRO_DEF (sm_macros.s regen) only; it is the
+ * source of truth for the CALL_FN macro body.  The legacy static path is
+ * preserved as _legacy for rollback reference. */
+static int emit_sm_call_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     const char *name  = ins->a[0].s ? ins->a[0].s : "";
     int         nargs = (int)ins->a[1].i;
     char lbl[32], anno[80];
     strtab_label(lbl, sizeof(lbl), name);
-    /* Annotation: show the unmangled fname (the args column shows the .Lstr_N
-     * label which is opaque); CALL_FN macro name is in col 2. */
+    snprintf(anno, sizeof(anno), "# %s", name);
+    return sm_emit_lbl_int32(out, sm_template_lookup(SM_CALL_FN),
+                             lbl, nargs, anno);
+}
+
+__attribute__((unused))
+static int emit_sm_call_legacy(FILE *out, const SM_Instr *ins, int pc)
+{
+    (void)pc;
+    const char *name  = ins->a[0].s ? ins->a[0].s : "";
+    int         nargs = (int)ins->a[1].i;
+    char lbl[32], anno[80];
+    strtab_label(lbl, sizeof(lbl), name);
     snprintf(anno, sizeof(anno), "%s", name);
     return sm_emit_lbl_int32(out, sm_template_lookup(SM_CALL_FN),
                              lbl, nargs, anno);
@@ -2193,7 +2209,7 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
 
             /* EM-7-pre keepers: SM_CALL_FN (general) + SM_CONCAT + SM_PUSH_NULL +
              * SM_COERCE_NUM + conditional return variants. */
-            case SM_CALL_FN:         rc = emit_sm_call(out, ins, pc);       break;
+            case SM_CALL_FN:         rc = emit_sm_call_dispatch(out, ins, pc); break;
             case SM_CONCAT:       rc = emit_sm_concat_dispatch(out, pc);      break;
             case SM_PUSH_NULL:    rc = emit_sm_push_null_dispatch(out, pc);   break;
             case SM_COERCE_NUM:   rc = emit_sm_coerce_num_dispatch(out, pc);  break;

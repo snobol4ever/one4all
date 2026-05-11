@@ -310,6 +310,68 @@ void t_emit_jmp(bb_label_t *target, jmp_kind_t kind)
     }
 }
 
+void t_lea_rdi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr)
+{
+    /* Load address of a strtab string into rdi.
+     *
+     *   BINARY:    movabs rdi, <in_proc_ptr>    — 10 bytes: 48 BF <8>
+     *              In-process JIT: the strtab string is already in memory;
+     *              bake its address directly.  Same encoding as t_mov_rdi_imm64.
+     *
+     *   TEXT:      lea rdi, [rip + sym_label]   — 7 bytes at link time;
+     *              GAS assembles this as a RIP-relative LEA (opcode 48 8D 3D).
+     *
+     *   MACRO_DEF: `lea rdi, [rip + \lbl]`      — same as TEXT but \lbl
+     *              is the macro parameter name, not a concrete label. */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY:
+        t_mov_rdi_imm64(in_proc_ptr);
+        return;
+    case EMIT_TEXT: {
+        char args[80];
+        snprintf(args, sizeof(args), "rdi, [rip + %s]",
+                 sym_label ? sym_label : "??sym??");
+        bb3c_format(emit_outf(), "", "lea", args);
+        return;
+    }
+    case EMIT_MACRO_DEF: {
+        /* Inside a .macro body the parameter is referenced as \lbl. */
+        bb3c_format(emit_outf(), "", "lea", "rdi, [rip + \\lbl]");
+        return;
+    }
+    }
+}
+
+void t_mov_esi_imm32(int val)
+{
+    /* mov esi, <imm32>   — 5 bytes: B8+reg  (BE <val32>)
+     *
+     *   BINARY:    BE <val32>   (MOV r/m32, imm32 short form for esi)
+     *   TEXT:      mov esi, <val>
+     *   MACRO_DEF: mov esi, \n   (parameter reference) */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY: {
+        /* MOV ESI, imm32: opcode B8+r where r=6 for ESI → 0xBE */
+        uint32_t u = (uint32_t)val;
+        bb_emit_byte(0xBE);
+        bb_emit_byte((uint8_t)(u      ));
+        bb_emit_byte((uint8_t)(u >>  8));
+        bb_emit_byte((uint8_t)(u >> 16));
+        bb_emit_byte((uint8_t)(u >> 24));
+        return;
+    }
+    case EMIT_TEXT: {
+        char args[32];
+        snprintf(args, sizeof(args), "esi, %d", val);
+        bb3c_format(emit_outf(), "", "mov", args);
+        return;
+    }
+    case EMIT_MACRO_DEF:
+        bb3c_format(emit_outf(), "", "mov", "esi, \\n");
+        return;
+    }
+}
+
 void t_noop_macro(const char *macro_name)
 {
     /* NOOP shape: emit one three-column line with macro_name in col 2.

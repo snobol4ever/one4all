@@ -132,4 +132,12 @@ void emit_sm_coerce_num(emitter_t *e);
 void emit_sm_label(emitter_t *e);
 void emit_sm_stno (emitter_t *e, int stno, int lineno, const char *src_text);
 
+/* SM_CALL_FN — sub-rung -p (2026-05-11).
+ *   name_lbl:    strtab label string (e.g. ".S42") for TEXT/MACRO_DEF
+ *   name_ptr:    in-process string pointer for BINARY
+ *   nargs:       number of arguments on the value stack
+ * Emits: lea rdi, [rip+lbl]; mov esi, nargs; call rt_call@PLT */
+void emit_sm_call_fn(emitter_t *e, const char *name_lbl,
+                     uint64_t name_ptr, int nargs);
+
 #endif /* RUNTIME_X86_TEMPLATES_TEMPLATES_H */
