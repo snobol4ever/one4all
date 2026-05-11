@@ -1151,6 +1151,72 @@ static void flat_emit_xnnyc(emitter_t *e, const char *chars,
                     charset_text_body, &a);
 }
 
+/* ── XBRKX text-body callback (EM-MODE4-IS-MODE3-DUMP-i) ─────────────────── */
+
+extern DESCR_t  bb_breakx(void *zeta, int entry);
+extern brkx_t  *bb_breakx_new(const char *chars);
+
+/* Arg struct passed to the brkx text-body callback. */
+typedef struct {
+    const char *chars;
+} brkx_text_arg_t;
+
+/* Text-path body for emit_bb_xbrkx.  Access to bb_flat.c static helpers.
+ * Structurally identical to charset_text_body but uses brkx label prefix
+ * and bb_breakx runtime function. */
+static void brkx_text_body(emitter_t *e,
+                            bb_label_t *lbl_succ,
+                            bb_label_t *lbl_fail,
+                            bb_label_t *lbl_β,
+                            void *arg_)
+{
+    const brkx_text_arg_t *a = (const brkx_text_arg_t *)arg_;
+    const char *chars = a->chars ? a->chars : "";
+
+    char preview[40];
+    if (chars && *chars) {
+        int n = (int)strlen(chars);
+        if (n > 24) snprintf(preview, sizeof(preview), "'%.24s...'", chars);
+        else        snprintf(preview, sizeof(preview), "'%s'", chars);
+    } else {
+        preview[0] = '\0';
+    }
+    flat_emit_box_banner(e, "BREAKX", preview, lbl_succ->name);
+
+    int id = g_flat_node_id++;
+    char zlbl[64], slbl[64];
+    snprintf(zlbl, sizeof(zlbl), ".Lbrkx%d_z",     id);
+    snprintf(slbl, sizeof(slbl), ".Lbrkx%d_chars", id);
+    flat_data_section(e);
+    flat3c_label(e, slbl);
+    flat_data_string(e, chars);
+    flat3c_label(e, zlbl);
+    flat_data_quad(e, slbl);   /* &chars */
+    flat_data_long(e, 0);      /* delta  */
+
+    flat_text_section(e);
+    flat_intel_syntax(e);
+    char rdi_arg[96];
+    snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", zlbl);
+    flat3c_action(e, "lea", rdi_arg);
+    flat3c_action(e, "mov", "esi, 0");
+    emit_call_sym_plt(e, "bb_breakx", (uint64_t)(uintptr_t)bb_breakx);
+    flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
+
+    EV_LABEL(e, lbl_β);
+    flat3c_action(e, "lea", rdi_arg);
+    flat3c_action(e, "mov", "esi, 1");
+    emit_call_sym_plt(e, "bb_breakx", (uint64_t)(uintptr_t)bb_breakx);
+    flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
+}
+
+static void flat_emit_xbrkx(emitter_t *e, const char *chars,
+                             bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
+{
+    brkx_text_arg_t a = { chars };
+    emit_bb_xbrkx(e, chars, lbl_succ, lbl_fail, lbl_β, brkx_text_body, &a);
+}
+
 /* ── integer-cursor text-body callback (EM-MODE4-IS-MODE3-DUMP-g) ────────── */
 
 extern DESCR_t bb_len  (void *zeta, int entry);
@@ -1356,36 +1422,8 @@ static void flat_emit_node(emitter_t *e, PATND_t *p,
         break;
     }
     case XBRKX: {
-        if (e->is_text) {
-            const char *cs0 = p->STRVAL_fn ? p->STRVAL_fn : "";
-            char preview[40];
-            int n = (int)strlen(cs0);
-            if (n > 24) snprintf(preview, sizeof(preview), "'%.24s...'", cs0);
-            else        snprintf(preview, sizeof(preview), "'%s'", cs0);
-            flat_emit_box_banner(e, "BREAKX", preview, lbl_succ->name);
-            int id = g_flat_node_id++;
-            char lbl[64], slbl[64];
-            snprintf(lbl,  sizeof(lbl),  ".Lbrkx%d_z",     id);
-            snprintf(slbl, sizeof(slbl), ".Lbrkx%d_chars", id);
-            const char *cs = p->STRVAL_fn ? p->STRVAL_fn : "";
-            flat_data_section(e);
-            flat3c_label(e, slbl);
-            flat_data_string(e, cs);
-            flat3c_label(e, lbl);
-            flat_data_quad(e, slbl);                  /* &chars */
-            flat_data_long(e, 0);                     /* delta */
-            flat_text_section(e);
-            flat_intel_syntax(e);
-            char rdi_arg[96]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", lbl);
-            flat_box_call(e, rdi_arg, "bb_breakx", 0);
-            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
-            EV_LABEL(e, lbl_β);
-            flat_box_call(e, rdi_arg, "bb_breakx", 1);
-            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
-        } else {
-            brkx_t *z = bb_breakx_new(p->STRVAL_fn?p->STRVAL_fn:"");
-            flat_emit_box_call(e, bb_breakx, "bb_breakx", z, lbl_succ, lbl_fail, lbl_β);
-        }
+        const char *chars = p->STRVAL_fn ? p->STRVAL_fn : "";
+        flat_emit_xbrkx(e, chars, lbl_succ, lbl_fail, lbl_β);
         break;
     }
     case XATP: {

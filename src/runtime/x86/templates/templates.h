@@ -85,4 +85,13 @@ void emit_bb_xrtb (emitter_t *e, long long num,
                    bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β,
                    bb_intcur_text_fn text_fn, void *text_arg);
 
+/* XBRKX (BREAKX) — break-from-variable box. Sub-rung -i (2026-05-11). */
+void emit_bb_xbrkx(emitter_t *e,
+                   const char *chars,
+                   bb_label_t *lbl_succ,
+                   bb_label_t *lbl_fail,
+                   bb_label_t *lbl_β,
+                   bb_brkx_text_fn text_body_fn,
+                   void *text_body_arg);
+
 #endif /* RUNTIME_X86_TEMPLATES_TEMPLATES_H */

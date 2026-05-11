@@ -83,6 +83,7 @@ RT_PIC_SRCS := \
     $(RT)/x86/templates/bb_xchr.c \
     $(RT)/x86/templates/bb_xspnc.c \
     $(RT)/x86/templates/bb_xlnth.c \
+    $(RT)/x86/templates/bb_xbrkx.c \
     $(RT)/x86/bb_boxes.c \
     $(RT)/x86/bb_broker.c \
     $(SRC)/frontend/snobol4/snobol4.tab.c \
@@ -246,6 +247,7 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_halt.c -o $(OBJ)/template_sm_halt.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_push_lit_i.c -o $(OBJ)/template_sm_push_lit_i.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_void_pop.c -o $(OBJ)/template_sm_void_pop.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xbrkx.c -o $(OBJ)/template_bb_xbrkx.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xchr.c -o $(OBJ)/template_bb_xchr.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xspnc.c -o $(OBJ)/template_bb_xspnc.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xlnth.c -o $(OBJ)/template_bb_xlnth.o
