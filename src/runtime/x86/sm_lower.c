@@ -36,63 +36,7 @@
 #include <gc/gc.h>
 #include "snobol4.h"
 
-/* Walk the proc body AST and populate `sc` with non-global variable names.
- * Mirrors coro_runtime.c's icn_scope_patch without mutating the IR.
- * Globals bridge to the NV store and do not get frame slots.
- * Names starting with '&' are keywords — skipped. */
-static void expression_scope_walk(IcnScope *sc, AST_t *e) {
-    if (!e) return;
-    if (e->kind == AST_GLOBAL) {
-        for (int i = 0; i < e->nchildren; i++)
-            if (e->children[i] && e->children[i]->sval)
-                scope_add(sc, e->children[i]->sval);
-        return;
-    }
-    if (e->kind == AST_VAR && e->sval) {
-        if (e->sval[0] != '&' && !is_global(e->sval))
-            scope_add(sc, e->sval);
-    }
-    for (int i = 0; i < e->nchildren; i++)
-        expression_scope_walk(sc, e->children[i]);
-}
-
-/* ── Emit a goto target (possibly forward ref) ──────────────────────────── */
-
-/* Emit SM_JUMP / SM_JUMP_S / SM_JUMP_F for a named SNOBOL4 goto target.
- * RETURN / FRETURN / NRETURN map to the corresponding return opcodes.
- * All other targets patch immediately if defined; otherwise register a
- * forward patch.  Returns the index of the emitted jump instruction. */
-static int emit_goto(LowerCtx *c, sm_opcode_t op, const char *target)
-{
-    SM_Program *p = c->p;
-    LabelTable *labtab = &c->labtab;
-    if (!target) return -1;
-
-    /* Special targets (case-insensitive per SNOBOL4 spec). */
-    if (strcasecmp(target, "RETURN") == 0) {
-        if (op == SM_JUMP_S) return sm_emit(p, SM_RETURN_S);
-        if (op == SM_JUMP_F) return sm_emit(p, SM_RETURN_F);
-        return sm_emit(p, SM_RETURN);
-    }
-    if (strcasecmp(target, "FRETURN") == 0) {
-        if (op == SM_JUMP_S) return sm_emit(p, SM_FRETURN_S);
-        if (op == SM_JUMP_F) return sm_emit(p, SM_FRETURN_F);
-        return sm_emit(p, SM_FRETURN);
-    }
-    if (strcasecmp(target, "NRETURN") == 0) {
-        if (op == SM_JUMP_S) return sm_emit(p, SM_NRETURN_S);
-        if (op == SM_JUMP_F) return sm_emit(p, SM_NRETURN_F);
-        return sm_emit(p, SM_NRETURN);
-    }
-
-    int idx = sm_emit_i(p, op, 0);
-    int resolved = labtab_find(labtab, target);
-    if (resolved >= 0)
-        sm_patch_jump(p, idx, resolved);
-    else
-        labtab_patch_later(labtab, idx, target);
-    return idx;
-}
+/* SR-3: expression_scope_walk, emit_goto, kw_canonicalize moved to lower_ctx.c */
 
 /* ── Expression lowering ────────────────────────────────────────────────── */
 
@@ -385,11 +329,7 @@ static void lower_expr(LowerCtx *c, const AST_t *e)
     }
     case AST_KEYWORD: {
         /* Keywords are stored uppercase; fold the source case before lookup. */
-        const char *kraw = e->sval ? e->sval : "";
-        char kup[64]; int ki = 0;
-        while (kraw[ki] && ki < 63) { kup[ki] = (char)toupper((unsigned char)kraw[ki]); ki++; }
-        kup[ki] = '\0';
-        sm_emit_s(p, SM_PUSH_VAR, kup);
+        sm_emit_s(p, SM_PUSH_VAR, kw_canonicalize(e->sval));
         return;
     }
     case AST_INDIRECT: {
@@ -496,11 +436,7 @@ static void lower_expr(LowerCtx *c, const AST_t *e)
                 sm_emit_s(p, SM_STORE_VAR, vn);
             }
             else if (lhs->kind == AST_KEYWORD) {
-                const char *kraw = lhs->sval ? lhs->sval : "";
-                char kup[64]; int ki = 0;
-                while (kraw[ki] && ki < 63) { kup[ki] = (char)toupper((unsigned char)kraw[ki]); ki++; }
-                kup[ki] = '\0';
-                sm_emit_s(p, SM_STORE_VAR, kup);
+                sm_emit_s(p, SM_STORE_VAR, kw_canonicalize(lhs->sval));
             }
             else if (lhs->kind == AST_FNC && lhs->sval) {
                 /* Field mutator: fname(obj) = val → push obj, call fname_SET 2 */
@@ -788,9 +724,7 @@ static void lower_expr(LowerCtx *c, const AST_t *e)
 
         if (lhs_slot >= 0 || lhs_name) {
             if (lhs_slot >= 0)    sm_emit_i(p, SM_LOAD_FRAME, lhs_slot);
-            else if (lhs_is_kw) { char ku[64]; int ki=0;
-                while (lhs_name[ki]&&ki<63){ku[ki]=(char)toupper((unsigned char)lhs_name[ki]);ki++;}
-                ku[ki]='\0'; sm_emit_s(p, SM_PUSH_VAR, ku); }
+            else if (lhs_is_kw)   sm_emit_s(p, SM_PUSH_VAR, kw_canonicalize(lhs_name));
             else                  sm_emit_s(p, SM_PUSH_VAR, lhs_name);
             lower_expr(c, rhs);
             #include "../../frontend/icon/icon_lex.h"
@@ -807,9 +741,7 @@ static void lower_expr(LowerCtx *c, const AST_t *e)
                 return;
             }
             if (lhs_slot >= 0)  sm_emit_i(p, SM_STORE_FRAME, lhs_slot);
-            else if (lhs_is_kw) { char ku[64]; int ki=0;
-                while (lhs_name[ki]&&ki<63){ku[ki]=(char)toupper((unsigned char)lhs_name[ki]);ki++;}
-                ku[ki]='\0'; sm_emit_s(p, SM_STORE_VAR, ku); }
+            else if (lhs_is_kw) sm_emit_s(p, SM_STORE_VAR, kw_canonicalize(lhs_name));
             else                sm_emit_s(p, SM_STORE_VAR, lhs_name);
             return;
         }

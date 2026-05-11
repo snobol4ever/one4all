@@ -1,25 +1,25 @@
 /*
- * lower_ctx.c — LabelTable implementation for the SM lowering pass (SR-2)
+ * lower_ctx.c — Lowering context helpers (SR-2, SR-3)
  *
- * Owns the label-resolution table: a name→instruction-index registry
- * with a forward-reference patch list.  The table knows nothing of
- * SM_Program internals — it is a pure name-to-int registry plus a
- * list of (jump_instr_idx, target_name) pairs that labtab_resolve()
- * closes out after all statements have been lowered.
- *
- * Memory: GC_MALLOC / GC_REALLOC / GC_strdup throughout.
- * labtab_free() is retained as a no-op shim so sm_lower.c call sites
- * compile unchanged; the GC reclaims storage automatically.
+ * SR-2: LabelTable — name→instruction-index registry with forward-reference
+ *       patch list.  GC_MALLOC throughout; labtab_free() is a no-op shim.
+ * SR-3: emit_goto, kw_canonicalize, expression_scope_walk moved here from
+ *       sm_lower.c so cohort files (SR-4+) can use them without a dependency
+ *       on the monolithic sm_lower.c.
  *
  * Authors: Lon Jones Cherryholmes · Claude Sonnet 4.6
  * Date: 2026-05-11
  */
 
 #include "lower_ctx.h"
-#include "sm_prog.h"   /* sm_patch_jump */
+#include "sm_prog.h"
+
+#include "../../runtime/interp/coro_runtime.h"
+#include "../ast/ast.h"
 
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 #include <gc/gc.h>
 
 #define LABEL_TABLE_INIT 64
@@ -124,4 +124,79 @@ int labtab_resolve(LabelTable *labtab, SM_Program *p)
         sm_patch_jump(p, labtab->patches[i].jump_instr_idx, target);
     }
     return ok;
+}
+
+/* ── Keyword canonicalization ───────────────────────────────────────────── */
+
+/* Return a GC-allocated uppercase copy of `raw`.  No length cap. */
+char *kw_canonicalize(const char *raw)
+{
+    if (!raw) raw = "";
+    size_t n = strlen(raw);
+    char *buf = GC_MALLOC(n + 1);
+    for (size_t i = 0; i < n; i++)
+        buf[i] = (char)toupper((unsigned char)raw[i]);
+    buf[n] = '\0';
+    return buf;
+}
+
+/* ── Proc-body scope walk ───────────────────────────────────────────────── */
+
+/* Walk the proc body AST and populate `sc` with non-global variable names.
+ * Mirrors coro_runtime.c's icn_scope_patch without mutating the IR.
+ * Globals bridge to the NV store and do not get frame slots.
+ * Names starting with '&' are keywords — skipped. */
+void expression_scope_walk(IcnScope *sc, AST_t *e)
+{
+    if (!e) return;
+    if (e->kind == AST_GLOBAL) {
+        for (int i = 0; i < e->nchildren; i++)
+            if (e->children[i] && e->children[i]->sval)
+                scope_add(sc, e->children[i]->sval);
+        return;
+    }
+    if (e->kind == AST_VAR && e->sval) {
+        if (e->sval[0] != '&' && !is_global(e->sval))
+            scope_add(sc, e->sval);
+    }
+    for (int i = 0; i < e->nchildren; i++)
+        expression_scope_walk(sc, e->children[i]);
+}
+
+/* ── Emit a goto target (possibly forward ref) ──────────────────────────── */
+
+/* Emit SM_JUMP / SM_JUMP_S / SM_JUMP_F for a named SNOBOL4 goto target.
+ * RETURN / FRETURN / NRETURN map to the corresponding return opcodes.
+ * All other targets patch immediately if defined; otherwise register a
+ * forward patch.  Returns the index of the emitted jump instruction. */
+int emit_goto(LowerCtx *c, sm_opcode_t op, const char *target)
+{
+    SM_Program *p = c->p;
+    LabelTable *labtab = &c->labtab;
+    if (!target) return -1;
+
+    /* Special targets (case-insensitive per SNOBOL4 spec). */
+    if (strcasecmp(target, "RETURN") == 0) {
+        if (op == SM_JUMP_S) return sm_emit(p, SM_RETURN_S);
+        if (op == SM_JUMP_F) return sm_emit(p, SM_RETURN_F);
+        return sm_emit(p, SM_RETURN);
+    }
+    if (strcasecmp(target, "FRETURN") == 0) {
+        if (op == SM_JUMP_S) return sm_emit(p, SM_FRETURN_S);
+        if (op == SM_JUMP_F) return sm_emit(p, SM_FRETURN_F);
+        return sm_emit(p, SM_FRETURN);
+    }
+    if (strcasecmp(target, "NRETURN") == 0) {
+        if (op == SM_JUMP_S) return sm_emit(p, SM_NRETURN_S);
+        if (op == SM_JUMP_F) return sm_emit(p, SM_NRETURN_F);
+        return sm_emit(p, SM_NRETURN);
+    }
+
+    int idx = sm_emit_i(p, op, 0);
+    int resolved = labtab_find(labtab, target);
+    if (resolved >= 0)
+        sm_patch_jump(p, idx, resolved);
+    else
+        labtab_patch_later(labtab, idx, target);
+    return idx;
 }

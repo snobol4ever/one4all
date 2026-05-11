@@ -106,6 +106,17 @@ int  labtab_find       (const LabelTable *labtab, const char *name);
 void labtab_patch_later(LabelTable *labtab, int jump_instr_idx, const char *name);
 int  labtab_resolve    (LabelTable *labtab, SM_Program *p);
 
+/* ── SR-3: helpers moved from sm_lower.c ───────────────────────────────── */
+
+/* Return a GC-allocated uppercase copy of `raw`.  No length cap. */
+char *kw_canonicalize(const char *raw);
+
+/* Walk a proc body AST, adding non-global variable names to `sc`. */
+void expression_scope_walk(IcnScope *sc, AST_t *e);
+
+/* Emit a SM_JUMP/SM_JUMP_S/SM_JUMP_F for a named SNOBOL4 goto target. */
+int emit_goto(LowerCtx *c, sm_opcode_t op, const char *target);
+
 #include "../common/ast_clone.h"   /* ast_gc_clone — used by emit_push_expr */
 
 static inline void emit_push_expr(LowerCtx *c, const AST_t *e)
