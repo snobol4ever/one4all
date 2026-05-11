@@ -82,17 +82,17 @@ static void emit_stmt_list(RStmt *head, FILE *out);
 
 static void emit_expr(RExpr *e, FILE *out) {
     if (!e) return;
-    switch (e->kind) {
+    switch (e->t) {
 
         case RE_NULL:   fprintf(out, "''"); break;
-        case RE_INT:    fprintf(out, "%ld", e->ival); break;
-        case RE_REAL:   fprintf(out, "%g",  e->dval); break;
-        case RE_VAR:    fprintf(out, "%s",  e->sval ? e->sval : "?"); break;
-        case RE_KEYWORD: fprintf(out, "&%s", e->sval ? e->sval : ""); break;
+        case RE_INT:    fprintf(out, "%ld", e->v.ival); break;
+        case RE_REAL:   fprintf(out, "%g",  e->v.dval); break;
+        case RE_VAR:    fprintf(out, "%s",  e->v.sval ? e->v.sval : "?"); break;
+        case RE_KEYWORD: fprintf(out, "&%s", e->v.sval ? e->v.sval : ""); break;
 
         case RE_STR:
             fprintf(out, "'");
-            for (const char *p = e->sval ? e->sval : ""; *p; p++) {
+            for (const char *p = e->v.sval ? e->v.sval : ""; *p; p++) {
                 if (*p == '\'') fprintf(out, "''");
                 else            fputc(*p, out);
             }
@@ -106,7 +106,7 @@ static void emit_expr(RExpr *e, FILE *out) {
         case RE_VALUE: fprintf(out, "IDENT(");    emit_expr(e->right,out); fprintf(out,")"); break;
         case RE_BANG:  fprintf(out, "*");         emit_expr_atom(e->right,out); break;
         case RE_DEREF: fprintf(out, "*");         emit_expr_atom(e->right,out); break;
-        case RE_CURSOR: fprintf(out, "@%s", e->sval ? e->sval : "?"); break;
+        case RE_CURSOR: fprintf(out, "@%s", e->v.sval ? e->v.sval : "?"); break;
         case RE_PATOPT:
             fprintf(out, "("); emit_expr(e->right,out); fprintf(out, " | '')"); break;
 
@@ -173,7 +173,7 @@ static void emit_expr(RExpr *e, FILE *out) {
 
         /* Function call */
         case RE_CALL:
-            if (e->sval)       fprintf(out, "%s", e->sval);
+            if (e->v.sval)       fprintf(out, "%s", e->v.sval);
             else if (e->left) { fprintf(out,"("); emit_expr(e->left,out); fprintf(out,")"); }
             fprintf(out,"(");
             for (int i = 0; i < e->nargs; i++) {
@@ -186,7 +186,7 @@ static void emit_expr(RExpr *e, FILE *out) {
         /* Subscript: a[i]  or  a[start+:len] */
         case RE_SUB_IDX:
             emit_expr(e->left, out);
-            if (e->nargs == 1 && e->args[0] && e->args[0]->kind == RE_RANGE) {
+            if (e->nargs == 1 && e->args[0] && e->args[0]->t == RE_RANGE) {
                 /* a[start+:len] → a[start,len]  (MACRO SPITBOL substring) */
                 fprintf(out,"[");
                 emit_expr(e->args[0]->left,  out);
@@ -204,14 +204,14 @@ static void emit_expr(RExpr *e, FILE *out) {
             break;
 
         default:
-            fprintf(out, "<expr:%d>", e->kind);
+            fprintf(out, "<expr:%d>", e->t);
             break;
     }
 }
 
 static void emit_expr_atom(RExpr *e, FILE *out) {
     if (!e) return;
-    switch (e->kind) {
+    switch (e->t) {
         /* Self-delimiting — no extra parens needed */
         case RE_STR: case RE_INT: case RE_REAL: case RE_NULL:
         case RE_VAR: case RE_KEYWORD: case RE_CALL: case RE_SUB_IDX:
@@ -233,7 +233,7 @@ static char _cb[COND_BUF];
 static const char *cond_str(RStmt *cond) {
     FILE *f = fmemopen(_cb, COND_BUF - 1, "w");
     if (!f) { _cb[0] = 0; return _cb; }
-    if (cond) switch (cond->kind) {
+    if (cond) switch (cond->t) {
         case RS_EXPR:
             emit_expr(cond->expr, f); break;
         case RS_MATCH:
@@ -245,7 +245,7 @@ static const char *cond_str(RStmt *cond) {
             emit_expr(cond->expr,f); fprintf(f," ? "); emit_expr(cond->pat,f);
             fprintf(f," = "); emit_expr(cond->repl,f); break;
         default:
-            fprintf(f,"* <bad-cond-%d>", cond->kind); break;
+            fprintf(f,"* <bad-cond-%d>", cond->t); break;
     }
     fclose(f);
     return _cb;
@@ -257,11 +257,11 @@ static const char *cond_str(RStmt *cond) {
 
 static void emit_stmt(RStmt *s, FILE *out) {
     if (!s) return;
-    switch (s->kind) {
+    switch (s->t) {
 
         case RS_EXPR:
             /* void function call needs dummy LHS to avoid pattern-MATCH_fn semantics */
-            if (s->expr && s->expr->kind == RE_CALL)
+            if (s->expr && s->expr->t == RE_CALL)
                 fprintf(out,"        RB_ = ");
             else
                 fprintf(out,"        ");
@@ -429,7 +429,7 @@ static void emit_stmt(RStmt *s, FILE *out) {
             break;
 
         default:
-            fprintf(out,"        * <stmt:%d>\n", s->kind); break;
+            fprintf(out,"        * <stmt:%d>\n", s->t); break;
     }
 }
 
@@ -478,7 +478,7 @@ static void emit_function(RDecl *d, FILE *out) {
     {
         RStmt *last = d->body;
         while (last && last->next) last = last->next;
-        if (!last || (last->kind != RS_RETURN && last->kind != RS_FAIL))
+        if (!last || (last->t != RS_RETURN && last->t != RS_FAIL))
             fprintf(out,"        :(RETURN)\n");
     }
     fprintf(out,"%s_end\n\n", name);
@@ -492,7 +492,7 @@ void rebus_emit(RProgram *prog, FILE *out) {
     rb_label = 0; rb_loop_depth = 0;
     fprintf(out,"*  Generated by rebus_emit.c — Rebus → SNOBOL4 (TR 84-9)\n*\n");
     for (RDecl *d = prog->decls; d; d = d->next) {
-        if (d->kind == RD_RECORD) emit_record(d, out);
+        if (d->t == RD_RECORD) emit_record(d, out);
         else                       emit_function(d, out);
     }
     fprintf(out,"        MAIN()\n");

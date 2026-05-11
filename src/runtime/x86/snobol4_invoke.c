@@ -27,7 +27,7 @@
  *   - "function index" INCL is the function name string (NV-keyed)
  *   - BRANIC = APPLY_fn (C builtin) or g_user_call_hook (SNOBOL4 body)
  *   - TESTF FNC = checking nargs vs declared arity (we use -1 for variadic)
- *   - ARGVAL in our tree-walk context = evaluate one AST_t argument
+ *   - ARGVAL in our tree-walk context = evaluate one tree_t argument
  *
  * Strategy (RT-1, additive shim):
  *   INVOKE_fn replaces the ad-hoc dispatch in call_user_function.

@@ -50,11 +50,11 @@ static void buf_push(char **buf, int *len, int *cap, char c) {
 }
 
 static Token make_tok(TkKind kind, char *text, int line) {
-    Token t; t.kind = kind; t.text = text; t.ival = 0; t.fval = 0.0; t.line = line;
+    Token t; t.t = kind; t.text = text; t.v.ival = 0; t.fval = 0.0; t.line = line;
     return t;
 }
 static Token make_err(int line, const char *msg) {
-    Token t; t.kind = TK_ERROR; t.text = strdup(msg); t.ival = 0; t.fval = 0.0; t.line = line;
+    Token t; t.t = TK_ERROR; t.text = strdup(msg); t.v.ival = 0; t.fval = 0.0; t.line = line;
     return t;
 }
 
@@ -164,7 +164,7 @@ static Token scan_number(Lexer *lx) {
         advance(lx); advance(lx);
         char c = advance(lx);
         Token t = make_tok(TK_INT, NULL, line);
-        t.ival = (long)c; t.text = strdup("0'c");
+        t.v.ival = (long)c; t.text = strdup("0'c");
         return t;
     }
     if (cur(lx) == '0' && (peek1(lx) == 'b' || peek1(lx) == 'x' || peek1(lx) == 'o')) {
@@ -184,7 +184,7 @@ static Token scan_number(Lexer *lx) {
             }
         }
         Token t = make_tok(TK_INT, buf, line);
-        t.ival = (long)(unsigned long long)strtoull(buf+2, NULL, radix);
+        t.v.ival = (long)(unsigned long long)strtoull(buf+2, NULL, radix);
         return t;
     }
 
@@ -235,7 +235,7 @@ static Token scan_number(Lexer *lx) {
         return t;
     } else {
         Token t = make_tok(TK_INT, buf, line);
-        t.ival = (long)(unsigned long long)strtoull(buf, NULL, 10);
+        t.v.ival = (long)(unsigned long long)strtoull(buf, NULL, 10);
         return t;
     }
 }
@@ -374,12 +374,12 @@ Token lexer_peek(Lexer *lx) {
 
 Token lexer_expect(Lexer *lx, TkKind kind, const char *context) {
     Token t = lexer_next(lx);
-    if (t.kind != kind) {
+    if (t.t != kind) {
         fprintf(stderr, "parse error at line %d in %s: expected %s, got '%s'\n",
                 t.line, context, tk_name(kind), t.text ? t.text : "?");
         /* return error token so caller can propagate */
-        Token err; err.kind = TK_ERROR; err.text = strdup("expected");
-        err.ival = 0; err.fval = 0; err.line = t.line;
+        Token err; err.t = TK_ERROR; err.text = strdup("expected");
+        err.v.ival = 0; err.fval = 0; err.line = t.line;
         return err;
     }
     return t;

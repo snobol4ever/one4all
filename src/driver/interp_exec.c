@@ -17,31 +17,31 @@
 
 #define PL_PRED_TABLE_SIZE PL_PRED_TABLE_SIZE_FWD
 
-/* SI-6: find the child index of a given AST_STMT node in prog->children[].
+/* SI-6: find the child index of a given AST_STMT node in prog->c[].
  * Used after label_lookup() to translate a pointer-to-stmt into an index. */
-static int ast_prog_find_idx(const AST_t *prog, const AST_t *stmt)
+static int ast_prog_find_idx(const tree_t *prog, const tree_t *stmt)
 {
     if (!prog || !stmt) return -1;
-    for (int i = 0; i < prog->nchildren; i++)
-        if (prog->children[i] == stmt) return i;
+    for (int i = 0; i < prog->n; i++)
+        if (prog->c[i] == stmt) return i;
     return -1;
 }
 
 /* SI-6: accessors — fetch named attribute from an AST_STMT node. */
-static inline AST_t        *s_expr(const AST_t *s, const char *tag) {
+static inline tree_t        *s_expr(const tree_t *s, const char *tag) {
     return stmt_attr_expr(stmt_attr_find(s, tag)); }
-static inline const char   *s_str (const AST_t *s, const char *tag) {
+static inline const char   *s_str (const tree_t *s, const char *tag) {
     return stmt_attr_str(stmt_attr_find(s, tag)); }
-static inline int           s_has (const AST_t *s, const char *tag) {
+static inline int           s_has (const tree_t *s, const char *tag) {
     return stmt_attr_find(s, tag) != NULL; }
-static inline int           s_int (const AST_t *s, const char *tag) {
+static inline int           s_int (const tree_t *s, const char *tag) {
     const char *v = s_str(s, tag); return v ? atoi(v) : 0; }
 
 /* SI-6: global program tree — set at execute_program entry so call_user_function
  * can walk AST_STMT children forward from a label_lookup result. */
-const AST_t *g_exec_prog = NULL;
+const tree_t *g_exec_prog = NULL;
 
-void execute_program(const AST_t *prog)
+void execute_program(const tree_t *prog)
 {
     NO_AST_WALK_GUARD("execute_program");
     g_exec_prog = prog;
@@ -65,39 +65,39 @@ void execute_program(const AST_t *prog)
      * survive longjmp and remain valid when the error handler at setjmp
      * reads goto_f / goto_f_expr.  Re-assign from s at top of each iteration
      * (after the NULL/END early-continue guards). */
-    int              ci        = 0;   /* index into prog->children[] */
+    int              ci        = 0;   /* index into prog->c[] */
     int              stno      = 0;
     int              succeeded = 1;
     DESCR_t          subj_val  = NULVCL;
     const char      *subj_name = NULL;
     const char      *target    = NULL;
-    int              nch       = prog ? prog->nchildren : 0;
-    const AST_t     *s         = NULL;
+    int              nch       = prog ? prog->n : 0;
+    const tree_t     *s         = NULL;
     int              s_is_end  = 0;
     const char      *s_label   = NULL;
     int              s_lang    = 0;
     int              s_has_eq  = 0;
-    AST_t           *s_subject = NULL;
-    AST_t           *s_pattern = NULL;
-    AST_t           *s_repl    = NULL;
-    AST_t           *go_s_attr = NULL;
-    AST_t           *go_f_attr = NULL;
-    AST_t           *go_u_attr = NULL;
+    tree_t           *s_subject = NULL;
+    tree_t           *s_pattern = NULL;
+    tree_t           *s_repl    = NULL;
+    tree_t           *go_s_attr = NULL;
+    tree_t           *go_f_attr = NULL;
+    tree_t           *go_u_attr = NULL;
     const char      *goto_s    = NULL;
     const char      *goto_f    = NULL;
     const char      *goto_u    = NULL;
-    AST_t           *goto_s_expr = NULL;
-    AST_t           *goto_f_expr = NULL;
-    AST_t           *goto_u_expr = NULL;
+    tree_t           *goto_s_expr = NULL;
+    tree_t           *goto_f_expr = NULL;
+    tree_t           *goto_u_expr = NULL;
 
     while (ci < nch) {
-        s = prog->children[ci];
+        s = prog->c[ci];
         if (!s) { ci++; continue; }
 
-        if (s->kind == AST_END) break;  /* U-23: polyglot multi-section dispatch handles remaining modules */
+        if (s->t == AST_END) break;  /* U-23: polyglot multi-section dispatch handles remaining modules */
 
         /* SI-6: re-assign per-stmt fields from s each iteration (hoisted above while). */
-        s_is_end  = (s->kind == AST_END);
+        s_is_end  = (s->t == AST_END);
         s_label   = s_str(s, ":lbl");
         s_lang    = s_int(s, ":lang");
         s_has_eq  = s_has(s, ":eq");
@@ -199,9 +199,9 @@ void execute_program(const AST_t *prog)
         /* LANG_SNO (0): fall through to existing SNOBOL4 path below.
          * Also skip any stray Prolog/Icon IR nodes that have lang==LANG_SNO
          * (shouldn't happen after U-12/U-13, but keep guard for safety). */
-        if (s_subject && (s_subject->kind == AST_CHOICE ||
-                          s_subject->kind == AST_UNIFY  ||
-                          s_subject->kind == AST_CLAUSE)) {
+        if (s_subject && (s_subject->t == AST_CHOICE ||
+                          s_subject->t == AST_UNIFY  ||
+                          s_subject->t == AST_CLAUSE)) {
             ci++; continue;
         }
 
@@ -210,21 +210,21 @@ void execute_program(const AST_t *prog)
         subj_name = NULL;
 
         if (s_subject) {
-            if (s_subject->kind == AST_VAR && s_subject->sval) {
-                subj_name = s_subject->sval;
+            if (s_subject->t == AST_VAR && s_subject->v.sval) {
+                subj_name = s_subject->v.sval;
                 /* Only read the value when we need to match against it.
                  * Pure assignment (has_eq, no pattern) only needs the name —
                  * calling NV_GET_fn on a function name triggers a spurious
                  * zero-arg call (APPLY_fn → g_user_call_hook), causing Error 5. */
                 if (s_pattern)
                     subj_val = NV_GET_fn(subj_name);
-            } else if (s_subject->kind == AST_INDIRECT && s_subject->nchildren > 0) {
+            } else if (s_subject->t == AST_INDIRECT && s_subject->n > 0) {
                 /* $'$B' or $X as subject — resolve to variable name for write-back */
-                AST_t *ic = s_subject->children[0];
-                if (ic->kind == AST_QLIT && ic->sval) {
-                    subj_name = ic->sval;  /* $'name' — literal name, use directly */
-                } else if (ic->kind == AST_VAR && ic->sval) {
-                    DESCR_t xv = NV_GET_fn(ic->sval);
+                tree_t *ic = s_subject->c[0];
+                if (ic->t == AST_QLIT && ic->v.sval) {
+                    subj_name = ic->v.sval;  /* $'name' — literal name, use directly */
+                } else if (ic->t == AST_VAR && ic->v.sval) {
+                    DESCR_t xv = NV_GET_fn(ic->v.sval);
                     subj_name = VARVAL_fn(xv);
                 } else {
                     DESCR_t nd = interp_eval(ic);
@@ -239,7 +239,7 @@ void execute_program(const AST_t *prog)
                     subj_val = NV_GET_fn(subj_name);
                 } else if (!subj_name)
                     subj_val = interp_eval(s_subject);
-            } else if (s_subject->kind == AST_FNC && s_has_eq && !s_pattern) {
+            } else if (s_subject->t == AST_FNC && s_has_eq && !s_pattern) {
                 /* SN-6 fix: fn() = val / fn(args) = val — LHS-as-fn assignment.
                  * The dedicated branches below (ITEM/FIELD setter, NRETURN lvalue-assign)
                  * call the function exactly once to obtain the assignment target.
@@ -298,25 +298,25 @@ void execute_program(const AST_t *prog)
 
         /* ── subscript assignment: A<i> = expr ─────────────────────── */
         } else if (s_has_eq && s_subject &&
-                   s_subject->kind == AST_IDX) {
-            AST_t *idx_e = s_subject;
-            if (idx_e->nchildren >= 2) {
-                DESCR_t base = interp_eval(idx_e->children[0]);
-                DESCR_t idx  = interp_eval(idx_e->children[1]);
+                   s_subject->t == AST_IDX) {
+            tree_t *idx_e = s_subject;
+            if (idx_e->n >= 2) {
+                DESCR_t base = interp_eval(idx_e->c[0]);
+                DESCR_t idx  = interp_eval(idx_e->c[1]);
                 DESCR_t repl_val = s_repl ? interp_eval(s_repl) : NULVCL;
                 if (IS_FAIL_fn(base) || IS_FAIL_fn(idx) || IS_FAIL_fn(repl_val)) {
                     succeeded = 0;
                 } else {
-                    if (idx_e->nchildren >= 3) {
-                        DESCR_t idx2 = interp_eval(idx_e->children[2]);
+                    if (idx_e->n >= 3) {
+                        DESCR_t idx2 = interp_eval(idx_e->c[2]);
                         subscript_set2(base, idx, idx2, repl_val);
                     } else {
                         subscript_set(base, idx, repl_val);
                     }
                     /* SN-26-bridge-coverage-g: fire VALUE record for subscript store. */
-                    { const char *base_nm = (idx_e->children[0] &&
-                                             idx_e->children[0]->kind == AST_VAR)
-                                           ? idx_e->children[0]->sval : NULL;
+                    { const char *base_nm = (idx_e->c[0] &&
+                                             idx_e->c[0]->t == AST_VAR)
+                                           ? idx_e->c[0]->v.sval : NULL;
                       if (base_nm) comm_var(base_nm, repl_val); }
                     succeeded = 1;
                 }
@@ -324,21 +324,21 @@ void execute_program(const AST_t *prog)
 
         /* ── keyword assignment: &KW = expr ───────────────────────── */
         } else if (s_has_eq && s_subject &&
-                   s_subject->kind == AST_KEYWORD && s_subject->sval) {
+                   s_subject->t == AST_KEYWORD && s_subject->v.sval) {
             DESCR_t repl_val = s_repl ? interp_eval(s_repl) : NULVCL;
             if (IS_FAIL_fn(repl_val)) {
                 succeeded = 0;
             } else {
                 g_kw_ctx = 1;             /* signal Error 7 guard in NV_SET_fn */
-                NV_SET_fn(s_subject->sval, repl_val);
+                NV_SET_fn(s_subject->v.sval, repl_val);
                 g_kw_ctx = 0;
                 succeeded = 1;
             }
 
         /* ── indirect assignment: $expr = rhs ─────────────────────── */
         } else if (s_has_eq && s_subject &&
-                   s_subject->kind == AST_INDIRECT) {
-            AST_t *ichild = s_subject->nchildren > 0 ? s_subject->children[0] : NULL;
+                   s_subject->t == AST_INDIRECT) {
+            tree_t *ichild = s_subject->n > 0 ? s_subject->c[0] : NULL;
             DESCR_t repl_val = s_repl ? interp_eval(s_repl) : NULVCL;
             if (IS_FAIL_fn(repl_val)) {
                 succeeded = 0;
@@ -356,19 +356,19 @@ void execute_program(const AST_t *prog)
 
         /* ── ITEM setter or DATA field setter: fname(obj[,i]) = expr ── */
         } else if (s_has_eq && s_subject &&
-                   s_subject->kind == AST_FNC && s_subject->sval &&
-                   s_subject->nchildren >= 1) {
+                   s_subject->t == AST_FNC && s_subject->v.sval &&
+                   s_subject->n >= 1) {
             DESCR_t repl_val = s_repl ? interp_eval(s_repl) : NULVCL;
             if (IS_FAIL_fn(repl_val)) {
                 succeeded = 0;
-            } else if (strcmp(s_subject->sval, "ITEM") == 0 &&  /* SN-19 */
-                       s_subject->nchildren >= 2) {
-                DESCR_t base = interp_eval(s_subject->children[0]);
-                DESCR_t idx  = interp_eval(s_subject->children[1]);
+            } else if (strcmp(s_subject->v.sval, "ITEM") == 0 &&  /* SN-19 */
+                       s_subject->n >= 2) {
+                DESCR_t base = interp_eval(s_subject->c[0]);
+                DESCR_t idx  = interp_eval(s_subject->c[1]);
                 if (IS_FAIL_fn(base) || IS_FAIL_fn(idx)) {
                     succeeded = 0;
-                } else if (s_subject->nchildren >= 3) {
-                    DESCR_t idx2 = interp_eval(s_subject->children[2]);
+                } else if (s_subject->n >= 3) {
+                    DESCR_t idx2 = interp_eval(s_subject->c[2]);
                     if (IS_FAIL_fn(idx2)) { succeeded = 0; }
                     else { subscript_set2(base, idx, idx2, repl_val); succeeded = 1; }
                 } else {
@@ -376,22 +376,22 @@ void execute_program(const AST_t *prog)
                     succeeded = 1;
                 }
             } else {
-                DESCR_t obj = interp_eval(s_subject->children[0]);
+                DESCR_t obj = interp_eval(s_subject->c[0]);
                 if (IS_FAIL_fn(obj)) {
                     succeeded = 0;
                 } else {
-                    FIELD_SET_fn(obj, s_subject->sval, repl_val);
+                    FIELD_SET_fn(obj, s_subject->v.sval, repl_val);
                     succeeded = 1;
                 }
             }
 
         /* ── NRETURN lvalue assign: fn() = expr  (zero-arg fn call as lvalue) ── */
         } else if (s_has_eq && s_subject &&
-                   s_subject->kind == AST_FNC && s_subject->sval &&
-                   s_subject->nchildren == 0) {
+                   s_subject->t == AST_FNC && s_subject->v.sval &&
+                   s_subject->n == 0) {
             DESCR_t rv = s_repl ? interp_eval(s_repl) : NULVCL;
             if (!IS_FAIL_fn(rv)) {
-                DESCR_t fres = call_user_function(s_subject->sval, NULL, 0);
+                DESCR_t fres = call_user_function(s_subject->v.sval, NULL, 0);
                 /* Use NAME_SET: slen discriminates NAMEPTR (interior ptr) from NAMEVAL (name string) */
                 if (NAME_SET(fres, rv)) { succeeded = 1; }
                 else { succeeded = 0; }
@@ -429,7 +429,7 @@ void execute_program(const AST_t *prog)
             if (strcmp(target, "END") == 0) break;  /* SN-19: canonical */
             /* RETURN/FRETURN at top-level (outside a call) → treat as END */
             if (strcmp(target, "RETURN") == 0 || strcmp(target, "FRETURN") == 0) break;  /* SN-19 */
-            const AST_t *dest = label_lookup(target);
+            const tree_t *dest = label_lookup(target);
             if (dest) {
                 int dest_ci = ast_prog_find_idx(prog, dest);
                 if (dest_ci >= 0) { ci = dest_ci; continue; }
@@ -476,7 +476,7 @@ void execute_program(const AST_t *prog)
                             { proc_table_call(_pi,NULL,0); break; }   /* CH-17g-call-sites */
                 g_lang = 0;
             } else if (_m->lang == LANG_PL) {
-                AST_t *pl_main = pl_pred_table_lookup(&g_pl_pred_table, "main/0");
+                tree_t *pl_main = pl_pred_table_lookup(&g_pl_pred_table, "main/0");
                 if (pl_main) {
                     int sv_pl = g_pl_active; g_pl_active = 1;
                     interp_eval(pl_main);
@@ -497,7 +497,7 @@ void execute_program(const AST_t *prog)
         }
     }
     {
-        AST_t *pl_main = pl_pred_table_lookup(&g_pl_pred_table, "main/0");
+        tree_t *pl_main = pl_pred_table_lookup(&g_pl_pred_table, "main/0");
         if (pl_main) {
             int sv_pl = g_pl_active;
             g_pl_active = 1;
@@ -509,7 +509,7 @@ void execute_program(const AST_t *prog)
 
 /* IM-3: execute_program_steps — run at most N statements then return.
  * Sets up g_ir_step_jmp so the step-limit longjmp lands here safely. */
-void execute_program_steps(const AST_t *prog, int n) {
+void execute_program_steps(const tree_t *prog, int n) {
     g_ir_step_limit = n;
     g_ir_steps_done = 0;
     if (setjmp(g_ir_step_jmp) == 0)

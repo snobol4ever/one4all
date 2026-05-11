@@ -997,12 +997,12 @@ static CMPND_t *cmpnd_new(int stype, const char *text, int tlen) {
 
 static void cmpnd_add(CMPND_t *parent, CMPND_t *child) {
     if (!child) return;
-    if (parent->nchildren >= parent->nalloc) {
-        parent->nalloc = parent->nalloc ? parent->nalloc * 2 : 4;
-        parent->children = realloc(parent->children,
-                                   parent->nalloc * sizeof(CMPND_t*));
+    if (parent->n >= parent->_nalloc) {
+        parent->_nalloc = parent->_nalloc ? parent->_nalloc * 2 : 4;
+        parent->c = realloc(parent->c,
+                                   parent->_nalloc * sizeof(CMPND_t*));
     }
-    parent->children[parent->nchildren++] = child;
+    parent->c[parent->n++] = child;
 }
 
 /* =========================================================================
@@ -1486,7 +1486,7 @@ static CMPND_t *ELEMNT(void) {
         char buf[64]; memcpy(buf, XSP.ptr, XSP.len < 63 ? XSP.len : 63);
         buf[XSP.len < 63 ? XSP.len : 63] = '\0';
         atom = cmpnd_new(final_type, buf, -1);
-        if (final_type == ILITYP) atom->ival = atoll(buf);
+        if (final_type == ILITYP) atom->v.ival = atoll(buf);
         else                      atom->fval = atof(buf);
         break;
     }
@@ -1773,11 +1773,11 @@ static CMPND_t *expr_prec_continue(CMPND_t *left, int min_prec) {
                 CMPND_t *right = expr_prec(next_min2);
                 CMPND_t *binop = cmpnd_new(cont_op, fn_name(cont_op), -1);
                 if ((cont_op == NAMFN || cont_op == DOLFN)
-                        && left->stype == CATFN && left->nchildren >= 2) {
+                        && left->stype == CATFN && left->n >= 2) {
                     CMPND_t *new_cat = cmpnd_new(CATFN, "CAT", -1);
-                    for (int _ci = 0; _ci < left->nchildren - 1; _ci++)
-                        cmpnd_add(new_cat, left->children[_ci]);
-                    CMPND_t *last2 = left->children[left->nchildren - 1];
+                    for (int _ci = 0; _ci < left->n - 1; _ci++)
+                        cmpnd_add(new_cat, left->c[_ci]);
+                    CMPND_t *last2 = left->c[left->n - 1];
                     cmpnd_add(binop, last2);
                     cmpnd_add(binop, right);
                     left = new_cat;
@@ -1857,14 +1857,14 @@ static CMPND_t *expr_prec_continue(CMPND_t *left, int min_prec) {
         CMPND_t *right = expr_prec(next_min);
 
         CMPND_t *binop = cmpnd_new(op, fn_name(op), -1);
-        if ((op == NAMFN || op == DOLFN) && left->stype == CATFN && left->nchildren >= 2) {
+        if ((op == NAMFN || op == DOLFN) && left->stype == CATFN && left->n >= 2) {
             /* "A B . V" parsed as left=CAT(A,B), op='.', right=V.
              * SNOBOL4 semantics: '.' binds only its immediate left neighbour.
              * Restructure: CAT(A, NAMFN(B, V))  — pop last child off the cat. */
             CMPND_t *new_cat  = cmpnd_new(CATFN, "CAT", -1);
-            for (int _ci = 0; _ci < left->nchildren - 1; _ci++)
-                cmpnd_add(new_cat, left->children[_ci]);
-            CMPND_t *last = left->children[left->nchildren - 1];
+            for (int _ci = 0; _ci < left->n - 1; _ci++)
+                cmpnd_add(new_cat, left->c[_ci]);
+            CMPND_t *last = left->c[left->n - 1];
             cmpnd_add(binop, last);
             cmpnd_add(binop, right);
             left = new_cat;
@@ -2158,16 +2158,16 @@ void cmpnd_print_sexp(CMPND_t *n, FILE *out, int oneline, int depth) {
     if (n->text && n->text[0])
         fprintf(out, " \"%s\"", n->text);
     if (n->stype == ILITYP)
-        fprintf(out, " ival=%lld", n->ival);
+        fprintf(out, " ival=%lld", n->v.ival);
     if (n->stype == FLITYP)
         fprintf(out, " fval=%g", n->fval);
-    if (n->nchildren == 0) {
+    if (n->n == 0) {
         fprintf(out, oneline ? ")" : ")\n");
     } else {
         if (!oneline) fprintf(out, "\n");
-        for (int i = 0; i < n->nchildren; i++) {
+        for (int i = 0; i < n->n; i++) {
             if (oneline && i > 0) fprintf(out, " ");
-            cmpnd_print_sexp(n->children[i], out, oneline, depth+1);
+            cmpnd_print_sexp(n->c[i], out, oneline, depth+1);
         }
         if (!oneline) fprintf(out, "%*s)\n", depth*2, "");
         else          fprintf(out, ")");

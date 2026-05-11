@@ -21,7 +21,7 @@
 #define PL_PRED_TABLE_SIZE_FWD 256
 
 typedef struct Pl_PredEntry_t {
-    const char *key; AST_t *choice; struct Pl_PredEntry_t *next;
+    const char *key; tree_t *choice; struct Pl_PredEntry_t *next;
     /* CH-17a: entry_pc is the SM_Program pc of the predicate's named expression.
      * Populated by sm_resolve_proc_entry_pcs after sm_lower runs.  -1 means
      * no expression emitted yet (CH-17d will start emitting predicate expressions).
@@ -43,17 +43,17 @@ extern int           g_pl_active;
 /*------------------------------------------------------------------------
  * Functions (defined in pl_runtime.c)
  *------------------------------------------------------------------------*/
-AST_t *pl_pred_table_lookup(Pl_PredTable *pt, const char *key);
-void    pl_pred_table_insert(Pl_PredTable *pt, const char *key, AST_t *choice);
-AST_t *pl_pred_table_lookup_global(const char *key);
+tree_t *pl_pred_table_lookup(Pl_PredTable *pt, const char *key);
+void    pl_pred_table_insert(Pl_PredTable *pt, const char *key, tree_t *choice);
+tree_t *pl_pred_table_lookup_global(const char *key);
 /* CH-17e: return the full Pl_PredEntry* so callers can read entry_pc */
 Pl_PredEntry *pl_pred_entry_lookup(const char *key);
 
 Term  **pl_env_new(int n);
-Term   *pl_unified_term_from_expr(AST_t *e, Term **env);
+Term   *pl_unified_term_from_expr(tree_t *e, Term **env);
 
-int     is_pl_user_call(AST_t *goal);
-int     interp_exec_pl_builtin(AST_t *goal, Term **env);
+int     is_pl_user_call(tree_t *goal);
+int     interp_exec_pl_builtin(tree_t *goal, Term **env);
 void    pl_execute_program_unified(CODE_t *prog);
 
 #endif /* DRIVER_PL_RUNTIME_H */

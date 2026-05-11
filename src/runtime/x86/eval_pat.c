@@ -1,7 +1,7 @@
 /*
  * eval_pat.c — pattern-context expression evaluator (RS-16).
  *
- * Evaluates an AST_t in PATTERN context, producing a DT_P descriptor.
+ * Evaluates an tree_t in PATTERN context, producing a DT_P descriptor.
  * Pattern evaluation drives SNOBOL4 match: alternation, concatenation,
  * captures, primitive patterns (LEN, TAB, ANY, BREAK, ARBNO, ...).
  *
@@ -23,7 +23,7 @@
 
 /* eval_node is in eval_code.c (sibling). pat_* helpers, NV_GET_fn, APPLY_fn,
  * PATVAL_fn, NULVCL, FAILDESCR, IS_FAIL_fn — all in snobol4.h. */
-extern DESCR_t eval_node(AST_t *e);
+extern DESCR_t eval_node(tree_t *e);
 
 /* RS-16: local copy of NAME_DEREF (originally inline in interp_private.h —
  * mode-1 only). This helper is needed for value-context arg eval inside
@@ -36,18 +36,18 @@ static inline DESCR_t NAME_DEREF(DESCR_t d) {
     return d;
 }
 
-DESCR_t interp_eval_pat(AST_t *e)
+DESCR_t interp_eval_pat(tree_t *e)
 {
     NO_AST_WALK_GUARD("interp_eval_pat");
     if (!e) return NULVCL;
-    switch (e->kind) {
+    switch (e->t) {
     case AST_SEQ:
     case AST_CAT: {
-        if (e->nchildren == 0) return NULVCL;
-        DESCR_t acc = interp_eval_pat(e->children[0]);
+        if (e->n == 0) return NULVCL;
+        DESCR_t acc = interp_eval_pat(e->c[0]);
         if (IS_FAIL_fn(acc)) return FAILDESCR;
-        for (int i = 1; i < e->nchildren; i++) {
-            DESCR_t nxt = interp_eval_pat(e->children[i]);
+        for (int i = 1; i < e->n; i++) {
+            DESCR_t nxt = interp_eval_pat(e->c[i]);
             if (IS_FAIL_fn(nxt)) return FAILDESCR;
             acc = pat_cat(acc, nxt);
         }
@@ -57,11 +57,11 @@ DESCR_t interp_eval_pat(AST_t *e)
         /* pattern alternation: p1 | p2 | ... — each child evaluated in
          * pattern context so that AST_DEFER(AST_VAR) children become XDSAR
          * nodes rather than frozen DT_E values. */
-        if (e->nchildren == 0) return pat_epsilon();
-        DESCR_t acc = interp_eval_pat(e->children[0]);
+        if (e->n == 0) return pat_epsilon();
+        DESCR_t acc = interp_eval_pat(e->c[0]);
         if (IS_FAIL_fn(acc)) return FAILDESCR;
-        for (int i = 1; i < e->nchildren; i++) {
-            DESCR_t nxt = interp_eval_pat(e->children[i]);
+        for (int i = 1; i < e->n; i++) {
+            DESCR_t nxt = interp_eval_pat(e->c[i]);
             if (IS_FAIL_fn(nxt)) return FAILDESCR;
             acc = pat_alt(acc, nxt);
         }
@@ -74,17 +74,17 @@ DESCR_t interp_eval_pat(AST_t *e)
          * by the surrounding context (pat_cat, pat_alt, etc.) via
          * pat_to_patnd.  Try children left-to-right; return first
          * non-failing value; fail if all fail. */
-        if (e->nchildren == 0) return FAILDESCR;
-        for (int i = 0; i < e->nchildren; i++) {
-            DESCR_t v = eval_node(e->children[i]);
+        if (e->n == 0) return FAILDESCR;
+        for (int i = 0; i < e->n; i++) {
+            DESCR_t v = eval_node(e->c[i]);
             if (!IS_FAIL_fn(v)) return v;
         }
         return FAILDESCR;
     }
     case AST_VAR:
-        if (e->sval && *e->sval) {
-            if (_is_pat_fnc_name(e->sval)) {
-                DESCR_t _fr = APPLY_fn(e->sval, NULL, 0);
+        if (e->v.sval && *e->v.sval) {
+            if (_is_pat_fnc_name(e->v.sval)) {
+                DESCR_t _fr = APPLY_fn(e->v.sval, NULL, 0);
                 if (!IS_FAIL_fn(_fr)) return _fr;
             }
             DESCR_t _v = eval_node(e);
@@ -109,10 +109,10 @@ DESCR_t interp_eval_pat(AST_t *e)
          * 2. *var         — AST_DEFER(AST_VAR): look up the variable NOW and return
          *    its stored pattern value (the pattern was built at assignment time).
          *    (Contrast: AST_DEFER in value context produces DT_E via interp_eval.) */
-        if (e->nchildren < 1) return pat_epsilon();
+        if (e->n < 1) return pat_epsilon();
         {
-            AST_t *child = e->children[0];
-            if (child->kind == AST_FNC && child->sval) {
+            tree_t *child = e->c[0];
+            if (child->t == AST_FNC && child->v.sval) {
                 /* *func(args) — build deferred XATP pattern node.
                  *
                  * SN-26c-parseerr-c (Bug B): args that are themselves function
@@ -124,7 +124,7 @@ DESCR_t interp_eval_pat(AST_t *e)
                  * (after ARBNO has bumped the counter), not at pattern-build
                  * time (when counter is just-pushed = 0).
                  *
-                 * Mechanism: wrap the arg child as DT_E (frozen AST_t*); the
+                 * Mechanism: wrap the arg child as DT_E (frozen tree_t*); the
                  * match-time path (bb_usercall in stmt_exec.c) thaws each DT_E
                  * via EVAL_fn before invoking the user function.
                  *
@@ -139,16 +139,16 @@ DESCR_t interp_eval_pat(AST_t *e)
                  * pattern-build time, we capture the stale value (typically
                  * empty), and the match-time call to Shift_t receives that
                  * stale value instead of the captured cursor substring.
-                 * Wrapping AST_VAR as DT_E with the AST_t* itself defers the
+                 * Wrapping AST_VAR as DT_E with the tree_t* itself defers the
                  * lookup to bb_usercall's thaw loop, which calls EVAL_fn ->
                  * eval_node -> NV_GET_fn AT MATCH TIME. */
-                int na = child->nchildren;
+                int na = child->n;
                 DESCR_t *av = NULL;
                 if (na > 0) {
                     av = GC_malloc(na * sizeof(DESCR_t));
                     for (int i = 0; i < na; i++) {
-                        AST_t *arg = child->children[i];
-                        if (arg && (arg->kind == AST_FNC || arg->kind == AST_VAR)) {
+                        tree_t *arg = child->c[i];
+                        if (arg && (arg->t == AST_FNC || arg->t == AST_VAR)) {
                             /* Defer: wrap as DT_E for match-time EVAL_fn thaw. */
                             av[i].v = DT_E;
                             av[i].ptr = arg;
@@ -160,9 +160,9 @@ DESCR_t interp_eval_pat(AST_t *e)
                 }
                 if (getenv("ONE4ALL_USERCALL_TRACE")) {
                     fprintf(stderr, "PAT_USER_CALL_BUILD name=%s nargs=%d\n",
-                            child->sval, na);
+                            child->v.sval, na);
                 }
-                return pat_user_call(child->sval, av, na);
+                return pat_user_call(child->v.sval, av, na);
             }
             /* *var — build XDSAR deferred-ref node so the variable is
              * resolved at MATCH time (not now).  This is required for
@@ -172,8 +172,8 @@ DESCR_t interp_eval_pat(AST_t *e)
              * being assigned.  pat_ref() creates an XDSAR node; the
              * materialise() path in snobol4_pattern.c resolves it with
              * cycle detection at match time. */
-            if (child->kind == AST_VAR && child->sval)
-                return pat_ref(child->sval);
+            if (child->t == AST_VAR && child->v.sval)
+                return pat_ref(child->v.sval);
             /* Non-VAR, non-FNC child: if it contains no pattern-only nodes,
              * it is a pure value expression — freeze as DT_E for EVAL() to
              * thaw later.  E.g. *('abc' 'def') or *'str' → DT_E, not STRING.
@@ -196,8 +196,8 @@ DESCR_t interp_eval_pat(AST_t *e)
     case AST_FAIL:    return pat_fail();
     case AST_SUCCEED: return pat_succeed();
     case AST_FENCE:
-        if (e->nchildren > 0) {
-            DESCR_t _inner = interp_eval_pat(e->children[0]);
+        if (e->n > 0) {
+            DESCR_t _inner = interp_eval_pat(e->c[0]);
             if (IS_FAIL_fn(_inner)) return FAILDESCR;
             return pat_fence_p(_inner);
         }
@@ -209,64 +209,64 @@ DESCR_t interp_eval_pat(AST_t *e)
      * POS(n), RPOS(n), TAB(n), RTAB(n), LEN(n) take integer args.
      * ANY(s), NOTANY(s), SPAN(s), BREAK(s), BREAKX(s) take string args. */
     case AST_POS: {
-        if (e->nchildren < 1) return pat_pos(0);
-        DESCR_t a = eval_node(e->children[0]);
+        if (e->n < 1) return pat_pos(0);
+        DESCR_t a = eval_node(e->c[0]);
         return pat_pos((int64_t)(a.v==DT_I ? a.i : (int64_t)(a.v==DT_R ? (int64_t)a.r : 0)));
     }
     case AST_RPOS: {
-        if (e->nchildren < 1) return pat_rpos(0);
-        DESCR_t a = eval_node(e->children[0]);
+        if (e->n < 1) return pat_rpos(0);
+        DESCR_t a = eval_node(e->c[0]);
         return pat_rpos((int64_t)(a.v==DT_I ? a.i : (int64_t)(a.v==DT_R ? (int64_t)a.r : 0)));
     }
     case AST_TAB: {
-        if (e->nchildren < 1) return pat_tab(0);
-        DESCR_t a = eval_node(e->children[0]);
+        if (e->n < 1) return pat_tab(0);
+        DESCR_t a = eval_node(e->c[0]);
         return pat_tab((int64_t)(a.v==DT_I ? a.i : (int64_t)(a.v==DT_R ? (int64_t)a.r : 0)));
     }
     case AST_RTAB: {
-        if (e->nchildren < 1) return pat_rtab(0);
-        DESCR_t a = eval_node(e->children[0]);
+        if (e->n < 1) return pat_rtab(0);
+        DESCR_t a = eval_node(e->c[0]);
         return pat_rtab((int64_t)(a.v==DT_I ? a.i : (int64_t)(a.v==DT_R ? (int64_t)a.r : 0)));
     }
     case AST_LEN: {
-        if (e->nchildren < 1) return pat_len(0);
-        DESCR_t a = eval_node(e->children[0]);
+        if (e->n < 1) return pat_len(0);
+        DESCR_t a = eval_node(e->c[0]);
         return pat_len((int64_t)(a.v==DT_I ? a.i : (int64_t)(a.v==DT_R ? (int64_t)a.r : 0)));
     }
     case AST_ANY: {
-        if (e->nchildren < 1) return pat_any_cs("");
-        DESCR_t a = NAME_DEREF(eval_node(e->children[0]));
+        if (e->n < 1) return pat_any_cs("");
+        DESCR_t a = NAME_DEREF(eval_node(e->c[0]));
         const char *s = (a.v==DT_S||a.v==DT_SNUL) && a.s ? a.s : "";
         return pat_any_cs(s);
     }
     case AST_NOTANY: {
-        if (e->nchildren < 1) return pat_notany("");
-        DESCR_t a = NAME_DEREF(eval_node(e->children[0]));
+        if (e->n < 1) return pat_notany("");
+        DESCR_t a = NAME_DEREF(eval_node(e->c[0]));
         const char *s = (a.v==DT_S||a.v==DT_SNUL) && a.s ? a.s : "";
         return pat_notany(s);
     }
     case AST_SPAN: {
-        if (e->nchildren < 1) return pat_span("");
-        DESCR_t a = NAME_DEREF(eval_node(e->children[0]));
+        if (e->n < 1) return pat_span("");
+        DESCR_t a = NAME_DEREF(eval_node(e->c[0]));
         const char *s = (a.v==DT_S||a.v==DT_SNUL) && a.s ? a.s : "";
         return pat_span(s);
     }
     case AST_BREAK: {
-        if (e->nchildren < 1) return pat_break_("");
-        DESCR_t a = NAME_DEREF(eval_node(e->children[0]));
+        if (e->n < 1) return pat_break_("");
+        DESCR_t a = NAME_DEREF(eval_node(e->c[0]));
         const char *s = (a.v==DT_S||a.v==DT_SNUL) && a.s ? a.s : "";
         return pat_break_(s);
     }
     case AST_BREAKX: {
         extern DESCR_t pat_breakx(const char *);
-        if (e->nchildren < 1) return pat_breakx("");
-        DESCR_t a = NAME_DEREF(eval_node(e->children[0]));
+        if (e->n < 1) return pat_breakx("");
+        DESCR_t a = NAME_DEREF(eval_node(e->c[0]));
         const char *s = (a.v==DT_S||a.v==DT_SNUL) && a.s ? a.s : "";
         return pat_breakx(s);
     }
     case AST_ARBNO: {
-        if (e->nchildren < 1) return pat_arb(); /* degenerate */
-        DESCR_t inner = interp_eval_pat(e->children[0]);
+        if (e->n < 1) return pat_arb(); /* degenerate */
+        DESCR_t inner = interp_eval_pat(e->c[0]);
         return pat_arbno(inner);
     }
 

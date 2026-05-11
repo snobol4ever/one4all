@@ -21,7 +21,7 @@
 CallFrame  call_stack[CALL_STACK_MAX];
 int        call_depth = 0;
 
-/* ── IC-5: AST_INITIAL persistence — file-scope table keyed on AST_t node id ── */
+/* ── IC-5: AST_INITIAL persistence — file-scope table keyed on tree_t node id ── */
 IcnInitEnt init_tab[ICN_INIT_MAX];
 int        icn_init_n = 0;
 
@@ -228,7 +228,7 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
         /* ── Find body label: use entry_label (supports OPSYN aliases and
          * alternate entry points), then fall back to fname/ufname ── */
         const char *entry = FUNC_ENTRY_fn(fname);
-        const AST_t *body = entry ? label_lookup(entry) : NULL;
+        const tree_t *body = entry ? label_lookup(entry) : NULL;
         if (!body) body = label_lookup(fname);
         if (!body) body = label_lookup(ufname);
 
@@ -244,27 +244,27 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
             /* SI-6: walk AST_STMT children of g_exec_prog forward from the body label.
              * Mirrors execute_program's index-based loop; STMT_t linked-list removed. */
             int ci = 0;
-            for (int _i = 0; _i < g_exec_prog->nchildren; _i++)
-                if (g_exec_prog->children[_i] == body) { ci = _i; break; }
-            int nch = g_exec_prog->nchildren;
+            for (int _i = 0; _i < g_exec_prog->n; _i++)
+                if (g_exec_prog->c[_i] == body) { ci = _i; break; }
+            int nch = g_exec_prog->n;
 
             while (ci < nch) {
-                const AST_t *s = g_exec_prog->children[ci];
+                const tree_t *s = g_exec_prog->c[ci];
                 if (!s) { ci++; continue; }
-                if (s->kind == AST_END) break;
-                if (s->kind != AST_STMT) { ci++; continue; }
+                if (s->t == AST_END) break;
+                if (s->t != AST_STMT) { ci++; continue; }
 
                 /* Read stmt fields via attr helpers (same as execute_program). */
-                AST_t *s_subject = stmt_attr_expr(stmt_attr_find(s, ":subj"));
-                AST_t *s_pattern = stmt_attr_expr(stmt_attr_find(s, ":pat"));
-                AST_t *s_repl    = stmt_attr_expr(stmt_attr_find(s, ":repl"));
+                tree_t *s_subject = stmt_attr_expr(stmt_attr_find(s, ":subj"));
+                tree_t *s_pattern = stmt_attr_expr(stmt_attr_find(s, ":pat"));
+                tree_t *s_repl    = stmt_attr_expr(stmt_attr_find(s, ":repl"));
                 int    s_has_eq  = stmt_attr_find(s, ":eq") != NULL;
                 int    s_stno    = 0;
                 { const char *_v = stmt_attr_str(stmt_attr_find(s, ":stno")); if (_v) s_stno = atoi(_v); }
 
-                if (s_subject && (s_subject->kind == AST_CHOICE ||
-                                  s_subject->kind == AST_UNIFY  ||
-                                  s_subject->kind == AST_CLAUSE)) {
+                if (s_subject && (s_subject->t == AST_CHOICE ||
+                                  s_subject->t == AST_UNIFY  ||
+                                  s_subject->t == AST_CLAUSE)) {
                     ci++; continue;
                 }
                 /* SN-26-bridge-coverage-n: fire MWK_LABEL on every executed
@@ -281,23 +281,23 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                 DESCR_t     subj_val  = NULVCL;
                 const char *subj_name = NULL;
                 if (s_subject) {
-                    if (s_subject->kind == AST_VAR && s_subject->sval) {
-                        subj_name = s_subject->sval;
+                    if (s_subject->t == AST_VAR && s_subject->v.sval) {
+                        subj_name = s_subject->v.sval;
                         /* Only read value when needed for pattern match */
                         if (s_pattern)
                             subj_val = NV_GET_fn(subj_name);
-                    } else if (s_subject->kind == AST_INDIRECT && s_subject->nchildren > 0) {
+                    } else if (s_subject->t == AST_INDIRECT && s_subject->n > 0) {
                         /* $'$B' or $X as subject — resolve to variable name for write-back.
                          * child is AST_QLIT "$B" (literal) or AST_VAR X (runtime indirect).
                          * SN-26-bridge-coverage-y: if the resolved value is a DT_N NAMEPTR
                          * (e.g. assign(name,...) where name was bound as `.snoBrackets`),
                          * recover the variable name from the NV cell pointer instead of
                          * letting VARVAL_fn read junk from the union's .s slot. */
-                        AST_t *ic = s_subject->children[0];
-                        if (ic->kind == AST_QLIT && ic->sval) {
-                            subj_name = ic->sval;  /* $'name' — literal name, use directly */
-                        } else if (ic->kind == AST_VAR && ic->sval) {
-                            DESCR_t xv = NV_GET_fn(ic->sval); /* $X — indirect */
+                        tree_t *ic = s_subject->c[0];
+                        if (ic->t == AST_QLIT && ic->v.sval) {
+                            subj_name = ic->v.sval;  /* $'name' — literal name, use directly */
+                        } else if (ic->t == AST_VAR && ic->v.sval) {
+                            DESCR_t xv = NV_GET_fn(ic->v.sval); /* $X — indirect */
                             if (IS_NAMEPTR(xv)) {
                                 const char *_rn = NV_name_from_ptr((const DESCR_t*)xv.ptr);
                                 subj_name = _rn ? _rn : NULL;
@@ -319,7 +319,7 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                             subj_val = NV_GET_fn(subj_name);
                         } else if (!subj_name)
                             subj_val = interp_eval(s_subject);
-                    } else if (s_subject->kind == AST_FNC && s_has_eq && !s_pattern) {
+                    } else if (s_subject->t == AST_FNC && s_has_eq && !s_pattern) {
                         /* SN-6 session 14: same guard as top-level execute_program
                          * loop (~L4142).  Dedicated branches below (ITEM/FIELD setter
                          * at ~L673, NRETURN lvalue-assign at ~L699) call the function
@@ -359,8 +359,8 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                      * is still valid here (no nested call between interp_eval return
                      * and this check). Re-fetch from the function's return variable. */
                     if (strcmp(kw_rtntype, "NRETURN") == 0      /* SN-19: literal uppercase */
-                            && s_repl && s_repl->kind == AST_FNC && s_repl->sval) {
-                        DESCR_t raw = NV_GET_fn(s_repl->sval);
+                            && s_repl && s_repl->t == AST_FNC && s_repl->v.sval) {
+                        DESCR_t raw = NV_GET_fn(s_repl->v.sval);
                         if (IS_NAME(raw)) repl_val = raw;
                     }
                     if (IS_FAIL_fn(repl_val)) succeeded = 0;
@@ -376,47 +376,47 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                             else { set_and_trace(subj_name, repl_val); succeeded = 1; }
                         } else { set_and_trace(subj_name, repl_val); succeeded = 1; }
                     }
-                } else if (s_has_eq && s_subject && s_subject->kind == AST_KEYWORD && s_subject->sval) {
+                } else if (s_has_eq && s_subject && s_subject->t == AST_KEYWORD && s_subject->v.sval) {
                     DESCR_t repl_val = s_repl ? interp_eval(s_repl) : NULVCL;
                     if (IS_FAIL_fn(repl_val)) succeeded = 0;
                     else {
                         /* SIL ASGNIC: delegate to ASGNIC_fn (snobol4.c export).
                          * Coerces to INTEGER and writes keyword global.
                          * Falls back to NV_SET_fn for unrecognised names (safety). */
-                        if (!ASGNIC_fn(s_subject->sval, repl_val))
-                            NV_SET_fn(s_subject->sval, repl_val);
+                        if (!ASGNIC_fn(s_subject->v.sval, repl_val))
+                            NV_SET_fn(s_subject->v.sval, repl_val);
                         succeeded = 1;
                     }
-                } else if (s_has_eq && s_subject && s_subject->kind == AST_IDX &&
-                           s_subject->nchildren >= 2) {
-                    DESCR_t base = interp_eval(s_subject->children[0]);
-                    DESCR_t idx  = interp_eval(s_subject->children[1]);
+                } else if (s_has_eq && s_subject && s_subject->t == AST_IDX &&
+                           s_subject->n >= 2) {
+                    DESCR_t base = interp_eval(s_subject->c[0]);
+                    DESCR_t idx  = interp_eval(s_subject->c[1]);
                     DESCR_t rv   = s_repl ? interp_eval(s_repl) : NULVCL;
                     if (IS_FAIL_fn(base)||IS_FAIL_fn(idx)||IS_FAIL_fn(rv)) succeeded = 0;
                     else {
-                        if (s_subject->nchildren == 3) {
-                            DESCR_t idx2 = interp_eval(s_subject->children[2]);
+                        if (s_subject->n == 3) {
+                            DESCR_t idx2 = interp_eval(s_subject->c[2]);
                             subscript_set2(base, idx, idx2, rv);
                         } else { subscript_set(base, idx, rv); }
                         /* SN-26-bridge-coverage-g: fire VALUE record for subscript store
                          * inside user function body. */
-                        { const char *base_nm = (s_subject->children[0] &&
-                                                 s_subject->children[0]->kind == AST_VAR)
-                                               ? s_subject->children[0]->sval : NULL;
+                        { const char *base_nm = (s_subject->c[0] &&
+                                                 s_subject->c[0]->t == AST_VAR)
+                                               ? s_subject->c[0]->v.sval : NULL;
                           if (base_nm) comm_var(base_nm, rv); }
                         succeeded = 1;
                     }
-                } else if (s_has_eq && s_subject && s_subject->kind == AST_FNC &&
-                           s_subject->sval && s_subject->nchildren >= 1) {
+                } else if (s_has_eq && s_subject && s_subject->t == AST_FNC &&
+                           s_subject->v.sval && s_subject->n >= 1) {
                     /* ITEM(arr,i[,j]) = val  or  field(obj) = val at statement level */
                     DESCR_t rv = s_repl ? interp_eval(s_repl) : NULVCL;
                     if (!IS_FAIL_fn(rv)) {
-                        if (strcmp(s_subject->sval, "ITEM") == 0 && s_subject->nchildren >= 2) {  /* SN-19 */
-                            DESCR_t base = interp_eval(s_subject->children[0]);
-                            DESCR_t idx  = interp_eval(s_subject->children[1]);
+                        if (strcmp(s_subject->v.sval, "ITEM") == 0 && s_subject->n >= 2) {  /* SN-19 */
+                            DESCR_t base = interp_eval(s_subject->c[0]);
+                            DESCR_t idx  = interp_eval(s_subject->c[1]);
                             if (!IS_FAIL_fn(base) && !IS_FAIL_fn(idx)) {
-                                if (s_subject->nchildren >= 3) {
-                                    DESCR_t idx2 = interp_eval(s_subject->children[2]);
+                                if (s_subject->n >= 3) {
+                                    DESCR_t idx2 = interp_eval(s_subject->c[2]);
                                     if (!IS_FAIL_fn(idx2)) subscript_set2(base, idx, idx2, rv);
                                 } else {
                                     subscript_set(base, idx, rv);
@@ -425,9 +425,9 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                             } else succeeded = 0;
                         } else {
                             /* DATA field setter: fname(obj) = val */
-                            DESCR_t obj = interp_eval(s_subject->children[0]);
+                            DESCR_t obj = interp_eval(s_subject->c[0]);
                             if (!IS_FAIL_fn(obj)) {
-                                FIELD_SET_fn(obj, s_subject->sval, rv);
+                                FIELD_SET_fn(obj, s_subject->v.sval, rv);
                                 /* SN-26-bridge-coverage-v: SPITBOL fires sysmw
                                  * (`<lval>` sentinel VALUE) on every aggregate
                                  * element store, including DATA fields.  Mirror
@@ -437,18 +437,18 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                             } else succeeded = 0;
                         }
                     } else succeeded = 0;
-                } else if (s_has_eq && s_subject && s_subject->kind == AST_FNC &&
-                           s_subject->sval && s_subject->nchildren == 0) {
+                } else if (s_has_eq && s_subject && s_subject->t == AST_FNC &&
+                           s_subject->v.sval && s_subject->n == 0) {
                     /* NRETURN lvalue assign: ref_a() = val  (zero-arg fn call as lvalue)
                      * Call the function; if result is DT_N write through to named variable. */
-                    DESCR_t fres = call_user_function(s_subject->sval, NULL, 0);
+                    DESCR_t fres = call_user_function(s_subject->v.sval, NULL, 0);
                     if (IS_NAME(fres)) {
                         DESCR_t rv = s_repl ? interp_eval(s_repl) : NULVCL;
                         if (IS_FAIL_fn(rv)) succeeded = 0;
                         else { succeeded = NAME_SET(fres, rv) ? 1 : 0; }
                     } else succeeded = 0;
-                } else if (s_has_eq && s_subject && s_subject->kind == AST_INDIRECT) {
-                    AST_t *ichild = s_subject->nchildren > 0 ? s_subject->children[0] : NULL;
+                } else if (s_has_eq && s_subject && s_subject->t == AST_INDIRECT) {
+                    tree_t *ichild = s_subject->n > 0 ? s_subject->c[0] : NULL;
                     DESCR_t repl_val = s_repl ? interp_eval(s_repl) : NULVCL;
                     if (IS_FAIL_fn(repl_val)) { succeeded = 0; }
                     else {
@@ -491,15 +491,15 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
 
                 /* ── Goto resolution ── */
                 const char *target = NULL;
-                AST_t *go_s_attr = stmt_attr_find(s, ":goS");
-                AST_t *go_f_attr = stmt_attr_find(s, ":goF");
-                AST_t *go_u_attr = stmt_attr_find(s, ":go");
+                tree_t *go_s_attr = stmt_attr_find(s, ":goS");
+                tree_t *go_f_attr = stmt_attr_find(s, ":goF");
+                tree_t *go_u_attr = stmt_attr_find(s, ":go");
                 const char *goto_s = go_s_attr ? stmt_attr_str(go_s_attr) : NULL;
                 const char *goto_f = go_f_attr ? stmt_attr_str(go_f_attr) : NULL;
                 const char *goto_u = go_u_attr ? stmt_attr_str(go_u_attr) : NULL;
-                AST_t *goto_s_expr = (go_s_attr && !goto_s) ? stmt_attr_expr(go_s_attr) : NULL;
-                AST_t *goto_f_expr = (go_f_attr && !goto_f) ? stmt_attr_expr(go_f_attr) : NULL;
-                AST_t *goto_u_expr = (go_u_attr && !goto_u) ? stmt_attr_expr(go_u_attr) : NULL;
+                tree_t *goto_s_expr = (go_s_attr && !goto_s) ? stmt_attr_expr(go_s_attr) : NULL;
+                tree_t *goto_f_expr = (go_f_attr && !goto_f) ? stmt_attr_expr(go_f_attr) : NULL;
+                tree_t *goto_u_expr = (go_u_attr && !goto_u) ? stmt_attr_expr(go_u_attr) : NULL;
 
                 if (goto_u && *goto_u)
                     target = goto_u;
@@ -538,10 +538,10 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                         strncpy(kw_rtntype, "NRETURN", sizeof(kw_rtntype)-1);
                         goto fn_done;
                     }
-                    const AST_t *dest = label_lookup(target);
+                    const tree_t *dest = label_lookup(target);
                     if (dest) {
                         for (int _j = 0; _j < nch; _j++)
-                            if (g_exec_prog->children[_j] == dest) { ci = _j; break; }
+                            if (g_exec_prog->c[_j] == dest) { ci = _j; break; }
                         continue;
                     }
                     break;

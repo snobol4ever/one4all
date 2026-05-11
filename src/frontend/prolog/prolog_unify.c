@@ -100,7 +100,7 @@ int unify(Term *t1, Term *t2, Trail *trail) {
 
     /* Integers */
     if (t1->tag == TT_INT && t2->tag == TT_INT)
-        return t1->ival == t2->ival;
+        return t1->v.ival == t2->v.ival;
 
     /* Floats */
     if (t1->tag == TT_FLOAT && t2->tag == TT_FLOAT)

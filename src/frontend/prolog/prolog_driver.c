@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void prolog_compile(const char *source, const char *filename, AST_t **out_ast)
+void prolog_compile(const char *source, const char *filename, tree_t **out_ast)
 {
     if (!filename) filename = "<stdin>";
     if (out_ast) *out_ast = NULL;

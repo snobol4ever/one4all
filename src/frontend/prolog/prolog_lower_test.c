@@ -31,15 +31,15 @@ static int tests_run = 0, tests_passed = 0;
 static int count_kind(CODE_t *prog, AST_e k) {
     int n = 0;
     for (STMT_t *s = prog->head; s; s = s->next)
-        if (s->subject && s->subject->kind == k) n++;
+        if (s->subject && s->subject->t == k) n++;
     return n;
 }
 
 /* Find AST_CHOICE by functor/arity string "foo/2" */
-static AST_t *find_choice(CODE_t *prog, const char *pred) {
+static tree_t *find_choice(CODE_t *prog, const char *pred) {
     for (STMT_t *s = prog->head; s; s = s->next)
-        if (s->subject && s->subject->kind == AST_CHOICE &&
-            s->subject->sval && strcmp(s->subject->sval, pred) == 0)
+        if (s->subject && s->subject->t == AST_CHOICE &&
+            s->subject->v.sval && strcmp(s->subject->v.sval, pred) == 0)
             return s->subject;
     return NULL;
 }
@@ -56,13 +56,13 @@ static void test_facts(void) {
     CODE_t   *ir = prolog_lower(pl);
 
     CHECK("facts: 1 AST_CHOICE", count_kind(ir, AST_CHOICE) == 1);
-    AST_t *ch = find_choice(ir, "person/1");
+    tree_t *ch = find_choice(ir, "person/1");
     CHECK("facts: choice is person/1", ch != NULL);
-    CHECK("facts: 3 clauses",  ch && ch->nchildren == 3);
+    CHECK("facts: 3 clauses",  ch && ch->n == 3);
     /* Each clause: 1 head arg, 0 body goals */
-    CHECK("facts: clause[0] nchildren==1", ch && ch->nchildren >= 1 &&
-          ch->children[0]->kind == AST_CLAUSE &&
-          ch->children[0]->nchildren == 1);
+    CHECK("facts: clause[0] nchildren==1", ch && ch->n >= 1 &&
+          ch->c[0]->t == AST_CLAUSE &&
+          ch->c[0]->n == 1);
     prolog_program_free(pl); free(ir);
 }
 
@@ -75,15 +75,15 @@ static void test_rule(void) {
     PlProgram *pl = prolog_parse(src, "t_rule");
     CODE_t   *ir = prolog_lower(pl);
 
-    AST_t *ch = find_choice(ir, "double/2");
+    tree_t *ch = find_choice(ir, "double/2");
     CHECK("rule: choice double/2 exists", ch != NULL);
-    CHECK("rule: 1 clause", ch && ch->nchildren == 1);
-    if (ch && ch->nchildren == 1) {
-        AST_t *cl = ch->children[0];
-        CHECK("rule: AST_CLAUSE kind", cl->kind == AST_CLAUSE);
+    CHECK("rule: 1 clause", ch && ch->n == 1);
+    if (ch && ch->n == 1) {
+        tree_t *cl = ch->c[0];
+        CHECK("rule: AST_CLAUSE kind", cl->t == AST_CLAUSE);
         /* head args: X(_V0), Y(_V1) = 2 children; body: is(Y, X*2) = 1 child */
-        CHECK("rule: 3 children (2 head args + 1 body goal)", cl->nchildren == 3);
-        CHECK("rule: n_vars >= 2", cl->ival >= 2);
+        CHECK("rule: 3 children (2 head args + 1 body goal)", cl->n == 3);
+        CHECK("rule: n_vars >= 2", cl->v.ival >= 2);
     }
     prolog_program_free(pl); free(ir);
 }
@@ -97,15 +97,15 @@ static void test_unify_node(void) {
     PlProgram *pl = prolog_parse(src, "t_unify");
     CODE_t   *ir = prolog_lower(pl);
 
-    AST_t *ch = find_choice(ir, "test/0");
+    tree_t *ch = find_choice(ir, "test/0");
     CHECK("unify: choice test/0 exists", ch != NULL);
-    if (ch && ch->nchildren == 1) {
-        AST_t *cl = ch->children[0];
+    if (ch && ch->n == 1) {
+        tree_t *cl = ch->c[0];
         /* body has 1 goal: X = foo -> AST_UNIFY */
         /* nchildren = 0 head args + 1 body = 1 */
         CHECK("unify: AST_UNIFY in body",
-              cl->nchildren >= 1 &&
-              cl->children[0]->kind == AST_UNIFY);
+              cl->n >= 1 &&
+              cl->c[0]->t == AST_UNIFY);
     }
     prolog_program_free(pl); free(ir);
 }
@@ -120,16 +120,16 @@ static void test_cut_node(void) {
     PlProgram *pl = prolog_parse(src, "t_cut");
     CODE_t   *ir = prolog_lower(pl);
 
-    AST_t *ch = find_choice(ir, "differ/2");
+    tree_t *ch = find_choice(ir, "differ/2");
     CHECK("cut: choice differ/2 exists", ch != NULL);
-    CHECK("cut: 2 clauses", ch && ch->nchildren == 2);
-    if (ch && ch->nchildren >= 1) {
-        AST_t *cl1 = ch->children[0];
+    CHECK("cut: 2 clauses", ch && ch->n == 2);
+    if (ch && ch->n >= 1) {
+        tree_t *cl1 = ch->c[0];
         /* differ(X,X) :- !,fail  -> head_args=2, body=[!,fail]=2 -> 4 children */
         /* body[0] = AST_CUT */
         int found_cut = 0;
-        for (int i = 0; i < cl1->nchildren; i++)
-            if (cl1->children[i]->kind == AST_CUT) found_cut = 1;
+        for (int i = 0; i < cl1->n; i++)
+            if (cl1->c[i]->t == AST_CUT) found_cut = 1;
         CHECK("cut: AST_CUT in clause 1 body", found_cut);
     }
     prolog_program_free(pl); free(ir);
@@ -150,8 +150,8 @@ static void test_multi_pred(void) {
     CHECK("multi: 2 AST_CHOICE nodes", count_kind(ir, AST_CHOICE) == 2);
     CHECK("multi: member/2 exists", find_choice(ir, "member/2") != NULL);
     CHECK("multi: append/3 exists", find_choice(ir, "append/3") != NULL);
-    AST_t *mem = find_choice(ir, "member/2");
-    CHECK("multi: member/2 has 2 clauses", mem && mem->nchildren == 2);
+    tree_t *mem = find_choice(ir, "member/2");
+    CHECK("multi: member/2 has 2 clauses", mem && mem->n == 2);
     prolog_program_free(pl); free(ir);
 }
 
@@ -169,7 +169,7 @@ static void test_directive(void) {
     /* First stmt is directive (AST_FNC) */
     CHECK("directive: first stmt is AST_FNC",
           ir->head && ir->head->subject &&
-          ir->head->subject->kind == AST_FNC);
+          ir->head->subject->t == AST_FNC);
     prolog_program_free(pl); free(ir);
 }
 
@@ -206,13 +206,13 @@ static void test_puzzle01(void) {
     CHECK("puzzle01: AST_CHOICE nodes >= 5", count_kind(ir, AST_CHOICE) >= 5);
     CHECK("puzzle01: person/1 has 3 clauses",
           find_choice(ir, "person/1") &&
-          find_choice(ir, "person/1")->nchildren == 3);
+          find_choice(ir, "person/1")->n == 3);
     CHECK("puzzle01: differ/2 has 2 clauses",
           find_choice(ir, "differ/2") &&
-          find_choice(ir, "differ/2")->nchildren == 2);
+          find_choice(ir, "differ/2")->n == 2);
     CHECK("puzzle01: differ/3 has 4 clauses",
           find_choice(ir, "differ/3") &&
-          find_choice(ir, "differ/3")->nchildren == 4);
+          find_choice(ir, "differ/3")->n == 4);
     prolog_program_free(pl); free(ir);
 }
 

@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 /* TK_* token values are defined in snobol4_parse.h (bison-generated, 258+).
- * Token.kind holds those values as a plain int — no separate enum here. */
+ * Token.t holds those values as a plain int — no separate enum here. */
 
 typedef struct {
     int         kind;   /* T_* from snobol4_parse.h */

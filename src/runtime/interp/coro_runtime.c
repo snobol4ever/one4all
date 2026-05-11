@@ -40,7 +40,7 @@
 /* RS-17b: with bb_exec_stmt now handling every statement-context site in this
  * file (was 13 direct interp_eval calls before RS-17b), and bb_eval_value
  * handling every value-context site (RS-17a), no `extern DESCR_t
- * interp_eval(AST_t *e);` declaration is needed here anymore.  The IR-mode
+ * interp_eval(tree_t *e);` declaration is needed here anymore.  The IR-mode
  * tree-walker reaches the work that arrives in coro_stmt.c's and
  * coro_value.c's fallthroughs; from this file's perspective, interp_eval is
  * gone.  This is the contract RS-19 locks in by promoting coro_runtime.c
@@ -50,7 +50,7 @@
 extern DESCR_t NV_SET_fn(const char *name, DESCR_t val);
 
 /* ── Icon unified interpreter state ────────────────────────────────────────
- * Icon procedures use slot-indexed locals (e->ival on AST_VAR nodes).
+ * Icon procedures use slot-indexed locals (e->v.ival on AST_VAR nodes).
  * When interp_eval is running inside an Icon procedure call, frame_env points
  * to the current frame's slot array. AST_VAR case checks frame_env first.
  * FRAME.env_n is the slot count. Both are NULL/0 when in SNOBOL4 context.
@@ -61,7 +61,7 @@ extern DESCR_t NV_SET_fn(const char *name, DESCR_t val);
 IcnProcEntry proc_table[PROC_TABLE_MAX];
 int          proc_count = 0;
 int          g_lang         = 0;     /* 0=SNOBOL4 1=Icon */
-AST_t      *g_icn_root     = NULL;  /* current Icon drive root */
+tree_t      *g_icn_root     = NULL;  /* current Icon drive root */
 
 /* A0 — SCRIP_NO_AST_WALK tripwire.  Set to 1 at entry of sm_interp_run /
  * sm_call_proc; cleared at exit.  When set, coro_eval / interp_eval /
@@ -90,24 +90,24 @@ int      frame_depth = 0;
 /* coro_drive_fnc suspend-value passthrough: while running the every-body,
  * set coro_drive_node = the AST_FNC being driven and coro_drive_val = suspended value.
  * interp_eval(AST_FNC) returns coro_drive_val directly when e == coro_drive_node. */
-AST_t  *coro_drive_node = NULL;
+tree_t  *coro_drive_node = NULL;
 DESCR_t  coro_drive_val;
 
 /* Convenience helpers that mirror the old flat-global helpers */
-void frame_push(AST_t *n, long v, const char *sv) {
+void frame_push(tree_t *n, long v, const char *sv) {
     IcnFrame *f = &FRAME;
-    if (f->gen_depth < FRAME_DEPTH_MAX) { f->gen[f->gen_depth].node=n; f->gen[f->gen_depth].cur=v; f->gen[f->gen_depth].sval=sv; f->gen_depth++; }
+    if (f->gen_depth < FRAME_DEPTH_MAX) { f->gen[f->gen_depth].node=n; f->gen[f->gen_depth].cur=v; f->gen[f->gen_depth].v.sval=sv; f->gen_depth++; }
 }
 void frame_pop(void) { if (FRAME.gen_depth > 0) FRAME.gen_depth--; }
-int  icn_frame_lookup(AST_t *n, long *out) {
+int  icn_frame_lookup(tree_t *n, long *out) {
     IcnFrame *f = &FRAME;
     for (int i=f->gen_depth-1;i>=0;i--) if(f->gen[i].node==n){*out=f->gen[i].cur;return 1;} return 0;
 }
-int  icn_frame_lookup_sv(AST_t *n, long *out, const char **sv) {
+int  icn_frame_lookup_sv(tree_t *n, long *out, const char **sv) {
     IcnFrame *f = &FRAME;
-    for (int i=f->gen_depth-1;i>=0;i--) if(f->gen[i].node==n){*out=f->gen[i].cur;*sv=f->gen[i].sval;return 1;} return 0;
+    for (int i=f->gen_depth-1;i>=0;i--) if(f->gen[i].node==n){*out=f->gen[i].cur;*sv=f->gen[i].v.sval;return 1;} return 0;
 }
-int  frame_active(AST_t *n) {
+int  frame_active(tree_t *n) {
     IcnFrame *f = &FRAME;
     for (int i=0;i<f->gen_depth;i++) if(f->gen[i].node==n) return 1; return 0;
 }
@@ -115,7 +115,7 @@ int  frame_active(AST_t *n) {
 /* CHUNKS-step17b'' (CH-17b''): pure-DESCR_t forwarders to FRAME.env[slot].
  * Used by sm_interp.c's SM_LOAD_FRAME / SM_STORE_FRAME handlers so the SM
  * runtime can read/write Icon frame slots without including coro_runtime.h
- * (which would expose AST_t / IR types across the SM/IR boundary).
+ * (which would expose tree_t / IR types across the SM/IR boundary).
  *
  * Semantics mirror coro_value.c:382–399 for AST_VAR with frame_depth > 0:
  *   slot in [0, FRAME.env_n) → use FRAME.env[slot]; else FAILDESCR.
@@ -174,11 +174,11 @@ void global_register(const char *name) {
  * declared `static x;` inside a procedure; their values persist across calls
  * to that procedure but are scoped to the procedure (statics with the same
  * name in different procs do not share storage).
- * CH-17g-statics: re-keyed off AST_t* onto (entry_pc, proc_name).
+ * CH-17g-statics: re-keyed off tree_t* onto (entry_pc, proc_name).
  * Primary key: entry_pc >= 0  → (entry_pc, var_name)  — stable SM pc.
  * Fallback key: entry_pc < 0  → (proc_name, var_name) — name string identity.
- * The fallback covers procs not yet lowered through sm_lower (AST_t path still
- * live in coro_call); it provides the same scoping guarantee that AST_t*
+ * The fallback covers procs not yet lowered through sm_lower (tree_t path still
+ * live in coro_call); it provides the same scoping guarantee that tree_t*
  * pointer identity provided before, since proc names are interned and unique. */
 typedef struct {
     int         entry_pc;   /* >= 0: primary key; < 0: use proc_name fallback */
@@ -210,9 +210,9 @@ static int static_entry_matches(const static_ent_t *e, int epc,
     return e->proc_name && pname && strcmp(e->proc_name, pname) == 0;
 }
 
-int static_get(AST_t *proc, const char *name, DESCR_t *out) {
+int static_get(tree_t *proc, const char *name, DESCR_t *out) {
     if (!proc || !name || !out) return 0;
-    const char *pname = proc->sval;
+    const char *pname = proc->v.sval;
     int epc = static_proc_entry_pc(pname);
     for (int i = 0; i < static_n; i++) {
         if (static_entry_matches(&static_tab[i], epc, pname, name)) {
@@ -223,9 +223,9 @@ int static_get(AST_t *proc, const char *name, DESCR_t *out) {
     return 0;
 }
 
-void static_set(AST_t *proc, const char *name, DESCR_t val) {
+void static_set(tree_t *proc, const char *name, DESCR_t val) {
     if (!proc || !name) return;
-    const char *pname = proc->sval;
+    const char *pname = proc->v.sval;
     int epc = static_proc_entry_pc(pname);
     for (int i = 0; i < static_n; i++) {
         if (static_entry_matches(&static_tab[i], epc, pname, name)) {
@@ -244,19 +244,19 @@ void static_set(AST_t *proc, const char *name, DESCR_t val) {
     static_n++;
 }
 
-int coro_drive(AST_t *e) {
+int coro_drive(tree_t *e) {
     if (!e) return 0;
     if (frame_active(e)) return 0;
-    AST_t *root = FRAME.body_root;
-    if (e->kind == AST_TO && e->nchildren >= 2) {
+    tree_t *root = FRAME.body_root;
+    if (e->t == AST_TO && e->n >= 2) {
         /* For scalar children: evaluate directly.
          * For generator children (e.g. (1 to 2) to (2 to 3)): drive each child
          * as a generator, iterating the cross-product of (lo_seq × hi_seq),
          * and for each (lo,hi) pair produce the inner lo..hi sequence. */
-        AST_t *lo_expr = e->children[0];
-        AST_t *hi_expr = e->children[1];
-        int is_lo_gen = (lo_expr->kind == AST_TO || lo_expr->kind == AST_TO_BY || lo_expr->kind == AST_ALTERNATE);
-        int is_hi_gen = (hi_expr->kind == AST_TO || hi_expr->kind == AST_TO_BY || hi_expr->kind == AST_ALTERNATE);
+        tree_t *lo_expr = e->c[0];
+        tree_t *hi_expr = e->c[1];
+        int is_lo_gen = (lo_expr->t == AST_TO || lo_expr->t == AST_TO_BY || lo_expr->t == AST_ALTERNATE);
+        int is_hi_gen = (hi_expr->t == AST_TO || hi_expr->t == AST_TO_BY || hi_expr->t == AST_ALTERNATE);
         int ticks = 0;
 
         if (!is_lo_gen && !is_hi_gen) {
@@ -281,12 +281,12 @@ int coro_drive(AST_t *e) {
                 if (!IS_FAIL_fn(d)) lo_vals[nlo++] = d.i;
             } else {
                 /* Drive lo_expr collecting all values */
-                AST_t *saved_root = FRAME.body_root;
+                tree_t *saved_root = FRAME.body_root;
                 /* Use frame_push/pop trick: temporarily drive lo_expr inline */
                 /* Simple approach: evaluate lo as AST_TO sequence manually */
-                if (lo_expr->kind == AST_TO && lo_expr->nchildren >= 2) {
-                    DESCR_t a = bb_eval_value(lo_expr->children[0]);
-                    DESCR_t b = bb_eval_value(lo_expr->children[1]);
+                if (lo_expr->t == AST_TO && lo_expr->n >= 2) {
+                    DESCR_t a = bb_eval_value(lo_expr->c[0]);
+                    DESCR_t b = bb_eval_value(lo_expr->c[1]);
                     if (!IS_FAIL_fn(a) && !IS_FAIL_fn(b))
                         for (long v = a.i; v <= b.i && nlo < 256; v++) lo_vals[nlo++] = v;
                 }
@@ -298,9 +298,9 @@ int coro_drive(AST_t *e) {
                 DESCR_t d = bb_eval_value(hi_expr);
                 if (!IS_FAIL_fn(d)) hi_vals[nhi++] = d.i;
             } else {
-                if (hi_expr->kind == AST_TO && hi_expr->nchildren >= 2) {
-                    DESCR_t a = bb_eval_value(hi_expr->children[0]);
-                    DESCR_t b = bb_eval_value(hi_expr->children[1]);
+                if (hi_expr->t == AST_TO && hi_expr->n >= 2) {
+                    DESCR_t a = bb_eval_value(hi_expr->c[0]);
+                    DESCR_t b = bb_eval_value(hi_expr->c[1]);
                     if (!IS_FAIL_fn(a) && !IS_FAIL_fn(b))
                         for (long v = a.i; v <= b.i && nhi < 256; v++) hi_vals[nhi++] = v;
                 }
@@ -321,10 +321,10 @@ int coro_drive(AST_t *e) {
         }
         return ticks;
     }
-    if (e->kind == AST_TO_BY && e->nchildren >= 3) {
-        DESCR_t lo_d=bb_eval_value(e->children[0]);
-        DESCR_t hi_d=bb_eval_value(e->children[1]);
-        DESCR_t st_d=bb_eval_value(e->children[2]);
+    if (e->t == AST_TO_BY && e->n >= 3) {
+        DESCR_t lo_d=bb_eval_value(e->c[0]);
+        DESCR_t hi_d=bb_eval_value(e->c[1]);
+        DESCR_t st_d=bb_eval_value(e->c[2]);
         if(IS_FAIL_fn(lo_d)||IS_FAIL_fn(hi_d)||IS_FAIL_fn(st_d)) return 0;
         long lo=lo_d.i,hi=hi_d.i,st=st_d.i?st_d.i:1; int ticks=0;
         if(st>0){for(long i=lo;i<=hi&&!FRAME.returning;i+=st){frame_push(e,i,NULL);int inner=coro_drive(root);if(!inner)bb_exec_stmt(FRAME.body_root);frame_pop();ticks++;if(FRAME.returning)break;}}
@@ -333,18 +333,18 @@ int coro_drive(AST_t *e) {
     }
     /* S-6 / RK-16: AST_ITERATE — iterate string chars OR Raku @array elements.
      * If the string contains \x01 (SOH) it is a Raku array: split on SOH and
-     * bind each element to the loop variable named in e->sval (if any).
+     * bind each element to the loop variable named in e->v.sval (if any).
      * Otherwise fall through to character-by-character Icon iteration.
      * IC-8: !N (integer) and !R (real) coerce to their image-string and iterate
      * each character — `!-514` → `-`,`5`,`1`,`4`; `!12.5` → `1`,`2`,`.`,`5`. */
-    if (e->kind == AST_ITERATE && e->nchildren >= 1) {
-        DESCR_t sv_d = bb_eval_value(e->children[0]);
+    if (e->t == AST_ITERATE && e->n >= 1) {
+        DESCR_t sv_d = bb_eval_value(e->c[0]);
         if (IS_FAIL_fn(sv_d)) return 0;
         /* IC-8: coerce numeric scalars to image-string before string-iterate path (D-1) */
         sv_d = descr_to_str_icn(sv_d);
         if (!IS_STR_fn(sv_d)) return 0;
         const char *str = sv_d.s ? sv_d.s : "";
-        const char *loopvar = e->sval;   /* loop variable name, or NULL */
+        const char *loopvar = e->v.sval;   /* loop variable name, or NULL */
 
         /* Raku array iteration: use when loopvar is set (for @arr -> $x)
          * OR when string contains \x01 (multi-element array). */
@@ -393,11 +393,11 @@ int coro_drive(AST_t *e) {
         return ticks;
     }
     /* S-7: find(pat,str) as generator — successive 1-based positions. */
-    if (e->kind == AST_FNC && e->nchildren>=3
-        && e->children[0] && e->children[0]->sval
-        && strcmp(e->children[0]->sval,"find")==0) {
-        DESCR_t s1 = bb_eval_value(e->children[1]);
-        DESCR_t s2 = bb_eval_value(e->children[2]);
+    if (e->t == AST_FNC && e->n>=3
+        && e->c[0] && e->c[0]->v.sval
+        && strcmp(e->c[0]->v.sval,"find")==0) {
+        DESCR_t s1 = bb_eval_value(e->c[1]);
+        DESCR_t s2 = bb_eval_value(e->c[2]);
         if (IS_FAIL_fn(s1)||IS_FAIL_fn(s2)) return 0;
         const char *needle = VARVAL_fn(s1), *hay = VARVAL_fn(s2);
         if (!needle||!hay) return 0;
@@ -417,8 +417,8 @@ int coro_drive(AST_t *e) {
         return ticks;
     }
     /* ── AST_FNC user proc — suspend-aware coroutine driver ────────────────── */
-    if (e->kind == AST_FNC) { int t = coro_drive_fnc(e); if (t > 0) return t; }
-    for(int i=0;i<e->nchildren;i++){int t=coro_drive(e->children[i]);if(t>0)return t;}
+    if (e->t == AST_FNC) { int t = coro_drive_fnc(e); if (t > 0) return t; }
+    for(int i=0;i<e->n;i++){int t=coro_drive(e->c[i]);if(t>0)return t;}
     return 0;
 }
 
@@ -439,46 +439,46 @@ int scope_get(IcnScope *sc, const char *name) {
     for (int i=0;i<sc->n;i++) if(strcmp(sc->e[i].name,name)==0) return sc->e[i].slot;
     return -1;
 }
-void icn_scope_patch(IcnScope *sc, AST_t *e) {
+void icn_scope_patch(IcnScope *sc, tree_t *e) {
     if (!e) return;
-    if (e->kind == AST_GLOBAL) {
-        for (int i=0;i<e->nchildren;i++)
-            if(e->children[i]&&e->children[i]->sval) scope_add(sc, e->children[i]->sval);
+    if (e->t == AST_GLOBAL) {
+        for (int i=0;i<e->n;i++)
+            if(e->c[i]&&e->c[i]->v.sval) scope_add(sc, e->c[i]->v.sval);
         return;
     }
-    if (e->kind == AST_VAR && e->sval) {
+    if (e->t == AST_VAR && e->v.sval) {
         /* U-23: globals bridge to SNO NV store — skip slot, preserve sval, set ival=-1 */
-        if (is_global(e->sval)) { e->ival = -1; }
-        else { int s = scope_add(sc, e->sval); if (s >= 0) e->ival = s; else e->ival = -1; }
+        if (is_global(e->v.sval)) { e->v.ival = -1; }
+        else { int s = scope_add(sc, e->v.sval); if (s >= 0) e->v.ival = s; else e->v.ival = -1; }
     }
-    for (int i=0;i<e->nchildren;i++) icn_scope_patch(sc, e->children[i]);
+    for (int i=0;i<e->n;i++) icn_scope_patch(sc, e->c[i]);
 }
 
 /* coro_call: call an Icon procedure node (AST_FNC with body children).
  * Mirrors icn_call() in icon_interp.c exactly, but uses DESCR_t and frame_env. */
-DESCR_t coro_call(AST_t *proc, DESCR_t *args, int nargs) {
-    int nparams = (int)proc->ival;
+DESCR_t coro_call(tree_t *proc, DESCR_t *args, int nargs) {
+    int nparams = (int)proc->v.ival;
     int body_start = 1 + nparams;
-    int nbody = proc->nchildren - body_start;
+    int nbody = proc->n - body_start;
 
     /* Build name→slot scope: params first, then locals from AST_GLOBAL decls */
     IcnScope sc; sc.n = 0;
     for (int i = 0; i < nparams && i < FRAME_SLOT_MAX; i++) {
-        AST_t *pn = proc->children[1+i];
-        if (pn && pn->sval) scope_add(&sc, pn->sval);
+        tree_t *pn = proc->c[1+i];
+        if (pn && pn->v.sval) scope_add(&sc, pn->v.sval);
     }
     for (int i = 0; i < nbody; i++) {
-        AST_t *st = proc->children[body_start+i];
-        if (st && st->kind == AST_GLOBAL)
-            for (int j = 0; j < st->nchildren; j++)
-                if (st->children[j] && st->children[j]->sval)
-                    scope_add(&sc, st->children[j]->sval);
+        tree_t *st = proc->c[body_start+i];
+        if (st && st->t == AST_GLOBAL)
+            for (int j = 0; j < st->n; j++)
+                if (st->c[j] && st->c[j]->v.sval)
+                    scope_add(&sc, st->c[j]->v.sval);
     }
-    /* Patch AST_VAR.ival with slot indices throughout body.
+    /* Patch AST_VAR.v.ival with slot indices throughout body.
      * scope_patch also adds any undeclared vars it encounters to sc,
      * so sc.n after patching is the true slot count. */
     for (int i = 0; i < nbody; i++)
-        icn_scope_patch(&sc, proc->children[body_start+i]);
+        icn_scope_patch(&sc, proc->c[body_start+i]);
 
     /* nslots = total slots assigned (params + locals + any undeclared vars) */
     int nslots = sc.n > 0 ? sc.n : (nparams > 0 ? nparams : FRAME_SLOT_MAX);
@@ -500,15 +500,15 @@ DESCR_t coro_call(AST_t *proc, DESCR_t *args, int nargs) {
      * static var's current slot value back.  Per-proc table; statics with
      * the same name in different procs do not share storage.   */
     for (int i = 0; i < nbody; i++) {
-        AST_t *st = proc->children[body_start + i];
-        if (!st || st->kind != AST_GLOBAL || st->ival != 1) continue;
-        for (int j = 0; j < st->nchildren; j++) {
-            AST_t *vn = st->children[j];
-            if (!vn || !vn->sval) continue;
-            int slot = scope_get(&sc, vn->sval);
+        tree_t *st = proc->c[body_start + i];
+        if (!st || st->t != AST_GLOBAL || st->v.ival != 1) continue;
+        for (int j = 0; j < st->n; j++) {
+            tree_t *vn = st->c[j];
+            if (!vn || !vn->v.sval) continue;
+            int slot = scope_get(&sc, vn->v.sval);
             if (slot < 0 || slot >= nslots) continue;
             DESCR_t saved;
-            if (static_get(proc, vn->sval, &saved))
+            if (static_get(proc, vn->v.sval, &saved))
                 f->env[slot] = saved;
         }
     }
@@ -520,8 +520,8 @@ DESCR_t coro_call(AST_t *proc, DESCR_t *args, int nargs) {
     DESCR_t result = NULVCL;
     int stmt = 0;
     while (stmt < nbody && !FRAME.returning && !FRAME.loop_break) {
-        AST_t *st = proc->children[body_start + stmt];
-        if (!st || st->kind == AST_GLOBAL) { stmt++; continue; }
+        tree_t *st = proc->c[body_start + stmt];
+        if (!st || st->t == AST_GLOBAL) { stmt++; continue; }
         FRAME.body_root = st;
         FRAME.suspending = 0;
         bb_exec_stmt(st);
@@ -529,7 +529,7 @@ DESCR_t coro_call(AST_t *proc, DESCR_t *args, int nargs) {
             /* Yield to caller; coroutine resumes here after each β pump. */
             while (FRAME.suspending && active_coro) {
                 coro_t *ss = active_coro;
-                AST_t *doclause        = FRAME.suspend_do;
+                tree_t *doclause        = FRAME.suspend_do;
                 ss->yielded             = FRAME.suspend_val;
                 FRAME.suspending      = 0;
                 swapcontext(&ss->gen_ctx, &ss->caller_ctx);
@@ -538,7 +538,7 @@ DESCR_t coro_call(AST_t *proc, DESCR_t *args, int nargs) {
                 /* For loop stmts: re-enter without calling bb_exec_stmt again here;
                  * just break out so the outer while re-issues bb_exec_stmt(st).
                  * For non-loop stmts (bare AST_SUSPEND): advance past stmt. */
-                if (st->kind != AST_WHILE && st->kind != AST_REPEAT && st->kind != AST_UNTIL)
+                if (st->t != AST_WHILE && st->t != AST_REPEAT && st->t != AST_UNTIL)
                     stmt++;
                 break;   /* always break — outer while re-enters st or advances */
             }
@@ -554,14 +554,14 @@ DESCR_t coro_call(AST_t *proc, DESCR_t *args, int nargs) {
     /* IC-9: persist static-variable values back to per-proc static table
      * before frame is destroyed.  Mirror the entry-restore loop above. */
     for (int i = 0; i < nbody; i++) {
-        AST_t *st = proc->children[body_start + i];
-        if (!st || st->kind != AST_GLOBAL || st->ival != 1) continue;
-        for (int j = 0; j < st->nchildren; j++) {
-            AST_t *vn = st->children[j];
-            if (!vn || !vn->sval) continue;
-            int slot = scope_get(&sc, vn->sval);
+        tree_t *st = proc->c[body_start + i];
+        if (!st || st->t != AST_GLOBAL || st->v.ival != 1) continue;
+        for (int j = 0; j < st->n; j++) {
+            tree_t *vn = st->c[j];
+            if (!vn || !vn->v.sval) continue;
+            int slot = scope_get(&sc, vn->v.sval);
             if (slot < 0 || slot >= nslots) continue;
-            static_set(proc, vn->sval, f->env[slot]);
+            static_set(proc, vn->v.sval, f->env[slot]);
         }
     }
 
@@ -583,7 +583,7 @@ DESCR_t coro_call(AST_t *proc, DESCR_t *args, int nargs) {
  * nested SM_State.  The IcnFrame pushed here is visible to SM_LOAD_FRAME /
  * SM_STORE_FRAME (via icn_frame_env_load/store) throughout the expression body.
  *
- * Static-variable persistence deferred to CH-17g (statics keyed on AST_t*;
+ * Static-variable persistence deferred to CH-17g (statics keyed on tree_t*;
  * procs with statics continue via legacy coro_call until that key changes).
  */
 DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs)
@@ -604,7 +604,7 @@ DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs)
     for (int i = 0; i < nparams && i < nargs && i < FRAME_SLOT_MAX; i++)
         f->env[i] = args[i];
 
-    /* CH-17g-proc-locals: patch AST_VAR.ival with frame slot indices so that
+    /* CH-17g-proc-locals: patch AST_VAR.v.ival with frame slot indices so that
      * AST-walker code running inside every-body / bb_exec_stmt (e.g. SM_BB_PUMP_EVERY
      * driving `every total +:= (1 to n)`) sees the correct slot for each local var.
      * Uses the same IcnScope that lower_proc_skeletons built and stored in lower_sc,
@@ -616,11 +616,11 @@ DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs)
             if (proc_table[i].entry_pc == entry_pc) { found_pi = i; break; }
         }
         if (found_pi >= 0 && proc_table[found_pi].proc) {
-            AST_t *proc = proc_table[found_pi].proc;
-            int nparams_p = (int)proc->ival;
+            tree_t *proc = proc_table[found_pi].proc;
+            int nparams_p = (int)proc->v.ival;
             int body_start = 1 + nparams_p;
-            for (int bi = body_start; bi < proc->nchildren; bi++)
-                icn_scope_patch(&proc_table[found_pi].lower_sc, proc->children[bi]);
+            for (int bi = body_start; bi < proc->n; bi++)
+                icn_scope_patch(&proc_table[found_pi].lower_sc, proc->c[bi]);
             /* Expand env_n to cover all slots (params + locals) */
             int total_slots = proc_table[found_pi].lower_sc.n;
             if (total_slots > f->env_n) f->env_n = total_slots;
@@ -705,9 +705,9 @@ int icn_descr_identical(DESCR_t a, DESCR_t b) {
     return memcmp(&a, &b, sizeof(DESCR_t)) == 0;
 }
 
-int is_suspendable(AST_t *e) {
+int is_suspendable(tree_t *e) {
     if (!e) return 0;
-    switch (e->kind) {
+    switch (e->t) {
         case AST_TO: case AST_TO_BY: case AST_ITERATE: case AST_ALTERNATE:
         case AST_SUSPEND: case AST_LIMIT: case AST_EVERY:
         case AST_BANG_BINARY: case AST_SEQ_EXPR:
@@ -718,12 +718,12 @@ int is_suspendable(AST_t *e) {
             return 1;
         /* AST_IDX is generative if its index child is generative — e.g. s[1 to 3] */
         case AST_IDX:
-            for (int i = 1; i < e->nchildren; i++)
-                if (is_suspendable(e->children[i])) return 1;
+            for (int i = 1; i < e->n; i++)
+                if (is_suspendable(e->c[i])) return 1;
             return 0;
         /* AST_ASSIGN is generative if its RHS is generative — e.g. x := (1|2|3) */
         case AST_ASSIGN:
-            return (e->nchildren >= 2 && is_suspendable(e->children[1])) ? 1 : 0;
+            return (e->n >= 2 && is_suspendable(e->c[1])) ? 1 : 0;
         /* AST_REVASSIGN is always generative — Byrd box succeeds once, then on β
          * reverts the cell and fails.  This is what makes `every x[3] <- 19`
          * leave x[3] at its prior value after the every loop completes.       */
@@ -739,12 +739,12 @@ int is_suspendable(AST_t *e) {
         case AST_EQ:  case AST_NE:
         case AST_IDENTICAL:                                /* IC-8: x === gen — drive gen */
         case AST_LCONCAT: case AST_CAT:
-                           for (int i = 0; i < e->nchildren; i++)
-                if (is_suspendable(e->children[i])) return 1;
+                           for (int i = 0; i < e->n; i++)
+                if (is_suspendable(e->c[i])) return 1;
             return 0;
         case AST_NONNULL:
             /* \E — generative if E is generative; filters out null values */
-            return is_suspendable(e->nchildren > 0 ? e->children[0] : NULL);
+            return is_suspendable(e->n > 0 ? e->c[0] : NULL);
         case AST_NULL:
             return 0;   /* /E is never a sequence generator */
         default:
@@ -761,12 +761,12 @@ static DESCR_t coro_oneshot(void *zeta, int entry) {
     return FAILDESCR;
 }
 
-/* Lazy-eval box — re-evaluates an AST_t node every time it is pumped α.
+/* Lazy-eval box — re-evaluates an tree_t node every time it is pumped α.
  * Used for AST_VAR (and other mutable scalar expressions) inside binop_gen,
  * so that  total + (1 to n)  reads the *current* value of `total` each tick
  * rather than capturing it once at setup time.
  * β always returns FAILDESCR (scalar — one value per pump). */
-typedef struct { AST_t *expr; } icn_lazy_state_t;
+typedef struct { tree_t *expr; } icn_lazy_state_t;
 static DESCR_t icn_lazy_box(void *zeta, int entry) {
     if (entry != α) return FAILDESCR;
     icn_lazy_state_t *z = (icn_lazy_state_t *)zeta;
@@ -790,14 +790,14 @@ static DESCR_t icn_lazy_box(void *zeta, int entry) {
 #define ICN_FNC_GEN_ARGS 8
 typedef struct {
     bb_node_t   arg_box;
-    AST_t     *call;       /* the AST_FNC node */
+    tree_t     *call;       /* the AST_FNC node */
     int         gen_idx;    /* which arg (0-based) is the generator */
     int         nargs;
     DESCR_t     args[ICN_FNC_GEN_ARGS];  /* pre-evaluated; args[gen_idx] filled each tick */
 } icn_fnc_gen_state_t;
 
 /* Forward declaration — defined in interp.c */
-extern DESCR_t icn_call_builtin(AST_t *call, DESCR_t *args, int nargs);
+extern DESCR_t icn_call_builtin(tree_t *call, DESCR_t *args, int nargs);
 
 static DESCR_t coro_bb_fnc(void *zeta, int entry) {
     icn_fnc_gen_state_t *z = (icn_fnc_gen_state_t *)zeta;
@@ -810,7 +810,7 @@ static DESCR_t coro_bb_fnc(void *zeta, int entry) {
  * coro_bb_suspend calls this via makecontext; it reads from coro_stage. */
 typedef struct {
     coro_t *ss;
-    AST_t              *proc;
+    tree_t              *proc;
     DESCR_t             *args;
     int                  nargs;
     int                  entry_pc;  /* CH-17c: -1 = legacy coro_call path */
@@ -944,17 +944,17 @@ static DESCR_t coro_bb_raku_array(void *zeta, int entry) {
  * find_leaf_suspendable — walk expr tree, return first generator-kind node.
  * Defined here (and in interp.c as static) so coro_bb_cat can use it.
  *--------------------------------------------------------------------------------------------------------------------------*/
-AST_t *find_leaf_suspendable(AST_t *e) {
+tree_t *find_leaf_suspendable(tree_t *e) {
     if (!e) return NULL;
-    switch (e->kind) {
+    switch (e->t) {
         case AST_TO: case AST_TO_BY: case AST_ITERATE: case AST_ALTERNATE:
         case AST_SUSPEND: case AST_LIMIT: case AST_EVERY: case AST_BANG_BINARY: case AST_SEQ_EXPR:
             return e;
         case AST_FNC: return e;
         default: break;
     }
-    for (int i = 0; i < e->nchildren; i++) {
-        AST_t *found = find_leaf_suspendable(e->children[i]);
+    for (int i = 0; i < e->n; i++) {
+        tree_t *found = find_leaf_suspendable(e->c[i]);
         if (found) return found;
     }
     return NULL;
@@ -967,7 +967,7 @@ AST_t *find_leaf_suspendable(AST_t *e) {
  * re-evaluates the full AST_CAT expression each tick to produce the concatenated
  * result string.  Handles the polyglot case: every write("ICN: " || (1 to 3)).
  *--------------------------------------------------------------------------------------------------------------------------*/
-typedef struct { bb_node_t gen; AST_t *cat_expr; AST_t *leaf; } icn_cat_gen_state_t;
+typedef struct { bb_node_t gen; tree_t *cat_expr; tree_t *leaf; } icn_cat_gen_state_t;
 static DESCR_t coro_bb_cat(void *zeta, int entry) {
     /* IC-9 fix (2026-05-01): per-tick re-eval of cat_expr can itself fail
      * (e.g. s[0 to 7] where s[0] is OOB).  Per Icon GDE semantics, a per-tick
@@ -1000,15 +1000,15 @@ static DESCR_t coro_bb_cat(void *zeta, int entry) {
  *     e.g.  every total := total + (1 to n)
  *     Re-evaluates full RHS each tick via coro_drive_node so `total` is fresh.
  *--------------------------------------------------------------------------------------------------------------------------*/
-typedef struct { bb_node_t rhs_gen; AST_t *lhs; } icn_assign_gen_state_t;
-static DESCR_t icn_assign_write(AST_t *lhs, DESCR_t val) {
-    if (lhs && lhs->kind == AST_VAR) {
-        int slot = (int)lhs->ival;
+typedef struct { bb_node_t rhs_gen; tree_t *lhs; } icn_assign_gen_state_t;
+static DESCR_t icn_assign_write(tree_t *lhs, DESCR_t val) {
+    if (lhs && lhs->t == AST_VAR) {
+        int slot = (int)lhs->v.ival;
         if (slot >= 0 && slot < FRAME.env_n) { FRAME.env[slot] = val; }
-        else if (slot < 0 && lhs->sval && lhs->sval[0] != '&') NV_SET_fn(lhs->sval, val);
-    } else if (lhs && lhs->kind == AST_FIELD && lhs->sval && lhs->nchildren >= 1) {
-        DESCR_t obj = bb_eval_value(lhs->children[0]);
-        if (!IS_FAIL_fn(obj)) FIELD_SET_fn(obj, lhs->sval, val);
+        else if (slot < 0 && lhs->v.sval && lhs->v.sval[0] != '&') NV_SET_fn(lhs->v.sval, val);
+    } else if (lhs && lhs->t == AST_FIELD && lhs->v.sval && lhs->n >= 1) {
+        DESCR_t obj = bb_eval_value(lhs->c[0]);
+        if (!IS_FAIL_fn(obj)) FIELD_SET_fn(obj, lhs->v.sval, val);
     }
     return val;
 }
@@ -1019,7 +1019,7 @@ static DESCR_t icn_bb_assign_gen(void *zeta, int entry) {
     return icn_assign_write(z->lhs, val);
 }
 
-typedef struct { bb_node_t leaf_gen; AST_t *rhs_expr; AST_t *leaf; AST_t *lhs; } icn_assign_cat_state_t;
+typedef struct { bb_node_t leaf_gen; tree_t *rhs_expr; tree_t *leaf; tree_t *lhs; } icn_assign_cat_state_t;
 static DESCR_t icn_bb_assign_cat(void *zeta, int entry) {
     icn_assign_cat_state_t *z = (icn_assign_cat_state_t *)zeta;
     int e2 = entry;
@@ -1054,8 +1054,8 @@ static DESCR_t icn_bb_assign_cat(void *zeta, int entry) {
  * test exercises them).
  *--------------------------------------------------------------------------------------------------------------------------*/
 typedef struct {
-    AST_t  *lhs_expr;
-    AST_t  *rhs_expr;
+    tree_t  *lhs_expr;
+    tree_t  *rhs_expr;
     DESCR_t *cell;       /* direct cell pointer (AST_IDX path) */
     DESCR_t  base_d;     /* base container for subscript_set revert (no stable cell) */
     DESCR_t  idx_d;      /* index for subscript_set revert */
@@ -1071,24 +1071,24 @@ static DESCR_t coro_bb_revassign(void *zeta, int entry) {
     if (entry == α) {
         DESCR_t rv = bb_eval_value(z->rhs_expr);
         if (IS_FAIL_fn(rv)) return FAILDESCR;
-        AST_t *lhs = z->lhs_expr;
-        if (lhs && lhs->kind == AST_VAR) {
-            int slot = (int)lhs->ival;
+        tree_t *lhs = z->lhs_expr;
+        if (lhs && lhs->t == AST_VAR) {
+            int slot = (int)lhs->v.ival;
             if (slot >= 0 && slot < FRAME.env_n) {
                 z->saved      = FRAME.env[slot];
                 z->var_slot   = slot;
                 z->have_saved = 1;
                 FRAME.env[slot] = rv;
-            } else if (lhs->sval && lhs->sval[0] != '&') {
-                z->saved      = NV_GET_fn(lhs->sval);
+            } else if (lhs->v.sval && lhs->v.sval[0] != '&') {
+                z->saved      = NV_GET_fn(lhs->v.sval);
                 z->var_slot   = -1;
-                z->var_name   = lhs->sval;
+                z->var_name   = lhs->v.sval;
                 z->have_saved = 1;
-                NV_SET_fn(lhs->sval, rv);
+                NV_SET_fn(lhs->v.sval, rv);
             }
-        } else if (lhs && lhs->kind == AST_IDX && lhs->nchildren >= 2) {
-            DESCR_t base = bb_eval_value(lhs->children[0]);
-            DESCR_t idx  = bb_eval_value(lhs->children[1]);
+        } else if (lhs && lhs->t == AST_IDX && lhs->n >= 2) {
+            DESCR_t base = bb_eval_value(lhs->c[0]);
+            DESCR_t idx  = bb_eval_value(lhs->c[1]);
             if (!IS_FAIL_fn(base) && !IS_FAIL_fn(idx)) {
                 /* Snapshot the *effective* prior value via subscript_get so we
                  * pick up the table-default for missing keys (rather than the
@@ -1165,8 +1165,8 @@ static DESCR_t coro_bb_revassign(void *zeta, int entry) {
  * pattern as coro_bb_revassign's AST_IDX branch.
  *--------------------------------------------------------------------------------------------------------------------------*/
 typedef struct {
-    AST_t  *lhs_expr;
-    AST_t  *rhs_expr;
+    tree_t  *lhs_expr;
+    tree_t  *rhs_expr;
     DESCR_t  saved_lhs;        /* lhs's prior value (valid when lhs_written) */
     DESCR_t  saved_rhs;        /* rhs's prior value (valid when rhs_written) */
     int      lhs_written;      /* α successfully wrote rv → lhs              */
@@ -1175,35 +1175,35 @@ typedef struct {
 
 /* Helper: write `val` to the lvalue described by `lv_expr`.  Returns 1 on
  * success, 0 on keyword-OOB-fail (no write performed in that case).        */
-static int icn_revswap_write(AST_t *lv_expr, DESCR_t val) {
-    if (!lv_expr || lv_expr->kind != AST_VAR) return 0;
-    if (lv_expr->sval && lv_expr->sval[0] == '&') {
-        return kw_assign(lv_expr->sval + 1, val);
+static int icn_revswap_write(tree_t *lv_expr, DESCR_t val) {
+    if (!lv_expr || lv_expr->t != AST_VAR) return 0;
+    if (lv_expr->v.sval && lv_expr->v.sval[0] == '&') {
+        return kw_assign(lv_expr->v.sval + 1, val);
     }
-    int slot = (int)lv_expr->ival;
+    int slot = (int)lv_expr->v.ival;
     if (slot >= 0 && slot < FRAME.env_n) { FRAME.env[slot] = val; return 1; }
-    if (slot < 0 && lv_expr->sval) { NV_SET_fn(lv_expr->sval, val); return 1; }
+    if (slot < 0 && lv_expr->v.sval) { NV_SET_fn(lv_expr->v.sval, val); return 1; }
     return 0;
 }
 
 /* Helper: read the lvalue's current value (for snapshot).                  */
-static DESCR_t icn_revswap_read(AST_t *lv_expr) {
-    if (!lv_expr || lv_expr->kind != AST_VAR) return FAILDESCR;
-    if (lv_expr->sval && lv_expr->sval[0] == '&') {
-        if (!strcmp(lv_expr->sval + 1, "pos")) return INTVAL(scan_pos);
-        if (!strcmp(lv_expr->sval + 1, "subject")) return scan_subj ? STRVAL(scan_subj) : NULVCL;
+static DESCR_t icn_revswap_read(tree_t *lv_expr) {
+    if (!lv_expr || lv_expr->t != AST_VAR) return FAILDESCR;
+    if (lv_expr->v.sval && lv_expr->v.sval[0] == '&') {
+        if (!strcmp(lv_expr->v.sval + 1, "pos")) return INTVAL(scan_pos);
+        if (!strcmp(lv_expr->v.sval + 1, "subject")) return scan_subj ? STRVAL(scan_subj) : NULVCL;
         return NULVCL;
     }
-    int slot = (int)lv_expr->ival;
+    int slot = (int)lv_expr->v.ival;
     if (slot >= 0 && slot < FRAME.env_n) return FRAME.env[slot];
-    if (slot < 0 && lv_expr->sval) return NV_GET_fn(lv_expr->sval);
+    if (slot < 0 && lv_expr->v.sval) return NV_GET_fn(lv_expr->v.sval);
     return NULVCL;
 }
 
 static DESCR_t coro_bb_revswap(void *zeta, int entry) {
     icn_revswap_state_t *z = (icn_revswap_state_t *)zeta;
     if (entry == α) {
-        AST_t *lhs = z->lhs_expr, *rhs = z->rhs_expr;
+        tree_t *lhs = z->lhs_expr, *rhs = z->rhs_expr;
         DESCR_t lv = bb_eval_value(lhs);
         DESCR_t rv = bb_eval_value(rhs);
         if (IS_FAIL_fn(lv) || IS_FAIL_fn(rv)) return FAILDESCR;
@@ -1250,7 +1250,7 @@ static DESCR_t coro_bb_revswap(void *zeta, int entry) {
  * Symmetrical case (left generator, right scalar) handled by ICN_BINOP_*-style
  * cross-product would be unusual for `===`; use the same drive-right pattern.
  *--------------------------------------------------------------------------------------------------------------------------*/
-typedef struct { bb_node_t r_gen; AST_t *lhs_expr; } icn_identical_gen_state_t;
+typedef struct { bb_node_t r_gen; tree_t *lhs_expr; } icn_identical_gen_state_t;
 static DESCR_t icn_bb_identical_gen(void *zeta, int entry) {
     icn_identical_gen_state_t *z = (icn_identical_gen_state_t *)zeta;
     DESCR_t lv = bb_eval_value(z->lhs_expr);     /* re-eval lhs each tick (cheap, no side effects) */
@@ -1267,7 +1267,7 @@ static DESCR_t icn_bb_identical_gen(void *zeta, int entry) {
 /* CHUNKS-step12: name-driven entry point used by SM_BB_PUMP_PROC. Does the
  * proc_table lookup + coroutine staging that the AST_FNC user-proc branch of
  * coro_eval used to do for the synthesised call_main wrapper, but without
- * routing through an AST_t. The IR walk inside coro_call(proc_table[i].proc,
+ * routing through an tree_t. The IR walk inside coro_call(proc_table[i].proc,
  * args, nargs) is unchanged — that work belongs to Step 17 (proc_table →
  * entry_pcs).
  *
@@ -1275,7 +1275,7 @@ static DESCR_t icn_bb_identical_gen(void *zeta, int entry) {
  * is provided so the helper can be reused if a future rung wants name-driven
  * dispatch with already-evaluated args; the no-generative-args fast path of
  * the AST_FNC branch is what's lifted here. Generative-arg routing
- * (coro_bb_fnc) is intentionally not lifted — it requires per-arg AST_t* to
+ * (coro_bb_fnc) is intentionally not lifted — it requires per-arg tree_t* to
  * pump, which the SM_BB_PUMP_PROC caller does not have. */
 bb_node_t coro_pump_proc_by_name(const char *name, DESCR_t *args, int nargs) {
     if (!name) return (bb_node_t){ NULL, NULL, 0 };
@@ -1294,7 +1294,7 @@ bb_node_t coro_pump_proc_by_name(const char *name, DESCR_t *args, int nargs) {
     return (bb_node_t){ NULL, NULL, 0 };
 }
 
-bb_node_t coro_eval(AST_t *e) {
+bb_node_t coro_eval(tree_t *e) {
     NO_AST_WALK_GUARD("coro_eval");
     if (!e) {
         icn_oneshot_state_t *z = calloc(1, sizeof(*z));
@@ -1303,9 +1303,9 @@ bb_node_t coro_eval(AST_t *e) {
     }
 
     /* ── AST_TO: (lo to hi) ────────────────────────────────────────────────── */
-    if (e->kind == AST_TO && e->nchildren >= 2) {
-        AST_t *lo_expr = e->children[0];
-        AST_t *hi_expr = e->children[1];
+    if (e->t == AST_TO && e->n >= 2) {
+        tree_t *lo_expr = e->c[0];
+        tree_t *hi_expr = e->c[1];
         int lo_gen = is_suspendable(lo_expr);
         int hi_gen = is_suspendable(hi_expr);
         if (lo_gen || hi_gen) {
@@ -1338,10 +1338,10 @@ bb_node_t coro_eval(AST_t *e) {
     }
 
     /* ── AST_TO_BY: (lo to hi by step) ─────────────────────────────────────── */
-    if (e->kind == AST_TO_BY && e->nchildren >= 3) {
-        DESCR_t lo_d   = bb_eval_value(e->children[0]);
-        DESCR_t hi_d   = bb_eval_value(e->children[1]);
-        DESCR_t step_d = bb_eval_value(e->children[2]);
+    if (e->t == AST_TO_BY && e->n >= 3) {
+        DESCR_t lo_d   = bb_eval_value(e->c[0]);
+        DESCR_t hi_d   = bb_eval_value(e->c[1]);
+        DESCR_t step_d = bb_eval_value(e->c[2]);
         int any_real = IS_REAL_fn(lo_d) || IS_REAL_fn(hi_d) || IS_REAL_fn(step_d);
         if (any_real) {
             icn_to_by_real_state_t *z = calloc(1, sizeof(*z));
@@ -1358,12 +1358,12 @@ bb_node_t coro_eval(AST_t *e) {
     }
 
     /* ── AST_ITERATE: (!str) / Raku for @arr -> $x ────────────────────────── */
-    if (e->kind == AST_ITERATE && e->nchildren >= 1) {
+    if (e->t == AST_ITERATE && e->n >= 1) {
         /* RK-21: if child is an AST_FNC call matching a user proc, treat as gather
          * coroutine — build coro_bb_suspend box exactly like the AST_FNC proc path. */
-        AST_t *child = e->children[0];
-        if (child && child->kind == AST_FNC && child->nchildren >= 1 && child->children[0]) {
-            const char *fn = child->children[0]->sval;
+        tree_t *child = e->c[0];
+        if (child && child->t == AST_FNC && child->n >= 1 && child->c[0]) {
+            const char *fn = child->c[0]->v.sval;
             if (fn) {
                 int pi;
                 for (pi = 0; pi < proc_count; pi++)
@@ -1380,8 +1380,8 @@ bb_node_t coro_eval(AST_t *e) {
                 }
             }
         }
-        DESCR_t sv = bb_eval_value(e->children[0]);
-        const char *loopvar = e->sval;
+        DESCR_t sv = bb_eval_value(e->c[0]);
+        const char *loopvar = e->v.sval;
         /* IC-8: coerce numeric scalars to image-string before string-iterate path (D-1) */
         sv = descr_to_str_icn(sv);
         /* IC-3: DT_T table iteration — !T yields each value */
@@ -1443,8 +1443,8 @@ bb_node_t coro_eval(AST_t *e) {
      * Wires `if x === key(T)` and similar patterns: drive RHS as generator,
      * yield rhs on identity match, retry on miss, exhaust when RHS done.
      * Non-generator case is handled by `case AST_IDENTICAL` in interp_eval. */
-    if (e->kind == AST_IDENTICAL && e->nchildren >= 2) {
-        AST_t *lc = e->children[0], *rc = e->children[1];
+    if (e->t == AST_IDENTICAL && e->n >= 2) {
+        tree_t *lc = e->c[0], *rc = e->c[1];
         int l_gen = is_suspendable(lc);
         int r_gen = is_suspendable(rc);
         if (l_gen || r_gen) {
@@ -1464,21 +1464,21 @@ bb_node_t coro_eval(AST_t *e) {
     }
 
     /* ── AST_ALTERNATE: (a | b | c | …) n-ary ─────────────────────────────── */
-    if (e->kind == AST_ALTERNATE && e->nchildren >= 2) {
+    if (e->t == AST_ALTERNATE && e->n >= 2) {
         /* Build left-recursive chain: alt(alt(gen[0], gen[1]), gen[2]), ...
          * so that exhausting each branch naturally falls through to the next. */
         bb_node_t acc;
         {
             icn_alternate_state_t *z = calloc(1, sizeof(*z));
-            z->gen[0] = coro_eval(e->children[0]);
-            z->gen[1] = coro_eval(e->children[1]);
+            z->gen[0] = coro_eval(e->c[0]);
+            z->gen[1] = coro_eval(e->c[1]);
             z->which  = 0;
             acc = (bb_node_t){ coro_bb_alternate, z, 0 };
         }
-        for (int _ai = 2; _ai < e->nchildren; _ai++) {
+        for (int _ai = 2; _ai < e->n; _ai++) {
             icn_alternate_state_t *z2 = calloc(1, sizeof(*z2));
             z2->gen[0] = acc;
-            z2->gen[1] = coro_eval(e->children[_ai]);
+            z2->gen[1] = coro_eval(e->c[_ai]);
             z2->which  = 0;
             acc = (bb_node_t){ coro_bb_alternate, z2, 0 };
         }
@@ -1499,9 +1499,9 @@ bb_node_t coro_eval(AST_t *e) {
             { AST_LCONCAT, ICN_BINOP_CONCAT, 0 },  /* ("a"|"b") || ("x"|"y") cross-product */
         };
         for (int mi = 0; mi < (int)(sizeof binop_map/sizeof binop_map[0]); mi++) {
-            if (e->kind != binop_map[mi].ek) continue;
-            if (e->nchildren < 2) break;
-            AST_t *lc = e->children[0], *rc = e->children[1];
+            if (e->t != binop_map[mi].ek) continue;
+            if (e->n < 2) break;
+            tree_t *lc = e->c[0], *rc = e->c[1];
             int l_gen = is_suspendable(lc);
             int r_gen = is_suspendable(rc);
             if (!l_gen && !r_gen) break;   /* scalar — let interp_eval handle it */
@@ -1518,22 +1518,22 @@ bb_node_t coro_eval(AST_t *e) {
      *   (a) BOTH children generative → cross-product via coro_bb_binop (IC-6 fix)
      *       e.g. ("a"|"b") || ("x"|"y") → ax ay bx by
      *   (b) ONE child generative → pump that generator, re-eval full AST_CAT each tick ── */
-    if (e->kind == AST_CAT && e->nchildren >= 2) {
-        int l_gen = is_suspendable(e->children[0]);
-        int r_gen = is_suspendable(e->children[1]);
+    if (e->t == AST_CAT && e->n >= 2) {
+        int l_gen = is_suspendable(e->c[0]);
+        int r_gen = is_suspendable(e->c[1]);
         if (l_gen && r_gen) {
             /* Cross-product: reuse coro_bb_binop with CONCAT op */
             icn_binop_gen_state_t *z = calloc(1, sizeof(*z));
-            z->left     = coro_eval(e->children[0]);
-            z->right    = coro_eval(e->children[1]);
+            z->left     = coro_eval(e->c[0]);
+            z->right    = coro_eval(e->c[1]);
             z->op       = ICN_BINOP_CONCAT;
             z->is_relop = 0;
             return (bb_node_t){ coro_bb_binop, z, 0 };
         }
         if (l_gen || r_gen) {
             int gi = l_gen ? 0 : 1;
-            AST_t *leaf = find_leaf_suspendable(e->children[gi]);
-            if (!leaf) leaf = e->children[gi];
+            tree_t *leaf = find_leaf_suspendable(e->c[gi]);
+            if (!leaf) leaf = e->c[gi];
             icn_cat_gen_state_t *z = calloc(1, sizeof(*z));
             z->gen      = coro_eval(leaf);
             z->cat_expr = e;
@@ -1543,11 +1543,11 @@ bb_node_t coro_eval(AST_t *e) {
     }
 
     /* ── AST_IDX: s[gen_idx] — drive index generator, re-eval subscript each tick ── */
-    if (e->kind == AST_IDX && e->nchildren >= 2) {
-        for (int _ci = 1; _ci < e->nchildren; _ci++) {
-            if (is_suspendable(e->children[_ci])) {
-                AST_t *leaf = find_leaf_suspendable(e->children[_ci]);
-                if (!leaf) leaf = e->children[_ci];
+    if (e->t == AST_IDX && e->n >= 2) {
+        for (int _ci = 1; _ci < e->n; _ci++) {
+            if (is_suspendable(e->c[_ci])) {
+                tree_t *leaf = find_leaf_suspendable(e->c[_ci]);
+                if (!leaf) leaf = e->c[_ci];
                 icn_cat_gen_state_t *z = calloc(1, sizeof(*z));
                 z->gen      = coro_eval(leaf);
                 z->cat_expr = e;     /* re-eval the full AST_IDX expression per tick */
@@ -1558,21 +1558,21 @@ bb_node_t coro_eval(AST_t *e) {
     }
 
     /* ── AST_FNC find(needle,str) with scalar or generative subject ── */
-    if (e->kind == AST_FNC && e->nchildren >= 3 && e->children[0] && e->children[0]->sval
-        && strcmp(e->children[0]->sval, "find") == 0) {
-        DESCR_t s1 = bb_eval_value(e->children[1]);
+    if (e->t == AST_FNC && e->n >= 3 && e->c[0] && e->c[0]->v.sval
+        && strcmp(e->c[0]->v.sval, "find") == 0) {
+        DESCR_t s1 = bb_eval_value(e->c[1]);
         if (!IS_FAIL_fn(s1)) {
-            if (is_suspendable(e->children[2])) {
+            if (is_suspendable(e->c[2])) {
                 /* Generative subject: drive subject gen, exhaust find positions per subject */
                 icn_find_gen_subj_t *z = calloc(1, sizeof(*z));
-                z->subj_gen   = coro_eval(e->children[2]);
+                z->subj_gen   = coro_eval(e->c[2]);
                 z->needle     = s1.s ? s1.s : "";
                 z->nlen       = (int)strlen(z->needle);
                 z->subj_entry = α;
                 z->hay        = NULL;
                 return (bb_node_t){ coro_bb_find_subj, z, 0 };
             }
-            DESCR_t s2 = bb_eval_value(e->children[2]);
+            DESCR_t s2 = bb_eval_value(e->c[2]);
             if (!IS_FAIL_fn(s2)) {
                 icn_find_state_t *z = calloc(1, sizeof(*z));
                 z->needle = s1.s ? s1.s : "";
@@ -1585,20 +1585,20 @@ bb_node_t coro_eval(AST_t *e) {
     }
 
     /* ── AST_FNC bal(c1,c2,c3,...) in scan context — coro_bb_bal generator ─── */
-    if (e->kind == AST_FNC && e->nchildren >= 2 && e->children[0] && e->children[0]->sval
-        && strcmp(e->children[0]->sval, "bal") == 0) {
-        int nargs = e->nchildren - 1;
-        DESCR_t cd = bb_eval_value(e->children[1]);
+    if (e->t == AST_FNC && e->n >= 2 && e->c[0] && e->c[0]->v.sval
+        && strcmp(e->c[0]->v.sval, "bal") == 0) {
+        int nargs = e->n - 1;
+        DESCR_t cd = bb_eval_value(e->c[1]);
         const char *c1 = VARVAL_fn(cd); if (!c1) goto bal_skip;
         const char *c2 = "(", *c3 = ")";
-        if (nargs >= 2) { DESCR_t t = bb_eval_value(e->children[2]); const char *v = VARVAL_fn(t); if (v && v[0]) c2 = v; }
-        if (nargs >= 3) { DESCR_t t = bb_eval_value(e->children[3]); const char *v = VARVAL_fn(t); if (v && v[0]) c3 = v; }
+        if (nargs >= 2) { DESCR_t t = bb_eval_value(e->c[2]); const char *v = VARVAL_fn(t); if (v && v[0]) c2 = v; }
+        if (nargs >= 3) { DESCR_t t = bb_eval_value(e->c[3]); const char *v = VARVAL_fn(t); if (v && v[0]) c3 = v; }
         const char *s; int slen, p, end;
         if (nargs >= 4) {
-            DESCR_t sv = bb_eval_value(e->children[4]); s = VARVAL_fn(sv); if (!s) s = "";
+            DESCR_t sv = bb_eval_value(e->c[4]); s = VARVAL_fn(sv); if (!s) s = "";
             slen = (int)strlen(s);
-            int i1 = (nargs >= 5) ? (int)bb_eval_value(e->children[5]).i : 1;
-            int i2 = (nargs >= 6) ? (int)bb_eval_value(e->children[6]).i : slen + 1;
+            int i1 = (nargs >= 5) ? (int)bb_eval_value(e->c[5]).i : 1;
+            int i2 = (nargs >= 6) ? (int)bb_eval_value(e->c[6]).i : slen + 1;
             if (i1 <= 0) i1 = 1; if (i2 <= 0) i2 = slen + 1;
             p = i1 - 1; end = i2 - 1;
         } else {
@@ -1615,9 +1615,9 @@ bb_node_t coro_eval(AST_t *e) {
     }
 
     /* ── AST_FNC key(T) — generator yielding each key of table T ──────────── */
-    if (e->kind == AST_FNC && e->nchildren >= 2 && e->children[0] && e->children[0]->sval
-        && strcmp(e->children[0]->sval, "key") == 0) {
-        DESCR_t td = bb_eval_value(e->children[1]);
+    if (e->t == AST_FNC && e->n >= 2 && e->c[0] && e->c[0]->v.sval
+        && strcmp(e->c[0]->v.sval, "key") == 0) {
+        DESCR_t td = bb_eval_value(e->c[1]);
         if (td.v == DT_T && td.tbl) {
             icn_tbl_key_iterate_state_t *z = calloc(1, sizeof(*z));
             z->tbl    = td.tbl;
@@ -1628,9 +1628,9 @@ bb_node_t coro_eval(AST_t *e) {
     }
 
     /* ── AST_FNC user proc — coroutine wrapper ─────────────────────────────── */
-    if (e->kind == AST_FNC && e->nchildren >= 1 && e->children[0] && e->children[0]->sval) {
-        const char *fn = e->children[0]->sval;
-        int nargs = e->nchildren - 1;
+    if (e->t == AST_FNC && e->n >= 1 && e->c[0] && e->c[0]->v.sval) {
+        const char *fn = e->c[0]->v.sval;
+        int nargs = e->n - 1;
         for (int i = 0; i < proc_count; i++) {
             if (strcmp(proc_table[i].name, fn) != 0) continue;
             /* IC-7 rung32: if any arg is generative, route to coro_bb_fnc.
@@ -1640,7 +1640,7 @@ bb_node_t coro_eval(AST_t *e) {
              * fnc_gen pumps the gen arg per tick and re-calls coro_call
              * with the substituted scalar arg each time. */
             for (int j = 0; j < nargs && j < ICN_FNC_GEN_ARGS; j++) {
-                AST_t *arg = e->children[1+j];
+                tree_t *arg = e->c[1+j];
                 if (!arg || !is_suspendable(arg)) continue;
                 icn_fnc_gen_state_t *fg = calloc(1, sizeof(*fg));
                 fg->arg_box = coro_eval(arg);
@@ -1650,14 +1650,14 @@ bb_node_t coro_eval(AST_t *e) {
                 /* Pre-evaluate all other args (non-generative) */
                 for (int k2 = 0; k2 < nargs && k2 < ICN_FNC_GEN_ARGS; k2++) {
                     if (k2 == j) continue;
-                    fg->args[k2] = bb_eval_value(e->children[1+k2]);
+                    fg->args[k2] = bb_eval_value(e->c[1+k2]);
                 }
                 return (bb_node_t){ coro_bb_fnc, fg, 0 };
             }
             /* Build args array */
             DESCR_t *args = nargs > 0 ? calloc(nargs, sizeof(DESCR_t)) : NULL;
             for (int j = 0; j < nargs; j++)
-                args[j] = bb_eval_value(e->children[1+j]);
+                args[j] = bb_eval_value(e->c[1+j]);
             /* Allocate suspend state + stack */
             coro_t *ss = coro_alloc(proc_trampoline);
             ss->trampoline_arg = NULL;   /* unused — trampoline reads coro_stage */
@@ -1671,12 +1671,12 @@ bb_node_t coro_eval(AST_t *e) {
             return (bb_node_t){ coro_bb_suspend, ss, 0 };
         }
         /* ── AST_FNC upto(cset, scan_subject) — drive subject gen per subject ── */
-        if (fn && strcmp(fn, "upto") == 0 && nargs >= 2 && is_suspendable(e->children[2])) {
-            DESCR_t cd = bb_eval_value(e->children[1]);
+        if (fn && strcmp(fn, "upto") == 0 && nargs >= 2 && is_suspendable(e->c[2])) {
+            DESCR_t cd = bb_eval_value(e->c[1]);
             const char *cset = VARVAL_fn(cd);
             if (cset) {
                 icn_upto_gen_subj_t *z = calloc(1, sizeof(*z));
-                z->subj_gen   = coro_eval(e->children[2]);
+                z->subj_gen   = coro_eval(e->c[2]);
                 z->cset       = cset;
                 z->subj_entry = α;
                 z->hay        = NULL;
@@ -1689,7 +1689,7 @@ bb_node_t coro_eval(AST_t *e) {
         /* Find first argument that is itself a generator expression.
          * Pre-evaluate all non-generative args; the gen arg is filled each tick. */
         for (int j = 0; j < nargs && j < ICN_FNC_GEN_ARGS; j++) {
-            AST_t *arg = e->children[1+j];
+            tree_t *arg = e->c[1+j];
             if (!arg) continue;
             if (is_suspendable(arg)) {
                 icn_fnc_gen_state_t *fg = calloc(1, sizeof(*fg));
@@ -1700,7 +1700,7 @@ bb_node_t coro_eval(AST_t *e) {
                 /* Pre-evaluate all other args */
                 for (int k2 = 0; k2 < nargs && k2 < ICN_FNC_GEN_ARGS; k2++) {
                     if (k2 == j) continue;
-                    fg->args[k2] = bb_eval_value(e->children[1+k2]);
+                    fg->args[k2] = bb_eval_value(e->c[1+k2]);
                 }
                 return (bb_node_t){ coro_bb_fnc, fg, 0 };
             }
@@ -1708,46 +1708,46 @@ bb_node_t coro_eval(AST_t *e) {
     }
 
     /* ── IC-2b: AST_LIMIT  (gen \ N) ──────────────────────────────────────── */
-    if (e->kind == AST_LIMIT && e->nchildren >= 2) {
+    if (e->t == AST_LIMIT && e->n >= 2) {
         icn_limit_state_t *z = calloc(1, sizeof(*z));
-        z->gen = coro_eval(e->children[0]);
-        DESCR_t nd = bb_eval_value(e->children[1]);
+        z->gen = coro_eval(e->c[0]);
+        DESCR_t nd = bb_eval_value(e->c[1]);
         z->max = IS_INT_fn(nd) ? nd.i : 0;
         return (bb_node_t){ coro_bb_limit, z, 0 };
     }
 
     /* ── IC-2b: AST_EVERY  (every gen [do body]) ──────────────────────────── */
-    if (e->kind == AST_EVERY && e->nchildren >= 1) {
+    if (e->t == AST_EVERY && e->n >= 1) {
         icn_every_state_t *z = calloc(1, sizeof(*z));
-        z->gen     = coro_eval(e->children[0]);
-        z->gen_ast = e->children[0];
-        z->body    = (e->nchildren >= 2) ? e->children[1] : NULL;
+        z->gen     = coro_eval(e->c[0]);
+        z->gen_ast = e->c[0];
+        z->body    = (e->n >= 2) ? e->c[1] : NULL;
         return (bb_node_t){ coro_bb_every, z, 0 };
     }
 
     /* ── IC-2b: AST_BANG_BINARY  (E1 ! E2) ────────────────────────────────── */
-    if (e->kind == AST_BANG_BINARY && e->nchildren >= 2) {
+    if (e->t == AST_BANG_BINARY && e->n >= 2) {
         icn_bang_binary_state_t *z = calloc(1, sizeof(*z));
-        z->proc_expr = e->children[0];
-        z->arg_box   = coro_eval(e->children[1]);
+        z->proc_expr = e->c[0];
+        z->arg_box   = coro_eval(e->c[1]);
         return (bb_node_t){ coro_bb_bang_binary, z, 0 };
     }
 
     /* ── IC-2b: AST_SEQ_EXPR  ((E1; E2; …; En)) ───────────────────────────── */
-    if (e->kind == AST_SEQ_EXPR && e->nchildren >= 1) {
+    if (e->t == AST_SEQ_EXPR && e->n >= 1) {
         icn_seq_state_t *z = calloc(1, sizeof(*z));
-        z->children = e->children;
-        z->n        = e->nchildren;
+        z->c = e->c;
+        z->n        = e->n;
         return (bb_node_t){ coro_bb_seq_expr, z, 0 };
     }
 
     /* ── IC-7: AST_NONNULL (\E) as generator — filter: pass values, skip null ──
      * every write(\(1 to 3)) — drive inner gen, yield each non-null value.   */
-    if (e->kind == AST_NONNULL && e->nchildren >= 1 && is_suspendable(e->children[0])) {
+    if (e->t == AST_NONNULL && e->n >= 1 && is_suspendable(e->c[0])) {
         /* Wrap inner gen in a filter: pump inner, skip null (empty string / DT_NUL).
          * Reuse coro_bb_limit state struct as a thin wrapper — just store inner gen. */
         icn_limit_state_t *z = calloc(1, sizeof(*z));
-        z->gen   = coro_eval(e->children[0]);
+        z->gen   = coro_eval(e->c[0]);
         z->max   = (long long)9e18;   /* no limit */
         z->count = 0;
         return (bb_node_t){ coro_bb_limit, z, 0 };
@@ -1760,13 +1760,13 @@ bb_node_t coro_eval(AST_t *e) {
     /* ── IC-7: seq(start) / seq(start, step) — infinite integer sequence ───
      * seq(i) yields i, i+1, i+2, … indefinitely.
      * seq(i, j) yields i, i+j, i+2j, … (step j; default step=1). */
-    if (e->kind == AST_FNC && e->nchildren >= 2 && e->children[0] && e->children[0]->sval
-        && strcmp(e->children[0]->sval, "seq") == 0) {
+    if (e->t == AST_FNC && e->n >= 2 && e->c[0] && e->c[0]->v.sval
+        && strcmp(e->c[0]->v.sval, "seq") == 0) {
         icn_to_by_state_t *z = calloc(1, sizeof(*z));
-        DESCR_t start = bb_eval_value(e->children[1]);
+        DESCR_t start = bb_eval_value(e->c[1]);
         z->lo   = IS_INT_fn(start) ? start.i : 1;
         z->hi   = (long long)9e18;   /* effectively infinite */
-        z->step = (e->nchildren >= 3) ? (long long)to_int(bb_eval_value(e->children[2])) : 1;
+        z->step = (e->n >= 3) ? (long long)to_int(bb_eval_value(e->c[2])) : 1;
         z->cur  = z->lo;
         return (bb_node_t){ coro_bb_to_by, z, 0 };
     }
@@ -1776,16 +1776,16 @@ bb_node_t coro_eval(AST_t *e) {
      *   tag is a user proc; "a"|"b"|"c" is the generative arg.
      * Build an coro_bb_fnc-style box: for each value from the gen arg,
      * call the proc coroutine via icn_call_builtin with substituted args.    */
-    if (e->kind == AST_FNC && e->nchildren >= 2 && e->children[0] && e->children[0]->sval) {
-        const char *fn2 = e->children[0]->sval;
-        int nargs2 = e->nchildren - 1;
+    if (e->t == AST_FNC && e->n >= 2 && e->c[0] && e->c[0]->v.sval) {
+        const char *fn2 = e->c[0]->v.sval;
+        int nargs2 = e->n - 1;
         /* only for user procs that have a generative argument */
         int is_proc = 0;
         for (int _p = 0; _p < proc_count; _p++)
             if (strcmp(proc_table[_p].name, fn2) == 0) { is_proc = 1; break; }
         if (is_proc) {
             for (int j = 0; j < nargs2 && j < ICN_FNC_GEN_ARGS; j++) {
-                AST_t *arg = e->children[1+j];
+                tree_t *arg = e->c[1+j];
                 if (!arg || !is_suspendable(arg)) continue;
                 /* Found generative arg at position j — build fnc_gen box */
                 icn_fnc_gen_state_t *fg = calloc(1, sizeof(*fg));
@@ -1795,7 +1795,7 @@ bb_node_t coro_eval(AST_t *e) {
                 fg->nargs   = nargs2;
                 for (int k2 = 0; k2 < nargs2 && k2 < ICN_FNC_GEN_ARGS; k2++) {
                     if (k2 == j) continue;
-                    fg->args[k2] = bb_eval_value(e->children[1+k2]);
+                    fg->args[k2] = bb_eval_value(e->c[1+k2]);
                 }
                 return (bb_node_t){ coro_bb_fnc, fg, 0 };
             }
@@ -1808,26 +1808,26 @@ bb_node_t coro_eval(AST_t *e) {
      *        each tick via coro_drive_node injection so mutable vars (e.g. `total`
      *        in `total := total + (1 to n)`) are read fresh on every iteration.
      *   gen: pure generator RHS, no mutable scalar siblings — pump directly. */
-    if (e->kind == AST_ASSIGN && e->nchildren >= 2 && is_suspendable(e->children[1])) {
-        AST_t *rhs = e->children[1];
-        AST_t *leaf = find_leaf_suspendable(rhs);
+    if (e->t == AST_ASSIGN && e->n >= 2 && is_suspendable(e->c[1])) {
+        tree_t *rhs = e->c[1];
+        tree_t *leaf = find_leaf_suspendable(rhs);
         int has_var = 0;
         if (leaf && leaf != rhs) {
-            for (int _ci = 0; _ci < rhs->nchildren && !has_var; _ci++)
-                if (rhs->children[_ci] && rhs->children[_ci]->kind == AST_VAR
-                    && rhs->children[_ci] != leaf) has_var = 1;
+            for (int _ci = 0; _ci < rhs->n && !has_var; _ci++)
+                if (rhs->c[_ci] && rhs->c[_ci]->t == AST_VAR
+                    && rhs->c[_ci] != leaf) has_var = 1;
         }
         if (has_var && leaf) {
             icn_assign_cat_state_t *zc = calloc(1, sizeof(*zc));
             zc->leaf_gen = coro_eval(leaf);
             zc->rhs_expr = rhs;
             zc->leaf     = leaf;
-            zc->lhs      = e->children[0];
+            zc->lhs      = e->c[0];
             return (bb_node_t){ icn_bb_assign_cat, zc, 0 };
         }
         icn_assign_gen_state_t *z = calloc(1, sizeof(*z));
         z->rhs_gen = coro_eval(rhs);
-        z->lhs     = e->children[0];
+        z->lhs     = e->c[0];
         return (bb_node_t){ icn_bb_assign_gen, z, 0 };
     }
 
@@ -1836,10 +1836,10 @@ bb_node_t coro_eval(AST_t *e) {
      * β: revert lhs to snapshot, fail.
      * Net effect: under `every`, the post-loop state of lhs equals its
      * pre-loop state; rhs was visible for the body of one tick only.       */
-    if (e->kind == AST_REVASSIGN && e->nchildren >= 2) {
+    if (e->t == AST_REVASSIGN && e->n >= 2) {
         icn_revassign_state_t *z = calloc(1, sizeof(*z));
-        z->lhs_expr = e->children[0];
-        z->rhs_expr = e->children[1];
+        z->lhs_expr = e->c[0];
+        z->rhs_expr = e->c[1];
         z->var_slot = -2;        /* sentinel for "unset" */
         return (bb_node_t){ coro_bb_revassign, z, 0 };
     }
@@ -1850,17 +1850,17 @@ bb_node_t coro_eval(AST_t *e) {
      * β: revert in left-to-right order, short-circuit on failure (so a
      *    keyword whose valid range was mutated by the body — e.g. via
      *    `&subject := "A"` — strands the rhs-revert).                      */
-    if (e->kind == AST_REVSWAP && e->nchildren >= 2) {
+    if (e->t == AST_REVSWAP && e->n >= 2) {
         icn_revswap_state_t *z = calloc(1, sizeof(*z));
-        z->lhs_expr = e->children[0];
-        z->rhs_expr = e->children[1];
+        z->lhs_expr = e->c[0];
+        z->rhs_expr = e->c[1];
         return (bb_node_t){ coro_bb_revswap, z, 0 };
     }
 
     /* ── AST_VAR / AST_INTLIT / scalar literals — lazy box (re-evaluates each α pump)
      * This ensures that  total + (1 to n)  reads the current value of `total`
      * on every tick rather than capturing it once at binop_gen setup time.   */
-    if (e->kind == AST_VAR || e->kind == AST_ILIT || e->kind == AST_FLIT || e->kind == AST_QLIT) {
+    if (e->t == AST_VAR || e->t == AST_ILIT || e->t == AST_FLIT || e->t == AST_QLIT) {
         icn_lazy_state_t *z = calloc(1, sizeof(*z));
         z->expr = e;
         return (bb_node_t){ icn_lazy_box, z, 0 };
@@ -1873,7 +1873,7 @@ bb_node_t coro_eval(AST_t *e) {
      * time — corrupting the procedure even when arm 0 succeeds.  By deferring
      * via icn_lazy_box, the frame state is only touched if/when arm 1 is
      * actually pumped. */
-    if (e->kind == AST_PROC_FAIL) {
+    if (e->t == AST_PROC_FAIL) {
         icn_lazy_state_t *z = calloc(1, sizeof(*z));
         z->expr = e;
         return (bb_node_t){ icn_lazy_box, z, 0 };
@@ -1887,44 +1887,44 @@ bb_node_t coro_eval(AST_t *e) {
 
 
 /* coro_drive_fnc: suspend-aware driver for user procedures called as generators.
- * Called by coro_drive when e->kind == AST_FNC and a matching proc exists.
+ * Called by coro_drive when e->t == AST_FNC and a matching proc exists.
  * Runs the proc body in-frame, pausing at each AST_SUSPEND, running the
  * every-body (body_root of the *caller* frame), then the do-clause, then
  * continuing from the same statement (so while-loops around suspend iterate). */
-int coro_drive_fnc(AST_t *e) {
-    if (!e || e->kind != AST_FNC || e->nchildren < 1 || !e->children[0]) return 0;
-    const char *fn = e->children[0]->sval;
+int coro_drive_fnc(tree_t *e) {
+    if (!e || e->t != AST_FNC || e->n < 1 || !e->c[0]) return 0;
+    const char *fn = e->c[0]->v.sval;
     if (!fn) return 0;
     int pi;
     for (pi = 0; pi < proc_count; pi++)
         if (strcmp(proc_table[pi].name, fn) == 0) break;
     if (pi >= proc_count) return 0;
 
-    AST_t *proc   = proc_table[pi].proc;
-    int nparams    = (int)proc->ival;
+    tree_t *proc   = proc_table[pi].proc;
+    int nparams    = (int)proc->v.ival;
     int body_start = 1 + nparams;
-    int nbody      = proc->nchildren - body_start;
+    int nbody      = proc->n - body_start;
 
     /* Build scope */
     IcnScope sc; sc.n = 0;
     for (int i = 0; i < nparams && i < FRAME_SLOT_MAX; i++) {
-        AST_t *pn = proc->children[1+i];
-        if (pn && pn->sval) scope_add(&sc, pn->sval);
+        tree_t *pn = proc->c[1+i];
+        if (pn && pn->v.sval) scope_add(&sc, pn->v.sval);
     }
     for (int i = 0; i < nbody; i++) {
-        AST_t *st = proc->children[body_start+i];
-        if (st && st->kind == AST_GLOBAL)
-            for (int j = 0; j < st->nchildren; j++)
-                if (st->children[j] && st->children[j]->sval)
-                    scope_add(&sc, st->children[j]->sval);
+        tree_t *st = proc->c[body_start+i];
+        if (st && st->t == AST_GLOBAL)
+            for (int j = 0; j < st->n; j++)
+                if (st->c[j] && st->c[j]->v.sval)
+                    scope_add(&sc, st->c[j]->v.sval);
     }
     for (int i = 0; i < nbody; i++)
-        icn_scope_patch(&sc, proc->children[body_start+i]);
+        icn_scope_patch(&sc, proc->c[body_start+i]);
     int nslots = sc.n > 0 ? sc.n : (nparams > 0 ? nparams : 1);
     if (nslots > FRAME_SLOT_MAX) nslots = FRAME_SLOT_MAX;
 
     /* Capture every-body from caller frame BEFORE pushing callee frame */
-    AST_t *every_body = (frame_depth >= 1)
+    tree_t *every_body = (frame_depth >= 1)
                          ? frame_stack[frame_depth-1].body_root : NULL;
 
     /* Push frame */
@@ -1933,22 +1933,22 @@ int coro_drive_fnc(AST_t *e) {
     memset(f, 0, sizeof *f);
     f->env_n = nslots;
     f->sc    = sc;
-    int nargs = e->nchildren - 1;
+    int nargs = e->n - 1;
     for (int i = 0; i < nparams && i < nargs && i < FRAME_SLOT_MAX; i++)
-        f->env[i] = bb_eval_value(e->children[1+i]);
+        f->env[i] = bb_eval_value(e->c[1+i]);
 
     /* Suspend-aware body loop */
     int ticks = 0;
     int stmt  = 0;
     while (stmt < nbody && !f->returning && !f->loop_break) {
-        AST_t *st = proc->children[body_start + stmt];
-        if (!st || st->kind == AST_GLOBAL) { stmt++; continue; }
+        tree_t *st = proc->c[body_start + stmt];
+        if (!st || st->t == AST_GLOBAL) { stmt++; continue; }
         f->body_root  = st;
         f->suspending = 0;
         bb_exec_stmt(st);
         if (f->suspending) {
             DESCR_t sv       = f->suspend_val;
-            AST_t *doclause = f->suspend_do;
+            tree_t *doclause = f->suspend_do;
             f->suspending    = 0;
             /* Run every-body with suspended value visible via FRAME being
              * the proc frame — write() etc. will call interp_eval on their
@@ -1976,7 +1976,7 @@ int coro_drive_fnc(AST_t *e) {
             /* If the stmt that suspended was a loop (AST_WHILE/AST_REPEAT/AST_UNTIL),
              * re-enter it so it can re-check its condition next tick.
              * For bare AST_SUSPEND (or any other stmt), advance past it — it fired once. */
-            if (st->kind != AST_WHILE && st->kind != AST_REPEAT && st->kind != AST_UNTIL)
+            if (st->t != AST_WHILE && st->t != AST_REPEAT && st->t != AST_UNTIL)
                 stmt++;
         } else {
             stmt++;
@@ -2035,7 +2035,7 @@ DESCR_t coro_bb_every(void *zeta, int entry) {
         /* Inject generator value so the body's reference to the same generator AST
          * node (e.g. `(1 to n)` in `x := x + (1 to n)`) returns the already-produced
          * value rather than building a fresh coro_eval and restarting from α. */
-        AST_t *saved_drive_node = coro_drive_node;
+        tree_t *saved_drive_node = coro_drive_node;
         DESCR_t saved_drive_val = coro_drive_val;
         coro_drive_node = z->gen_ast;
         coro_drive_val  = v;
@@ -2072,8 +2072,8 @@ DESCR_t coro_bb_bang_binary(void *zeta, int entry) {
         z->cur_arg = arg;
         if (!z->proc_expr) return FAILDESCR;
         /* Inject arg as result of first argument child via drive passthrough */
-        if (z->proc_expr->nchildren >= 2 && z->proc_expr->children[1]) {
-            coro_drive_node = z->proc_expr->children[1];
+        if (z->proc_expr->n >= 2 && z->proc_expr->c[1]) {
+            coro_drive_node = z->proc_expr->c[1];
             coro_drive_val  = arg;
         }
         DESCR_t result = bb_eval_value(z->proc_expr);
@@ -2092,9 +2092,9 @@ DESCR_t coro_bb_seq_expr(void *zeta, int entry) {
     icn_seq_state_t *z = (icn_seq_state_t *)zeta;
     if (entry == α) {
         for (int i = 0; i < z->n - 1; i++)
-            if (z->children[i]) bb_eval_value(z->children[i]);
-        if (z->n <= 0 || !z->children[z->n - 1]) return FAILDESCR;
-        z->last_box = coro_eval(z->children[z->n - 1]);
+            if (z->c[i]) bb_eval_value(z->c[i]);
+        if (z->n <= 0 || !z->c[z->n - 1]) return FAILDESCR;
+        z->last_box = coro_eval(z->c[z->n - 1]);
         z->started  = 1;
         return z->last_box.fn(z->last_box.ζ, α);
     }

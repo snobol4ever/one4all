@@ -37,18 +37,18 @@ static IcnNode *parse_file_first_stmt(const char *src) {
         return NULL;
     }
     IcnNode *proc = procs[0];
-    if (proc->nchildren < 2) return NULL;
-    return proc->children[1]; /* first stmt (child 0 is proc name) */
+    if (proc->n < 2) return NULL;
+    return proc->c[1]; /* first stmt (child 0 is proc name) */
 }
 
 /* =========================================================================
  * AST shape checks
  * ======================================================================= */
 
-static int is_kind(IcnNode *n, IcnKind k) { return n && n->kind == k; }
-static int is_int(IcnNode *n, long v) { return n && n->kind == ICN_INT && n->val.ival == v; }
+static int is_kind(IcnNode *n, IcnKind k) { return n && n->t == k; }
+static int is_int(IcnNode *n, long v) { return n && n->t == ICN_INT && n->val.v.ival == v; }
 static int is_var(IcnNode *n, const char *name) {
-    return n && n->kind == ICN_VAR && strcmp(n->val.sval, name) == 0;
+    return n && n->t == ICN_VAR && strcmp(n->val.v.sval, name) == 0;
 }
 
 /* =========================================================================
@@ -58,23 +58,23 @@ static int is_var(IcnNode *n, const char *name) {
 static void test_literal_int(void) {
     printf("--- literal int ---\n");
     IcnNode *n = parse_one_expr("42");
-    if (is_int(n, 42)) PASS("42"); else FAIL("42", "kind=%s", n ? icn_kind_name(n->kind) : "null");
+    if (is_int(n, 42)) PASS("42"); else FAIL("42", "kind=%s", n ? icn_kind_name(n->t) : "null");
     icn_node_free(n);
 }
 
 static void test_literal_real(void) {
     printf("--- literal real ---\n");
     IcnNode *n = parse_one_expr("3.14");
-    if (n && n->kind == ICN_REAL && n->val.fval > 3.13 && n->val.fval < 3.15) PASS("3.14");
-    else FAIL("3.14", "kind=%s", n ? icn_kind_name(n->kind) : "null");
+    if (n && n->t == ICN_REAL && n->val.fval > 3.13 && n->val.fval < 3.15) PASS("3.14");
+    else FAIL("3.14", "kind=%s", n ? icn_kind_name(n->t) : "null");
     icn_node_free(n);
 }
 
 static void test_literal_string(void) {
     printf("--- literal string ---\n");
     IcnNode *n = parse_one_expr("\"hello\"");
-    if (n && n->kind == ICN_STR && strcmp(n->val.sval, "hello") == 0) PASS("\"hello\"");
-    else FAIL("\"hello\"", "kind=%s", n ? icn_kind_name(n->kind) : "null");
+    if (n && n->t == ICN_STR && strcmp(n->val.v.sval, "hello") == 0) PASS("\"hello\"");
+    else FAIL("\"hello\"", "kind=%s", n ? icn_kind_name(n->t) : "null");
     icn_node_free(n);
 }
 
@@ -82,7 +82,7 @@ static void test_var(void) {
     printf("--- variable ---\n");
     IcnNode *n = parse_one_expr("x");
     if (is_var(n, "x")) PASS("x");
-    else FAIL("x", "kind=%s", n ? icn_kind_name(n->kind) : "null");
+    else FAIL("x", "kind=%s", n ? icn_kind_name(n->t) : "null");
     icn_node_free(n);
 }
 
@@ -90,27 +90,27 @@ static void test_binop(void) {
     printf("--- binary ops ---\n");
     {
         IcnNode *n = parse_one_expr("1 + 2");
-        if (is_kind(n, ICN_ADD) && is_int(n->children[0], 1) && is_int(n->children[1], 2)) PASS("1+2");
+        if (is_kind(n, ICN_ADD) && is_int(n->c[0], 1) && is_int(n->c[1], 2)) PASS("1+2");
         else FAIL("1+2", "bad");
         icn_node_free(n);
     }
     {
         IcnNode *n = parse_one_expr("3 * 4");
-        if (is_kind(n, ICN_MUL) && is_int(n->children[0], 3) && is_int(n->children[1], 4)) PASS("3*4");
+        if (is_kind(n, ICN_MUL) && is_int(n->c[0], 3) && is_int(n->c[1], 4)) PASS("3*4");
         else FAIL("3*4", "bad");
         icn_node_free(n);
     }
     {
         /* Left-associativity: 1 + 2 + 3 = (1+2)+3 */
         IcnNode *n = parse_one_expr("1 + 2 + 3");
-        if (is_kind(n, ICN_ADD) && is_kind(n->children[0], ICN_ADD)) PASS("left-assoc add");
+        if (is_kind(n, ICN_ADD) && is_kind(n->c[0], ICN_ADD)) PASS("left-assoc add");
         else FAIL("left-assoc add", "bad");
         icn_node_free(n);
     }
     {
         /* Precedence: 1 + 2 * 3 = 1 + (2*3) */
         IcnNode *n = parse_one_expr("1 + 2 * 3");
-        if (is_kind(n, ICN_ADD) && is_kind(n->children[1], ICN_MUL)) PASS("prec * over +");
+        if (is_kind(n, ICN_ADD) && is_kind(n->c[1], ICN_MUL)) PASS("prec * over +");
         else FAIL("prec * over +", "bad");
         icn_node_free(n);
     }
@@ -121,17 +121,17 @@ static void test_to_generator(void) {
     {
         /* 1 to 5 → ICN_TO(INT(1), INT(5)) */
         IcnNode *n = parse_one_expr("1 to 5");
-        if (is_kind(n, ICN_TO) && n->nchildren == 2 &&
-            is_int(n->children[0], 1) && is_int(n->children[1], 5))
+        if (is_kind(n, ICN_TO) && n->n == 2 &&
+            is_int(n->c[0], 1) && is_int(n->c[1], 5))
             PASS("1 to 5");
-        else FAIL("1 to 5", "kind=%s nc=%d", n ? icn_kind_name(n->kind) : "null", n ? n->nchildren : -1);
+        else FAIL("1 to 5", "kind=%s nc=%d", n ? icn_kind_name(n->t) : "null", n ? n->n : -1);
         icn_node_free(n);
     }
     {
         /* 1 to 10 by 2 → ICN_TO_BY */
         IcnNode *n = parse_one_expr("1 to 10 by 2");
-        if (is_kind(n, ICN_TO_BY) && n->nchildren == 3) PASS("1 to 10 by 2");
-        else FAIL("1 to 10 by 2", "kind=%s", n ? icn_kind_name(n->kind) : "null");
+        if (is_kind(n, ICN_TO_BY) && n->n == 3) PASS("1 to 10 by 2");
+        else FAIL("1 to 10 by 2", "kind=%s", n ? icn_kind_name(n->t) : "null");
         icn_node_free(n);
     }
 }
@@ -140,14 +140,14 @@ static void test_relational(void) {
     printf("--- relational ---\n");
     {
         IcnNode *n = parse_one_expr("2 < 4");
-        if (is_kind(n, ICN_LT) && is_int(n->children[0], 2) && is_int(n->children[1], 4)) PASS("2 < 4");
+        if (is_kind(n, ICN_LT) && is_int(n->c[0], 2) && is_int(n->c[1], 4)) PASS("2 < 4");
         else FAIL("2 < 4", "bad");
         icn_node_free(n);
     }
     {
         /* goal-directed: 2 < (1 to 4) */
         IcnNode *n = parse_one_expr("2 < (1 to 4)");
-        if (is_kind(n, ICN_LT) && is_kind(n->children[1], ICN_TO)) PASS("2 < (1 to 4)");
+        if (is_kind(n, ICN_LT) && is_kind(n->c[1], ICN_TO)) PASS("2 < (1 to 4)");
         else FAIL("2 < (1 to 4)", "bad");
         icn_node_free(n);
     }
@@ -158,16 +158,16 @@ static void test_call(void) {
     {
         /* write(42) → PROC_CALL(VAR(write), INT(42)) */
         IcnNode *n = parse_one_expr("write(42)");
-        if (is_kind(n, PROC_CALL) && n->nchildren == 2 &&
-            is_var(n->children[0], "write") && is_int(n->children[1], 42))
+        if (is_kind(n, PROC_CALL) && n->n == 2 &&
+            is_var(n->c[0], "write") && is_int(n->c[1], 42))
             PASS("write(42)");
-        else FAIL("write(42)", "kind=%s nc=%d", n ? icn_kind_name(n->kind) : "null", n ? n->nchildren : -1);
+        else FAIL("write(42)", "kind=%s nc=%d", n ? icn_kind_name(n->t) : "null", n ? n->n : -1);
         icn_node_free(n);
     }
     {
         /* write(1 to 5) — arg is ICN_TO */
         IcnNode *n = parse_one_expr("write(1 to 5)");
-        if (is_kind(n, PROC_CALL) && n->nchildren == 2 && is_kind(n->children[1], ICN_TO)) PASS("write(1 to 5)");
+        if (is_kind(n, PROC_CALL) && n->n == 2 && is_kind(n->c[1], ICN_TO)) PASS("write(1 to 5)");
         else FAIL("write(1 to 5)", "bad");
         icn_node_free(n);
     }
@@ -178,11 +178,11 @@ static void test_every(void) {
     /* every write(1 to 5); → ICN_EVERY(PROC_CALL(...)) */
     const char *src = "procedure main();\n  every write(1 to 5);\nend";
     IcnNode *stmt = parse_file_first_stmt(src);
-    if (stmt && is_kind(stmt, ICN_EVERY) && stmt->nchildren == 1 &&
-        is_kind(stmt->children[0], PROC_CALL))
+    if (stmt && is_kind(stmt, ICN_EVERY) && stmt->n == 1 &&
+        is_kind(stmt->c[0], PROC_CALL))
         PASS("every write(1 to 5)");
     else
-        FAIL("every write(1 to 5)", "stmt=%s", stmt ? icn_kind_name(stmt->kind) : "null");
+        FAIL("every write(1 to 5)", "stmt=%s", stmt ? icn_kind_name(stmt->t) : "null");
 }
 
 /* =========================================================================
@@ -230,16 +230,16 @@ static void test_rung1_parse(void) {
         char name[128]; snprintf(name, sizeof(name), "parse %s", cases[i].file);
         if (!procs || count == 0) { FAIL(name, "no procedures parsed"); continue; }
         IcnNode *proc = procs[0];
-        if (proc->nchildren < 2) { FAIL(name, "procedure has no statements"); continue; }
-        IcnNode *first_stmt = proc->children[1];
+        if (proc->n < 2) { FAIL(name, "procedure has no statements"); continue; }
+        IcnNode *first_stmt = proc->c[1];
         if (!is_kind(first_stmt, cases[i].stmt_kind)) {
             FAIL(name, "first stmt is %s, want %s",
-                 icn_kind_name(first_stmt->kind), icn_kind_name(cases[i].stmt_kind));
+                 icn_kind_name(first_stmt->t), icn_kind_name(cases[i].stmt_kind));
             continue;
         }
-        if (!is_kind(first_stmt->children[0], cases[i].arg_kind)) {
+        if (!is_kind(first_stmt->c[0], cases[i].arg_kind)) {
             FAIL(name, "stmt child is %s, want %s",
-                 icn_kind_name(first_stmt->children[0]->kind), icn_kind_name(cases[i].arg_kind));
+                 icn_kind_name(first_stmt->c[0]->t), icn_kind_name(cases[i].arg_kind));
             continue;
         }
         PASS(name);

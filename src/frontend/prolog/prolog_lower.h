@@ -12,11 +12,11 @@ CODE_t *prolog_lower(PlProgram *pl_prog);
 void prolog_lower_pretty(CODE_t *prog, FILE *out);
 
 /*
- * pl_assert_term — build an AST_CLAUSE AST_t from a runtime Term* (for assertz/asserta).
+ * pl_assert_term — build an AST_CLAUSE tree_t from a runtime Term* (for assertz/asserta).
  * head-only Term → fact; ':-'(Head,Body) → rule.
  * Sets *functor_out and *arity_out to the predicate key.
  * Returns NULL on error.
  */
-AST_t *pl_assert_term(Term *t, int *functor_out, int *arity_out);
+tree_t *pl_assert_term(Term *t, int *functor_out, int *arity_out);
 
 #endif /* PROLOG_LOWER_H */

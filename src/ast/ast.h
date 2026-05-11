@@ -2,7 +2,7 @@
  * ir.h — Unified Intermediate Representation
  *
  * THE single source of truth for all IR node kinds across all frontends
- * and all backends in scrip-cc. Every frontend lowers to AST_t nodes
+ * and all backends in scrip-cc. Every frontend lowers to tree_t nodes
  * using this AST_e enum. Every backend consumes it.
  *
  * 59 canonical node kinds:
@@ -268,7 +268,7 @@ typedef enum AST_e {
 /* =========================================================================
  * AugOp_e — augmented-assignment operator codes (SR-9)
  *
- * Written into AST_AUGOP.ival by the Icon frontend (icon_parse.c).
+ * Written into AST_AUGOP.v.ival by the Icon frontend (icon_parse.c).
  * lower.c / lower_icn_unary.c reads these values without including
  * the frontend's icon_lex.h — eliminating the mid-function #include.
  *
@@ -301,58 +301,81 @@ typedef enum {
 } AugOp_e;
 
 /* =========================================================================
- * AST_t — unified n-ary expression node
+ * tree_t — the canonical IR node type.
  *
- * All structural children live in the `children` array (realloc-grown).
- * Leaf nodes (AST_QLIT / AST_ILIT / AST_FLIT / AST_CSET / AST_NUL / AST_VAR / AST_KEYWORD)
- * have nchildren == 0.
- *
- * The `id` field is assigned during the emit pass (unique per program).
- * It drives all generated label strings: P_<id>_α, L<id>_α, etc.
- *
- * sval / ival / fval union is not a C union here — all three exist as
- * separate fields to avoid aliasing hazards across frontends. The active
- * field is determined by kind:
- *   sval — AST_QLIT (text), AST_VAR/AST_KEYWORD/AST_FNC/AST_IDX (name), AST_CSET (chars)
- *   ival — AST_ILIT
- *   fval — AST_FLIT
- * ========================================================================= */
-
-/* AST_t — the unified IR node.  Four logical fields matching Snocone `tree`:
+ * Matches the Snocone `tree` datatype exactly: four logical fields t/v/n/c.
  *
  *   t  — kind       (AST_e)
- *   v  — value      (anonymous union: sval / ival / dval — active by kind)
- *   n  — nchildren  (int)
- *   c  — children[] (AST_t **)
+ *   v  — value      (union: v.sval / v.ival / v.dval — active by kind)
+ *   n  — nchildren  (int, number of valid children)
+ *   c  — children[] (tree_t **, realloc array that grows and shrinks)
  *
- * v field usage by kind:
- *   sval — AST_QLIT (text), AST_VAR/AST_KEYWORD/AST_FNC/AST_IDX (name),
- *           AST_CSET (chars), AST_ATTR (tag string)
- *   ival — AST_ILIT (literal); AST_VAR (frame-slot index after Icon scope,
- *           sval still holds name); AST_AUGOP (AugOp_e); AST_GLOBAL (flag)
- *   dval — AST_FLIT (float literal)
+ * v field by kind:
+ *   v.sval — AST_QLIT (text), AST_VAR/AST_KEYWORD/AST_FNC/AST_IDX (name),
+ *             AST_CSET (chars), AST_ATTR (tag string)
+ *   v.ival — AST_ILIT (literal); AST_VAR (frame-slot index after Icon scope
+ *             analysis; v.sval still holds name); AST_AUGOP (AugOp_e);
+ *             AST_GLOBAL (declared-global flag)
+ *   v.dval — AST_FLIT (float literal)
  *
- * Implementation details (not part of the logical tree — underscore-prefixed):
- *   _nalloc — allocated capacity of c[] (realloc bookkeeping)
- *   _id     — node identity for INITIAL block dedup (emit-time annotation)
+ * C implementation details (not logical tree fields, underscore-prefixed):
+ *   _nalloc — allocated capacity of c[] for realloc bookkeeping
+ *   _id     — node identity for INITIAL block dedup (emit-time only)
  *
- * FI-0A: ast.h is the sole owner of this definition.
- */
-typedef struct AST_t AST_t;
+ * ast.h is the sole owner of this definition (FI-0A).
+ * ========================================================================= */
+typedef struct tree_t tree_t;
 
-struct AST_t {
-    AST_e    t;             /* kind                                          */
+struct tree_t {
+    AST_e    t;         /* kind                                              */
     union {
-        char    *sval;      /* string value (QLIT/VAR/FNC/KEYWORD/ATTR/CSET) */
-        long long ival;     /* integer value (ILIT) or slot/flag (VAR etc.) */
-        double   dval;      /* float value (FLIT)                           */
+        char     *sval; /* string value (QLIT/VAR/FNC/KEYWORD/ATTR/CSET)    */
+        long long ival; /* integer value (ILIT) or slot/flag (VAR etc.)     */
+        double   dval;  /* float value (FLIT)                               */
     } v;
-    int      n;             /* nchildren — number of valid children          */
-    AST_t  **c;             /* children[] — realloc-grown array              */
-    /* ── C implementation details (not logical tree fields) ── */
-    int      _nalloc;       /* allocated capacity of c[]                     */
-    int      _id;           /* node id for INITIAL dedup (emit-time only)    */
+    int       n;        /* nchildren — number of valid children              */
+    tree_t  **c;        /* children[] — realloc-grown/shrunk array           */
+    /* C implementation details: */
+    int      _nalloc;   /* allocated capacity of c[]                         */
+    int      _id;       /* node id for INITIAL dedup (emit-time only)        */
 };
+
+/* =========================================================================
+ * tree_push / tree_pop / tree_new
+ *
+ * tree_push: append child; c[] doubles when full.
+ * tree_pop:  remove last child; c[] halves when n < _nalloc/4; frees when empty.
+ * tree_new:  allocate a zeroed node with kind t.
+ *
+ * These match the Snocone push_child / pop_child / tree contract exactly.
+ * ========================================================================= */
+#include <stdlib.h>
+
+static inline void tree_push(tree_t *p, tree_t *child) {
+    if (p->n >= p->_nalloc) {
+        p->_nalloc = p->_nalloc ? p->_nalloc * 2 : 4;
+        p->c = (tree_t **)realloc(p->c, (size_t)p->_nalloc * sizeof(tree_t *));
+    }
+    p->c[p->n++] = child;
+}
+
+static inline tree_t *tree_pop(tree_t *p) {
+    if (p->n == 0) return NULL;
+    tree_t *child = p->c[--p->n];
+    if (p->n == 0) {
+        free(p->c); p->c = NULL; p->_nalloc = 0;
+    } else if (p->n < p->_nalloc / 4) {
+        p->_nalloc /= 2;
+        p->c = (tree_t **)realloc(p->c, (size_t)p->_nalloc * sizeof(tree_t *));
+    }
+    return child;
+}
+
+static inline tree_t *tree_new(AST_e kind) {
+    tree_t *e = (tree_t *)calloc(1, sizeof(tree_t));
+    e->t = kind;
+    return e;
+}
 
 /* =========================================================================
  * AST_e name table — for ast_print.c and debugging
@@ -487,22 +510,6 @@ static const char * const ast_e_name[AST_KIND_COUNT] = {
 #endif /* IR_DEFINE_NAMES */
 
 
-
-/* =========================================================================
- * Compatibility accessor macros — keep existing callsites unchanged.
- *
- * The logical fields are t / v.sval|ival|dval / n / c.
- * Code written before the struct rename uses kind/sval/ival/dval/
- * nchildren/children/nalloc/id.  These macros make both spellings work.
- * ========================================================================= */
-#define kind       t
-#define sval       v.sval
-#define ival       v.ival
-#define dval       v.dval
-#define nchildren  n
-#define children   c
-#define nalloc     _nalloc
-#define id         _id
 
 #ifdef __cplusplus
 }

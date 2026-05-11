@@ -34,23 +34,18 @@
 
 /* ast_stmt_new — allocate a zeroed AST node of the given kind.
  * Public: used by snobol4.y (SI-4) to build AST_STMT/AST_END directly. */
-AST_t *ast_stmt_new(AST_e kind)
+tree_t *ast_stmt_new(AST_e kind)
 {
-    AST_t *n = calloc(1, sizeof *n);
-    n->kind = kind;
+    tree_t *n = calloc(1, sizeof *n);
+    n->t = kind;
     return n;
 }
-static AST_t *sa_new(AST_e kind) { return ast_stmt_new(kind); }
+static tree_t *sa_new(AST_e kind) { return ast_stmt_new(kind); }
 
-static void sa_add(AST_t *parent, AST_t *child)
+static void sa_add(tree_t *parent, tree_t *child)
 {
     if (!child) return;  /* tagged encoding: never add NULL children */
-    if (parent->nchildren >= parent->nalloc) {
-        parent->nalloc = parent->nalloc ? parent->nalloc * 2 : 8;
-        parent->children = realloc(parent->children,
-                                   (size_t)parent->nalloc * sizeof(AST_t *));
-    }
-    parent->children[parent->nchildren++] = child;
+    tree_push(parent, child);
 }
 
 /*
@@ -58,45 +53,45 @@ static void sa_add(AST_t *parent, AST_t *child)
  * Matches tree(':tag', string_value) in Snocone.
  * Public: used by snobol4.y (SI-4).
  */
-AST_t *ast_attr_leaf(const char *tag, const char *val)
+tree_t *ast_attr_leaf(const char *tag, const char *val)
 {
-    AST_t *n = sa_new(AST_ATTR);
-    n->sval = strdup(tag);
+    tree_t *n = sa_new(AST_ATTR);
+    n->v.sval = strdup(tag);
     /* Store payload as first child if val non-empty, else leaf with no child */
     if (val && val[0]) {
-        AST_t *leaf = sa_new(AST_QLIT);
-        leaf->sval = strdup(val);
+        tree_t *leaf = sa_new(AST_QLIT);
+        leaf->v.sval = strdup(val);
         sa_add(n, leaf);
     }
     return n;
 }
-static AST_t *attr_leaf(const char *tag, const char *val) { return ast_attr_leaf(tag, val); }
+static tree_t *attr_leaf(const char *tag, const char *val) { return ast_attr_leaf(tag, val); }
 
 /*
  * ast_attr_int — tag node with integer value (stored as string in child sval).
  * Public: used by snobol4.y (SI-4).
  */
-AST_t *ast_attr_int(const char *tag, int ival)
+tree_t *ast_attr_int(const char *tag, int ival)
 {
     char buf[32];
     snprintf(buf, sizeof buf, "%d", ival);
     return ast_attr_leaf(tag, buf);
 }
-static AST_t *attr_int(const char *tag, int ival) { return ast_attr_int(tag, ival); }
+static tree_t *attr_int(const char *tag, int ival) { return ast_attr_int(tag, ival); }
 
 /*
- * ast_attr_expr — tag node with one AST_t* expression child.
+ * ast_attr_expr — tag node with one tree_t* expression child.
  * Matches tree(':tag', '', 1, expr) in Snocone.
  * Public: used by snobol4.y (SI-4).
  */
-AST_t *ast_attr_expr(const char *tag, AST_t *expr)
+tree_t *ast_attr_expr(const char *tag, tree_t *expr)
 {
-    AST_t *n = sa_new(AST_ATTR);
-    n->sval = strdup(tag);
+    tree_t *n = sa_new(AST_ATTR);
+    n->v.sval = strdup(tag);
     sa_add(n, expr);
     return n;
 }
-static AST_t *attr_expr(const char *tag, AST_t *e) { return ast_attr_expr(tag, e); }
+static tree_t *attr_expr(const char *tag, tree_t *e) { return ast_attr_expr(tag, e); }
 
 /*
  * make_goto_attr — build a goto attribute node.
@@ -104,7 +99,7 @@ static AST_t *attr_expr(const char *tag, AST_t *e) { return ast_attr_expr(tag, e
  * Computed expr → attr_expr(':goX', expr)
  * Absent → NULL (caller skips adding it)
  */
-static AST_t *make_goto_attr(const char *tag, const char *label, AST_t *expr)
+static tree_t *make_goto_attr(const char *tag, const char *label, tree_t *expr)
 {
     if (expr)                   return attr_expr(tag, expr);
     if (label && label[0])      return attr_leaf(tag, label);
@@ -113,10 +108,10 @@ static AST_t *make_goto_attr(const char *tag, const char *label, AST_t *expr)
 
 /* ── public API ─────────────────────────────────────────────────────────── */
 
-AST_t *stmt_to_ast(const STMT_t *s)
+tree_t *stmt_to_ast(const STMT_t *s)
 {
     if (s->is_end) {
-        AST_t *node = sa_new(AST_END);
+        tree_t *node = sa_new(AST_END);
         if (s->label && s->label[0])
             sa_add(node, attr_leaf(":lbl",  s->label));
         sa_add(node, attr_int(":line", s->lineno));
@@ -124,7 +119,7 @@ AST_t *stmt_to_ast(const STMT_t *s)
         return node;
     }
 
-    AST_t *node = sa_new(AST_STMT);
+    tree_t *node = sa_new(AST_STMT);
 
     /* Label */
     if (s->label && s->label[0])
@@ -153,8 +148,8 @@ AST_t *stmt_to_ast(const STMT_t *s)
             sa_add(node, attr_expr(":repl", s->replacement));
         else {
             /* has_eq=true with no replacement → empty string replacement */
-            AST_t *empty = sa_new(AST_QLIT);
-            empty->sval = strdup("");
+            tree_t *empty = sa_new(AST_QLIT);
+            empty->v.sval = strdup("");
             sa_add(node, attr_expr(":repl", empty));
         }
     }
@@ -167,9 +162,9 @@ AST_t *stmt_to_ast(const STMT_t *s)
     return node;
 }
 
-AST_t *code_to_ast(const CODE_t *prog)
+tree_t *code_to_ast(const CODE_t *prog)
 {
-    AST_t *root = sa_new(AST_PROGRAM);
+    tree_t *root = sa_new(AST_PROGRAM);
     for (const STMT_t *s = prog->head; s; s = s->next)
         sa_add(root, stmt_to_ast(s));
     return root;
@@ -180,11 +175,11 @@ AST_t *code_to_ast(const CODE_t *prog)
  * Returns the AST_ATTR node, or NULL if not present.
  * Used by lower_stmt() to read tagged fields.
  */
-AST_t *stmt_attr_find(const AST_t *stmt, const char *tag)
+tree_t *stmt_attr_find(const tree_t *stmt, const char *tag)
 {
-    for (int i = 0; i < stmt->nchildren; i++) {
-        AST_t *ch = stmt->children[i];
-        if (ch && ch->kind == AST_ATTR && ch->sval && strcmp(ch->sval, tag) == 0)
+    for (int i = 0; i < stmt->n; i++) {
+        tree_t *ch = stmt->c[i];
+        if (ch && ch->t == AST_ATTR && ch->v.sval && strcmp(ch->v.sval, tag) == 0)
             return ch;
     }
     return NULL;
@@ -194,20 +189,20 @@ AST_t *stmt_attr_find(const AST_t *stmt, const char *tag)
  * stmt_attr_expr — get the expression child of an attribute node.
  * Returns children[0] if present, NULL otherwise.
  */
-AST_t *stmt_attr_expr(const AST_t *attr)
+tree_t *stmt_attr_expr(const tree_t *attr)
 {
-    if (!attr || attr->nchildren == 0) return NULL;
-    return attr->children[0];
+    if (!attr || attr->n == 0) return NULL;
+    return attr->c[0];
 }
 
 /*
  * stmt_attr_str — get the string value of an attribute leaf node.
- * For leaf attrs: children[0]->sval; for childless attrs: attr->sval payload.
+ * For leaf attrs: children[0]->v.sval; for childless attrs: attr->v.sval payload.
  */
-const char *stmt_attr_str(const AST_t *attr)
+const char *stmt_attr_str(const tree_t *attr)
 {
     if (!attr) return NULL;
-    if (attr->nchildren > 0 && attr->children[0])
-        return attr->children[0]->sval;
+    if (attr->n > 0 && attr->c[0])
+        return attr->c[0]->v.sval;
     return NULL;
 }

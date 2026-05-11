@@ -18,7 +18,7 @@
 #include <string.h>
 #include <ctype.h>
 #include "snobol4.h"
-#include "../ast/ast.h"         /* ir.h first — sets EXPR_T_DEFINED so scrip_cc.h skips its own AST_t */
+#include "../ast/ast.h"         /* ir.h first — sets EXPR_T_DEFINED so scrip_cc.h skips its own tree_t */
 #include "../../frontend/snobol4/scrip_cc.h"
 /* CMPILE.c removed — bison/flex path via scrip_cc.h (GOAL-REMOVE-CMPILE S-4) */
 
@@ -39,7 +39,7 @@ DESCR_t (*g_eval_str_hook)(const char *s) = NULL;
 static PATND_t *spat_new(XKIND_t kind) {
     PATND_t *p = (PATND_t *)GC_MALLOC(sizeof(PATND_t));
     memset(p, 0, sizeof(PATND_t));
-    p->kind = kind;
+    p->t = kind;
     return p;
 }
 
@@ -49,18 +49,18 @@ static void patnd_set_children(PATND_t *p, PATND_t **ch, int n) {
     int count = 0;
     for (int i = 0; i < n; i++) if (ch[i]) count++;
     if (count == 0) return;
-    p->children = (PATND_t **)GC_MALLOC((size_t)count * sizeof(PATND_t *));
+    p->c = (PATND_t **)GC_MALLOC((size_t)count * sizeof(PATND_t *));
     int j = 0;
-    for (int i = 0; i < n; i++) if (ch[i]) p->children[j++] = ch[i];
-    p->nchildren = count;
+    for (int i = 0; i < n; i++) if (ch[i]) p->c[j++] = ch[i];
+    p->n = count;
 }
 
 /* Append a child to an XCAT or XOR node (used when flattening at build time). */
 static void patnd_append_child(PATND_t *p, PATND_t *ch) {
     if (!ch) return;
-    p->children = (PATND_t **)GC_REALLOC(p->children,
-                      (size_t)(p->nchildren + 1) * sizeof(PATND_t *));
-    p->children[p->nchildren++] = ch;
+    p->c = (PATND_t **)GC_REALLOC(p->c,
+                      (size_t)(p->n + 1) * sizeof(PATND_t *));
+    p->c[p->n++] = ch;
 }
 
 /* Wrap a PATND_t in a DESCR_t */
@@ -207,7 +207,7 @@ DESCR_t pat_epsilon(void) {
 }
 
 /* Forward declaration — eval_node is defined in eval_code.c (separate TU) */
-extern DESCR_t eval_node(AST_t *e);
+extern DESCR_t eval_node(tree_t *e);
 
 /* pat_to_patnd: coerce a DESCR_t to a PATND_t*, handling string literals.
  * Returns NULL if the value cannot be represented as a pattern.
@@ -220,24 +220,24 @@ extern DESCR_t eval_node(AST_t *e);
 static PATND_t *pat_to_patnd(DESCR_t v) {
     if (v.v == DT_E) {
         /* CHUNKS-step02: chunk DT_E (slen==1) — dispatch via EXPVAL_fn which
-         * routes to sm_call_expression.  Legacy AST_t* path (slen==0) follows below. */
+         * routes to sm_call_expression.  Legacy tree_t* path (slen==0) follows below. */
         if (v.slen == 1) {
             v = EXPVAL_fn(v);
             /* Fall through to coerce result as pattern value */
             goto coerce;
         }
-        AST_t *frozen = (AST_t *)v.ptr;
+        tree_t *frozen = (tree_t *)v.ptr;
         if (!frozen) return NULL;   /* null DT_E — propagate failure (do not epsilon) */
-        if (frozen->kind == AST_FNC) {
+        if (frozen->t == AST_FNC) {
             /* *func(args...) — side-effect call deferred to match time via XATP */
-            int nargs = frozen->nchildren;
+            int nargs = frozen->n;
             DESCR_t *args = NULL;
             if (nargs > 0) {
                 args = (DESCR_t *)alloca((size_t)nargs * sizeof(DESCR_t));
                 for (int i = 0; i < nargs; i++)
-                    args[i] = eval_node(frozen->children[i]);
+                    args[i] = eval_node(frozen->c[i]);
             }
-            const char *fname = frozen->sval ? frozen->sval : "";
+            const char *fname = frozen->v.sval ? frozen->v.sval : "";
             DESCR_t pv = pat_user_call(fname, args, nargs);
             if (IS_FAIL_fn(pv)) return NULL;
             /* If function returned a real pattern, use it directly */
@@ -246,11 +246,11 @@ static PATND_t *pat_to_patnd(DESCR_t v) {
             /* Otherwise coerce non-pattern result to literal string pattern */
             v = pv;  /* fall through to coercion below */
         }
-        if (frozen->kind == AST_VAR && frozen->sval) {
+        if (frozen->t == AST_VAR && frozen->v.sval) {
             /* *varname — deferred variable reference, resolved at match time via XVAR.
              * This is the recursive grammar case: factor = ... *factor ...
              * The variable may not exist yet at construction time. */
-            DESCR_t name_d = STRVAL(frozen->sval);
+            DESCR_t name_d = STRVAL(frozen->v.sval);
             DESCR_t pv = var_as_pattern(name_d);
             return spat_of(pv);
         }
@@ -292,13 +292,13 @@ DESCR_t pat_cat(DESCR_t left, DESCR_t right) {
 
     PATND_t *p = spat_new(XCAT);
     /* Flatten: if left is already XCAT, steal its children */
-    if (l->kind == XCAT) {
-        for (int i = 0; i < l->nchildren; i++) patnd_append_child(p, l->children[i]);
+    if (l->t == XCAT) {
+        for (int i = 0; i < l->n; i++) patnd_append_child(p, l->c[i]);
     } else {
         patnd_append_child(p, l);
     }
-    if (r->kind == XCAT) {
-        for (int i = 0; i < r->nchildren; i++) patnd_append_child(p, r->children[i]);
+    if (r->t == XCAT) {
+        for (int i = 0; i < r->n; i++) patnd_append_child(p, r->c[i]);
     } else {
         patnd_append_child(p, r);
     }
@@ -316,13 +316,13 @@ DESCR_t pat_alt(DESCR_t left, DESCR_t right) {
 
     PATND_t *p = spat_new(XOR);
     /* Flatten: if left is already XOR, steal its children */
-    if (l->kind == XOR) {
-        for (int i = 0; i < l->nchildren; i++) patnd_append_child(p, l->children[i]);
+    if (l->t == XOR) {
+        for (int i = 0; i < l->n; i++) patnd_append_child(p, l->c[i]);
     } else {
         patnd_append_child(p, l);
     }
-    if (r->kind == XOR) {
-        for (int i = 0; i < r->nchildren; i++) patnd_append_child(p, r->children[i]);
+    if (r->t == XOR) {
+        for (int i = 0; i < r->n; i++) patnd_append_child(p, r->c[i]);
     } else {
         patnd_append_child(p, r);
     }
@@ -827,7 +827,7 @@ DESCR_t EVAL_fn(DESCR_t expr) {
     fprintf(stderr, "EVAL_fn: v=%d s=%s\n", (int)expr.v,
             (expr.v==5||expr.v==0) && expr.s ? expr.s : "(non-str)");
      *
-     * DT_E  → EXPVAL_fn (execute frozen AST_t* with save/restore)
+     * DT_E  → EXPVAL_fn (execute frozen tree_t* with save/restore)
      * DT_I  → idempotent (return as-is)
      * DT_R  → idempotent (return as-is)
      * DT_P  → run pattern hook (existing behaviour)
@@ -1018,11 +1018,11 @@ DESCR_t pat_call(const char *name, DESCR_t arg) {
 }
 
 /* compile_to_expression — SIL CONVE path: parse string → freeze as DT_E.
- * Used by CONVERT(s,"EXPRESSION"). Does NOT evaluate — stores AST_t* as DT_E
+ * Used by CONVERT(s,"EXPRESSION"). Does NOT evaluate — stores tree_t* as DT_E
  * for later thaw by EVAL_fn. Returns FAILDESCR if parse fails. */
 DESCR_t compile_to_expression(const char *src) {
     if (!src || !*src) return FAILDESCR;
-    AST_t *tree = parse_expr_pat_from_str(src);
+    tree_t *tree = parse_expr_pat_from_str(src);
     if (!tree) return FAILDESCR;
 
     DESCR_t d;
@@ -1091,15 +1091,15 @@ static const char *xkind_name(XKIND_t k) {
 
 static void patnd_print_r(const PATND_t *p, FILE *out, int depth) {
     if (!p) { fprintf(out, "%*s(null)\n", depth*2, ""); return; }
-    fprintf(out, "%*s(%s", depth*2, "", xkind_name(p->kind));
+    fprintf(out, "%*s(%s", depth*2, "", xkind_name(p->t));
     if (p->STRVAL_fn) fprintf(out, " \"%s\"", p->STRVAL_fn);
     if (p->num)       fprintf(out, " %lld", (long long)p->num);
-    if (p->nchildren == 0) {
+    if (p->n == 0) {
         fprintf(out, ")\n");
     } else {
         fprintf(out, "\n");
-        for (int i = 0; i < p->nchildren; i++)
-            patnd_print_r(p->children[i], out, depth + 1);
+        for (int i = 0; i < p->n; i++)
+            patnd_print_r(p->c[i], out, depth + 1);
         fprintf(out, "%*s)\n", depth*2, "");
     }
 }

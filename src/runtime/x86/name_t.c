@@ -42,7 +42,7 @@ int name_commit_value(const NAME_t *nm, DESCR_t value)
      * unchanged (EVAL_fn idempotent for DT_S / DT_I / DT_R). */
     if (value.v == DT_E) value = EVAL_fn(value);
 
-    switch (nm->kind) {
+    switch (nm->t) {
 
     case NM_VAR:
         if (nm->var_name && nm->var_name[0])
@@ -182,7 +182,7 @@ void name_init_as_var(NAME_t *nm, const char *var_name)
 {
     if (!nm) return;
     memset(nm, 0, sizeof(*nm));
-    nm->kind     = NM_VAR;
+    nm->t     = NM_VAR;
     nm->var_name = var_name;
 }
 
@@ -190,7 +190,7 @@ void name_init_as_ptr(NAME_t *nm, DESCR_t *var_ptr)
 {
     if (!nm) return;
     memset(nm, 0, sizeof(*nm));
-    nm->kind    = NM_PTR;
+    nm->t    = NM_PTR;
     nm->var_ptr = var_ptr;
 }
 
@@ -201,7 +201,7 @@ void name_init_as_call(NAME_t *nm,
 {
     if (!nm) return;
     memset(nm, 0, sizeof(*nm));
-    nm->kind            = NM_CALL;
+    nm->t            = NM_CALL;
     nm->fnc_name        = fnc_name;
     nm->fnc_args        = fnc_args;
     nm->fnc_nargs       = fnc_nargs;

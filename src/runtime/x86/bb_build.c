@@ -766,27 +766,27 @@ typedef struct {
 
 static bb_box_fn bb_alt_emit_binary(PATND_t *p)
 {
-    int nc = p->nchildren;
+    int nc = p->n;
     if (nc == 0) return bb_eps_emit_binary();
-    if (nc == 1) return bb_build_binary_node(p->children[0]);
+    if (nc == 1) return bb_build_binary_node(p->c[0]);
 
     bin_alt_t *z = calloc(1, sizeof(bin_alt_t));
     if (!z) return NULL;
     z->cap      = nc > BB_ALT_INIT_BIN ? nc : BB_ALT_INIT_BIN;
-    z->children = malloc(z->cap * sizeof(bin_altchild_t));
-    if (!z->children) { free(z); return NULL; }
+    z->c = malloc(z->cap * sizeof(bin_altchild_t));
+    if (!z->c) { free(z); return NULL; }
     z->n = nc;
 
     for (int i = 0; i < nc; i++) {
-        bb_box_fn cfn = bb_build_binary_node(p->children[i]);
-        if (!cfn) { free(z->children); free(z); return NULL; }
-        z->children[i].fn    = cfn;
-        z->children[i].state = NULL;  /* binary leaf — no separate zeta */
+        bb_box_fn cfn = bb_build_binary_node(p->c[i]);
+        if (!cfn) { free(z->c); free(z); return NULL; }
+        z->c[i].fn    = cfn;
+        z->c[i].state = NULL;  /* binary leaf — no separate zeta */
     }
 
 #define ALT_TRAM_SIZE 32
     bb_buf_t tbuf = bb_alloc(ALT_TRAM_SIZE);
-    if (!tbuf) { free(z->children); free(z); return NULL; }
+    if (!tbuf) { free(z->c); free(z); return NULL; }
     bb_emit_mode = EMIT_BINARY;
     bb_emit_begin(tbuf, ALT_TRAM_SIZE);
     bb_emit_byte(0x48); bb_emit_byte(0xBF);
@@ -795,7 +795,7 @@ static bb_box_fn bb_alt_emit_binary(PATND_t *p)
     bb_emit_u64((uint64_t)(uintptr_t)bb_alt);
     bb_emit_byte(0xFF); bb_emit_byte(0xE0);
     int nb = bb_emit_end();
-    if (nb <= 0 || nb > ALT_TRAM_SIZE) { bb_free(tbuf, ALT_TRAM_SIZE); free(z->children); free(z); return NULL; }
+    if (nb <= 0 || nb > ALT_TRAM_SIZE) { bb_free(tbuf, ALT_TRAM_SIZE); free(z->c); free(z); return NULL; }
     bb_seal(tbuf, (size_t)nb);
     return (bb_box_fn)tbuf;
 #undef ALT_TRAM_SIZE
@@ -841,8 +841,8 @@ static bb_box_fn bb_breakx_emit_binary(const char *chars)
 static bb_box_fn bb_nme_emit_binary(PATND_t *p)
 {
     /* Recursively build child */
-    bb_box_fn child_fn = (p->nchildren > 0)
-                         ? bb_build_binary_node(p->children[0])
+    bb_box_fn child_fn = (p->n > 0)
+                         ? bb_build_binary_node(p->c[0])
                          : bb_build_binary_node(NULL);  /* eps */
     if (!child_fn) return NULL;
 
@@ -879,8 +879,8 @@ static bb_box_fn bb_nme_emit_binary(PATND_t *p)
 
 static bb_box_fn bb_fnme_emit_binary(PATND_t *p)
 {
-    bb_box_fn child_fn = (p->nchildren > 0)
-                         ? bb_build_binary_node(p->children[0])
+    bb_box_fn child_fn = (p->n > 0)
+                         ? bb_build_binary_node(p->c[0])
                          : bb_build_binary_node(NULL);
     if (!child_fn) return NULL;
 
@@ -1185,7 +1185,7 @@ static bb_box_fn bb_arbn_emit_binary(PATND_t *p)
 {
 #define ARBN_TRAM_SIZE 32
     /* Build body child in binary — fall back to C if unsupported */
-    PATND_t *body_p = (p->nchildren > 0) ? p->children[0] : NULL;
+    PATND_t *body_p = (p->n > 0) ? p->c[0] : NULL;
     bb_box_fn body_fn = bb_build_binary_node(body_p);
     if (!body_fn) return NULL;   /* child unsupported → C fallback */
 
@@ -1226,7 +1226,7 @@ static bb_box_fn bb_callcap_emit_binary(PATND_t *p)
 {
 #define CALLCAP_TRAM_SIZE 32
     /* Build child in binary */
-    PATND_t *child_p = (p->nchildren > 0) ? p->children[0] : NULL;
+    PATND_t *child_p = (p->n > 0) ? p->c[0] : NULL;
     bb_box_fn child_fn = bb_build_binary_node(child_p);
     if (!child_fn) return NULL;
 
@@ -1270,7 +1270,7 @@ static bb_box_fn bb_build_binary_node(PATND_t *p)
         /* null → epsilon */
         return bb_eps_emit_binary();
     }
-    switch (p->kind) {
+    switch (p->t) {
 
     /* ── M-DYN-B1: literal string ─────────────────────────────────── */
     case XCHR: {
@@ -1356,18 +1356,18 @@ static bb_box_fn bb_build_binary_node(PATND_t *p)
      * If any child returns NULL → fall back to C path for whole XCAT.
      * ──────────────────────────────────────────────────────────────── */
     case XCAT: {
-        if (p->nchildren == 0)
+        if (p->n == 0)
             return bb_eps_emit_binary();
-        if (p->nchildren == 1)
-            return bb_build_binary_node(p->children[0]);
+        if (p->n == 1)
+            return bb_build_binary_node(p->c[0]);
 
         /* Fold right: seq(children[0], seq(children[1], ...)) */
-        bb_box_fn  right_fn    = bb_build_binary_node(p->children[p->nchildren - 1]);
+        bb_box_fn  right_fn    = bb_build_binary_node(p->c[p->n - 1]);
         if (!right_fn) return NULL;
         void      *right_state = NULL;   /* binary leaves carry no ζ */
 
-        for (int i = p->nchildren - 2; i >= 0; i--) {
-            bb_box_fn left_fn = bb_build_binary_node(p->children[i]);
+        for (int i = p->n - 2; i >= 0; i--) {
+            bb_box_fn left_fn = bb_build_binary_node(p->c[i]);
             if (!left_fn) return NULL;
 
             bin_seq_t *seq_zeta = calloc(1, sizeof(bin_seq_t));
@@ -1416,10 +1416,10 @@ static bb_box_fn bb_build_binary_node(PATND_t *p)
     /* ── M-DYN-B10: XFNCE — FENCE (succeed once; β cuts) ───────────────── */
     case XFNCE: {
         /* FENCE0 (no child): bare FENCE — seal only */
-        if (p->nchildren == 0) return bb_fence_emit_binary();
+        if (p->n == 0) return bb_fence_emit_binary();
         /* FENCE1 (one child): FENCE(P) — sequence child then seal.
          * If P fails → whole match fails (ω). If P succeeds → seal (β cuts). */
-        bb_box_fn child_fn = bb_build_binary_node(p->children[0]);
+        bb_box_fn child_fn = bb_build_binary_node(p->c[0]);
         if (!child_fn) return NULL;
         bb_box_fn fence_fn = bb_fence_emit_binary();
         if (!fence_fn) return NULL;
@@ -1486,7 +1486,7 @@ static bb_box_fn bb_build_binary_node(PATND_t *p)
                 "XSUCF","XBAL","XEPS","XCAT","XOR","XDSAR","XFNME","XNME",
                 "XCALLCAP","XVAR","XATP","XBRKX"
             };
-            int k = (int)p->kind;
+            int k = (int)p->t;
             const char *kn = (k >= 0 && k < (int)(sizeof knames/sizeof knames[0]))
                              ? knames[k] : "XUNKNOWN";
             fprintf(stderr, "BIN_MISS: %s (kind=%d)\n", kn, k);

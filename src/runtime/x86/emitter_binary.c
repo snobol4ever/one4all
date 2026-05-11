@@ -37,7 +37,7 @@ static void binary_emit_insn(emitter_t *e, const bb_insn_desc_t *d)
     uint32_t a1 = d->a1;
     uint8_t  a2 = d->a2;
 
-    switch (d->kind) {
+    switch (d->t) {
     /* 64-bit reg ← imm64 : REX.W Bx <8> */
     case BB_INSN_MOV_R10_IMM64: b2(0x49,0xBA); imm64(a0); break; /* 49 BA */
     case BB_INSN_MOV_RAX_IMM64: b2(0x48,0xB8); imm64(a0); break; /* 48 B8 */

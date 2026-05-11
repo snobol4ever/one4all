@@ -14,13 +14,13 @@
 
 #include <stdint.h>
 #include <setjmp.h>
-#include "frontend/snobol4/scrip_cc.h"  /* AST_t, DESCR_t */
+#include "frontend/snobol4/scrip_cc.h"  /* tree_t, DESCR_t */
 
 /* ── Diagnostic flags (set in main, read by execute_program / sm_interp) ── */
 extern int g_opt_trace;
 extern int g_opt_dump_bb;
 
-/* ── AST_t program state ───────────────────────────────────────────────── */
+/* ── tree_t program state ───────────────────────────────────────────────── */
 extern int g_polyglot; /* 1 when running a fenced polyglot .scrip file */
 
 /* ── ScripModule registry — lives in scrip.c; execute_program uses it (FI-7 will move) ── */
@@ -28,8 +28,8 @@ extern int g_polyglot; /* 1 when running a fenced polyglot .scrip file */
 typedef struct {
     int              lang;
     const char      *name;
-    const AST_t     *first;   /* SI-6: first AST_STMT child in this module */
-    const AST_t     *last;    /* SI-6: last  AST_STMT child in this module */
+    const tree_t     *first;   /* SI-6: first AST_STMT child in this module */
+    const tree_t     *last;    /* SI-6: last  AST_STMT child in this module */
     int              nstmts;
     int              sno_label_start;
     int              sno_label_count;
@@ -43,23 +43,23 @@ typedef struct {
 } ScripModuleRegistry;
 extern ScripModuleRegistry g_registry;
 /* polyglot_init declared in polyglot.h — forward ref for execute_program */
-void polyglot_init(const AST_t *prog, uint32_t lang_mask);
-uint32_t polyglot_lang_mask(const AST_t *prog);
+void polyglot_init(const tree_t *prog, uint32_t lang_mask);
+uint32_t polyglot_lang_mask(const tree_t *prog);
 void icn_record_register(const char *spec);  /* IC-5: register record type at init time */
 
 /* ── Label table ───────────────────────────────────────────────────────── */
 extern int label_count;     /* needed by polyglot_init for sno_label_start */
-void    label_table_build(const AST_t *prog);
-const AST_t *label_lookup(const char *name);
-extern const AST_t *g_exec_prog;  /* SI-6: program tree for call_user_function body walk */
-void    prescan_defines(const AST_t *prog);
+void    label_table_build(const tree_t *prog);
+const tree_t *label_lookup(const char *name);
+extern const tree_t *g_exec_prog;  /* SI-6: program tree for call_user_function body walk */
+void    prescan_defines(const tree_t *prog);
 
 /* ── Core interpreter entry points ────────────────────────────────────── */
-DESCR_t interp_eval    (AST_t *e);
-DESCR_t interp_eval_pat(AST_t *e);
-void    execute_program(const AST_t *prog);
-void    execute_program_steps(const AST_t *prog, int n);  /* IM-3: step-limited run */
-void    ir_dump_program(const AST_t *prog, FILE *f);
+DESCR_t interp_eval    (tree_t *e);
+DESCR_t interp_eval_pat(tree_t *e);
+void    execute_program(const tree_t *prog);
+void    execute_program_steps(const tree_t *prog, int n);  /* IM-3: step-limited run */
+void    ir_dump_program(const tree_t *prog, FILE *f);
 
 /* IM-3: IR step-limit globals */
 extern int     g_ir_step_limit;

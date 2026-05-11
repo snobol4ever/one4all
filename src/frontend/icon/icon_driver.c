@@ -15,7 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void icon_compile(const char *source, const char *filename, AST_t **out_ast) {
+void icon_compile(const char *source, const char *filename, tree_t **out_ast) {
     if (!filename) filename = "<stdin>";
     if (out_ast) *out_ast = NULL;
     sno_set_case_sensitive(1);

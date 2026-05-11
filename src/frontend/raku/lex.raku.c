@@ -1263,12 +1263,12 @@ YY_RULE_SETUP
 case 21:
 YY_RULE_SETUP
 #line 65 "frontend/raku/raku.l"
-{ raku_yylval.ival = 1; return LIT_INT; }
+{ raku_yylval.v.ival = 1; return LIT_INT; }
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
 #line 66 "frontend/raku/raku.l"
-{ raku_yylval.ival = 0; return LIT_INT; }
+{ raku_yylval.v.ival = 0; return LIT_INT; }
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
@@ -1431,44 +1431,44 @@ YY_RULE_SETUP
 case 54:
 YY_RULE_SETUP
 #line 104 "frontend/raku/raku.l"
-{ raku_yylval.dval = atof(yytext); return LIT_FLOAT; }
+{ raku_yylval.v.dval = atof(yytext); return LIT_FLOAT; }
 	YY_BREAK
 case 55:
 YY_RULE_SETUP
 #line 105 "frontend/raku/raku.l"
-{ raku_yylval.dval = atof(yytext); return LIT_FLOAT; }
+{ raku_yylval.v.dval = atof(yytext); return LIT_FLOAT; }
 	YY_BREAK
 case 56:
 YY_RULE_SETUP
 #line 106 "frontend/raku/raku.l"
-{ raku_yylval.ival = atol(yytext); return LIT_INT; }
+{ raku_yylval.v.ival = atol(yytext); return LIT_INT; }
 	YY_BREAK
 /* ── Sigil variables ─────────────────────────────────────────── */
 case 57:
 YY_RULE_SETUP
 #line 109 "frontend/raku/raku.l"
-{ raku_yylval.sval = strdup("$_"); return VAR_SCALAR; }
+{ raku_yylval.v.sval = strdup("$_"); return VAR_SCALAR; }
 	YY_BREAK
 case 58:
 YY_RULE_SETUP
 #line 110 "frontend/raku/raku.l"
-{ raku_yylval.sval = strdup(yytext); return VAR_SCALAR; }
+{ raku_yylval.v.sval = strdup(yytext); return VAR_SCALAR; }
 	YY_BREAK
 case 59:
 YY_RULE_SETUP
 #line 111 "frontend/raku/raku.l"
-{ raku_yylval.sval = strdup(yytext); return VAR_ARRAY; }
+{ raku_yylval.v.sval = strdup(yytext); return VAR_ARRAY; }
 	YY_BREAK
 case 60:
 YY_RULE_SETUP
 #line 112 "frontend/raku/raku.l"
-{ raku_yylval.sval = strdup(yytext); return VAR_HASH; }
+{ raku_yylval.v.sval = strdup(yytext); return VAR_HASH; }
 	YY_BREAK
 /* ── Identifiers (bare words — sub names, builtins) ─────────── */
 case 61:
 YY_RULE_SETUP
 #line 115 "frontend/raku/raku.l"
-{ raku_yylval.sval = strdup(yytext); return IDENT; }
+{ raku_yylval.v.sval = strdup(yytext); return IDENT; }
 	YY_BREAK
 /* ── Double-quoted string: flat literal or interpolated ──────── */
 /* If the buffer contains '$', emit LIT_INTERP_STR (RK-12).     */
@@ -1483,7 +1483,7 @@ YY_RULE_SETUP
 #line 121 "frontend/raku/raku.l"
 {
     raku_strbuf[raku_strpos] = '\0';
-    raku_yylval.sval = strdup(raku_strbuf);
+    raku_yylval.v.sval = strdup(raku_strbuf);
     BEGIN(INITIAL);
     if (strchr(raku_strbuf, '$') != NULL)
         return LIT_INTERP_STR;
@@ -1532,7 +1532,7 @@ YY_RULE_SETUP
 #line 138 "frontend/raku/raku.l"
 {
     raku_strbuf[raku_strpos] = '\0';
-    raku_yylval.sval = strdup(raku_strbuf);
+    raku_yylval.v.sval = strdup(raku_strbuf);
     BEGIN(INITIAL);
     return LIT_STR;
 }

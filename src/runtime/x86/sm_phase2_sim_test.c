@@ -49,9 +49,9 @@ int main(void)
         DESCR_t d = sm_phase2_to_patnd(p, 0, p->count, &has_v);
         PATND_t *root = (PATND_t *)d.s;
         check("A: DT_P returned",   d.v == DT_P && root != NULL);
-        check("A: root=XNME",       root && root->kind == XNME);
-        check("A: child=XBRKC",     root && root->nchildren == 1 &&
-                                    root->children[0]->kind == XBRKC);
+        check("A: root=XNME",       root && root->t == XNME);
+        check("A: child=XBRKC",     root && root->n == 1 &&
+                                    root->c[0]->t == XBRKC);
         check("A: has_variant=0",   has_v == 0);
         check("A: fully_invar",     root && patnd_is_fully_invariant(root));
         sm_prog_free(p);
@@ -72,12 +72,12 @@ int main(void)
         DESCR_t d = sm_phase2_to_patnd(p, 0, p->count, &has_v);
         PATND_t *root = (PATND_t *)d.s;
         check("B: DT_P returned",  d.v == DT_P && root != NULL);
-        check("B: root=XCAT",      root && root->kind == XCAT);
-        check("B: 2 children",     root && root->nchildren == 2);
-        check("B: left=XCHR",      root && root->nchildren == 2 &&
-                                   root->children[0]->kind == XCHR);
-        check("B: right=XCHR",     root && root->nchildren == 2 &&
-                                   root->children[1]->kind == XCHR);
+        check("B: root=XCAT",      root && root->t == XCAT);
+        check("B: 2 children",     root && root->n == 2);
+        check("B: left=XCHR",      root && root->n == 2 &&
+                                   root->c[0]->t == XCHR);
+        check("B: right=XCHR",     root && root->n == 2 &&
+                                   root->c[1]->t == XCHR);
         check("B: has_variant=0",  has_v == 0);
         check("B: fully_invar",    root && patnd_is_fully_invariant(root));
         sm_prog_free(p);
@@ -96,7 +96,7 @@ int main(void)
         DESCR_t d = sm_phase2_to_patnd(p, 0, p->count, &has_v);
         PATND_t *root = (PATND_t *)d.s;
         check("C: DT_P returned",   d.v == DT_P && root != NULL);
-        check("C: root=XDSAR",      root && root->kind == XDSAR);
+        check("C: root=XDSAR",      root && root->t == XDSAR);
         check("C: has_variant=0",   has_v == 0);
         check("C: fully_invar",     root && patnd_is_fully_invariant(root));
         sm_prog_free(p);
@@ -112,19 +112,19 @@ int main(void)
         DESCR_t d = sm_phase2_to_patnd(p, 0, 0, &has_v);
         PATND_t *root = (PATND_t *)d.s;
         check("D: DT_P returned",  d.v == DT_P && root != NULL);
-        check("D: root=XEPS",      root && root->kind == XEPS);
+        check("D: root=XEPS",      root && root->t == XEPS);
         check("D: has_variant=0",  has_v == 0);
         sm_prog_free(p);
     }
 
     /* ── Test E: flat_is_eligible_node per-kind spot-checks */
     {
-        PATND_t xchr = {0}; xchr.kind = XCHR;
-        PATND_t xcat = {0}; xcat.kind = XCAT;
-        PATND_t xdsar = {0}; xdsar.kind = XDSAR;
-        PATND_t xbrkc = {0}; xbrkc.kind = XBRKC;
-        PATND_t xeps  = {0}; xeps.kind  = XEPS;
-        PATND_t xposi = {0}; xposi.kind = XPOSI;
+        PATND_t xchr = {0}; xchr.t = XCHR;
+        PATND_t xcat = {0}; xcat.t = XCAT;
+        PATND_t xdsar = {0}; xdsar.t = XDSAR;
+        PATND_t xbrkc = {0}; xbrkc.t = XBRKC;
+        PATND_t xeps  = {0}; xeps.t  = XEPS;
+        PATND_t xposi = {0}; xposi.t = XPOSI;
         check("E: XCHR invariant",   flat_is_eligible_node(&xchr)  == 1);
         check("E: XCAT invariant",   flat_is_eligible_node(&xcat)  == 1);
         check("E: XEPS invariant",   flat_is_eligible_node(&xeps)  == 1);

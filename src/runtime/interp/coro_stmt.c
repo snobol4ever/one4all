@@ -50,11 +50,11 @@
  *  (b) statement-context body children recurse via `bb_exec_stmt`, again
  *      avoiding interp_eval.
  *----------------------------------------------------------------------------------------------------------------------------*/
-void bb_exec_stmt(AST_t *e)
+void bb_exec_stmt(tree_t *e)
 {
     if (!e) return;
 
-    switch (e->kind) {
+    switch (e->t) {
 
     /*========================================================================
      * Trivial control-flow markers — set FRAME state, no children.
@@ -76,7 +76,7 @@ void bb_exec_stmt(AST_t *e)
         return;
     }
     case AST_RETURN: {
-        DESCR_t rv = (e->nchildren > 0) ? bb_eval_value(e->children[0]) : NULVCL;
+        DESCR_t rv = (e->n > 0) ? bb_eval_value(e->c[0]) : NULVCL;
         FRAME.returning  = 1;
         FRAME.return_val = rv;
         return;
@@ -86,11 +86,11 @@ void bb_exec_stmt(AST_t *e)
      * AST_SUSPEND — yield a value to coro_drive_fnc loop.
      *======================================================================*/
     case AST_SUSPEND: {
-        DESCR_t val = (e->nchildren > 0) ? bb_eval_value(e->children[0]) : NULVCL;
+        DESCR_t val = (e->n > 0) ? bb_eval_value(e->c[0]) : NULVCL;
         if (!IS_FAIL_fn(val)) {
             FRAME.suspending  = 1;
             FRAME.suspend_val = val;
-            FRAME.suspend_do  = (e->nchildren > 1) ? e->children[1] : NULL;
+            FRAME.suspend_do  = (e->n > 1) ? e->c[1] : NULL;
         }
         return;
     }
@@ -102,23 +102,23 @@ void bb_exec_stmt(AST_t *e)
      * else-branch.  Otherwise classic single-shot evaluation.
      *======================================================================*/
     case AST_IF: {
-        if (e->nchildren < 1) return;
-        AST_t *test = e->children[0];
+        if (e->n < 1) return;
+        tree_t *test = e->c[0];
         if (is_suspendable(test)) {
             bb_node_t box = coro_eval(test);
             DESCR_t v = box.fn(box.ζ, α);
             if (!IS_FAIL_fn(v) && !FRAME.returning && !FRAME.loop_break) {
-                if (e->nchildren > 1) bb_exec_stmt(e->children[1]);
+                if (e->n > 1) bb_exec_stmt(e->c[1]);
             } else {
-                if (e->nchildren > 2) bb_exec_stmt(e->children[2]);
+                if (e->n > 2) bb_exec_stmt(e->c[2]);
             }
             return;
         }
         DESCR_t cv = bb_eval_value(test);
         if (!IS_FAIL_fn(cv)) {
-            if (e->nchildren > 1) bb_exec_stmt(e->children[1]);
+            if (e->n > 1) bb_exec_stmt(e->c[1]);
         } else {
-            if (e->nchildren > 2) bb_exec_stmt(e->children[2]);
+            if (e->n > 2) bb_exec_stmt(e->c[2]);
         }
         return;
     }
@@ -133,10 +133,10 @@ void bb_exec_stmt(AST_t *e)
         int saved_brk = FRAME.loop_break; FRAME.loop_break = 0;
         int saved_nxt = FRAME.loop_next;  FRAME.loop_next  = 0;
         while (!FRAME.returning && !FRAME.loop_break && !FRAME.suspending) {
-            DESCR_t cv = (e->nchildren > 0) ? bb_eval_value(e->children[0]) : FAILDESCR;
+            DESCR_t cv = (e->n > 0) ? bb_eval_value(e->c[0]) : FAILDESCR;
             if (IS_FAIL_fn(cv)) break;
             FRAME.loop_next = 0;
-            if (e->nchildren > 1) bb_exec_stmt(e->children[1]);
+            if (e->n > 1) bb_exec_stmt(e->c[1]);
             if (FRAME.suspending) break;
         }
         FRAME.loop_break = saved_brk;
@@ -147,10 +147,10 @@ void bb_exec_stmt(AST_t *e)
         int saved_brk = FRAME.loop_break; FRAME.loop_break = 0;
         int saved_nxt = FRAME.loop_next;  FRAME.loop_next  = 0;
         while (!FRAME.returning && !FRAME.loop_break && !FRAME.suspending) {
-            DESCR_t cv = (e->nchildren > 0) ? bb_eval_value(e->children[0]) : FAILDESCR;
+            DESCR_t cv = (e->n > 0) ? bb_eval_value(e->c[0]) : FAILDESCR;
             if (!IS_FAIL_fn(cv)) break;
             FRAME.loop_next = 0;
-            if (e->nchildren > 1) bb_exec_stmt(e->children[1]);
+            if (e->n > 1) bb_exec_stmt(e->c[1]);
             if (FRAME.suspending) break;
         }
         FRAME.loop_break = saved_brk;
@@ -162,8 +162,8 @@ void bb_exec_stmt(AST_t *e)
         int saved_nxt = FRAME.loop_next;  FRAME.loop_next  = 0;
         while (!FRAME.returning && !FRAME.loop_break && !FRAME.suspending) {
             FRAME.loop_next = 0;
-            if (e->nchildren > 0) {
-                bb_exec_stmt(e->children[0]);
+            if (e->n > 0) {
+                bb_exec_stmt(e->c[0]);
                 if (FRAME.suspending) break;
             }
         }
@@ -182,8 +182,8 @@ void bb_exec_stmt(AST_t *e)
      *======================================================================*/
     case AST_SEQ:
     case AST_SEQ_EXPR: {
-        for (int i = 0; i < e->nchildren; i++) {
-            bb_exec_stmt(e->children[i]);
+        for (int i = 0; i < e->n; i++) {
+            bb_exec_stmt(e->c[i]);
             if (FRAME.returning || FRAME.loop_break || FRAME.loop_next ||
                 FRAME.suspending) break;
         }
@@ -271,6 +271,6 @@ void bb_exec_stmt(AST_t *e)
      * Abort with a diagnostic naming the kind. */
     fprintf(stderr,
             "FATAL bb_exec_stmt: unhandled kind %d (RS-23e isolation breach)\n",
-            (int)e->kind);
+            (int)e->t);
     abort();
 }

@@ -14,7 +14,7 @@
 
 /* _eval_str_impl_fn — EVAL(string) hook for pattern-context strings.
  * Uses bison parse_expr_pat_from_str (snobol4.tab.c) which produces
- * AST_t with correct AST_e values directly — no CMPILE/CMPND_t bridge.
+ * tree_t with correct AST_e values directly — no CMPILE/CMPND_t bridge.
  *
  * In SM mode, this path remains via interp_eval_pat. interp_eval_pat is
  * SM-safe by construction: all user-function dispatch flows through APPLY_fn
@@ -29,7 +29,7 @@
  * pat_len()/pat_tab()/etc. helpers; eval_node would silently coerce them
  * to STRING. RS-12 explored the route and reverted. */
 DESCR_t _eval_str_impl_fn(const char *s) {
-    AST_t *tree = parse_expr_pat_from_str(s);
+    tree_t *tree = parse_expr_pat_from_str(s);
     if (!tree) return FAILDESCR;
     return interp_eval_pat(tree);
 }
@@ -109,7 +109,7 @@ DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
      * so label_lookup always returns NULL. SM-bodied functions are dispatched
      * by the RS-11 block below via sm_label_pc_lookup. */
     const char *_entry = FUNC_ENTRY_fn(name);
-    const AST_t *_body = NULL;
+    const tree_t *_body = NULL;
     if (!g_current_sm_prog) {
         _body = _entry ? label_lookup(_entry) : NULL;
         if (!_body) _body = label_lookup(name);
@@ -148,16 +148,16 @@ DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
         if (g_pl_active) {
             char pl_key[256];
             snprintf(pl_key, sizeof pl_key, "%s/%d", name, nargs);
-            AST_t *choice = pl_pred_table_lookup(&g_pl_pred_table, pl_key);
+            tree_t *choice = pl_pred_table_lookup(&g_pl_pred_table, pl_key);
             if (choice) {
                 /* Set up Prolog arg Term** from DESCR_t args, drive BB_ONCE */
                 Term **pl_args = (nargs > 0) ? pl_env_new(nargs) : NULL;
                 for (int _i = 0; _i < nargs; _i++)
                     pl_args[_i] = pl_unified_term_from_expr(
-                        /* wrap DESCR_t as a literal AST_t leaf */
+                        /* wrap DESCR_t as a literal tree_t leaf */
                         (args[_i].v == DT_S)
-                            ? &(AST_t){ .kind = AST_QLIT, .sval = (char*)args[_i].s }
-                            : &(AST_t){ .kind = AST_ILIT, .ival = (long)args[_i].s },
+                            ? &(tree_t){ .t = AST_QLIT, .v.sval = (char*)args[_i].s }
+                            : &(tree_t){ .t = AST_ILIT, .v.ival = (long)args[_i].s },
                         NULL);
                 Term **saved_env = g_pl_env;
                 g_pl_env = pl_args;
@@ -271,20 +271,20 @@ DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
 /* ── ir_dump_program — print AST_PROGRAM as IR sexp — one line per statement.
  * SI-6: walks AST_PROGRAM children, reads fields via stmt_attr_find.
  * Accepts CODE_t* for --dump-ir-bison (callers pass sno_parse_ast CODE_t as AST*). */
-void ir_dump_program(const AST_t *prog, FILE *f) {
+void ir_dump_program(const tree_t *prog, FILE *f) {
     if (!prog) { fprintf(f, "(NULL-PROGRAM)\n"); return; }
-    for (int i = 0; i < prog->nchildren; i++) {
-        const AST_t *s = prog->children[i];
+    for (int i = 0; i < prog->n; i++) {
+        const tree_t *s = prog->c[i];
         if (!s) continue;
         fprintf(f, "(STMT");
         const char *lbl  = stmt_attr_str(stmt_attr_find(s, ":lbl"));
         int has_eq = stmt_attr_find(s, ":eq") != NULL;
         if (lbl)         fprintf(f, " :lbl %s", lbl);
         if (has_eq)      fprintf(f, " :eq");
-        if (s->kind == AST_END) fprintf(f, " :end");
-        AST_t *subj = stmt_attr_expr(stmt_attr_find(s, ":subj"));
-        AST_t *pat  = stmt_attr_expr(stmt_attr_find(s, ":pat"));
-        AST_t *repl = stmt_attr_expr(stmt_attr_find(s, ":repl"));
+        if (s->t == AST_END) fprintf(f, " :end");
+        tree_t *subj = stmt_attr_expr(stmt_attr_find(s, ":subj"));
+        tree_t *pat  = stmt_attr_expr(stmt_attr_find(s, ":pat"));
+        tree_t *repl = stmt_attr_expr(stmt_attr_find(s, ":repl"));
         if (subj) { fprintf(f, " :subj "); ir_print_node(subj, f); }
         if (pat)  { fprintf(f, " :pat ");  ir_print_node(pat, f);  }
         if (repl) { fprintf(f, " :repl "); ir_print_node(repl, f); }

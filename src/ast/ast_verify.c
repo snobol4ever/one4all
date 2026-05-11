@@ -1,7 +1,7 @@
 /*
  * ast_verify.c — IR structural invariant checker
  *
- * Validates every node in an AST_t tree:
+ * Validates every node in an tree_t tree:
  *   1. kind is in range [0, AST_KIND_COUNT)
  *   2. nchildren satisfies the per-kind spec (min/max)
  *   3. No NULL child pointers where children are expected
@@ -21,7 +21,7 @@
  */
 
 #define IR_DEFINE_NAMES
-#include "scrip_cc.h"   /* → ir/ast.h (AST_e, AST_t, compat aliases, ast_e_name) */
+#include "scrip_cc.h"   /* → ir/ast.h (AST_e, tree_t, compat aliases, ast_e_name) */
 
 #include <stdio.h>
 #include <string.h>
@@ -150,7 +150,7 @@ static void violation(VerifyState *vs, const char *path, const char *msg) {
  * Core recursive checker
  * ---------------------------------------------------------------------- */
 
-static void verify_node(const AST_t *e, const char *path,
+static void verify_node(const tree_t *e, const char *path,
                         VerifyState *vs, int depth) {
     char child_path[512];
 
@@ -164,43 +164,43 @@ static void verify_node(const AST_t *e, const char *path,
     }
 
     /* 1. kind in range */
-    if ((int)e->kind < 0 || e->kind >= AST_KIND_COUNT) {
+    if ((int)e->t < 0 || e->t >= AST_KIND_COUNT) {
         char msg[64];
-        snprintf(msg, sizeof msg, "invalid kind %d", (int)e->kind);
+        snprintf(msg, sizeof msg, "invalid kind %d", (int)e->t);
         violation(vs, path, msg);
         return;   /* can't check further without a valid kind */
     }
 
-    const char *kname = ast_e_name[e->kind] ? ast_e_name[e->kind] : "?";
-    const KindSpec *spec = &kind_spec[e->kind];
+    const char *kname = ast_e_name[e->t] ? ast_e_name[e->t] : "?";
+    const KindSpec *spec = &kind_spec[e->t];
 
     /* 2. sval required? */
-    if (spec->need_sval && !e->sval) {
+    if (spec->need_sval && !e->v.sval) {
         char msg[128];
         snprintf(msg, sizeof msg, "%s requires non-NULL sval", kname);
         violation(vs, path, msg);
     }
 
     /* 3. nchildren spec */
-    if (spec->sk == SPEC_EXACT && e->nchildren != spec->n) {
+    if (spec->sk == SPEC_EXACT && e->n != spec->n) {
         char msg[128];
         snprintf(msg, sizeof msg,
-                 "%s: expected %d children, got %d", kname, spec->n, e->nchildren);
+                 "%s: expected %d children, got %d", kname, spec->n, e->n);
         violation(vs, path, msg);
-    } else if (spec->sk == SPEC_MIN && e->nchildren < spec->n) {
+    } else if (spec->sk == SPEC_MIN && e->n < spec->n) {
         char msg[128];
         snprintf(msg, sizeof msg,
-                 "%s: expected >= %d children, got %d", kname, spec->n, e->nchildren);
+                 "%s: expected >= %d children, got %d", kname, spec->n, e->n);
         violation(vs, path, msg);
     }
 
     /* 4. No NULL children */
-    for (int i = 0; i < e->nchildren; i++) {
+    for (int i = 0; i < e->n; i++) {
         snprintf(child_path, sizeof child_path, "%s[%d]", path, i);
-        if (!e->children[i]) {
+        if (!e->c[i]) {
             violation(vs, child_path, "NULL child pointer");
         } else {
-            verify_node(e->children[i], child_path, vs, depth + 1);
+            verify_node(e->c[i], child_path, vs, depth + 1);
         }
     }
 }
@@ -209,7 +209,7 @@ static void verify_node(const AST_t *e, const char *path,
  * Public API
  * ---------------------------------------------------------------------- */
 
-int ir_verify_node(const AST_t *e, const char *path, FILE *err) {
+int ir_verify_node(const tree_t *e, const char *path, FILE *err) {
     VerifyState vs = { 0, err ? err : stderr };
     verify_node(e, path ? path : "root", &vs, 0);
     return vs.count;
@@ -249,15 +249,15 @@ int ir_verify_program(const CODE_t *prog, FILE *err) {
 #include <stdlib.h>
 #include <assert.h>
 
-static AST_t *mk(AST_e k) {
-    AST_t *e = calloc(1, sizeof *e);
-    e->kind = k;
+static tree_t *mk(AST_e k) {
+    tree_t *e = calloc(1, sizeof *e);
+    e->t = k;
     return e;
 }
-static void add_child(AST_t *parent, AST_t *child) {
-    parent->children = realloc(parent->children,
-                               (size_t)(parent->nchildren + 1) * sizeof(AST_t *));
-    parent->children[parent->nchildren++] = child;
+static void add_child(tree_t *parent, tree_t *child) {
+    parent->c = realloc(parent->c,
+                               (size_t)(parent->n + 1) * sizeof(tree_t *));
+    parent->c[parent->n++] = child;
 }
 
 int main(void) {
@@ -265,9 +265,9 @@ int main(void) {
 
     /* --- Test 1: valid AST_ASSIGN(AST_VAR, AST_ILIT) --- */
     {
-        AST_t *a = mk(AST_ASSIGN);
-        AST_t *v = mk(AST_VAR);  v->sval = "x";
-        AST_t *n = mk(AST_ILIT); n->ival = 1;
+        tree_t *a = mk(AST_ASSIGN);
+        tree_t *v = mk(AST_VAR);  v->v.sval = "x";
+        tree_t *n = mk(AST_ILIT); n->v.ival = 1;
         add_child(a, v);
         add_child(a, n);
         int errs = ir_verify_node(a, "test1", stderr);
@@ -277,7 +277,7 @@ int main(void) {
 
     /* --- Test 2: AST_VAR missing sval --- */
     {
-        AST_t *v = mk(AST_VAR);  /* sval intentionally NULL */
+        tree_t *v = mk(AST_VAR);  /* sval intentionally NULL */
         int errs = ir_verify_node(v, "test2", NULL);  /* suppress output */
         if (errs != 1) { fprintf(stderr, "FAIL test2: expected 1 violation, got %d\n", errs); failures++; }
         else fprintf(stderr, "PASS test2: AST_VAR with NULL sval caught\n");
@@ -285,8 +285,8 @@ int main(void) {
 
     /* --- Test 3: AST_ADD with wrong child count --- */
     {
-        AST_t *a = mk(AST_ADD);
-        AST_t *n = mk(AST_ILIT);
+        tree_t *a = mk(AST_ADD);
+        tree_t *n = mk(AST_ILIT);
         add_child(a, n);  /* only 1 child, need 2 */
         int errs = ir_verify_node(a, "test3", NULL);
         if (errs != 1) { fprintf(stderr, "FAIL test3: expected 1 violation, got %d\n", errs); failures++; }
@@ -295,9 +295,9 @@ int main(void) {
 
     /* --- Test 4: AST_SEQ with 2 valid children --- */
     {
-        AST_t *s  = mk(AST_SEQ);
-        AST_t *q1 = mk(AST_QLIT); q1->sval = "hello";
-        AST_t *q2 = mk(AST_QLIT); q2->sval = "world";
+        tree_t *s  = mk(AST_SEQ);
+        tree_t *q1 = mk(AST_QLIT); q1->v.sval = "hello";
+        tree_t *q2 = mk(AST_QLIT); q2->v.sval = "world";
         add_child(s, q1);
         add_child(s, q2);
         int errs = ir_verify_node(s, "test4", stderr);
@@ -307,7 +307,7 @@ int main(void) {
 
     /* --- Test 5: AST_QLIT missing sval --- */
     {
-        AST_t *q = mk(AST_QLIT);  /* sval intentionally NULL */
+        tree_t *q = mk(AST_QLIT);  /* sval intentionally NULL */
         int errs = ir_verify_node(q, "test5", NULL);
         if (errs != 1) { fprintf(stderr, "FAIL test5: expected 1 violation, got %d\n", errs); failures++; }
         else fprintf(stderr, "PASS test5: AST_QLIT with NULL sval caught\n");
@@ -315,11 +315,11 @@ int main(void) {
 
     /* --- Test 6: nested valid tree --- */
     {
-        AST_t *assign = mk(AST_ASSIGN);
-        AST_t *lhs    = mk(AST_VAR);  lhs->sval = "result";
-        AST_t *add    = mk(AST_ADD);
-        AST_t *one    = mk(AST_ILIT); one->ival = 1;
-        AST_t *two    = mk(AST_ILIT); two->ival = 2;
+        tree_t *assign = mk(AST_ASSIGN);
+        tree_t *lhs    = mk(AST_VAR);  lhs->v.sval = "result";
+        tree_t *add    = mk(AST_ADD);
+        tree_t *one    = mk(AST_ILIT); one->v.ival = 1;
+        tree_t *two    = mk(AST_ILIT); two->v.ival = 2;
         add_child(add, one);
         add_child(add, two);
         add_child(assign, lhs);

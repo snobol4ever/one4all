@@ -234,19 +234,19 @@ typedef struct {
  * ================================================================ */
 static inline RExpr *rexpr_new(REKind k, int lineno) {
     RExpr *e = calloc(1, sizeof *e);
-    e->kind   = k;
+    e->t   = k;
     e->lineno = lineno;
     return e;
 }
 static inline RStmt *rstmt_new(RSKind k, int lineno) {
     RStmt *s = calloc(1, sizeof *s);
-    s->kind   = k;
+    s->t   = k;
     s->lineno = lineno;
     return s;
 }
 static inline RDecl *rdecl_new(RDKind k, int lineno) {
     RDecl *d = calloc(1, sizeof *d);
-    d->kind   = k;
+    d->t   = k;
     d->lineno = lineno;
     return d;
 }

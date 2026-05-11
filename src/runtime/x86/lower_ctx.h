@@ -41,15 +41,15 @@ int  labtab_resolve    (LabelTable *lt, SM_Program *p);
 char *kw_canonicalize(const char *raw);
 
 /* Walk proc-body AST, add non-global variable names to sc. */
-void expression_scope_walk(IcnScope *sc, AST_t *e);
+void expression_scope_walk(IcnScope *sc, tree_t *e);
 
 /* ── Macros used by lower.c handlers ────────────────────────────────────── */
 
 #include "../common/ast_clone.h"
 
-#define T0(t) ((t)->nchildren > 0 ? (t)->children[0] : NULL)
-#define T1(t) ((t)->nchildren > 1 ? (t)->children[1] : NULL)
-#define T2(t) ((t)->nchildren > 2 ? (t)->children[2] : NULL)
+#define T0(t) ((t)->n > 0 ? (t)->c[0] : NULL)
+#define T1(t) ((t)->n > 1 ? (t)->c[1] : NULL)
+#define T2(t) ((t)->n > 2 ? (t)->c[2] : NULL)
 
 /* These macros assume the handler has `SM_Program *p = g_p;` in scope. */
 #define LOWER2(op)     do { lower_expr(T0(t)); lower_expr(T1(t)); sm_emit(p,(op)); return; } while(0)

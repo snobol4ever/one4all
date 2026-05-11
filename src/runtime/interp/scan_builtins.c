@@ -25,15 +25,15 @@
  *   1. interp_eval's icn-frame AST_FNC case — preserves mode-1 behaviour.
  *   2. bb_eval_value's AST_FNC case — before the generic builtin arg-eval
  *      loop is fine because args are already pre-evaluated (the dispatch
- *      uses args[] directly, not call->children).
+ *      uses args[] directly, not call->c).
  *   3. icn_call_builtin top — defensive coverage for the coro_bb_fnc path
  *      and for any caller that pre-evaluates args.
  *
  * Design notes.
  * - Args are pre-evaluated.  The original interp_eval-resident code
- *   used `interp_eval(e->children[i])` lazily at point of use; the
+ *   used `interp_eval(e->c[i])` lazily at point of use; the
  *   lifted version reads args[i-1] (because args[0] is the first
- *   *user* argument, corresponding to call->children[1]).  This matches
+ *   *user* argument, corresponding to call->c[1]).  This matches
  *   the icn_call_builtin / bb_eval_value calling convention and avoids
  *   double-evaluation.
  * - `find` uses `icn_frame_lookup(call, &pos)` to honour outer-pump
@@ -54,10 +54,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-int scan_try_call_builtin(AST_t *call, DESCR_t *args, int nargs, DESCR_t *out)
+int scan_try_call_builtin(tree_t *call, DESCR_t *args, int nargs, DESCR_t *out)
 {
-    if (!call || call->nchildren < 1 || !call->children[0]) return 0;
-    const char *fn = call->children[0]->sval;
+    if (!call || call->n < 1 || !call->c[0]) return 0;
+    const char *fn = call->c[0]->v.sval;
     if (!fn) return 0;
 
     /* any(c, [s, i1, i2]) — succeed if next char is in cset c; advance pos by 1. */

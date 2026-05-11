@@ -22,7 +22,7 @@
  *   1. interp_eval's icn-frame AST_FNC case — preserves mode-1 behaviour.
  *   2. bb_eval_value's AST_FNC case — before the generic builtin arg-eval loop,
  *      because Raku block-receiving builtins (raku_try / raku_map / raku_grep /
- *      raku_sort) need AST_t access and must not be subject to FAIL-prop on
+ *      raku_sort) need tree_t access and must not be subject to FAIL-prop on
  *      the body argument.
  *   3. icn_call_builtin top — defensive coverage for the coro_bb_fnc path.
  *
@@ -70,11 +70,11 @@
  * Internal recursions evaluate children via `bb_eval_value`, not `interp_eval`,
  * to keep this file off the IR-walker call graph (RS-20 isolation invariant).
  *--------------------------------------------------------------------------------------------------------------------------*/
-int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
-    if (!call || call->nchildren < 1 || !call->children[0]) return 0;
-    const char *fn = call->children[0]->sval;
+int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
+    if (!call || call->n < 1 || !call->c[0]) return 0;
+    const char *fn = call->c[0]->v.sval;
     if (!fn) return 0;
-    int nargs = call->nchildren - 1;
+    int nargs = call->n - 1;
 
             /* ── RK-22: Raku string op builtins ────────────────────────────
              * substr($s, $start [, $len])  — 0-based; maps to SNOBOL4 SUBSTR (1-based)
@@ -85,8 +85,8 @@ int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
              * trim($s) — strip leading+trailing whitespace (Raku semantics)
              * chars($s) / length($s) — number of chars                     */
             if (!strcmp(fn,"raku_substr") || (!strcmp(fn,"substr") && nargs >= 2)) {
-                DESCR_t sd = bb_eval_value(call->children[1]);
-                DESCR_t id = bb_eval_value(call->children[2]);
+                DESCR_t sd = bb_eval_value(call->c[1]);
+                DESCR_t id = bb_eval_value(call->c[2]);
                 const char *s = VARVAL_fn(sd); if (!s) s = "";
                 long slen = (long)strlen(s);
                 long start = IS_INT_fn(id) ? id.i : 0;
@@ -95,7 +95,7 @@ int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
                 if (start > slen) start = slen;
                 long len = slen - start;
                 if (nargs >= 3) {
-                    DESCR_t ld = bb_eval_value(call->children[3]);
+                    DESCR_t ld = bb_eval_value(call->c[3]);
                     len = IS_INT_fn(ld) ? ld.i : len;
                     if (len < 0) len = 0;
                     if (start + len > slen) len = slen - start;
@@ -105,25 +105,25 @@ int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
                 { *__rk_out = STRVAL(out); return 1; }
             }
             if (!strcmp(fn,"raku_index") || (!strcmp(fn,"index") && nargs >= 2)) {
-                DESCR_t sd = bb_eval_value(call->children[1]);
-                DESCR_t nd = bb_eval_value(call->children[2]);
+                DESCR_t sd = bb_eval_value(call->c[1]);
+                DESCR_t nd = bb_eval_value(call->c[2]);
                 const char *s = VARVAL_fn(sd); if (!s) s = "";
                 const char *needle = VARVAL_fn(nd); if (!needle) needle = "";
                 long from = 0;
-                if (nargs >= 3) { DESCR_t pd = bb_eval_value(call->children[3]); from = IS_INT_fn(pd)?pd.i:0; }
+                if (nargs >= 3) { DESCR_t pd = bb_eval_value(call->c[3]); from = IS_INT_fn(pd)?pd.i:0; }
                 if (from < 0) from = 0;
                 if (*needle == '\0') { *__rk_out = INTVAL(from); return 1; }
                 const char *found = strstr(s + from, needle);
                 { *__rk_out = found ? INTVAL((long)(found - s)) : INTVAL(-1); return 1; }
             }
             if (!strcmp(fn,"raku_rindex") || (!strcmp(fn,"rindex") && nargs >= 2)) {
-                DESCR_t sd = bb_eval_value(call->children[1]);
-                DESCR_t nd = bb_eval_value(call->children[2]);
+                DESCR_t sd = bb_eval_value(call->c[1]);
+                DESCR_t nd = bb_eval_value(call->c[2]);
                 const char *s = VARVAL_fn(sd); if (!s) s = "";
                 const char *needle = VARVAL_fn(nd); if (!needle) needle = "";
                 long slen = (long)strlen(s);
                 long from = slen;
-                if (nargs >= 3) { DESCR_t pd = bb_eval_value(call->children[3]); from = IS_INT_fn(pd)?pd.i:slen; }
+                if (nargs >= 3) { DESCR_t pd = bb_eval_value(call->c[3]); from = IS_INT_fn(pd)?pd.i:slen; }
                 size_t nlen = strlen(needle);
                 if (nlen == 0) { *__rk_out = INTVAL(from < slen ? from : slen); return 1; }
                 long best = -1;
@@ -136,8 +136,8 @@ int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
                 /* RK-23: $s ~~ /pattern/ — substring search (literal regex subset).
                  * Returns INTVAL(1) on match, FAILDESCR on no match.
                  * If pattern evaluates to DT_P, dispatch through match_pattern. */
-                DESCR_t sd = bb_eval_value(call->children[1]);
-                DESCR_t pd = bb_eval_value(call->children[2]);
+                DESCR_t sd = bb_eval_value(call->c[1]);
+                DESCR_t pd = bb_eval_value(call->c[2]);
                 const char *subj = VARVAL_fn(sd); if (!subj) subj = "";
                 if (pd.v == DT_P) {
                     extern int exec_stmt(const char *, DESCR_t *, DESCR_t, DESCR_t *, int);
@@ -155,8 +155,8 @@ int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
             if (!strcmp(fn,"raku_match_global") && nargs == 2) {
                 /* RK-37: $s ~~ m:g/pat/ -- collect all non-overlapping matches */
                 /* Returns SOH-delimited list of full-match strings for for-loop */
-                DESCR_t sd = bb_eval_value(call->children[1]);
-                DESCR_t pd = bb_eval_value(call->children[2]);
+                DESCR_t sd = bb_eval_value(call->c[1]);
+                DESCR_t pd = bb_eval_value(call->c[2]);
                 const char *subj = VARVAL_fn(sd); if (!subj) subj = "";
                 const char *pat  = VARVAL_fn(pd); if (!pat)  pat  = "";
                 Raku_nfa *nfa = raku_nfa_build(pat);
@@ -191,8 +191,8 @@ int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
             if (!strcmp(fn,"raku_subst") && nargs == 2) {
                 /* RK-37: $s ~~ s/pat/repl/[g] -- substitution */
                 /* tok format: "pat\x01repl\x01flag" where flag=g or - */
-                DESCR_t sd = bb_eval_value(call->children[1]);
-                DESCR_t td = bb_eval_value(call->children[2]);
+                DESCR_t sd = bb_eval_value(call->c[1]);
+                DESCR_t td = bb_eval_value(call->c[2]);
                 const char *subj = VARVAL_fn(sd); if (!subj) subj = "";
                 const char *tok  = VARVAL_fn(td); if (!tok)  tok  = "";
                 /* split tok on \x01 */
@@ -224,18 +224,18 @@ int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
                 }
                 raku_nfa_free(nfa);
                 /* update the subject variable in the frame if it was a VAR */
-                if (call->children[1]->kind==AST_VAR && call->children[1]->ival>=0 &&
-                    call->children[1]->ival<FRAME.env_n && frame_depth>0)
-                    FRAME.env[call->children[1]->ival] = STRVAL(res);
+                if (call->c[1]->t==AST_VAR && call->c[1]->v.ival>=0 &&
+                    call->c[1]->v.ival<FRAME.env_n && frame_depth>0)
+                    FRAME.env[call->c[1]->v.ival] = STRVAL(res);
                 { *__rk_out = did_one ? STRVAL(res) : sd; return 1; }
             }
             /* RK-38: file I/O builtins */
             if (!strcmp(fn,"open") && (nargs==1||nargs==2)) {
-                DESCR_t pd=bb_eval_value(call->children[1]);
+                DESCR_t pd=bb_eval_value(call->c[1]);
                 const char *path=VARVAL_fn(pd); if(!path||!*path) { *__rk_out = FAILDESCR; return 1; }
                 const char *mode="r";
                 if(nargs==2){
-                    DESCR_t md=bb_eval_value(call->children[2]);
+                    DESCR_t md=bb_eval_value(call->c[2]);
                     const char *ms=VARVAL_fn(md); if(!ms) ms="";
                     if(strstr(ms,":w")||strstr(ms,"w")) mode="w";
                     else if(strstr(ms,":a")||strstr(ms,"a")) mode="a";
@@ -247,14 +247,14 @@ int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
                 { *__rk_out = INTVAL(idx); return 1; }
             }
             if (!strcmp(fn,"close") && nargs==1) {
-                DESCR_t fd=bb_eval_value(call->children[1]);
+                DESCR_t fd=bb_eval_value(call->c[1]);
                 int idx=(int)(IS_INT_fn(fd)?fd.i:0);
                 FILE *fp=raku_fh_get(idx);
                 if(fp){fclose(fp);raku_fh_free(idx);}
                 { *__rk_out = INTVAL(0); return 1; }
             }
             if (!strcmp(fn,"slurp") && nargs==1) {
-                DESCR_t ad=bb_eval_value(call->children[1]);
+                DESCR_t ad=bb_eval_value(call->c[1]);
                 FILE *fp=NULL; int need_close=0;
                 if(IS_INT_fn(ad)) {
                     fp=raku_fh_get((int)ad.i);
@@ -271,7 +271,7 @@ int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
             }
             if (!strcmp(fn,"lines") && nargs==1) {
                 /* lines(fh|path) -> SOH-delimited line list for for-loop */
-                DESCR_t ad=bb_eval_value(call->children[1]);
+                DESCR_t ad=bb_eval_value(call->c[1]);
                 FILE *fp=NULL; int need_close=0;
                 if(IS_INT_fn(ad)) {
                     fp=raku_fh_get((int)ad.i);
@@ -295,8 +295,8 @@ int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
             }
             if ((!strcmp(fn,"raku_print_fh")||!strcmp(fn,"raku_say_fh")) && nargs==2) {
                 /* RK-39: print/say to file handle */
-                DESCR_t fd=bb_eval_value(call->children[1]);
-                DESCR_t vd=bb_eval_value(call->children[2]);
+                DESCR_t fd=bb_eval_value(call->c[1]);
+                DESCR_t vd=bb_eval_value(call->c[2]);
                 int idx=(int)(IS_INT_fn(fd)?fd.i:1);
                 FILE *fp=raku_fh_get(idx); if(!fp) fp=stdout;
                 const char *s=VARVAL_fn(vd); if(!s) s="";
@@ -306,8 +306,8 @@ int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
             }
             if (!strcmp(fn,"spurt") && nargs==2) {
                 /* RK-56: spurt(path, content) -- write string to file */
-                DESCR_t pd=bb_eval_value(call->children[1]);
-                DESCR_t cd=bb_eval_value(call->children[2]);
+                DESCR_t pd=bb_eval_value(call->c[1]);
+                DESCR_t cd=bb_eval_value(call->c[2]);
                 const char *path=VARVAL_fn(pd); if(!path||!*path) { *__rk_out = FAILDESCR; return 1; }
                 const char *content=VARVAL_fn(cd); if(!content) content="";
                 FILE *fp=fopen(path,"w"); if(!fp) { *__rk_out = FAILDESCR; return 1; }
@@ -316,7 +316,7 @@ int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
             }
             if (!strcmp(fn,"raku_nfa_compile") && nargs == 1) {
                 /* RK-32: compile pattern string -> NFA, print state count, return 0 */
-                DESCR_t pd = bb_eval_value(call->children[1]);
+                DESCR_t pd = bb_eval_value(call->c[1]);
                 const char *pat = VARVAL_fn(pd); if (!pat) pat = "";
                 { Raku_nfa *nfa = raku_nfa_build(pat);
                   if (!nfa) { printf("NFA:%s:ERROR\n", pat); { *__rk_out = INTVAL(0); return 1; } }
@@ -327,7 +327,7 @@ int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
             }
             if (!strcmp(fn,"raku_named_capture") && nargs == 1) {
                 /* RK-35: $<n> named capture from last ~~ match */
-                DESCR_t nd = bb_eval_value(call->children[1]);
+                DESCR_t nd = bb_eval_value(call->c[1]);
                 const char *name = VARVAL_fn(nd); if (!name) name = "";
                 if (!g_raku_match.matched) { *__rk_out = STRVAL(GC_strdup("")); return 1; }
                 int g = -1;
@@ -342,7 +342,7 @@ int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
             }
             if (!strcmp(fn,"raku_capture") && nargs == 1) {
                 /* RK-34: $N positional capture from last ~~ match */
-                DESCR_t nd = bb_eval_value(call->children[1]);
+                DESCR_t nd = bb_eval_value(call->c[1]);
                 int n = (int)(IS_INT_fn(nd) ? nd.i : 0);
                 if (!g_raku_match.matched || n < 0 || n >= g_raku_match.ngroups
                     || g_raku_match.group_start[n] < 0) { *__rk_out = STRVAL(GC_strdup("")); return 1; }
@@ -356,21 +356,21 @@ int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
                 { *__rk_out = STRVAL(out); return 1; }
             }
             if (!strcmp(fn,"raku_uc") || (!strcmp(fn,"uc") && nargs == 1)) {
-                DESCR_t sd = bb_eval_value(call->children[1]);
+                DESCR_t sd = bb_eval_value(call->c[1]);
                 const char *s = VARVAL_fn(sd); if (!s) s = "";
                 char *out = GC_strdup(s);
                 for (char *p = out; *p; p++) *p = (char)toupper((unsigned char)*p);
                 { *__rk_out = STRVAL(out); return 1; }
             }
             if (!strcmp(fn,"raku_lc") || (!strcmp(fn,"lc") && nargs == 1)) {
-                DESCR_t sd = bb_eval_value(call->children[1]);
+                DESCR_t sd = bb_eval_value(call->c[1]);
                 const char *s = VARVAL_fn(sd); if (!s) s = "";
                 char *out = GC_strdup(s);
                 for (char *p = out; *p; p++) *p = (char)tolower((unsigned char)*p);
                 { *__rk_out = STRVAL(out); return 1; }
             }
             if (!strcmp(fn,"raku_trim")) {
-                DESCR_t sd = bb_eval_value(call->children[1]);
+                DESCR_t sd = bb_eval_value(call->c[1]);
                 const char *s = VARVAL_fn(sd); if (!s) s = "";
                 while (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r') s++;
                 size_t len = strlen(s);
@@ -380,7 +380,7 @@ int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
             }
             if (!strcmp(fn,"chars") || !strcmp(fn,"length")) {
                 if (nargs == 1) {
-                    DESCR_t sd = bb_eval_value(call->children[1]);
+                    DESCR_t sd = bb_eval_value(call->c[1]);
                     const char *s = VARVAL_fn(sd); if (!s) s = "";
                     { *__rk_out = INTVAL((long)strlen(s)); return 1; }
                 }
@@ -391,7 +391,7 @@ int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
              * raku_try(body)        — eval body; if FAIL, clear exception, return NULVCL
              * raku_try(body, catch) — eval body; if FAIL, eval catch block, return result */
             if (!strcmp(fn,"raku_die") && nargs >= 1) {
-                DESCR_t md = bb_eval_value(call->children[1]);
+                DESCR_t md = bb_eval_value(call->c[1]);
                 const char *msg = VARVAL_fn(md); if (!msg) msg = "Died";
                 extern char g_raku_exception[512];
                 snprintf(g_raku_exception, sizeof g_raku_exception, "%s", msg);
@@ -400,22 +400,22 @@ int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
             if (!strcmp(fn,"raku_try") && (nargs == 1 || nargs == 2)) {
                 extern char g_raku_exception[512];
                 g_raku_exception[0] = '\0';
-                DESCR_t r = bb_eval_value(call->children[1]);   /* try body */
+                DESCR_t r = bb_eval_value(call->c[1]);   /* try body */
                 int body_failed = IS_FAIL_fn(r);
                 int real_die    = (g_raku_exception[0] != '\0'); /* only raku_die sets this */
                 if (!body_failed) { g_raku_exception[0]='\0'; { *__rk_out = r; return 1; } } /* success */
                 /* body failed */
                 if (nargs == 2 && real_die) {
                     /* CATCH block: only fires on explicit die, not on fall-off-end */
-                    AST_t *catch_blk = call->children[2];
+                    tree_t *catch_blk = call->c[2];
                     int _sl2 = -1;
-                    AST_t *_stk2[64]; int _sn2=0; _stk2[_sn2++]=catch_blk;
+                    tree_t *_stk2[64]; int _sn2=0; _stk2[_sn2++]=catch_blk;
                     while (_sn2>0 && _sl2<0) {
-                        AST_t *_n=_stk2[--_sn2]; if(!_n) continue;
-                        if(_n->kind==AST_VAR && _n->sval &&
-                           (strcmp(_n->sval,"$!")==0||strcmp(_n->sval,"!")==0))
-                            _sl2=(int)_n->ival;
-                        for(int _ci=0;_ci<_n->nchildren&&_sn2<62;_ci++) _stk2[_sn2++]=_n->children[_ci];
+                        tree_t *_n=_stk2[--_sn2]; if(!_n) continue;
+                        if(_n->t==AST_VAR && _n->v.sval &&
+                           (strcmp(_n->v.sval,"$!")==0||strcmp(_n->v.sval,"!")==0))
+                            _sl2=(int)_n->v.ival;
+                        for(int _ci=0;_ci<_n->n&&_sn2<62;_ci++) _stk2[_sn2++]=_n->c[_ci];
                     }
                     DESCR_t exc_d = STRVAL(GC_strdup(g_raku_exception));
                     if (_sl2 >= 0 && _sl2 < FRAME.env_n) FRAME.env[_sl2] = exc_d;
@@ -441,8 +441,8 @@ int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
 #define SOH '\x01'
 
             if (!strcmp(fn,"raku_map") && nargs == 2) {
-                AST_t *blk = call->children[1];          /* block AST_t* */
-                DESCR_t arrd = bb_eval_value(call->children[2]);
+                tree_t *blk = call->c[1];          /* block tree_t* */
+                DESCR_t arrd = bb_eval_value(call->c[2]);
                 const char *as = VARVAL_fn(arrd); if (!as) as = "";
                 /* iterate elems, eval block with $_ bound, collect */
                 char *out = GC_strdup("");
@@ -458,17 +458,17 @@ int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
                       char *_ep_ev; long _iv_ev = strtol(elem, &_ep_ev, 10);
                       DESCR_t _ev = (*_ep_ev == '\0' && _ep_ev > elem) ? INTVAL(_iv_ev) : STRVAL(elem);
                       int _sl = -1;
-                      AST_t *_stk[64]; int _sn=0; _stk[_sn++]=blk;
+                      tree_t *_stk[64]; int _sn=0; _stk[_sn++]=blk;
                       while (_sn>0 && _sl<0) {
-                          AST_t *_n=_stk[--_sn];
+                          tree_t *_n=_stk[--_sn];
                           if (!_n) continue;
-                          if (_n->kind==AST_VAR && _n->sval) {
-                              const char *_sv = _n->sval;
+                          if (_n->t==AST_VAR && _n->v.sval) {
+                              const char *_sv = _n->v.sval;
                               /* match "$_" or "_" (sigil may be stripped) */
                               if (strcmp(_sv,"$_")==0 || strcmp(_sv,"_")==0)
-                                  _sl=(int)_n->ival;
+                                  _sl=(int)_n->v.ival;
                           }
-                          for(int _ci=0;_ci<_n->nchildren&&_sn<62;_ci++) _stk[_sn++]=_n->children[_ci];
+                          for(int _ci=0;_ci<_n->n&&_sn<62;_ci++) _stk[_sn++]=_n->c[_ci];
                       }
                       if (_sl >= 0 && _sl < FRAME.env_n) FRAME.env[_sl] = _ev;
                       else NV_SET_fn("$_", _ev); }
@@ -491,8 +491,8 @@ int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
             }
 
             if (!strcmp(fn,"raku_grep") && nargs == 2) {
-                AST_t *blk = call->children[1];
-                DESCR_t arrd = bb_eval_value(call->children[2]);
+                tree_t *blk = call->c[1];
+                DESCR_t arrd = bb_eval_value(call->c[2]);
                 const char *as = VARVAL_fn(arrd); if (!as) as = "";
                 char *out = GC_strdup("");
                 const char *seg = as;
@@ -507,17 +507,17 @@ int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
                       char *_ep_ev; long _iv_ev = strtol(elem, &_ep_ev, 10);
                       DESCR_t _ev = (*_ep_ev == '\0' && _ep_ev > elem) ? INTVAL(_iv_ev) : STRVAL(elem);
                       int _sl = -1;
-                      AST_t *_stk[64]; int _sn=0; _stk[_sn++]=blk;
+                      tree_t *_stk[64]; int _sn=0; _stk[_sn++]=blk;
                       while (_sn>0 && _sl<0) {
-                          AST_t *_n=_stk[--_sn];
+                          tree_t *_n=_stk[--_sn];
                           if (!_n) continue;
-                          if (_n->kind==AST_VAR && _n->sval) {
-                              const char *_sv = _n->sval;
+                          if (_n->t==AST_VAR && _n->v.sval) {
+                              const char *_sv = _n->v.sval;
                               /* match "$_" or "_" (sigil may be stripped) */
                               if (strcmp(_sv,"$_")==0 || strcmp(_sv,"_")==0)
-                                  _sl=(int)_n->ival;
+                                  _sl=(int)_n->v.ival;
                           }
-                          for(int _ci=0;_ci<_n->nchildren&&_sn<62;_ci++) _stk[_sn++]=_n->children[_ci];
+                          for(int _ci=0;_ci<_n->n&&_sn<62;_ci++) _stk[_sn++]=_n->c[_ci];
                       }
                       if (_sl >= 0 && _sl < FRAME.env_n) FRAME.env[_sl] = _ev;
                       else NV_SET_fn("$_", _ev); }
@@ -541,9 +541,9 @@ int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
             if (!strcmp(fn,"raku_sort") && (nargs == 1 || nargs == 2)) {
                 /* Simple lexicographic sort; numeric if all-integer elements.
                  * With block (nargs==2): use $a/$b comparator block. */
-                DESCR_t arrd = bb_eval_value(call->children[nargs == 2 ? 2 : 1]);
+                DESCR_t arrd = bb_eval_value(call->c[nargs == 2 ? 2 : 1]);
                 const char *as = VARVAL_fn(arrd); if (!as || !*as) { *__rk_out = STRVAL(GC_strdup("")); return 1; }
-                AST_t *blk = (nargs == 2) ? call->children[1] : NULL;
+                tree_t *blk = (nargs == 2) ? call->c[1] : NULL;
                 /* split into array of strings */
                 int cnt = 1; for (const char *p=as;*p;p++) if(*p==SOH) cnt++;
                 char **elems = GC_malloc((size_t)cnt * sizeof(char*));
@@ -614,11 +614,11 @@ int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
              * ──────────────────────────────────────────────────────────────*/
             if (!strcmp(fn,"raku_new")) {
                 /* children: [fn_name_var, classname_qlit, key1, val1, ...] */
-                /* call->children[0] = AST_VAR("raku_new") (make_call layout)
-                 * call->children[1] = AST_QLIT(classname)
-                 * call->children[2..] = alternating key, val */
-                if (call->nchildren < 2) { *__rk_out = NULVCL; return 1; }
-                DESCR_t cnameD = bb_eval_value(call->children[1]);
+                /* call->c[0] = AST_VAR("raku_new") (make_call layout)
+                 * call->c[1] = AST_QLIT(classname)
+                 * call->c[2..] = alternating key, val */
+                if (call->n < 2) { *__rk_out = NULVCL; return 1; }
+                DESCR_t cnameD = bb_eval_value(call->c[1]);
                 const char *cname = VARVAL_fn(cnameD);
                 if (!cname || !*cname) { *__rk_out = FAILDESCR; return 1; }
                 ScDatType *t = sc_dat_find_type(cname);
@@ -627,9 +627,9 @@ int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
                 DESCR_t fvals[64];
                 for (int i=0;i<t->nfields && i<64;i++) fvals[i]=NULVCL;
                 /* Walk named pairs: children[2],children[3] = key,val ... */
-                for (int ci=2; ci+1 < call->nchildren; ci+=2) {
-                    DESCR_t kD = bb_eval_value(call->children[ci]);
-                    DESCR_t vD = bb_eval_value(call->children[ci+1]);
+                for (int ci=2; ci+1 < call->n; ci+=2) {
+                    DESCR_t kD = bb_eval_value(call->c[ci]);
+                    DESCR_t vD = bb_eval_value(call->c[ci+1]);
                     const char *kname = VARVAL_fn(kD);
                     if (!kname) continue;
                     for (int fi=0;fi<t->nfields;fi++) {
@@ -641,9 +641,9 @@ int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
 
             if (!strcmp(fn,"raku_mcall")) {
                 /* children: [fn_var, obj, methname_qlit, arg1, arg2, ...] */
-                if (call->nchildren < 3) { *__rk_out = FAILDESCR; return 1; }
-                DESCR_t obj    = bb_eval_value(call->children[1]);
-                DESCR_t mnameD = bb_eval_value(call->children[2]);
+                if (call->n < 3) { *__rk_out = FAILDESCR; return 1; }
+                DESCR_t obj    = bb_eval_value(call->c[1]);
+                DESCR_t mnameD = bb_eval_value(call->c[2]);
                 const char *mname = VARVAL_fn(mnameD);
                 if (!mname || !*mname) { *__rk_out = FAILDESCR; return 1; }
                 /* Determine class name from obj's DT_DATA type */
@@ -662,11 +662,11 @@ int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
                     if (strcmp(proc_table[pi].name, procname) == 0) break;
                 if (pi >= proc_count) { *__rk_out = FAILDESCR; return 1; }
                 /* Build arg array: self=obj, then extra args */
-                int nextra = call->nchildren - 3;
+                int nextra = call->n - 3;
                 int total  = 1 + nextra;
                 DESCR_t *callargs = GC_malloc((size_t)total * sizeof(DESCR_t));
                 callargs[0] = obj;
-                for (int i=0;i<nextra;i++) callargs[i+1] = bb_eval_value(call->children[3+i]);
+                for (int i=0;i<nextra;i++) callargs[i+1] = bb_eval_value(call->c[3+i]);
                 { *__rk_out = proc_table_call(pi, callargs, total); return 1; }   /* CH-17g-call-sites */
             }
 

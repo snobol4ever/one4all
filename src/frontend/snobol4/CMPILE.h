@@ -91,11 +91,11 @@ void cmpile_free(CMPILE_t *s);
  * depth: indent level; callers pass 0 for root. */
 void cmpnd_print_sexp(CMPND_t *n, FILE *out, int oneline, int depth);
 
-/* cmpnd_to_expr — lower a CMPND_t parse node to AST_t IR (shared IR).
+/* cmpnd_to_expr — lower a CMPND_t parse node to tree_t IR (shared IR).
  * Defined in snobol4_pattern.c; declared here so callers can link against it
  * without pulling in the full runtime.  Returns NULL for empty/unknown nodes. */
-struct AST_t;   /* forward — full definition in scrip_cc.h */
-struct AST_t *cmpnd_to_expr(CMPND_t *n);
+struct tree_t;   /* forward — full definition in scrip_cc.h */
+struct tree_t *cmpnd_to_expr(CMPND_t *n);
 
 /* cmpile_print — dump one CMPILE_t statement.
  * oneline=0: labelled fields.  oneline=1: single-line S-expression.

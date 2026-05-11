@@ -73,7 +73,7 @@ void pl_write(Term *t) {
             printf("_G%d", t->var_slot);
             break;
         case TT_INT:
-            printf("%ld", t->ival);
+            printf("%ld", t->v.ival);
             break;
         case TT_FLOAT: {
             double fv = t->fval;
@@ -90,7 +90,7 @@ void pl_write(Term *t) {
             if (strcmp(fn, "$VAR") == 0 && t->compound.arity == 1) {
                 Term *n = term_deref(t->compound.args[0]);
                 if (n && n->tag == TT_INT) {
-                    long num = n->ival;
+                    long num = n->v.ival;
                     int letter = (int)(num % 26);
                     long suffix = num / 26;
                     if (suffix == 0) printf("%c", 'A' + letter);
@@ -256,7 +256,7 @@ static void pl_writeq_term(Term *t) {
             printf("_G%d", t->var_slot);
             break;
         case TT_INT:
-            printf("%ld", t->ival);
+            printf("%ld", t->v.ival);
             break;
         case TT_FLOAT: {
             double fv = t->fval;
@@ -271,7 +271,7 @@ static void pl_writeq_term(Term *t) {
             if (strcmp(fn,"$VAR")==0 && t->compound.arity==1) {
                 Term *n = term_deref(t->compound.args[0]);
                 if (n && n->tag == TT_INT) {
-                    long num = n->ival; int letter=(int)(num%26); long suf=num/26;
+                    long num = n->v.ival; int letter=(int)(num%26); long suf=num/26;
                     if (suf==0) printf("%c",'A'+letter); else printf("%c%ld",'A'+letter,suf);
                     break;
                 }
@@ -362,7 +362,7 @@ static void pl_write_canonical_term(Term *t) {
             break;
         }
         case TT_VAR:  printf("_G%d",t->var_slot); break;
-        case TT_INT:  printf("%ld",t->ival); break;
+        case TT_INT:  printf("%ld",t->v.ival); break;
         case TT_FLOAT: {
             double fv=t->fval;
             if(fv==(long)fv&&fv>=-1e15&&fv<=1e15) printf("%.1f",fv);
@@ -408,7 +408,7 @@ static void pl_write_to_file(Term *t, FILE *out) {
             break;
         }
         case TT_VAR:   fprintf(out, "_G%d", t->var_slot); break;
-        case TT_INT:   fprintf(out, "%ld", t->ival); break;
+        case TT_INT:   fprintf(out, "%ld", t->v.ival); break;
         case TT_FLOAT: {
             double fv = t->fval;
             if (fv == (long)fv && fv >= -1e15 && fv <= 1e15) fprintf(out, "%.1f", fv);
@@ -474,7 +474,7 @@ int pl_functor(Term *t, Term *name, Term *arity, Trail *tr) {
                 arity_term = term_new_int(0);
                 break;
             case TT_INT:
-                name_term  = term_new_int(t->ival);
+                name_term  = term_new_int(t->v.ival);
                 arity_term = term_new_int(0);
                 break;
             case TT_FLOAT:
@@ -498,11 +498,11 @@ int pl_functor(Term *t, Term *name, Term *arity, Trail *tr) {
         /* Construct mode: Name and Arity must be bound */
         if (!name || name->tag == TT_VAR) return 0;
         if (!arity || arity->tag != TT_INT) return 0;
-        long ar = arity->ival;
+        long ar = arity->v.ival;
         Term *new_t;
         if (ar == 0) {
             if (name->tag == TT_ATOM) new_t = term_new_atom(name->atom_id);
-            else if (name->tag == TT_INT) new_t = term_new_int(name->ival);
+            else if (name->tag == TT_INT) new_t = term_new_int(name->v.ival);
             else return 0;
         } else {
             if (name->tag != TT_ATOM) return 0;
@@ -530,7 +530,7 @@ int pl_arg(Term *n, Term *compound, Term *arg, Trail *tr) {
 
     if (!n || n->tag != TT_INT) return 0;
     if (!compound || compound->tag != TT_COMPOUND) return 0;
-    long idx = n->ival;  /* 1-based */
+    long idx = n->v.ival;  /* 1-based */
     if (idx < 1 || idx > compound->compound.arity) return 0;
 
     int mark = trail_mark(tr);
@@ -583,7 +583,7 @@ int pl_univ(Term *t, Term *list, Trail *tr) {
             Term *items[1] = { term_new_atom(t->atom_id) };
             result = make_list(1, items);
         } else if (t->tag == TT_INT) {
-            Term *items[1] = { term_new_int(t->ival) };
+            Term *items[1] = { term_new_int(t->v.ival) };
             result = make_list(1, items);
         } else if (t->tag == TT_COMPOUND) {
             int arity = t->compound.arity;
@@ -706,10 +706,10 @@ static Term *pl_eval_arith_term(Term *t) {
                 Term *lv = pl_eval_arith_term(t->compound.args[0]);
                 Term *rv = pl_eval_arith_term(t->compound.args[1]);
                 int is_float = (lv->tag == TT_FLOAT || rv->tag == TT_FLOAT);
-                double ld = (lv->tag == TT_FLOAT) ? lv->fval : (double)lv->ival;
-                double rd = (rv->tag == TT_FLOAT) ? rv->fval : (double)rv->ival;
-                long   li = (lv->tag == TT_INT)   ? lv->ival : (long)lv->fval;
-                long   ri = (rv->tag == TT_INT)   ? rv->ival : (long)rv->fval;
+                double ld = (lv->tag == TT_FLOAT) ? lv->fval : (double)lv->v.ival;
+                double rd = (rv->tag == TT_FLOAT) ? rv->fval : (double)rv->v.ival;
+                long   li = (lv->tag == TT_INT)   ? lv->v.ival : (long)lv->fval;
+                long   ri = (rv->tag == TT_INT)   ? rv->v.ival : (long)rv->fval;
                 if (f == _aid_plus)   return is_float ? term_new_float(ld+rd) : term_new_int(li+ri);
                 if (f == _aid_minus)  return is_float ? term_new_float(ld-rd) : term_new_int(li-ri);
                 if (f == _aid_times)  return is_float ? term_new_float(ld*rd) : term_new_int(li*ri);
@@ -728,8 +728,8 @@ static Term *pl_eval_arith_term(Term *t) {
             }
             if (a == 1) {
                 Term *v = pl_eval_arith_term(t->compound.args[0]);
-                double d = (v->tag == TT_FLOAT) ? v->fval : (double)v->ival;
-                long   i = (v->tag == TT_INT)   ? v->ival : (long)v->fval;
+                double d = (v->tag == TT_FLOAT) ? v->fval : (double)v->v.ival;
+                long   i = (v->tag == TT_INT)   ? v->v.ival : (long)v->fval;
                 if (f == _aid_minus)    return (v->tag==TT_FLOAT) ? term_new_float(-d) : term_new_int(-i);
                 if (f == _aid_abs)      return (v->tag==TT_FLOAT) ? term_new_float(fabs(d)) : term_new_int(i<0?-i:i);
                 if (f == _aid_sqrt)     return term_new_float(sqrt(d));
@@ -758,14 +758,14 @@ static Term *pl_eval_arith_term(Term *t) {
 long pl_eval_arith(Term *t) {
     Term *r = pl_eval_arith_term(t);
     if (!r) return 0;
-    return (r->tag == TT_FLOAT) ? (long)r->fval : r->ival;
+    return (r->tag == TT_FLOAT) ? (long)r->fval : r->v.ival;
 }
 
 /* Floating-point version for mixed-type comparisons */
 static double pl_eval_dbl(Term *t) {
     Term *r = pl_eval_arith_term(t);
     if (!r) return 0.0;
-    return (r->tag == TT_FLOAT) ? r->fval : (double)r->ival;
+    return (r->tag == TT_FLOAT) ? r->fval : (double)r->v.ival;
 }
 
 /* is/2: Result is Expr — unify Result with correctly-typed evaluated term */

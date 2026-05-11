@@ -1246,7 +1246,7 @@ int flat_is_eligible_node(const PATND_t *p)
     /* XVAR: runtime DESCR_t as pattern node — graph unknown at emit time.
      * All other kinds (XARBN, XNME, XFNME, XDSAR, XSPNC, etc.) are invariant:
      * the BB graph structure is fixed at build time. */
-    return p->kind != XVAR;
+    return p->t != XVAR;
 }
 
 /* ── patnd_is_fully_invariant: whole-tree check ──────────────────────── */
@@ -1256,9 +1256,9 @@ int patnd_is_fully_invariant(const PATND_t *p)
 {
     if (!p) return 1;
     if (!flat_is_eligible_node(p)) return 0;
-    if (p->kind == XCAT && p->nchildren > 2) return 0;
-    for (int i = 0; i < p->nchildren; i++)
-        if (!patnd_is_fully_invariant(p->children[i])) return 0;
+    if (p->t == XCAT && p->n > 2) return 0;
+    for (int i = 0; i < p->n; i++)
+        if (!patnd_is_fully_invariant(p->c[i])) return 0;
     return 1;
 }
 

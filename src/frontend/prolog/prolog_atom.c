@@ -178,7 +178,7 @@ Term *term_new_int(long ival) {
     Term *t = GC_malloc(sizeof(Term));
     memset(t, 0, sizeof(Term));
     t->tag  = TT_INT;
-    t->ival = ival;
+    t->v.ival = ival;
     return t;
 }
 

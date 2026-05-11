@@ -1,7 +1,7 @@
 /*============================================================================================================================
  * coro_stmt.h — Pure-BB statement-context evaluator for Icon Byrd boxes (RS-17b)
  *
- * `bb_exec_stmt` executes an AST_t in **statement context** without going
+ * `bb_exec_stmt` executes an tree_t in **statement context** without going
  * through `interp_eval` (the IR-mode-only driver tree-walker).  It is the
  * statement-context analog of `bb_eval_value` (which produces a single
  * DESCR_t).  Statement context means: side effects only — no caller-visible
@@ -37,6 +37,6 @@
  * state (FRAME.returning, FRAME.loop_break, FRAME.suspending, etc.).  No
  * caller-visible return value; mirrors the discarded-result semantics of
  * the 13 call sites this replaces in coro_runtime.c. */
-void bb_exec_stmt(AST_t *e);
+void bb_exec_stmt(tree_t *e);
 
 #endif /* CORO_STMT_H */

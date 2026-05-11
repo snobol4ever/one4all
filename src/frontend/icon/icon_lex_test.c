@@ -33,7 +33,7 @@ static int tokenize_all(const char *src, IcnToken *toks, int max) {
     for (;;) {
         IcnToken t = icn_lex_next(&lx);
         if (n < max) toks[n++] = t;
-        if (t.kind == TK_EOF || t.kind == TK_ERROR || n >= max) break;
+        if (t.t == TK_EOF || t.t == TK_ERROR || n >= max) break;
     }
     return n;
 }
@@ -43,8 +43,8 @@ static int expect1(const char *src, IcnTkKind expected, const char *test_name) {
     IcnToken toks[4];
     int n = tokenize_all(src, toks, 4);
     if (n < 1) { FAIL(test_name, "no tokens"); return 0; }
-    if (toks[0].kind != expected) {
-        FAIL(test_name, "got %s, want %s", icn_tk_name(toks[0].kind), icn_tk_name(expected));
+    if (toks[0].t != expected) {
+        FAIL(test_name, "got %s, want %s", icn_tk_name(toks[0].t), icn_tk_name(expected));
         return 0;
     }
     PASS(test_name);
@@ -86,7 +86,7 @@ static void test_keywords(void) {
         {NULL, 0}
     };
     for (int i = 0; cases[i].src; i++)
-        expect1(cases[i].src, cases[i].kind, cases[i].src);
+        expect1(cases[i].src, cases[i].t, cases[i].src);
 }
 
 static void test_operators(void) {
@@ -132,7 +132,7 @@ static void test_operators(void) {
         {NULL, 0}
     };
     for (int i = 0; cases[i].src; i++)
-        expect1(cases[i].src, cases[i].kind, cases[i].src);
+        expect1(cases[i].src, cases[i].t, cases[i].src);
 }
 
 static void test_punctuation(void) {
@@ -150,7 +150,7 @@ static void test_punctuation(void) {
         {NULL, 0}
     };
     for (int i = 0; cases[i].src; i++)
-        expect1(cases[i].src, cases[i].kind, cases[i].src);
+        expect1(cases[i].src, cases[i].t, cases[i].src);
 }
 
 static void test_integer_literals(void) {
@@ -168,11 +168,11 @@ static void test_integer_literals(void) {
         IcnToken toks[4];
         tokenize_all(cases[i].src, toks, 4);
         char name[64]; snprintf(name, sizeof(name), "int %s", cases[i].src);
-        if (toks[0].kind != TK_INT) {
-            FAIL(name, "not TK_INT, got %s", icn_tk_name(toks[0].kind)); continue;
+        if (toks[0].t != TK_INT) {
+            FAIL(name, "not TK_INT, got %s", icn_tk_name(toks[0].t)); continue;
         }
-        if (toks[0].val.ival != cases[i].expected) {
-            FAIL(name, "value %ld want %ld", toks[0].val.ival, cases[i].expected); continue;
+        if (toks[0].val.v.ival != cases[i].expected) {
+            FAIL(name, "value %ld want %ld", toks[0].val.v.ival, cases[i].expected); continue;
         }
         PASS(name);
     }
@@ -192,8 +192,8 @@ static void test_real_literals(void) {
         IcnToken toks[4];
         tokenize_all(cases[i].src, toks, 4);
         char name[64]; snprintf(name, sizeof(name), "real %s", cases[i].src);
-        if (toks[0].kind != TK_REAL) {
-            FAIL(name, "not TK_REAL, got %s", icn_tk_name(toks[0].kind)); continue;
+        if (toks[0].t != TK_REAL) {
+            FAIL(name, "not TK_REAL, got %s", icn_tk_name(toks[0].t)); continue;
         }
         double diff = toks[0].val.fval - cases[i].expected;
         if (diff < -1e-9 || diff > 1e-9) {
@@ -210,16 +210,16 @@ static void test_string_literals(void) {
     {
         IcnToken toks[4];
         tokenize_all("\"hello\"", toks, 4);
-        if (toks[0].kind == TK_STRING && strcmp(toks[0].val.sval.data, "hello") == 0) PASS("\"hello\"");
-        else FAIL("\"hello\"", "got kind=%s val=%s", icn_tk_name(toks[0].kind),
-                  toks[0].kind == TK_STRING ? toks[0].val.sval.data : "?");
+        if (toks[0].t == TK_STRING && strcmp(toks[0].val.v.sval.data, "hello") == 0) PASS("\"hello\"");
+        else FAIL("\"hello\"", "got kind=%s val=%s", icn_tk_name(toks[0].t),
+                  toks[0].t == TK_STRING ? toks[0].val.v.sval.data : "?");
     }
 
     /* Escape sequences */
     {
         IcnToken toks[4];
         tokenize_all("\"a\\nb\"", toks, 4);
-        if (toks[0].kind == TK_STRING && toks[0].val.sval.data[1] == '\n') PASS("escape \\n");
+        if (toks[0].t == TK_STRING && toks[0].val.v.sval.data[1] == '\n') PASS("escape \\n");
         else FAIL("escape \\n", "bad escape");
     }
 
@@ -227,16 +227,16 @@ static void test_string_literals(void) {
     {
         IcnToken toks[4];
         tokenize_all("\"\"", toks, 4);
-        if (toks[0].kind == TK_STRING && toks[0].val.sval.len == 0) PASS("empty string");
-        else FAIL("empty string", "kind=%s len=%zu", icn_tk_name(toks[0].kind),
-                  toks[0].kind == TK_STRING ? toks[0].val.sval.len : 999);
+        if (toks[0].t == TK_STRING && toks[0].val.v.sval.len == 0) PASS("empty string");
+        else FAIL("empty string", "kind=%s len=%zu", icn_tk_name(toks[0].t),
+                  toks[0].t == TK_STRING ? toks[0].val.v.sval.len : 999);
     }
 
     /* "done" — appears in corpus */
     {
         IcnToken toks[4];
         tokenize_all("\"done\"", toks, 4);
-        if (toks[0].kind == TK_STRING && strcmp(toks[0].val.sval.data, "done") == 0) PASS("\"done\"");
+        if (toks[0].t == TK_STRING && strcmp(toks[0].val.v.sval.data, "done") == 0) PASS("\"done\"");
         else FAIL("\"done\"", "bad");
     }
 }
@@ -246,13 +246,13 @@ static void test_cset_literals(void) {
     {
         IcnToken toks[4];
         tokenize_all("'abc'", toks, 4);
-        if (toks[0].kind == TK_CSET && strcmp(toks[0].val.sval.data, "abc") == 0) PASS("'abc'");
-        else FAIL("'abc'", "got kind=%s", icn_tk_name(toks[0].kind));
+        if (toks[0].t == TK_CSET && strcmp(toks[0].val.v.sval.data, "abc") == 0) PASS("'abc'");
+        else FAIL("'abc'", "got kind=%s", icn_tk_name(toks[0].t));
     }
     {
         IcnToken toks[4];
         tokenize_all("''", toks, 4);
-        if (toks[0].kind == TK_CSET && toks[0].val.sval.len == 0) PASS("empty cset");
+        if (toks[0].t == TK_CSET && toks[0].val.v.sval.len == 0) PASS("empty cset");
         else FAIL("empty cset", "bad");
     }
 }
@@ -267,10 +267,10 @@ static void test_identifiers(void) {
         IcnToken toks[4];
         tokenize_all(cases[i].src, toks, 4);
         char name[64]; snprintf(name, sizeof(name), "ident %s", cases[i].src);
-        if (toks[0].kind == TK_IDENT && strcmp(toks[0].val.sval.data, cases[i].src) == 0)
+        if (toks[0].t == TK_IDENT && strcmp(toks[0].val.v.sval.data, cases[i].src) == 0)
             PASS(name);
         else
-            FAIL(name, "got kind=%s", icn_tk_name(toks[0].kind));
+            FAIL(name, "got kind=%s", icn_tk_name(toks[0].t));
     }
 }
 
@@ -279,16 +279,16 @@ static void test_eof(void) {
     {
         IcnToken toks[4];
         int n = tokenize_all("", toks, 4);
-        if (n >= 1 && toks[0].kind == TK_EOF) PASS("empty source → EOF");
-        else FAIL("empty source → EOF", "n=%d kind=%s", n, n>0 ? icn_tk_name(toks[0].kind) : "?");
+        if (n >= 1 && toks[0].t == TK_EOF) PASS("empty source → EOF");
+        else FAIL("empty source → EOF", "n=%d kind=%s", n, n>0 ? icn_tk_name(toks[0].t) : "?");
     }
     /* Multiple calls after EOF still return EOF */
     {
         IcnLexer lx; icn_lex_init(&lx, "");
         IcnToken a = icn_lex_next(&lx);
         IcnToken b = icn_lex_next(&lx);
-        if (a.kind == TK_EOF && b.kind == TK_EOF) PASS("repeated EOF");
-        else FAIL("repeated EOF", "a=%s b=%s", icn_tk_name(a.kind), icn_tk_name(b.kind));
+        if (a.t == TK_EOF && b.t == TK_EOF) PASS("repeated EOF");
+        else FAIL("repeated EOF", "a=%s b=%s", icn_tk_name(a.t), icn_tk_name(b.t));
     }
 }
 
@@ -297,8 +297,8 @@ static void test_comments(void) {
     {
         IcnToken toks[4];
         int n = tokenize_all("# this is a comment\n42", toks, 4);
-        if (n >= 1 && toks[0].kind == TK_INT && toks[0].val.ival == 42) PASS("# comment skipped");
-        else FAIL("# comment skipped", "n=%d kind=%s", n, n>0 ? icn_tk_name(toks[0].kind) : "?");
+        if (n >= 1 && toks[0].t == TK_INT && toks[0].val.v.ival == 42) PASS("# comment skipped");
+        else FAIL("# comment skipped", "n=%d kind=%s", n, n>0 ? icn_tk_name(toks[0].t) : "?");
     }
 }
 
@@ -327,8 +327,8 @@ static void test_corpus_file(const char *path) {
     int errors = 0;
     for (;;) {
         IcnToken t = icn_lex_next(&lx);
-        if (t.kind == TK_ERROR) { errors++; printf("    error: %s\n", lx.errmsg); }
-        if (t.kind == TK_EOF) break;
+        if (t.t == TK_ERROR) { errors++; printf("    error: %s\n", lx.errmsg); }
+        if (t.t == TK_EOF) break;
     }
     free(src);
 
@@ -366,9 +366,9 @@ static void test_sequence(const char *src, IcnTkKind *expected, int n, const cha
     int ok = 1;
     if (got < n) { FAIL(name, "only %d tokens, want %d", got, n); return; }
     for (int i = 0; i < n; i++) {
-        if (toks[i].kind != expected[i]) {
+        if (toks[i].t != expected[i]) {
             FAIL(name, "tok[%d]: got %s want %s", i,
-                 icn_tk_name(toks[i].kind), icn_tk_name(expected[i]));
+                 icn_tk_name(toks[i].t), icn_tk_name(expected[i]));
             ok = 0; break;
         }
     }
@@ -402,7 +402,7 @@ static void test_sequences(void) {
         int n = tokenize_all("1\n2", toks, 8);
         int found_semi = 0;
         for (int i = 0; i < n; i++)
-            if (toks[i].kind == TK_SEMICOL) found_semi = 1;
+            if (toks[i].t == TK_SEMICOL) found_semi = 1;
         if (!found_semi) PASS("no auto-semicolon on newline");
         else FAIL("no auto-semicolon on newline", "found spurious semicolon");
     }

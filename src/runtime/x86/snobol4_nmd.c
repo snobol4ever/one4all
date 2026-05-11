@@ -236,10 +236,10 @@ void NAME_pop(void)
 /* same_var_target — last-write-wins dedup helper used inline below. */
 static int same_var_target(const NAME_entry_t *a, const NAME_entry_t *b)
 {
-    if (a->name.kind != b->name.kind) return 0;
-    if (a->name.kind == NM_PTR)
+    if (a->name.t != b->name.t) return 0;
+    if (a->name.t == NM_PTR)
         return a->name.var_ptr && a->name.var_ptr == b->name.var_ptr;
-    if (a->name.kind == NM_VAR)
+    if (a->name.t == NM_VAR)
         return a->name.var_name && b->name.var_name
                && strcmp(a->name.var_name, b->name.var_name) == 0;
     return 0;
@@ -254,12 +254,12 @@ void NAME_commit(void)
         NAME_entry_t *e = &es[i];
         if (!e->live) continue;
 
-        if (e->name.kind == NM_VAR || e->name.kind == NM_PTR) {
+        if (e->name.t == NM_VAR || e->name.t == NM_PTR) {
             int superseded = 0;
             for (int j = i + 1; j < ctx->top; j++) {
                 NAME_entry_t *f = &es[j];
                 if (!f->live) continue;
-                if (f->name.kind == NM_CALL) break;
+                if (f->name.t == NM_CALL) break;
                 if (same_var_target(e, f)) { superseded = 1; break; }
             }
             if (superseded) continue;

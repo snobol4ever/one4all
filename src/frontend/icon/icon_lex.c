@@ -49,7 +49,7 @@ static void buf_push(char **buf, int *len, int *cap, char c) {
 static IcnToken make_tok(IcnTkKind kind, int line, int col) {
     IcnToken t;
     memset(&t, 0, sizeof(t));
-    t.kind = kind; t.line = line; t.col = col;
+    t.t = kind; t.line = line; t.col = col;
     return t;
 }
 
@@ -103,7 +103,7 @@ static const KwEntry keywords[] = {
 static IcnTkKind lookup_keyword(const char *word) {
     for (int i = 0; keywords[i].word; i++)
         if (strcmp(keywords[i].word, word) == 0)
-            return keywords[i].kind;
+            return keywords[i].t;
     return TK_IDENT;
 }
 
@@ -180,8 +180,8 @@ static IcnToken scan_string(IcnLexer *lx) {
     lex_advance(lx); /* consume closing " */
     if (!buf) buf = strdup("");
     IcnToken t = make_tok(TK_STRING, line, col);
-    t.val.sval.data = buf;
-    t.val.sval.len  = (size_t)len;
+    t.val.v.sval.data = buf;
+    t.val.v.sval.len  = (size_t)len;
     return t;
 }
 
@@ -208,8 +208,8 @@ static IcnToken scan_cset(IcnLexer *lx) {
     lex_advance(lx); /* consume closing ' */
     if (!buf) buf = strdup("");
     IcnToken t = make_tok(TK_CSET, line, col);
-    t.val.sval.data = buf;
-    t.val.sval.len  = (size_t)len;
+    t.val.v.sval.data = buf;
+    t.val.v.sval.len  = (size_t)len;
     return t;
 }
 
@@ -235,7 +235,7 @@ static IcnToken scan_number(IcnLexer *lx) {
         long val = strtol(buf, NULL, 16);
         free(buf);
         IcnToken t = make_tok(TK_INT, line, col);
-        t.val.ival = val;
+        t.val.v.ival = val;
         return t;
     }
 
@@ -262,7 +262,7 @@ static IcnToken scan_number(IcnLexer *lx) {
         }
         free(buf);
         IcnToken t = make_tok(TK_INT, line, col);
-        t.val.ival = val;
+        t.val.v.ival = val;
         return t;
     }
 
@@ -290,7 +290,7 @@ static IcnToken scan_number(IcnLexer *lx) {
         t.val.fval = strtod(buf, NULL);
     } else {
         t = make_tok(TK_INT, line, col);
-        t.val.ival = strtol(buf, NULL, 10);
+        t.val.v.ival = strtol(buf, NULL, 10);
     }
     free(buf);
     return t;
@@ -310,8 +310,8 @@ static IcnToken scan_ident(IcnLexer *lx) {
     IcnTkKind kind = lookup_keyword(buf);
     IcnToken t = make_tok(kind, line, col);
     if (kind == TK_IDENT) {
-        t.val.sval.data = buf;
-        t.val.sval.len  = (size_t)len;
+        t.val.v.sval.data = buf;
+        t.val.v.sval.len  = (size_t)len;
     } else {
         free(buf); /* keyword — no string payload needed */
     }

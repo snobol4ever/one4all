@@ -90,7 +90,7 @@
 #include <gc/gc.h>
 
 /* eval_node lives in src/runtime/x86/eval_code.c — IR-free expression evaluator. */
-extern DESCR_t eval_node(AST_t *e);
+extern DESCR_t eval_node(tree_t *e);
 
 /* GOAL-ICON-BB-COMPLETE A3-seed-fix: canonical Icon ?E LCG seed.
  * Shared with src/runtime/x86/sm_interp.c (SM ICN_RANDOM dispatch) and
@@ -115,11 +115,11 @@ unsigned long bb_icn_rnd_seed = 12345UL;
  * then delegate to `shared_arith` in runtime/common/coerce.c.  One helper
  * instead of six near-identical cases — and the same code path SM mode uses.
  *----------------------------------------------------------------------------------------------------------------------------*/
-static DESCR_t bb_arith(AST_t *e, sm_opcode_t op)
+static DESCR_t bb_arith(tree_t *e, sm_opcode_t op)
 {
-    if (e->nchildren < 2) return FAILDESCR;
-    DESCR_t l = bb_eval_value(e->children[0]);
-    DESCR_t r = bb_eval_value(e->children[1]);
+    if (e->n < 2) return FAILDESCR;
+    DESCR_t l = bb_eval_value(e->c[0]);
+    DESCR_t r = bb_eval_value(e->c[1]);
     if (l.v == DT_FAIL || r.v == DT_FAIL) return FAILDESCR;
     if (l.v == DT_S)    l = INTVAL(to_int(l));
     if (r.v == DT_S)    r = INTVAL(to_int(r));
@@ -138,11 +138,11 @@ static DESCR_t bb_arith(AST_t *e, sm_opcode_t op)
  *----------------------------------------------------------------------------------------------------------------------------*/
 typedef enum { BBR_LT, BBR_LE, BBR_GT, BBR_GE, BBR_EQ, BBR_NE } bb_relop_t;
 
-static DESCR_t bb_numrel(AST_t *e, bb_relop_t op)
+static DESCR_t bb_numrel(tree_t *e, bb_relop_t op)
 {
-    if (e->nchildren < 2) return FAILDESCR;
-    DESCR_t l = bb_eval_value(e->children[0]);
-    DESCR_t r = bb_eval_value(e->children[1]);
+    if (e->n < 2) return FAILDESCR;
+    DESCR_t l = bb_eval_value(e->c[0]);
+    DESCR_t r = bb_eval_value(e->c[1]);
     if (IS_FAIL_fn(l) || IS_FAIL_fn(r)) return FAILDESCR;
     double lv = (l.v == DT_R) ? l.r : (double)(l.v == DT_I ? l.i : 0);
     double rv = (r.v == DT_R) ? r.r : (double)(r.v == DT_I ? r.i : 0);
@@ -169,11 +169,11 @@ static DESCR_t bb_numrel(AST_t *e, bb_relop_t op)
  *----------------------------------------------------------------------------------------------------------------------------*/
 typedef enum { BBS_LLT, BBS_LLE, BBS_LGT, BBS_LGE, BBS_LEQ, BBS_LNE } bb_strrelop_t;
 
-static DESCR_t bb_strrel(AST_t *e, bb_strrelop_t op)
+static DESCR_t bb_strrel(tree_t *e, bb_strrelop_t op)
 {
-    if (e->nchildren < 2) return FAILDESCR;
-    DESCR_t l = bb_eval_value(e->children[0]);
-    DESCR_t r = bb_eval_value(e->children[1]);
+    if (e->n < 2) return FAILDESCR;
+    DESCR_t l = bb_eval_value(e->c[0]);
+    DESCR_t r = bb_eval_value(e->c[1]);
     if (IS_FAIL_fn(l) || IS_FAIL_fn(r)) return FAILDESCR;
     const char *ls = VARVAL_fn(l); if (!ls) ls = "";
     const char *rs = VARVAL_fn(r); if (!rs) rs = "";
@@ -204,11 +204,11 @@ static DESCR_t bb_strrel(AST_t *e, bb_strrelop_t op)
  * bb_eval_value).  If one ever did, descr_to_str_icn would fail-through
  * to FAILDESCR rather than producing garbage.
  *----------------------------------------------------------------------------------------------------------------------------*/
-static DESCR_t bb_str_concat(AST_t *e)
+static DESCR_t bb_str_concat(tree_t *e)
 {
-    if (e->nchildren < 2) return NULVCL;
-    DESCR_t a = bb_eval_value(e->children[0]);
-    DESCR_t b = bb_eval_value(e->children[1]);
+    if (e->n < 2) return NULVCL;
+    DESCR_t a = bb_eval_value(e->c[0]);
+    DESCR_t b = bb_eval_value(e->c[1]);
     if (IS_FAIL_fn(a) || IS_FAIL_fn(b)) return FAILDESCR;
     DESCR_t as = descr_to_str_icn(a);
     DESCR_t bs = descr_to_str_icn(b);
@@ -236,16 +236,16 @@ static DESCR_t bb_str_concat(AST_t *e)
  *----------------------------------------------------------------------------------------------------------------------------*/
 typedef enum { BBS_RANGE, BBS_PLUS, BBS_MINUS } bb_section_t;
 
-static DESCR_t bb_section(AST_t *e, bb_section_t kind)
+static DESCR_t bb_section(tree_t *e, bb_section_t kind)
 {
-    if (e->nchildren < 3) return NULVCL;
-    DESCR_t sd = bb_eval_value(e->children[0]);
+    if (e->n < 3) return NULVCL;
+    DESCR_t sd = bb_eval_value(e->c[0]);
     if (IS_FAIL_fn(sd)) return FAILDESCR;
     const char *s = VARVAL_fn(sd);
     if (!s) s = "";
     int slen = (int)strlen(s);
-    DESCR_t a1 = bb_eval_value(e->children[1]);
-    DESCR_t a2 = bb_eval_value(e->children[2]);
+    DESCR_t a1 = bb_eval_value(e->c[1]);
+    DESCR_t a2 = bb_eval_value(e->c[2]);
     if (IS_FAIL_fn(a1) || IS_FAIL_fn(a2)) return FAILDESCR;
     int i = (int)to_int(a1);
     int x = (int)to_int(a2);   /* j for RANGE, n for PLUS/MINUS */
@@ -346,24 +346,24 @@ static DESCR_t bb_augop_compute(DESCR_t lv, DESCR_t rv, IcnTkKind op)
  * AUGOP_APPLY macro never wrote back to keyword lvalues).  Callers
  * already checked !IS_FAIL_fn(res).
  *----------------------------------------------------------------------------------------------------------------------------*/
-static void bb_augop_writeback(AST_t *lhs, DESCR_t res)
+static void bb_augop_writeback(tree_t *lhs, DESCR_t res)
 {
     if (!lhs) return;
-    if (lhs->kind == AST_VAR) {
-        int slot = (int)lhs->ival;
+    if (lhs->t == AST_VAR) {
+        int slot = (int)lhs->v.ival;
         if (frame_depth > 0 && slot >= 0 && slot < FRAME.env_n)
             FRAME.env[slot] = res;
-        else if (slot < 0 && lhs->sval && lhs->sval[0] != '&')
-            set_and_trace(lhs->sval, res);
-    } else if (lhs->kind == AST_IDX && lhs->nchildren >= 2) {
-        DESCR_t base = bb_eval_value(lhs->children[0]);
-        DESCR_t idx  = bb_eval_value(lhs->children[1]);
+        else if (slot < 0 && lhs->v.sval && lhs->v.sval[0] != '&')
+            set_and_trace(lhs->v.sval, res);
+    } else if (lhs->t == AST_IDX && lhs->n >= 2) {
+        DESCR_t base = bb_eval_value(lhs->c[0]);
+        DESCR_t idx  = bb_eval_value(lhs->c[1]);
         if (!IS_FAIL_fn(base) && !IS_FAIL_fn(idx))
             subscript_set(base, idx, res);
-    } else if (lhs->kind == AST_FIELD && lhs->sval && lhs->nchildren >= 1) {
-        DESCR_t obj = bb_eval_value(lhs->children[0]);
+    } else if (lhs->t == AST_FIELD && lhs->v.sval && lhs->n >= 1) {
+        DESCR_t obj = bb_eval_value(lhs->c[0]);
         if (!IS_FAIL_fn(obj)) {
-            DESCR_t *cell = data_field_ptr(lhs->sval, obj);
+            DESCR_t *cell = data_field_ptr(lhs->v.sval, obj);
             if (cell) *cell = res;
         }
     }
@@ -382,14 +382,14 @@ static void bb_augop_writeback(AST_t *lhs, DESCR_t res)
  * FRAME.env[ival].  Outside an Icon frame, AST_VAR delegates to eval_node which
  * does the SNOBOL4 NV_GET_fn lookup.
  *----------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t bb_eval_value(AST_t *e)
+DESCR_t bb_eval_value(tree_t *e)
 {
     if (!e) return NULVCL;
 
     /* Icon-frame-aware AST_VAR: slot read when inside an Icon procedure call. */
-    if (e->kind == AST_VAR && frame_depth > 0) {
-        if (e->sval && e->sval[0] == '&') {
-            const char *kw = e->sval + 1;
+    if (e->t == AST_VAR && frame_depth > 0) {
+        if (e->v.sval && e->v.sval[0] == '&') {
+            const char *kw = e->v.sval + 1;
             if (!strcmp(kw, "subject")) return scan_subj ? STRVAL(scan_subj) : NULVCL;
             if (!strcmp(kw, "pos"))     return INTVAL(scan_pos);
             if (!strcmp(kw, "letters")) return STRVAL("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
@@ -400,16 +400,16 @@ DESCR_t bb_eval_value(AST_t *e)
             if (!strcmp(kw, "fail"))    return FAILDESCR;
             return NULVCL;
         }
-        int slot = (int)e->ival;
+        int slot = (int)e->v.ival;
         if (slot >= 0 && slot < FRAME.env_n) return FRAME.env[slot];
-        if (slot < 0 && e->sval && e->sval[0] != '&') return NV_GET_fn(e->sval);
+        if (slot < 0 && e->v.sval && e->v.sval[0] != '&') return NV_GET_fn(e->v.sval);
         return NULVCL;
     }
 
     /* Kinds that eval_node already handles identically for SNOBOL4 and Icon
      * outside-of-frame: literals, &keywords, NULVCL.  AST_VAR outside an Icon
      * frame goes through eval_node's NV_GET_fn path. */
-    switch (e->kind) {
+    switch (e->t) {
     case AST_ILIT:
     case AST_FLIT:
     case AST_QLIT:
@@ -424,42 +424,42 @@ DESCR_t bb_eval_value(AST_t *e)
      * Mirrors interp_eval.c lines 373-474; all interp_eval(child) replaced
      * with bb_eval_value(child). */
     case AST_ASSIGN: {
-        if (e->nchildren < 2) return NULVCL;
-        DESCR_t val = bb_eval_value(e->children[1]);
+        if (e->n < 2) return NULVCL;
+        DESCR_t val = bb_eval_value(e->c[1]);
         if (IS_FAIL_fn(val)) return FAILDESCR;
-        AST_t *lhs = e->children[0];
-        if (lhs && (lhs->kind == AST_SECTION || lhs->kind == AST_SECTION_PLUS ||
-                    lhs->kind == AST_SECTION_MINUS)) {
+        tree_t *lhs = e->c[0];
+        if (lhs && (lhs->t == AST_SECTION || lhs->t == AST_SECTION_PLUS ||
+                    lhs->t == AST_SECTION_MINUS)) {
             if (icn_string_section_assign(lhs, val)) return val;
             return FAILDESCR;
         }
-        if (lhs && lhs->kind == AST_IDX && lhs->nchildren >= 2) {
+        if (lhs && lhs->t == AST_IDX && lhs->n >= 2) {
             if (icn_string_section_assign(lhs, val)) return val;
-            { DESCR_t _b = bb_eval_value(lhs->children[0]);
+            { DESCR_t _b = bb_eval_value(lhs->c[0]);
               if (_b.v == DT_S || _b.v == DT_SNUL) return FAILDESCR; }
         }
-        if (lhs && lhs->kind == AST_VAR) {
-            if (lhs->sval && lhs->sval[0] == '&') {
-                if (!kw_assign(lhs->sval + 1, val)) return FAILDESCR;
+        if (lhs && lhs->t == AST_VAR) {
+            if (lhs->v.sval && lhs->v.sval[0] == '&') {
+                if (!kw_assign(lhs->v.sval + 1, val)) return FAILDESCR;
                 return val;
             }
-            int slot = (int)lhs->ival;
+            int slot = (int)lhs->v.ival;
             if (slot >= 0 && slot < FRAME.env_n) { FRAME.env[slot] = val; return val; }
-            if (slot < 0 && lhs->sval && lhs->sval[0] != '&') set_and_trace(lhs->sval, val);
-        } else if (lhs && lhs->kind == AST_IDX && lhs->nchildren >= 2) {
-            DESCR_t base = bb_eval_value(lhs->children[0]);
+            if (slot < 0 && lhs->v.sval && lhs->v.sval[0] != '&') set_and_trace(lhs->v.sval, val);
+        } else if (lhs && lhs->t == AST_IDX && lhs->n >= 2) {
+            DESCR_t base = bb_eval_value(lhs->c[0]);
             if (!IS_FAIL_fn(base)) {
-                DESCR_t idx = bb_eval_value(lhs->children[1]);
+                DESCR_t idx = bb_eval_value(lhs->c[1]);
                 if (!IS_FAIL_fn(idx)) subscript_set(base, idx, val);
             }
-        } else if (lhs && lhs->kind == AST_FIELD && lhs->sval && lhs->nchildren >= 1) {
-            DESCR_t obj = bb_eval_value(lhs->children[0]);
+        } else if (lhs && lhs->t == AST_FIELD && lhs->v.sval && lhs->n >= 1) {
+            DESCR_t obj = bb_eval_value(lhs->c[0]);
             if (!IS_FAIL_fn(obj)) {
-                DESCR_t *cell = data_field_ptr(lhs->sval, obj);
+                DESCR_t *cell = data_field_ptr(lhs->v.sval, obj);
                 if (cell) *cell = val;
             }
-        } else if (lhs && lhs->kind == AST_ITERATE && lhs->nchildren >= 1) {
-            DESCR_t cv = bb_eval_value(lhs->children[0]);
+        } else if (lhs && lhs->t == AST_ITERATE && lhs->n >= 1) {
+            DESCR_t cv = bb_eval_value(lhs->c[0]);
             if (!IS_FAIL_fn(cv)) {
                 if (cv.v == DT_T && cv.tbl) {
                     for (int b = 0; b < TABLE_BUCKETS; b++)
@@ -485,12 +485,12 @@ DESCR_t bb_eval_value(AST_t *e)
      * Builtin path evaluates args through bb_eval_value then calls icn_call_builtin
      * (already IR-free).  Mirror of interp_eval.c AST_FNC case but recursion-safe. */
     case AST_FNC: {
-        if (e->nchildren < 1) return NULVCL;
-        const char *fn = e->children[0] ? e->children[0]->sval : NULL;
+        if (e->n < 1) return NULVCL;
+        const char *fn = e->c[0] ? e->c[0]->v.sval : NULL;
         if (!fn) return NULVCL;
-        int nargs = e->nchildren - 1;
+        int nargs = e->n - 1;
         /* RS-23a-raku: Raku block-receiving builtins (raku_try / raku_map /
-         * raku_grep / raku_sort) need raw AST_t access and must NOT be subject
+         * raku_grep / raku_sort) need raw tree_t access and must NOT be subject
          * to FAIL-prop on the body argument — dispatch them here, before the
          * generic user-proc / builtin pre-eval loops below.  raku_try_call_builtin
          * returns 1 if `fn` matched a Raku builtin (and *out is set); 0 means
@@ -504,14 +504,14 @@ DESCR_t bb_eval_value(AST_t *e)
         for (int i = 0; i < proc_count; i++) {
             if (strcmp(proc_table[i].name, fn) != 0) continue;
             DESCR_t *args = nargs > 0 ? GC_malloc((size_t)nargs * sizeof(DESCR_t)) : NULL;
-            for (int j = 0; j < nargs; j++) args[j] = bb_eval_value(e->children[1+j]);
+            for (int j = 0; j < nargs; j++) args[j] = bb_eval_value(e->c[1+j]);
             DESCR_t result = proc_table_call(i, args, nargs);
             return result;
         }
         /* Builtin path: evaluate args through bb_eval_value, then icn_call_builtin. */
         DESCR_t *args = nargs > 0 ? GC_malloc((size_t)nargs * sizeof(DESCR_t)) : NULL;
         for (int j = 0; j < nargs; j++) {
-            args[j] = bb_eval_value(e->children[1+j]);
+            args[j] = bb_eval_value(e->c[1+j]);
             if (IS_FAIL_fn(args[j])) return FAILDESCR;
         }
         return icn_call_builtin(e, args, nargs);
@@ -545,9 +545,9 @@ DESCR_t bb_eval_value(AST_t *e)
      * full `~===` path becomes IR-free; until then AST_NOT still falls through
      * to interp_eval and walks back here for its AST_IDENTICAL child. */
     case AST_IDENTICAL: {
-        if (e->nchildren < 2) return FAILDESCR;
-        DESCR_t l = bb_eval_value(e->children[0]);
-        DESCR_t r = bb_eval_value(e->children[1]);
+        if (e->n < 2) return FAILDESCR;
+        DESCR_t l = bb_eval_value(e->c[0]);
+        DESCR_t r = bb_eval_value(e->c[1]);
         if (IS_FAIL_fn(l) || IS_FAIL_fn(r)) return FAILDESCR;
         return icn_descr_identical(l, r) ? r : FAILDESCR;
     }
@@ -576,26 +576,26 @@ DESCR_t bb_eval_value(AST_t *e)
      * AST_IDX with two index children) → subscript_get2.  Mirrors
      * interp_eval.c:3084. */
     case AST_IDX: {
-        if (e->nchildren < 2) return FAILDESCR;
-        DESCR_t base = bb_eval_value(e->children[0]);
+        if (e->n < 2) return FAILDESCR;
+        DESCR_t base = bb_eval_value(e->c[0]);
         if (IS_FAIL_fn(base)) return FAILDESCR;
-        if (e->nchildren == 2) {
-            DESCR_t idx = bb_eval_value(e->children[1]);
+        if (e->n == 2) {
+            DESCR_t idx = bb_eval_value(e->c[1]);
             if (IS_FAIL_fn(idx)) return FAILDESCR;
             return subscript_get(base, idx);
         }
-        DESCR_t i1 = bb_eval_value(e->children[1]);
-        DESCR_t i2 = bb_eval_value(e->children[2]);
+        DESCR_t i1 = bb_eval_value(e->c[1]);
+        DESCR_t i2 = bb_eval_value(e->c[2]);
         if (IS_FAIL_fn(i1) || IS_FAIL_fn(i2)) return FAILDESCR;
         return subscript_get2(base, i1, i2);
     }
 
-    /* RS-22c: record field read.  e->sval = field name, child[0] = object. */
+    /* RS-22c: record field read.  e->v.sval = field name, child[0] = object. */
     case AST_FIELD: {
-        if (!e->sval || e->nchildren < 1) return NULVCL;
-        DESCR_t obj = bb_eval_value(e->children[0]);
+        if (!e->v.sval || e->n < 1) return NULVCL;
+        DESCR_t obj = bb_eval_value(e->c[0]);
         if (IS_FAIL_fn(obj)) return FAILDESCR;
-        DESCR_t *cell = data_field_ptr(e->sval, obj);
+        DESCR_t *cell = data_field_ptr(e->v.sval, obj);
         if (!cell) return FAILDESCR;
         return *cell;
     }
@@ -613,11 +613,11 @@ DESCR_t bb_eval_value(AST_t *e)
      * build the DT_DATA descriptor.  The static-flag idiom matches IR
      * mode exactly: DEFDAT_fn is called at most once per process. */
     case AST_MAKELIST: {
-        int n = e->nchildren;
+        int n = e->n;
         static int icnlist_registered = 0;
         if (!icnlist_registered) { DEFDAT_fn("icnlist(frame_elems,frame_size,icn_type)"); icnlist_registered = 1; }
         DESCR_t *elems = GC_malloc((n > 0 ? n : 1) * sizeof(DESCR_t));
-        for (int i = 0; i < n; i++) elems[i] = bb_eval_value(e->children[i]);
+        for (int i = 0; i < n; i++) elems[i] = bb_eval_value(e->c[i]);
         DESCR_t eptr; eptr.v = DT_DATA; eptr.slen = 0; eptr.ptr = (void*)elems;
         return DATCON_fn("icnlist", eptr, INTVAL(n), STRVAL("list"));
     }
@@ -626,12 +626,12 @@ DESCR_t bb_eval_value(AST_t *e)
      * AST_PLS is more elaborate than `pos()` — try integer parse first,
      * then real, fall back to INTVAL(0).  Match exactly. */
     case AST_MNS: {
-        if (e->nchildren < 1) return FAILDESCR;
-        return neg(bb_eval_value(e->children[0]));
+        if (e->n < 1) return FAILDESCR;
+        return neg(bb_eval_value(e->c[0]));
     }
     case AST_PLS: {
-        if (e->nchildren < 1) return FAILDESCR;
-        DESCR_t v = bb_eval_value(e->children[0]);
+        if (e->n < 1) return FAILDESCR;
+        DESCR_t v = bb_eval_value(e->c[0]);
         if (IS_FAIL_fn(v)) return FAILDESCR;
         if (IS_INT_fn(v) || IS_REAL_fn(v)) return v;
         const char *s = VARVAL_fn(v);
@@ -647,16 +647,16 @@ DESCR_t bb_eval_value(AST_t *e)
     /* RS-22d: boolean not.  `not E` succeeds with &null iff E fails;
      * fails iff E succeeds.  Mirrors interp_eval.c:3124. */
     case AST_NOT: {
-        if (e->nchildren < 1) return FAILDESCR;
-        DESCR_t v = bb_eval_value(e->children[0]);
+        if (e->n < 1) return FAILDESCR;
+        DESCR_t v = bb_eval_value(e->c[0]);
         if (IS_FAIL_fn(v)) return NULVCL;
         return FAILDESCR;
     }
 
     /* RS-22d: `/E` succeed-if-null. Mirrors interp_eval.c:3629. */
     case AST_NULL: {
-        if (e->nchildren < 1) return NULVCL;
-        DESCR_t v = bb_eval_value(e->children[0]);
+        if (e->n < 1) return NULVCL;
+        DESCR_t v = bb_eval_value(e->c[0]);
         if (IS_FAIL_fn(v)) return FAILDESCR;
         if (v.v == DT_SNUL) return NULVCL;
         if (v.v == DT_S && (!v.s || v.s[0] == '\0')) return NULVCL;
@@ -665,8 +665,8 @@ DESCR_t bb_eval_value(AST_t *e)
 
     /* RS-22d: `\E` succeed-if-non-null. Mirrors interp_eval.c:3646. */
     case AST_NONNULL: {
-        if (e->nchildren < 1) return FAILDESCR;
-        DESCR_t v = bb_eval_value(e->children[0]);
+        if (e->n < 1) return FAILDESCR;
+        DESCR_t v = bb_eval_value(e->c[0]);
         if (IS_FAIL_fn(v)) return FAILDESCR;
         if (v.v == DT_SNUL) return FAILDESCR;
         if (v.v == DT_S && (!v.s || v.s[0] == '\0')) return FAILDESCR;
@@ -675,8 +675,8 @@ DESCR_t bb_eval_value(AST_t *e)
 
     /* RS-22d: `*E` size — string/list/table.  Mirrors interp_eval.c:3133. */
     case AST_SIZE: {
-        if (e->nchildren < 1) return INTVAL(0);
-        DESCR_t v = bb_eval_value(e->children[0]);
+        if (e->n < 1) return INTVAL(0);
+        DESCR_t v = bb_eval_value(e->c[0]);
         if (IS_FAIL_fn(v)) return FAILDESCR;
         if (v.v == DT_T) return INTVAL(v.tbl ? v.tbl->size : 0);
         if (v.v == DT_DATA) {
@@ -704,8 +704,8 @@ DESCR_t bb_eval_value(AST_t *e)
      * the two RNGs interleave separately.  In pure BB (post-RS-22e)
      * this becomes the single source. */
     case AST_RANDOM: {
-        if (e->nchildren < 1) return FAILDESCR;
-        DESCR_t v = bb_eval_value(e->children[0]);
+        if (e->n < 1) return FAILDESCR;
+        DESCR_t v = bb_eval_value(e->c[0]);
         if (IS_FAIL_fn(v)) return FAILDESCR;
         /* GOAL-ICON-BB-COMPLETE A3-seed-fix: single canonical RNG seed shared
          * with sm_interp.c::ICN_RANDOM and interp_eval.c::AST_RANDOM so the
@@ -768,15 +768,15 @@ DESCR_t bb_eval_value(AST_t *e)
      * `bb_augop_compute` is the shared compute step; `bb_augop_writeback`
      * is the shared writeback (AST_VAR slot / AST_IDX / AST_FIELD). */
     case AST_AUGOP: {
-        if (e->nchildren < 2) return NULVCL;
-        AST_t *lhs = e->children[0];
-        AST_t *rhs = e->children[1];
-        IcnTkKind op = (IcnTkKind)e->ival;
+        if (e->n < 2) return NULVCL;
+        tree_t *lhs = e->c[0];
+        tree_t *rhs = e->c[1];
+        IcnTkKind op = (IcnTkKind)e->v.ival;
         DESCR_t result = NULVCL;
 
         /* (1) `!container OP:= rhs` — bang-iterate lvalue. */
-        if (lhs && lhs->kind == AST_ITERATE && lhs->nchildren >= 1) {
-            DESCR_t cv = bb_eval_value(lhs->children[0]);
+        if (lhs && lhs->t == AST_ITERATE && lhs->n >= 1) {
+            DESCR_t cv = bb_eval_value(lhs->c[0]);
             DESCR_t rv = bb_eval_value(rhs);
             if (IS_FAIL_fn(cv) || IS_FAIL_fn(rv)) return FAILDESCR;
             #define BB_AUGOP_CELL(cell_) do { \
@@ -911,10 +911,10 @@ DESCR_t bb_eval_value(AST_t *e)
     }
 
     case AST_SEQ: {
-        if (e->nchildren == 0) return NULVCL;
+        if (e->n == 0) return NULVCL;
         DESCR_t last = NULVCL;
-        for (int i = 0; i < e->nchildren; i++) {
-            last = bb_eval_value(e->children[i]);
+        for (int i = 0; i < e->n; i++) {
+            last = bb_eval_value(e->c[i]);
             if (IS_FAIL_fn(last)) return FAILDESCR;
             if (FRAME.returning || FRAME.loop_break || FRAME.loop_next) break;
         }
@@ -937,8 +937,8 @@ DESCR_t bb_eval_value(AST_t *e)
      * NULVCL.  Mirrors interp_eval.c:3569 verbatim — only `interp_eval`
      * recursive calls are replaced with `bb_eval_value`. */
     case AST_SCAN: {
-        if (e->nchildren < 1) return FAILDESCR;
-        DESCR_t subj_d = bb_eval_value(e->children[0]);
+        if (e->n < 1) return FAILDESCR;
+        DESCR_t subj_d = bb_eval_value(e->c[0]);
         if (IS_FAIL_fn(subj_d)) return FAILDESCR;
         const char *subj_s = VARVAL_fn(subj_d); if (!subj_s) subj_s = "";
         if (scan_depth < SCAN_STACK_MAX) {
@@ -947,7 +947,7 @@ DESCR_t bb_eval_value(AST_t *e)
             scan_depth++;
         }
         scan_subj = subj_s; scan_pos = 1;
-        DESCR_t r = (e->nchildren >= 2) ? bb_eval_value(e->children[1]) : NULVCL;
+        DESCR_t r = (e->n >= 2) ? bb_eval_value(e->c[1]) : NULVCL;
         if (scan_depth > 0) {
             scan_depth--;
             scan_subj = scan_stack[scan_depth].subj;
@@ -957,21 +957,21 @@ DESCR_t bb_eval_value(AST_t *e)
     }
 
     case AST_CASE: {
-        if (e->nchildren < 1) return NULVCL;
-        DESCR_t topic = bb_eval_value(e->children[0]);
+        if (e->n < 1) return NULVCL;
+        DESCR_t topic = bb_eval_value(e->c[0]);
         /* Detect Raku triple layout: (nchildren-1)%3==0 AND child[1] is
          * AST_ILIT or AST_NUL (the comparison-kind marker). */
-        int is_raku_layout = (e->nchildren >= 4 && (e->nchildren - 1) % 3 == 0 &&
-            e->children[1] && (e->children[1]->kind == AST_ILIT || e->children[1]->kind == AST_NUL));
+        int is_raku_layout = (e->n >= 4 && (e->n - 1) % 3 == 0 &&
+            e->c[1] && (e->c[1]->t == AST_ILIT || e->c[1]->t == AST_NUL));
         if (is_raku_layout) {
             int i = 1;
-            while (i + 2 < e->nchildren) {
-                AST_t *cmpnode = e->children[i];
-                AST_t *val     = e->children[i+1];
-                AST_t *body    = e->children[i+2];
+            while (i + 2 < e->n) {
+                tree_t *cmpnode = e->c[i];
+                tree_t *val     = e->c[i+1];
+                tree_t *body    = e->c[i+2];
                 i += 3;
-                if (cmpnode->kind == AST_NUL) return bb_eval_value(body);
-                AST_e cmp = (AST_e)(cmpnode->ival);
+                if (cmpnode->t == AST_NUL) return bb_eval_value(body);
+                AST_e cmp = (AST_e)(cmpnode->v.ival);
                 DESCR_t wval = bb_eval_value(val);
                 int match = 0;
                 if (cmp == AST_LEQ) {
@@ -984,16 +984,16 @@ DESCR_t bb_eval_value(AST_t *e)
                 }
                 if (match) return bb_eval_value(body);
             }
-            if (i+1 < e->nchildren && e->children[i]->kind == AST_NUL)
-                return bb_eval_value(e->children[i+1]);
+            if (i+1 < e->n && e->c[i]->t == AST_NUL)
+                return bb_eval_value(e->c[i+1]);
             return NULVCL;
         }
         /* Icon: pairs [val, body] then optional trailing default body */
-        int nc = e->nchildren;
+        int nc = e->n;
         int i = 1;
         while (i + 1 < nc) {
-            DESCR_t wval = bb_eval_value(e->children[i]);
-            AST_t *body = e->children[i+1];
+            DESCR_t wval = bb_eval_value(e->c[i]);
+            tree_t *body = e->c[i+1];
             i += 2;
             int match;
             if (IS_INT_fn(topic) && IS_INT_fn(wval)) match = (topic.i == wval.i);
@@ -1004,7 +1004,7 @@ DESCR_t bb_eval_value(AST_t *e)
             if (match) return bb_eval_value(body);
         }
         /* trailing default body (odd remaining child count) */
-        if (i < nc) return bb_eval_value(e->children[i]);
+        if (i < nc) return bb_eval_value(e->c[i]);
         return NULVCL;
     }
 
@@ -1013,19 +1013,19 @@ DESCR_t bb_eval_value(AST_t *e)
      * The four binary ops delegate to the icn_cset_* helpers in icon_runtime.c
      * (now declared in coro_runtime.h).  AST_CSET literal mirrors interp_eval.c:3466. */
     case AST_CSET:
-        return e->sval ? STRVAL(e->sval) : NULVCL;
+        return e->v.sval ? STRVAL(e->v.sval) : NULVCL;
 
     case AST_CSET_COMPL: {
-        DESCR_t operand = bb_eval_value(e->children[0]);
+        DESCR_t operand = bb_eval_value(e->c[0]);
         if (IS_FAIL_fn(operand)) return FAILDESCR;
         const char *cs = IS_NULL_fn(operand) ? "" : VARVAL_fn(operand);
         return STRVAL(icn_cset_complement(cs));
     }
 
     case AST_CSET_UNION: {
-        DESCR_t lv = bb_eval_value(e->children[0]);
+        DESCR_t lv = bb_eval_value(e->c[0]);
         if (IS_FAIL_fn(lv)) return FAILDESCR;
-        DESCR_t rv = bb_eval_value(e->children[1]);
+        DESCR_t rv = bb_eval_value(e->c[1]);
         if (IS_FAIL_fn(rv)) return FAILDESCR;
         const char *a = IS_NULL_fn(lv) ? "" : VARVAL_fn(lv);
         const char *b = IS_NULL_fn(rv) ? "" : VARVAL_fn(rv);
@@ -1033,9 +1033,9 @@ DESCR_t bb_eval_value(AST_t *e)
     }
 
     case AST_CSET_DIFF: {
-        DESCR_t lv = bb_eval_value(e->children[0]);
+        DESCR_t lv = bb_eval_value(e->c[0]);
         if (IS_FAIL_fn(lv)) return FAILDESCR;
-        DESCR_t rv = bb_eval_value(e->children[1]);
+        DESCR_t rv = bb_eval_value(e->c[1]);
         if (IS_FAIL_fn(rv)) return FAILDESCR;
         const char *a = IS_NULL_fn(lv) ? "" : VARVAL_fn(lv);
         const char *b = IS_NULL_fn(rv) ? "" : VARVAL_fn(rv);
@@ -1043,9 +1043,9 @@ DESCR_t bb_eval_value(AST_t *e)
     }
 
     case AST_CSET_INTER: {
-        DESCR_t lv = bb_eval_value(e->children[0]);
+        DESCR_t lv = bb_eval_value(e->c[0]);
         if (IS_FAIL_fn(lv)) return FAILDESCR;
-        DESCR_t rv = bb_eval_value(e->children[1]);
+        DESCR_t rv = bb_eval_value(e->c[1]);
         if (IS_FAIL_fn(rv)) return FAILDESCR;
         const char *a = IS_NULL_fn(lv) ? "" : VARVAL_fn(lv);
         const char *b = IS_NULL_fn(rv) ? "" : VARVAL_fn(rv);
@@ -1059,10 +1059,10 @@ DESCR_t bb_eval_value(AST_t *e)
         int saved_brk = FRAME.loop_break; FRAME.loop_break = 0;
         int saved_nxt = FRAME.loop_next;  FRAME.loop_next  = 0;
         while (!FRAME.returning && !FRAME.loop_break && !FRAME.suspending) {
-            DESCR_t cv = (e->nchildren > 0) ? bb_eval_value(e->children[0]) : FAILDESCR;
+            DESCR_t cv = (e->n > 0) ? bb_eval_value(e->c[0]) : FAILDESCR;
             if (IS_FAIL_fn(cv)) break;
             FRAME.loop_next = 0;
-            if (e->nchildren > 1) bb_exec_stmt(e->children[1]);
+            if (e->n > 1) bb_exec_stmt(e->c[1]);
             if (FRAME.suspending) break;
         }
         FRAME.loop_break = saved_brk;
@@ -1082,13 +1082,13 @@ DESCR_t bb_eval_value(AST_t *e)
      *   2. AST_SEQ conjunction — drive filter, execute seq body per tick.
      *   3. Generic — drive gen via coro_eval box, run body per tick. */
     case AST_EVERY: {
-        if (e->nchildren < 1) return NULVCL;
-        AST_t *gen  = e->children[0];
-        AST_t *body = (e->nchildren > 1) ? e->children[1] : NULL;
-        if (gen->kind == AST_ASSIGN &&
-            gen->nchildren >= 2 && is_suspendable(gen->children[1])) {
-            AST_t *leaf = find_leaf_suspendable(gen->children[1]);
-            if (!leaf) leaf = gen->children[1];
+        if (e->n < 1) return NULVCL;
+        tree_t *gen  = e->c[0];
+        tree_t *body = (e->n > 1) ? e->c[1] : NULL;
+        if (gen->t == AST_ASSIGN &&
+            gen->n >= 2 && is_suspendable(gen->c[1])) {
+            tree_t *leaf = find_leaf_suspendable(gen->c[1]);
+            if (!leaf) leaf = gen->c[1];
             bb_node_t rbox = coro_eval(leaf);
             DESCR_t tick = rbox.fn(rbox.ζ, α);
             while (!IS_FAIL_fn(tick) && !FRAME.returning && !FRAME.loop_break) {
@@ -1105,13 +1105,13 @@ DESCR_t bb_eval_value(AST_t *e)
             FRAME.loop_next  = 0;
             return NULVCL;
         }
-        if (gen->kind == AST_SEQ && gen->nchildren >= 2 && is_suspendable(gen->children[0])) {
-            AST_t *filter = gen->children[0];
+        if (gen->t == AST_SEQ && gen->n >= 2 && is_suspendable(gen->c[0])) {
+            tree_t *filter = gen->c[0];
             bb_node_t fbox = coro_eval(filter);
             DESCR_t tick = fbox.fn(fbox.ζ, α);
             while (!IS_FAIL_fn(tick) && !FRAME.returning && !FRAME.loop_break) {
                 FRAME.loop_next = 0;
-                for (int _si = 1; _si < gen->nchildren; _si++) bb_exec_stmt(gen->children[_si]);
+                for (int _si = 1; _si < gen->n; _si++) bb_exec_stmt(gen->c[_si]);
                 if (body) bb_exec_stmt(body);
                 if (FRAME.returning || FRAME.loop_break) break;
                 tick = fbox.fn(fbox.ζ, β);
@@ -1125,11 +1125,11 @@ DESCR_t bb_eval_value(AST_t *e)
         DESCR_t val = box.fn(box.ζ, α);
         while (!IS_FAIL_fn(val) && !FRAME.returning && !FRAME.loop_break) {
             FRAME.loop_next = 0;
-            if (gen->sval && *gen->sval && caller_depth >= 1) {
+            if (gen->v.sval && *gen->v.sval && caller_depth >= 1) {
                 IcnFrame *cf = &frame_stack[caller_depth - 1];
-                int slot = scope_get(&cf->sc, gen->sval);
+                int slot = scope_get(&cf->sc, gen->v.sval);
                 if (slot >= 0 && slot < cf->env_n) cf->env[slot] = val;
-                else NV_SET_fn(gen->sval, val);
+                else NV_SET_fn(gen->v.sval, val);
             }
             if (body) {
                 frame_push(gen, val.v == DT_I ? val.i : 0, val.v == DT_I ? NULL : val.s);
@@ -1152,38 +1152,38 @@ DESCR_t bb_eval_value(AST_t *e)
     case AST_INITIAL: {
         IcnInitEnt *ent = NULL;
         for (int _i = 0; _i < icn_init_n; _i++)
-            if (init_tab[_i].id == e->id) { ent = &init_tab[_i]; break; }
+            if (init_tab[_i].id == e->_id) { ent = &init_tab[_i]; break; }
         if (!ent) {
-            for (int i = 0; i < e->nchildren; i++) (void)bb_eval_value(e->children[i]);
+            for (int i = 0; i < e->n; i++) (void)bb_eval_value(e->c[i]);
             if (icn_init_n < ICN_INIT_MAX) {
                 ent = &init_tab[icn_init_n++];
-                ent->id = e->id; ent->ns = 0;
-                for (int i = 0; i < e->nchildren && ent->ns < ICN_INIT_SLOTS; i++) {
-                    AST_t *ch = e->children[i];
-                    if (!ch || ch->kind != AST_ASSIGN || ch->nchildren < 1) continue;
-                    AST_t *lhs = ch->children[0];
-                    if (!lhs || lhs->kind != AST_VAR || !lhs->sval) continue;
+                ent->id = e->_id; ent->ns = 0;
+                for (int i = 0; i < e->n && ent->ns < ICN_INIT_SLOTS; i++) {
+                    tree_t *ch = e->c[i];
+                    if (!ch || ch->t != AST_ASSIGN || ch->n < 1) continue;
+                    tree_t *lhs = ch->c[0];
+                    if (!lhs || lhs->t != AST_VAR || !lhs->v.sval) continue;
                     IcnInitSlot *sl = &ent->s[ent->ns++];
-                    strncpy(sl->nm, lhs->sval, 63); sl->nm[63] = '\0';
-                    if (frame_depth > 0 && lhs->ival >= 0 && lhs->ival < FRAME.env_n)
-                        sl->val = FRAME.env[lhs->ival];
+                    strncpy(sl->nm, lhs->v.sval, 63); sl->nm[63] = '\0';
+                    if (frame_depth > 0 && lhs->v.ival >= 0 && lhs->v.ival < FRAME.env_n)
+                        sl->val = FRAME.env[lhs->v.ival];
                     else
-                        sl->val = NV_GET_fn(lhs->sval);
+                        sl->val = NV_GET_fn(lhs->v.sval);
                 }
             }
-            e->ival = 1;
+            e->v.ival = 1;
         } else {
             for (int si = 0; si < ent->ns; si++) {
                 int restored = 0;
                 if (frame_depth > 0) {
-                    for (int i = 0; i < e->nchildren && !restored; i++) {
-                        AST_t *ch = e->children[i];
-                        if (!ch || ch->kind != AST_ASSIGN || ch->nchildren < 1) continue;
-                        AST_t *lhs = ch->children[0];
-                        if (!lhs || lhs->kind != AST_VAR || !lhs->sval) continue;
-                        if (strcasecmp(lhs->sval, ent->s[si].nm) == 0
-                            && lhs->ival >= 0 && lhs->ival < FRAME.env_n) {
-                            FRAME.env[lhs->ival] = ent->s[si].val;
+                    for (int i = 0; i < e->n && !restored; i++) {
+                        tree_t *ch = e->c[i];
+                        if (!ch || ch->t != AST_ASSIGN || ch->n < 1) continue;
+                        tree_t *lhs = ch->c[0];
+                        if (!lhs || lhs->t != AST_VAR || !lhs->v.sval) continue;
+                        if (strcasecmp(lhs->v.sval, ent->s[si].nm) == 0
+                            && lhs->v.ival >= 0 && lhs->v.ival < FRAME.env_n) {
+                            FRAME.env[lhs->v.ival] = ent->s[si].val;
                             restored = 1;
                         }
                     }
@@ -1198,26 +1198,26 @@ DESCR_t bb_eval_value(AST_t *e)
      * Returns rv (the new value of lhs), or FAILDESCR if either side fails.
      * Mirrors interp_eval.c:3408-3437; interp_eval(child) → bb_eval_value(child). */
     case AST_SWAP: {
-        if (e->nchildren < 2 || frame_depth <= 0) return NULVCL;
-        AST_t *lhs = e->children[0], *rhs = e->children[1];
+        if (e->n < 2 || frame_depth <= 0) return NULVCL;
+        tree_t *lhs = e->c[0], *rhs = e->c[1];
         DESCR_t lv = bb_eval_value(lhs), rv = bb_eval_value(rhs);
         if (IS_FAIL_fn(lv) || IS_FAIL_fn(rv)) return FAILDESCR;
-        if (lhs && lhs->kind == AST_VAR) {
-            if (lhs->sval && lhs->sval[0] == '&') {
-                if (!kw_assign(lhs->sval + 1, rv)) return FAILDESCR;
+        if (lhs && lhs->t == AST_VAR) {
+            if (lhs->v.sval && lhs->v.sval[0] == '&') {
+                if (!kw_assign(lhs->v.sval + 1, rv)) return FAILDESCR;
             } else {
-                int sl=(int)lhs->ival;
+                int sl=(int)lhs->v.ival;
                 if (sl>=0&&sl<FRAME.env_n) FRAME.env[sl]=rv;
-                else if (sl<0&&lhs->sval) NV_SET_fn(lhs->sval,rv);
+                else if (sl<0&&lhs->v.sval) NV_SET_fn(lhs->v.sval,rv);
             }
         }
-        if (rhs && rhs->kind == AST_VAR) {
-            if (rhs->sval && rhs->sval[0] == '&') {
-                if (!kw_assign(rhs->sval + 1, lv)) return FAILDESCR;
+        if (rhs && rhs->t == AST_VAR) {
+            if (rhs->v.sval && rhs->v.sval[0] == '&') {
+                if (!kw_assign(rhs->v.sval + 1, lv)) return FAILDESCR;
             } else {
-                int sl=(int)rhs->ival;
+                int sl=(int)rhs->v.ival;
                 if (sl>=0&&sl<FRAME.env_n) FRAME.env[sl]=lv;
-                else if (sl<0&&rhs->sval) NV_SET_fn(rhs->sval,lv);
+                else if (sl<0&&rhs->v.sval) NV_SET_fn(rhs->v.sval,lv);
             }
         }
         return rv;
@@ -1244,8 +1244,8 @@ DESCR_t bb_eval_value(AST_t *e)
      * suspendable cond, drive its first value via coro_eval+α so generator
      * semantics are preserved. */
     case AST_IF: {
-        if (e->nchildren < 1) return NULVCL;
-        AST_t *test = e->children[0];
+        if (e->n < 1) return NULVCL;
+        tree_t *test = e->c[0];
         DESCR_t cv;
         if (is_suspendable(test)) {
             bb_node_t box = coro_eval(test);
@@ -1254,8 +1254,8 @@ DESCR_t bb_eval_value(AST_t *e)
             cv = bb_eval_value(test);
         }
         if (!IS_FAIL_fn(cv))
-            return (e->nchildren > 1) ? bb_eval_value(e->children[1]) : cv;
-        return (e->nchildren > 2) ? bb_eval_value(e->children[2]) : FAILDESCR;
+            return (e->n > 1) ? bb_eval_value(e->c[1]) : cv;
+        return (e->n > 2) ? bb_eval_value(e->c[2]) : FAILDESCR;
     }
 
     /* AST_PROC_FAIL in value context — mirrors interp_eval.c:2064-2070.
@@ -1282,24 +1282,24 @@ DESCR_t bb_eval_value(AST_t *e)
      * contexts) — that path is unaffected.  Three lvalue shapes: AST_VAR
      * (slot or NV name), AST_IDX (subscript_set), AST_FIELD (data_field_ptr). */
     case AST_REVASSIGN: {
-        if (e->nchildren < 2) return NULVCL;
-        DESCR_t val = bb_eval_value(e->children[1]);
+        if (e->n < 2) return NULVCL;
+        DESCR_t val = bb_eval_value(e->c[1]);
         if (IS_FAIL_fn(val)) return FAILDESCR;
-        AST_t *lhs = e->children[0];
-        if (lhs && lhs->kind == AST_VAR) {
-            int slot = (int)lhs->ival;
+        tree_t *lhs = e->c[0];
+        if (lhs && lhs->t == AST_VAR) {
+            int slot = (int)lhs->v.ival;
             if (slot >= 0 && slot < FRAME.env_n) FRAME.env[slot] = val;
-            else if (slot < 0 && lhs->sval && lhs->sval[0] != '&') set_and_trace(lhs->sval, val);
-        } else if (lhs && lhs->kind == AST_IDX && lhs->nchildren >= 2) {
-            DESCR_t base = bb_eval_value(lhs->children[0]);
+            else if (slot < 0 && lhs->v.sval && lhs->v.sval[0] != '&') set_and_trace(lhs->v.sval, val);
+        } else if (lhs && lhs->t == AST_IDX && lhs->n >= 2) {
+            DESCR_t base = bb_eval_value(lhs->c[0]);
             if (!IS_FAIL_fn(base)) {
-                DESCR_t idx = bb_eval_value(lhs->children[1]);
+                DESCR_t idx = bb_eval_value(lhs->c[1]);
                 if (!IS_FAIL_fn(idx)) subscript_set(base, idx, val);
             }
-        } else if (lhs && lhs->kind == AST_FIELD && lhs->sval && lhs->nchildren >= 1) {
-            DESCR_t obj = bb_eval_value(lhs->children[0]);
+        } else if (lhs && lhs->t == AST_FIELD && lhs->v.sval && lhs->n >= 1) {
+            DESCR_t obj = bb_eval_value(lhs->c[0]);
             if (!IS_FAIL_fn(obj)) {
-                DESCR_t *cell = data_field_ptr(lhs->sval, obj);
+                DESCR_t *cell = data_field_ptr(lhs->v.sval, obj);
                 if (cell) *cell = val;
             }
         }
@@ -1330,7 +1330,7 @@ DESCR_t bb_eval_value(AST_t *e)
      * coro_stmt.c:69 is the more common path. */
     case AST_LOOP_BREAK: {
         FRAME.loop_break = 1;
-        return (e->nchildren > 0) ? bb_eval_value(e->children[0]) : NULVCL;
+        return (e->n > 0) ? bb_eval_value(e->c[0]) : NULVCL;
     }
 
     /* AST_RETURN in value context — surfaced by the same diag rerun.  Pattern:
@@ -1342,12 +1342,12 @@ DESCR_t bb_eval_value(AST_t *e)
      * path; this addition handles the rare value-context arrival. */
     case AST_RETURN: {
         if (frame_depth > 0) {
-            FRAME.return_val = (e->nchildren > 0)
-                ? bb_eval_value(e->children[0]) : NULVCL;
+            FRAME.return_val = (e->n > 0)
+                ? bb_eval_value(e->c[0]) : NULVCL;
             FRAME.returning = 1;
             return FRAME.return_val;
         }
-        return (e->nchildren > 0) ? bb_eval_value(e->children[0]) : NULVCL;
+        return (e->n > 0) ? bb_eval_value(e->c[0]) : NULVCL;
     }
 
     default:
@@ -1364,6 +1364,6 @@ DESCR_t bb_eval_value(AST_t *e)
      * naming the kind so the gap can be lifted into bb_eval_value. */
     fprintf(stderr,
             "FATAL bb_eval_value: unhandled kind %d (RS-23e isolation breach)\n",
-            (int)e->kind);
+            (int)e->t);
     abort();
 }

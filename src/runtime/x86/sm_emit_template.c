@@ -278,7 +278,7 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
      *   Col 2 (16-wide): opcode/directive/mnemonic
      *   Col 3 (free):    args/operands */
     char macro_def[64];
-    switch (t->kind) {
+    switch (t->t) {
     case SM_TPL_NULLARY:
         snprintf(macro_def, sizeof(macro_def), "%s", t->macro_name);
         macro_line(out, "", ".macro", macro_def);
@@ -462,7 +462,7 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
         break;
     }
     fprintf(stderr, "sm_emit_template: render_macro_body: unknown kind %d\n",
-            (int)t->kind);
+            (int)t->t);
     return -1;
 }
 
@@ -509,7 +509,7 @@ static int build_args_col(char *buf, int cap, const sm_op_template_t *t,
                           const sm_emit_args_t *args)
 {
     int n = 0;
-    switch (t->kind) {
+    switch (t->t) {
     case SM_TPL_NULLARY:
     case SM_TPL_RET:
     case SM_TPL_NOOP:
@@ -593,7 +593,7 @@ static int build_args_col(char *buf, int cap, const sm_op_template_t *t,
         break;
     default:
         fprintf(stderr, "sm_emit_template: build_args_col: unknown kind %d\n",
-                (int)t->kind);
+                (int)t->t);
         return -1;
     }
     return (n < 0 || n >= cap) ? -1 : 0;

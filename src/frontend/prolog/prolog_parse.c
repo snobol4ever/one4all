@@ -199,7 +199,7 @@ static Term *parse_primary(Parser *p);
 static Term *parse_list(Parser *p) {
     /* '[' already consumed; peek tells us if empty */
     Token tk = lexer_peek(&p->lx);
-    if (tk.kind == TK_RBRACKET) {
+    if (tk.t == TK_RBRACKET) {
         lexer_next(&p->lx); /* consume ] */
         return term_new_atom(ATOM_NIL);
     }
@@ -216,18 +216,18 @@ static Term *parse_list(Parser *p) {
     tk = lexer_peek(&p->lx);
     Term *tail = NULL;
 
-    if (tk.kind == TK_COMMA) {
+    if (tk.t == TK_COMMA) {
         lexer_next(&p->lx);
         tail = parse_list(p); /* recurse for rest */
-    } else if (tk.kind == TK_PIPE) {
+    } else if (tk.t == TK_PIPE) {
         lexer_next(&p->lx);
         p->in_args++;
         tail = parse_term(p, 1200);
         p->in_args--;
         tk = lexer_peek(&p->lx);
-        if (tk.kind == TK_RBRACKET) lexer_next(&p->lx);
+        if (tk.t == TK_RBRACKET) lexer_next(&p->lx);
         else perror_at(p, tk.line, "expected ] after list tail");
-    } else if (tk.kind == TK_RBRACKET) {
+    } else if (tk.t == TK_RBRACKET) {
         lexer_next(&p->lx);
         tail = term_new_atom(ATOM_NIL);
     } else {
@@ -248,7 +248,7 @@ static int parse_args(Parser *p, Term ***args_out) {
 
     /* f() — zero-arity compound: peek for immediate ')' */
     Token pk0 = lexer_peek(&p->lx);
-    if (pk0.kind == TK_RPAREN) {
+    if (pk0.t == TK_RPAREN) {
         *args_out = args;
         return 0;
     }
@@ -265,7 +265,7 @@ static int parse_args(Parser *p, Term ***args_out) {
         if (!t) break;
         args[n++] = t;
         Token tk = lexer_peek(&p->lx);
-        if (tk.kind != TK_COMMA) break;
+        if (tk.t != TK_COMMA) break;
         lexer_next(&p->lx); /* consume comma */
     }
     p->in_args--;
@@ -280,7 +280,7 @@ static int parse_args(Parser *p, Term ***args_out) {
 static Term *parse_primary(Parser *p) {
     Token tk = lexer_next(&p->lx);
 
-    switch (tk.kind) {
+    switch (tk.t) {
         case TK_VAR:
             return scope_get(&p->sc, tk.text);
 
@@ -288,7 +288,7 @@ static Term *parse_primary(Parser *p) {
             return term_new_var(-1); /* fresh anonymous each time */
 
         case TK_INT: {
-            Term *t = term_new_int(tk.ival);
+            Term *t = term_new_int(tk.v.ival);
             return t;
         }
         case TK_FLOAT: {
@@ -305,12 +305,12 @@ static Term *parse_primary(Parser *p) {
         case TK_ATOM: {
             /* Check if followed by '(' -> compound */
             Token pk = lexer_peek(&p->lx);
-            if (pk.kind == TK_LPAREN) {
+            if (pk.t == TK_LPAREN) {
                 lexer_next(&p->lx); /* consume ( */
                 Term **args = NULL;
                 int nargs = parse_args(p, &args);
                 Token rp = lexer_peek(&p->lx);
-                if (rp.kind == TK_RPAREN) lexer_next(&p->lx);
+                if (rp.t == TK_RPAREN) lexer_next(&p->lx);
                 else perror_at(p, rp.line, "expected ) after args");
                 int fid = prolog_atom_intern(tk.text);
                 Term *t = term_new_compound(fid, nargs, args);
@@ -330,9 +330,9 @@ static Term *parse_primary(Parser *p) {
                     strcmp(tk.text, "ensure_loaded") == 0 ||
                     strcmp(tk.text, "mode") == 0) {
                 /* Only treat as prefix if next token can start a term */
-                if (pk.kind == TK_ATOM || pk.kind == TK_VAR || pk.kind == TK_INT ||
-                    pk.kind == TK_FLOAT || pk.kind == TK_LPAREN || pk.kind == TK_LBRACKET ||
-                    pk.kind == TK_OP) {
+                if (pk.t == TK_ATOM || pk.t == TK_VAR || pk.t == TK_INT ||
+                    pk.t == TK_FLOAT || pk.t == TK_LPAREN || pk.t == TK_LBRACKET ||
+                    pk.t == TK_OP) {
                     int fid = prolog_atom_intern(tk.text);
                     Term *arg = parse_term(p, 1150);
                     Term *args1[1] = { arg };
@@ -356,7 +356,7 @@ static Term *parse_primary(Parser *p) {
             Term *t = parse_term(p, 1200);
             p->in_args = saved_in_args;
             Token rp = lexer_peek(&p->lx);
-            if (rp.kind == TK_RPAREN) lexer_next(&p->lx);
+            if (rp.t == TK_RPAREN) lexer_next(&p->lx);
             else perror_at(p, rp.line, "expected )");
             return t;
         }
@@ -370,14 +370,14 @@ static Term *parse_primary(Parser *p) {
          * parse error (operator climbing handles them as binary ops). */
         case TK_COMMA:
         case TK_SEMI: {
-            const char *opname = (tk.kind == TK_COMMA) ? "," : ";";
+            const char *opname = (tk.t == TK_COMMA) ? "," : ";";
             Token pk = lexer_peek(&p->lx);
-            if (pk.kind == TK_LPAREN) {
+            if (pk.t == TK_LPAREN) {
                 lexer_next(&p->lx); /* consume ( */
                 Term **args = NULL;
                 int nargs = parse_args(p, &args);
                 Token rp = lexer_peek(&p->lx);
-                if (rp.kind == TK_RPAREN) lexer_next(&p->lx);
+                if (rp.t == TK_RPAREN) lexer_next(&p->lx);
                 else perror_at(p, rp.line, "expected ) after args");
                 int fid = prolog_atom_intern(opname);
                 Term *t = term_new_compound(fid, nargs, args);
@@ -403,13 +403,13 @@ static Term *parse_primary(Parser *p) {
             }
             if (strcmp(tk.text, "-") == 0) {
                 Token pk = lexer_peek(&p->lx);
-                if (pk.kind == TK_INT || pk.kind == TK_FLOAT) {
+                if (pk.t == TK_INT || pk.t == TK_FLOAT) {
                     Token num = lexer_next(&p->lx);
-                    if (num.kind == TK_INT)   return term_new_int(-num.ival);
-                    if (num.kind == TK_FLOAT) return term_new_float(-num.fval);
+                    if (num.t == TK_INT)   return term_new_int(-num.v.ival);
+                    if (num.t == TK_FLOAT) return term_new_float(-num.fval);
                 }
                 /* -atom, -compound, -Variable: treat as -(Arg) prefix compound (prec 200) */
-                if (pk.kind == TK_ATOM || pk.kind == TK_OP || pk.kind == TK_VAR || pk.kind == TK_LPAREN) {
+                if (pk.t == TK_ATOM || pk.t == TK_OP || pk.t == TK_VAR || pk.t == TK_LPAREN) {
                     Term *arg = parse_term(p, 200);
                     int fid = prolog_atom_intern("-");
                     Term *args[1] = { arg };
@@ -419,8 +419,8 @@ static Term *parse_primary(Parser *p) {
             if (strcmp(tk.text, "+") == 0) {
                 Token pk = lexer_peek(&p->lx);
                 /* +atom, +compound, +Variable: treat as +(Arg) prefix compound (prec 200) */
-                if (pk.kind == TK_ATOM || pk.kind == TK_OP || pk.kind == TK_VAR ||
-                    pk.kind == TK_LPAREN || pk.kind == TK_INT || pk.kind == TK_FLOAT) {
+                if (pk.t == TK_ATOM || pk.t == TK_OP || pk.t == TK_VAR ||
+                    pk.t == TK_LPAREN || pk.t == TK_INT || pk.t == TK_FLOAT) {
                     Term *arg = parse_term(p, 200);
                     int fid = prolog_atom_intern("+");
                     Term *args[1] = { arg };
@@ -431,12 +431,12 @@ static Term *parse_primary(Parser *p) {
             {
                 int id = prolog_atom_intern(tk.text);
                 Token pk2 = lexer_peek(&p->lx);
-                if (pk2.kind == TK_LPAREN) {
+                if (pk2.t == TK_LPAREN) {
                     lexer_next(&p->lx); /* consume ( */
                     Term **args = NULL;
                     int nargs = parse_args(p, &args);
                     Token rp = lexer_peek(&p->lx);
-                    if (rp.kind == TK_RPAREN) lexer_next(&p->lx);
+                    if (rp.t == TK_RPAREN) lexer_next(&p->lx);
                     else perror_at(p, rp.line, "expected ) after args");
                     Term *t = term_new_compound(id, nargs, args);
                     free(args);
@@ -456,14 +456,14 @@ static Term *parse_primary(Parser *p) {
         case TK_LBRACE: {
             /* { Term } — parsed as '{}'(Term) compound, used in DCG bodies */
             Token pk2 = lexer_peek(&p->lx);
-            if (pk2.kind == TK_RBRACE) {
+            if (pk2.t == TK_RBRACE) {
                 /* {} — empty braces → atom '{}' */
                 lexer_next(&p->lx);
                 return term_new_atom(prolog_atom_intern("{}"));
             }
             Term *inner = parse_term(p, 1200);
             Token rb = lexer_next(&p->lx);
-            if (rb.kind != TK_RBRACE)
+            if (rb.t != TK_RBRACE)
                 perror_at(p, rb.line, "expected } after term");
             int curl_id = prolog_atom_intern("{}");
             Term *args[1] = { inner };
@@ -487,12 +487,12 @@ static Term *parse_term(Parser *p, int max_prec) {
         Token pk = lexer_peek(&p->lx);
         const char *optext = NULL;
 
-        if (pk.kind == TK_OP)   optext = pk.text;
-        else if (pk.kind == TK_ATOM) optext = pk.text; /* mod, is, etc */
-        else if (pk.kind == TK_COMMA && p->in_args > 0) break; /* comma is arg separator */
-        else if (pk.kind == TK_COMMA && max_prec >= 1000) optext = ",";
-        else if (pk.kind == TK_SEMI  && max_prec >= 1100) optext = ";";
-        else if (pk.kind == TK_NECK  && max_prec >= 1200) optext = ":-";
+        if (pk.t == TK_OP)   optext = pk.text;
+        else if (pk.t == TK_ATOM) optext = pk.text; /* mod, is, etc */
+        else if (pk.t == TK_COMMA && p->in_args > 0) break; /* comma is arg separator */
+        else if (pk.t == TK_COMMA && max_prec >= 1000) optext = ",";
+        else if (pk.t == TK_SEMI  && max_prec >= 1100) optext = ";";
+        else if (pk.t == TK_NECK  && max_prec >= 1200) optext = ":-";
         else break;
 
         const OpEntry *op = optext ? find_binop(optext) : NULL;
@@ -911,17 +911,17 @@ static PlClause *parse_clause(Parser *p) {
     scope_reset(&p->sc);
 
     Token pk = lexer_peek(&p->lx);
-    if (pk.kind == TK_EOF) return NULL;
+    if (pk.t == TK_EOF) return NULL;
 
     PlClause *cl = calloc(1, sizeof(PlClause));
     cl->lineno = pk.line;
 
     /* Directive:  :- goal . */
-    if (pk.kind == TK_NECK) {
+    if (pk.t == TK_NECK) {
         lexer_next(&p->lx); /* consume :- */
         Term *goal = parse_term(p, 1200);
         Token dot = lexer_next(&p->lx);
-        if (dot.kind != TK_DOT)
+        if (dot.t != TK_DOT)
             perror_at(p, dot.line, "expected . after directive");
 
         /* Conditional-compilation meta-directives — handled here, returned as a
@@ -949,7 +949,7 @@ static PlClause *parse_clause(Parser *p) {
     cl->head = head;
 
     pk = lexer_peek(&p->lx);
-    if (pk.kind == TK_NECK) {
+    if (pk.t == TK_NECK) {
         /* Normal :- rule — head was parsed at 1200 but comma at top level is fine
          * because the head of a :- clause is never a bare conjunction. */
         lexer_next(&p->lx); /* consume :- */
@@ -957,7 +957,7 @@ static PlClause *parse_clause(Parser *p) {
         int n = count_conj(body_term);
         cl->body  = malloc((n ? n : 1) * sizeof(Term *));
         cl->nbody = flatten_conj(body_term, cl->body, 0);
-    } else if (pk.kind == TK_OP && strcmp(pk.text, "-->") == 0) {
+    } else if (pk.t == TK_OP && strcmp(pk.text, "-->") == 0) {
         lexer_next(&p->lx); /* consume --> */
         Term *dcg_body = parse_term(p, 1200);
         /* Pushback notation: if head is ','(RealHead, Pushback), split it */
@@ -975,7 +975,7 @@ static PlClause *parse_clause(Parser *p) {
     }
 
     Token dot = lexer_next(&p->lx);
-    if (dot.kind != TK_DOT)
+    if (dot.t != TK_DOT)
         perror_at(p, dot.line, "expected . at end of clause");
 
     return cl;
@@ -999,8 +999,8 @@ PlProgram *prolog_parse(const char *src, const char *filename) {
 
     for (;;) {
         Token pk = lexer_peek(&p.lx);
-        if (pk.kind == TK_EOF) break;
-        if (pk.kind == TK_ERROR) {
+        if (pk.t == TK_EOF) break;
+        if (pk.t == TK_ERROR) {
             fprintf(stderr, "%s:%d: lex error: %s\n",
                     p.filename, pk.line, pk.text);
             p.nerrors++;
@@ -1069,7 +1069,7 @@ void term_pretty(Term *t, FILE *out) {
             fprintf(out, "_V%d", t->var_slot < 0 ? 0 : t->var_slot);
             break;
         case TT_INT:
-            fprintf(out, "%ld", t->ival);
+            fprintf(out, "%ld", t->v.ival);
             break;
         case TT_FLOAT:
             fprintf(out, "%g", t->fval);

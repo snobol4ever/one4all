@@ -22,7 +22,7 @@
 
 #include "runtime/x86/bb_broker.h"         /* bb_box_fn, bb_node_t, BrokerMode, bb_broker, DESCR_t, FAILDESCR, IS_FAIL_fn, α, β */
 #include "frontend/prolog/prolog_runtime.h"
-#include "frontend/snobol4/scrip_cc.h"      /* AST_t — needed for pl_box_builtin */
+#include "frontend/snobol4/scrip_cc.h"      /* tree_t — needed for pl_box_builtin */
 #include "frontend/prolog/prolog_builtin.h" /* interp_exec_pl_builtin */
 
 /*----------------------------------------------------------------------------------------------------------------------
@@ -37,7 +37,7 @@ bb_node_t pl_box_true(void);
 bb_node_t pl_box_fail(void);
 
 /* pl_box_builtin — α calls interp_exec_pl_builtin(goal, env); β returns ω */
-bb_node_t pl_box_builtin(AST_t *goal, Term **env);
+bb_node_t pl_box_builtin(tree_t *goal, Term **env);
 
 /*----------------------------------------------------------------------------------------------------------------------
  * CAT box constructors
@@ -47,7 +47,7 @@ bb_node_t pl_box_builtin(AST_t *goal, Term **env);
 bb_node_t pl_box_cat(bb_node_t left, bb_node_t right);
 
 /* pl_box_goal_from_ir — build a bb_node_t for any goal IR node (AST_FNC, AST_UNIFY, AST_CUT, ...) */
-bb_node_t pl_box_goal_from_ir(AST_t *g, Term **env);
+bb_node_t pl_box_goal_from_ir(tree_t *g, Term **env);
 
 /* pl_box_cat_list — fold goals[0..n-1] into a left-associative CAT chain. */
 bb_node_t pl_box_cat_list(bb_node_t *goals, int n);
@@ -55,14 +55,14 @@ bb_node_t pl_box_cat_list(bb_node_t *goals, int n);
 /*----------------------------------------------------------------------------------------------------------------------
  * pl_box_clause: one Horn clause as a Byrd box
  *--------------------------------------------------------------------------------------------------------------------*/
-bb_node_t pl_box_clause(AST_t *ec, Term **caller_args, int arity);
+bb_node_t pl_box_clause(tree_t *ec, Term **caller_args, int arity);
 
 /*----------------------------------------------------------------------------------------------------------------------
  * OR-box constructors
  *--------------------------------------------------------------------------------------------------------------------*/
 
 /* pl_box_choice — OR-box over all AST_CLAUSE children of an AST_CHOICE node. */
-bb_node_t pl_box_choice(AST_t *choice_node, Term **caller_args, int arity);
+bb_node_t pl_box_choice(tree_t *choice_node, Term **caller_args, int arity);
 
 /* CH-17e: pl_box_choice_pc — SM-expression variant of pl_box_choice.
  * Calls sm_call_expression(entry_pc) directly; no IR walk.
@@ -70,7 +70,7 @@ bb_node_t pl_box_choice(AST_t *choice_node, Term **caller_args, int arity);
 bb_node_t pl_box_choice_pc(int entry_pc, Term **caller_args, int arity);
 
 /* pl_box_choice_call — build an OR-box for an AST_FNC user-predicate call goal. */
-bb_node_t pl_box_choice_call(AST_t *goal, Term **env);
+bb_node_t pl_box_choice_call(tree_t *goal, Term **env);
 
 /*----------------------------------------------------------------------------------------------------------------------
  * pl_box_cut: FENCE analog for Prolog cut

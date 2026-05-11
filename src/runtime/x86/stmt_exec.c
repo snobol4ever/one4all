@@ -83,10 +83,10 @@ extern DESCR_t (*g_user_call_hook)(const char *name, DESCR_t *args, int nargs);
 #include "bb_build.h"
 #include "../x86/bb_flat.h"     /* bb_lit_emit_binary — M-DYN-B1 */
 
-/* SN-6b: DT_E thaw in bb_deferred_var needs AST_t + AST_FNC/AST_VAR kinds and
+/* SN-6b: DT_E thaw in bb_deferred_var needs tree_t + AST_FNC/AST_VAR kinds and
  * eval_node() for argument evaluation. Mirrors snobol4_pattern.c's pat_to_patnd. */
 #include "../ast/ast.h"
-extern DESCR_t eval_node(AST_t *e);
+extern DESCR_t eval_node(tree_t *e);
 
 /* In the full-runtime build, include bb_box.h after snobol4.h.
  * bb_box.h now uses spec_t (not spec_t) so no collision with engine. */
@@ -244,7 +244,7 @@ typedef struct {
 static int patnd_is_invariant(PATND_t *p)
 {
     if (!p)                                           return 1;  /* null → epsilon, invariant */
-    switch (p->kind) {
+    switch (p->t) {
     case XDSAR:
     case XVAR:
     case XATP:
@@ -255,8 +255,8 @@ static int patnd_is_invariant(PATND_t *p)
     default:                                          break;
     }
     /* Recurse into children */
-    for (int i = 0; i < p->nchildren; i++)
-        if (p->children[i] && !patnd_is_invariant(p->children[i])) return 0;
+    for (int i = 0; i < p->n; i++)
+        if (p->c[i] && !patnd_is_invariant(p->c[i])) return 0;
     return 1;
 }
 
@@ -513,7 +513,7 @@ static DESCR_t bb_usercall(void *zeta, int entry)
                 * a pattern at the current cursor.  String returns become anchored
                 * literal-string matches; pattern returns are matched as patterns. */
                if (IS_FAIL_fn(r))                         goto UC_ω;
-               if (r.v == DT_P && r.p && r.p->kind == XFAIL) goto UC_ω;
+               if (r.v == DT_P && r.p && r.p->t == XFAIL) goto UC_ω;
 
                /* SN-26c-parseerr-h: NRETURN → epsilon-match.  Side effects on
                 * globals already committed during the body's execution are
@@ -603,7 +603,7 @@ bb_node_t bb_build(PATND_t *p)
         /* fall through — build it, then insert below */
     }
 
-    switch (p->kind) {
+    switch (p->t) {
 
     /* ── literal string ─────────────────────────────────────────────── */
     case XCHR: {
@@ -743,13 +743,13 @@ bb_node_t bb_build(PATND_t *p)
 
     /* ── CONCATENATION (n-ary, fold-right into bb_seq pairs) ────────── */
     case XCAT: {
-        if (p->nchildren == 0) { n = bb_build(NULL); break; }
-        if (p->nchildren == 1) { n = bb_build(p->children[0]); break; }
+        if (p->n == 0) { n = bb_build(NULL); break; }
+        if (p->n == 1) { n = bb_build(p->c[0]); break; }
         /* Fold right: seq(children[0], seq(children[1], ...)) */
-        n = bb_build(p->children[p->nchildren - 1]);
-        for (int i = p->nchildren - 2; i >= 0; i--) {
+        n = bb_build(p->c[p->n - 1]);
+        for (int i = p->n - 2; i >= 0; i--) {
             seq_t *ζ = calloc(1, sizeof(seq_t));
-            bb_node_t l = bb_build(p->children[i]);
+            bb_node_t l = bb_build(p->c[i]);
             ζ->left.fn    = l.fn;  ζ->left.state  = l.ζ;
             ζ->right.fn   = n.fn;  ζ->right.state = n.ζ;
             bb_node_t seq_n;
@@ -764,13 +764,13 @@ bb_node_t bb_build(PATND_t *p)
     /* ── ALTERNATION (n-ary, direct children[] iteration) ──────────── */
     case XOR: {
         alt_t *ζ = calloc(1, sizeof(alt_t));
-        int nc = p->nchildren;
+        int nc = p->n;
         ζ->cap      = nc > BB_ALT_INIT ? nc : BB_ALT_INIT;
-        ζ->children = malloc(ζ->cap * sizeof(bchild_t));
+        ζ->c = malloc(ζ->cap * sizeof(bchild_t));
         for (int i = 0; i < nc; i++) {
-            bb_node_t arm         = bb_build(p->children[i]);
-            ζ->children[i].fn    = arm.fn;
-            ζ->children[i].state = arm.ζ;
+            bb_node_t arm         = bb_build(p->c[i]);
+            ζ->c[i].fn    = arm.fn;
+            ζ->c[i].state = arm.ζ;
         }
         ζ->n = nc;
         n.fn = bb_alt;
@@ -782,7 +782,7 @@ bb_node_t bb_build(PATND_t *p)
     /* ── ARBNO(body) ────────────────────────────────────────────────── */
     case XARBN: {
         arbno_t *ζ = calloc(1, sizeof(arbno_t));
-        bb_node_t body = bb_build(p->nchildren > 0 ? p->children[0] : NULL);
+        bb_node_t body = bb_build(p->n > 0 ? p->c[0] : NULL);
         ζ->fn    = body.fn;
         ζ->state = body.ζ;
         ζ->cap   = ARBNO_INIT;
@@ -795,7 +795,7 @@ bb_node_t bb_build(PATND_t *p)
 
     /* ── IMMEDIATE CAPTURE: pat $ var ───────────────────────────────── */
     case XFNME: {
-        bb_node_t child = bb_build(p->nchildren > 0 ? p->children[0] : NULL);
+        bb_node_t child = bb_build(p->n > 0 ? p->c[0] : NULL);
         /* SN-6 Bug #1d: DT_N with slen==0 carries name string in .s (NAMEVAL).
          * Mirror of bb_build.c bb_fnme_emit_binary — preserve name so
          * NAME_commit reaches NV_SET_fn() and fires I/O hooks (OUTPUT, PUNCH). */
@@ -814,7 +814,7 @@ bb_node_t bb_build(PATND_t *p)
 
     /* ── CONDITIONAL CAPTURE: pat . var ─────────────────────────────── */
     case XNME: {
-        bb_node_t child = bb_build(p->nchildren > 0 ? p->children[0] : NULL);
+        bb_node_t child = bb_build(p->n > 0 ? p->c[0] : NULL);
         /* SN-6 Bug #1d: DT_N with slen==0 carries name string in .s (NAMEVAL).
          * Mirror of bb_build.c bb_nme_emit_binary — preserve name so
          * NAME_commit reaches NV_SET_fn() and fires I/O hooks (OUTPUT, PUNCH).
@@ -833,7 +833,7 @@ bb_node_t bb_build(PATND_t *p)
 
     /* ── CALLCAP: pat . *func() — deferred-function capture target ─── */
     case XCALLCAP: {
-        bb_node_t child = bb_build(p->nchildren > 0 ? p->children[0] : NULL);
+        bb_node_t child = bb_build(p->n > 0 ? p->c[0] : NULL);
         /* SN-21d: single bb_cap box with NM_CALL NAME_t.  Deferred (.) flow
          * pushes an NM_CALL entry on γ; NAME_commit fires it via
          * name_commit_value → g_user_call_hook.  TL-2 arg-name deferred
@@ -861,7 +861,7 @@ bb_node_t bb_build(PATND_t *p)
          *
          * Store only the variable name; the box fetches live at α.
          */
-        const char *name = (p->kind == XDSAR) ? p->STRVAL_fn
+        const char *name = (p->t == XDSAR) ? p->STRVAL_fn
                          : (p->var.v == DT_S)  ? p->var.s : NULL;
         if (name && *name) {
             deferred_var_t *ζ = calloc(1, sizeof(deferred_var_t));
@@ -907,7 +907,7 @@ bb_node_t bb_build(PATND_t *p)
 
     /* ── FENCE — cut: γ on α, ω on all β (no backtrack across fence) ── */
     case XFNCE: {
-        if (p->nchildren == 0) {
+        if (p->n == 0) {
             /* FENCE0: bare FENCE — seal only */
             fence_t *ζ = calloc(1, sizeof(fence_t));
             n.fn = bb_fence;
@@ -916,7 +916,7 @@ bb_node_t bb_build(PATND_t *p)
         } else {
             /* FENCE1: FENCE(P) — sequence child then seal.
              * Child fails → ω (fail). Child succeeds → seal (β cuts). */
-            bb_node_t child = bb_build(p->children[0]);
+            bb_node_t child = bb_build(p->c[0]);
             fence_t *fζ = calloc(1, sizeof(fence_t));
             bb_node_t fence_n; fence_n.fn= bb_fence; fence_n.ζ=fζ; fence_n.ζ_size=sizeof(*fζ);
             seq_t *sζ = calloc(1, sizeof(seq_t));
@@ -977,7 +977,7 @@ bb_node_t bb_build(PATND_t *p)
     /* ── unimplemented: epsilon stub (logged) ────────────────────────── */
     default: {
         fprintf(stderr, "stmt_exec: unimplemented XKIND %d — using epsilon\n",
-                (int)p->kind);
+                (int)p->t);
         eps_t *ζ = calloc(1, sizeof(eps_t));
         n.fn = bb_eps;
         n.ζ  = ζ;
@@ -1055,24 +1055,24 @@ static DESCR_t bb_deferred_var(void *zeta, int entry)
                          * equivalent to SPITBOL's PATVAL semantics.
                          * ──────────────────────────────────────────────── */
                         if (val.v == DT_E) {
-                            AST_t *frozen = (AST_t *)val.ptr;
+                            tree_t *frozen = (tree_t *)val.ptr;
                             if (!frozen) {
                                 /* null DT_E — propagate failure (do not epsilon) */
                                 g_dvar_depth--;
                                 goto DVAR_ω;
                             }
-                            if (frozen->kind == AST_FNC) {
+                            if (frozen->t == AST_FNC) {
                                 /* *func(args...) — build XATP via pat_user_call */
-                                int nargs = frozen->nchildren;
+                                int nargs = frozen->n;
                                 DESCR_t *args = NULL;
                                 if (nargs > 0) {
                                     args = (DESCR_t *)alloca((size_t)nargs * sizeof(DESCR_t));
                                     for (int i = 0; i < nargs; i++)
-                                        args[i] = eval_node(frozen->children[i]);
+                                        args[i] = eval_node(frozen->c[i]);
                                 }
-                                const char *fname = frozen->sval ? frozen->sval : "";
+                                const char *fname = frozen->v.sval ? frozen->v.sval : "";
                                 val = pat_user_call(fname, args, nargs);
-                            } else if (frozen->kind == AST_VAR && frozen->sval) {
+                            } else if (frozen->t == AST_VAR && frozen->v.sval) {
                                 /* *varname — re-resolve directly via NV_GET_fn.
                                  * Going through var_as_pattern→XVAR would add
                                  * another layer of indirection (a nested
@@ -1081,7 +1081,7 @@ static DESCR_t bb_deferred_var(void *zeta, int entry)
                                  * bb_deferred_var IS the deferred re-resolve
                                  * box, we skip the indirection and fetch the
                                  * underlying value directly. */
-                                val = NV_GET_fn(frozen->sval);
+                                val = NV_GET_fn(frozen->v.sval);
                             } else {
                                 /* Other frozen expression: strict thaw via PATVAL_fn */
                                 val = PATVAL_fn(val);
@@ -1521,11 +1521,11 @@ int cache_test_run(const char *lit, int n_iters)
     /* Build a single static PATND_t node (stack-allocated, same address each
      * call — required for pointer-keyed cache to work). */
     static PATND_t node;
-    node.kind         = XCHR;
+    node.t         = XCHR;
     node.materialising = 0;
     node.STRVAL_fn         = lit;
     node.num          = 0;
-    node.children = NULL; node.nchildren = 0;
+    node.c = NULL; node.n = 0;
     node.args = NULL;
     node.nargs = 0;
 
@@ -1612,9 +1612,9 @@ int deferred_var_test(void)
 
     /* Build deferred_var_t for *T15_PAT */
     static PATND_t dsar_node;
-    dsar_node.kind  = XDSAR;
+    dsar_node.t  = XDSAR;
     dsar_node.STRVAL_fn  = "T15_PAT";
-    dsar_node.children = NULL; dsar_node.nchildren = 0;
+    dsar_node.c = NULL; dsar_node.n = 0;
     dsar_node.args  = NULL;
     dsar_node.nargs = 0;
 
