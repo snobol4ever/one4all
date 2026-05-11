@@ -140,4 +140,12 @@ void emit_sm_stno (emitter_t *e, int stno, int lineno, const char *src_text);
 void emit_sm_call_fn(emitter_t *e, const char *name_lbl,
                      uint64_t name_ptr, int nargs);
 
+/* SM_RETURN / SM_RETURN_VARIANT family — sub-rung -q (2026-05-11).
+ * emit_sm_return: MACRO_DEF source of truth for RETURN macro (ret).
+ * emit_sm_return_variant: MACRO_DEF source of truth for RETURN_VARIANT macro
+ *   (mov edi,kind; mov esi,cond; call rt_do_return@PLT; test/jz/ret/label).
+ * TEXT dispatch uses sm_emit_ret / sm_emit_ret_var (proven path). */
+void emit_sm_return(emitter_t *e);
+void emit_sm_return_variant(emitter_t *e, int kind, int cond, int pc);
+
 #endif /* RUNTIME_X86_TEMPLATES_TEMPLATES_H */

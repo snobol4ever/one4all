@@ -960,11 +960,11 @@ static int emit_sm_call_expression(FILE *out, const SM_Instr *ins, int pc)
                               (int)ins->a[0].i);
 }
 
-static int emit_sm_return(FILE *out, int pc)
+static int emit_sm_return_dispatch(FILE *out, int pc)
 {
     (void)pc;
-    /* SM_RETURN: native return.  The expression's last push left the result
-     * on the SM value stack inside libscrip_rt.so. */
+    /* SM_RETURN: native return.  TEXT dispatch uses sm_emit_ret (proven path).
+     * Template emit_sm_return (templates/sm_return.c) is MACRO_DEF source of truth. */
     return sm_emit_ret(out, sm_template_lookup(SM_RETURN), NULL);
 }
 
@@ -1104,10 +1104,9 @@ static int emit_sm_call_legacy(FILE *out, const SM_Instr *ins, int pc)
 
 /* SM_RETURN_S / SM_RETURN_F / SM_FRETURN[_S/_F] / SM_NRETURN[_S/_F].
  *
- * Driven by the SM_RETURN_VARIANT template (one source of truth with
- * sm_macros' SM_RETURN_VARIANT macro).  kind/cond computed from opcode.
- * For unconditional plain SM_RETURN, emit_sm_return uses SM_RETURN. */
-static int emit_sm_return_variant(FILE *out, sm_opcode_t op, int pc)
+ * TEXT dispatch uses sm_emit_ret_var (proven path).
+ * Template emit_sm_return_variant (templates/sm_return.c) is MACRO_DEF source of truth. */
+static int emit_sm_return_variant_dispatch(FILE *out, sm_opcode_t op, int pc)
 {
     int kind = 0;  /* RETURN */
     if (op == SM_FRETURN || op == SM_FRETURN_S || op == SM_FRETURN_F) kind = 1;
@@ -2205,7 +2204,7 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
             /* EM-5: expression descriptor push expression call, return. */
             case SM_PUSH_EXPRESSION:   rc = emit_sm_push_expression(out, ins, pc); break;
             case SM_CALL_EXPRESSION:   rc = emit_sm_call_expression(out, ins, pc); break;
-            case SM_RETURN:       rc = emit_sm_return(out, pc);          break;
+            case SM_RETURN:       rc = emit_sm_return_dispatch(out, pc);          break;
 
             /* EM-7-pre keepers: SM_CALL_FN (general) + SM_CONCAT + SM_PUSH_NULL +
              * SM_COERCE_NUM + conditional return variants. */
@@ -2220,7 +2219,7 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
             case SM_FRETURN_S:
             case SM_FRETURN_F:
             case SM_NRETURN_S:
-            case SM_NRETURN_F:    rc = emit_sm_return_variant(out, ins->op, pc); break;
+            case SM_NRETURN_F:    rc = emit_sm_return_variant_dispatch(out, ins->op, pc); break;
 
             /* SM_STNO -- statement boundary; emits major page break w/ source. */
             case SM_STNO:         rc = emit_sm_stno_dispatch(out, ins, pc,

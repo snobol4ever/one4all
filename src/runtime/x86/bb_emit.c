@@ -372,6 +372,97 @@ void t_mov_esi_imm32(int val)
     }
 }
 
+void t_mov_edi_imm32(int val)
+{
+    /* mov edi, <imm32>  — 5 bytes: BF <val32>  (MOV EDI, imm32)
+     *   BINARY:    BF <val32>
+     *   TEXT:      mov edi, <val>
+     *   MACRO_DEF: mov edi, \kind   (param reference for first RETURN_VARIANT arg) */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY: {
+        uint32_t u = (uint32_t)val;
+        bb_emit_byte(0xBF);
+        bb_emit_byte((uint8_t)(u      ));
+        bb_emit_byte((uint8_t)(u >>  8));
+        bb_emit_byte((uint8_t)(u >> 16));
+        bb_emit_byte((uint8_t)(u >> 24));
+        return;
+    }
+    case EMIT_TEXT: {
+        char args[32];
+        snprintf(args, sizeof(args), "edi, %d", val);
+        bb3c_format(emit_outf(), "", "mov", args);
+        return;
+    }
+    case EMIT_MACRO_DEF:
+        bb3c_format(emit_outf(), "", "mov", "edi, \\kind");
+        return;
+    }
+}
+
+void t_test_eax_eax(void)
+{
+    /* test eax, eax  — 2 bytes: 85 C0
+     *   BINARY:    85 C0
+     *   TEXT/MACRO_DEF: test eax, eax */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY:
+        bb_emit_byte(0x85); bb_emit_byte(0xC0);
+        return;
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF:
+        bb3c_format(emit_outf(), "", "test", "eax, eax");
+        return;
+    }
+}
+
+void t_jz_retskip(int pc)
+{
+    /* jz .Lretskip_<pc>  — conditional jump to the skip label.
+     *   BINARY:    0F 84 <rel32>  (forward ref; patch needed — not wired yet)
+     *   TEXT:      jz  .Lretskip_<pc>
+     *   MACRO_DEF: jz  .Lretskip_\pc\()   (GAS param ref + empty paste) */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY:
+        /* Mode-3 uses standard_blob; template not called in BINARY mode.
+         * Emit NOP placeholder so binary mode is at least structurally safe. */
+        bb_emit_byte(0x90);
+        return;
+    case EMIT_TEXT: {
+        char args[40];
+        snprintf(args, sizeof(args), ".Lretskip_%d", pc);
+        bb3c_format(emit_outf(), "", "jz", args);
+        return;
+    }
+    case EMIT_MACRO_DEF:
+        bb3c_format(emit_outf(), "", "jz", ".Lretskip_\\pc\\()");
+        return;
+    }
+}
+
+void t_retskip_label(int pc)
+{
+    /* .Lretskip_<pc>:  — local label after the conditional ret.
+     *   BINARY:    no-op (label offset recorded by bb_label machinery, not here)
+     *   TEXT:      .Lretskip_<pc>:
+     *   MACRO_DEF: .Lretskip_\pc\():   (GAS param ref + empty paste avoids
+     *              concatenation ambiguity) */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY:
+        return;
+    case EMIT_TEXT: {
+        FILE *f = emit_outf();
+        fprintf(f, ".Lretskip_%d:\n", pc);
+        return;
+    }
+    case EMIT_MACRO_DEF: {
+        FILE *f = emit_outf();
+        fputs(".Lretskip_\\pc\\():\n", f);
+        return;
+    }
+    }
+}
+
 void t_noop_macro(const char *macro_name)
 {
     /* NOOP shape: emit one three-column line with macro_name in col 2.
