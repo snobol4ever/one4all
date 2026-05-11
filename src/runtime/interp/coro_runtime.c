@@ -992,31 +992,47 @@ static DESCR_t coro_bb_cat(void *zeta, int entry) {
 /*----------------------------------------------------------------------------------------------------------------------------
  * icn_bb_assign_gen — AST_ASSIGN with generative RHS  (x := gen_expr)
  *
- * IC-6 fix for  every (x := (1|2|3|4)) > 2 & write(x):
- * Pumps the RHS generator each tick, writes the result into the target
- * variable slot (or NV), and returns the value so binop_gen can test it.
- *   α: pump RHS α, write var, return value (or ω if RHS immediately fails).
- *   β: pump RHS β, write var, return value (or ω if RHS exhausted).
+ * Two variants:
+ *   icn_bb_assign_gen — RHS is a pure generator (no mutable scalar siblings):
+ *     e.g.  every (x := (1|2|3)) > 2 & write(x)
+ *     Pumps rhs_gen each tick, writes result to lhs.
+ *   icn_bb_assign_cat — RHS has mutable scalars alongside a generator:
+ *     e.g.  every total := total + (1 to n)
+ *     Re-evaluates full RHS each tick via coro_drive_node so `total` is fresh.
  *--------------------------------------------------------------------------------------------------------------------------*/
 typedef struct { bb_node_t rhs_gen; AST_t *lhs; } icn_assign_gen_state_t;
-static DESCR_t icn_bb_assign_gen(void *zeta, int entry) {
-    icn_assign_gen_state_t *z = (icn_assign_gen_state_t *)zeta;
-    DESCR_t val = z->rhs_gen.fn(z->rhs_gen.ζ, entry);
-    if (IS_FAIL_fn(val)) return FAILDESCR;
-    /* Write value into target variable */
-    AST_t *lhs = z->lhs;
+static DESCR_t icn_assign_write(AST_t *lhs, DESCR_t val) {
     if (lhs && lhs->kind == AST_VAR) {
         int slot = (int)lhs->ival;
         if (slot >= 0 && slot < FRAME.env_n) { FRAME.env[slot] = val; }
         else if (slot < 0 && lhs->sval && lhs->sval[0] != '&') NV_SET_fn(lhs->sval, val);
     } else if (lhs && lhs->kind == AST_FIELD && lhs->sval && lhs->nchildren >= 1) {
-        /* IC-5: record field lvalue  obj.fieldname := gen_value.
-         * Use FIELD_SET_fn (declared in snobol4.h, already linked) rather than
-         * data_field_ptr (interp_private.h not included here). */
         DESCR_t obj = bb_eval_value(lhs->children[0]);
         if (!IS_FAIL_fn(obj)) FIELD_SET_fn(obj, lhs->sval, val);
     }
     return val;
+}
+static DESCR_t icn_bb_assign_gen(void *zeta, int entry) {
+    icn_assign_gen_state_t *z = (icn_assign_gen_state_t *)zeta;
+    DESCR_t val = z->rhs_gen.fn(z->rhs_gen.ζ, entry);
+    if (IS_FAIL_fn(val)) return FAILDESCR;
+    return icn_assign_write(z->lhs, val);
+}
+
+typedef struct { bb_node_t leaf_gen; AST_t *rhs_expr; AST_t *leaf; AST_t *lhs; } icn_assign_cat_state_t;
+static DESCR_t icn_bb_assign_cat(void *zeta, int entry) {
+    icn_assign_cat_state_t *z = (icn_assign_cat_state_t *)zeta;
+    int e2 = entry;
+    for (;;) {
+        DESCR_t tick = z->leaf_gen.fn(z->leaf_gen.ζ, e2);
+        if (IS_FAIL_fn(tick)) return FAILDESCR;
+        coro_drive_node = z->leaf;
+        coro_drive_val  = tick;
+        DESCR_t val = bb_eval_value(z->rhs_expr);
+        coro_drive_node = NULL;
+        if (!IS_FAIL_fn(val)) return icn_assign_write(z->lhs, val);
+        e2 = β;
+    }
 }
 
 /*----------------------------------------------------------------------------------------------------------------------------
@@ -1786,13 +1802,31 @@ bb_node_t coro_eval(AST_t *e) {
         }
     }
 
-    /* ── AST_ASSIGN with generative RHS — IC-6 fix for (x:=alt)>2 filter pattern ──
-     * e.g.  every (x := (1|2|3|4)) > 2 & write(x)
-     * Pumps the RHS generator on each α/β tick and writes the result into the
-     * target variable slot before returning it (so binop_gen sees each alt value). */
+    /* ── AST_ASSIGN with generative RHS — IC-6 / mutable-scalar fix ─────────────
+     * Two variants selected at coro_eval time:
+     *   cat: RHS has an AST_VAR sibling of the leaf generator — re-eval full RHS
+     *        each tick via coro_drive_node injection so mutable vars (e.g. `total`
+     *        in `total := total + (1 to n)`) are read fresh on every iteration.
+     *   gen: pure generator RHS, no mutable scalar siblings — pump directly. */
     if (e->kind == AST_ASSIGN && e->nchildren >= 2 && is_suspendable(e->children[1])) {
+        AST_t *rhs = e->children[1];
+        AST_t *leaf = find_leaf_suspendable(rhs);
+        int has_var = 0;
+        if (leaf && leaf != rhs) {
+            for (int _ci = 0; _ci < rhs->nchildren && !has_var; _ci++)
+                if (rhs->children[_ci] && rhs->children[_ci]->kind == AST_VAR
+                    && rhs->children[_ci] != leaf) has_var = 1;
+        }
+        if (has_var && leaf) {
+            icn_assign_cat_state_t *zc = calloc(1, sizeof(*zc));
+            zc->leaf_gen = coro_eval(leaf);
+            zc->rhs_expr = rhs;
+            zc->leaf     = leaf;
+            zc->lhs      = e->children[0];
+            return (bb_node_t){ icn_bb_assign_cat, zc, 0 };
+        }
         icn_assign_gen_state_t *z = calloc(1, sizeof(*z));
-        z->rhs_gen = coro_eval(e->children[1]);
+        z->rhs_gen = coro_eval(rhs);
         z->lhs     = e->children[0];
         return (bb_node_t){ icn_bb_assign_gen, z, 0 };
     }
