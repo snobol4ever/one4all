@@ -130,6 +130,7 @@ typedef void (*LowerHandler)(LowerCtx *c, const AST_t *e);
  * Cohort files that recurse (AST_INDIRECT, AST_DEFER, etc.) call lower_expr directly. */
 void lower_expr    (LowerCtx *c, const AST_t *e);
 void lower_pat_expr(LowerCtx *c, const AST_t *e);
+void lower_stmt    (LowerCtx *c, const STMT_t *s);  /* lower_stmt.c (SR-12) */
 
 /* sm_pat_capture_fn_arg_names: moved to lower_pat.c (SR-7); used by cohort_capture (SR-8). */
 const char *sm_pat_capture_fn_arg_names(const AST_t *fnc);
