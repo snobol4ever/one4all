@@ -237,6 +237,8 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/sm_lower.c   -o $(OBJ)/sm_lower.o
 	$(CC) $(CRT)   -c $(RT)/x86/lower_ctx.c  -o $(OBJ)/lower_ctx.o
 	$(CC) $(CRT)   -c $(RT)/x86/cohort_literal.c -o $(OBJ)/cohort_literal.o
+	$(CC) $(CRT)   -c $(RT)/x86/cohort_ref.c     -o $(OBJ)/cohort_ref.o
+	$(CC) $(CRT)   -c $(RT)/x86/cohort_arith.c   -o $(OBJ)/cohort_arith.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_image.c   -o $(OBJ)/sm_image.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_codegen.c -o $(OBJ)/sm_codegen.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_emit_template.c -o $(OBJ)/sm_emit_template.o

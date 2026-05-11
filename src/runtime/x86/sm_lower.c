@@ -47,12 +47,14 @@ static int          g_handlers_initialized = 0;
 static void init_handlers(void)
 {
     cohort_literal_register(g_handlers);
+    cohort_ref_register(g_handlers);
+    cohort_arith_register(g_handlers);
     g_handlers_initialized = 1;
 }
 
 /* ── Expression lowering ────────────────────────────────────────────────── */
 
-static void lower_expr(LowerCtx *c, const AST_t *e);
+void lower_expr(LowerCtx *c, const AST_t *e);
 
 /* Extract argument names from a *fn(var,var,...) AST_FNC subtree for
  * SM_PAT_CAPTURE_FN.  Returns a GC-lifetime '\t'-separated name list, or
@@ -293,7 +295,7 @@ static void lower_pat_expr(LowerCtx *c, const AST_t *e)
     }
 }
 
-static void lower_expr(LowerCtx *c, const AST_t *e)
+void lower_expr(LowerCtx *c, const AST_t *e)
 {
     SM_Program *p = c->p;
     LabelTable *labtab = &c->labtab;
@@ -321,73 +323,11 @@ static void lower_expr(LowerCtx *c, const AST_t *e)
     /* AST_NUL → cohort_literal */
 
     /* ── References ── */
-    case AST_VAR: {
-        const char *vn = e->sval ? e->sval : "";
-        /* Inside proc-body expression lowering, consult the per-proc frame scope.
-         * Globals, keywords ('&'-prefixed), and unscoped names fall through to
-         * SM_PUSH_VAR (NV store). */
-        if (c->expression_body_lowering && c->expression_scope && vn[0] && vn[0] != '&') {
-            int slot = scope_get(c->expression_scope, vn);
-            if (slot >= 0) { sm_emit_i(p, SM_LOAD_FRAME, slot); return; }
-        }
-        sm_emit_s(p, SM_PUSH_VAR, vn);
-        return;
-    }
-    case AST_KEYWORD: {
-        /* Keywords are stored uppercase; fold the source case before lookup. */
-        sm_emit_s(p, SM_PUSH_VAR, kw_canonicalize(e->sval));
-        return;
-    }
-    case AST_INDIRECT: {
-        /* $expr — eval name-string, look up variable, push value.
-         * $.var<idx> special case: push var value directly + IDX (bypasses INDIR_GET). */
-        AST_t *ch = e->nchildren > 0 ? e->children[0] : NULL;
-        if (ch && ch->kind == AST_NAME && ch->nchildren == 1) {
-            AST_t *inner = ch->children[0];
-            if (inner && inner->kind == AST_IDX && inner->nchildren >= 2
-                    && inner->children[0] && inner->children[0]->kind == AST_VAR
-                    && inner->children[0]->sval) {
-                const char *vn = inner->children[0]->sval;
-                sm_emit_s(p, SM_PUSH_VAR, vn);
-                for (int i = 1; i < inner->nchildren; i++) lower_expr(c, inner->children[i]);
-                sm_emit_si(p, SM_CALL_FN, "IDX", (int64_t)inner->nchildren);
-                return;
-            }
-        }
-        lower_expr(c, ch);
-        sm_emit_si(p, SM_CALL_FN, "INDIR_GET", 1);
-        return;
-    }
-    case AST_DEFER: {
-        /* *expr in value context — lower child as a compiled SM expression.
-         * DT_E carries an entry_pc; EVAL_fn thaws it at call time.
-         *
-         *   SM_JUMP  skip
-         *   entry_pc: <lower_expr(child)>
-         *   SM_RETURN
-         *   skip: SM_PUSH_EXPRESSION entry_pc, 0
-         */
-        const AST_t *child = e->nchildren > 0 ? e->children[0] : NULL;
-        int skip_jump = sm_emit_i(p, SM_JUMP, 0);
-        int entry_pc  = sm_label(p);
-        if (child) lower_expr(c, child);
-        else       sm_emit(p, SM_PUSH_NULL);
-        sm_emit(p, SM_RETURN);
-        int skip_lbl = sm_label(p);
-        sm_patch_jump(p, skip_jump, skip_lbl);
-        sm_emit_ii(p, SM_PUSH_EXPRESSION, (int64_t)entry_pc, 0);
-        return;
-    }
+    /* AST_VAR, AST_KEYWORD, AST_INDIRECT, AST_DEFER → cohort_ref */
 
     /* ── Arithmetic ── */
-    case AST_ADD: LOWER2(SM_ADD);
-    case AST_SUB: LOWER2(SM_SUB);
-    case AST_MUL: LOWER2(SM_MUL);
-    case AST_DIV: LOWER2(SM_DIV);
-    case AST_POW: LOWER2(SM_EXP);
-    case AST_MOD: LOWER2(SM_MOD);
-    case AST_MNS: LOWER1_VAL(SM_NEG);
-    case AST_PLS: LOWER1_VAL(SM_COERCE_NUM);
+    /* AST_INTERROGATE, AST_NAME, AST_MNS, AST_PLS,
+     * AST_ADD, AST_SUB, AST_MUL, AST_DIV, AST_MOD, AST_POW → cohort_arith */
 
     /* ── Value-context disjunction (SNOBOL4 paren-list / Snocone ||) ── */
     case AST_VLIST: {
@@ -523,17 +463,7 @@ static void lower_expr(LowerCtx *c, const AST_t *e)
         sm_emit_i(p, SM_LCOMP, (int64_t)e->kind);
         return;
 
-    case AST_INTERROGATE:
-        lower_expr(c, e->nchildren > 0 ? e->children[0] : NULL);
-        return;
-
-    case AST_NAME: {
-        const char *vname = (e->nchildren > 0 && e->children[0] && e->children[0]->sval)
-                            ? e->children[0]->sval : "";
-        sm_emit_s(p, SM_PUSH_LIT_S, vname);
-        sm_emit_si(p, SM_CALL_FN, "NAME_PUSH", 1);
-        return;
-    }
+    /* AST_INTERROGATE, AST_NAME → cohort_arith */
 
     /* ── Scan E ? E ── */
     case AST_SCAN:

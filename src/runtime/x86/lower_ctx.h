@@ -126,9 +126,15 @@ int emit_goto(LowerCtx *c, sm_opcode_t op, const char *target);
  */
 typedef void (*LowerHandler)(LowerCtx *c, const AST_t *e);
 
+/* lower_expr and lower_pat_expr: non-static since SR-5 (Phase-2 cohort promotion).
+ * Cohort files that recurse (AST_INDIRECT, AST_DEFER, etc.) call lower_expr directly. */
+void lower_expr    (LowerCtx *c, const AST_t *e);
+
 /* Each cohort file exports one registration function that fills its
  * slice of the handler table. */
 void cohort_literal_register(LowerHandler tbl[AST_KIND_COUNT]);
+void cohort_ref_register    (LowerHandler tbl[AST_KIND_COUNT]);
+void cohort_arith_register  (LowerHandler tbl[AST_KIND_COUNT]);
 
 #include "../common/ast_clone.h"   /* ast_gc_clone — used by emit_push_expr */
 
