@@ -16,8 +16,10 @@
  *   3. SM_HALT + labtab_resolve — patches forward GOTO targets; reports any
  *      AST kinds that hit lower_unhandled() (diagnostic, normally silent).
  *
- * Naming: c = LowerCtx*, p = SM_Program*, t = AST_t*, s = STMT_t*.
- * Handler signature: static void lower_foo(LowerCtx *c, const AST_t *t)
+ * File-scope state: g_p (SM_Program), g_labtab (LabelTable),
+ * g_in_proc_body + g_proc_scope (Icon frame-slot context), g_unhandled_kinds (diagnostic).
+ * Naming: p = SM_Program*, t = AST_t*, s = STMT_t*.
+ * Handler signature: static void lower_foo(const AST_t *t)
  *
  * Authors: Lon Jones Cherryholmes · Claude Sonnet 4.6
  */
@@ -42,9 +44,59 @@
 #include <gc/gc.h>
 #include "snobol4.h"
 
-void lower_expr    (LowerCtx *c, const AST_t *t);
-void lower_pat_expr(LowerCtx *c, const AST_t *t);
-void lower_stmt    (LowerCtx *c, const STMT_t *s);
+void lower_expr    (const AST_t *t);
+void lower_pat_expr(const AST_t *t);
+void lower_stmt    (const STMT_t *s);
+
+/*── File-scope lowering state ───────────────────────────────────────────────
+ * lower() initializes these before the pass; all handlers read/write them.
+ * Only one lowering pass runs at a time (lower() is not reentrant).
+ *────────────────────────────────────────────────────────────────────────────*/
+#define LOWER_UNHANDLED_WORDS 4
+static SM_Program  *g_p;
+static LabelTable   g_labtab;
+static int          g_in_proc_body;
+static IcnScope    *g_proc_scope;
+static unsigned long long g_unhandled_kinds[LOWER_UNHANDLED_WORDS];
+
+static void emit_push_expr(const AST_t *t)
+{
+    sm_emit_ptr(g_p, SM_PUSH_EXPR, (void *)ast_gc_clone(t));
+}
+
+static void lower_unhandled(const AST_t *t)
+{
+    if (!g_in_proc_body && t->kind >= 0 && t->kind < AST_KIND_COUNT) {
+        int w = t->kind / 64, b = t->kind % 64;
+        if (w < LOWER_UNHANDLED_WORDS) g_unhandled_kinds[w] |= (1ULL << b);
+    }
+    sm_emit(g_p, SM_PUSH_NULL);
+}
+
+static int emit_goto(sm_opcode_t op, const char *target)
+{
+    if (!target) return -1;
+    if (strcasecmp(target, "RETURN")  == 0) {
+        if (op == SM_JUMP_S) return sm_emit(g_p, SM_RETURN_S);
+        if (op == SM_JUMP_F) return sm_emit(g_p, SM_RETURN_F);
+        return sm_emit(g_p, SM_RETURN);
+    }
+    if (strcasecmp(target, "FRETURN") == 0) {
+        if (op == SM_JUMP_S) return sm_emit(g_p, SM_FRETURN_S);
+        if (op == SM_JUMP_F) return sm_emit(g_p, SM_FRETURN_F);
+        return sm_emit(g_p, SM_FRETURN);
+    }
+    if (strcasecmp(target, "NRETURN") == 0) {
+        if (op == SM_JUMP_S) return sm_emit(g_p, SM_NRETURN_S);
+        if (op == SM_JUMP_F) return sm_emit(g_p, SM_NRETURN_F);
+        return sm_emit(g_p, SM_NRETURN);
+    }
+    int idx = sm_emit_i(g_p, op, 0);
+    int resolved = labtab_find(&g_labtab, target);
+    if (resolved >= 0) sm_patch_jump(g_p, idx, resolved);
+    else               labtab_patch_later(&g_labtab, idx, target);
+    return idx;
+}
 
 /* Helpers: read a child safely. */
 #define T0(t) ((t)->nchildren > 0 ? (t)->children[0] : NULL)
@@ -52,26 +104,26 @@ void lower_stmt    (LowerCtx *c, const STMT_t *s);
 #define T2(t) ((t)->nchildren > 2 ? (t)->children[2] : NULL)
 
 /* One-liner handlers for arithmetic and unary ops. */
-#define CALL1(fn) do { lower_expr(c,T0(t)); sm_emit_si(p,SM_CALL_FN,(fn),1); } while(0)
-#define CALL2(fn) do { lower_expr(c,T0(t)); lower_expr(c,T1(t)); sm_emit_si(p,SM_CALL_FN,(fn),2); } while(0)
+#define CALL1(fn) do { lower_expr(T0(t)); sm_emit_si(p,SM_CALL_FN,(fn),1); } while(0)
+#define CALL2(fn) do { lower_expr(T0(t)); lower_expr(T1(t)); sm_emit_si(p,SM_CALL_FN,(fn),2); } while(0)
 
 /* Inline frame-slot load for a named variable, falling back to NV store. */
-static void emit_var_load(LowerCtx *c, const char *vn)
+static void emit_var_load(const char *vn)
 {
-    SM_Program *p = c->p;
-    if (c->expression_body_lowering && c->expression_scope && vn[0] && vn[0] != '&') {
-        int slot = scope_get(c->expression_scope, vn);
+    SM_Program *p = g_p;
+    if (g_in_proc_body && g_proc_scope && vn[0] && vn[0] != '&') {
+        int slot = scope_get(g_proc_scope, vn);
         if (slot >= 0) { sm_emit_i(p, SM_LOAD_FRAME, slot); return; }
     }
     sm_emit_s(p, SM_PUSH_VAR, vn);
 }
 
 /* Inline frame-slot store for a named variable, falling back to NV store. */
-static void emit_var_store(LowerCtx *c, const char *vn)
+static void emit_var_store(const char *vn)
 {
-    SM_Program *p = c->p;
-    if (c->expression_body_lowering && c->expression_scope && vn[0] && vn[0] != '&') {
-        int slot = scope_get(c->expression_scope, vn);
+    SM_Program *p = g_p;
+    if (g_in_proc_body && g_proc_scope && vn[0] && vn[0] != '&') {
+        int slot = scope_get(g_proc_scope, vn);
         if (slot >= 0) { sm_emit_i(p, SM_STORE_FRAME, slot); return; }
     }
     sm_emit_s(p, SM_STORE_VAR, vn);
@@ -79,12 +131,12 @@ static void emit_var_store(LowerCtx *c, const char *vn)
 
 /* Emit a thunked SM expression (JUMP/body/RETURN/PUSH_EXPRESSION).
  * Used by DEFER, EVAL, and pattern-capture argument lowering. */
-static void emit_thunk(LowerCtx *c, const AST_t *body)
+static void emit_thunk(const AST_t *body)
 {
-    SM_Program *p = c->p;
+    SM_Program *p = g_p;
     int skip = sm_emit_i(p, SM_JUMP, 0);
     int entry = sm_label(p);
-    if (body) lower_expr(c, body); else sm_emit(p, SM_PUSH_NULL);
+    if (body) lower_expr(body); else sm_emit(p, SM_PUSH_NULL);
     sm_emit(p, SM_RETURN);
     sm_patch_jump(p, skip, sm_label(p));
     sm_emit_ii(p, SM_PUSH_EXPRESSION, (int64_t)entry, 0);
@@ -92,20 +144,20 @@ static void emit_thunk(LowerCtx *c, const AST_t *body)
 
 /*── Literals ────────────────────────────────────────────────────────────────*/
 
-static void lower_qlit(LowerCtx *c, const AST_t *t) { sm_emit_s(c->p, SM_PUSH_LIT_S, t->sval ? t->sval : ""); }
-static void lower_cset(LowerCtx *c, const AST_t *t) { sm_emit_s(c->p, SM_PUSH_LIT_S, t->sval ? t->sval : ""); }
-static void lower_ilit(LowerCtx *c, const AST_t *t) { sm_emit_i(c->p, SM_PUSH_LIT_I, (int64_t)t->ival); }
-static void lower_flit(LowerCtx *c, const AST_t *t) { sm_emit_f(c->p, SM_PUSH_LIT_F, t->dval); }
-static void lower_nul (LowerCtx *c, const AST_t *t) { (void)t; sm_emit(c->p, SM_PUSH_NULL); }
+static void lower_qlit(const AST_t *t) { sm_emit_s(g_p, SM_PUSH_LIT_S, t->sval ? t->sval : ""); }
+static void lower_cset(const AST_t *t) { sm_emit_s(g_p, SM_PUSH_LIT_S, t->sval ? t->sval : ""); }
+static void lower_ilit(const AST_t *t) { sm_emit_i(g_p, SM_PUSH_LIT_I, (int64_t)t->ival); }
+static void lower_flit(const AST_t *t) { sm_emit_f(g_p, SM_PUSH_LIT_F, t->dval); }
+static void lower_nul (const AST_t *t) { (void)t; sm_emit(g_p, SM_PUSH_NULL); }
 
 /*── Variable references ─────────────────────────────────────────────────────*/
 
-static void lower_var(LowerCtx *c, const AST_t *t)     { emit_var_load(c, t->sval ? t->sval : ""); }
-static void lower_keyword(LowerCtx *c, const AST_t *t) { sm_emit_s(c->p, SM_PUSH_VAR, kw_canonicalize(t->sval)); }
+static void lower_var(const AST_t *t)     { emit_var_load(t->sval ? t->sval : ""); }
+static void lower_keyword(const AST_t *t) { sm_emit_s(g_p, SM_PUSH_VAR, kw_canonicalize(t->sval)); }
 
-static void lower_indirect(LowerCtx *c, const AST_t *t)
+static void lower_indirect(const AST_t *t)
 {
-    SM_Program *p = c->p;
+    SM_Program *p = g_p;
     /* $.var[idx] fast path: bypass INDIR_GET, emit PUSH_VAR + IDX directly. */
     const AST_t *ch = T0(t);
     if (ch && ch->kind == AST_NAME && ch->nchildren == 1) {
@@ -114,53 +166,53 @@ static void lower_indirect(LowerCtx *c, const AST_t *t)
                 && inner->children[0] && inner->children[0]->kind == AST_VAR
                 && inner->children[0]->sval) {
             sm_emit_s(p, SM_PUSH_VAR, inner->children[0]->sval);
-            for (int i = 1; i < inner->nchildren; i++) lower_expr(c, inner->children[i]);
+            for (int i = 1; i < inner->nchildren; i++) lower_expr( inner->children[i]);
             sm_emit_si(p, SM_CALL_FN, "IDX", (int64_t)inner->nchildren);
             return;
         }
     }
-    lower_expr(c, ch);
+    lower_expr(ch);
     sm_emit_si(p, SM_CALL_FN, "INDIR_GET", 1);
 }
 
-static void lower_defer(LowerCtx *c, const AST_t *t)
+static void lower_defer(const AST_t *t)
 {
     /* *expr in value context — thunk the child, push a DT_E descriptor. */
-    emit_thunk(c, T0(t));
+    emit_thunk(T0(t));
 }
 
 /*── Arithmetic ──────────────────────────────────────────────────────────────*/
 
-static void lower_interrogate(LowerCtx *c, const AST_t *t) { lower_expr(c, T0(t)); }
+static void lower_interrogate(const AST_t *t) { lower_expr(T0(t)); }
 
-static void lower_name(LowerCtx *c, const AST_t *t)
+static void lower_name(const AST_t *t)
 {
-    SM_Program *p = c->p;
+    SM_Program *p = g_p;
     const char *vname = (T0(t) && T0(t)->sval) ? T0(t)->sval : "";
     sm_emit_s(p, SM_PUSH_LIT_S, vname);
     sm_emit_si(p, SM_CALL_FN, "NAME_PUSH", 1);
 }
 
-static void lower_mns(LowerCtx *c, const AST_t *t) { SM_Program *p = c->p; LOWER1_VAL(SM_NEG); }
-static void lower_pls(LowerCtx *c, const AST_t *t) { SM_Program *p = c->p; LOWER1_VAL(SM_COERCE_NUM); }
-static void lower_add(LowerCtx *c, const AST_t *t) { SM_Program *p = c->p; LOWER2(SM_ADD); }
-static void lower_sub(LowerCtx *c, const AST_t *t) { SM_Program *p = c->p; LOWER2(SM_SUB); }
-static void lower_mul(LowerCtx *c, const AST_t *t) { SM_Program *p = c->p; LOWER2(SM_MUL); }
-static void lower_div(LowerCtx *c, const AST_t *t) { SM_Program *p = c->p; LOWER2(SM_DIV); }
-static void lower_mod(LowerCtx *c, const AST_t *t) { SM_Program *p = c->p; LOWER2(SM_MOD); }
-static void lower_pow(LowerCtx *c, const AST_t *t) { SM_Program *p = c->p; LOWER2(SM_EXP); }
+static void lower_mns(const AST_t *t) { SM_Program *p = g_p; LOWER1_VAL(SM_NEG); }
+static void lower_pls(const AST_t *t) { SM_Program *p = g_p; LOWER1_VAL(SM_COERCE_NUM); }
+static void lower_add(const AST_t *t) { SM_Program *p = g_p; LOWER2(SM_ADD); }
+static void lower_sub(const AST_t *t) { SM_Program *p = g_p; LOWER2(SM_SUB); }
+static void lower_mul(const AST_t *t) { SM_Program *p = g_p; LOWER2(SM_MUL); }
+static void lower_div(const AST_t *t) { SM_Program *p = g_p; LOWER2(SM_DIV); }
+static void lower_mod(const AST_t *t) { SM_Program *p = g_p; LOWER2(SM_MOD); }
+static void lower_pow(const AST_t *t) { SM_Program *p = g_p; LOWER2(SM_EXP); }
 
 /*── Sequences and alternation ───────────────────────────────────────────────*/
 
-static void lower_vlist(LowerCtx *c, const AST_t *t)
+static void lower_vlist(const AST_t *t)
 {
-    SM_Program *p = c->p;
+    SM_Program *p = g_p;
     if (t->nchildren == 0) { sm_emit(p, SM_PUSH_NULL); return; }
-    if (t->nchildren == 1) { lower_expr(c, t->children[0]); return; }
+    if (t->nchildren == 1) { lower_expr(t->children[0]); return; }
     int n = t->nchildren - 1;
     int *jumps = (int *)malloc((size_t)n * sizeof(int));
     for (int i = 0; i < t->nchildren; i++) {
-        lower_expr(c, t->children[i]);
+        lower_expr(t->children[i]);
         if (i < t->nchildren - 1) { jumps[i] = sm_emit_i(p, SM_JUMP_S, 0); sm_emit(p, SM_VOID_POP); }
     }
     int done = sm_label(p);
@@ -168,26 +220,26 @@ static void lower_vlist(LowerCtx *c, const AST_t *t)
     free(jumps);
 }
 
-static void lower_cat_seq(LowerCtx *c, const AST_t *t)
+static void lower_cat_seq(const AST_t *t)
 {
-    SM_Program *p = c->p;
+    SM_Program *p = g_p;
     int has_defer = 0;
     for (int i = 0; i < t->nchildren && !has_defer; i++)
         if (t->children[i] && t->children[i]->kind == AST_DEFER) has_defer = 1;
     if (has_defer) {
-        for (int i = 0; i < t->nchildren; i++) lower_pat_expr(c, t->children[i]);
+        for (int i = 0; i < t->nchildren; i++) lower_pat_expr(t->children[i]);
         for (int i = 1; i < t->nchildren; i++) sm_emit(p, SM_PAT_CAT);
     } else {
-        for (int i = 0; i < t->nchildren; i++) lower_expr(c, t->children[i]);
+        for (int i = 0; i < t->nchildren; i++) lower_expr(t->children[i]);
         for (int i = 1; i < t->nchildren; i++) sm_emit(p, SM_CONCAT);
     }
 }
 
-static void lower_alt  (LowerCtx *c, const AST_t *t) { lower_pat_expr(c, t); }
+static void lower_alt  (const AST_t *t) { lower_pat_expr(t); }
 
-static void lower_opsyn(LowerCtx *c, const AST_t *t)
+static void lower_opsyn(const AST_t *t)
 {
-    SM_Program *p = c->p;
+    SM_Program *p = g_p;
     const char *raw = t->sval ? t->sval : "&";
     static char op_buf[4];
     const char *op = raw;
@@ -195,7 +247,7 @@ static void lower_opsyn(LowerCtx *c, const AST_t *t)
     if (lp && lp[1] && lp[2] == ')') { op_buf[0] = lp[1]; op_buf[1] = '\0'; op = op_buf; }
     else if (strcmp(raw, "BARFN")  == 0) op = "|";
     else if (strcmp(raw, "AROWFN") == 0) op = "^";
-    for (int i = 0; i < t->nchildren; i++) lower_expr(c, t->children[i]);
+    for (int i = 0; i < t->nchildren; i++) lower_expr(t->children[i]);
     sm_emit_si(p, SM_CALL_FN, op, (int64_t)t->nchildren);
 }
 
@@ -224,20 +276,20 @@ const char *sm_pat_capture_fn_arg_names(const AST_t *fnc)
 
 /* Emit args for a *fn(arg,...) pattern-capture call.
  * Literal args go inline; non-literal args are thunked. */
-static void emit_pat_fn_args(LowerCtx *c, const AST_t *fnc)
+static void emit_pat_fn_args(const AST_t *fnc)
 {
     for (int i = 0; i < fnc->nchildren; i++) {
         AST_t *arg = fnc->children[i];
-        if (arg && arg->kind == AST_QLIT) lower_expr(c, arg);
-        else                              emit_thunk(c, arg);
+        if (arg && arg->kind == AST_QLIT) lower_expr(arg);
+        else                              emit_thunk(arg);
     }
 }
 
 /* Emit a pattern capture of kind mode (0=conditional .V, 1=immediate $V, 2=cursor @V).
  * Handles variable, *fn(), and *fn(args) targets. */
-static void emit_pat_capture(LowerCtx *c, const AST_t *var_node, int mode)
+static void emit_pat_capture(const AST_t *var_node, int mode)
 {
-    SM_Program *p = c->p;
+    SM_Program *p = g_p;
     if (var_node && var_node->kind == AST_DEFER
             && var_node->nchildren > 0
             && var_node->children[0]
@@ -249,7 +301,7 @@ static void emit_pat_capture(LowerCtx *c, const AST_t *var_node, int mode)
             int idx = sm_emit_s(p, SM_PAT_CAPTURE_FN, fnc->sval);
             p->instrs[idx].a[1].i = mode; p->instrs[idx].a[2].s = names;
         } else {
-            emit_pat_fn_args(c, fnc);
+            emit_pat_fn_args(fnc);
             int idx = sm_emit_s(p, SM_PAT_CAPTURE_FN_ARGS, fnc->sval);
             p->instrs[idx].a[1].i = mode; p->instrs[idx].a[2].i = fnc->nchildren;
         }
@@ -259,9 +311,9 @@ static void emit_pat_capture(LowerCtx *c, const AST_t *var_node, int mode)
     }
 }
 
-void lower_pat_expr(LowerCtx *c, const AST_t *t)
+void lower_pat_expr(const AST_t *t)
 {
-    SM_Program *p = c->p;
+    SM_Program *p = g_p;
     if (!t) return;
     switch (t->kind) {
     case AST_QLIT:  sm_emit_s(p, SM_PAT_LIT, t->sval ? t->sval : ""); return;
@@ -273,44 +325,44 @@ void lower_pat_expr(LowerCtx *c, const AST_t *t)
     case AST_ABORT: sm_emit(p, SM_PAT_ABORT);  return;
     case AST_BAL:   sm_emit(p, SM_PAT_BAL);    return;
     case AST_FENCE:
-        if (t->nchildren > 0) { lower_pat_expr(c, t->children[0]); sm_emit(p, SM_PAT_FENCE1); }
+        if (t->nchildren > 0) { lower_pat_expr(t->children[0]); sm_emit(p, SM_PAT_FENCE1); }
         else                    sm_emit(p, SM_PAT_FENCE);
         return;
-    case AST_ANY:    lower_expr(c, T0(t)); sm_emit(p, SM_PAT_ANY);    return;
-    case AST_NOTANY: lower_expr(c, T0(t)); sm_emit(p, SM_PAT_NOTANY); return;
-    case AST_SPAN:   lower_expr(c, T0(t)); sm_emit(p, SM_PAT_SPAN);   return;
-    case AST_BREAK:  lower_expr(c, T0(t)); sm_emit(p, SM_PAT_BREAK);  return;
-    case AST_BREAKX: lower_expr(c, T0(t)); sm_emit(p, SM_PAT_BREAK);  return;
-    case AST_LEN:    lower_expr(c, T0(t)); sm_emit(p, SM_PAT_LEN);    return;
-    case AST_POS:    lower_expr(c, T0(t)); sm_emit(p, SM_PAT_POS);    return;
-    case AST_RPOS:   lower_expr(c, T0(t)); sm_emit(p, SM_PAT_RPOS);   return;
-    case AST_TAB:    lower_expr(c, T0(t)); sm_emit(p, SM_PAT_TAB);    return;
-    case AST_RTAB:   lower_expr(c, T0(t)); sm_emit(p, SM_PAT_RTAB);   return;
+    case AST_ANY:    lower_expr(T0(t)); sm_emit(p, SM_PAT_ANY);    return;
+    case AST_NOTANY: lower_expr(T0(t)); sm_emit(p, SM_PAT_NOTANY); return;
+    case AST_SPAN:   lower_expr(T0(t)); sm_emit(p, SM_PAT_SPAN);   return;
+    case AST_BREAK:  lower_expr(T0(t)); sm_emit(p, SM_PAT_BREAK);  return;
+    case AST_BREAKX: lower_expr(T0(t)); sm_emit(p, SM_PAT_BREAK);  return;
+    case AST_LEN:    lower_expr(T0(t)); sm_emit(p, SM_PAT_LEN);    return;
+    case AST_POS:    lower_expr(T0(t)); sm_emit(p, SM_PAT_POS);    return;
+    case AST_RPOS:   lower_expr(T0(t)); sm_emit(p, SM_PAT_RPOS);   return;
+    case AST_TAB:    lower_expr(T0(t)); sm_emit(p, SM_PAT_TAB);    return;
+    case AST_RTAB:   lower_expr(T0(t)); sm_emit(p, SM_PAT_RTAB);   return;
     case AST_ARBNO:  { SM_Program *_p = p; LOWER1_PAT(SM_PAT_ARBNO); }
     case AST_SEQ:
     case AST_CAT:
-        for (int i = 0; i < t->nchildren; i++) lower_pat_expr(c, t->children[i]);
+        for (int i = 0; i < t->nchildren; i++) lower_pat_expr(t->children[i]);
         for (int i = 1; i < t->nchildren; i++) sm_emit(p, SM_PAT_CAT);
         return;
     case AST_ALT:
-        for (int i = 0; i < t->nchildren; i++) lower_pat_expr(c, t->children[i]);
+        for (int i = 0; i < t->nchildren; i++) lower_pat_expr(t->children[i]);
         for (int i = 1; i < t->nchildren; i++) sm_emit(p, SM_PAT_ALT);
         return;
     case AST_CAPT_COND_ASGN:
-        lower_pat_expr(c, T0(t));
-        if (t->nchildren > 1) emit_pat_capture(c, t->children[1], 0);
+        lower_pat_expr(T0(t));
+        if (t->nchildren > 1) emit_pat_capture(t->children[1], 0);
         return;
     case AST_CAPT_IMMED_ASGN:
-        lower_pat_expr(c, T0(t));
-        if (t->nchildren > 1) emit_pat_capture(c, t->children[1], 1);
+        lower_pat_expr(T0(t));
+        if (t->nchildren > 1) emit_pat_capture(t->children[1], 1);
         return;
     case AST_CAPT_CURSOR:
         if (t->nchildren == 1) {
             sm_emit(p, SM_PAT_EPS);
-            emit_pat_capture(c, t->children[0], 2);
+            emit_pat_capture(t->children[0], 2);
         } else {
-            lower_pat_expr(c, T0(t));
-            if (t->nchildren > 1) emit_pat_capture(c, t->children[1], 2);
+            lower_pat_expr(T0(t));
+            if (t->nchildren > 1) emit_pat_capture(t->children[1], 2);
         }
         return;
     case AST_DEFER: {
@@ -321,7 +373,7 @@ void lower_pat_expr(LowerCtx *c, const AST_t *t)
                 int idx = sm_emit_s(p, SM_PAT_USERCALL, ch->sval);
                 p->instrs[idx].a[2].s = NULL;
             } else {
-                emit_pat_fn_args(c, ch);
+                emit_pat_fn_args(ch);
                 int idx = sm_emit_s(p, SM_PAT_USERCALL_ARGS, ch->sval);
                 p->instrs[idx].a[1].i = ch->nchildren;
             }
@@ -329,20 +381,20 @@ void lower_pat_expr(LowerCtx *c, const AST_t *t)
         }
         /* *var — push by name so self-recursive patterns resolve at match time. */
         if (ch && ch->kind == AST_VAR && ch->sval) { sm_emit_s(p, SM_PAT_REFNAME, ch->sval); return; }
-        lower_expr(c, ch); sm_emit(p, SM_PAT_DEREF);
+        lower_expr(ch); sm_emit(p, SM_PAT_DEREF);
         return;
     }
     default:
-        lower_expr(c, t); sm_emit(p, SM_PAT_DEREF);
+        lower_expr(t); sm_emit(p, SM_PAT_DEREF);
         return;
     }
 }
 
 /*── Function calls, assignment, scanning ────────────────────────────────────*/
 
-static void lower_fnc(LowerCtx *c, const AST_t *t)
+static void lower_fnc(const AST_t *t)
 {
-    SM_Program *p = c->p;
+    SM_Program *p = g_p;
     int nargs = t->nchildren;
 
     /* EVAL(*expr) — inline the thunked expression, call SM_CALL_EXPRESSION. */
@@ -350,7 +402,7 @@ static void lower_fnc(LowerCtx *c, const AST_t *t)
             && t->children[0] && t->children[0]->kind == AST_DEFER) {
         const AST_t *inner = T0(t->children[0]);
         int skip = sm_emit_i(p, SM_JUMP, 0), entry = sm_label(p);
-        if (inner) lower_expr(c, inner); else sm_emit(p, SM_PUSH_NULL);
+        if (inner) lower_expr(inner); else sm_emit(p, SM_PUSH_NULL);
         sm_emit(p, SM_RETURN);
         sm_patch_jump(p, skip, sm_label(p));
         sm_emit_ii(p, SM_CALL_EXPRESSION, (int64_t)entry, 0);
@@ -359,104 +411,104 @@ static void lower_fnc(LowerCtx *c, const AST_t *t)
     /* Icon-style call: sval==NULL, children[0] is the callee name node. */
     if (!t->sval && nargs >= 1 && t->children[0] && t->children[0]->sval) {
         const char *fn = t->children[0]->sval;
-        for (int i = 1; i < nargs; i++) lower_expr(c, t->children[i]);
+        for (int i = 1; i < nargs; i++) lower_expr(t->children[i]);
         sm_emit_si(p, SM_CALL_FN, fn, (int64_t)(nargs - 1));
         return;
     }
-    for (int i = 0; i < nargs; i++) lower_expr(c, t->children[i]);
+    for (int i = 0; i < nargs; i++) lower_expr(t->children[i]);
     sm_emit_si(p, SM_CALL_FN, t->sval ? t->sval : "", (int64_t)nargs);
 }
 
-static void lower_idx(LowerCtx *c, const AST_t *t)
+static void lower_idx(const AST_t *t)
 {
-    SM_Program *p = c->p;
-    for (int i = 0; i < t->nchildren; i++) lower_expr(c, t->children[i]);
+    SM_Program *p = g_p;
+    for (int i = 0; i < t->nchildren; i++) lower_expr(t->children[i]);
     sm_emit_si(p, SM_CALL_FN, "IDX", (int64_t)t->nchildren);
 }
 
-static void lower_assign(LowerCtx *c, const AST_t *t)
+static void lower_assign(const AST_t *t)
 {
-    SM_Program *p = c->p;
-    lower_expr(c, T1(t));   /* rhs first */
+    SM_Program *p = g_p;
+    lower_expr(T1(t));   /* rhs first */
     const AST_t *lhs = T0(t);
     if (!lhs) return;
-    if (lhs->kind == AST_VAR)     { emit_var_store(c, lhs->sval ? lhs->sval : ""); return; }
+    if (lhs->kind == AST_VAR)     { emit_var_store( lhs->sval ? lhs->sval : ""); return; }
     if (lhs->kind == AST_KEYWORD) { sm_emit_s(p, SM_STORE_VAR, kw_canonicalize(lhs->sval)); return; }
     if (lhs->kind == AST_FNC && lhs->sval) {
-        lower_expr(c, T0(lhs));
+        lower_expr( T0(lhs));
         char set[256]; snprintf(set, sizeof set, "%s_SET", lhs->sval);
         sm_emit_si(p, SM_CALL_FN, set, 2); return;
     }
     if (lhs->kind == AST_IDX) {
-        for (int i = 0; i < lhs->nchildren; i++) lower_expr(c, lhs->children[i]);
+        for (int i = 0; i < lhs->nchildren; i++) lower_expr( lhs->children[i]);
         sm_emit_si(p, SM_CALL_FN, "IDX_SET", (int64_t)(lhs->nchildren + 1)); return;
     }
     if (lhs->kind == AST_FIELD) {
-        lower_expr(c, T0(lhs));
+        lower_expr( T0(lhs));
         sm_emit_s(p, SM_PUSH_LIT_S, lhs->sval ? lhs->sval : "");
         sm_emit_si(p, SM_CALL_FN, "FIELD_SET", 3); return;
     }
-    lower_expr(c, lhs);
+    lower_expr(lhs);
     sm_emit_si(p, SM_CALL_FN, "ASGN", 2);
 }
 
-static void lower_scan(LowerCtx *c, const AST_t *t)
+static void lower_scan(const AST_t *t)
 {
-    SM_Program *p = c->p;
+    SM_Program *p = g_p;
     if (t->nchildren < 1) { sm_emit(p, SM_PUSH_NULL); return; }
-    lower_expr(c, t->children[0]);
+    lower_expr(t->children[0]);
     sm_emit_si(p, SM_CALL_FN, "ICN_SCAN_PUSH", 1);
     sm_emit(p, SM_VOID_POP);
-    if (t->nchildren > 1) lower_expr(c, t->children[1]); else sm_emit(p, SM_PUSH_NULL);
+    if (t->nchildren > 1) lower_expr(t->children[1]); else sm_emit(p, SM_PUSH_NULL);
     sm_emit_si(p, SM_CALL_FN, "ICN_SCAN_POP", 1);
 }
 
-static void lower_swap(LowerCtx *c, const AST_t *t)
+static void lower_swap(const AST_t *t)
 {
-    SM_Program *p = c->p;
+    SM_Program *p = g_p;
     /* Inline fast path for two plain variables: save→copy→restore. */
     if (t->nchildren >= 2 && T0(t) && T1(t)
             && T0(t)->kind == AST_VAR && T1(t)->kind == AST_VAR) {
         const char *ln = T0(t)->sval ? T0(t)->sval : "";
         const char *rn = T1(t)->sval ? T1(t)->sval : "";
-        emit_var_load(c, ln); sm_emit_s(p, SM_STORE_VAR, "__icn_swap_tmp__"); sm_emit(p, SM_VOID_POP);
-        emit_var_load(c, rn); emit_var_store(c, ln);
-        sm_emit_s(p, SM_PUSH_VAR, "__icn_swap_tmp__"); emit_var_store(c, rn);
+        emit_var_load( ln); sm_emit_s(p, SM_STORE_VAR, "__icn_swap_tmp__"); sm_emit(p, SM_VOID_POP);
+        emit_var_load( rn); emit_var_store( ln);
+        sm_emit_s(p, SM_PUSH_VAR, "__icn_swap_tmp__"); emit_var_store( rn);
         sm_emit(p, SM_VOID_POP);
         return;
     }
-    lower_expr(c, T0(t)); lower_expr(c, T1(t));
+    lower_expr(T0(t)); lower_expr(T1(t));
     sm_emit_si(p, SM_CALL_FN, "SWAP", 2);
 }
 
 /*── Relational operators ────────────────────────────────────────────────────*/
 
-static void lower_acomp(LowerCtx *c, const AST_t *t)
+static void lower_acomp(const AST_t *t)
 {
-    SM_Program *p = c->p;
-    lower_expr(c, T0(t)); lower_expr(c, T1(t));
+    SM_Program *p = g_p;
+    lower_expr(T0(t)); lower_expr(T1(t));
     sm_emit_i(p, SM_ACOMP, (int64_t)t->kind);
 }
-static void lower_lcomp(LowerCtx *c, const AST_t *t)
+static void lower_lcomp(const AST_t *t)
 {
-    SM_Program *p = c->p;
-    lower_expr(c, T0(t)); lower_expr(c, T1(t));
+    SM_Program *p = g_p;
+    lower_expr(T0(t)); lower_expr(T1(t));
     sm_emit_i(p, SM_LCOMP, (int64_t)t->kind);
 }
 
 /*── Cset / list ops ─────────────────────────────────────────────────────────*/
 
-static void lower_cset_op(LowerCtx *c, const AST_t *t) { emit_push_expr(c, t); }
+static void lower_cset_op(const AST_t *t) { emit_push_expr(t); }
 
-static void lower_lconcat(LowerCtx *c, const AST_t *t)
+static void lower_lconcat(const AST_t *t)
 {
-    SM_Program *p = c->p;
+    SM_Program *p = g_p;
     int has_gen = 0;
     for (int i = 0; i < t->nchildren && !has_gen; i++)
         if (is_suspendable(t->children[i])) has_gen = 1;
     if (!has_gen) {
         if (t->nchildren < 1) { sm_emit(p, SM_PUSH_NULL); return; }
-        for (int i = 0; i < t->nchildren; i++) lower_expr(c, t->children[i]);
+        for (int i = 0; i < t->nchildren; i++) lower_expr(t->children[i]);
         for (int i = 1; i < t->nchildren; i++) sm_emit(p, SM_CONCAT);
         return;
     }
@@ -465,20 +517,20 @@ static void lower_lconcat(LowerCtx *c, const AST_t *t)
 
 /*── Unary Icon ops ──────────────────────────────────────────────────────────*/
 
-static void lower_nonnull (LowerCtx *c, const AST_t *t) { SM_Program *p=c->p; CALL1("NONNULL"); }
-static void lower_null    (LowerCtx *c, const AST_t *t) { SM_Program *p=c->p; CALL1("ICN_NULL"); }
-static void lower_size    (LowerCtx *c, const AST_t *t) { SM_Program *p=c->p; CALL1("SIZE"); }
-static void lower_identical(LowerCtx *c, const AST_t *t){ SM_Program *p=c->p; CALL2("IDENTICAL"); }
-static void lower_random  (LowerCtx *c, const AST_t *t)
+static void lower_nonnull (const AST_t *t) { SM_Program *p=g_p; CALL1("NONNULL"); }
+static void lower_null    (const AST_t *t) { SM_Program *p=g_p; CALL1("ICN_NULL"); }
+static void lower_size    (const AST_t *t) { SM_Program *p=g_p; CALL1("SIZE"); }
+static void lower_identical(const AST_t *t){ SM_Program *p=g_p; CALL2("IDENTICAL"); }
+static void lower_random  (const AST_t *t)
 {
-    SM_Program *p = c->p;
+    SM_Program *p = g_p;
     if (t->nchildren >= 1) { CALL1("ICN_RANDOM"); } else { sm_emit(p, SM_PUSH_NULL); }
 }
 
-static void lower_not(LowerCtx *c, const AST_t *t)
+static void lower_not(const AST_t *t)
 {
-    SM_Program *p = c->p;
-    lower_expr(c, T0(t));
+    SM_Program *p = g_p;
+    lower_expr(T0(t));
     int js = sm_emit_i(p, SM_JUMP_S, 0);
     sm_emit(p, SM_VOID_POP); sm_emit(p, SM_PUSH_NULL);
     int jend = sm_emit_i(p, SM_JUMP, 0);
@@ -487,17 +539,17 @@ static void lower_not(LowerCtx *c, const AST_t *t)
     sm_patch_jump(p, jend, sm_label(p));
 }
 
-static void lower_augop(LowerCtx *c, const AST_t *t)
+static void lower_augop(const AST_t *t)
 {
-    SM_Program *p = c->p;
+    SM_Program *p = g_p;
     const AST_t *lhs = T0(t), *rhs = T1(t);
     int op = (int)t->ival;
     /* Fast path: simple variable or keyword lhs — inline load/op/store. */
     const char *lname = NULL; int lslot = -1, is_kw = 0;
     if (lhs && lhs->kind == AST_VAR && lhs->sval) {
         lname = lhs->sval;
-        if (c->expression_body_lowering && c->expression_scope && lname[0] && lname[0] != '&')
-            lslot = scope_get(c->expression_scope, lname);
+        if (g_in_proc_body && g_proc_scope && lname[0] && lname[0] != '&')
+            lslot = scope_get(g_proc_scope, lname);
     } else if (lhs && lhs->kind == AST_KEYWORD && lhs->sval) {
         lname = lhs->sval; is_kw = 1;
     }
@@ -505,7 +557,7 @@ static void lower_augop(LowerCtx *c, const AST_t *t)
         if      (lslot >= 0) sm_emit_i(p, SM_LOAD_FRAME, lslot);
         else if (is_kw)      sm_emit_s(p, SM_PUSH_VAR, kw_canonicalize(lname));
         else                 sm_emit_s(p, SM_PUSH_VAR, lname);
-        lower_expr(c, rhs);
+        lower_expr(rhs);
         int done = 1;
         switch (op) {
         case TK_AUGPLUS:   sm_emit(p, SM_ADD);    break;
@@ -526,88 +578,88 @@ static void lower_augop(LowerCtx *c, const AST_t *t)
         }
         return;
     }
-    lower_expr(c, lhs); lower_expr(c, rhs);
+    lower_expr(lhs); lower_expr(rhs);
     sm_emit_i(p, SM_PUSH_LIT_I, (int64_t)op);
     sm_emit_si(p, SM_CALL_FN, "AUGOP", 3);
 }
 
 /*── Control flow ────────────────────────────────────────────────────────────*/
 
-static void lower_seq_expr(LowerCtx *c, const AST_t *t)
+static void lower_seq_expr(const AST_t *t)
 {
-    SM_Program *p = c->p;
+    SM_Program *p = g_p;
     if (t->nchildren == 0) { sm_emit(p, SM_PUSH_NULL); return; }
     for (int i = 0; i < t->nchildren; i++) {
-        lower_expr(c, t->children[i]);
+        lower_expr(t->children[i]);
         if (i < t->nchildren - 1) sm_emit(p, SM_VOID_POP);
     }
 }
 
-static void lower_if(LowerCtx *c, const AST_t *t)
+static void lower_if(const AST_t *t)
 {
-    SM_Program *p = c->p;
+    SM_Program *p = g_p;
     if (t->nchildren < 1) { sm_emit(p, SM_PUSH_NULL); return; }
-    lower_expr(c, t->children[0]);
+    lower_expr(t->children[0]);
     int jf = sm_emit_i(p, SM_JUMP_F, 0);
     sm_emit(p, SM_VOID_POP);
-    if (t->nchildren > 1) lower_expr(c, t->children[1]); else sm_emit(p, SM_PUSH_NULL);
+    if (t->nchildren > 1) lower_expr(t->children[1]); else sm_emit(p, SM_PUSH_NULL);
     int jend = sm_emit_i(p, SM_JUMP, 0);
     sm_patch_jump(p, jf, sm_label(p));
     sm_emit(p, SM_VOID_POP);
-    if (t->nchildren > 2) lower_expr(c, t->children[2]); else sm_emit(p, SM_PUSH_NULL);
+    if (t->nchildren > 2) lower_expr(t->children[2]); else sm_emit(p, SM_PUSH_NULL);
     sm_patch_jump(p, jend, sm_label(p));
 }
 
 /* Shared body for while/until — differs only in which jump exits. */
-static void lower_while_until(LowerCtx *c, const AST_t *t, int exit_on_success)
+static void lower_while_until(const AST_t *t, int exit_on_success)
 {
-    SM_Program *p = c->p;
+    SM_Program *p = g_p;
     int top = sm_label(p);
     if (t->nchildren < 1) { sm_emit(p, SM_PUSH_NULL); return; }
-    lower_expr(c, t->children[0]);
+    lower_expr(t->children[0]);
     int jx = exit_on_success ? sm_emit_i(p, SM_JUMP_S, 0) : sm_emit_i(p, SM_JUMP_F, 0);
     sm_emit(p, SM_VOID_POP);
-    if (t->nchildren > 1) { lower_expr(c, t->children[1]); sm_emit(p, SM_VOID_POP); }
+    if (t->nchildren > 1) { lower_expr(t->children[1]); sm_emit(p, SM_VOID_POP); }
     sm_emit_i(p, SM_JUMP, top);
     sm_patch_jump(p, jx, sm_label(p));
     sm_emit(p, SM_VOID_POP); sm_emit(p, SM_PUSH_NULL);
 }
-static void lower_while(LowerCtx *c, const AST_t *t) { lower_while_until(c, t, 0); }
-static void lower_until(LowerCtx *c, const AST_t *t) { lower_while_until(c, t, 1); }
+static void lower_while(const AST_t *t) { lower_while_until(t, 0); }
+static void lower_until(const AST_t *t) { lower_while_until(t, 1); }
 
-static void lower_repeat(LowerCtx *c, const AST_t *t)
+static void lower_repeat(const AST_t *t)
 {
-    SM_Program *p = c->p;
+    SM_Program *p = g_p;
     int top = sm_label(p);
-    if (t->nchildren > 0) { lower_expr(c, t->children[0]); sm_emit(p, SM_VOID_POP); }
+    if (t->nchildren > 0) { lower_expr(t->children[0]); sm_emit(p, SM_VOID_POP); }
     sm_emit_i(p, SM_JUMP, top);
     sm_emit(p, SM_PUSH_NULL);
 }
 
-static void lower_loop_break(LowerCtx *c, const AST_t *t)
+static void lower_loop_break(const AST_t *t)
 {
-    SM_Program *p = c->p;
-    if (t->nchildren > 0) lower_expr(c, t->children[0]); else sm_emit(p, SM_PUSH_NULL);
+    SM_Program *p = g_p;
+    if (t->nchildren > 0) lower_expr(t->children[0]); else sm_emit(p, SM_PUSH_NULL);
     sm_emit_i(p, SM_JUMP, p->count + 1);  /* sentinel: sm_interp detects self+1 as break */
 }
 
-static void lower_loop_next(LowerCtx *c, const AST_t *t) { (void)t; sm_emit(c->p, SM_PUSH_NULL); }
+static void lower_loop_next(const AST_t *t) { (void)t; sm_emit(g_p, SM_PUSH_NULL); }
 
-static void lower_return(LowerCtx *c, const AST_t *t)
+static void lower_return(const AST_t *t)
 {
-    SM_Program *p = c->p;
-    if (t->nchildren > 0) lower_expr(c, t->children[0]); else sm_emit(p, SM_PUSH_NULL);
+    SM_Program *p = g_p;
+    if (t->nchildren > 0) lower_expr(t->children[0]); else sm_emit(p, SM_PUSH_NULL);
     sm_emit(p, SM_RETURN);
 }
 
-static void lower_proc_fail(LowerCtx *c, const AST_t *t)
+static void lower_proc_fail(const AST_t *t)
 {
-    (void)t; sm_emit(c->p, SM_PUSH_NULL); sm_emit(c->p, SM_FRETURN);
+    (void)t; sm_emit(g_p, SM_PUSH_NULL); sm_emit(g_p, SM_FRETURN);
 }
 
-static void lower_case(LowerCtx *c, const AST_t *t)
+static void lower_case(const AST_t *t)
 {
-    SM_Program *p = c->p;
+    SM_Program *p = g_p;
     if (t->nchildren < 1) { sm_emit(p, SM_PUSH_NULL); return; }
 
     /* Raku triple layout: (n-1) divisible by 3, child[1] is ILIT or NUL. */
@@ -618,20 +670,20 @@ static void lower_case(LowerCtx *c, const AST_t *t)
     if (!is_raku) {
         /* Icon pair layout: topic + (val,body)* + [default] */
         int nc = t->nchildren - 1, has_def = nc % 2, npairs = nc / 2;
-        lower_expr(c, t->children[0]);
+        lower_expr(t->children[0]);
         sm_emit_s(p, SM_STORE_VAR, "__case_topic__"); sm_emit(p, SM_VOID_POP);
         int end_jumps[64], nend = 0;
         for (int i = 0; i < npairs && i < 32; i++) {
             sm_emit_s(p, SM_PUSH_VAR, "__case_topic__");
-            lower_expr(c, t->children[1 + i*2]);
+            lower_expr(t->children[1 + i*2]);
             sm_emit_si(p, SM_CALL_FN, "ICN_CASE_EQ", 2);
             int jf = sm_emit_i(p, SM_JUMP_F, 0);
             sm_emit(p, SM_VOID_POP);
-            lower_expr(c, t->children[2 + i*2]);
+            lower_expr(t->children[2 + i*2]);
             if (nend < 64) end_jumps[nend++] = sm_emit_i(p, SM_JUMP, 0);
             sm_patch_jump(p, jf, sm_label(p)); sm_emit(p, SM_VOID_POP);
         }
-        if (has_def) lower_expr(c, t->children[t->nchildren - 1]); else sm_emit(p, SM_PUSH_NULL);
+        if (has_def) lower_expr(t->children[t->nchildren - 1]); else sm_emit(p, SM_PUSH_NULL);
         int end = sm_label(p);
         for (int i = 0; i < nend; i++) sm_patch_jump(p, end_jumps[i], end);
         return;
@@ -640,7 +692,7 @@ static void lower_case(LowerCtx *c, const AST_t *t)
     /* Raku triple layout: topic + (cmp_kind, val, body)* + [default triple] */
     #define CHUNK(expr) do { \
         int _s=sm_emit_i(p,SM_JUMP,0), _e=sm_label(p); \
-        lower_expr(c,(expr)); sm_emit(p,SM_RETURN); \
+        lower_expr((expr)); sm_emit(p,SM_RETURN); \
         sm_patch_jump(p,_s,sm_label(p)); \
         sm_emit_ii(p,SM_PUSH_EXPRESSION,(int64_t)_e,0); } while(0)
 
@@ -664,35 +716,35 @@ static void lower_case(LowerCtx *c, const AST_t *t)
 
 /*── Data constructors ───────────────────────────────────────────────────────*/
 
-static void lower_makelist(LowerCtx *c, const AST_t *t)
+static void lower_makelist(const AST_t *t)
 {
-    SM_Program *p = c->p;
-    for (int i = 0; i < t->nchildren; i++) lower_expr(c, t->children[i]);
+    SM_Program *p = g_p;
+    for (int i = 0; i < t->nchildren; i++) lower_expr(t->children[i]);
     sm_emit_si(p, SM_CALL_FN, "MAKELIST", (int64_t)t->nchildren);
 }
 
-static void lower_record(LowerCtx *c, const AST_t *t)
+static void lower_record(const AST_t *t)
 {
-    SM_Program *p = c->p;
+    SM_Program *p = g_p;
     sm_emit_s(p, SM_PUSH_LIT_S, t->sval ? t->sval : "");
-    for (int i = 0; i < t->nchildren; i++) lower_expr(c, t->children[i]);
+    for (int i = 0; i < t->nchildren; i++) lower_expr(t->children[i]);
     sm_emit_si(p, SM_CALL_FN, "RECORD_MAKE", (int64_t)t->nchildren + 1);
 }
 
-static void lower_field(LowerCtx *c, const AST_t *t)
+static void lower_field(const AST_t *t)
 {
-    SM_Program *p = c->p;
-    lower_expr(c, T0(t));
+    SM_Program *p = g_p;
+    lower_expr(T0(t));
     sm_emit_s(p, SM_PUSH_LIT_S, t->sval ? t->sval : "");
     sm_emit_si(p, SM_CALL_FN, "FIELD_GET", 2);
 }
 
-static void lower_global(LowerCtx *c, const AST_t *t) { (void)t; sm_emit(c->p, SM_PUSH_NULL); }
+static void lower_global(const AST_t *t) { (void)t; sm_emit(g_p, SM_PUSH_NULL); }
 
-static void lower_initial(LowerCtx *c, const AST_t *t)
+static void lower_initial(const AST_t *t)
 {
     /* Once-on-first-call guard: NV sentinel per AST node pointer. */
-    SM_Program *p = c->p;
+    SM_Program *p = g_p;
     char sentinel[64];
     snprintf(sentinel, sizeof sentinel, "__initial_%lx__", (unsigned long)(uintptr_t)t);
     sm_emit_s(p, SM_PUSH_VAR, sentinel);
@@ -701,7 +753,7 @@ static void lower_initial(LowerCtx *c, const AST_t *t)
     sm_emit(p, SM_VOID_POP);
     for (int i = 0; i < t->nchildren; i++) {
         if (!t->children[i]) continue;
-        lower_expr(c, t->children[i]); sm_emit(p, SM_VOID_POP);
+        lower_expr(t->children[i]); sm_emit(p, SM_VOID_POP);
     }
     sm_emit_i(p, SM_PUSH_LIT_I, 1);
     sm_emit_s(p, SM_STORE_VAR, sentinel); sm_emit(p, SM_VOID_POP);
@@ -712,38 +764,38 @@ static void lower_initial(LowerCtx *c, const AST_t *t)
 
 /*── String sections ─────────────────────────────────────────────────────────*/
 
-static void lower_section_3(LowerCtx *c, const AST_t *t, const char *fn)
+static void lower_section_3(const AST_t *t, const char *fn)
 {
-    SM_Program *p = c->p;
+    SM_Program *p = g_p;
     if (t->nchildren >= 3) {
-        lower_expr(c, t->children[0]); lower_expr(c, t->children[1]); lower_expr(c, t->children[2]);
+        lower_expr(t->children[0]); lower_expr(t->children[1]); lower_expr(t->children[2]);
         sm_emit_si(p, SM_CALL_FN, fn, 3);
     } else sm_emit(p, SM_PUSH_NULL);
 }
-static void lower_section      (LowerCtx *c, const AST_t *t) { lower_section_3(c, t, "ICN_SECTION_RANGE"); }
-static void lower_section_plus (LowerCtx *c, const AST_t *t) { lower_section_3(c, t, "ICN_SECTION_PLUS");  }
-static void lower_section_minus(LowerCtx *c, const AST_t *t) { lower_section_3(c, t, "ICN_SECTION_MINUS"); }
-static void lower_bang_binary  (LowerCtx *c, const AST_t *t)
+static void lower_section      (const AST_t *t) { lower_section_3(t, "ICN_SECTION_RANGE"); }
+static void lower_section_plus (const AST_t *t) { lower_section_3(t, "ICN_SECTION_PLUS");  }
+static void lower_section_minus(const AST_t *t) { lower_section_3(t, "ICN_SECTION_MINUS"); }
+static void lower_bang_binary  (const AST_t *t)
 {
-    sm_emit_i(c->p, SM_BB_PUMP_AST, (int64_t)ast_pump_table_register((AST_t *)t));
+    sm_emit_i(g_p, SM_BB_PUMP_AST, (int64_t)ast_pump_table_register((AST_t *)t));
 }
 
 /*── Generator coroutines ────────────────────────────────────────────────────*/
 
 /* Emit an SM coroutine body for integer range lo..hi [by step].
  * glocal slots: 0=lo, 1=hi, 2=cur, (3=step for to_by). */
-static void emit_range_coroutine(LowerCtx *c, const AST_t *lo_expr,
+static void emit_range_coroutine(const AST_t *lo_expr,
                                   const AST_t *hi_expr, const AST_t *step_expr)
 {
-    SM_Program *p = c->p;
+    SM_Program *p = g_p;
     int skip = sm_emit_i(p, SM_JUMP, 0), entry = sm_label(p);
     sm_emit(p, SM_RESUME);
-    if (lo_expr) lower_expr(c, lo_expr); else sm_emit_i(p, SM_PUSH_LIT_I, 0);
+    if (lo_expr) lower_expr(lo_expr); else sm_emit_i(p, SM_PUSH_LIT_I, 0);
     sm_emit_i(p, SM_STORE_GLOCAL, 0); sm_emit(p, SM_VOID_POP);
-    if (hi_expr) lower_expr(c, hi_expr); else sm_emit_i(p, SM_PUSH_LIT_I, 0);
+    if (hi_expr) lower_expr(hi_expr); else sm_emit_i(p, SM_PUSH_LIT_I, 0);
     sm_emit_i(p, SM_STORE_GLOCAL, 1); sm_emit(p, SM_VOID_POP);
     if (step_expr) {
-        lower_expr(c, step_expr);
+        lower_expr(step_expr);
         sm_emit_i(p, SM_STORE_GLOCAL, 3); sm_emit(p, SM_VOID_POP);
     }
     sm_emit_i(p, SM_LOAD_GLOCAL, 0);
@@ -786,59 +838,59 @@ static void emit_range_coroutine(LowerCtx *c, const AST_t *lo_expr,
     sm_emit(p, SM_BB_PUMP_SM);
 }
 
-static void lower_to   (LowerCtx *c, const AST_t *t) { emit_range_coroutine(c, T0(t), T1(t), NULL); }
-static void lower_to_by(LowerCtx *c, const AST_t *t) { emit_range_coroutine(c, T0(t), T1(t), T2(t)); }
+static void lower_to   (const AST_t *t) { emit_range_coroutine(T0(t), T1(t), NULL); }
+static void lower_to_by(const AST_t *t) { emit_range_coroutine(T0(t), T1(t), T2(t)); }
 
-static void lower_every(LowerCtx *c, const AST_t *t)
+static void lower_every(const AST_t *t)
 {
-    sm_emit_i(c->p, SM_BB_PUMP_EVERY, (int64_t)every_table_register((AST_t *)t));
+    sm_emit_i(g_p, SM_BB_PUMP_EVERY, (int64_t)every_table_register((AST_t *)t));
 }
 
-static void lower_suspend(LowerCtx *c, const AST_t *t)
+static void lower_suspend(const AST_t *t)
 {
-    SM_Program *p = c->p;
-    if (t->nchildren > 0 && t->children[0]) lower_expr(c, t->children[0]);
+    SM_Program *p = g_p;
+    if (t->nchildren > 0 && t->children[0]) lower_expr(t->children[0]);
     else sm_emit(p, SM_PUSH_NULL);
     int jf = sm_emit_i(p, SM_JUMP_F, 0);
     sm_emit(p, SM_SUSPEND_VALUE);
-    if (t->nchildren > 1 && t->children[1]) { lower_expr(c, t->children[1]); sm_emit(p, SM_VOID_POP); }
+    if (t->nchildren > 1 && t->children[1]) { lower_expr(t->children[1]); sm_emit(p, SM_VOID_POP); }
     sm_emit(p, SM_PUSH_NULL);
     int jdone = sm_emit_i(p, SM_JUMP, 0);
     sm_patch_jump(p, jf, sm_label(p));
     sm_patch_jump(p, jdone, sm_label(p));
 }
 
-static void lower_bb_pump_ast(LowerCtx *c, const AST_t *t)
+static void lower_bb_pump_ast(const AST_t *t)
 {
-    sm_emit_i(c->p, SM_BB_PUMP_AST, (int64_t)ast_pump_table_register((AST_t *)t));
+    sm_emit_i(g_p, SM_BB_PUMP_AST, (int64_t)ast_pump_table_register((AST_t *)t));
 }
-static void lower_limit(LowerCtx *c, const AST_t *t) { emit_push_expr(c, t); sm_emit(c->p, SM_BB_PUMP); }
+static void lower_limit(const AST_t *t) { emit_push_expr(t); sm_emit(g_p, SM_BB_PUMP); }
 
 /*── Prolog ──────────────────────────────────────────────────────────────────*/
 
-static void lower_choice(LowerCtx *c, const AST_t *t)
+static void lower_choice(const AST_t *t)
 {
-    SM_Program *p = c->p;
+    SM_Program *p = g_p;
     if (t->sval) {
         const char *sl = strrchr(t->sval, '/');
         int arity = sl ? atoi(sl + 1) : 0;
         sm_emit_si(p, SM_BB_ONCE_PROC, t->sval, (int64_t)arity);
     } else {
-        emit_push_expr(c, t); sm_emit(p, SM_BB_ONCE);
+        emit_push_expr(t); sm_emit(p, SM_BB_ONCE);
     }
 }
 
-static void lower_prolog_child(LowerCtx *c, const AST_t *t)
+static void lower_prolog_child(const AST_t *t)
 {
-    emit_push_expr(c, t); sm_emit(c->p, SM_BB_ONCE);
+    emit_push_expr(t); sm_emit(g_p, SM_BB_ONCE);
 }
 
 /*── Statement lowering ──────────────────────────────────────────────────────*/
 
-void lower_stmt(LowerCtx *c, const STMT_t *s)
+void lower_stmt(const STMT_t *s)
 {
-    SM_Program *p = c->p;
-    LabelTable *labtab = &c->labtab;
+    SM_Program *p = g_p;
+    LabelTable *labtab = &g_labtab;
 
     /* Skip blank lines entirely. */
     if (!s->is_end && (!s->label || !s->label[0])
@@ -866,7 +918,7 @@ void lower_stmt(LowerCtx *c, const STMT_t *s)
             const char *sl = strrchr(s->subject->sval, '/');
             sm_emit_si(p, SM_BB_ONCE_PROC, s->subject->sval, (int64_t)(sl ? atoi(sl+1) : 0));
         } else {
-            if (s->subject) lower_expr(c, s->subject); else sm_emit(p, SM_PUSH_NULL);
+            if (s->subject) lower_expr( s->subject); else sm_emit(p, SM_PUSH_NULL);
             sm_emit(p, SM_BB_ONCE);
         }
         goto emit_gotos;
@@ -874,9 +926,9 @@ void lower_stmt(LowerCtx *c, const STMT_t *s)
 
     if (s->pattern) {
         /* Pattern-match statement: pat / subject [= replacement] */
-        lower_pat_expr(c, s->pattern);
-        if (s->subject) lower_expr(c, s->subject); else sm_emit(p, SM_PUSH_NULL);
-        if (s->has_eq && s->replacement) lower_expr(c, s->replacement);
+        lower_pat_expr( s->pattern);
+        if (s->subject) lower_expr( s->subject); else sm_emit(p, SM_PUSH_NULL);
+        if (s->has_eq && s->replacement) lower_expr( s->replacement);
         else if (s->has_eq)              sm_emit_si(p, SM_PUSH_LIT_S, "", 0);
         else                             sm_emit_i(p, SM_PUSH_LIT_I, 0);
         const char *sname = (s->subject && (s->subject->kind == AST_VAR
@@ -887,29 +939,29 @@ void lower_stmt(LowerCtx *c, const STMT_t *s)
 
     if (s->subject) {
         if (s->has_eq) {
-            if (s->replacement) lower_expr(c, s->replacement); else sm_emit(p, SM_PUSH_NULL);
+            if (s->replacement) lower_expr( s->replacement); else sm_emit(p, SM_PUSH_NULL);
             const AST_t *lhs = s->subject;
             if (lhs->kind == AST_VAR || lhs->kind == AST_KEYWORD) {
                 sm_emit_s(p, SM_STORE_VAR, lhs->sval ? lhs->sval : "");
             } else if (lhs->kind == AST_INDIRECT) {
-                lower_expr(c, T0(lhs)); sm_emit_si(p, SM_CALL_FN, "ASGN_INDIR", 2);
+                lower_expr( T0(lhs)); sm_emit_si(p, SM_CALL_FN, "ASGN_INDIR", 2);
             } else if (lhs->kind == AST_IDX) {
-                for (int i = 0; i < lhs->nchildren; i++) lower_expr(c, lhs->children[i]);
+                for (int i = 0; i < lhs->nchildren; i++) lower_expr( lhs->children[i]);
                 sm_emit_si(p, SM_CALL_FN, "IDX_SET", (int64_t)(lhs->nchildren + 1));
             } else if (lhs->kind == AST_FNC && lhs->sval) {
                 if (lhs->nchildren == 0) {
                     sm_emit_si(p, SM_CALL_FN, "NRETURN_ASGN", 1);
                     p->instrs[p->count - 1].a[1].s = GC_strdup(lhs->sval);
                 } else if (strcasecmp(lhs->sval, "ITEM") == 0) {
-                    for (int i = 0; i < lhs->nchildren; i++) lower_expr(c, lhs->children[i]);
+                    for (int i = 0; i < lhs->nchildren; i++) lower_expr( lhs->children[i]);
                     sm_emit_si(p, SM_CALL_FN, "ITEM_SET", (int64_t)(lhs->nchildren + 1));
                 } else {
-                    lower_expr(c, T0(lhs));
+                    lower_expr( T0(lhs));
                     char set[256]; snprintf(set, sizeof set, "%s_SET", lhs->sval);
                     sm_emit_si(p, SM_CALL_FN, set, 2);
                 }
             } else {
-                lower_expr(c, lhs); sm_emit_si(p, SM_CALL_FN, "ASGN", 2);
+                lower_expr(lhs); sm_emit_si(p, SM_CALL_FN, "ASGN", 2);
             }
         } else {
             /* Bare expression — RETURN/FRETURN/NRETURN handled as jump. */
@@ -918,17 +970,17 @@ void lower_stmt(LowerCtx *c, const STMT_t *s)
                 if (strcasecmp(s->subject->sval, "FRETURN") == 0) { sm_emit(p, SM_FRETURN); goto emit_gotos; }
                 if (strcasecmp(s->subject->sval, "NRETURN") == 0) { sm_emit(p, SM_NRETURN); goto emit_gotos; }
             }
-            lower_expr(c, s->subject); sm_emit(p, SM_VOID_POP);
+            lower_expr( s->subject); sm_emit(p, SM_VOID_POP);
         }
     }
 
 emit_gotos:
     if (!s->goto_u && !s->goto_u_expr && !s->goto_s && !s->goto_s_expr
             && !s->goto_f && !s->goto_f_expr) return;
-    if (s->goto_u && s->goto_u[0]) { emit_goto(c, SM_JUMP, s->goto_u); return; }
+    if (s->goto_u && s->goto_u[0]) { emit_goto( SM_JUMP, s->goto_u); return; }
     if (s->goto_u_expr) { sm_emit_s(p, SM_PUSH_LIT_S, "(computed-goto)"); sm_emit(p, SM_JUMP_INDIR); return; }
-    if (s->goto_s && s->goto_s[0]) emit_goto(c, SM_JUMP_S, s->goto_s);
-    if (s->goto_f && s->goto_f[0]) emit_goto(c, SM_JUMP_F, s->goto_f);
+    if (s->goto_s && s->goto_s[0]) emit_goto( SM_JUMP_S, s->goto_s);
+    if (s->goto_f && s->goto_f[0]) emit_goto( SM_JUMP_F, s->goto_f);
 }
 
 /*── Expression dispatcher ────────────────────────────────────────────────────
@@ -936,97 +988,97 @@ emit_gotos:
  * Pattern primitives all delegate to lower_pat_expr (they carry no extra state).
  * AST_REVASSIGN / AST_REVSWAP fall to default until implemented.
  *────────────────────────────────────────────────────────────────────────────*/
-void lower_expr(LowerCtx *c, const AST_t *t)
+void lower_expr(const AST_t *t)
 {
-    if (!t) { sm_emit(c->p, SM_PUSH_NULL); return; }
+    if (!t) { sm_emit(g_p, SM_PUSH_NULL); return; }
     switch (t->kind) {
     /* literals */
-    case AST_QLIT: case AST_CSET:              lower_qlit(c, t);          return;
-    case AST_ILIT:                             lower_ilit(c, t);          return;
-    case AST_FLIT:                             lower_flit(c, t);          return;
-    case AST_NUL:                              lower_nul(c, t);           return;
+    case AST_QLIT: case AST_CSET:              lower_qlit(t);          return;
+    case AST_ILIT:                             lower_ilit(t);          return;
+    case AST_FLIT:                             lower_flit(t);          return;
+    case AST_NUL:                              lower_nul(t);           return;
     /* references */
-    case AST_VAR:                              lower_var(c, t);           return;
-    case AST_KEYWORD:                          lower_keyword(c, t);       return;
-    case AST_INDIRECT:                         lower_indirect(c, t);      return;
-    case AST_DEFER:                            lower_defer(c, t);         return;
+    case AST_VAR:                              lower_var(t);           return;
+    case AST_KEYWORD:                          lower_keyword(t);       return;
+    case AST_INDIRECT:                         lower_indirect(t);      return;
+    case AST_DEFER:                            lower_defer(t);         return;
     /* arithmetic */
-    case AST_INTERROGATE:                      lower_interrogate(c, t);   return;
-    case AST_NAME:                             lower_name(c, t);          return;
-    case AST_MNS:   lower_mns(c, t);   return;    case AST_PLS: lower_pls(c, t); return;
-    case AST_ADD:   lower_add(c, t);   return;    case AST_SUB: lower_sub(c, t); return;
-    case AST_MUL:   lower_mul(c, t);   return;    case AST_DIV: lower_div(c, t); return;
-    case AST_MOD:   lower_mod(c, t);   return;    case AST_POW: lower_pow(c, t); return;
+    case AST_INTERROGATE:                      lower_interrogate(t);   return;
+    case AST_NAME:                             lower_name(t);          return;
+    case AST_MNS:   lower_mns(t);   return;    case AST_PLS: lower_pls(t); return;
+    case AST_ADD:   lower_add(t);   return;    case AST_SUB: lower_sub(t); return;
+    case AST_MUL:   lower_mul(t);   return;    case AST_DIV: lower_div(t); return;
+    case AST_MOD:   lower_mod(t);   return;    case AST_POW: lower_pow(t); return;
     /* sequences */
-    case AST_VLIST:                            lower_vlist(c, t);         return;
-    case AST_CAT: case AST_SEQ:                lower_cat_seq(c, t);       return;
-    case AST_ALT:                              lower_alt(c, t);           return;
-    case AST_OPSYN:                            lower_opsyn(c, t);         return;
+    case AST_VLIST:                            lower_vlist(t);         return;
+    case AST_CAT: case AST_SEQ:                lower_cat_seq(t);       return;
+    case AST_ALT:                              lower_alt(t);           return;
+    case AST_OPSYN:                            lower_opsyn(t);         return;
     /* pattern primitives — delegate to lower_pat_expr */
     case AST_ARB:    case AST_ARBNO:  case AST_POS:    case AST_RPOS:
     case AST_ANY:    case AST_NOTANY: case AST_SPAN:   case AST_BREAK:  case AST_BREAKX:
     case AST_LEN:    case AST_TAB:    case AST_RTAB:   case AST_REM:
     case AST_FAIL:   case AST_SUCCEED:case AST_FENCE:  case AST_ABORT:  case AST_BAL:
     case AST_CAPT_COND_ASGN: case AST_CAPT_IMMED_ASGN: case AST_CAPT_CURSOR:
-                                               lower_pat_expr(c, t);      return;
+                                               lower_pat_expr(t);      return;
     /* calls */
-    case AST_FNC:                              lower_fnc(c, t);           return;
-    case AST_IDX:                              lower_idx(c, t);           return;
-    case AST_ASSIGN:                           lower_assign(c, t);        return;
-    case AST_SCAN:                             lower_scan(c, t);          return;
-    case AST_SWAP:                             lower_swap(c, t);          return;
+    case AST_FNC:                              lower_fnc(t);           return;
+    case AST_IDX:                              lower_idx(t);           return;
+    case AST_ASSIGN:                           lower_assign(t);        return;
+    case AST_SCAN:                             lower_scan(t);          return;
+    case AST_SWAP:                             lower_swap(t);          return;
     /* relops */
     case AST_LT: case AST_LE: case AST_GT: case AST_GE: case AST_EQ: case AST_NE:
-                                               lower_acomp(c, t);         return;
+                                               lower_acomp(t);         return;
     case AST_LLT: case AST_LLE: case AST_LGT: case AST_LGE: case AST_LEQ: case AST_LNE:
-                                               lower_lcomp(c, t);         return;
+                                               lower_lcomp(t);         return;
     /* cset / list */
     case AST_CSET_COMPL: case AST_CSET_UNION: case AST_CSET_DIFF: case AST_CSET_INTER:
-                                               lower_cset_op(c, t);       return;
-    case AST_LCONCAT:                          lower_lconcat(c, t);       return;
+                                               lower_cset_op(t);       return;
+    case AST_LCONCAT:                          lower_lconcat(t);       return;
     /* unary Icon */
-    case AST_NONNULL:                          lower_nonnull(c, t);       return;
-    case AST_NULL:                             lower_null(c, t);          return;
-    case AST_NOT:                              lower_not(c, t);           return;
-    case AST_SIZE:                             lower_size(c, t);          return;
-    case AST_RANDOM:                           lower_random(c, t);        return;
-    case AST_IDENTICAL:                        lower_identical(c, t);     return;
-    case AST_AUGOP:                            lower_augop(c, t);         return;
+    case AST_NONNULL:                          lower_nonnull(t);       return;
+    case AST_NULL:                             lower_null(t);          return;
+    case AST_NOT:                              lower_not(t);           return;
+    case AST_SIZE:                             lower_size(t);          return;
+    case AST_RANDOM:                           lower_random(t);        return;
+    case AST_IDENTICAL:                        lower_identical(t);     return;
+    case AST_AUGOP:                            lower_augop(t);         return;
     /* control */
-    case AST_SEQ_EXPR:                         lower_seq_expr(c, t);      return;
-    case AST_IF:                               lower_if(c, t);            return;
-    case AST_WHILE:                            lower_while(c, t);         return;
-    case AST_UNTIL:                            lower_until(c, t);         return;
-    case AST_REPEAT:                           lower_repeat(c, t);        return;
-    case AST_LOOP_BREAK:                       lower_loop_break(c, t);    return;
-    case AST_LOOP_NEXT:                        lower_loop_next(c, t);     return;
-    case AST_RETURN:                           lower_return(c, t);        return;
-    case AST_PROC_FAIL:                        lower_proc_fail(c, t);     return;
-    case AST_CASE:                             lower_case(c, t);          return;
+    case AST_SEQ_EXPR:                         lower_seq_expr(t);      return;
+    case AST_IF:                               lower_if(t);            return;
+    case AST_WHILE:                            lower_while(t);         return;
+    case AST_UNTIL:                            lower_until(t);         return;
+    case AST_REPEAT:                           lower_repeat(t);        return;
+    case AST_LOOP_BREAK:                       lower_loop_break(t);    return;
+    case AST_LOOP_NEXT:                        lower_loop_next(t);     return;
+    case AST_RETURN:                           lower_return(t);        return;
+    case AST_PROC_FAIL:                        lower_proc_fail(t);     return;
+    case AST_CASE:                             lower_case(t);          return;
     /* data */
-    case AST_MAKELIST:                         lower_makelist(c, t);      return;
-    case AST_RECORD:                           lower_record(c, t);        return;
-    case AST_FIELD:                            lower_field(c, t);         return;
-    case AST_GLOBAL:                           lower_global(c, t);        return;
-    case AST_INITIAL:                          lower_initial(c, t);       return;
+    case AST_MAKELIST:                         lower_makelist(t);      return;
+    case AST_RECORD:                           lower_record(t);        return;
+    case AST_FIELD:                            lower_field(t);         return;
+    case AST_GLOBAL:                           lower_global(t);        return;
+    case AST_INITIAL:                          lower_initial(t);       return;
     /* sections */
-    case AST_SECTION:                          lower_section(c, t);       return;
-    case AST_SECTION_PLUS:                     lower_section_plus(c, t);  return;
-    case AST_SECTION_MINUS:                    lower_section_minus(c, t); return;
-    case AST_BANG_BINARY:                      lower_bang_binary(c, t);   return;
+    case AST_SECTION:                          lower_section(t);       return;
+    case AST_SECTION_PLUS:                     lower_section_plus(t);  return;
+    case AST_SECTION_MINUS:                    lower_section_minus(t); return;
+    case AST_BANG_BINARY:                      lower_bang_binary(t);   return;
     /* generators */
-    case AST_SUSPEND:                          lower_suspend(c, t);       return;
-    case AST_TO:                               lower_to(c, t);            return;
-    case AST_TO_BY:                            lower_to_by(c, t);         return;
-    case AST_LIMIT:                            lower_limit(c, t);         return;
-    case AST_ALTERNATE: case AST_ITERATE:      lower_bb_pump_ast(c, t);   return;
-    case AST_EVERY:                            lower_every(c, t);         return;
+    case AST_SUSPEND:                          lower_suspend(t);       return;
+    case AST_TO:                               lower_to(t);            return;
+    case AST_TO_BY:                            lower_to_by(t);         return;
+    case AST_LIMIT:                            lower_limit(t);         return;
+    case AST_ALTERNATE: case AST_ITERATE:      lower_bb_pump_ast(t);   return;
+    case AST_EVERY:                            lower_every(t);         return;
     /* Prolog */
-    case AST_CHOICE:                           lower_choice(c, t);        return;
+    case AST_CHOICE:                           lower_choice(t);        return;
     case AST_CLAUSE: case AST_CUT: case AST_UNIFY:
-    case AST_TRAIL_MARK: case AST_TRAIL_UNWIND: lower_prolog_child(c, t); return;
+    case AST_TRAIL_MARK: case AST_TRAIL_UNWIND: lower_prolog_child(t); return;
     /* not yet implemented (AST_REVASSIGN, AST_REVSWAP) */
-    default:                                   lower_unhandled(c, t);     return;
+    default:                                   lower_unhandled(t);     return;
     }
 }
 
@@ -1062,9 +1114,9 @@ static void build_proc_scope(IcnScope *sc, const AST_t *proc, int body_start)
     }
 }
 
-static void lower_proc_skeletons(LowerCtx *c)
+static void lower_proc_skeletons(void)
 {
-    SM_Program *p = c->p;
+    SM_Program *p = g_p;
 
     for (int pi = 0; pi < proc_count; pi++) {
         const char *nm = proc_table[pi].name;
@@ -1075,15 +1127,13 @@ static void lower_proc_skeletons(LowerCtx *c)
         if (proc) {
             int body_start = 1 + (int)proc->ival;
             IcnScope sc; build_proc_scope(&sc, proc, body_start);
-            c->expression_scope = &sc; c->expression_body_lowering = 1;
+            proc_table[pi].lower_sc = sc;
+            g_proc_scope = &sc; g_in_proc_body = 1;
             for (int i = body_start; i < proc->nchildren; i++) {
                 if (!proc->children[i]) continue;
-                lower_expr(c, proc->children[i]); sm_emit(p, SM_VOID_POP);
+                lower_expr( proc->children[i]); sm_emit(p, SM_VOID_POP);
             }
-            /* CH-17g-proc-locals: store finalized scope so sm_call_proc can
-             * icn_scope_patch() body AST nodes for every-body AST walker. */
-            proc_table[pi].lower_sc = sc;
-            c->expression_body_lowering = 0; c->expression_scope = NULL;
+            g_in_proc_body = 0; g_proc_scope = NULL;
         }
         sm_emit(p, SM_RETURN);
         sm_patch_jump(p, skip, sm_label(p));
@@ -1106,43 +1156,38 @@ SM_Program *lower(const CODE_t *prog)
 {
     if (!prog) return NULL;
 
-    LowerCtx ctx = {
-        .p = sm_prog_new(),
-        .expression_body_lowering = 0,
-        .expression_scope = NULL,
-    };
-    labtab_init(&ctx.labtab);
-    for (int i = 0; i < LOWER_UNHANDLED_WORDS; i++) ctx.unhandled_kinds[i] = 0;
+    g_p            = sm_prog_new();
+    g_in_proc_body = 0;
+    g_proc_scope   = NULL;
+    labtab_init(&g_labtab);
+    for (int i = 0; i < LOWER_UNHANDLED_WORDS; i++) g_unhandled_kinds[i] = 0;
 
-    LowerCtx *c = &ctx; SM_Program *p = ctx.p; LabelTable *labtab = &ctx.labtab;
-
-    lower_proc_skeletons(c);
+    lower_proc_skeletons();
 
     int stno = 0, has_icn = 0;
     for (const STMT_t *s = prog->head; s; s = s->next) {
-        if (s->lang == LANG_ICN) { has_icn = 1; sm_stno_label_record(p, ++stno, NULL); continue; }
-        lower_stmt(c, s);
-        sm_stno_label_record(p, ++stno, (s->label && s->label[0]) ? s->label : NULL);
+        if (s->lang == LANG_ICN) { has_icn = 1; sm_stno_label_record(g_p, ++stno, NULL); continue; }
+        lower_stmt(s);
+        sm_stno_label_record(g_p, ++stno, (s->label && s->label[0]) ? s->label : NULL);
     }
 
-    if (has_icn) sm_emit_si(p, SM_BB_PUMP_PROC, "main", 0);
-    if (p->count == 0 || p->instrs[p->count - 1].op != SM_HALT) sm_emit(p, SM_HALT);
+    if (has_icn) sm_emit_si(g_p, SM_BB_PUMP_PROC, "main", 0);
+    if (g_p->count == 0 || g_p->instrs[g_p->count - 1].op != SM_HALT) sm_emit(g_p, SM_HALT);
 
-    labtab_resolve(labtab, p);
-    labtab_free(labtab);
+    labtab_resolve(&g_labtab, g_p);
+    labtab_free(&g_labtab);
 
-    /* Report any unhandled AST kinds — normally silent. */
     int any = 0;
-    for (int w = 0; w < LOWER_UNHANDLED_WORDS; w++) if (ctx.unhandled_kinds[w]) { any = 1; break; }
+    for (int w = 0; w < LOWER_UNHANDLED_WORDS; w++) if (g_unhandled_kinds[w]) { any = 1; break; }
     if (any) {
         fprintf(stderr, "sm_lower: unhandled AST kinds:");
         for (int k = 0; k < AST_KIND_COUNT; k++) {
             int w = k/64, b = k%64;
-            if (w < LOWER_UNHANDLED_WORDS && (ctx.unhandled_kinds[w] >> b) & 1)
+            if (w < LOWER_UNHANDLED_WORDS && (g_unhandled_kinds[w] >> b) & 1)
                 fprintf(stderr, " %s", ast_e_name[k]);
         }
         fprintf(stderr, "\n");
     }
 
-    return p;
+    return g_p;
 }
