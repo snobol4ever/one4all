@@ -330,12 +330,19 @@ typedef struct AST_t AST_t;
 
 struct AST_t {
     AST_e    kind;          /* t — node type/kind                           */
-    char    *sval;          /* v — string value (QLIT text, VAR/FNC name,   */
-    long long ival;         /*     integer value for ILIT, or               */
-    double   dval;          /*     float value for FLIT)                    */
-    AST_t **children;      /* c — child nodes (realloc-grown array)        */
+    /* v — node value; active field(s) depend on kind:
+     *   sval: string (QLIT text, VAR/FNC/KEYWORD name, ATTR tag)
+     *   ival: integer (ILIT literal; also frame-slot index on VAR after scope)
+     *   dval: float   (FLIT literal)
+     * sval and ival may both be set on VAR nodes after Icon scope analysis.
+     * They are logically one value field (the Snocone `v`) but kept separate
+     * in C because some nodes carry both a name string and a derived integer. */
+    char    *sval;
+    long long ival;
+    double   dval;
+    AST_t  **children;     /* c — child nodes (realloc-grown array)        */
     int      nchildren;     /* n — number of valid children                 */
-    int      nalloc;        /* C impl detail: allocated capacity (not part of logical tree) */
+    int      nalloc;        /* C impl detail: allocated capacity            */
     int      id;            /* C impl detail: node id for INITIAL dedup     */
 };
 
