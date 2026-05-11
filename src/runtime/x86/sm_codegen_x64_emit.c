@@ -824,6 +824,23 @@ static int emit_sm_store_var(FILE *out, const SM_Instr *ins, int pc)
 static int emit_sm_pop(FILE *out, int pc)
 {
     (void)pc;
+    /* EM-MODE4-IS-MODE3-DUMP-h: routed through per-opcode template.
+     * emitter_text_new(out) constructs a text emitter in INVOCATION mode;
+     * emit_sm_void_pop (templates/sm_void_pop.c) emits:
+     *   call rt_pop_void@PLT
+     * directly to `out`.  Legacy sm_emit_nullary path retained below
+     * as __attribute__((unused)) for rollback reference. */
+    emitter_t *e = emitter_text_new(out);
+    if (!e) return -1;
+    emit_sm_void_pop(e);
+    emitter_free(e);
+    return 0;
+}
+
+__attribute__((unused))
+static int emit_sm_pop_legacy(FILE *out, int pc)
+{
+    (void)pc;
     return sm_emit_nullary(out, sm_template_lookup(SM_VOID_POP), NULL);
 }
 

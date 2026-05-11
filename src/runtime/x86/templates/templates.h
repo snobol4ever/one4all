@@ -38,6 +38,11 @@ void emit_sm_halt(emitter_t *e);
  * uses Standard blob pending ME-4+ (sub-rung -f, sess 2026-05-11). */
 void emit_sm_push_lit_i(emitter_t *e, int64_t val);
 
+/* SM_VOID_POP — call rt_pop_void@PLT; discard TOS.
+ * No mode-3/mode-4 divergence; template used by mode-4; mode-3 still
+ * uses Standard blob (sub-rung -h, sess 2026-05-11). */
+void emit_sm_void_pop(emitter_t *e);
+
 /* ── BB box templates ─────────────────────────────────────────────────── */
 
 /* XCHR — literal-string-match box.  Sub-rung -d (2026-05-11). */
