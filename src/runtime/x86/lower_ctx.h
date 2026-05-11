@@ -123,23 +123,8 @@ void expression_scope_walk(IcnScope *sc, AST_t *e);
 /* Emit a SM_JUMP/SM_JUMP_S/SM_JUMP_F for a named SNOBOL4 goto target. */
 int emit_goto(LowerCtx *c, sm_opcode_t op, const char *target);
 
-/* SR-4: LowerHandler typedef — handler function pointer type.
- * Defined here so lower_ctx.h is self-contained for any future split. */
-typedef void (*LowerHandler)(LowerCtx *c, const AST_t *e);
-
-/* lower_expr and lower_pat_expr: non-static since SR-5.
- * Cohort files that recursed (AST_INDIRECT, AST_DEFER, etc.) called lower_expr
- * directly.  Now that all cohorts are merged into lower.c, these are still
- * declared here for use by lower_pat_expr (which has a switch that calls
- * lower_expr) and lower_stmt. */
-void lower_expr    (LowerCtx *c, const AST_t *e);
-void lower_pat_expr(LowerCtx *c, const AST_t *e);
-void lower_stmt    (LowerCtx *c, const STMT_t *s);  /* lower_stmt.c (SR-12) */
-
-/* sm_pat_capture_fn_arg_names: used by lower_pat_expr inside lower.c. */
-const char *sm_pat_capture_fn_arg_names(const AST_t *fnc);
-
-/* SR-14: explicit fallback for kinds not yet implemented. */
+/* lower_unhandled: records unhandled kind in ctx->unhandled_kinds[] bitset,
+ * emits SM_PUSH_NULL so the SM_Program remains structurally valid. */
 void lower_unhandled(LowerCtx *c, const AST_t *e);
 
 #include "../common/ast_clone.h"   /* ast_gc_clone — used by emit_push_expr */

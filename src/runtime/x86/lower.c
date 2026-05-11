@@ -931,100 +931,103 @@ emit_gotos:
     if (s->goto_f && s->goto_f[0]) emit_goto(c, SM_JUMP_F, s->goto_f);
 }
 
-/*── Handler table ───────────────────────────────────────────────────────────*/
-
-typedef void (*LowerHandler)(LowerCtx *c, const AST_t *t);
-static LowerHandler g_handlers[AST_KIND_COUNT];
-static int g_initialized = 0;
-
-static void init_handlers(void)
-{
-    for (int i = 0; i < AST_KIND_COUNT; i++) g_handlers[i] = lower_unhandled;
-
-    g_handlers[AST_QLIT] = lower_qlit;   g_handlers[AST_CSET] = lower_cset;
-    g_handlers[AST_ILIT] = lower_ilit;   g_handlers[AST_FLIT] = lower_flit;
-    g_handlers[AST_NUL]  = lower_nul;
-
-    g_handlers[AST_VAR]      = lower_var;       g_handlers[AST_KEYWORD]  = lower_keyword;
-    g_handlers[AST_INDIRECT] = lower_indirect;   g_handlers[AST_DEFER]    = lower_defer;
-
-    g_handlers[AST_INTERROGATE] = lower_interrogate; g_handlers[AST_NAME] = lower_name;
-    g_handlers[AST_MNS] = lower_mns; g_handlers[AST_PLS] = lower_pls;
-    g_handlers[AST_ADD] = lower_add; g_handlers[AST_SUB] = lower_sub;
-    g_handlers[AST_MUL] = lower_mul; g_handlers[AST_DIV] = lower_div;
-    g_handlers[AST_MOD] = lower_mod; g_handlers[AST_POW] = lower_pow;
-
-    g_handlers[AST_VLIST] = lower_vlist; g_handlers[AST_CAT]   = lower_cat_seq;
-    g_handlers[AST_SEQ]   = lower_cat_seq; g_handlers[AST_ALT] = lower_alt;
-    g_handlers[AST_OPSYN] = lower_opsyn;
-
-    /* Pattern primitives — all delegate to lower_pat_expr */
-    LowerHandler pat = (LowerHandler)lower_pat_expr;
-    g_handlers[AST_ARB] = pat; g_handlers[AST_ARBNO]  = pat; g_handlers[AST_POS]    = pat;
-    g_handlers[AST_RPOS]= pat; g_handlers[AST_ANY]    = pat; g_handlers[AST_NOTANY] = pat;
-    g_handlers[AST_SPAN]= pat; g_handlers[AST_BREAK]  = pat; g_handlers[AST_BREAKX] = pat;
-    g_handlers[AST_LEN] = pat; g_handlers[AST_TAB]    = pat; g_handlers[AST_RTAB]   = pat;
-    g_handlers[AST_REM] = pat; g_handlers[AST_FAIL]   = pat; g_handlers[AST_SUCCEED]= pat;
-    g_handlers[AST_FENCE]=pat; g_handlers[AST_ABORT]  = pat; g_handlers[AST_BAL]    = pat;
-    g_handlers[AST_CAPT_COND_ASGN]  = pat;
-    g_handlers[AST_CAPT_IMMED_ASGN] = pat;
-    g_handlers[AST_CAPT_CURSOR]     = pat;
-
-    g_handlers[AST_FNC]    = lower_fnc;    g_handlers[AST_IDX]    = lower_idx;
-    g_handlers[AST_ASSIGN] = lower_assign; g_handlers[AST_SCAN]   = lower_scan;
-    g_handlers[AST_SWAP]   = lower_swap;
-
-    g_handlers[AST_LT] = lower_acomp; g_handlers[AST_LE] = lower_acomp;
-    g_handlers[AST_GT] = lower_acomp; g_handlers[AST_GE] = lower_acomp;
-    g_handlers[AST_EQ] = lower_acomp; g_handlers[AST_NE] = lower_acomp;
-    g_handlers[AST_LLT]= lower_lcomp; g_handlers[AST_LLE]= lower_lcomp;
-    g_handlers[AST_LGT]= lower_lcomp; g_handlers[AST_LGE]= lower_lcomp;
-    g_handlers[AST_LEQ]= lower_lcomp; g_handlers[AST_LNE]= lower_lcomp;
-
-    g_handlers[AST_CSET_COMPL] = lower_cset_op; g_handlers[AST_CSET_UNION] = lower_cset_op;
-    g_handlers[AST_CSET_DIFF]  = lower_cset_op; g_handlers[AST_CSET_INTER] = lower_cset_op;
-    g_handlers[AST_LCONCAT]    = lower_lconcat;
-
-    g_handlers[AST_NONNULL]   = lower_nonnull;  g_handlers[AST_NULL]      = lower_null;
-    g_handlers[AST_NOT]       = lower_not;       g_handlers[AST_SIZE]      = lower_size;
-    g_handlers[AST_RANDOM]    = lower_random;    g_handlers[AST_IDENTICAL] = lower_identical;
-    g_handlers[AST_AUGOP]     = lower_augop;
-
-    g_handlers[AST_SEQ_EXPR]   = lower_seq_expr; g_handlers[AST_WHILE]     = lower_while;
-    g_handlers[AST_UNTIL]      = lower_until;     g_handlers[AST_REPEAT]    = lower_repeat;
-    g_handlers[AST_IF]         = lower_if;        g_handlers[AST_CASE]      = lower_case;
-    g_handlers[AST_RETURN]     = lower_return;    g_handlers[AST_PROC_FAIL] = lower_proc_fail;
-    g_handlers[AST_LOOP_BREAK] = lower_loop_break;g_handlers[AST_LOOP_NEXT] = lower_loop_next;
-
-    g_handlers[AST_MAKELIST] = lower_makelist; g_handlers[AST_RECORD]  = lower_record;
-    g_handlers[AST_FIELD]    = lower_field;    g_handlers[AST_GLOBAL]  = lower_global;
-    g_handlers[AST_INITIAL]  = lower_initial;
-
-    g_handlers[AST_SECTION]       = lower_section;
-    g_handlers[AST_SECTION_PLUS]  = lower_section_plus;
-    g_handlers[AST_SECTION_MINUS] = lower_section_minus;
-    g_handlers[AST_BANG_BINARY]   = lower_bang_binary;
-
-    g_handlers[AST_SUSPEND]   = lower_suspend;    g_handlers[AST_TO]        = lower_to;
-    g_handlers[AST_TO_BY]     = lower_to_by;      g_handlers[AST_LIMIT]     = lower_limit;
-    g_handlers[AST_ALTERNATE] = lower_bb_pump_ast;g_handlers[AST_ITERATE]   = lower_bb_pump_ast;
-    g_handlers[AST_EVERY]     = lower_every;
-
-    g_handlers[AST_CHOICE]       = lower_choice;
-    g_handlers[AST_CLAUSE]       = lower_prolog_child; g_handlers[AST_CUT]          = lower_prolog_child;
-    g_handlers[AST_UNIFY]        = lower_prolog_child; g_handlers[AST_TRAIL_MARK]   = lower_prolog_child;
-    g_handlers[AST_TRAIL_UNWIND] = lower_prolog_child;
-
-    /* AST_REVASSIGN, AST_REVSWAP: Icon reversible ops, not yet implemented. */
-
-    g_initialized = 1;
-}
-
+/*── Expression dispatcher ────────────────────────────────────────────────────
+ * One switch — the compiler sees all cases, warns on missing ones (-Wswitch).
+ * Pattern primitives all delegate to lower_pat_expr (they carry no extra state).
+ * AST_REVASSIGN / AST_REVSWAP fall to default until implemented.
+ *────────────────────────────────────────────────────────────────────────────*/
 void lower_expr(LowerCtx *c, const AST_t *t)
 {
     if (!t) { sm_emit(c->p, SM_PUSH_NULL); return; }
-    if (!g_initialized) init_handlers();
-    g_handlers[t->kind](c, t);
+    switch (t->kind) {
+    /* literals */
+    case AST_QLIT: case AST_CSET:              lower_qlit(c, t);          return;
+    case AST_ILIT:                             lower_ilit(c, t);          return;
+    case AST_FLIT:                             lower_flit(c, t);          return;
+    case AST_NUL:                              lower_nul(c, t);           return;
+    /* references */
+    case AST_VAR:                              lower_var(c, t);           return;
+    case AST_KEYWORD:                          lower_keyword(c, t);       return;
+    case AST_INDIRECT:                         lower_indirect(c, t);      return;
+    case AST_DEFER:                            lower_defer(c, t);         return;
+    /* arithmetic */
+    case AST_INTERROGATE:                      lower_interrogate(c, t);   return;
+    case AST_NAME:                             lower_name(c, t);          return;
+    case AST_MNS:   lower_mns(c, t);   return;    case AST_PLS: lower_pls(c, t); return;
+    case AST_ADD:   lower_add(c, t);   return;    case AST_SUB: lower_sub(c, t); return;
+    case AST_MUL:   lower_mul(c, t);   return;    case AST_DIV: lower_div(c, t); return;
+    case AST_MOD:   lower_mod(c, t);   return;    case AST_POW: lower_pow(c, t); return;
+    /* sequences */
+    case AST_VLIST:                            lower_vlist(c, t);         return;
+    case AST_CAT: case AST_SEQ:                lower_cat_seq(c, t);       return;
+    case AST_ALT:                              lower_alt(c, t);           return;
+    case AST_OPSYN:                            lower_opsyn(c, t);         return;
+    /* pattern primitives — delegate to lower_pat_expr */
+    case AST_ARB:    case AST_ARBNO:  case AST_POS:    case AST_RPOS:
+    case AST_ANY:    case AST_NOTANY: case AST_SPAN:   case AST_BREAK:  case AST_BREAKX:
+    case AST_LEN:    case AST_TAB:    case AST_RTAB:   case AST_REM:
+    case AST_FAIL:   case AST_SUCCEED:case AST_FENCE:  case AST_ABORT:  case AST_BAL:
+    case AST_CAPT_COND_ASGN: case AST_CAPT_IMMED_ASGN: case AST_CAPT_CURSOR:
+                                               lower_pat_expr(c, t);      return;
+    /* calls */
+    case AST_FNC:                              lower_fnc(c, t);           return;
+    case AST_IDX:                              lower_idx(c, t);           return;
+    case AST_ASSIGN:                           lower_assign(c, t);        return;
+    case AST_SCAN:                             lower_scan(c, t);          return;
+    case AST_SWAP:                             lower_swap(c, t);          return;
+    /* relops */
+    case AST_LT: case AST_LE: case AST_GT: case AST_GE: case AST_EQ: case AST_NE:
+                                               lower_acomp(c, t);         return;
+    case AST_LLT: case AST_LLE: case AST_LGT: case AST_LGE: case AST_LEQ: case AST_LNE:
+                                               lower_lcomp(c, t);         return;
+    /* cset / list */
+    case AST_CSET_COMPL: case AST_CSET_UNION: case AST_CSET_DIFF: case AST_CSET_INTER:
+                                               lower_cset_op(c, t);       return;
+    case AST_LCONCAT:                          lower_lconcat(c, t);       return;
+    /* unary Icon */
+    case AST_NONNULL:                          lower_nonnull(c, t);       return;
+    case AST_NULL:                             lower_null(c, t);          return;
+    case AST_NOT:                              lower_not(c, t);           return;
+    case AST_SIZE:                             lower_size(c, t);          return;
+    case AST_RANDOM:                           lower_random(c, t);        return;
+    case AST_IDENTICAL:                        lower_identical(c, t);     return;
+    case AST_AUGOP:                            lower_augop(c, t);         return;
+    /* control */
+    case AST_SEQ_EXPR:                         lower_seq_expr(c, t);      return;
+    case AST_IF:                               lower_if(c, t);            return;
+    case AST_WHILE:                            lower_while(c, t);         return;
+    case AST_UNTIL:                            lower_until(c, t);         return;
+    case AST_REPEAT:                           lower_repeat(c, t);        return;
+    case AST_LOOP_BREAK:                       lower_loop_break(c, t);    return;
+    case AST_LOOP_NEXT:                        lower_loop_next(c, t);     return;
+    case AST_RETURN:                           lower_return(c, t);        return;
+    case AST_PROC_FAIL:                        lower_proc_fail(c, t);     return;
+    case AST_CASE:                             lower_case(c, t);          return;
+    /* data */
+    case AST_MAKELIST:                         lower_makelist(c, t);      return;
+    case AST_RECORD:                           lower_record(c, t);        return;
+    case AST_FIELD:                            lower_field(c, t);         return;
+    case AST_GLOBAL:                           lower_global(c, t);        return;
+    case AST_INITIAL:                          lower_initial(c, t);       return;
+    /* sections */
+    case AST_SECTION:                          lower_section(c, t);       return;
+    case AST_SECTION_PLUS:                     lower_section_plus(c, t);  return;
+    case AST_SECTION_MINUS:                    lower_section_minus(c, t); return;
+    case AST_BANG_BINARY:                      lower_bang_binary(c, t);   return;
+    /* generators */
+    case AST_SUSPEND:                          lower_suspend(c, t);       return;
+    case AST_TO:                               lower_to(c, t);            return;
+    case AST_TO_BY:                            lower_to_by(c, t);         return;
+    case AST_LIMIT:                            lower_limit(c, t);         return;
+    case AST_ALTERNATE: case AST_ITERATE:      lower_bb_pump_ast(c, t);   return;
+    case AST_EVERY:                            lower_every(c, t);         return;
+    /* Prolog */
+    case AST_CHOICE:                           lower_choice(c, t);        return;
+    case AST_CLAUSE: case AST_CUT: case AST_UNIFY:
+    case AST_TRAIL_MARK: case AST_TRAIL_UNWIND: lower_prolog_child(c, t); return;
+    /* not yet implemented (AST_REVASSIGN, AST_REVSWAP) */
+    default:                                   lower_unhandled(c, t);     return;
+    }
 }
 
 /*── Procedure skeletons ─────────────────────────────────────────────────────*/
