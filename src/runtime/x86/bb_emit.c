@@ -262,6 +262,54 @@ void t_macro_end(void)
     }
 }
 
+void t_test_rax_rax(void)
+{
+    /* test rax, rax — set ZF from rax; used before conditional jumps.
+     *   BINARY:    48 85 C0  (REX.W TEST rax, rax)
+     *   TEXT:      `test rax, rax`
+     *   MACRO_DEF: same as TEXT */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY:
+        bb_emit_byte(0x48); bb_emit_byte(0x85); bb_emit_byte(0xC0);
+        return;
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF:
+        bb3c_format(emit_outf(), "", "test", "rax, rax");
+        return;
+    }
+}
+
+void t_emit_jmp(bb_label_t *target, jmp_kind_t kind)
+{
+    /* Emit a jump of the given kind to target.
+     *   BINARY:
+     *     JMP_JMP  -> E9 rel32
+     *     JMP_JE   -> 74 rel8 (short; near-forward within a blob)
+     *     JMP_JNE  -> 75 rel8
+     *     JMP_JL   -> 7C rel8
+     *     JMP_JGE  -> 7D rel8
+     *     JMP_JG   -> 0F 8F rel32
+     *   TEXT/MACRO_DEF: three-column `jXX target` via bb3c_emit_jmp. */
+    static const char *const mn_tab[] = { "jmp", "je", "jne", "jl", "jge", "jg" };
+    const char *mn = ((unsigned)kind < 6) ? mn_tab[kind] : "jmp";
+    switch (bb_emit_mode) {
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF:
+        bb3c_emit_jmp(emit_outf(), mn, target->name);
+        return;
+    case EMIT_BINARY:
+        switch (kind) {
+        case JMP_JMP: bb_insn_jmp_rel32(target);  return;
+        case JMP_JE:  bb_insn_je_rel8(target);    return;
+        case JMP_JNE: bb_insn_jne_rel8(target);   return;
+        case JMP_JL:  bb_insn_jl_rel8(target);    return;
+        case JMP_JGE: bb_insn_jge_rel8(target);   return;
+        case JMP_JG:  bb_insn_jg_rel32(target);   return;
+        }
+        return;
+    }
+}
+
 /* ── label ──────────────────────────────────────────────────────────────── */
 
 void bb_label_init(bb_label_t *lbl, const char *name)

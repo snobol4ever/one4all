@@ -31,17 +31,6 @@
 #include <stdarg.h>
 #include "bb_emit.h"   /* bb_label_t, bb_patch_kind_t, bb_buf_t */
 
-/* ── jump kind ────────────────────────────────────────────────────────────── */
-
-typedef enum {
-    JMP_JMP = 0,
-    JMP_JE,
-    JMP_JNE,
-    JMP_JL,
-    JMP_JGE,
-    JMP_JG,
-} jmp_kind_t;
-
 /* ── EM-MODE4-IS-MODE3-DUMP-b ────────────────────────────────────────────── */
 /*
  * Text-emitter mode (sess 2026-05-11 sub-rung -b).

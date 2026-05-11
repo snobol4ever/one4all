@@ -118,6 +118,22 @@ void bb_label_define(bb_label_t *lbl);
 /* True if label has been defined (offset != BB_LABEL_UNRESOLVED) */
 #define bb_label_defined(lbl)  ((lbl)->offset != BB_LABEL_UNRESOLVED)
 
+/* ── jump kind (used by t_emit_jmp and emitter_t vtable) ────────────────── */
+/* Defined here so both bb_emit.h and emitter.h consumers share one enum.   */
+
+typedef enum {
+    JMP_JMP = 0,
+    JMP_JE,
+    JMP_JNE,
+    JMP_JL,
+    JMP_JGE,
+    JMP_JG,
+} jmp_kind_t;
+
+/* Three-way jmp helpers (no emitter_t *e parameter). */
+void t_test_rax_rax(void);
+void t_emit_jmp(bb_label_t *target, jmp_kind_t kind);
+
 /* ── binary mode state ──────────────────────────────────────────────────── */
 
 extern bb_buf_t  bb_emit_buf;   /* current pool buffer */
