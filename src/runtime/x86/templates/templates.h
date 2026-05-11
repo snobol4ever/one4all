@@ -117,4 +117,12 @@ void emit_bb_xfail(emitter_t *e,
 void emit_bb_xfarb(emitter_t *e,
                    bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
 
+/* SM nullary RT-call family — sub-rung -n (2026-05-11).
+ * SM_CONCAT:     pop right+left, push concat result → rt_concat()
+ * SM_PUSH_NULL:  push null descriptor               → rt_push_null()
+ * SM_COERCE_NUM: coerce TOS string to number        → rt_coerce_num() */
+void emit_sm_concat    (emitter_t *e);
+void emit_sm_push_null (emitter_t *e);
+void emit_sm_coerce_num(emitter_t *e);
+
 #endif /* RUNTIME_X86_TEMPLATES_TEMPLATES_H */

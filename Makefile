@@ -251,6 +251,7 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_void_pop.c -o $(OBJ)/template_sm_void_pop.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_jump.c -o $(OBJ)/template_sm_jump.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_arith.c -o $(OBJ)/template_sm_arith.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_nullary_rt.c -o $(OBJ)/template_sm_nullary_rt.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xbrkx.c -o $(OBJ)/template_bb_xbrkx.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xposi.c -o $(OBJ)/template_bb_xposi.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xfarb.c -o $(OBJ)/template_bb_xfarb.o

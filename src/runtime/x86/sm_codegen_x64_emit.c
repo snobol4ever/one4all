@@ -1059,25 +1059,31 @@ static int emit_sm_stno(FILE *out, const SM_Instr *ins, int pc,
  * These are Phase 1/4/5 concerns, orthogonal to BB / pattern-matching.
  * ----------------------------------------------------------------------- */
 
-/* SM_CONCAT: pop right then left; push CONCAT result.  All in libscrip_rt. */
-static int emit_sm_concat(FILE *out, int pc)
+/* SM_CONCAT / SM_PUSH_NULL / SM_COERCE_NUM: now routed through templates
+ * (sm_nullary_rt.c, EM-MODE4-IS-MODE3-DUMP-n).  The static wrappers below
+ * bridge the old FILE*-based dispatcher into emit_mode_set + template call. */
+static int emit_sm_concat_dispatch(FILE *out, int pc)
 {
     (void)pc;
-    return sm_emit_nullary(out, sm_template_lookup(SM_CONCAT), NULL);
+    emit_mode_set(EMIT_TEXT, out);
+    emit_sm_concat(NULL);
+    return 0;
 }
 
-/* SM_PUSH_NULL: push null (empty-string) descriptor; sets last_ok=1. */
-static int emit_sm_push_null(FILE *out, int pc)
+static int emit_sm_push_null_dispatch(FILE *out, int pc)
 {
     (void)pc;
-    return sm_emit_nullary(out, sm_template_lookup(SM_PUSH_NULL), NULL);
+    emit_mode_set(EMIT_TEXT, out);
+    emit_sm_push_null(NULL);
+    return 0;
 }
 
-/* SM_COERCE_NUM: unary +; coerce string→int/real if needed. */
-static int emit_sm_coerce_num(FILE *out, int pc)
+static int emit_sm_coerce_num_dispatch(FILE *out, int pc)
 {
     (void)pc;
-    return sm_emit_nullary(out, sm_template_lookup(SM_COERCE_NUM), NULL);
+    emit_mode_set(EMIT_TEXT, out);
+    emit_sm_coerce_num(NULL);
+    return 0;
 }
 
 /* SM_CALL_FN: general function call.  All dispatch (pseudo-calls, builtins,
@@ -2206,9 +2212,9 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
             /* EM-7-pre keepers: SM_CALL_FN (general) + SM_CONCAT + SM_PUSH_NULL +
              * SM_COERCE_NUM + conditional return variants. */
             case SM_CALL_FN:         rc = emit_sm_call(out, ins, pc);       break;
-            case SM_CONCAT:       rc = emit_sm_concat(out, pc);          break;
-            case SM_PUSH_NULL:    rc = emit_sm_push_null(out, pc);       break;
-            case SM_COERCE_NUM:   rc = emit_sm_coerce_num(out, pc);      break;
+            case SM_CONCAT:       rc = emit_sm_concat_dispatch(out, pc);      break;
+            case SM_PUSH_NULL:    rc = emit_sm_push_null_dispatch(out, pc);   break;
+            case SM_COERCE_NUM:   rc = emit_sm_coerce_num_dispatch(out, pc);  break;
             case SM_FRETURN:
             case SM_NRETURN:
             case SM_RETURN_S:
