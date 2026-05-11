@@ -1,7 +1,7 @@
 /*============================================================================================================================
  * coro_value.h — Pure-BB value-context evaluator for Icon Byrd boxes (RS-17a)
  *
- * `bb_eval_value` evaluates an tree_t in **value context** without going through
+ * `bb_eval_value` evaluates an AST_t in **value context** without going through
  * `interp_eval` (the IR-mode-only driver tree-walker).  It is the value-context
  * analog of `coro_eval` (which builds a Byrd-box generator).
  *
@@ -25,7 +25,7 @@
 #include "../ast/ast.h"
 #include "snobol4.h"      /* DESCR_t */
 
-DESCR_t bb_eval_value(tree_t *e);
+DESCR_t bb_eval_value(AST_t *e);
 
 /* GOAL-ICON-BB-COMPLETE A3-seed-fix: canonical Icon ?E LCG seed.
  * Defined in coro_value.c, referenced by sm_interp.c (SM ICN_RANDOM)

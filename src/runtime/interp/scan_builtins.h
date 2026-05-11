@@ -7,7 +7,7 @@
 #ifndef SCAN_BUILTINS_H
 #define SCAN_BUILTINS_H
 
-#include "../ast/ast.h"    /* tree_t */
+#include "../ast/ast.h"    /* AST_t */
 #include "snobol4.h"        /* DESCR_t */
 
 /* Returns 1 if `call` named a SCAN builtin and was handled (*out set).
@@ -23,6 +23,6 @@
  * (any/many/move/tab/match).  Inside-scan-only builtins fail when
  * scan_pos == 0 (no scan in flight) unless a string-arg overload is
  * provided. */
-int scan_try_call_builtin(tree_t *call, DESCR_t *args, int nargs, DESCR_t *out);
+int scan_try_call_builtin(AST_t *call, DESCR_t *args, int nargs, DESCR_t *out);
 
 #endif /* SCAN_BUILTINS_H */

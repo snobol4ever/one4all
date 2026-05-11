@@ -2,7 +2,7 @@
  * icon_parse.h — Tiny-ICON recursive-descent parser API
  *
  * Parses explicit-semicolon Icon (no auto-insertion).
- * Produces tree_t / STMT_t IR directly — no intermediate AST.
+ * Produces AST_t / STMT_t IR directly — no intermediate AST.
  *
  * FI-2: IcnNode/icon_ast eliminated (2026-04-14).
  */
@@ -11,7 +11,7 @@
 #define ICON_PARSE_H
 
 #include "icon_lex.h"
-#include "../snobol4/scrip_cc.h"   /* CODE_t, STMT_t, tree_t, LANG_ICN */
+#include "../snobol4/scrip_cc.h"   /* CODE_t, STMT_t, AST_t, LANG_ICN */
 
 /* -------------------------------------------------------------------------
  * Parser state
@@ -37,9 +37,9 @@ void     icn_parse_init(IcnParser *p, IcnLexer *lex);
 
 /* Parse a complete Icon source file directly to IR.
  * Returns CODE_t* (caller owns) or NULL on parse error. */
-CODE_t *icn_parse_file(IcnParser *p, tree_t **out_ast);
+CODE_t *icn_parse_file(IcnParser *p, AST_t **out_ast);
 
-/* Parse a single expression to tree_t (useful for unit tests) */
-tree_t  *icn_parse_expr(IcnParser *p);
+/* Parse a single expression to AST_t (useful for unit tests) */
+AST_t  *icn_parse_expr(IcnParser *p);
 
 #endif /* ICON_PARSE_H */

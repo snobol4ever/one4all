@@ -83,10 +83,10 @@ extern DESCR_t (*g_user_call_hook)(const char *name, DESCR_t *args, int nargs);
 #include "bb_build.h"
 #include "../x86/bb_flat.h"     /* bb_lit_emit_binary — M-DYN-B1 */
 
-/* SN-6b: DT_E thaw in bb_deferred_var needs tree_t + AST_FNC/AST_VAR kinds and
+/* SN-6b: DT_E thaw in bb_deferred_var needs AST_t + AST_FNC/AST_VAR kinds and
  * eval_node() for argument evaluation. Mirrors snobol4_pattern.c's pat_to_patnd. */
 #include "../ast/ast.h"
-extern DESCR_t eval_node(tree_t *e);
+extern DESCR_t eval_node(AST_t *e);
 
 /* In the full-runtime build, include bb_box.h after snobol4.h.
  * bb_box.h now uses spec_t (not spec_t) so no collision with engine. */
@@ -1055,7 +1055,7 @@ static DESCR_t bb_deferred_var(void *zeta, int entry)
                          * equivalent to SPITBOL's PATVAL semantics.
                          * ──────────────────────────────────────────────── */
                         if (val.v == DT_E) {
-                            tree_t *frozen = (tree_t *)val.ptr;
+                            AST_t *frozen = (AST_t *)val.ptr;
                             if (!frozen) {
                                 /* null DT_E — propagate failure (do not epsilon) */
                                 g_dvar_depth--;

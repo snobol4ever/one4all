@@ -41,7 +41,7 @@ int  labtab_resolve    (LabelTable *lt, SM_Program *p);
 char *kw_canonicalize(const char *raw);
 
 /* Walk proc-body AST, add non-global variable names to sc. */
-void expression_scope_walk(IcnScope *sc, tree_t *e);
+void expression_scope_walk(IcnScope *sc, AST_t *e);
 
 /* ── Macros used by lower.c handlers ────────────────────────────────────── */
 

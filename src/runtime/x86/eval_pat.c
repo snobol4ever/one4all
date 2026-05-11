@@ -1,7 +1,7 @@
 /*
  * eval_pat.c — pattern-context expression evaluator (RS-16).
  *
- * Evaluates an tree_t in PATTERN context, producing a DT_P descriptor.
+ * Evaluates an AST_t in PATTERN context, producing a DT_P descriptor.
  * Pattern evaluation drives SNOBOL4 match: alternation, concatenation,
  * captures, primitive patterns (LEN, TAB, ANY, BREAK, ARBNO, ...).
  *
@@ -23,7 +23,7 @@
 
 /* eval_node is in eval_code.c (sibling). pat_* helpers, NV_GET_fn, APPLY_fn,
  * PATVAL_fn, NULVCL, FAILDESCR, IS_FAIL_fn — all in snobol4.h. */
-extern DESCR_t eval_node(tree_t *e);
+extern DESCR_t eval_node(AST_t *e);
 
 /* RS-16: local copy of NAME_DEREF (originally inline in interp_private.h —
  * mode-1 only). This helper is needed for value-context arg eval inside
@@ -36,7 +36,7 @@ static inline DESCR_t NAME_DEREF(DESCR_t d) {
     return d;
 }
 
-DESCR_t interp_eval_pat(tree_t *e)
+DESCR_t interp_eval_pat(AST_t *e)
 {
     NO_AST_WALK_GUARD("interp_eval_pat");
     if (!e) return NULVCL;
@@ -111,7 +111,7 @@ DESCR_t interp_eval_pat(tree_t *e)
          *    (Contrast: AST_DEFER in value context produces DT_E via interp_eval.) */
         if (e->n < 1) return pat_epsilon();
         {
-            tree_t *child = e->c[0];
+            AST_t *child = e->c[0];
             if (child->t == AST_FNC && child->v.sval) {
                 /* *func(args) — build deferred XATP pattern node.
                  *
@@ -124,7 +124,7 @@ DESCR_t interp_eval_pat(tree_t *e)
                  * (after ARBNO has bumped the counter), not at pattern-build
                  * time (when counter is just-pushed = 0).
                  *
-                 * Mechanism: wrap the arg child as DT_E (frozen tree_t*); the
+                 * Mechanism: wrap the arg child as DT_E (frozen AST_t*); the
                  * match-time path (bb_usercall in stmt_exec.c) thaws each DT_E
                  * via EVAL_fn before invoking the user function.
                  *
@@ -139,7 +139,7 @@ DESCR_t interp_eval_pat(tree_t *e)
                  * pattern-build time, we capture the stale value (typically
                  * empty), and the match-time call to Shift_t receives that
                  * stale value instead of the captured cursor substring.
-                 * Wrapping AST_VAR as DT_E with the tree_t* itself defers the
+                 * Wrapping AST_VAR as DT_E with the AST_t* itself defers the
                  * lookup to bb_usercall's thaw loop, which calls EVAL_fn ->
                  * eval_node -> NV_GET_fn AT MATCH TIME. */
                 int na = child->n;
@@ -147,7 +147,7 @@ DESCR_t interp_eval_pat(tree_t *e)
                 if (na > 0) {
                     av = GC_malloc(na * sizeof(DESCR_t));
                     for (int i = 0; i < na; i++) {
-                        tree_t *arg = child->c[i];
+                        AST_t *arg = child->c[i];
                         if (arg && (arg->t == AST_FNC || arg->t == AST_VAR)) {
                             /* Defer: wrap as DT_E for match-time EVAL_fn thaw. */
                             av[i].v = DT_E;

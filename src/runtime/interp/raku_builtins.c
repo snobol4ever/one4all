@@ -22,7 +22,7 @@
  *   1. interp_eval's icn-frame AST_FNC case — preserves mode-1 behaviour.
  *   2. bb_eval_value's AST_FNC case — before the generic builtin arg-eval loop,
  *      because Raku block-receiving builtins (raku_try / raku_map / raku_grep /
- *      raku_sort) need tree_t access and must not be subject to FAIL-prop on
+ *      raku_sort) need AST_t access and must not be subject to FAIL-prop on
  *      the body argument.
  *   3. icn_call_builtin top — defensive coverage for the coro_bb_fnc path.
  *
@@ -70,7 +70,7 @@
  * Internal recursions evaluate children via `bb_eval_value`, not `interp_eval`,
  * to keep this file off the IR-walker call graph (RS-20 isolation invariant).
  *--------------------------------------------------------------------------------------------------------------------------*/
-int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
+int raku_try_call_builtin(AST_t *call, DESCR_t *__rk_out) {
     if (!call || call->n < 1 || !call->c[0]) return 0;
     const char *fn = call->c[0]->v.sval;
     if (!fn) return 0;
@@ -407,11 +407,11 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
                 /* body failed */
                 if (nargs == 2 && real_die) {
                     /* CATCH block: only fires on explicit die, not on fall-off-end */
-                    tree_t *catch_blk = call->c[2];
+                    AST_t *catch_blk = call->c[2];
                     int _sl2 = -1;
-                    tree_t *_stk2[64]; int _sn2=0; _stk2[_sn2++]=catch_blk;
+                    AST_t *_stk2[64]; int _sn2=0; _stk2[_sn2++]=catch_blk;
                     while (_sn2>0 && _sl2<0) {
-                        tree_t *_n=_stk2[--_sn2]; if(!_n) continue;
+                        AST_t *_n=_stk2[--_sn2]; if(!_n) continue;
                         if(_n->t==AST_VAR && _n->v.sval &&
                            (strcmp(_n->v.sval,"$!")==0||strcmp(_n->v.sval,"!")==0))
                             _sl2=(int)_n->v.ival;
@@ -441,7 +441,7 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
 #define SOH '\x01'
 
             if (!strcmp(fn,"raku_map") && nargs == 2) {
-                tree_t *blk = call->c[1];          /* block tree_t* */
+                AST_t *blk = call->c[1];          /* block AST_t* */
                 DESCR_t arrd = bb_eval_value(call->c[2]);
                 const char *as = VARVAL_fn(arrd); if (!as) as = "";
                 /* iterate elems, eval block with $_ bound, collect */
@@ -458,9 +458,9 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
                       char *_ep_ev; long _iv_ev = strtol(elem, &_ep_ev, 10);
                       DESCR_t _ev = (*_ep_ev == '\0' && _ep_ev > elem) ? INTVAL(_iv_ev) : STRVAL(elem);
                       int _sl = -1;
-                      tree_t *_stk[64]; int _sn=0; _stk[_sn++]=blk;
+                      AST_t *_stk[64]; int _sn=0; _stk[_sn++]=blk;
                       while (_sn>0 && _sl<0) {
-                          tree_t *_n=_stk[--_sn];
+                          AST_t *_n=_stk[--_sn];
                           if (!_n) continue;
                           if (_n->t==AST_VAR && _n->v.sval) {
                               const char *_sv = _n->v.sval;
@@ -491,7 +491,7 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
             }
 
             if (!strcmp(fn,"raku_grep") && nargs == 2) {
-                tree_t *blk = call->c[1];
+                AST_t *blk = call->c[1];
                 DESCR_t arrd = bb_eval_value(call->c[2]);
                 const char *as = VARVAL_fn(arrd); if (!as) as = "";
                 char *out = GC_strdup("");
@@ -507,9 +507,9 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
                       char *_ep_ev; long _iv_ev = strtol(elem, &_ep_ev, 10);
                       DESCR_t _ev = (*_ep_ev == '\0' && _ep_ev > elem) ? INTVAL(_iv_ev) : STRVAL(elem);
                       int _sl = -1;
-                      tree_t *_stk[64]; int _sn=0; _stk[_sn++]=blk;
+                      AST_t *_stk[64]; int _sn=0; _stk[_sn++]=blk;
                       while (_sn>0 && _sl<0) {
-                          tree_t *_n=_stk[--_sn];
+                          AST_t *_n=_stk[--_sn];
                           if (!_n) continue;
                           if (_n->t==AST_VAR && _n->v.sval) {
                               const char *_sv = _n->v.sval;
@@ -543,7 +543,7 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
                  * With block (nargs==2): use $a/$b comparator block. */
                 DESCR_t arrd = bb_eval_value(call->c[nargs == 2 ? 2 : 1]);
                 const char *as = VARVAL_fn(arrd); if (!as || !*as) { *__rk_out = STRVAL(GC_strdup("")); return 1; }
-                tree_t *blk = (nargs == 2) ? call->c[1] : NULL;
+                AST_t *blk = (nargs == 2) ? call->c[1] : NULL;
                 /* split into array of strings */
                 int cnt = 1; for (const char *p=as;*p;p++) if(*p==SOH) cnt++;
                 char **elems = GC_malloc((size_t)cnt * sizeof(char*));

@@ -90,7 +90,7 @@ char *kw_canonicalize(const char *raw)
     return buf;
 }
 
-void expression_scope_walk(IcnScope *sc, tree_t *e)
+void expression_scope_walk(IcnScope *sc, AST_t *e)
 {
     if (!e) return;
     if (e->t == AST_GLOBAL) {

@@ -50,7 +50,7 @@
 #include "snobol4.h"
 #include "sil_macros.h"
 #include "../ast/ast.h"
-#include "../../frontend/snobol4/scrip_cc.h"  /* tree_t, AST_FNC for SM_PAT_CAPTURE_FN */
+#include "../../frontend/snobol4/scrip_cc.h"  /* AST_t, AST_FNC for SM_PAT_CAPTURE_FN */
 #include "bb_broker.h"   /* SN-9b: SM_BB_PUMP / SM_BB_ONCE handlers */
 #include "templates/templates.h"  /* EM-MODE4-IS-MODE3-DUMP-c: per-opcode templates */
 #include "bb_emit.h"              /* EM-MODE4-IS-MODE3-DUMP-c: capture-and-flush adapter */
@@ -380,7 +380,7 @@ static void h_call_chunk(void)
  *
  * coro_eval and pump_print live in scrip.c / sm_interp.c — declared
  * extern here so the handler bodies are identical to the sm_interp cases. */
-extern bb_node_t coro_eval(tree_t *e);
+extern bb_node_t coro_eval(AST_t *e);
 static void jit_pump_print(DESCR_t val, void *arg)
 {
     (void)arg;
@@ -391,7 +391,7 @@ static void jit_pump_print(DESCR_t val, void *arg)
 static void h_bb_pump(void)
 {
     DESCR_t expr_d = POP();
-    tree_t *expr   = (tree_t *)expr_d.ptr;
+    AST_t *expr   = (AST_t *)expr_d.ptr;
     if (!expr) { STATE->last_ok = 0; return; }
     bb_node_t node = coro_eval(expr);
     int ticks = bb_broker(node, BB_PUMP, jit_pump_print, NULL);
@@ -401,7 +401,7 @@ static void h_bb_pump(void)
 static void h_bb_once(void)
 {
     DESCR_t expr_d = POP();
-    tree_t *expr   = (tree_t *)expr_d.ptr;
+    AST_t *expr   = (AST_t *)expr_d.ptr;
     if (!expr) { STATE->last_ok = 0; return; }
     bb_node_t node = coro_eval(expr);
     int ticks = bb_broker(node, BB_ONCE, NULL, NULL);
@@ -409,7 +409,7 @@ static void h_bb_once(void)
 }
 
 /* CH-17f: Prolog name-driven BB_ONCE — mirror of SM_BB_ONCE_PROC handler
- * in sm_interp.c.  No tree_t* pushed or walked at the SM layer.
+ * in sm_interp.c.  No AST_t* pushed or walked at the SM layer.
  * IR fallback path until expression bodies are filled in a later rung. */
 #include "../../frontend/prolog/pl_broker.h"
 #include "../../runtime/interp/pl_runtime.h"
@@ -417,7 +417,7 @@ static void h_bb_once_proc(void)
 {
     const char   *key   = CUR_INS->a[0].s;
     int           arity = (int)CUR_INS->a[1].i;
-    tree_t       *choice = key ? pl_pred_table_lookup_global(key) : NULL;
+    AST_t       *choice = key ? pl_pred_table_lookup_global(key) : NULL;
     bb_node_t     node   = choice ? pl_box_choice(choice, g_pl_env, arity)
                                   : pl_box_fail();
     int ticks = bb_broker(node, BB_ONCE, NULL, NULL);
@@ -487,7 +487,7 @@ static void h_bb_pump_case(void)
         if (val_pcs[k] < 0 || body_pcs[k] < 0) continue;
         DESCR_t wval = sm_call_expression(val_pcs[k]);
         int match = 0;
-        if ((tree_e)cmp_kinds[k] == AST_LEQ) {
+        if ((AST_e)cmp_kinds[k] == AST_LEQ) {
             const char *ts = IS_STR_fn(topic) ? topic.s : VARVAL_fn(topic);
             const char *ws = IS_STR_fn(wval)  ? wval.s  : VARVAL_fn(wval);
             match = (ts && ws && strcmp(ts, ws) == 0);
@@ -549,7 +549,7 @@ static void h_bb_pump_sm(void)
 static void h_bb_pump_every(void)
 {
     int every_id = (int)CUR_INS->a[0].i;
-    tree_t *every_ast = every_table_lookup(every_id);
+    AST_t *every_ast = every_table_lookup(every_id);
     if (!every_ast) {
         STATE->last_ok = 0;
         PUSH(NULVCL);
@@ -570,7 +570,7 @@ static void h_bb_pump_every(void)
 static void h_bb_pump_ast(void)
 {
     int ast_id = (int)CUR_INS->a[0].i;
-    tree_t *ast = ast_pump_table_lookup(ast_id);
+    AST_t *ast = ast_pump_table_lookup(ast_id);
     if (!ast) {
         STATE->last_ok = 0;
         PUSH(NULVCL);
@@ -873,7 +873,7 @@ int me11_exec_stmt(DESCR_t *r12, const char *sn, int64_t has_repl)
 
 /* ME-12 — SM_BB_PUMP / SM_BB_ONCE thin helpers.
  *
- * Each pops one DESCR_t (tree_t* in .ptr) and drives the Byrd-box broker.
+ * Each pops one DESCR_t (AST_t* in .ptr) and drives the Byrd-box broker.
  * Mirror of h_bb_pump / h_bb_once in this file; the only difference is
  * that the inline-blob version takes the DESCR_t by value (passed in
  * rdi:rsi by the calling blob) instead of popping it from STATE->stack.
@@ -888,7 +888,7 @@ int me11_exec_stmt(DESCR_t *r12, const char *sn, int64_t has_repl)
  * bb_broker does not.
  */
 int me12_bb_pump(DESCR_t expr_d) {
-    tree_t *expr = (tree_t *)expr_d.ptr;
+    AST_t *expr = (AST_t *)expr_d.ptr;
     if (!expr) return 0;
     bb_node_t node = coro_eval(expr);
     int ticks = bb_broker(node, BB_PUMP, jit_pump_print, NULL);
@@ -896,7 +896,7 @@ int me12_bb_pump(DESCR_t expr_d) {
 }
 
 int me12_bb_once(DESCR_t expr_d) {
-    tree_t *expr = (tree_t *)expr_d.ptr;
+    AST_t *expr = (AST_t *)expr_d.ptr;
     if (!expr) return 0;
     bb_node_t node = coro_eval(expr);
     int ticks = bb_broker(node, BB_ONCE, NULL, NULL);
@@ -3102,7 +3102,7 @@ static void emit_me11_exec_stmt_blob(const char *sn, int64_t has_repl,
 /*------------------------------------------------------------------------*/
 /* ME-12 — SM_BB_PUMP / SM_BB_ONCE.                                       */
 /*                                                                        */
-/* Both opcodes share an identical shape: pop one DESCR_t (tree_t* in     */
+/* Both opcodes share an identical shape: pop one DESCR_t (AST_t* in     */
 /* .ptr), call the runtime helper, write the int result to last_ok.      */
 /* Net stack delta: -1.  Single emitter parameterized by helper fn.      */
 /*                                                                        */
@@ -3457,7 +3457,7 @@ int sm_codegen(SM_Program *prog)
                 g_trampoline_offset);
         } else if (op == SM_BB_PUMP || op == SM_BB_ONCE) {
             /* ME-12: inline-native Byrd-box broker drive.  Pop one DESCR_t
-             * (tree_t* in .ptr), call me12_bb_pump or me12_bb_once which
+             * (AST_t* in .ptr), call me12_bb_pump or me12_bb_once which
              * forwards to coro_eval + bb_broker.  Net delta: -1.
              * SM_SUSPEND_VALUE stays on emit_standard_blob fallback —
              * see emit_me12_bb_blob comment for rationale. */

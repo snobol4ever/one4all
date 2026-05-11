@@ -39,9 +39,9 @@ ScripModuleRegistry g_registry;   /* zero-initialised; nmod==0 for single-lang *
 int g_irrun_lowers = 0;
 
 /* SI-6: stmt_attr accessor helpers (mirrors interp_exec.c) */
-static inline int           s_int(const tree_t *s, const char *tag) {
+static inline int           s_int(const AST_t *s, const char *tag) {
     const char *v = stmt_attr_str(stmt_attr_find(s, tag)); return v ? atoi(v) : 0; }
-static inline tree_t        *s_expr(const tree_t *s, const char *tag) {
+static inline AST_t        *s_expr(const AST_t *s, const char *tag) {
     return stmt_attr_expr(stmt_attr_find(s, tag)); }
 
 
@@ -53,12 +53,12 @@ static inline tree_t        *s_expr(const tree_t *s, const char *tag) {
  * appears in at least one STMT_t.lang field.  Callers pass this into
  * polyglot_init so per-language init is skipped when not needed.
  * ══════════════════════════════════════════════════════════════════════════ */
-uint32_t polyglot_lang_mask(const tree_t *prog)
+uint32_t polyglot_lang_mask(const AST_t *prog)
 {
     uint32_t mask = 0;
     if (!prog) return mask;
     for (int i = 0; i < prog->n; i++) {
-        const tree_t *s = prog->c[i];
+        const AST_t *s = prog->c[i];
         if (!s) continue;
         int lang = s_int(s, ":lang");
         if (lang >= 0 && lang < 32)
@@ -84,7 +84,7 @@ uint32_t polyglot_lang_mask(const tree_t *prog)
 int g_fi8_icn_init_count = 0;
 int g_fi8_pl_init_count  = 0;
 
-void polyglot_init(const tree_t *prog, uint32_t lang_mask)
+void polyglot_init(const AST_t *prog, uint32_t lang_mask)
 {
     if (!prog) return;
 
@@ -123,7 +123,7 @@ void polyglot_init(const tree_t *prog, uint32_t lang_mask)
     int mod_idx  = -1;   /* index into g_registry.mods, or -1 if none open */
 
     for (int _ci = 0; _ci < prog->n; _ci++) {
-        const tree_t *s = prog->c[_ci];
+        const AST_t *s = prog->c[_ci];
         if (!s || (s->t != AST_STMT && s->t != AST_END)) continue;
 
         int s_lang = s_int(s, ":lang");
@@ -152,11 +152,11 @@ void polyglot_init(const tree_t *prog, uint32_t lang_mask)
             g_registry.mods[mod_idx].nstmts++;
         }
 
-        tree_t *subj = s_expr(s, ":subj");
+        AST_t *subj = s_expr(s, ":subj");
         if (!subj) continue;
 
         if (s_lang == LANG_ICN || s_lang == LANG_RAKU) {
-            tree_t *proc = subj;
+            AST_t *proc = subj;
             if (proc->t == AST_GLOBAL) {
                 for (int _gi = 0; _gi < proc->n; _gi++)
                     if (proc->c[_gi] && proc->c[_gi]->v.sval)
@@ -192,7 +192,7 @@ void polyglot_init(const tree_t *prog, uint32_t lang_mask)
                 interp_eval(proc);
             }
         } else if (s_lang == LANG_PL) {
-            tree_t *sub = subj;
+            AST_t *sub = subj;
             if ((sub->t == AST_CHOICE || sub->t == AST_CLAUSE) && sub->v.sval) {
                 pl_pred_table_insert(&g_pl_pred_table, sub->v.sval, sub);
                 g_pl_active = 1;
@@ -221,16 +221,16 @@ void polyglot_init(const tree_t *prog, uint32_t lang_mask)
  * iterative explicit stack (no recursion) to avoid blowing C stack on
  * deeply nested goal trees built by the lowerer.
  *============================================================================================================================*/
-static int pl_directive_max_var_slot(tree_t *root)
+static int pl_directive_max_var_slot(AST_t *root)
 {
     if (!root) return -1;
     int max_slot = -1;
     enum { CAP = 512 };
-    tree_t *stk[CAP];
+    AST_t *stk[CAP];
     int top = 0;
     stk[top++] = root;
     while (top > 0) {
-        tree_t *e = stk[--top];
+        AST_t *e = stk[--top];
         if (!e) continue;
         if (e->t == AST_VAR && (int)e->v.ival > max_slot) max_slot = (int)e->v.ival;
         for (int i = 0; i < e->n && top < CAP; i++)
@@ -250,7 +250,7 @@ static int pl_directive_max_var_slot(tree_t *root)
  * For single-language programs: routes to the appropriate legacy entry point.
  * OE-8 will retire the legacy entry points entirely.
  *============================================================================================================================*/
-void polyglot_execute(const tree_t *prog) {
+void polyglot_execute(const AST_t *prog) {
     if (!prog) return;
     if (g_polyglot) {
         execute_program(prog);   /* runs SNO + U-23 ICN/PL registry dispatch */
@@ -259,7 +259,7 @@ void polyglot_execute(const tree_t *prog) {
     /* Single-language .icn or .pl — detect from first non-empty child's :lang */
     int slang = LANG_SNO;
     for (int _i = 0; _i < prog->n; _i++) {
-        const tree_t *ch = prog->c[_i];
+        const AST_t *ch = prog->c[_i];
         if (ch && (ch->t == AST_STMT || ch->t == AST_END)) {
             slang = s_int(ch, ":lang"); break;
         }
@@ -282,10 +282,10 @@ void polyglot_execute(const tree_t *prog) {
         g_pl_active = 1;
         /* Execute non-AST_CHOICE/AST_CLAUSE LANG_PL stmts as directives before main/0. */
         for (int _ci = 0; _ci < prog->n; _ci++) {
-            const tree_t *_s = prog->c[_ci];
+            const AST_t *_s = prog->c[_ci];
             if (!_s || _s->t != AST_STMT) continue;
             if (s_int(_s, ":lang") != LANG_PL) continue;
-            tree_t *_subj = s_expr(_s, ":subj");
+            AST_t *_subj = s_expr(_s, ":subj");
             if (!_subj) continue;
             if (_subj->t == AST_CHOICE || _subj->t == AST_CLAUSE) continue;
             int _max_slot = pl_directive_max_var_slot(_subj);
@@ -297,7 +297,7 @@ void polyglot_execute(const tree_t *prog) {
             if (_dir_env) free(_dir_env);
         }
         Pl_PredEntry *_main_pe = pl_pred_entry_lookup("main/0");
-        tree_t *main_choice = pl_pred_table_lookup(&g_pl_pred_table, "main/0");
+        AST_t *main_choice = pl_pred_table_lookup(&g_pl_pred_table, "main/0");
         extern SM_Program *g_current_sm_prog;
         if (_main_pe && _main_pe->entry_pc >= 0 && g_current_sm_prog != NULL) {
             extern DESCR_t sm_call_expression(int);
@@ -323,10 +323,10 @@ void polyglot_execute(const tree_t *prog) {
  * are appended in source order into one AST_PROGRAM, with :lang attr already set
  * by each frontend (U-12).  Unrecognised fence languages are skipped silently.
  *============================================================================================================================*/
-extern tree_t *sno_parse_string_ast(const char *src, CODE_t **code_out);
-tree_t *parse_scrip_polyglot(const char *src, const char *filename)
+extern AST_t *sno_parse_string_ast(const char *src, CODE_t **code_out);
+AST_t *parse_scrip_polyglot(const char *src, const char *filename)
 {
-    tree_t *result = calloc(1, sizeof(tree_t));
+    AST_t *result = calloc(1, sizeof(AST_t));
     if (!result) return NULL;
     result->t = AST_PROGRAM;
 
@@ -380,7 +380,7 @@ tree_t *parse_scrip_polyglot(const char *src, const char *filename)
         if (lang < 0) { free(block); continue; }
 
         /* Compile block with the appropriate frontend, collect AST_PROGRAM */
-        tree_t *sub_ast = NULL;
+        AST_t *sub_ast = NULL;
         if (lang == LANG_SNO || lang == LANG_SCRIP) {
             sub_ast = sno_parse_string_ast(block, NULL);
         } else if (lang == LANG_ICN) {
@@ -398,9 +398,9 @@ tree_t *parse_scrip_polyglot(const char *src, const char *filename)
 
         /* Append sub_ast's children into result */
         for (int _i = 0; _i < sub_ast->n; _i++) {
-            tree_t *ch = sub_ast->c[_i];
+            AST_t *ch = sub_ast->c[_i];
             if (!ch) continue;
-            tree_push(result, ch);
+            ast_push(result, ch);
         }
         free(sub_ast->c); free(sub_ast);
     }

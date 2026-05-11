@@ -2,16 +2,16 @@
  * prolog_lower.c — Prolog ClauseAST -> scrip-cc IR lowering
  *
  * Takes a PlProgram (list of PlClause) and produces a CODE_t* whose
- * STMT_t nodes carry the Prolog IR node kinds added to tree_e in scrip-cc.h.
+ * STMT_t nodes carry the Prolog IR node kinds added to AST_e in scrip-cc.h.
  *
  * Pipeline:
  *   1. Group clauses by functor/arity key -> one AST_CHOICE per predicate
  *   2. For each PlClause -> one AST_CLAUSE child of the AST_CHOICE
- *   3. Lower each Term* in head args and body goals -> tree_t*
+ *   3. Lower each Term* in head args and body goals -> AST_t*
  *   4. Assign variable slots per clause (VarScope reused from parser)
  *   5. Emit AST_TRAIL_MARK / AST_TRAIL_UNWIND sentinels around each clause
  *
- * Term -> tree_t lowering:
+ * Term -> AST_t lowering:
  *   TT_ATOM     -> AST_QLIT  (sval = atom name)
  *   TT_INT      -> AST_ILIT  (ival = value)
  *   TT_FLOAT    -> AST_FLIT  (dval = value)
@@ -61,11 +61,11 @@ static PredKey key_of_head(Term *head) {
 }
 
 /* =========================================================================
- * Term -> tree_t lowering
+ * Term -> AST_t lowering
  * ======================================================================= */
 
-static tree_t *lower_term(Term *t);
-static tree_t *lower_clause(PlClause *cl, PredKey key);
+static AST_t *lower_term(Term *t);
+static AST_t *lower_clause(PlClause *cl, PredKey key);
 
 /* Walk the Term graph rooted at the head + each body goal of a clause.
  * Pass 1: find max named-var slot.  Pass 2: assign fresh distinct slots to
@@ -116,10 +116,10 @@ static char *pred_str(int functor, int arity) {
     return strdup(buf);
 }
 
-static tree_t *lower_term(Term *t) {
+static AST_t *lower_term(Term *t) {
     t = term_deref(t);
     if (!t) {
-        tree_t *e = expr_new(AST_QLIT);
+        AST_t *e = expr_new(AST_QLIT);
         e->v.sval = strdup("[]");
         return e;
     }
@@ -129,23 +129,23 @@ static tree_t *lower_term(Term *t) {
             /* ! -> AST_CUT */
             if (t->atom_id == ATOM_CUT) return expr_new(AST_CUT);
             /* Atom in a goal position -> AST_FNC/0 (nl, true, fail, halt, etc.) */
-            tree_t *e = expr_new(AST_FNC);
+            AST_t *e = expr_new(AST_FNC);
             const char *nm = prolog_atom_name(t->atom_id);
             e->v.sval = strdup(nm ? nm : "");
             return e;
         }
         case TT_INT: {
-            tree_t *e = expr_new(AST_ILIT);
+            AST_t *e = expr_new(AST_ILIT);
             e->v.ival = t->v.ival;
             return e;
         }
         case TT_FLOAT: {
-            tree_t *e = expr_new(AST_FLIT);
+            AST_t *e = expr_new(AST_FLIT);
             e->v.dval = t->fval;
             return e;
         }
         case TT_VAR: {
-            tree_t *e = expr_new(AST_VAR);
+            AST_t *e = expr_new(AST_VAR);
             int slot = t->saved_slot;  /* -1 = anonymous wildcard */
             char buf[32];
             if (slot < 0) {
@@ -165,21 +165,21 @@ static tree_t *lower_term(Term *t) {
             /* =/2 -> AST_UNIFY */
             int eq_id = prolog_atom_intern("=");
             if (t->compound.functor == eq_id && arity == 2) {
-                tree_t *e = expr_new(AST_UNIFY);
+                AST_t *e = expr_new(AST_UNIFY);
                 expr_add_child(e, lower_term(t->compound.args[0]));
                 expr_add_child(e, lower_term(t->compound.args[1]));
                 return e;
             }
 
             /* Arithmetic operators within is/2 rhs */
-            struct { const char *name; tree_e kind; } arith[] = {
+            struct { const char *name; AST_e kind; } arith[] = {
                 { "+", AST_ADD }, { "-", AST_SUB }, { "*", AST_MUL },
                 { "/", AST_DIV }, { "//", AST_DIV }, { NULL, 0 }
             };
             if (arity == 2) {
                 for (int i = 0; arith[i].name; i++) {
                     if (strcmp(fn, arith[i].name) == 0) {
-                        tree_t *e = expr_new(arith[i].t);
+                        AST_t *e = expr_new(arith[i].t);
                         expr_add_child(e, lower_term(t->compound.args[0]));
                         expr_add_child(e, lower_term(t->compound.args[1]));
                         return e;
@@ -191,7 +191,7 @@ static tree_t *lower_term(Term *t) {
              * e.g. (A,(B,(C,D))) -> AST_FNC(",") [A, B, C, D]  */
             int comma_id = prolog_atom_intern(",");
             if (t->compound.functor == comma_id && arity == 2) {
-                tree_t *e = expr_new(AST_FNC);
+                AST_t *e = expr_new(AST_FNC);
                 e->v.sval = strdup(",");
                 /* walk the right spine collecting all conjuncts */
                 Term *cur = t;
@@ -209,7 +209,7 @@ static tree_t *lower_term(Term *t) {
              * e.g. (A;(B;C)) -> AST_FNC(";") [A, B, C]  */
             int semi_id = prolog_atom_intern(";");
             if (t->compound.functor == semi_id && arity == 2) {
-                tree_t *e = expr_new(AST_FNC);
+                AST_t *e = expr_new(AST_FNC);
                 e->v.sval = strdup(";");
                 Term *cur = t;
                 while (cur && cur->tag == TT_COMPOUND &&
@@ -228,7 +228,7 @@ static tree_t *lower_term(Term *t) {
              * Every then-step is visible at top level for the emitter. */
             int arrow_id = prolog_atom_intern("->");
             if (t->compound.functor == arrow_id && arity == 2) {
-                tree_t *e = expr_new(AST_FNC);
+                AST_t *e = expr_new(AST_FNC);
                 e->v.sval = strdup("->");
                 /* children[0] = Cond */
                 expr_add_child(e, lower_term(t->compound.args[0]));
@@ -245,7 +245,7 @@ static tree_t *lower_term(Term *t) {
             }
 
             /* General compound / goal -> AST_FNC */
-            tree_t *e = expr_new(AST_FNC);
+            AST_t *e = expr_new(AST_FNC);
             e->v.sval = strdup(fn);
             for (int i = 0; i < arity; i++)
                 expr_add_child(e, lower_term(t->compound.args[i]));
@@ -254,7 +254,7 @@ static tree_t *lower_term(Term *t) {
         case TT_REF:
             return lower_term(t->ref);
         default: {
-            tree_t *e = expr_new(AST_QLIT);
+            AST_t *e = expr_new(AST_QLIT);
             e->v.sval = strdup("?");
             return e;
         }
@@ -262,7 +262,7 @@ static tree_t *lower_term(Term *t) {
 }
 
 /* =========================================================================
- * Lower one PlClause -> AST_CLAUSE tree_t
+ * Lower one PlClause -> AST_CLAUSE AST_t
  *
  * AST_CLAUSE layout:
  *   sval   = "functor/arity"
@@ -274,8 +274,8 @@ static tree_t *lower_term(Term *t) {
  *    around the head-unify region by the emitter; lower just records
  *    ival = trail_mark_slot = n_vars)
  * ======================================================================= */
-static tree_t *lower_clause(PlClause *cl, PredKey key) {
-    tree_t *ec = expr_new(AST_CLAUSE);
+static AST_t *lower_clause(PlClause *cl, PredKey key) {
+    AST_t *ec = expr_new(AST_CLAUSE);
     ec->v.sval = pred_str(key.functor, key.arity);
 
     /* Count distinct variable slots via full recursive Term walk */
@@ -407,7 +407,7 @@ CODE_t *prolog_lower(PlProgram *pl_prog) {
     /* ---- Pass 1: collect all predicate keys in order of first appearance */
     #define MAX_PREDS 512
     PredKey  keys[MAX_PREDS];
-    tree_t  *choices[MAX_PREDS];   /* one AST_CHOICE per predicate */
+    AST_t  *choices[MAX_PREDS];   /* one AST_CHOICE per predicate */
     int      nkeys = 0;
     int      clause_idx = 0;  /* tracks position for plunit_suite[] lookup */
 
@@ -487,7 +487,7 @@ CODE_t *prolog_lower(PlProgram *pl_prog) {
         }
 
         /* Lower this clause and append to the choice */
-        tree_t *ec = lower_clause(cl, k);
+        AST_t *ec = lower_clause(cl, k);
         expr_add_child(choices[found], ec);
     }
 
@@ -558,7 +558,7 @@ CODE_t *prolog_lower(PlProgram *pl_prog) {
 /* =========================================================================
  * prolog_lower_pretty — IR dump for diagnostics
  * ======================================================================= */
-static void ast_dump(tree_t *e, int indent, FILE *out) {
+static void ast_dump(AST_t *e, int indent, FILE *out) {
     if (!e) { fprintf(out, "%*s<null>\n", indent, ""); return; }
     const char *kname = "?";
     switch (e->t) {
@@ -607,7 +607,7 @@ void prolog_lower_pretty(CODE_t *prog, FILE *out) {
  * Also sets *key_out to the predicate key (functor atom_id, arity).
  * Returns NULL on error.
  *============================================================================================================================*/
-tree_t *pl_assert_term(Term *t, int *functor_out, int *arity_out) {
+AST_t *pl_assert_term(Term *t, int *functor_out, int *arity_out) {
     if (!t) return NULL;
     t = term_deref(t);
     if (!t) return NULL;

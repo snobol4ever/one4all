@@ -1,7 +1,7 @@
 /*
  * interp_ref.c — lvalue evaluator (interp_eval_ref)
  *
- * Evaluates an tree_t in NAME context, returning a DESCR_t* interior pointer.
+ * Evaluates an AST_t in NAME context, returning a DESCR_t* interior pointer.
  * Mirrors SIL: ARYA10 (array), ASSCR (table), FIELD (DATA), GNVARS (variable).
  * Called by assignment sites that need a writable cell rather than a value.
  *
@@ -12,7 +12,7 @@
 
 #include "interp_private.h"
 
-DESCR_t *interp_eval_ref(tree_t *e)
+DESCR_t *interp_eval_ref(AST_t *e)
 {
     NO_AST_WALK_GUARD("interp_eval_ref");
     if (!e) return NULL;

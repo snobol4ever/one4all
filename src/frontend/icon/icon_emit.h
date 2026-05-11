@@ -50,8 +50,8 @@ typedef struct {
  * API (post G-9 migration — IcnEmitter struct removed)
  * -------------------------------------------------------------------------*/
 #include "ast/ast.h"
-void icn_emit_file(tree_t **nodes, int count, FILE *out);
-void icn_emit_expr(tree_t *n, const char *γ, const char *ω, char *oa, char *ob);
+void icn_emit_file(AST_t **nodes, int count, FILE *out);
+void icn_emit_expr(AST_t *n, const char *γ, const char *ω, char *oa, char *ob);
 void icn_label_α  (int id, char *buf, size_t sz);
 void icn_label_β  (int id, char *buf, size_t sz);
 

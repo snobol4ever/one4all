@@ -1,7 +1,7 @@
 /*
  * ast_print.c — Unified IR pretty-printer
  *
- * Prints any tree_t node (and its subtree) in a readable S-expression form.
+ * Prints any AST_t node (and its subtree) in a readable S-expression form.
  * Used for debugging all frontends uniformly — one printer, all 59 node kinds.
  *
  * Public API:
@@ -20,10 +20,10 @@
 
 /*
  * Include scrip-cc.h — it defines EXPR_T_DEFINED then includes ir/ast.h,
- * giving us tree_e and tree_t.  IR_DEFINE_NAMES pulls in ast_e_name[].
+ * giving us AST_e and AST_t.  IR_DEFINE_NAMES pulls in ast_e_name[].
  */
 #define IR_DEFINE_NAMES
-#include "scrip_cc.h"   /* → ir/ast.h (tree_e, tree_t, ast_e_name) */
+#include "scrip_cc.h"   /* → ir/ast.h (AST_e, AST_t, ast_e_name) */
 
 /* -------------------------------------------------------------------------
  * ast_print.h forward declarations (inlined here — no separate .h needed
@@ -63,7 +63,7 @@ static void print_indent(int depth, FILE *f) {
 }
 
 /* Core recursive printer */
-static void print_node(const tree_t *e, FILE *f, int depth) {
+static void print_node(const AST_t *e, FILE *f, int depth) {
     if (!e) { fputs("(null)", f); return; }
     if (depth > AST_PRINT_MAX_DEPTH) { fputs("(...)", f); return; }
 
@@ -153,11 +153,11 @@ static void print_node(const tree_t *e, FILE *f, int depth) {
  * Public API
  * ---------------------------------------------------------------------- */
 
-void ir_print_node(const tree_t *e, FILE *f) {
+void ir_print_node(const AST_t *e, FILE *f) {
     print_node(e, f, 0);
 }
 
-void ir_print_node_nl(const tree_t *e, FILE *f) {
+void ir_print_node_nl(const AST_t *e, FILE *f) {
     print_node(e, f, 0);
     fputc('\n', f);
 }
@@ -169,50 +169,50 @@ void ir_print_node_nl(const tree_t *e, FILE *f) {
  * ---------------------------------------------------------------------- */
 #ifdef AST_PRINT_TEST
 
-/* Minimal tree_t for test — mirrors scrip-cc.h fields we use */
+/* Minimal AST_t for test — mirrors scrip-cc.h fields we use */
 #include <stdlib.h>
 
-static tree_t *mk(tree_e k) {
-    tree_t *e = calloc(1, sizeof *e);
+static AST_t *mk(AST_e k) {
+    AST_t *e = calloc(1, sizeof *e);
     e->t = k;
     return e;
 }
-static void add_child(tree_t *parent, tree_t *child) {
+static void add_child(AST_t *parent, AST_t *child) {
     parent->c = realloc(parent->c,
-                               (size_t)(parent->n + 1) * sizeof(tree_t *));
+                               (size_t)(parent->n + 1) * sizeof(AST_t *));
     parent->c[parent->n++] = child;
 }
 
 int main(void) {
     /* (AST_SEQ (AST_QLIT "hello") (AST_VAR x) (AST_ILIT 42)) */
-    tree_t *root = mk(AST_SEQ);
-    tree_t *lit  = mk(AST_QLIT); lit->v.sval  = "hello";
-    tree_t *var  = mk(AST_VAR);  var->v.sval  = "x";
-    tree_t *num  = mk(AST_ILIT); num->v.ival  = 42;
+    AST_t *root = mk(AST_SEQ);
+    AST_t *lit  = mk(AST_QLIT); lit->v.sval  = "hello";
+    AST_t *var  = mk(AST_VAR);  var->v.sval  = "x";
+    AST_t *num  = mk(AST_ILIT); num->v.ival  = 42;
     add_child(root, lit);
     add_child(root, var);
     add_child(root, num);
 
     /* (AST_ASSIGN (AST_VAR result) (AST_ADD (AST_ILIT 1) (AST_ILIT 2))) */
-    tree_t *assign = mk(AST_ASSIGN);
-    tree_t *lhs    = mk(AST_VAR);  lhs->v.sval = "result";
-    tree_t *add    = mk(AST_ADD);
-    tree_t *one    = mk(AST_ILIT); one->v.ival = 1;
-    tree_t *two    = mk(AST_ILIT); two->v.ival = 2;
+    AST_t *assign = mk(AST_ASSIGN);
+    AST_t *lhs    = mk(AST_VAR);  lhs->v.sval = "result";
+    AST_t *add    = mk(AST_ADD);
+    AST_t *one    = mk(AST_ILIT); one->v.ival = 1;
+    AST_t *two    = mk(AST_ILIT); two->v.ival = 2;
     add_child(add, one);
     add_child(add, two);
     add_child(assign, lhs);
     add_child(assign, add);
 
     /* (AST_FNC LENGTH (AST_VAR s)) */
-    tree_t *fnc = mk(AST_FNC); fnc->v.sval = "LENGTH";
-    tree_t *arg = mk(AST_VAR); arg->v.sval = "s";
+    AST_t *fnc = mk(AST_FNC); fnc->v.sval = "LENGTH";
+    AST_t *arg = mk(AST_VAR); arg->v.sval = "s";
     add_child(fnc, arg);
 
     /* Pattern: (AST_ALT (AST_QLIT "foo") (AST_SPAN "abc")) */
-    tree_t *alt  = mk(AST_ALT);
-    tree_t *foo  = mk(AST_QLIT); foo->v.sval  = "foo";
-    tree_t *span = mk(AST_SPAN); span->v.sval = "abc";
+    AST_t *alt  = mk(AST_ALT);
+    AST_t *foo  = mk(AST_QLIT); foo->v.sval  = "foo";
+    AST_t *span = mk(AST_SPAN); span->v.sval = "abc";
     add_child(alt, foo);
     add_child(alt, span);
 

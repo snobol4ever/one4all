@@ -27,10 +27,10 @@
 #include <dlfcn.h>
 
 #include "descr.h"     /* DESCR_t */
-#include "scrip_cc.h"   /* tree_t, tree_e, ast_e_name[] via IR_DEFINE_NAMES */
+#include "scrip_cc.h"   /* AST_t, AST_e, ast_e_name[] via IR_DEFINE_NAMES */
 #include "ast/ast.h"
 
-DESCR_t __real_interp_eval(tree_t *e);
+DESCR_t __real_interp_eval(AST_t *e);
 
 /* Fixed-size dedup: (kind << 24) | (hash(caller) & 0xFFFFFF). */
 #define DEDUP_CAP 1024
@@ -99,7 +99,7 @@ static void diag_init_once(void) {
     if (!g_diag_fp) g_diag_fp = stderr;
 }
 
-DESCR_t __wrap_interp_eval(tree_t *e) {
+DESCR_t __wrap_interp_eval(AST_t *e) {
     diag_init_once();
     g_wrap_calls++;
     char caller[128] = {0};

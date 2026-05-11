@@ -5,7 +5,7 @@
  * ----------
  *   DESCR_t     eval_expr(const char *src)
  *       Parse src as a SNOBOL4 expression via parse_expr_from_str(),
- *       walk the tree_t IR tree, evaluate to a DESCR_t.
+ *       walk the AST_t IR tree, evaluate to a DESCR_t.
  *       Returns FAILDESCR on parse or eval failure.
  *
  *   DESCR_t     code(const char *src)
@@ -23,7 +23,7 @@
  *   EVAL and CODE are not special.  They are the runtime doing what it
  *   always does with source that arrived late (ARCH-byrd-dynamic.md).
  *
- *   eval_expr: parse_expr_from_str → eval_node (recursive tree_t walk)
+ *   eval_expr: parse_expr_from_str → eval_node (recursive AST_t walk)
  *   code:      fmemopen → sno_parse → CODE_t* stored as DT_C
  *   exec_code: walk CODE_t stmts, call exec_stmt per stmt,
  *                     resolve gotos, return first branch target.
@@ -72,10 +72,10 @@ extern int         Ω;
 extern int         Δ;
 
 /* ══════════════════════════════════════════════════════════════════════════
- * eval_node — recursive tree_t → DESCR_t evaluator
+ * eval_node — recursive AST_t → DESCR_t evaluator
  * ══════════════════════════════════════════════════════════════════════════ */
 
-DESCR_t eval_node(tree_t *e)
+DESCR_t eval_node(AST_t *e)
 {
     if (!e) return NULVCL;
 
@@ -84,7 +84,7 @@ DESCR_t eval_node(tree_t *e)
     /* ── deferred expression — freeze child as DT_E (EXPRESSION type) ── */
     case AST_DEFER:
         /* *X  (STRFN/UOP_STR) — produce a DT_E EXPRESSION descriptor.
-         * The descriptor holds a pointer to the child tree_t*.
+         * The descriptor holds a pointer to the child AST_t*.
          * EVAL_fn thaws it by calling eval_node on the child.
          * Do NOT evaluate the child here — that is EVAL()'s job. */
         if (e->n < 1) return NULVCL;
@@ -197,7 +197,7 @@ DESCR_t eval_node(tree_t *e)
         /* left child is lvalue (AST_VAR or AST_INDIRECT) */
         DESCR_t val = eval_node(e->c[1]);
         if (IS_FAIL_fn(val)) return FAILDESCR;
-        tree_t *lv = e->c[0];
+        AST_t *lv = e->c[0];
         if (lv && lv->t == AST_VAR && lv->v.sval)
             NV_SET_fn(lv->v.sval, val);
         else if (lv && lv->t == AST_INDIRECT && lv->n > 0) {
@@ -257,7 +257,7 @@ DESCR_t eval_node(tree_t *e)
         /* DOTFN: .X yields the name (lvalue) of X, not its value.
          * Child is AST_VAR (variable name) or AST_KEYWORD. */
         if (e->n < 1) return FAILDESCR;
-        tree_t *child = e->c[0];
+        AST_t *child = e->c[0];
         if (!child) return FAILDESCR;
         if (child->t == AST_VAR && child->v.sval)
             return NAME_fn(child->v.sval);
@@ -324,9 +324,9 @@ DESCR_t eval_node(tree_t *e)
          * variable name without dereferencing — return NAME_fn(resolved_name)
          * so bb_nme_emit_binary gets varname="$B", not the value of $B. */
         DESCR_t name;
-        tree_t *tgt = e->c[1];
+        AST_t *tgt = e->c[1];
         if (tgt && tgt->t == AST_INDIRECT && tgt->n > 0) {
-            tree_t *ic = tgt->c[0];
+            AST_t *ic = tgt->c[0];
             const char *nm = NULL;
             if (ic->t == AST_QLIT && ic->v.sval)        nm = ic->v.sval;
             else if (ic->t == AST_VAR  && ic->v.sval) { DESCR_t xv = NV_GET_fn(ic->v.sval); nm = VARVAL_fn(xv); }
@@ -350,9 +350,9 @@ DESCR_t eval_node(tree_t *e)
         if (IS_FAIL_fn(pat)) return FAILDESCR;
         /* Same AST_INDIRECT target resolution as AST_CAPT_COND_ASGN above. */
         DESCR_t name;
-        tree_t *tgt = e->c[1];
+        AST_t *tgt = e->c[1];
         if (tgt && tgt->t == AST_INDIRECT && tgt->n > 0) {
-            tree_t *ic = tgt->c[0];
+            AST_t *ic = tgt->c[0];
             const char *nm = NULL;
             if (ic->t == AST_QLIT && ic->v.sval)        nm = ic->v.sval;
             else if (ic->t == AST_VAR  && ic->v.sval) { DESCR_t xv = NV_GET_fn(ic->v.sval); nm = VARVAL_fn(xv); }
@@ -372,7 +372,7 @@ DESCR_t eval_node(tree_t *e)
         /* @VAR — cursor-position capture: build XATP("@", varname) node.
          * Child is AST_VAR or AST_NAME holding the capture variable name. */
         if (e->n < 1) return FAILDESCR;
-        tree_t *child = e->c[0];
+        AST_t *child = e->c[0];
         const char *varname = NULL;
         if (child && child->t == AST_VAR  && child->v.sval) varname = child->v.sval;
         if (child && child->t == AST_NAME && child->n > 0
@@ -407,7 +407,7 @@ DESCR_t eval_node(tree_t *e)
  * eval_expr — public entry point
  *
  * Parses src via CMPILE's EXPR() entry (cmpile_eval_expr), lowers the
- * CMPND_t parse tree to tree_t IR via cmpnd_to_expr(), then evaluates.
+ * CMPND_t parse tree to AST_t IR via cmpnd_to_expr(), then evaluates.
  * This is the SIL CONVEX/CONVE path — no bison/flex involved.
  * ══════════════════════════════════════════════════════════════════════════ */
 
@@ -415,7 +415,7 @@ DESCR_t eval_expr(const char *src)
 {
     if (!src || !*src) return NULVCL;
 
-    tree_t *tree = parse_expr_pat_from_str(src);
+    AST_t *tree = parse_expr_pat_from_str(src);
     if (!tree) return FAILDESCR;
 
     return eval_node(tree);
@@ -431,14 +431,14 @@ DESCR_t code(const char *src)
     if (!src || !*src) return FAILDESCR;
 
     /* SI-6: use sno_parse_string_ast — stores AST_PROGRAM* in DT_C. */
-    extern tree_t *sno_parse_string_ast(const char *src, CODE_t **code_out);
-    tree_t *ast = sno_parse_string_ast(src, NULL);
+    extern AST_t *sno_parse_string_ast(const char *src, CODE_t **code_out);
+    AST_t *ast = sno_parse_string_ast(src, NULL);
 
     if (!ast || ast->n == 0) return FAILDESCR;
 
     DESCR_t d;
     d.v   = DT_C;
-    d.ptr = ast;           /* tree_t* stored as generic GC pointer */
+    d.ptr = ast;           /* AST_t* stored as generic GC pointer */
     d.slen = 0;
     return d;
 }
@@ -465,18 +465,18 @@ DESCR_t code(const char *src)
 const char *exec_code(DESCR_t code_block)
 {
     if (code_block.v != DT_C || !code_block.ptr) return NULL;
-    const tree_t *prog = (const tree_t *)code_block.ptr;  /* SI-6: AST_PROGRAM* */
+    const AST_t *prog = (const AST_t *)code_block.ptr;  /* SI-6: AST_PROGRAM* */
 
     for (int _ci = 0; _ci < prog->n; _ci++) {
-        const tree_t *s = prog->c[_ci];
+        const AST_t *s = prog->c[_ci];
         if (!s) continue;
         if (s->t == AST_END) return "";
 
         /* SI-6: read stmt fields via stmt_attr helpers */
         int has_eq = stmt_attr_find(s, ":eq") != NULL;
-        tree_t *subject     = stmt_attr_expr(stmt_attr_find(s, ":subj"));
-        tree_t *pattern     = stmt_attr_expr(stmt_attr_find(s, ":pat"));
-        tree_t *replacement = stmt_attr_expr(stmt_attr_find(s, ":repl"));
+        AST_t *subject     = stmt_attr_expr(stmt_attr_find(s, ":subj"));
+        AST_t *pattern     = stmt_attr_expr(stmt_attr_find(s, ":pat"));
+        AST_t *replacement = stmt_attr_expr(stmt_attr_find(s, ":repl"));
         const char *goto_u = stmt_attr_str(stmt_attr_find(s, ":go"));
         const char *goto_s = stmt_attr_str(stmt_attr_find(s, ":goS"));
         const char *goto_f = stmt_attr_str(stmt_attr_find(s, ":goF"));
@@ -541,10 +541,10 @@ const char *exec_code(DESCR_t code_block)
  * RT-6: EXPVAL_fn — execute a DT_E EXPRESSION with full save/restore
  *
  * SIL EXPVAL: saves system state (NAM frame, subject globals), executes
- * the frozen tree_t* child via eval_node, then restores state on exit.
+ * the frozen AST_t* child via eval_node, then restores state on exit.
  * Fully re-entrant — nested EVAL() calls stack save frames correctly.
  *
- * DT_E holds ptr = frozen tree_t* (set by AST_DEFER in eval_node above).
+ * DT_E holds ptr = frozen AST_t* (set by AST_DEFER in eval_node above).
  * ══════════════════════════════════════════════════════════════════════════ */
 
 DESCR_t EXPVAL_fn(DESCR_t expr_d)
@@ -558,7 +558,7 @@ DESCR_t EXPVAL_fn(DESCR_t expr_d)
             return sm_call_expression(entry_pc);
         }
 
-        /* Legacy: Frozen tree_t* — thaw and evaluate with NAM frame isolation */
+        /* Legacy: Frozen AST_t* — thaw and evaluate with NAM frame isolation */
         if (!expr_d.ptr) return FAILDESCR;
 
         /* Save subject globals (SIL: WPTR/XCL/YCL/TCL) */
@@ -575,7 +575,7 @@ DESCR_t EXPVAL_fn(DESCR_t expr_d)
         NAME_ctx_t eval_ctx;
         NAME_ctx_enter(&eval_ctx);
 
-        DESCR_t result = eval_node((tree_t *)expr_d.ptr);
+        DESCR_t result = eval_node((AST_t *)expr_d.ptr);
 
         /* Restore NAM frame — tear down eval_ctx.  Captures inside an
          * EXPRESSION are local and do not propagate out (same semantics
@@ -605,7 +605,7 @@ DESCR_t EXPVAL_fn(DESCR_t expr_d)
  * RT-7: CONVE_fn — compile a string to a DT_E EXPRESSION descriptor
  *
  * SIL CONVE/CONVEX: parse the string as an expression via CMPILE,
- * lower to tree_t IR, wrap in a DT_E descriptor (frozen tree_t*).
+ * lower to AST_t IR, wrap in a DT_E descriptor (frozen AST_t*).
  * Returns FAILDESCR on parse failure.
  * ══════════════════════════════════════════════════════════════════════════ */
 
@@ -614,7 +614,7 @@ DESCR_t CONVE_fn(DESCR_t str_d)
     const char *s = VARVAL_fn(str_d);
     if (!s || !*s) return FAILDESCR;
 
-    tree_t *tree = parse_expr_pat_from_str(s);
+    AST_t *tree = parse_expr_pat_from_str(s);
     if (!tree) return FAILDESCR;
 
     DESCR_t d;

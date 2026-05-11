@@ -2446,7 +2446,7 @@ const char *datatype(DESCR_t v) {
  * TREEBLK_t operations
  * ============================================================ */
 
-TREEBLK_t *tree_new(const char *tag, DESCR_t val) {
+TREEBLK_t *expr_new(const char *tag, DESCR_t val) {
     TREEBLK_t *t = GC_malloc(sizeof(TREEBLK_t));
     t->tag = GC_strdup(tag ? tag : "");
     t->val = val;
@@ -2457,7 +2457,7 @@ TREEBLK_t *tree_new(const char *tag, DESCR_t val) {
 }
 
 TREEBLK_t *tree_new0(const char *tag) {
-    return tree_new(tag, NULVCL);
+    return expr_new(tag, NULVCL);
 }
 
 static void _tree_ensure_cap(TREEBLK_t *x, int needed) {

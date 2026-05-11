@@ -111,7 +111,7 @@ typedef struct _TREEBLK_t {
     struct _TREEBLK_t **c;   /* children array    — c(x) */
 } TREEBLK_t;
 
-TREEBLK_t *tree_new(const char *tag, DESCR_t val);
+TREEBLK_t *expr_new(const char *tag, DESCR_t val);
 TREEBLK_t *tree_new0(const char *tag);     /* tag only, null val, no children */
 void  tree_append(TREEBLK_t *x, TREEBLK_t *y);  /* Append(x,y)  */
 void  tree_prepend(TREEBLK_t *x, TREEBLK_t *y); /* Prepend(x,y) */

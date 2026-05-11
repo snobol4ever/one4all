@@ -54,7 +54,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-int scan_try_call_builtin(tree_t *call, DESCR_t *args, int nargs, DESCR_t *out)
+int scan_try_call_builtin(AST_t *call, DESCR_t *args, int nargs, DESCR_t *out)
 {
     if (!call || call->n < 1 || !call->c[0]) return 0;
     const char *fn = call->c[0]->v.sval;

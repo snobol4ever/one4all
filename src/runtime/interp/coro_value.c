@@ -90,7 +90,7 @@
 #include <gc/gc.h>
 
 /* eval_node lives in src/runtime/x86/eval_code.c — IR-free expression evaluator. */
-extern DESCR_t eval_node(tree_t *e);
+extern DESCR_t eval_node(AST_t *e);
 
 /* GOAL-ICON-BB-COMPLETE A3-seed-fix: canonical Icon ?E LCG seed.
  * Shared with src/runtime/x86/sm_interp.c (SM ICN_RANDOM dispatch) and
@@ -115,7 +115,7 @@ unsigned long bb_icn_rnd_seed = 12345UL;
  * then delegate to `shared_arith` in runtime/common/coerce.c.  One helper
  * instead of six near-identical cases — and the same code path SM mode uses.
  *----------------------------------------------------------------------------------------------------------------------------*/
-static DESCR_t bb_arith(tree_t *e, sm_opcode_t op)
+static DESCR_t bb_arith(AST_t *e, sm_opcode_t op)
 {
     if (e->n < 2) return FAILDESCR;
     DESCR_t l = bb_eval_value(e->c[0]);
@@ -138,7 +138,7 @@ static DESCR_t bb_arith(tree_t *e, sm_opcode_t op)
  *----------------------------------------------------------------------------------------------------------------------------*/
 typedef enum { BBR_LT, BBR_LE, BBR_GT, BBR_GE, BBR_EQ, BBR_NE } bb_relop_t;
 
-static DESCR_t bb_numrel(tree_t *e, bb_relop_t op)
+static DESCR_t bb_numrel(AST_t *e, bb_relop_t op)
 {
     if (e->n < 2) return FAILDESCR;
     DESCR_t l = bb_eval_value(e->c[0]);
@@ -169,7 +169,7 @@ static DESCR_t bb_numrel(tree_t *e, bb_relop_t op)
  *----------------------------------------------------------------------------------------------------------------------------*/
 typedef enum { BBS_LLT, BBS_LLE, BBS_LGT, BBS_LGE, BBS_LEQ, BBS_LNE } bb_strrelop_t;
 
-static DESCR_t bb_strrel(tree_t *e, bb_strrelop_t op)
+static DESCR_t bb_strrel(AST_t *e, bb_strrelop_t op)
 {
     if (e->n < 2) return FAILDESCR;
     DESCR_t l = bb_eval_value(e->c[0]);
@@ -204,7 +204,7 @@ static DESCR_t bb_strrel(tree_t *e, bb_strrelop_t op)
  * bb_eval_value).  If one ever did, descr_to_str_icn would fail-through
  * to FAILDESCR rather than producing garbage.
  *----------------------------------------------------------------------------------------------------------------------------*/
-static DESCR_t bb_str_concat(tree_t *e)
+static DESCR_t bb_str_concat(AST_t *e)
 {
     if (e->n < 2) return NULVCL;
     DESCR_t a = bb_eval_value(e->c[0]);
@@ -236,7 +236,7 @@ static DESCR_t bb_str_concat(tree_t *e)
  *----------------------------------------------------------------------------------------------------------------------------*/
 typedef enum { BBS_RANGE, BBS_PLUS, BBS_MINUS } bb_section_t;
 
-static DESCR_t bb_section(tree_t *e, bb_section_t kind)
+static DESCR_t bb_section(AST_t *e, bb_section_t kind)
 {
     if (e->n < 3) return NULVCL;
     DESCR_t sd = bb_eval_value(e->c[0]);
@@ -346,7 +346,7 @@ static DESCR_t bb_augop_compute(DESCR_t lv, DESCR_t rv, IcnTkKind op)
  * AUGOP_APPLY macro never wrote back to keyword lvalues).  Callers
  * already checked !IS_FAIL_fn(res).
  *----------------------------------------------------------------------------------------------------------------------------*/
-static void bb_augop_writeback(tree_t *lhs, DESCR_t res)
+static void bb_augop_writeback(AST_t *lhs, DESCR_t res)
 {
     if (!lhs) return;
     if (lhs->t == AST_VAR) {
@@ -382,7 +382,7 @@ static void bb_augop_writeback(tree_t *lhs, DESCR_t res)
  * FRAME.env[ival].  Outside an Icon frame, AST_VAR delegates to eval_node which
  * does the SNOBOL4 NV_GET_fn lookup.
  *----------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t bb_eval_value(tree_t *e)
+DESCR_t bb_eval_value(AST_t *e)
 {
     if (!e) return NULVCL;
 
@@ -427,7 +427,7 @@ DESCR_t bb_eval_value(tree_t *e)
         if (e->n < 2) return NULVCL;
         DESCR_t val = bb_eval_value(e->c[1]);
         if (IS_FAIL_fn(val)) return FAILDESCR;
-        tree_t *lhs = e->c[0];
+        AST_t *lhs = e->c[0];
         if (lhs && (lhs->t == AST_SECTION || lhs->t == AST_SECTION_PLUS ||
                     lhs->t == AST_SECTION_MINUS)) {
             if (icn_string_section_assign(lhs, val)) return val;
@@ -490,7 +490,7 @@ DESCR_t bb_eval_value(tree_t *e)
         if (!fn) return NULVCL;
         int nargs = e->n - 1;
         /* RS-23a-raku: Raku block-receiving builtins (raku_try / raku_map /
-         * raku_grep / raku_sort) need raw tree_t access and must NOT be subject
+         * raku_grep / raku_sort) need raw AST_t access and must NOT be subject
          * to FAIL-prop on the body argument — dispatch them here, before the
          * generic user-proc / builtin pre-eval loops below.  raku_try_call_builtin
          * returns 1 if `fn` matched a Raku builtin (and *out is set); 0 means
@@ -769,8 +769,8 @@ DESCR_t bb_eval_value(tree_t *e)
      * is the shared writeback (AST_VAR slot / AST_IDX / AST_FIELD). */
     case AST_AUGOP: {
         if (e->n < 2) return NULVCL;
-        tree_t *lhs = e->c[0];
-        tree_t *rhs = e->c[1];
+        AST_t *lhs = e->c[0];
+        AST_t *rhs = e->c[1];
         IcnTkKind op = (IcnTkKind)e->v.ival;
         DESCR_t result = NULVCL;
 
@@ -966,12 +966,12 @@ DESCR_t bb_eval_value(tree_t *e)
         if (is_raku_layout) {
             int i = 1;
             while (i + 2 < e->n) {
-                tree_t *cmpnode = e->c[i];
-                tree_t *val     = e->c[i+1];
-                tree_t *body    = e->c[i+2];
+                AST_t *cmpnode = e->c[i];
+                AST_t *val     = e->c[i+1];
+                AST_t *body    = e->c[i+2];
                 i += 3;
                 if (cmpnode->t == AST_NUL) return bb_eval_value(body);
-                tree_e cmp = (tree_e)(cmpnode->v.ival);
+                AST_e cmp = (AST_e)(cmpnode->v.ival);
                 DESCR_t wval = bb_eval_value(val);
                 int match = 0;
                 if (cmp == AST_LEQ) {
@@ -993,7 +993,7 @@ DESCR_t bb_eval_value(tree_t *e)
         int i = 1;
         while (i + 1 < nc) {
             DESCR_t wval = bb_eval_value(e->c[i]);
-            tree_t *body = e->c[i+1];
+            AST_t *body = e->c[i+1];
             i += 2;
             int match;
             if (IS_INT_fn(topic) && IS_INT_fn(wval)) match = (topic.i == wval.i);
@@ -1083,11 +1083,11 @@ DESCR_t bb_eval_value(tree_t *e)
      *   3. Generic — drive gen via coro_eval box, run body per tick. */
     case AST_EVERY: {
         if (e->n < 1) return NULVCL;
-        tree_t *gen  = e->c[0];
-        tree_t *body = (e->n > 1) ? e->c[1] : NULL;
+        AST_t *gen  = e->c[0];
+        AST_t *body = (e->n > 1) ? e->c[1] : NULL;
         if (gen->t == AST_ASSIGN &&
             gen->n >= 2 && is_suspendable(gen->c[1])) {
-            tree_t *leaf = find_leaf_suspendable(gen->c[1]);
+            AST_t *leaf = find_leaf_suspendable(gen->c[1]);
             if (!leaf) leaf = gen->c[1];
             bb_node_t rbox = coro_eval(leaf);
             DESCR_t tick = rbox.fn(rbox.ζ, α);
@@ -1106,7 +1106,7 @@ DESCR_t bb_eval_value(tree_t *e)
             return NULVCL;
         }
         if (gen->t == AST_SEQ && gen->n >= 2 && is_suspendable(gen->c[0])) {
-            tree_t *filter = gen->c[0];
+            AST_t *filter = gen->c[0];
             bb_node_t fbox = coro_eval(filter);
             DESCR_t tick = fbox.fn(fbox.ζ, α);
             while (!IS_FAIL_fn(tick) && !FRAME.returning && !FRAME.loop_break) {
@@ -1159,9 +1159,9 @@ DESCR_t bb_eval_value(tree_t *e)
                 ent = &init_tab[icn_init_n++];
                 ent->id = e->_id; ent->ns = 0;
                 for (int i = 0; i < e->n && ent->ns < ICN_INIT_SLOTS; i++) {
-                    tree_t *ch = e->c[i];
+                    AST_t *ch = e->c[i];
                     if (!ch || ch->t != AST_ASSIGN || ch->n < 1) continue;
-                    tree_t *lhs = ch->c[0];
+                    AST_t *lhs = ch->c[0];
                     if (!lhs || lhs->t != AST_VAR || !lhs->v.sval) continue;
                     IcnInitSlot *sl = &ent->s[ent->ns++];
                     strncpy(sl->nm, lhs->v.sval, 63); sl->nm[63] = '\0';
@@ -1177,9 +1177,9 @@ DESCR_t bb_eval_value(tree_t *e)
                 int restored = 0;
                 if (frame_depth > 0) {
                     for (int i = 0; i < e->n && !restored; i++) {
-                        tree_t *ch = e->c[i];
+                        AST_t *ch = e->c[i];
                         if (!ch || ch->t != AST_ASSIGN || ch->n < 1) continue;
-                        tree_t *lhs = ch->c[0];
+                        AST_t *lhs = ch->c[0];
                         if (!lhs || lhs->t != AST_VAR || !lhs->v.sval) continue;
                         if (strcasecmp(lhs->v.sval, ent->s[si].nm) == 0
                             && lhs->v.ival >= 0 && lhs->v.ival < FRAME.env_n) {
@@ -1199,7 +1199,7 @@ DESCR_t bb_eval_value(tree_t *e)
      * Mirrors interp_eval.c:3408-3437; interp_eval(child) → bb_eval_value(child). */
     case AST_SWAP: {
         if (e->n < 2 || frame_depth <= 0) return NULVCL;
-        tree_t *lhs = e->c[0], *rhs = e->c[1];
+        AST_t *lhs = e->c[0], *rhs = e->c[1];
         DESCR_t lv = bb_eval_value(lhs), rv = bb_eval_value(rhs);
         if (IS_FAIL_fn(lv) || IS_FAIL_fn(rv)) return FAILDESCR;
         if (lhs && lhs->t == AST_VAR) {
@@ -1245,7 +1245,7 @@ DESCR_t bb_eval_value(tree_t *e)
      * semantics are preserved. */
     case AST_IF: {
         if (e->n < 1) return NULVCL;
-        tree_t *test = e->c[0];
+        AST_t *test = e->c[0];
         DESCR_t cv;
         if (is_suspendable(test)) {
             bb_node_t box = coro_eval(test);
@@ -1285,7 +1285,7 @@ DESCR_t bb_eval_value(tree_t *e)
         if (e->n < 2) return NULVCL;
         DESCR_t val = bb_eval_value(e->c[1]);
         if (IS_FAIL_fn(val)) return FAILDESCR;
-        tree_t *lhs = e->c[0];
+        AST_t *lhs = e->c[0];
         if (lhs && lhs->t == AST_VAR) {
             int slot = (int)lhs->v.ival;
             if (slot >= 0 && slot < FRAME.env_n) FRAME.env[slot] = val;

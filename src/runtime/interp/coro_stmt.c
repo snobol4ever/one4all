@@ -50,7 +50,7 @@
  *  (b) statement-context body children recurse via `bb_exec_stmt`, again
  *      avoiding interp_eval.
  *----------------------------------------------------------------------------------------------------------------------------*/
-void bb_exec_stmt(tree_t *e)
+void bb_exec_stmt(AST_t *e)
 {
     if (!e) return;
 
@@ -103,7 +103,7 @@ void bb_exec_stmt(tree_t *e)
      *======================================================================*/
     case AST_IF: {
         if (e->n < 1) return;
-        tree_t *test = e->c[0];
+        AST_t *test = e->c[0];
         if (is_suspendable(test)) {
             bb_node_t box = coro_eval(test);
             DESCR_t v = box.fn(box.ζ, α);

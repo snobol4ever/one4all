@@ -19,7 +19,7 @@
 
 /* SI-6: find the child index of a given AST_STMT node in prog->c[].
  * Used after label_lookup() to translate a pointer-to-stmt into an index. */
-static int ast_prog_find_idx(const tree_t *prog, const tree_t *stmt)
+static int ast_prog_find_idx(const AST_t *prog, const AST_t *stmt)
 {
     if (!prog || !stmt) return -1;
     for (int i = 0; i < prog->n; i++)
@@ -28,20 +28,20 @@ static int ast_prog_find_idx(const tree_t *prog, const tree_t *stmt)
 }
 
 /* SI-6: accessors — fetch named attribute from an AST_STMT node. */
-static inline tree_t        *s_expr(const tree_t *s, const char *tag) {
+static inline AST_t        *s_expr(const AST_t *s, const char *tag) {
     return stmt_attr_expr(stmt_attr_find(s, tag)); }
-static inline const char   *s_str (const tree_t *s, const char *tag) {
+static inline const char   *s_str (const AST_t *s, const char *tag) {
     return stmt_attr_str(stmt_attr_find(s, tag)); }
-static inline int           s_has (const tree_t *s, const char *tag) {
+static inline int           s_has (const AST_t *s, const char *tag) {
     return stmt_attr_find(s, tag) != NULL; }
-static inline int           s_int (const tree_t *s, const char *tag) {
+static inline int           s_int (const AST_t *s, const char *tag) {
     const char *v = s_str(s, tag); return v ? atoi(v) : 0; }
 
 /* SI-6: global program tree — set at execute_program entry so call_user_function
  * can walk AST_STMT children forward from a label_lookup result. */
-const tree_t *g_exec_prog = NULL;
+const AST_t *g_exec_prog = NULL;
 
-void execute_program(const tree_t *prog)
+void execute_program(const AST_t *prog)
 {
     NO_AST_WALK_GUARD("execute_program");
     g_exec_prog = prog;
@@ -72,23 +72,23 @@ void execute_program(const tree_t *prog)
     const char      *subj_name = NULL;
     const char      *target    = NULL;
     int              nch       = prog ? prog->n : 0;
-    const tree_t     *s         = NULL;
+    const AST_t     *s         = NULL;
     int              s_is_end  = 0;
     const char      *s_label   = NULL;
     int              s_lang    = 0;
     int              s_has_eq  = 0;
-    tree_t           *s_subject = NULL;
-    tree_t           *s_pattern = NULL;
-    tree_t           *s_repl    = NULL;
-    tree_t           *go_s_attr = NULL;
-    tree_t           *go_f_attr = NULL;
-    tree_t           *go_u_attr = NULL;
+    AST_t           *s_subject = NULL;
+    AST_t           *s_pattern = NULL;
+    AST_t           *s_repl    = NULL;
+    AST_t           *go_s_attr = NULL;
+    AST_t           *go_f_attr = NULL;
+    AST_t           *go_u_attr = NULL;
     const char      *goto_s    = NULL;
     const char      *goto_f    = NULL;
     const char      *goto_u    = NULL;
-    tree_t           *goto_s_expr = NULL;
-    tree_t           *goto_f_expr = NULL;
-    tree_t           *goto_u_expr = NULL;
+    AST_t           *goto_s_expr = NULL;
+    AST_t           *goto_f_expr = NULL;
+    AST_t           *goto_u_expr = NULL;
 
     while (ci < nch) {
         s = prog->c[ci];
@@ -220,7 +220,7 @@ void execute_program(const tree_t *prog)
                     subj_val = NV_GET_fn(subj_name);
             } else if (s_subject->t == AST_INDIRECT && s_subject->n > 0) {
                 /* $'$B' or $X as subject — resolve to variable name for write-back */
-                tree_t *ic = s_subject->c[0];
+                AST_t *ic = s_subject->c[0];
                 if (ic->t == AST_QLIT && ic->v.sval) {
                     subj_name = ic->v.sval;  /* $'name' — literal name, use directly */
                 } else if (ic->t == AST_VAR && ic->v.sval) {
@@ -299,7 +299,7 @@ void execute_program(const tree_t *prog)
         /* ── subscript assignment: A<i> = expr ─────────────────────── */
         } else if (s_has_eq && s_subject &&
                    s_subject->t == AST_IDX) {
-            tree_t *idx_e = s_subject;
+            AST_t *idx_e = s_subject;
             if (idx_e->n >= 2) {
                 DESCR_t base = interp_eval(idx_e->c[0]);
                 DESCR_t idx  = interp_eval(idx_e->c[1]);
@@ -338,7 +338,7 @@ void execute_program(const tree_t *prog)
         /* ── indirect assignment: $expr = rhs ─────────────────────── */
         } else if (s_has_eq && s_subject &&
                    s_subject->t == AST_INDIRECT) {
-            tree_t *ichild = s_subject->n > 0 ? s_subject->c[0] : NULL;
+            AST_t *ichild = s_subject->n > 0 ? s_subject->c[0] : NULL;
             DESCR_t repl_val = s_repl ? interp_eval(s_repl) : NULVCL;
             if (IS_FAIL_fn(repl_val)) {
                 succeeded = 0;
@@ -429,7 +429,7 @@ void execute_program(const tree_t *prog)
             if (strcmp(target, "END") == 0) break;  /* SN-19: canonical */
             /* RETURN/FRETURN at top-level (outside a call) → treat as END */
             if (strcmp(target, "RETURN") == 0 || strcmp(target, "FRETURN") == 0) break;  /* SN-19 */
-            const tree_t *dest = label_lookup(target);
+            const AST_t *dest = label_lookup(target);
             if (dest) {
                 int dest_ci = ast_prog_find_idx(prog, dest);
                 if (dest_ci >= 0) { ci = dest_ci; continue; }
@@ -476,7 +476,7 @@ void execute_program(const tree_t *prog)
                             { proc_table_call(_pi,NULL,0); break; }   /* CH-17g-call-sites */
                 g_lang = 0;
             } else if (_m->lang == LANG_PL) {
-                tree_t *pl_main = pl_pred_table_lookup(&g_pl_pred_table, "main/0");
+                AST_t *pl_main = pl_pred_table_lookup(&g_pl_pred_table, "main/0");
                 if (pl_main) {
                     int sv_pl = g_pl_active; g_pl_active = 1;
                     interp_eval(pl_main);
@@ -497,7 +497,7 @@ void execute_program(const tree_t *prog)
         }
     }
     {
-        tree_t *pl_main = pl_pred_table_lookup(&g_pl_pred_table, "main/0");
+        AST_t *pl_main = pl_pred_table_lookup(&g_pl_pred_table, "main/0");
         if (pl_main) {
             int sv_pl = g_pl_active;
             g_pl_active = 1;
@@ -509,7 +509,7 @@ void execute_program(const tree_t *prog)
 
 /* IM-3: execute_program_steps — run at most N statements then return.
  * Sets up g_ir_step_jmp so the step-limit longjmp lands here safely. */
-void execute_program_steps(const tree_t *prog, int n) {
+void execute_program_steps(const AST_t *prog, int n) {
     g_ir_step_limit = n;
     g_ir_steps_done = 0;
     if (setjmp(g_ir_step_jmp) == 0)

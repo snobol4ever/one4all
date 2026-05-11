@@ -72,7 +72,7 @@ void exec_snapshot_free(ExecSnapshot *s);
  * Returns 0 if IR/SM/JIT agree on all statements, else first diverging stmt#.
  * verbose: 0=silent on agreement, 1=per-stmt progress, 2=full diff. */
 /* sync_monitor_run takes AST_PROGRAM directly (SI-6). */
-int sync_monitor_run(const tree_t *prog, int verbose, const char *sno_path);
+int sync_monitor_run(const AST_t *prog, int verbose, const char *sno_path);
 
 /* IM-15b: CSNOBOL4 4th executor interface lives in csnobol4_shim.c (WITH_CSNOBOL4 build).
  * Normal builds use inline stubs in sync_monitor.c — no public declarations needed. */

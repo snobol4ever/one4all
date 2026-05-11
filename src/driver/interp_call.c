@@ -21,7 +21,7 @@
 CallFrame  call_stack[CALL_STACK_MAX];
 int        call_depth = 0;
 
-/* ── IC-5: AST_INITIAL persistence — file-scope table keyed on tree_t node id ── */
+/* ── IC-5: AST_INITIAL persistence — file-scope table keyed on AST_t node id ── */
 IcnInitEnt init_tab[ICN_INIT_MAX];
 int        icn_init_n = 0;
 
@@ -228,7 +228,7 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
         /* ── Find body label: use entry_label (supports OPSYN aliases and
          * alternate entry points), then fall back to fname/ufname ── */
         const char *entry = FUNC_ENTRY_fn(fname);
-        const tree_t *body = entry ? label_lookup(entry) : NULL;
+        const AST_t *body = entry ? label_lookup(entry) : NULL;
         if (!body) body = label_lookup(fname);
         if (!body) body = label_lookup(ufname);
 
@@ -249,15 +249,15 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
             int nch = g_exec_prog->n;
 
             while (ci < nch) {
-                const tree_t *s = g_exec_prog->c[ci];
+                const AST_t *s = g_exec_prog->c[ci];
                 if (!s) { ci++; continue; }
                 if (s->t == AST_END) break;
                 if (s->t != AST_STMT) { ci++; continue; }
 
                 /* Read stmt fields via attr helpers (same as execute_program). */
-                tree_t *s_subject = stmt_attr_expr(stmt_attr_find(s, ":subj"));
-                tree_t *s_pattern = stmt_attr_expr(stmt_attr_find(s, ":pat"));
-                tree_t *s_repl    = stmt_attr_expr(stmt_attr_find(s, ":repl"));
+                AST_t *s_subject = stmt_attr_expr(stmt_attr_find(s, ":subj"));
+                AST_t *s_pattern = stmt_attr_expr(stmt_attr_find(s, ":pat"));
+                AST_t *s_repl    = stmt_attr_expr(stmt_attr_find(s, ":repl"));
                 int    s_has_eq  = stmt_attr_find(s, ":eq") != NULL;
                 int    s_stno    = 0;
                 { const char *_v = stmt_attr_str(stmt_attr_find(s, ":stno")); if (_v) s_stno = atoi(_v); }
@@ -293,7 +293,7 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                          * (e.g. assign(name,...) where name was bound as `.snoBrackets`),
                          * recover the variable name from the NV cell pointer instead of
                          * letting VARVAL_fn read junk from the union's .s slot. */
-                        tree_t *ic = s_subject->c[0];
+                        AST_t *ic = s_subject->c[0];
                         if (ic->t == AST_QLIT && ic->v.sval) {
                             subj_name = ic->v.sval;  /* $'name' — literal name, use directly */
                         } else if (ic->t == AST_VAR && ic->v.sval) {
@@ -448,7 +448,7 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                         else { succeeded = NAME_SET(fres, rv) ? 1 : 0; }
                     } else succeeded = 0;
                 } else if (s_has_eq && s_subject && s_subject->t == AST_INDIRECT) {
-                    tree_t *ichild = s_subject->n > 0 ? s_subject->c[0] : NULL;
+                    AST_t *ichild = s_subject->n > 0 ? s_subject->c[0] : NULL;
                     DESCR_t repl_val = s_repl ? interp_eval(s_repl) : NULVCL;
                     if (IS_FAIL_fn(repl_val)) { succeeded = 0; }
                     else {
@@ -491,15 +491,15 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
 
                 /* ── Goto resolution ── */
                 const char *target = NULL;
-                tree_t *go_s_attr = stmt_attr_find(s, ":goS");
-                tree_t *go_f_attr = stmt_attr_find(s, ":goF");
-                tree_t *go_u_attr = stmt_attr_find(s, ":go");
+                AST_t *go_s_attr = stmt_attr_find(s, ":goS");
+                AST_t *go_f_attr = stmt_attr_find(s, ":goF");
+                AST_t *go_u_attr = stmt_attr_find(s, ":go");
                 const char *goto_s = go_s_attr ? stmt_attr_str(go_s_attr) : NULL;
                 const char *goto_f = go_f_attr ? stmt_attr_str(go_f_attr) : NULL;
                 const char *goto_u = go_u_attr ? stmt_attr_str(go_u_attr) : NULL;
-                tree_t *goto_s_expr = (go_s_attr && !goto_s) ? stmt_attr_expr(go_s_attr) : NULL;
-                tree_t *goto_f_expr = (go_f_attr && !goto_f) ? stmt_attr_expr(go_f_attr) : NULL;
-                tree_t *goto_u_expr = (go_u_attr && !goto_u) ? stmt_attr_expr(go_u_attr) : NULL;
+                AST_t *goto_s_expr = (go_s_attr && !goto_s) ? stmt_attr_expr(go_s_attr) : NULL;
+                AST_t *goto_f_expr = (go_f_attr && !goto_f) ? stmt_attr_expr(go_f_attr) : NULL;
+                AST_t *goto_u_expr = (go_u_attr && !goto_u) ? stmt_attr_expr(go_u_attr) : NULL;
 
                 if (goto_u && *goto_u)
                     target = goto_u;
@@ -538,7 +538,7 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                         strncpy(kw_rtntype, "NRETURN", sizeof(kw_rtntype)-1);
                         goto fn_done;
                     }
-                    const tree_t *dest = label_lookup(target);
+                    const AST_t *dest = label_lookup(target);
                     if (dest) {
                         for (int _j = 0; _j < nch; _j++)
                             if (g_exec_prog->c[_j] == dest) { ci = _j; break; }

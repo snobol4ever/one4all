@@ -2,8 +2,8 @@
  * ir.h — Unified Intermediate Representation
  *
  * THE single source of truth for all IR node kinds across all frontends
- * and all backends in scrip-cc. Every frontend lowers to tree_t nodes
- * using this tree_e enum. Every backend consumes it.
+ * and all backends in scrip-cc. Every frontend lowers to AST_t nodes
+ * using this AST_e enum. Every backend consumes it.
  *
  * 59 canonical node kinds:
  *   5  Literals
@@ -38,10 +38,10 @@ extern "C" {
 #endif
 
 /* =========================================================================
- * tree_e — unified expression node kind enum
+ * AST_e — unified expression node kind enum
  * ========================================================================= */
 
-typedef enum tree_e {
+typedef enum AST_e {
 
     /* --- Literals -------------------------------------------------------- */
 
@@ -263,7 +263,7 @@ typedef enum tree_e {
     AST_KIND_COUNT    /* Total number of kinds — used for array sizing / asserts.
                      * NOT a valid node kind. Must remain last. */
 
-} tree_e;
+} AST_e;
 
 /* =========================================================================
  * AugOp_e — augmented-assignment operator codes (SR-9)
@@ -301,14 +301,14 @@ typedef enum {
 } AugOp_e;
 
 /* =========================================================================
- * tree_t — the canonical IR node type.
+ * AST_t — the canonical IR node type.
  *
  * Matches the Snocone `tree` datatype exactly: four logical fields t/v/n/c.
  *
- *   t  — kind       (tree_e)
+ *   t  — kind       (AST_e)
  *   v  — value      (union: v.sval / v.ival / v.dval — active by kind)
  *   n  — nchildren  (int, number of valid children)
- *   c  — children[] (tree_t **, realloc array that grows and shrinks)
+ *   c  — children[] (AST_t **, realloc array that grows and shrinks)
  *
  * v field by kind:
  *   v.sval — AST_QLIT (text), AST_VAR/AST_KEYWORD/AST_FNC/AST_IDX (name),
@@ -324,61 +324,61 @@ typedef enum {
  *
  * ast.h is the sole owner of this definition (FI-0A).
  * ========================================================================= */
-typedef struct tree_t tree_t;
+typedef struct AST_t AST_t;
 
-struct tree_t {
-    tree_e    t;         /* kind                                              */
+struct AST_t {
+    AST_e    t;         /* kind                                              */
     union {
         char     *sval; /* string value (QLIT/VAR/FNC/KEYWORD/ATTR/CSET)    */
         long long ival; /* integer value (ILIT) or slot/flag (VAR etc.)     */
         double   dval;  /* float value (FLIT)                               */
     } v;
     int       n;        /* nchildren — number of valid children              */
-    tree_t  **c;        /* children[] — realloc-grown/shrunk array           */
+    AST_t  **c;        /* children[] — realloc-grown/shrunk array           */
     /* C implementation details: */
     int      _nalloc;   /* allocated capacity of c[]                         */
     int      _id;       /* node id for INITIAL dedup (emit-time only)        */
 };
 
 /* =========================================================================
- * tree_push / tree_pop / tree_new
+ * ast_push / ast_pop / expr_new
  *
- * tree_push: append child; c[] doubles when full.
- * tree_pop:  remove last child; c[] halves when n < _nalloc/4; frees when empty.
- * tree_new:  allocate a zeroed node with kind t.
+ * ast_push: append child; c[] doubles when full.
+ * ast_pop:  remove last child; c[] halves when n < _nalloc/4; frees when empty.
+ * expr_new:  allocate a zeroed node with kind t.
  *
  * These match the Snocone push_child / pop_child / tree contract exactly.
  * ========================================================================= */
 #include <stdlib.h>
 
-static inline void tree_push(tree_t *p, tree_t *child) {
+static inline void ast_push(AST_t *p, AST_t *child) {
     if (p->n >= p->_nalloc) {
         p->_nalloc = p->_nalloc ? p->_nalloc * 2 : 4;
-        p->c = (tree_t **)realloc(p->c, (size_t)p->_nalloc * sizeof(tree_t *));
+        p->c = (AST_t **)realloc(p->c, (size_t)p->_nalloc * sizeof(AST_t *));
     }
     p->c[p->n++] = child;
 }
 
-static inline tree_t *tree_pop(tree_t *p) {
+static inline AST_t *ast_pop(AST_t *p) {
     if (p->n == 0) return NULL;
-    tree_t *child = p->c[--p->n];
+    AST_t *child = p->c[--p->n];
     if (p->n == 0) {
         free(p->c); p->c = NULL; p->_nalloc = 0;
     } else if (p->n < p->_nalloc / 4) {
         p->_nalloc /= 2;
-        p->c = (tree_t **)realloc(p->c, (size_t)p->_nalloc * sizeof(tree_t *));
+        p->c = (AST_t **)realloc(p->c, (size_t)p->_nalloc * sizeof(AST_t *));
     }
     return child;
 }
 
-static inline tree_t *tree_new(tree_e kind) {
-    tree_t *e = (tree_t *)calloc(1, sizeof(tree_t));
+static inline AST_t *expr_new(AST_e kind) {
+    AST_t *e = (AST_t *)calloc(1, sizeof(AST_t));
     e->t = kind;
     return e;
 }
 
 /* =========================================================================
- * tree_e name table — for ast_print.c and debugging
+ * AST_e name table — for ast_print.c and debugging
  * ========================================================================= */
 
 #ifdef IR_DEFINE_NAMES

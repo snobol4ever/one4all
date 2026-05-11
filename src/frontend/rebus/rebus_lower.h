@@ -9,4 +9,4 @@
 CODE_t *rebus_lower(RProgram *rp);
 
 /* Public: full pipeline: parse src string, set *out_ast to AST_PROGRAM. */
-void rebus_compile(const char *src, const char *filename, tree_t **out_ast);
+void rebus_compile(const char *src, const char *filename, AST_t **out_ast);

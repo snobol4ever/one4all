@@ -18,11 +18,11 @@
  * produced by code_to_ast() (SI-2 shim) or directly by a frontend (SI-4+).
  *
  * The caller owns the returned SM_Program and must free it with sm_prog_free().
- * tree_t trees must remain valid for the duration of this call (lower does not
+ * AST_t trees must remain valid for the duration of this call (lower does not
  * deep-copy strings; it borrows sval pointers in the GC heap or interned).
  *
  * Returns NULL on allocation failure.
  */
-SM_Program *lower(const tree_t *prog);
+SM_Program *lower(const AST_t *prog);
 
 #endif /* LOWER_H */

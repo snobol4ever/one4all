@@ -12,7 +12,7 @@
  *============================================================================================================================*/
 
 #include "icon_gen.h"
-#include "../ast/ast.h"            /* tree_t, tree_e, AST_TO, AST_TO_BY, AST_ITERATE, AST_SUSPEND, AST_FNC */
+#include "../ast/ast.h"            /* AST_t, AST_e, AST_TO, AST_TO_BY, AST_ITERATE, AST_SUSPEND, AST_FNC */
 #include "../../runtime/common/coerce.h"  /* descr_to_str_icn (D-1/D-2 RS-6) */
 #include <stdio.h>
 #include <stdlib.h>

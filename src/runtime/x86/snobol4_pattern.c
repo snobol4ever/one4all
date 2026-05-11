@@ -18,7 +18,7 @@
 #include <string.h>
 #include <ctype.h>
 #include "snobol4.h"
-#include "../ast/ast.h"         /* ir.h first — sets EXPR_T_DEFINED so scrip_cc.h skips its own tree_t */
+#include "../ast/ast.h"         /* ir.h first — sets EXPR_T_DEFINED so scrip_cc.h skips its own AST_t */
 #include "../../frontend/snobol4/scrip_cc.h"
 /* CMPILE.c removed — bison/flex path via scrip_cc.h (GOAL-REMOVE-CMPILE S-4) */
 
@@ -207,7 +207,7 @@ DESCR_t pat_epsilon(void) {
 }
 
 /* Forward declaration — eval_node is defined in eval_code.c (separate TU) */
-extern DESCR_t eval_node(tree_t *e);
+extern DESCR_t eval_node(AST_t *e);
 
 /* pat_to_patnd: coerce a DESCR_t to a PATND_t*, handling string literals.
  * Returns NULL if the value cannot be represented as a pattern.
@@ -220,13 +220,13 @@ extern DESCR_t eval_node(tree_t *e);
 static PATND_t *pat_to_patnd(DESCR_t v) {
     if (v.v == DT_E) {
         /* CHUNKS-step02: chunk DT_E (slen==1) — dispatch via EXPVAL_fn which
-         * routes to sm_call_expression.  Legacy tree_t* path (slen==0) follows below. */
+         * routes to sm_call_expression.  Legacy AST_t* path (slen==0) follows below. */
         if (v.slen == 1) {
             v = EXPVAL_fn(v);
             /* Fall through to coerce result as pattern value */
             goto coerce;
         }
-        tree_t *frozen = (tree_t *)v.ptr;
+        AST_t *frozen = (AST_t *)v.ptr;
         if (!frozen) return NULL;   /* null DT_E — propagate failure (do not epsilon) */
         if (frozen->t == AST_FNC) {
             /* *func(args...) — side-effect call deferred to match time via XATP */
@@ -633,7 +633,7 @@ int subscript_set2(DESCR_t arr, DESCR_t i, DESCR_t j, DESCR_t val) {
     return 0;  /* not an array — fail */
 }
 
-/* tree_new — 4-arg version: creates a DT_DATA('tree(t,v,n,c)') instance */
+/* expr_new — 4-arg version: creates a DT_DATA('tree(t,v,n,c)') instance */
 DESCR_t MAKE_TREE_fn(DESCR_t tag, DESCR_t val, DESCR_t n_children, DESCR_t children) {
     /* tree type registered in SNO_INIT_fn — DEFDAT_fn + _b_tree_* override done there */
     return DATCON_fn("tree", tag, val, n_children, children, (DESCR_t){0});
@@ -827,7 +827,7 @@ DESCR_t EVAL_fn(DESCR_t expr) {
     fprintf(stderr, "EVAL_fn: v=%d s=%s\n", (int)expr.v,
             (expr.v==5||expr.v==0) && expr.s ? expr.s : "(non-str)");
      *
-     * DT_E  → EXPVAL_fn (execute frozen tree_t* with save/restore)
+     * DT_E  → EXPVAL_fn (execute frozen AST_t* with save/restore)
      * DT_I  → idempotent (return as-is)
      * DT_R  → idempotent (return as-is)
      * DT_P  → run pattern hook (existing behaviour)
@@ -1018,11 +1018,11 @@ DESCR_t pat_call(const char *name, DESCR_t arg) {
 }
 
 /* compile_to_expression — SIL CONVE path: parse string → freeze as DT_E.
- * Used by CONVERT(s,"EXPRESSION"). Does NOT evaluate — stores tree_t* as DT_E
+ * Used by CONVERT(s,"EXPRESSION"). Does NOT evaluate — stores AST_t* as DT_E
  * for later thaw by EVAL_fn. Returns FAILDESCR if parse fails. */
 DESCR_t compile_to_expression(const char *src) {
     if (!src || !*src) return FAILDESCR;
-    tree_t *tree = parse_expr_pat_from_str(src);
+    AST_t *tree = parse_expr_pat_from_str(src);
     if (!tree) return FAILDESCR;
 
     DESCR_t d;

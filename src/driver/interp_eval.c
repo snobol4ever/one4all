@@ -107,7 +107,7 @@ int _is_pat_fnc_name(const char *s) {
 
 /* DYN-54: returns 1 if expr tree contains any pattern-only node.
  * Mirrors is_pat() in snobol4.y but accessible at eval time. */
-int _expr_is_pat(tree_t *e) {
+int _expr_is_pat(AST_t *e) {
     if (!e) return 0;
     switch (e->t) {
         case AST_ARB: case AST_ARBNO: case AST_CAPT_COND_ASGN:
@@ -156,7 +156,7 @@ DESCR_t *data_field_ptr(const char *fname, DESCR_t inst) {
  * Only handles the simple case: lhs->c[0] is an addressable lvalue
  * (AST_VAR / AST_FIELD / AST_NAME / AST_INDIRECT) whose current value is a string.
  * Nested patterns like `t[k][i:j] := v` are not (yet) supported. */
-int icn_string_section_assign(tree_t *lhs, DESCR_t val) {
+int icn_string_section_assign(AST_t *lhs, DESCR_t val) {
     if (!lhs) return 0;
     int kind = lhs->t;
     if (kind != AST_SECTION && kind != AST_SECTION_PLUS &&
@@ -167,7 +167,7 @@ int icn_string_section_assign(tree_t *lhs, DESCR_t val) {
     /* Get a pointer to the underlying cell (so we can write back).  Prefer
      * local slot for AST_VAR (when in an icon frame), falling back to NV via
      * interp_eval_ref.  This mirrors the read-side logic in case AST_VAR. */
-    tree_t *bch = lhs->c[0];
+    AST_t *bch = lhs->c[0];
     DESCR_t *cell = NULL;
     if (bch && bch->t == AST_VAR && frame_depth > 0) {
         int sl = (int)bch->v.ival;
@@ -231,7 +231,7 @@ int icn_string_section_assign(tree_t *lhs, DESCR_t val) {
 
     /* Write back to the cell.  If the base is a global variable, also route
      * through set_and_trace so VALUE traces fire — mirrors AST_ASSIGN. */
-    tree_t *base_expr = lhs->c[0];
+    AST_t *base_expr = lhs->c[0];
     if (base_expr && base_expr->t == AST_VAR && base_expr->v.sval &&
         base_expr->v.sval[0] != '&' &&
         !(frame_depth > 0 && base_expr->v.ival >= 0 && base_expr->v.ival < FRAME.env_n))
@@ -250,7 +250,7 @@ int icn_string_section_assign(tree_t *lhs, DESCR_t val) {
  * via eval_expr (we call it by re-parsing for non-trivial exprs,
  * but for the common case we use NV_GET_fn / NV_SET_fn directly).
  *
- * For the interpreter we need direct tree_t evaluation, not string
+ * For the interpreter we need direct AST_t evaluation, not string
  * re-parse.  We replicate the minimal logic needed here rather than
  * exposing eval_node (which is static in eval_code.c).
  * ══════════════════════════════════════════════════════════════════════════ */
@@ -278,9 +278,9 @@ const char *real_str(double r, char *buf, int bufsz) {
     return buf;
 }
 
-/* CH-17g-runtime-bridge-1 (2026-05-09): name-based tree_t-free Icon builtin
+/* CH-17g-runtime-bridge-1 (2026-05-09): name-based AST_t-free Icon builtin
  * dispatch.  Returns 1 if the call was handled (and writes the result to
- * *out), 0 otherwise.  The caller has no tree_t handle: only the function
+ * *out), 0 otherwise.  The caller has no AST_t handle: only the function
  * name and pre-evaluated args.
  *
  * This helper is the bridge that lets SM_CALL_FN in sm_interp.c dispatch
@@ -298,14 +298,14 @@ const char *real_str(double r, char *buf, int bufsz) {
  *
  * Scope today: write, writes.  Each branch is a copy of the same logic
  * in icn_call_builtin's body — kept in lockstep by having icn_call_builtin
- * delegate here.  Future rungs may extend coverage to other tree_t-free
+ * delegate here.  Future rungs may extend coverage to other AST_t-free
  * Icon builtins (integer, string, real, char, type, copy, list, table,
  * read, repl, upto, find, any, many, tab, move, match, …) — each kind
  * migrates by adding a branch here AND removing its branch from
  * icn_call_builtin's tail (or its current home in interp_eval's AST_FNC
  * switch) in the same commit.
  *
- * Builtins that need tree_t (Raku/SCAN dispatch helpers, mutators that
+ * Builtins that need AST_t (Raku/SCAN dispatch helpers, mutators that
  * write back through children[1]'s lvalue identity, generator builtins
  * that inspect children[i] structurally) are NOT covered here and remain
  * with icn_call_builtin / interp_eval.  Those become per-kind expression
@@ -344,7 +344,7 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
     /* CH-17g-runtime-bridge-3 (2026-05-09): single-arg pure value-transforms.
      * Each branch is a verbatim copy of the equivalent in-eval branch, with
      * `interp_eval(e->c[i])` replaced by `args[i-1]` (already
-     * pre-evaluated by the SM_CALL_FN handler).  No tree_t access.
+     * pre-evaluated by the SM_CALL_FN handler).  No AST_t access.
      *
      * Builtins covered: integer, real, string, numeric, char, ord, type,
      * image (0 or 1 arg), copy, *e (size-of). */
@@ -496,7 +496,7 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
     }
     /* CH-17g-runtime-bridge-3 BATCH 2 (2026-05-09): multi-arg pure transforms.
      * Same constraints as batch 1 — verbatim port of in-eval branches with
-     * `interp_eval(e->c[i])` → `args[i-1]`.  All tree_t-free, no
+     * `interp_eval(e->c[i])` → `args[i-1]`.  All AST_t-free, no
      * write-back, no &pos/&subject mutation.  g_lang reads (in `trim`) are
      * safe because polyglot_execute sets g_lang=1 before any Icon proc runs,
      * regardless of --ir-run vs --sm-run path. */
@@ -886,7 +886,7 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
     /* CH-17g-builtin-batch (2026-05-11): SM-mode Icon builtins missing from
      * icn_try_call_builtin_by_name.  All are verbatim ports of the AST-walk
      * paths in interp_eval.c / coro_value.c with interp_eval(e->c[i])
-     * replaced by args[i] (pre-evaluated by SM_CALL_FN). No tree_t access. */
+     * replaced by args[i] (pre-evaluated by SM_CALL_FN). No AST_t access. */
 
     /* SIZE (*E) — string/list/table size.  Mirrors coro_value.c:AST_SIZE. */
     if (!strcmp(fn,"SIZE") && nargs == 1) {
@@ -1188,7 +1188,7 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
  * Used by coro_bb_fnc to avoid re-evaluating generator children.
  * Dispatches write/writes/upto/find/any/many/upto/tab/move/match by name.
  * For user procs, calls coro_call directly. */
-DESCR_t icn_call_builtin(tree_t *call, DESCR_t *args, int nargs) {
+DESCR_t icn_call_builtin(AST_t *call, DESCR_t *args, int nargs) {
     if (!call || call->n < 1 || !call->c[0]) return NULVCL;
     const char *fn = call->c[0]->v.sval;
     if (!fn) return NULVCL;
@@ -1210,7 +1210,7 @@ DESCR_t icn_call_builtin(tree_t *call, DESCR_t *args, int nargs) {
         if (scan_try_call_builtin(call, args, nargs, &__sc_d)) return __sc_d;
     }
     /* CH-17g-runtime-bridge-1 (2026-05-09): delegate write/writes (and any
-     * future tree_t-free Icon builtins) to icn_try_call_builtin_by_name.
+     * future AST_t-free Icon builtins) to icn_try_call_builtin_by_name.
      * Pure refactor; behaviour identical to the inlined branches that lived
      * here previously. */
     {
@@ -1292,17 +1292,17 @@ DESCR_t icn_call_builtin(tree_t *call, DESCR_t *args, int nargs) {
              * children[0]..c[nargs] (children[0] is the function-name
              * node, retained as-is).  Nothing in the current builtin
              * implementations stores call->c[i] beyond the call. */
-            tree_t   leafbufs[16];               /* covers all observed arities */
-            tree_t  *kidsbuf[16 + 1];            /* +1 for the name node */
-            tree_t **kids = kidsbuf;
-            tree_t  *leaves = leafbufs;
+            AST_t   leafbufs[16];               /* covers all observed arities */
+            AST_t  *kidsbuf[16 + 1];            /* +1 for the name node */
+            AST_t **kids = kidsbuf;
+            AST_t  *leaves = leafbufs;
             if (nargs > 16) {
-                kids   = (tree_t **)GC_malloc(sizeof(tree_t *) * (size_t)(nargs + 1));
-                leaves = (tree_t  *)GC_malloc(sizeof(tree_t  ) * (size_t)nargs);
+                kids   = (AST_t **)GC_malloc(sizeof(AST_t *) * (size_t)(nargs + 1));
+                leaves = (AST_t  *)GC_malloc(sizeof(AST_t  ) * (size_t)nargs);
             }
             kids[0] = call->c[0];        /* keep the function-name node */
             for (int _i = 0; _i < nargs; _i++) {
-                tree_t *L = &leaves[_i];
+                AST_t *L = &leaves[_i];
                 memset(L, 0, sizeof *L);
                 switch (args[_i].v) {
                     case DT_S:
@@ -1326,7 +1326,7 @@ DESCR_t icn_call_builtin(tree_t *call, DESCR_t *args, int nargs) {
                 }
                 kids[_i + 1] = L;
             }
-            tree_t clone;
+            AST_t clone;
             memset(&clone, 0, sizeof clone);
             clone.t      = call->t;
             clone.v.sval      = call->v.sval;
@@ -1400,7 +1400,7 @@ int icn_kw_can_assign(const char *kw, DESCR_t val) {
     return 1;
 }
 
-DESCR_t interp_eval(tree_t *e)
+DESCR_t interp_eval(AST_t *e)
 {
     NO_AST_WALK_GUARD("interp_eval");
     if (!e) return NULVCL;
@@ -2664,7 +2664,7 @@ DESCR_t interp_eval(tree_t *e)
          * BP-1: .field(x) — AST_FNC child with one arg — must return NAMEPTR into
          * the DATA struct field cell, not a name-table lookup. */
         if (e->n < 1) return FAILDESCR;
-        tree_t *child = e->c[0];
+        AST_t *child = e->c[0];
         if (child->t == AST_FNC && child->v.sval && child->n == 1) {
             DESCR_t inst = interp_eval(child->c[0]);
             DESCR_t *cell = data_field_ptr(child->v.sval, inst);
@@ -2829,7 +2829,7 @@ DESCR_t interp_eval(tree_t *e)
          * use interp_eval_pat for child[0] and pat_cat for the rest. */
         int has_defer = 0;
         for (int j = 0; j < e->n; j++) {
-            tree_t *cj = e->c[j];
+            AST_t *cj = e->c[j];
             if (cj && cj->t == AST_DEFER) { has_defer = 1; break; }
         }
         DESCR_t acc = has_defer ? interp_eval_pat(e->c[0])
@@ -2895,7 +2895,7 @@ DESCR_t interp_eval(tree_t *e)
         if (e->n < 2) return FAILDESCR;
         DESCR_t val = interp_eval(e->c[1]);
         if (IS_FAIL_fn(val)) return FAILDESCR;
-        tree_t *lv = e->c[0];
+        AST_t *lv = e->c[0];
         /* IC-9: string-section / string-index lvalue. */
         if (lv && (lv->t == AST_SECTION || lv->t == AST_SECTION_PLUS ||
                    lv->t == AST_SECTION_MINUS)) {
@@ -2964,7 +2964,7 @@ DESCR_t interp_eval(tree_t *e)
             }
         }
         else if (lv && lv->t == AST_INDIRECT && lv->n > 0) {
-            tree_t *ichild = lv->c[0];
+            AST_t *ichild = lv->c[0];
             const char *nm = NULL;
             if (ichild->t == AST_CAPT_COND_ASGN && ichild->n == 1
                     && ichild->c[0]->t == AST_VAR && ichild->c[0]->v.sval)
@@ -2980,7 +2980,7 @@ DESCR_t interp_eval(tree_t *e)
 
     case AST_INDIRECT: {
         if (e->n < 1) return FAILDESCR;
-        tree_t *child = e->c[0];
+        AST_t *child = e->c[0];
         /* $.var parses as AST_INDIRECT(AST_NAME(AST_CAPT_COND_ASGN(AST_VAR)))
          * $.var<idx> parses as AST_INDIRECT(AST_NAME(AST_CAPT_COND_ASGN(AST_VAR, idx)))
          * The AST_NAME wrapper (from the dot-prefix parse) is unwrapped first.
@@ -3037,7 +3037,7 @@ DESCR_t interp_eval(tree_t *e)
         }
 
         if (child->t == AST_CAPT_COND_ASGN && child->n == 1) {
-            tree_t *inner = child->c[0];
+            AST_t *inner = child->c[0];
             /* $.var<idx> case: dot child is AST_IDX whose base is AST_VAR */
             if (inner->t == AST_IDX && inner->n >= 2
                     && inner->c[0]->t == AST_VAR
@@ -3158,7 +3158,7 @@ DESCR_t interp_eval(tree_t *e)
          * Builtins never have a body label; user functions always do (prescan_defines). */
         {
             /* Resolve body: try as-is, uppercase, then entry_label (OPSYN aliases) */
-            const tree_t *body = label_lookup(e->v.sval);
+            const AST_t *body = label_lookup(e->v.sval);
             if (!body) {
                 char ufn[128];
                 size_t fl = strlen(e->v.sval);
@@ -3190,7 +3190,7 @@ DESCR_t interp_eval(tree_t *e)
             if (g_pl_active) {
                 char _pk[256];
                 snprintf(_pk, sizeof _pk, "%s/%d", e->v.sval, nargs);
-                tree_t *_choice = pl_pred_table_lookup(&g_pl_pred_table, _pk);
+                AST_t *_choice = pl_pred_table_lookup(&g_pl_pred_table, _pk);
                 if (_choice) {
                     Term **_pl_args = (nargs > 0) ? pl_env_new(nargs) : NULL;
                     Term **_saved   = g_pl_env;
@@ -3302,9 +3302,9 @@ DESCR_t interp_eval(tree_t *e)
          *
          * *complex_expr: freeze as DT_E for EVAL() to thaw later. */
         if (e->n < 1) return NULVCL;
-        tree_t *child = e->c[0];
+        AST_t *child = e->c[0];
         /* RUNTIME-6: *X in value context ALWAYS produces DT_E (EXPRESSION).
-         * The child tree_t* is frozen; EVAL() thaws and executes it.
+         * The child AST_t* is frozen; EVAL() thaws and executes it.
          * interp_eval_pat handles the pattern-context path (*var, *func). */
         DESCR_t d;
         d.v    = DT_E;
@@ -3387,11 +3387,11 @@ DESCR_t interp_eval(tree_t *e)
          *                          Function must NOT be called at build time. */
         if (e->n < 2) return NULVCL;
         DESCR_t pat = interp_eval_pat(e->c[0]);
-        tree_t *tgt = e->c[1];
+        AST_t *tgt = e->c[1];
         if (tgt->t == AST_DEFER && tgt->n == 1
                 && tgt->c[0]->t == AST_FNC && tgt->c[0]->v.sval) {
             /* Deferred-function target — build XCALLCAP, don't call now */
-            tree_t *fnc = tgt->c[0];
+            AST_t *fnc = tgt->c[0];
             int na = fnc->n;
             /* TL-2: when every arg is a plain AST_VAR, store *names* and defer
              * lookup to flush time (NAME_commit).  This matches oracle semantics
@@ -3399,7 +3399,7 @@ DESCR_t interp_eval(tree_t *e)
              * pattern have written their variables. */
             int all_vars = (na > 0);
             for (int i = 0; i < na; i++) {
-                tree_t *c = fnc->c[i];
+                AST_t *c = fnc->c[i];
                 if (!c || c->t != AST_VAR || !c->v.sval) { all_vars = 0; break; }
             }
             if (all_vars) {
@@ -3422,14 +3422,14 @@ DESCR_t interp_eval(tree_t *e)
              * via EVAL_fn → EXPVAL_fn (name_t.c:97). */
             DESCR_t *av = na > 0 ? GC_malloc(na * sizeof(DESCR_t)) : NULL;
             for (int i = 0; i < na; i++) {
-                tree_t *arg = fnc->c[i];
+                AST_t *arg = fnc->c[i];
                 if (arg && arg->t == AST_QLIT) {
                     /* Pure string literal — safe to evaluate eagerly,
                      * idempotent under EVAL.  Avoids needless DT_E wrap. */
                     av[i] = interp_eval(arg);
                 } else if (arg) {
                     /* Any other expression kind — defer.  EXPVAL_fn at
-                     * thaw time handles all tree_t shapes. */
+                     * thaw time handles all AST_t shapes. */
                     av[i].v = DT_E;
                     av[i].ptr = arg;
                     av[i].slen = 0;
@@ -3445,11 +3445,11 @@ DESCR_t interp_eval(tree_t *e)
          * NAM list and fires in left-to-right order after preceding captures. */
         if (tgt->t == AST_INDIRECT && tgt->n == 1
                 && tgt->c[0]->t == AST_FNC && tgt->c[0]->v.sval) {
-            tree_t *fnc = tgt->c[0];
+            AST_t *fnc = tgt->c[0];
             int na = fnc->n;
             int all_vars = (na > 0);
             for (int i = 0; i < na; i++) {
-                tree_t *c = fnc->c[i];
+                AST_t *c = fnc->c[i];
                 if (!c || c->t != AST_VAR || !c->v.sval) { all_vars = 0; break; }
             }
             if (all_vars) {
@@ -3463,7 +3463,7 @@ DESCR_t interp_eval(tree_t *e)
              * see twin site above for full rationale. */
             DESCR_t *av = na > 0 ? GC_malloc(na * sizeof(DESCR_t)) : NULL;
             for (int i = 0; i < na; i++) {
-                tree_t *arg = fnc->c[i];
+                AST_t *arg = fnc->c[i];
                 if (arg && arg->t == AST_QLIT) {
                     av[i] = interp_eval(arg);
                 } else if (arg) {
@@ -3481,7 +3481,7 @@ DESCR_t interp_eval(tree_t *e)
             /* REM . $'$B' — target is AST_INDIRECT(AST_QLIT "$B").
              * We need the *variable name* ("$B"), not the value of $'$B'.
              * The name is the evaluated string of the child expression. */
-            tree_t *ichild = tgt->c[0];
+            AST_t *ichild = tgt->c[0];
             if (ichild->t == AST_QLIT || ichild->t == AST_VAR)
                 nm = ichild->v.sval;                     /* literal name: $'$B' or $.X */
             else {
@@ -3495,7 +3495,7 @@ DESCR_t interp_eval(tree_t *e)
         /* pat $ target — immediate assignment during match */
         if (e->n < 2) return NULVCL;
         DESCR_t pat = interp_eval_pat(e->c[0]);
-        tree_t *tgt = e->c[1];
+        AST_t *tgt = e->c[1];
         if (tgt->t == AST_DEFER && tgt->n == 1
                 && tgt->c[0]->t == AST_FNC && tgt->c[0]->v.sval) {
             /* SN-26c-parseerr-f: "pat $ *fn(args)" — deferred-call immediate capture.
@@ -3505,11 +3505,11 @@ DESCR_t interp_eval(tree_t *e)
              * the same pattern (e.g. beauty's "SPAN $ tx $ *match(list, pattern)").
              * Calling fn eagerly at build time reads empty vars → fn returns fail
              * → match guard silently vanishes. */
-            tree_t *fnc = tgt->c[0];
+            AST_t *fnc = tgt->c[0];
             int na = fnc->n;
             int all_vars = (na > 0);
             for (int i = 0; i < na; i++) {
-                tree_t *c = fnc->c[i];
+                AST_t *c = fnc->c[i];
                 if (!c || c->t != AST_VAR || !c->v.sval) { all_vars = 0; break; }
             }
             if (all_vars) {
@@ -3520,7 +3520,7 @@ DESCR_t interp_eval(tree_t *e)
             /* Mixed args: defer AST_VAR and AST_FNC; evaluate literals eagerly. */
             DESCR_t *av = na > 0 ? GC_malloc(na * sizeof(DESCR_t)) : NULL;
             for (int i = 0; i < na; i++) {
-                tree_t *arg = fnc->c[i];
+                AST_t *arg = fnc->c[i];
                 if (arg && (arg->t == AST_FNC || arg->t == AST_VAR)) {
                     av[i].v = DT_E;
                     av[i].ptr = arg;
@@ -3531,10 +3531,10 @@ DESCR_t interp_eval(tree_t *e)
             }
             return pat_assign_callcap_named_imm(pat, fnc->v.sval, av, na, NULL, 0);
         }
-        tree_t *tgt2 = e->c[1];
+        AST_t *tgt2 = e->c[1];
         const char *nm = tgt2->v.sval;
         if (!nm && tgt2->t == AST_INDIRECT && tgt2->n > 0) {
-            tree_t *ichild = tgt2->c[0];
+            AST_t *ichild = tgt2->c[0];
             if (ichild->t == AST_QLIT || ichild->t == AST_VAR)
                 nm = ichild->v.sval;
             else { DESCR_t nd = interp_eval(ichild); nm = VARVAL_fn(nd); }
@@ -3669,8 +3669,8 @@ DESCR_t interp_eval(tree_t *e)
 
     case AST_EVERY: {
         if (e->n < 1) return NULVCL;
-        tree_t *gen  = e->c[0];
-        tree_t *body = (e->n > 1) ? e->c[1] : NULL;
+        AST_t *gen  = e->c[0];
+        AST_t *body = (e->n > 1) ? e->c[1] : NULL;
         /* IC-2a: coro_eval + BB_PUMP — all goal-directed ops through Byrd boxes.
          * Special case: if gen is AST_ASSIGN or AST_AUGOP with a generative RHS,
          * drive the LEAF generator inside the RHS and re-evaluate gen each tick so
@@ -3682,7 +3682,7 @@ DESCR_t interp_eval(tree_t *e)
          * then re-reads the current value of `total` from the frame slot each iteration. */
         if ((gen->t == AST_ASSIGN) &&
             gen->n >= 2 && is_suspendable(gen->c[1])) {
-            tree_t *leaf = find_leaf_suspendable(gen->c[1]);
+            AST_t *leaf = find_leaf_suspendable(gen->c[1]);
             if (!leaf) leaf = gen->c[1];   /* fallback: treat whole RHS as gen */
             bb_node_t rbox = coro_eval(leaf);
             DESCR_t tick = rbox.fn(rbox.ζ, α);
@@ -3701,7 +3701,7 @@ DESCR_t interp_eval(tree_t *e)
             FRAME.loop_break = 0;
             return NULVCL;
         }
-        tree_t *do_expr = body ? body : gen;
+        AST_t *do_expr = body ? body : gen;
         bb_node_t box = coro_eval(gen);
         DESCR_t val = box.fn(box.ζ, α);
         while (!IS_FAIL_fn(val) && !FRAME.returning && !FRAME.loop_break) {
@@ -3779,12 +3779,12 @@ DESCR_t interp_eval(tree_t *e)
             /* Raku: triples [cmpnode(AST_ILIT), val, body] */
             int i = 1;
             while (i + 2 < e->n) {
-                tree_t *cmpnode = e->c[i];
-                tree_t *val     = e->c[i+1];
-                tree_t *body    = e->c[i+2];
+                AST_t *cmpnode = e->c[i];
+                AST_t *val     = e->c[i+1];
+                AST_t *body    = e->c[i+2];
                 i += 3;
                 if (cmpnode->t == AST_NUL) return interp_eval(body);
-                tree_e cmp = (tree_e)(cmpnode->v.ival);
+                AST_e cmp = (AST_e)(cmpnode->v.ival);
                 DESCR_t wval = interp_eval(val);
                 int match = 0;
                 if (cmp == AST_LEQ) {
@@ -3806,7 +3806,7 @@ DESCR_t interp_eval(tree_t *e)
         int i = 1;
         while (i + 1 < nc) {
             DESCR_t wval = interp_eval(e->c[i]);
-            tree_t *body = e->c[i+1];
+            AST_t *body = e->c[i+1];
             i += 2;
             int match;
             if (IS_INT_fn(topic) && IS_INT_fn(wval)) match = (topic.i == wval.i);
@@ -3923,8 +3923,8 @@ DESCR_t interp_eval(tree_t *e)
 
     case AST_AUGOP: {
         if (e->n < 2) return NULVCL;
-        tree_t *lhs = e->c[0];
-        tree_t *rhs = e->c[1];
+        AST_t *lhs = e->c[0];
+        AST_t *rhs = e->c[1];
         /* Helper lambda: apply augop to (lv, rv), write back to lhs slot, return result */
         #define AUGOP_APPLY(lv_, rv_) do { \
             DESCR_t _lv = (lv_), _rv = (rv_); \
@@ -4172,7 +4172,7 @@ DESCR_t interp_eval(tree_t *e)
      * → x=3 (lhs write committed) &pos=3 (rhs write OOB-aborted).)        */
     case AST_SWAP: {
         if (e->n < 2 || frame_depth <= 0) return NULVCL;
-        tree_t *lhs = e->c[0], *rhs = e->c[1];
+        AST_t *lhs = e->c[0], *rhs = e->c[1];
         DESCR_t lv = interp_eval(lhs), rv = interp_eval(rhs);
         if (IS_FAIL_fn(lv) || IS_FAIL_fn(rv)) return FAILDESCR;
         /* Step 1: write rv → lhs.  Halt on keyword-OOB. */
@@ -4204,7 +4204,7 @@ DESCR_t interp_eval(tree_t *e)
      * routes to coro_bb_revswap for snapshot + revert on β.                */
     case AST_REVSWAP: {
         if (e->n < 2 || frame_depth <= 0) return NULVCL;
-        tree_t *lhs = e->c[0], *rhs = e->c[1];
+        AST_t *lhs = e->c[0], *rhs = e->c[1];
         DESCR_t lv = interp_eval(lhs), rv = interp_eval(rhs);
         if (IS_FAIL_fn(lv) || IS_FAIL_fn(rv)) return FAILDESCR;
         if (lhs && lhs->t == AST_VAR) {
@@ -4335,9 +4335,9 @@ DESCR_t interp_eval(tree_t *e)
                 ent = &init_tab[icn_init_n++];
                 ent->id = e->_id; ent->ns = 0;
                 for (int i = 0; i < e->n && ent->ns < ICN_INIT_SLOTS; i++) {
-                    tree_t *ch = e->c[i];
+                    AST_t *ch = e->c[i];
                     if (!ch || ch->t != AST_ASSIGN || ch->n < 1) continue;
-                    tree_t *lhs = ch->c[0];
+                    AST_t *lhs = ch->c[0];
                     if (!lhs || lhs->t != AST_VAR || !lhs->v.sval) continue;
                     IcnInitSlot *sl = &ent->s[ent->ns++];
                     strncpy(sl->nm, lhs->v.sval, 63); sl->nm[63] = '\0';
@@ -4354,9 +4354,9 @@ DESCR_t interp_eval(tree_t *e)
                 int restored = 0;
                 if (frame_depth > 0) {
                     for (int i = 0; i < e->n && !restored; i++) {
-                        tree_t *ch = e->c[i];
+                        AST_t *ch = e->c[i];
                         if (!ch || ch->t != AST_ASSIGN || ch->n < 1) continue;
-                        tree_t *lhs = ch->c[0];
+                        AST_t *lhs = ch->c[0];
                         if (!lhs || lhs->t != AST_VAR || !lhs->v.sval) continue;
                         if (strcasecmp(lhs->v.sval, ent->s[si].nm) == 0
                             && lhs->v.ival >= 0 && lhs->v.ival < FRAME.env_n) {
@@ -4376,7 +4376,7 @@ DESCR_t interp_eval(tree_t *e)
         /* e->v.sval = type name; children = field name AST_VAR nodes.
          * Build spec string "typename(f1,f2,...)" and call DEFDAT_fn + sc_dat_register. */
         if (!e->v.sval) return NULVCL;
-        /* Only register once (tree_t node persists across calls) */
+        /* Only register once (AST_t node persists across calls) */
         if (e->v.ival != 0) return NULVCL;
         e->v.ival = 1;
         char spec[256]; int pos=0;

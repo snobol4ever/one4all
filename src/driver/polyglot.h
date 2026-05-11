@@ -25,9 +25,9 @@ extern int g_fi8_pl_init_count;
  * the --ir-run non-SNO path.  Default 0 (disabled). */
 extern int g_irrun_lowers;
 
-uint32_t polyglot_lang_mask(const tree_t *prog);
-void     polyglot_init   (const tree_t *prog, uint32_t lang_mask);
-void     polyglot_execute(const tree_t *prog);
-tree_t   *parse_scrip_polyglot(const char *src, const char *filename);
+uint32_t polyglot_lang_mask(const AST_t *prog);
+void     polyglot_init   (const AST_t *prog, uint32_t lang_mask);
+void     polyglot_execute(const AST_t *prog);
+AST_t   *parse_scrip_polyglot(const char *src, const char *filename);
 
 #endif /* POLYGLOT_H */

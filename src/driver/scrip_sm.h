@@ -26,7 +26,7 @@
 
 #include "../runtime/x86/sm_prog.h"
 #include "../runtime/x86/sm_interp.h"
-#include "../ast/ast.h"  /* tree_t */
+#include "../ast/ast.h"  /* AST_t */
 
 /* Build label table, prescan DEFINEs, lower IR to SM_Program.
  * SI-6: takes AST_PROGRAM directly.
@@ -36,11 +36,11 @@
  *
  * Returns NULL on failure (sm_lower error). On success, returned pointer
  * must be freed with sm_prog_free() after run completes. */
-SM_Program *sm_preamble(const tree_t *ast_prog);
+SM_Program *sm_preamble(const AST_t *ast_prog);
 
 /* CH-17g-irrun-lowers: run sm_lower + sm_resolve_proc_entry_pcs on ast_prog
  * and then free the SM_Program. */
-void sm_resolve_irrun_entry_pcs(const tree_t *ast_prog);
+void sm_resolve_irrun_entry_pcs(const AST_t *ast_prog);
 
 /* Driver-mode runner signature: takes program + state, returns
  *   0  = normal halt
