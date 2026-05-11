@@ -147,6 +147,7 @@ extern DESCR_t pat_at_cursor(const char *varname);
 static void h_label(void)    { /* no-op */ }
 static void h_halt(void)     { g_jit_halted = 1; }
 static void h_define(void)   { /* handled by prescan */ }
+static void h_define_entry(void) { /* ME-6a no-op in mode-2; mode-3 blob handles jit_in_call */ }
 /* RS-9c: SM-frame-aware return handlers — mirror sm_interp.c SM_RETURN/SM_FRETURN/SM_NRETURN */
 static void h_return_impl(int is_fret, int is_nret)
 {
@@ -1201,6 +1202,7 @@ static void h_call(void)
             }
             fr->nsaved = ns;
             comm_call(retname);
+            STATE->jit_in_call = 1;   /* ME-6a: signal SM_DEFINE_ENTRY blob to do push rbp */
             STATE->pc = body_pc;  /* jump into body; dispatch loop continues */
             return;               /* do NOT fall through to INVOKE_fn */
         }
@@ -1387,6 +1389,7 @@ static void init_handler_table(void)
     g_handlers[SM_NRETURN_S]   = h_nreturn_s;
     g_handlers[SM_NRETURN_F]   = h_nreturn_f;
     g_handlers[SM_DEFINE]      = h_define;
+    g_handlers[SM_DEFINE_ENTRY] = h_define_entry;
     g_handlers[SM_INCR]        = h_incr;
     g_handlers[SM_DECR]        = h_decr;
 
@@ -1876,17 +1879,51 @@ static size_t emit_jump_blob_skeleton(int32_t target_pc)
 static void emit_me6_define_entry_blob(size_t trampoline_abs_off) __attribute__((unused));
 static void emit_me6_define_entry_blob(size_t trampoline_abs_off)
 {
-    /* inc dword [r13+20]  (41 ff 45 14)  4 bytes — pc++ */
+    /* ME-6a: SM_DEFINE_ENTRY blob.
+     *
+     * Shape (~26 bytes):
+     *   inc dword [r13+20]       4 bytes  — pc++
+     *   mov eax, [r13+28]        4 bytes  — eax = jit_in_call
+     *   mov dword [r13+28], 0    7 bytes  — jit_in_call = 0 (always clear)
+     *   test eax, eax            2 bytes  — was this a real call?
+     *   jz skip  (rel8 +4)       2 bytes  — no: skip prologue
+     *   push rbp                 1 byte   — save caller's rbp
+     *   mov rbp, rsp             3 bytes  — establish frame
+     *   skip:
+     *   jmp rel32 trampoline     5 bytes  — dispatch next
+     *
+     * jit_in_call lives at SM_State offset 28 ([r13+28]).
+     * Cleared unconditionally before the test so a stale 1 can never leak
+     * across statements.
+     */
+
+    /* inc dword [r13+20]  (41 ff 45 14) */
     seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
     seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x14);
 
-    /* push rbp  (55)  1 byte — save caller's rbp */
+    /* mov eax, [r13+28]  (41 8b 45 1c) */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x1c);
+
+    /* mov dword [r13+28], 0  (41 c7 45 1c 00 00 00 00)  7 bytes */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xc7);
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x1c);
+    seg_byte(SEG_CODE, 0x00); seg_byte(SEG_CODE, 0x00);
+    seg_byte(SEG_CODE, 0x00); seg_byte(SEG_CODE, 0x00);
+
+    /* test eax, eax  (85 c0) */
+    seg_byte(SEG_CODE, 0x85); seg_byte(SEG_CODE, 0xc0);
+
+    /* jz skip rel8 = +4  (74 04) — skip push rbp + mov rbp,rsp */
+    seg_byte(SEG_CODE, 0x74); seg_byte(SEG_CODE, 0x04);
+
+    /* push rbp  (55) */
     seg_byte(SEG_CODE, 0x55);
 
-    /* mov rbp, rsp  (48 89 e5)  3 bytes — establish frame */
+    /* mov rbp, rsp  (48 89 e5) */
     seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x89); seg_byte(SEG_CODE, 0xe5);
 
-    /* jmp rel32 trampoline.  rel32 from byte AFTER the rel32. */
+    /* skip: jmp rel32 trampoline */
     size_t rel32_end_off = seg_offset(SEG_CODE) + 5;
     int32_t rel = (int32_t)((int64_t)trampoline_abs_off - (int64_t)rel32_end_off);
     seg_byte(SEG_CODE, 0xe9);
@@ -2376,34 +2413,27 @@ int sm_codegen(SM_Program *prog)
             jump_rel32_offs[jump_count] = fallthru_rel32_off;
             jump_count++;
         } else if (op == SM_LABEL || op == SM_STNO) {
-            /* ME-5: stack-neutral handlers — use the no-stack variant of
-             * the standard blob (skips the r12↔sp sync protocol; ~18B
-             * smaller per blob).  h_label is a no-op; h_stno reads pc
-             * operand, fires monitor hook, sets st->sp=0 (mode-2
-             * statement-boundary contract).  Neither reads nor writes
-             * st->stack contents.  The post-call reload of r12 from
-             * st->stack + st->sp*16 handles h_stno's sp reset correctly.
-             *
-             * ME-6 (held — see GOAL-MODE3-EMIT.md handoff addendum sess 7,
-             * 2026-05-10): SM_LABEL with the define-entry flag
-             * (a[2].i == 1, set by sm_lower's lower_stmt when
-             * FUNC_IS_ENTRY_LABEL hits) was investigated as the prologue-
-             * emission site.  Routing it through emit_me6_define_entry_blob
-             * regressed sn7_beauty 26 → 20 because user-function bodies
-             * frequently SM_JUMP back to their own define-entry SM_LABEL
-             * (e.g. icase's `:(icase)` loop), causing the `push rbp`
-             * prologue to re-execute on every iteration without a paired
-             * pop — the saved-rbp values pollute the native stack and
-             * SM_HALT's `ret` eventually fetches a stale stack address
-             * as its return target, segfaulting in user space.  The fix
-             * requires either (a) detecting re-entry and gating the
-             * push, or (b) moving the prologue out of SM_LABEL into the
-             * h_call dispatch site so it fires exactly once per call.
-             * Both are out of scope for this session; routing reverted
-             * to the no-stack standard blob.  emit_me6_define_entry_blob
-             * is preserved in this file as architectural scaffolding;
-             * see the handoff for the next-session retry plan. */
+            /* ME-5: stack-neutral handlers — use the no-stack variant. */
             emit_standard_blob_no_stack(g_handlers[op], g_trampoline_offset);
+        } else if (op == SM_DEFINE_ENTRY) {
+            /* ME-6a: conditional prologue blob.  Reads STATE->jit_in_call
+             * ([r13+28]); does `push rbp; mov rbp, rsp` only when flag is 1
+             * (entered via h_call), then clears the flag.  Goto paths that
+             * land on the define-entry SM_LABEL and advance to SM_DEFINE_ENTRY
+             * see jit_in_call==0 and skip the prologue entirely. */
+            emit_me6_define_entry_blob(g_trampoline_offset);
+        } else if (op == SM_RETURN   || op == SM_FRETURN  || op == SM_NRETURN  ||
+                   op == SM_RETURN_S || op == SM_RETURN_F ||
+                   op == SM_FRETURN_S || op == SM_FRETURN_F ||
+                   op == SM_NRETURN_S || op == SM_NRETURN_F) {
+            /* ME-6a: return-variant blobs.  Call me6_return_dispatch with
+             * variant bits; conditionally pop rbp if jit_epilogue_pending. */
+            int bits = 0;
+            if (op == SM_FRETURN   || op == SM_FRETURN_S || op == SM_FRETURN_F) bits |= 1;
+            if (op == SM_NRETURN   || op == SM_NRETURN_S || op == SM_NRETURN_F) bits |= 2;
+            if (op == SM_RETURN_S  || op == SM_FRETURN_S || op == SM_NRETURN_S) bits |= 4;
+            if (op == SM_RETURN_F  || op == SM_FRETURN_F || op == SM_NRETURN_F) bits |= 8;
+            emit_me6_return_blob(bits, g_trampoline_offset);
         } else if (op == SM_ADD || op == SM_SUB || op == SM_MUL ||
                    op == SM_DIV || op == SM_MOD) {
             /* ME-4: inline-native arithmetic.  Args loaded from r12-stack,

@@ -308,6 +308,9 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
         case SM_LABEL:
             /* no-op at runtime — label is a marker for the builder */
             break;
+        case SM_DEFINE_ENTRY:
+            /* ME-6a: no-op in mode-2; mode-3 blob does conditional push rbp */
+            break;
 
         case SM_HALT:
             return 0;

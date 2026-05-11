@@ -1674,6 +1674,14 @@ static void lower_stmt(SM_Program *p, LabelTable *lt, const STMT_t *s)
          * DEFINE'd-function entries and not for ordinary :S(label) targets. */
         if (FUNC_IS_ENTRY_LABEL(s->label)) {
             p->instrs[p->count - 1].a[2].i = 1;
+            /* ME-6a: emit SM_DEFINE_ENTRY immediately after the define-entry
+             * SM_LABEL.  h_call sets STATE->jit_in_call = 1 then jumps to the
+             * SM_LABEL PC; the dispatch loop advances and hits SM_DEFINE_ENTRY,
+             * which in mode-3 does `push rbp ; mov rbp, rsp` (gated on the
+             * flag) then clears the flag.  A bare :(label) goto lands on the
+             * SM_LABEL PC identically — but jit_in_call is 0 (h_call never
+             * set it), so SM_DEFINE_ENTRY is a no-op on those paths. */
+            sm_emit(p, SM_DEFINE_ENTRY);
         }
     }
 

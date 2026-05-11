@@ -241,6 +241,12 @@ typedef enum {
     SM_FRETURN_F,   /* :F(FRETURN) — return FAIL only if !last_ok */
     SM_NRETURN_S,   /* :S(NRETURN) — return NAME only if last_ok */
     SM_NRETURN_F,   /* :F(NRETURN) — return NAME only if !last_ok */
+    /* ME-6a: emitted by sm_lower immediately after the define-entry SM_LABEL.
+     * In mode-3 the blob does `push rbp ; mov rbp, rsp` only when
+     * STATE->jit_in_call == 1 (i.e. entered via SM_CALL_FN dispatch, not a
+     * plain goto back to the function's own label).  Blob always clears
+     * jit_in_call.  In mode-2 and mode-1 this is a no-op. */
+    SM_DEFINE_ENTRY,
     SM_DEFINE,
 
     /* Type dispatch / indirect */

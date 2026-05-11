@@ -81,6 +81,12 @@ typedef struct {
      * (verified via offsetof in build_scrip.sh wiring; see ME-6 in
      * GOAL-MODE3-EMIT.md).  Mode-2 (sm_interp.c) never reads or writes this. */
     int       jit_epilogue_pending;
+    /* ME-6a (mode-3 only): set to 1 by h_call just before STATE->pc = body_pc
+     * so SM_DEFINE_ENTRY blob knows the entry is a real function call (vs a
+     * goto back to the function's own label).  The SM_DEFINE_ENTRY blob reads
+     * this flag, does push rbp / mov rbp, rsp only if it is 1, then clears it.
+     * Lives at offset 28 from r13.  Mode-2 never reads or writes this. */
+    int       jit_in_call;
     jmp_buf   err_jmp;     /* per-statement error recovery (SM_STNO arms it) */
     int       err_fail_pc; /* pc to jump to on runtime error (-1 = halt) */
     int       err_armed;   /* 1 if err_jmp is live */
