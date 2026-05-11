@@ -247,6 +247,7 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_halt.c -o $(OBJ)/template_sm_halt.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_push_lit_i.c -o $(OBJ)/template_sm_push_lit_i.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_void_pop.c -o $(OBJ)/template_sm_void_pop.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_jump.c -o $(OBJ)/template_sm_jump.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xbrkx.c -o $(OBJ)/template_bb_xbrkx.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xchr.c -o $(OBJ)/template_bb_xchr.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xspnc.c -o $(OBJ)/template_bb_xspnc.o

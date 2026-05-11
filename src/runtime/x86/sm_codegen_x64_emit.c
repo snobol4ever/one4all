@@ -871,12 +871,15 @@ static int emit_sm_label(FILE *out, const SM_Instr *ins, int pc)
     return sm_emit_noop(out, sm_template_lookup(SM_LABEL), NULL);
 }
 
-static int emit_sm_jump(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_jump_line(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    int target = (int)ins->a[0].i;
-    return sm_emit_pcref_jmp(out, sm_template_lookup(SM_JUMP),
-                             target, NULL);
+    /* EM-MODE4-IS-MODE3-DUMP-j: routed through per-opcode template. */
+    emitter_t *e = emitter_text_new(out);
+    if (!e) return -1;
+    emit_sm_jump(e, (int)ins->a[0].i);
+    emitter_free(e);
+    return 0;
 }
 
 static int emit_sm_jump_cond(FILE *out, const SM_Instr *ins, int pc,
@@ -887,17 +890,20 @@ static int emit_sm_jump_cond(FILE *out, const SM_Instr *ins, int pc,
      * we pick the right one and emit the per-call line. */
     (void)pc;
     int  target = (int)ins->a[0].i;
-    int  op_id  = take_when_ok ? SM_JUMP_S : SM_JUMP_F;
-    return sm_emit_pcref_cond(out, sm_template_lookup(op_id),
-                              target, take_when_ok, NULL);
+    emitter_t *e = emitter_text_new(out);
+    if (!e) return -1;
+    if (take_when_ok) emit_sm_jump_s(e, target);
+    else              emit_sm_jump_f(e, target);
+    emitter_free(e);
+    return 0;
 }
 
-static int emit_sm_jump_s(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_jump_s_line(FILE *out, const SM_Instr *ins, int pc)
 {
     return emit_sm_jump_cond(out, ins, pc, /*take_when_ok=*/1);
 }
 
-static int emit_sm_jump_f(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_jump_f_line(FILE *out, const SM_Instr *ins, int pc)
 {
     return emit_sm_jump_cond(out, ins, pc, /*take_when_ok=*/0);
 }
@@ -2186,9 +2192,9 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
              * every PC already serves as the target); SM_JUMP/S/F resolve
              * targets to baked-at-emit-time .Lpc<a[0].i>. */
             case SM_LABEL:        rc = emit_sm_label(out, ins, pc);      break;
-            case SM_JUMP:         rc = emit_sm_jump(out, ins, pc);       break;
-            case SM_JUMP_S:       rc = emit_sm_jump_s(out, ins, pc);     break;
-            case SM_JUMP_F:       rc = emit_sm_jump_f(out, ins, pc);     break;
+            case SM_JUMP:         rc = emit_sm_jump_line(out, ins, pc);   break;
+            case SM_JUMP_S:       rc = emit_sm_jump_s_line(out, ins, pc); break;
+            case SM_JUMP_F:       rc = emit_sm_jump_f_line(out, ins, pc); break;
 
             /* EM-5: expression descriptor push expression call, return. */
             case SM_PUSH_EXPRESSION:   rc = emit_sm_push_expression(out, ins, pc); break;

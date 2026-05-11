@@ -94,4 +94,9 @@ void emit_bb_xbrkx(emitter_t *e,
                    bb_brkx_text_fn text_body_fn,
                    void *text_body_arg);
 
+/* SM_JUMP family — sub-rung -j (2026-05-11). */
+void emit_sm_jump  (emitter_t *e, int target_pc);
+void emit_sm_jump_s(emitter_t *e, int target_pc);
+void emit_sm_jump_f(emitter_t *e, int target_pc);
+
 #endif /* RUNTIME_X86_TEMPLATES_TEMPLATES_H */
