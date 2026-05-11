@@ -890,7 +890,7 @@ static void lower_prolog_child(const AST_t *t)
 void lower_stmt(const STMT_t *s)
 {
     SM_Program *p = g_p;
-    LabelTable *labtab = &g_labtab;
+    LabelTable *tbl = &g_labtab;
 
     /* Skip blank lines entirely. */
     if (!s->is_end && (!s->label || !s->label[0])
@@ -902,7 +902,7 @@ void lower_stmt(const STMT_t *s)
 
     if (s->label && s->label[0]) {
         int lbl_idx = sm_label_named(p, s->label);
-        labtab_define(labtab, s->label, lbl_idx);
+        labtab_define(tbl, s->label, lbl_idx);
         if (FUNC_IS_ENTRY_LABEL(s->label)) {
             p->instrs[p->count - 1].a[2].i = 1;
             sm_emit(p, SM_DEFINE_ENTRY);
