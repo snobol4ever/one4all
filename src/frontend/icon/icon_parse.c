@@ -54,18 +54,18 @@
  * Internal helpers — mirrors icon_lower.c helpers, now inline in parser
  * ======================================================================= */
 
-static tree_t *e_leaf_sval(AST_e k, const char *s, int len) {
+static tree_t *e_leaf_sval(tree_e k, const char *s, int len) {
     tree_t *e = expr_new(k);
     if (len >= 0) e->v.sval = intern_n(s, len);
     else          e->v.sval = intern(s);
     return e;
 }
 
-static tree_t *e_unary(AST_e k, tree_t *child) {
+static tree_t *e_unary(tree_e k, tree_t *child) {
     return expr_unary(k, child);
 }
 
-static tree_t *e_binary(AST_e k, tree_t *left, tree_t *right) {
+static tree_t *e_binary(tree_e k, tree_t *left, tree_t *right) {
     return expr_binary(k, left, right);
 }
 
@@ -347,7 +347,7 @@ static tree_t *parse_mul(IcnParser *p) {
     tree_t *n = parse_pow(p);
     if (!n) return NULL;
     for (;;) {
-        AST_e k;
+        tree_e k;
         if      (check(p, TK_STAR))  k = AST_MUL;
         else if (check(p, TK_SLASH)) k = AST_DIV;
         else if (check(p, TK_MOD))   k = AST_MOD;
@@ -362,7 +362,7 @@ static tree_t *parse_add(IcnParser *p) {
     tree_t *n = parse_mul(p);
     if (!n) return NULL;
     for (;;) {
-        AST_e k;
+        tree_e k;
         if      (check(p, TK_PLUS))  k = AST_ADD;
         else if (check(p, TK_MINUS)) k = AST_SUB;
         else break;
@@ -376,7 +376,7 @@ static tree_t *parse_cset(IcnParser *p) {
     tree_t *n = parse_add(p);
     if (!n) return NULL;
     for (;;) {
-        AST_e k;
+        tree_e k;
         if      (check(p, TK_PLUSPLUS))   k = AST_CSET_UNION;
         else if (check(p, TK_MINUSMINUS)) k = AST_CSET_DIFF;
         else if (check(p, TK_STARSTAR))   k = AST_CSET_INTER;
@@ -397,7 +397,7 @@ static tree_t *parse_concat(IcnParser *p) {
     tree_t *n = parse_cset(p);
     if (!n) return NULL;
     for (;;) {
-        AST_e k;
+        tree_e k;
         if      (check(p, TK_LCONCAT)) k = AST_LCONCAT;
         else if (check(p, TK_CONCAT))  k = AST_CAT;
         else break;
@@ -414,7 +414,7 @@ static int is_relop(IcnTkKind k) {
            k==TK_SEQ || k==TK_SNE;
 }
 
-static AST_e relop_ekind(IcnTkKind k) {
+static tree_e relop_ekind(IcnTkKind k) {
     switch (k) {
         case TK_LT:  return AST_LT;   case TK_LE:  return AST_LE;
         case TK_GT:  return AST_GT;   case TK_GE:  return AST_GE;
@@ -430,7 +430,7 @@ static tree_t *parse_rel(IcnParser *p) {
     tree_t *n = parse_concat(p);
     if (!n) return NULL;
     while (is_relop(p->cur.t)) {
-        AST_e k = relop_ekind(p->cur.t);
+        tree_e k = relop_ekind(p->cur.t);
         advance(p);
         n = e_binary(k, n, parse_concat(p));
     }

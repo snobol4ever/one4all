@@ -14,7 +14,7 @@
 
 /* _eval_str_impl_fn — EVAL(string) hook for pattern-context strings.
  * Uses bison parse_expr_pat_from_str (snobol4.tab.c) which produces
- * tree_t with correct AST_e values directly — no CMPILE/CMPND_t bridge.
+ * tree_t with correct tree_e values directly — no CMPILE/CMPND_t bridge.
  *
  * In SM mode, this path remains via interp_eval_pat. interp_eval_pat is
  * SM-safe by construction: all user-function dispatch flows through APPLY_fn

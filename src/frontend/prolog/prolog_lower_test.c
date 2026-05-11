@@ -27,8 +27,8 @@ static int tests_run = 0, tests_passed = 0;
     else        printf("FAIL: %s\n", label); \
 } while(0)
 
-/* Count STMT_t nodes whose subject has a given AST_e */
-static int count_kind(CODE_t *prog, AST_e k) {
+/* Count STMT_t nodes whose subject has a given tree_e */
+static int count_kind(CODE_t *prog, tree_e k) {
     int n = 0;
     for (STMT_t *s = prog->head; s; s = s->next)
         if (s->subject && s->subject->t == k) n++;

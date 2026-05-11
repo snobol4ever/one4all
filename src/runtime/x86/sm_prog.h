@@ -136,7 +136,7 @@ typedef enum {
      * AST_CASE.  a[0].i = ncases (number of when-arms), a[1].i = has_default
      * (0 or 1).  Stack layout at entry (deepest first):
      *   topic_expression           (DT_E, evaluates the case topic)
-     *   cmp_kind_0   (DT_I, AST_e value: AST_LEQ for string ==, else AST_EQ)
+     *   cmp_kind_0   (DT_I, tree_e value: AST_LEQ for string ==, else AST_EQ)
      *   val_expression_0           (DT_E, evaluates arm 0's "when" value)
      *   body_expression_0          (DT_E, evaluates arm 0's body)
      *   ... ncases triples ...

@@ -25,7 +25,7 @@
 #include "snobol4.h"   /* DESCR_t, PATND_t, DT_* */
 #include "sil_macros.h" /* IS_NAMEPTR, NAME_DEREF_PTR, IS_NAMEVAL, etc. */
 
-/* tree_t / AST_e for SM_PAT_CAPTURE_FN synthetic AST_FNC node */
+/* tree_t / tree_e for SM_PAT_CAPTURE_FN synthetic AST_FNC node */
 #include "../ast/ast.h"
 #include "../../frontend/snobol4/scrip_cc.h"
 
@@ -894,7 +894,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
          * SM_BB_PUMP for AST_CASE. a[0].i = ncases, a[1].i = has_default.
          * Stack layout (bottom→top, i.e. earliest pushed first):
          *   topic_chunk          (DT_E)
-         *   cmp_kind_0           (DT_I, AST_e: AST_LEQ for ==, AST_EQ otherwise)
+         *   cmp_kind_0           (DT_I, tree_e: AST_LEQ for ==, AST_EQ otherwise)
          *   val_chunk_0          (DT_E)
          *   body_chunk_0         (DT_E)
          *   ... ncases triples ...
@@ -949,7 +949,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 if (val_pcs[k] < 0 || body_pcs[k] < 0) continue;
                 DESCR_t wval = sm_call_expression(val_pcs[k]);
                 int match = 0;
-                if ((AST_e)cmp_kinds[k] == AST_LEQ) {
+                if ((tree_e)cmp_kinds[k] == AST_LEQ) {
                     /* String equality (Raku ==): coerce to string both sides */
                     const char *ts = IS_STR_fn(topic) ? topic.s : VARVAL_fn(topic);
                     const char *ws = IS_STR_fn(wval)  ? wval.s  : VARVAL_fn(wval);

@@ -34,13 +34,13 @@
 
 /* ast_stmt_new — allocate a zeroed AST node of the given kind.
  * Public: used by snobol4.y (SI-4) to build AST_STMT/AST_END directly. */
-tree_t *ast_stmt_new(AST_e kind)
+tree_t *ast_stmt_new(tree_e kind)
 {
     tree_t *n = calloc(1, sizeof *n);
     n->t = kind;
     return n;
 }
-static tree_t *sa_new(AST_e kind) { return ast_stmt_new(kind); }
+static tree_t *sa_new(tree_e kind) { return ast_stmt_new(kind); }
 
 static void sa_add(tree_t *parent, tree_t *child)
 {

@@ -21,7 +21,7 @@
  */
 
 #define IR_DEFINE_NAMES
-#include "scrip_cc.h"   /* → ir/ast.h (AST_e, tree_t, compat aliases, ast_e_name) */
+#include "scrip_cc.h"   /* → ir/ast.h (tree_e, tree_t, compat aliases, ast_e_name) */
 
 #include <stdio.h>
 #include <string.h>
@@ -249,7 +249,7 @@ int ir_verify_program(const CODE_t *prog, FILE *err) {
 #include <stdlib.h>
 #include <assert.h>
 
-static tree_t *mk(AST_e k) {
+static tree_t *mk(tree_e k) {
     tree_t *e = calloc(1, sizeof *e);
     e->t = k;
     return e;

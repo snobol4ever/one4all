@@ -3784,7 +3784,7 @@ DESCR_t interp_eval(tree_t *e)
                 tree_t *body    = e->c[i+2];
                 i += 3;
                 if (cmpnode->t == AST_NUL) return interp_eval(body);
-                AST_e cmp = (AST_e)(cmpnode->v.ival);
+                tree_e cmp = (tree_e)(cmpnode->v.ival);
                 DESCR_t wval = interp_eval(val);
                 int match = 0;
                 if (cmp == AST_LEQ) {

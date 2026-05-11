@@ -971,7 +971,7 @@ DESCR_t bb_eval_value(tree_t *e)
                 tree_t *body    = e->c[i+2];
                 i += 3;
                 if (cmpnode->t == AST_NUL) return bb_eval_value(body);
-                AST_e cmp = (AST_e)(cmpnode->v.ival);
+                tree_e cmp = (tree_e)(cmpnode->v.ival);
                 DESCR_t wval = bb_eval_value(val);
                 int match = 0;
                 if (cmp == AST_LEQ) {

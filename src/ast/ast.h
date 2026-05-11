@@ -3,7 +3,7 @@
  *
  * THE single source of truth for all IR node kinds across all frontends
  * and all backends in scrip-cc. Every frontend lowers to tree_t nodes
- * using this AST_e enum. Every backend consumes it.
+ * using this tree_e enum. Every backend consumes it.
  *
  * 59 canonical node kinds:
  *   5  Literals
@@ -38,10 +38,10 @@ extern "C" {
 #endif
 
 /* =========================================================================
- * AST_e — unified expression node kind enum
+ * tree_e — unified expression node kind enum
  * ========================================================================= */
 
-typedef enum AST_e {
+typedef enum tree_e {
 
     /* --- Literals -------------------------------------------------------- */
 
@@ -263,7 +263,7 @@ typedef enum AST_e {
     AST_KIND_COUNT    /* Total number of kinds — used for array sizing / asserts.
                      * NOT a valid node kind. Must remain last. */
 
-} AST_e;
+} tree_e;
 
 /* =========================================================================
  * AugOp_e — augmented-assignment operator codes (SR-9)
@@ -305,7 +305,7 @@ typedef enum {
  *
  * Matches the Snocone `tree` datatype exactly: four logical fields t/v/n/c.
  *
- *   t  — kind       (AST_e)
+ *   t  — kind       (tree_e)
  *   v  — value      (union: v.sval / v.ival / v.dval — active by kind)
  *   n  — nchildren  (int, number of valid children)
  *   c  — children[] (tree_t **, realloc array that grows and shrinks)
@@ -327,7 +327,7 @@ typedef enum {
 typedef struct tree_t tree_t;
 
 struct tree_t {
-    AST_e    t;         /* kind                                              */
+    tree_e    t;         /* kind                                              */
     union {
         char     *sval; /* string value (QLIT/VAR/FNC/KEYWORD/ATTR/CSET)    */
         long long ival; /* integer value (ILIT) or slot/flag (VAR etc.)     */
@@ -371,14 +371,14 @@ static inline tree_t *tree_pop(tree_t *p) {
     return child;
 }
 
-static inline tree_t *tree_new(AST_e kind) {
+static inline tree_t *tree_new(tree_e kind) {
     tree_t *e = (tree_t *)calloc(1, sizeof(tree_t));
     e->t = kind;
     return e;
 }
 
 /* =========================================================================
- * AST_e name table — for ast_print.c and debugging
+ * tree_e name table — for ast_print.c and debugging
  * ========================================================================= */
 
 #ifdef IR_DEFINE_NAMES

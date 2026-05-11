@@ -487,7 +487,7 @@ static void h_bb_pump_case(void)
         if (val_pcs[k] < 0 || body_pcs[k] < 0) continue;
         DESCR_t wval = sm_call_expression(val_pcs[k]);
         int match = 0;
-        if ((AST_e)cmp_kinds[k] == AST_LEQ) {
+        if ((tree_e)cmp_kinds[k] == AST_LEQ) {
             const char *ts = IS_STR_fn(topic) ? topic.s : VARVAL_fn(topic);
             const char *ws = IS_STR_fn(wval)  ? wval.s  : VARVAL_fn(wval);
             match = (ts && ws && strcmp(ts, ws) == 0);

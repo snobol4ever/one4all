@@ -20,10 +20,10 @@
 
 /*
  * Include scrip-cc.h — it defines EXPR_T_DEFINED then includes ir/ast.h,
- * giving us AST_e and tree_t.  IR_DEFINE_NAMES pulls in ast_e_name[].
+ * giving us tree_e and tree_t.  IR_DEFINE_NAMES pulls in ast_e_name[].
  */
 #define IR_DEFINE_NAMES
-#include "scrip_cc.h"   /* → ir/ast.h (AST_e, tree_t, ast_e_name) */
+#include "scrip_cc.h"   /* → ir/ast.h (tree_e, tree_t, ast_e_name) */
 
 /* -------------------------------------------------------------------------
  * ast_print.h forward declarations (inlined here — no separate .h needed
@@ -172,7 +172,7 @@ void ir_print_node_nl(const tree_t *e, FILE *f) {
 /* Minimal tree_t for test — mirrors scrip-cc.h fields we use */
 #include <stdlib.h>
 
-static tree_t *mk(AST_e k) {
+static tree_t *mk(tree_e k) {
     tree_t *e = calloc(1, sizeof *e);
     e->t = k;
     return e;

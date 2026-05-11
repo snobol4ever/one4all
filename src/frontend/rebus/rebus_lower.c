@@ -5,11 +5,11 @@
  * Authored: 2026-03-30, G-9 s19, Claude Sonnet 4.6
  *
  * Walks RProgram* (from rebus_parse()) and produces CODE_t*
- * (STMT_t list with tree_t nodes using AST_e values).
+ * (STMT_t list with tree_t nodes using tree_e values).
  *
  * Architecture per archive/doc/IR_LOWER_REBUS.md:
- *   - P-component (pattern) → SNOBOL4 AST_e pool
- *   - L-component (control) → Icon AST_e pool / label+goto STMT_t chains
+ *   - P-component (pattern) → SNOBOL4 tree_e pool
+ *   - L-component (control) → Icon tree_e pool / label+goto STMT_t chains
  *
  * Control-flow lowering uses the same label/goto STMT_t pattern as
  * snocone_control.c.  Each structured construct becomes labeled SNOBOL4-style
@@ -186,7 +186,7 @@ static tree_t *lower_expr(RebLow *L, RExpr *e) {
     case RE_AUG:
         /* Synthesize: lhs := lhs augop rhs */
         {
-            AST_e op;
+            tree_e op;
             switch (e->augop) {
             case RE_ADD: op = AST_ADD; break;
             case RE_SUB: op = AST_SUB; break;
@@ -243,7 +243,7 @@ static void lower_stmt(RebLow *L, RStmt *s) {
                 /* x +:= e  →  subject=x, has_eq=1, replacement=x+e */
                 tree_t *lhs = lower_expr(L, ex->left);
                 tree_t *rhs = lower_expr(L, ex->right);
-                AST_e   op  = (ex->t == RE_ADDASSIGN) ? AST_ADD :
+                tree_e   op  = (ex->t == RE_ADDASSIGN) ? AST_ADD :
                               (ex->t == RE_SUBASSIGN) ? AST_SUB : AST_CAT;
                 /* Need a fresh copy of lhs for the rhs operand */
                 tree_t *lhs2 = lower_expr(L, ex->left);

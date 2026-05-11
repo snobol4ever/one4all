@@ -1489,7 +1489,7 @@ bb_node_t coro_eval(tree_t *e) {
      * Detects when either child is a generator kind.  Non-generator children
      * are wrapped as oneshot boxes by the recursive coro_eval call.      */
     {
-        static const struct { AST_e ek; IcnBinopKind bk; int is_rel; } binop_map[] = {
+        static const struct { tree_e ek; IcnBinopKind bk; int is_rel; } binop_map[] = {
             { AST_ADD, ICN_BINOP_ADD, 0 }, { AST_SUB, ICN_BINOP_SUB, 0 },
             { AST_MUL, ICN_BINOP_MUL, 0 }, { AST_DIV, ICN_BINOP_DIV, 0 },
             { AST_MOD, ICN_BINOP_MOD, 0 },

@@ -27,7 +27,7 @@
 #include <dlfcn.h>
 
 #include "descr.h"     /* DESCR_t */
-#include "scrip_cc.h"   /* tree_t, AST_e, ast_e_name[] via IR_DEFINE_NAMES */
+#include "scrip_cc.h"   /* tree_t, tree_e, ast_e_name[] via IR_DEFINE_NAMES */
 #include "ast/ast.h"
 
 DESCR_t __real_interp_eval(tree_t *e);

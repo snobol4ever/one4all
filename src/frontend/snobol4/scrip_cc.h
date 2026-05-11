@@ -31,11 +31,11 @@
 
 /* ---- expression node kinds — from shared IR ---- */
 /*
- * M-G1-IR-HEADER-WIRE: AST_e is now defined in ir/ast.h (the single source
+ * M-G1-IR-HEADER-WIRE: tree_e is now defined in ir/ast.h (the single source
  * of truth for all canonical node kinds).
  *
  * M-G3-ALIAS-CLEANUP: IR_COMPAT_ALIASES section removed — dead code,
- * never enabled. All code uses canonical AST_e names directly:
+ * never enabled. All code uses canonical tree_e names directly:
  * AST_VAR, AST_ALT, AST_MNS, AST_POW, AST_CAPT_COND_ASGN, AST_CAPT_IMMED_ASGN,
  * AST_CAPT_CURSOR, AST_NUL, AST_ASSIGN, AST_SCAN, AST_ITERATE, AST_ALTERNATE, AST_IDX.
  *
@@ -129,7 +129,7 @@ typedef struct CODE_t_opaque CODE_t;
 
 /* ---- allocators (wrappers around tree_new/tree_push from ast.h) ---- */
 /* tree_new(k) is defined in ast.h — use it directly where possible.   */
-static inline tree_t *expr_new(AST_e k) { return tree_new(k); }
+static inline tree_t *expr_new(tree_e k) { return tree_new(k); }
 static inline STMT_t *stmt_new(void) { return calloc(1, sizeof(STMT_t)); }
 
 /* expr_add_child: alias for tree_push */
@@ -138,12 +138,12 @@ static inline void expr_add_child(tree_t *e, tree_t *child) {
 }
 
 /* Convenience: build a unary node (one child). */
-static inline tree_t *expr_unary(AST_e k, tree_t *operand) {
+static inline tree_t *expr_unary(tree_e k, tree_t *operand) {
     tree_t *e = tree_new(k); tree_push(e, operand); return e;
 }
 
 /* Convenience: build a binary node (two children). */
-static inline tree_t *expr_binary(AST_e k, tree_t *left, tree_t *right) {
+static inline tree_t *expr_binary(tree_e k, tree_t *left, tree_t *right) {
     tree_t *e = tree_new(k); tree_push(e, left); tree_push(e, right); return e;
 }
 
@@ -188,7 +188,7 @@ const char  *stmt_attr_str(const tree_t *attr);
 
 /* ---- SI-4: direct AST_STMT/AST_END builders (stmt_ast.c) -------------- */
 /* Used by snobol4.y to emit AST tree directly without the STMT_t intermediary. */
-tree_t       *ast_stmt_new(AST_e kind);
+tree_t       *ast_stmt_new(tree_e kind);
 tree_t       *ast_attr_leaf(const char *tag, const char *val);
 tree_t       *ast_attr_int(const char *tag, int ival);
 tree_t       *ast_attr_expr(const char *tag, tree_t *expr);

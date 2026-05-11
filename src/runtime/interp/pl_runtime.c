@@ -686,7 +686,7 @@ static Term *pl_copy_term(Term *t) {
 
 #define PL_SYNTH_TENV_MAX 64
 
-static tree_t *pl_synth_new(AST_e k) {
+static tree_t *pl_synth_new(tree_e k) {
     tree_t *e = (tree_t *)calloc(1, sizeof(tree_t));
     e->t = k;
     return e;
@@ -758,7 +758,7 @@ static tree_t *pl_term_to_synth_expr(Term *t, Term **tenv, int *pn) {
              * top-level goals — this is fine because is/2 calls
              * pl_unified_eval_arith_term which knows these kinds. */
             if (arity == 2) {
-                AST_e ak = AST_KIND_COUNT;
+                tree_e ak = AST_KIND_COUNT;
                 if      (!strcmp(fn,"+"))   ak = AST_ADD;
                 else if (!strcmp(fn,"-"))   ak = AST_SUB;
                 else if (!strcmp(fn,"*"))   ak = AST_MUL;
