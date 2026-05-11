@@ -222,16 +222,30 @@ typedef enum AST_e {
      * Until SI-6, the shim helpers stmt_to_ast / code_to_ast produce these
      * from the old structs; lower() and lower_stmt() consume them.
      *
-     * AST_PROGRAM  — was CODE_t: children[] = list of AST_STMT nodes
-     * AST_STMT     — was STMT_t: children[0]=subject, [1]=pattern,
-     *                [2]=replacement, [3]=AST_GOTO_S, [4]=AST_GOTO_F,
-     *                [5]=AST_GOTO_U, [6..8]=computed goto exprs
-     *                sval=label  ival=lang  a[0].i=lineno  a[1].i=stno
-     *                a[2].i=flags
-     * AST_GOTO_S/F/U — goto arm: sval=target label (NULL = fall-through)
+     * AST_PROGRAM  — was CODE_t: children[] = list of AST_STMT / AST_END nodes
+     * AST_STMT     — was STMT_t (non-END):
+     *                  sval     = label (NULL if none)
+     *                  ival     = lang  (LANG_SNO / LANG_ICN / …)
+     *                  a[0].i   = lineno
+     *                  a[1].i   = stno
+     *                  children[0] = subject     (NULL slot if absent)
+     *                  children[1] = pattern     (NULL slot if absent)
+     *                  children[2] = replacement (NULL slot → no '=';
+     *                                             non-NULL → has_eq=true,
+     *                                             AST_NUL node → '=' with
+     *                                             empty replacement)
+     *                  children[3] = AST_GOTO_S  (sval=label or NULL;
+     *                                             nchildren=0 or 1 for expr)
+     *                  children[4] = AST_GOTO_F  (same)
+     *                  children[5] = AST_GOTO_U  (same)
+     * AST_END      — was STMT_t with is_end=1: sval=label, a[0].i=lineno,
+     *                a[1].i=stno; no children
+     * AST_GOTO_S/F/U — goto arm: sval=target label (NULL = absent);
+     *                  nchildren=0 (static) or 1 (computed expr child)
      * ----------------------------------------------------------------------- */
     AST_PROGRAM,
     AST_STMT,
+    AST_END,      /* END statement — structurally distinct from AST_STMT    */
     AST_GOTO_S,   /* success goto arm   */
     AST_GOTO_F,   /* failure goto arm   */
     AST_GOTO_U,   /* unconditional goto */
@@ -445,6 +459,7 @@ static const char * const ast_e_name[AST_KIND_COUNT] = {
     [AST_REVSWAP]      = "AST_REVSWAP",
     [AST_PROGRAM]      = "AST_PROGRAM",
     [AST_STMT]         = "AST_STMT",
+    [AST_END]          = "AST_END",
     [AST_GOTO_S]       = "AST_GOTO_S",
     [AST_GOTO_F]       = "AST_GOTO_F",
     [AST_GOTO_U]       = "AST_GOTO_U",

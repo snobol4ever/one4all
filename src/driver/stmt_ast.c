@@ -1,36 +1,50 @@
 /*
- * stmt_ast.c — SI-2: shim helpers bridging CODE_t/STMT_t → AST_t
+ * stmt_ast.c — SI-2 (revised): shim helpers bridging CODE_t/STMT_t → AST_t
  *
- * During Phase 5 (SI-1..SI-6), frontends still emit the old CODE_t/STMT_t
- * linked-list structures.  lower() and lower_stmt() will be migrated (SI-3)
- * to consume AST_PROGRAM / AST_STMT trees.  These shims translate on the
- * fly so SI-3 can switch lower()'s signature without touching any frontend.
+ * During Phase 5 (SI-1..SI-6) frontends still emit CODE_t/STMT_t.  These
+ * shims translate to AST_PROGRAM / AST_STMT / AST_END so that lower() and
+ * lower_stmt() can be migrated (SI-3) without touching any frontend.
  *
- * Once all six frontends emit AST_STMT directly (SI-4..SI-5), these shims
+ * Once all six frontends emit AST_STMT directly (SI-4..SI-5) these shims
  * become dead code and are deleted in SI-6.
  *
- * AST_STMT encoding (see ast.h):
- *   sval          = label (NULL or "" if none)
- *   ival          = lang  (LANG_SNO / LANG_ICN / …)
- *   a[0].i        = lineno
- *   a[1].i        = stno
- *   a[2].i        = flags (bit 0 = has_eq, bit 1 = is_end)
- *   children[0]   = subject   AST_t* (NULL node if absent)
- *   children[1]   = pattern   AST_t* (NULL node if absent)
- *   children[2]   = replacement AST_t* (NULL node if absent)
- *   children[3]   = AST_GOTO_S node  (sval=goto_s label or NULL;
- *                                      child[0]=goto_s_expr or NULL)
- *   children[4]   = AST_GOTO_F node  (sval=goto_f label or NULL;
- *                                      child[0]=goto_f_expr or NULL)
- *   children[5]   = AST_GOTO_U node  (sval=goto_u label or NULL;
- *                                      child[0]=goto_u_expr or NULL)
+ * ── Pure AST encoding ──────────────────────────────────────────────────────
  *
- * AST_PROGRAM encoding:
- *   children[0..nstmts-1] = AST_STMT nodes (one per STMT_t)
+ * Every node is characterised solely by:
+ *   kind  — what the node IS
+ *   sval  — string value  (name / label / literal text)
+ *   ival  — integer value (lang for STMT, literal for ILIT, etc.)
+ *   dval  — float value   (float literals only)
+ *   nchildren / children[] — structural children
+ *   a[0..1] — small integer metadata (lineno, stno); not tree structure
  *
- * Flags bit-field:
- *   STMT_FLAG_HAS_EQ   bit 0  — statement has an '=' (replacement field)
- *   STMT_FLAG_IS_END   bit 1  — END statement
+ * No boolean flags in a[].  Structural distinctions are expressed as kinds
+ * or as the presence/absence of a children[] slot.
+ *
+ * AST_PROGRAM   children[0..n-1] = AST_STMT or AST_END nodes
+ *
+ * AST_STMT      sval     = label (NULL if none)
+ *               ival     = lang  (LANG_SNO / LANG_ICN / …)
+ *               a[0].i   = lineno
+ *               a[1].i   = stno
+ *               children[0] = subject      (NULL slot if absent)
+ *               children[1] = pattern      (NULL slot if absent)
+ *               children[2] = replacement  NULL slot → no '=' (has_eq false)
+ *                                          non-NULL  → has '=' (has_eq true)
+ *                                          AST_NUL   → '=' with empty repl
+ *               children[3] = AST_GOTO_S   arm
+ *               children[4] = AST_GOTO_F   arm
+ *               children[5] = AST_GOTO_U   arm
+ *
+ * AST_END       sval     = label (NULL if none)
+ *               a[0].i   = lineno
+ *               a[1].i   = stno
+ *               nchildren = 0
+ *
+ * AST_GOTO_S/F/U sval   = static label (NULL if arm absent)
+ *                nchildren = 0   static label (or absent)
+ *                nchildren = 1   computed goto: children[0] = expr
+ * ──────────────────────────────────────────────────────────────────────────
  */
 
 #include <stdlib.h>
@@ -38,71 +52,101 @@
 #include "ast/ast.h"
 #include "frontend/snobol4/scrip_cc.h"
 
-/* ── flag bits ─────────────────────────────────────────────────────────── */
-#define STMT_FLAG_HAS_EQ   1
-#define STMT_FLAG_IS_END   2
-
 /* ── internal helpers ───────────────────────────────────────────────────── */
 
 /* Allocate a zero-filled AST_t of the given kind. */
-static AST_t *ast_new(AST_e kind)
+static AST_t *sa_new(AST_e kind)
 {
     AST_t *n = calloc(1, sizeof *n);
     n->kind = kind;
     return n;
 }
 
-/* Append one child to a node, growing children[] as needed. */
-static void ast_add_child(AST_t *parent, AST_t *child)
+/*
+ * Append one child slot to a node.  child may be NULL — a NULL slot is a
+ * valid, meaningful "absent" entry in the fixed-layout children[] of AST_STMT.
+ * The nchildren count is always incremented so slot indices are stable.
+ */
+static void sa_add(AST_t *parent, AST_t *child)
 {
     if (parent->nchildren >= parent->nalloc) {
-        parent->nalloc = parent->nalloc ? parent->nalloc * 2 : 4;
+        parent->nalloc = parent->nalloc ? parent->nalloc * 2 : 8;
         parent->children = realloc(parent->children,
                                    (size_t)parent->nalloc * sizeof(AST_t *));
     }
     parent->children[parent->nchildren++] = child;
 }
 
-/* Build one AST_GOTO_S/F/U node from a label string and optional expr. */
+/*
+ * Build one goto-arm node.
+ *   label  — static target label string, or NULL if arm is absent
+ *   expr   — computed-goto expression, or NULL for static/absent arm
+ * A NULL label AND NULL expr → arm is absent (sval=NULL, nchildren=0).
+ * A non-empty label         → sval=label, nchildren=0.
+ * A non-NULL expr           → sval=NULL, nchildren=1, children[0]=expr.
+ */
 static AST_t *make_goto_arm(AST_e kind, const char *label, AST_t *expr)
 {
-    AST_t *arm = ast_new(kind);
-    arm->sval = label ? strdup(label) : NULL;
-    if (expr)
-        ast_add_child(arm, expr);
+    AST_t *arm = sa_new(kind);
+    if (expr) {
+        /* computed goto — expr takes precedence; label is ignored */
+        sa_add(arm, expr);
+    } else if (label && label[0]) {
+        arm->sval = strdup(label);
+    }
+    /* else: absent arm — sval=NULL, nchildren=0 */
     return arm;
 }
 
 /* ── public API ─────────────────────────────────────────────────────────── */
 
 /*
- * stmt_to_ast — convert one STMT_t into an AST_STMT node.
+ * stmt_to_ast — convert one STMT_t into AST_STMT or AST_END.
+ *
+ * END statements become AST_END (structurally distinct kind — not a flag).
+ * All other statements become AST_STMT with exactly 6 children.
  *
  * The STMT_t's AST_t child pointers (subject, pattern, replacement,
- * goto_*_expr) are moved into the new node — not copied — since they
- * are GC-allocated and the shim is a one-shot translation.
+ * goto_*_expr) are moved into the new node — not copied.
  */
 AST_t *stmt_to_ast(const STMT_t *s)
 {
-    AST_t *node = ast_new(AST_STMT);
+    if (s->is_end) {
+        AST_t *node = sa_new(AST_END);
+        node->sval   = (s->label && s->label[0]) ? strdup(s->label) : NULL;
+        node->a[0].i = s->lineno;
+        node->a[1].i = s->stno;
+        return node;
+    }
 
-    /* Scalar fields */
+    AST_t *node = sa_new(AST_STMT);
+
+    /* Scalar fields — no boolean flags */
     node->sval   = (s->label && s->label[0]) ? strdup(s->label) : NULL;
     node->ival   = (long long)s->lang;
     node->a[0].i = s->lineno;
     node->a[1].i = s->stno;
-    node->a[2].i = (s->has_eq  ? STMT_FLAG_HAS_EQ : 0)
-                 | (s->is_end  ? STMT_FLAG_IS_END  : 0);
 
-    /* children[0..2]: subject / pattern / replacement (NULL means absent) */
-    ast_add_child(node, s->subject);
-    ast_add_child(node, s->pattern);
-    ast_add_child(node, s->replacement);
+    /* children[0]: subject (NULL slot if absent) */
+    sa_add(node, s->subject);
+
+    /* children[1]: pattern (NULL slot if absent) */
+    sa_add(node, s->pattern);
+
+    /*
+     * children[2]: replacement
+     *   NULL slot → has_eq false (no '=' in source)
+     *   non-NULL  → has_eq true  (AST_NUL means '=' with empty replacement)
+     */
+    if (s->has_eq)
+        sa_add(node, s->replacement ? s->replacement : sa_new(AST_NUL));
+    else
+        sa_add(node, (AST_t *)NULL);
 
     /* children[3..5]: goto arms */
-    ast_add_child(node, make_goto_arm(AST_GOTO_S, s->goto_s, s->goto_s_expr));
-    ast_add_child(node, make_goto_arm(AST_GOTO_F, s->goto_f, s->goto_f_expr));
-    ast_add_child(node, make_goto_arm(AST_GOTO_U, s->goto_u, s->goto_u_expr));
+    sa_add(node, make_goto_arm(AST_GOTO_S, s->goto_s, s->goto_s_expr));
+    sa_add(node, make_goto_arm(AST_GOTO_F, s->goto_f, s->goto_f_expr));
+    sa_add(node, make_goto_arm(AST_GOTO_U, s->goto_u, s->goto_u_expr));
 
     return node;
 }
@@ -110,13 +154,13 @@ AST_t *stmt_to_ast(const STMT_t *s)
 /*
  * code_to_ast — convert a full CODE_t program into an AST_PROGRAM node.
  *
- * Each STMT_t in the linked list becomes one AST_STMT child.
- * The CODE_t itself is not freed; that is the caller's responsibility.
+ * Each STMT_t in the linked list becomes one child (AST_STMT or AST_END).
+ * The CODE_t itself is not freed; caller's responsibility.
  */
 AST_t *code_to_ast(const CODE_t *prog)
 {
-    AST_t *root = ast_new(AST_PROGRAM);
+    AST_t *root = sa_new(AST_PROGRAM);
     for (const STMT_t *s = prog->head; s; s = s->next)
-        ast_add_child(root, stmt_to_ast(s));
+        sa_add(root, stmt_to_ast(s));
     return root;
 }

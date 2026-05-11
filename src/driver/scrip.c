@@ -477,7 +477,7 @@ int main(int argc, char **argv)
     if (dump_sm && !mode_sm_run) {
         label_table_build(prog);
         prescan_defines(prog);
-        SM_Program *sm0 = lower(prog);
+        SM_Program *sm0 = lower(code_to_ast(prog));
         if (!sm0) { fprintf(stderr, "scrip: sm_lower failed\n"); return 1; }
         sm_prog_print(sm0, stdout);
         sm_prog_free(sm0);

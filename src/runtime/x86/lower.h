@@ -9,18 +9,20 @@
 #define LOWER_H
 
 #include "sm_prog.h"
-#include "../../frontend/snobol4/scrip_cc.h"
+#include "../../ast/ast.h"
 
 /*
- * sm_lower — compile a SNOBOL4 IR CODE_t into a flat SM_Program.
+ * lower — compile an AST_PROGRAM node into a flat SM_Program.
+ *
+ * prog must be an AST_PROGRAM whose children are AST_STMT / AST_END nodes
+ * produced by code_to_ast() (SI-2 shim) or directly by a frontend (SI-4+).
  *
  * The caller owns the returned SM_Program and must free it with sm_prog_free().
- * The input CODE_t* and all AST_t trees must remain valid for the duration
- * of this call (sm_lower does not deep-copy strings; it borrows sval pointers
- * that live in the GC heap or are interned).
+ * AST_t trees must remain valid for the duration of this call (lower does not
+ * deep-copy strings; it borrows sval pointers in the GC heap or interned).
  *
  * Returns NULL on allocation failure.
  */
-SM_Program *lower(const CODE_t *prog);
+SM_Program *lower(const AST_t *prog);
 
 #endif /* LOWER_H */

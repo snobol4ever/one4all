@@ -13,6 +13,7 @@
 #include <setjmp.h>
 #include "scrip_sm.h"
 #include "../runtime/x86/lower.h"
+#include "../frontend/snobol4/scrip_cc.h"  /* SI-3: code_to_ast() shim */
 #include "../runtime/x86/sm_prog.h"           /* CH-17a: sm_label_pc_lookup */
 #include "../runtime/x86/sm_codegen.h"        /* sm_jit_unwind_call_stack */
 #include "../runtime/common/ast_clone.h"
@@ -77,7 +78,7 @@ static void sm_resolve_proc_entry_pcs(SM_Program *p)
 void sm_resolve_irrun_entry_pcs(void *prog_void)
 {
     CODE_t *prog = (CODE_t *)prog_void;
-    SM_Program *sm = lower(prog);
+    SM_Program *sm = lower(code_to_ast(prog));
     if (!sm) {
         fprintf(stderr, "scrip: sm_lower failed in irrun-lowers\n");
         return;
@@ -102,7 +103,7 @@ SM_Program *sm_preamble(void *prog_void){
     uint32_t lang_mask = polyglot_lang_mask(prog);
     polyglot_init(prog, lang_mask);
 
-    SM_Program *sm = lower(prog);
+    SM_Program *sm = lower(code_to_ast(prog));
     if (!sm) {
         fprintf(stderr, "scrip: sm_lower failed\n");
         return NULL;

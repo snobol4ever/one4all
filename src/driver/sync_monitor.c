@@ -287,7 +287,7 @@ static int snap_diff(const ExecSnapshot *a, const char *a_name,
 int sync_monitor_run(void *prog_arg, int verbose, const char *sno_path) {
     CODE_t *prog = (CODE_t *)prog_arg;
     /* ── Build SM_Program once ── */
-    SM_Program *sm_prog = lower(prog);
+    SM_Program *sm_prog = lower(code_to_ast(prog));
     if (!sm_prog) { fprintf(stderr, "sync_monitor: sm_lower failed\n"); return -1; }
 
     /* ── Initialise JIT image once ── */

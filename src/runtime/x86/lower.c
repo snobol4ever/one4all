@@ -5,20 +5,20 @@
  * a flat SM_Program (stack-machine instruction sequence) consumed by four
  * execution backends: IR-interp, SM-interp, JIT-exec, native-emit.
  *
- * Entry point: SM_Program *lower(const CODE_t *prog)
+ * Entry point: SM_Program *lower(const AST_t *prog)  — prog is AST_PROGRAM
  *
  * Three phases inside lower():
  *   1. lower_proc_skeletons — JUMP/label/RETURN stubs for every procedure
  *      and Prolog predicate so forward calls resolve before bodies land.
- *   2. lower_stmt loop — walks the statement list; lower_stmt() routes each
- *      statement to pattern-match, assignment, or expression paths;
- *      lower_expr() dispatches to a per-kind handler via g_handlers[].
+ *   2. lower_stmt loop — walks AST_PROGRAM children (AST_STMT / AST_END);
+ *      lower_stmt() routes each statement to pattern-match, assignment,
+ *      or expression paths; lower_expr() dispatches via g_handlers[].
  *   3. SM_HALT + labtab_resolve — patches forward GOTO targets; reports any
  *      AST kinds that hit lower_unhandled() (diagnostic, normally silent).
  *
  * File-scope state: g_p (SM_Program), g_labtab (LabelTable),
  * g_in_proc_body + g_proc_scope (Icon frame-slot context), g_unhandled_kinds (diagnostic).
- * Naming: p = SM_Program*, t = AST_t*, s = STMT_t*.
+ * Naming: p = SM_Program*, t = AST_t*, s = AST_STMT / AST_END node.
  * Handler signature: static void lower_foo(const AST_t *t)
  *
  * Authors: Lon Jones Cherryholmes · Claude Sonnet 4.6
@@ -46,7 +46,7 @@
 
 void lower_expr    (const AST_t *t);
 void lower_pat_expr(const AST_t *t);
-void lower_stmt    (const STMT_t *s);
+void lower_stmt    (const AST_t *s);  /* SI-3: s is AST_STMT or AST_END */
 
 /*── File-scope lowering state ───────────────────────────────────────────────
  * lower() initializes these before the pass; all handlers read/write them.
@@ -885,78 +885,123 @@ static void lower_prolog_child(const AST_t *t)
     emit_push_expr(t); sm_emit(g_p, SM_BB_ONCE);
 }
 
-/*── Statement lowering ──────────────────────────────────────────────────────*/
+/*── Statement lowering ──────────────────────────────────────────────────────
+ * SI-3: lower_stmt reads AST_STMT / AST_END (pure node encoding).
+ *
+ * AST_STMT children layout (fixed 6 slots):
+ *   [0] subject      — NULL slot means absent
+ *   [1] pattern      — NULL slot means absent
+ *   [2] replacement  — NULL slot means no '=' (has_eq false)
+ *                      non-NULL means has '=' (has_eq true)
+ *                      AST_NUL  means '=' with empty replacement
+ *   [3] AST_GOTO_S   — sval=label or NULL; nchildren=1 for computed
+ *   [4] AST_GOTO_F   — same
+ *   [5] AST_GOTO_U   — same
+ * Scalars: sval=label, ival=lang, a[0].i=lineno, a[1].i=stno
+ *────────────────────────────────────────────────────────────────────────────*/
 
-void lower_stmt(const STMT_t *s)
+void lower_stmt(const AST_t *s)
 {
     SM_Program *p = g_p;
     LabelTable *tbl = &g_labtab;
 
-    /* Skip blank lines entirely. */
-    if (!s->is_end && (!s->label || !s->label[0])
-            && !s->subject && !s->pattern && !s->replacement
-            && !s->goto_u && !s->goto_u_expr
-            && !s->goto_s && !s->goto_s_expr
-            && !s->goto_f && !s->goto_f_expr)
+    /* AST_END — the END statement */
+    if (s->kind == AST_END) {
+        if (s->sval && s->sval[0]) {
+            int lbl_idx = sm_label_named(p, s->sval);
+            labtab_define(tbl, s->sval, lbl_idx);
+        }
+        sm_emit_ii(p, SM_STNO, (int64_t)s->a[1].i, (int64_t)s->a[0].i);
+        sm_emit(p, SM_HALT);
+        return;
+    }
+
+    /* AST_STMT — read children via fixed-slot indices */
+    AST_t *subject     = s->nchildren > 0 ? s->children[0] : NULL;
+    AST_t *pattern     = s->nchildren > 1 ? s->children[1] : NULL;
+    AST_t *replacement = s->nchildren > 2 ? s->children[2] : NULL;
+    AST_t *goto_s_arm  = s->nchildren > 3 ? s->children[3] : NULL;
+    AST_t *goto_f_arm  = s->nchildren > 4 ? s->children[4] : NULL;
+    AST_t *goto_u_arm  = s->nchildren > 5 ? s->children[5] : NULL;
+
+    int has_eq = (replacement != NULL);  /* non-NULL slot → has '=' */
+    int lang   = (int)s->ival;
+
+    /* Goto arm accessors */
+    const char *goto_s      = (goto_s_arm && goto_s_arm->sval) ? goto_s_arm->sval : NULL;
+    const char *goto_f      = (goto_f_arm && goto_f_arm->sval) ? goto_f_arm->sval : NULL;
+    const char *goto_u      = (goto_u_arm && goto_u_arm->sval) ? goto_u_arm->sval : NULL;
+    AST_t      *goto_s_expr = (goto_s_arm && goto_s_arm->nchildren > 0) ? goto_s_arm->children[0] : NULL;
+    AST_t      *goto_f_expr = (goto_f_arm && goto_f_arm->nchildren > 0) ? goto_f_arm->children[0] : NULL;
+    AST_t      *goto_u_expr = (goto_u_arm && goto_u_arm->nchildren > 0) ? goto_u_arm->children[0] : NULL;
+
+    /* Suppress AST_NUL replacement sentinel: has_eq stays true, expr is empty */
+    if (replacement && replacement->kind == AST_NUL)
+        replacement = NULL;
+
+    /* Skip blank lines entirely */
+    if ((!s->sval || !s->sval[0])
+            && !subject && !pattern && !replacement && !has_eq
+            && !goto_u && !goto_u_expr
+            && !goto_s && !goto_s_expr
+            && !goto_f && !goto_f_expr)
         return;
 
-    if (s->label && s->label[0]) {
-        int lbl_idx = sm_label_named(p, s->label);
-        labtab_define(tbl, s->label, lbl_idx);
-        if (FUNC_IS_ENTRY_LABEL(s->label)) {
+    if (s->sval && s->sval[0]) {
+        int lbl_idx = sm_label_named(p, s->sval);
+        labtab_define(tbl, s->sval, lbl_idx);
+        if (FUNC_IS_ENTRY_LABEL(s->sval)) {
             p->instrs[p->count - 1].a[2].i = 1;
             sm_emit(p, SM_DEFINE_ENTRY);
         }
     }
 
-    sm_emit_ii(p, SM_STNO, (int64_t)s->stno, (int64_t)s->lineno);
-    if (s->is_end) { sm_emit(p, SM_HALT); return; }
-    if (s->lang == LANG_ICN) return;  /* Icon defs registered by polyglot_init */
+    sm_emit_ii(p, SM_STNO, (int64_t)s->a[1].i, (int64_t)s->a[0].i);
+    if (lang == LANG_ICN) return;
 
-    if (s->lang == LANG_PL) {
-        if (s->subject && s->subject->kind == AST_CHOICE && s->subject->sval) {
-            const char *sl = strrchr(s->subject->sval, '/');
-            sm_emit_si(p, SM_BB_ONCE_PROC, s->subject->sval, (int64_t)(sl ? atoi(sl+1) : 0));
+    if (lang == LANG_PL) {
+        if (subject && subject->kind == AST_CHOICE && subject->sval) {
+            const char *sl = strrchr(subject->sval, '/');
+            sm_emit_si(p, SM_BB_ONCE_PROC, subject->sval, (int64_t)(sl ? atoi(sl+1) : 0));
         } else {
-            if (s->subject) lower_expr( s->subject); else sm_emit(p, SM_PUSH_NULL);
+            if (subject) lower_expr(subject); else sm_emit(p, SM_PUSH_NULL);
             sm_emit(p, SM_BB_ONCE);
         }
         goto emit_gotos;
     }
 
-    if (s->pattern) {
-        /* Pattern-match statement: pat / subject [= replacement] */
-        lower_pat_expr( s->pattern);
-        if (s->subject) lower_expr( s->subject); else sm_emit(p, SM_PUSH_NULL);
-        if (s->has_eq && s->replacement) lower_expr( s->replacement);
-        else if (s->has_eq)              sm_emit_si(p, SM_PUSH_LIT_S, "", 0);
-        else                             sm_emit_i(p, SM_PUSH_LIT_I, 0);
-        const char *sname = (s->subject && (s->subject->kind == AST_VAR
-                              || s->subject->kind == AST_KEYWORD)) ? s->subject->sval : NULL;
-        sm_emit_si(p, SM_EXEC_STMT, sname, (int64_t)s->has_eq);
+    if (pattern) {
+        lower_pat_expr(pattern);
+        if (subject) lower_expr(subject); else sm_emit(p, SM_PUSH_NULL);
+        if (has_eq && replacement) lower_expr(replacement);
+        else if (has_eq)           sm_emit_si(p, SM_PUSH_LIT_S, "", 0);
+        else                       sm_emit_i(p, SM_PUSH_LIT_I, 0);
+        const char *sname = (subject && (subject->kind == AST_VAR
+                              || subject->kind == AST_KEYWORD)) ? subject->sval : NULL;
+        sm_emit_si(p, SM_EXEC_STMT, sname, (int64_t)has_eq);
         goto emit_gotos;
     }
 
-    if (s->subject) {
-        if (s->has_eq) {
-            if (s->replacement) lower_expr( s->replacement); else sm_emit(p, SM_PUSH_NULL);
-            const AST_t *lhs = s->subject;
+    if (subject) {
+        if (has_eq) {
+            if (replacement) lower_expr(replacement); else sm_emit(p, SM_PUSH_NULL);
+            const AST_t *lhs = subject;
             if (lhs->kind == AST_VAR || lhs->kind == AST_KEYWORD) {
                 sm_emit_s(p, SM_STORE_VAR, lhs->sval ? lhs->sval : "");
             } else if (lhs->kind == AST_INDIRECT) {
-                lower_expr( T0(lhs)); sm_emit_si(p, SM_CALL_FN, "ASGN_INDIR", 2);
+                lower_expr(T0(lhs)); sm_emit_si(p, SM_CALL_FN, "ASGN_INDIR", 2);
             } else if (lhs->kind == AST_IDX) {
-                for (int i = 0; i < lhs->nchildren; i++) lower_expr( lhs->children[i]);
+                for (int i = 0; i < lhs->nchildren; i++) lower_expr(lhs->children[i]);
                 sm_emit_si(p, SM_CALL_FN, "IDX_SET", (int64_t)(lhs->nchildren + 1));
             } else if (lhs->kind == AST_FNC && lhs->sval) {
                 if (lhs->nchildren == 0) {
                     sm_emit_si(p, SM_CALL_FN, "NRETURN_ASGN", 1);
                     p->instrs[p->count - 1].a[1].s = GC_strdup(lhs->sval);
                 } else if (strcasecmp(lhs->sval, "ITEM") == 0) {
-                    for (int i = 0; i < lhs->nchildren; i++) lower_expr( lhs->children[i]);
+                    for (int i = 0; i < lhs->nchildren; i++) lower_expr(lhs->children[i]);
                     sm_emit_si(p, SM_CALL_FN, "ITEM_SET", (int64_t)(lhs->nchildren + 1));
                 } else {
-                    lower_expr( T0(lhs));
+                    lower_expr(T0(lhs));
                     char set[256]; snprintf(set, sizeof set, "%s_SET", lhs->sval);
                     sm_emit_si(p, SM_CALL_FN, set, 2);
                 }
@@ -964,23 +1009,22 @@ void lower_stmt(const STMT_t *s)
                 lower_expr(lhs); sm_emit_si(p, SM_CALL_FN, "ASGN", 2);
             }
         } else {
-            /* Bare expression — RETURN/FRETURN/NRETURN handled as jump. */
-            if (s->subject->kind == AST_VAR && s->subject->sval) {
-                if (strcasecmp(s->subject->sval, "RETURN")  == 0) { sm_emit(p, SM_RETURN);  goto emit_gotos; }
-                if (strcasecmp(s->subject->sval, "FRETURN") == 0) { sm_emit(p, SM_FRETURN); goto emit_gotos; }
-                if (strcasecmp(s->subject->sval, "NRETURN") == 0) { sm_emit(p, SM_NRETURN); goto emit_gotos; }
+            if (subject->kind == AST_VAR && subject->sval) {
+                if (strcasecmp(subject->sval, "RETURN")  == 0) { sm_emit(p, SM_RETURN);  goto emit_gotos; }
+                if (strcasecmp(subject->sval, "FRETURN") == 0) { sm_emit(p, SM_FRETURN); goto emit_gotos; }
+                if (strcasecmp(subject->sval, "NRETURN") == 0) { sm_emit(p, SM_NRETURN); goto emit_gotos; }
             }
-            lower_expr( s->subject); sm_emit(p, SM_VOID_POP);
+            lower_expr(subject); sm_emit(p, SM_VOID_POP);
         }
     }
 
 emit_gotos:
-    if (!s->goto_u && !s->goto_u_expr && !s->goto_s && !s->goto_s_expr
-            && !s->goto_f && !s->goto_f_expr) return;
-    if (s->goto_u && s->goto_u[0]) { emit_goto( SM_JUMP, s->goto_u); return; }
-    if (s->goto_u_expr) { sm_emit_s(p, SM_PUSH_LIT_S, "(computed-goto)"); sm_emit(p, SM_JUMP_INDIR); return; }
-    if (s->goto_s && s->goto_s[0]) emit_goto( SM_JUMP_S, s->goto_s);
-    if (s->goto_f && s->goto_f[0]) emit_goto( SM_JUMP_F, s->goto_f);
+    if (!goto_u && !goto_u_expr && !goto_s && !goto_s_expr
+            && !goto_f && !goto_f_expr) return;
+    if (goto_u && goto_u[0]) { emit_goto(SM_JUMP,   goto_u); return; }
+    if (goto_u_expr) { sm_emit_s(p, SM_PUSH_LIT_S, "(computed-goto)"); sm_emit(p, SM_JUMP_INDIR); return; }
+    if (goto_s && goto_s[0]) emit_goto(SM_JUMP_S, goto_s);
+    if (goto_f && goto_f[0]) emit_goto(SM_JUMP_F, goto_f);
 }
 
 /*── Expression dispatcher ────────────────────────────────────────────────────
@@ -1150,11 +1194,14 @@ static void lower_proc_skeletons(void)
     }
 }
 
-/*── Public entry point ──────────────────────────────────────────────────────*/
+/*── Public entry point ──────────────────────────────────────────────────────
+ * SI-3: lower() takes AST_PROGRAM node produced by code_to_ast() (SI-2 shim)
+ * or directly by a frontend (SI-4+).  No CODE_t / STMT_t access here.
+ *────────────────────────────────────────────────────────────────────────────*/
 
-SM_Program *lower(const CODE_t *prog)
+SM_Program *lower(const AST_t *prog)
 {
-    if (!prog) return NULL;
+    if (!prog || prog->kind != AST_PROGRAM) return NULL;
 
     g_p            = sm_prog_new();
     g_in_proc_body = 0;
@@ -1165,10 +1212,18 @@ SM_Program *lower(const CODE_t *prog)
     lower_proc_skeletons();
 
     int stno = 0, has_icn = 0;
-    for (const STMT_t *s = prog->head; s; s = s->next) {
-        if (s->lang == LANG_ICN) { has_icn = 1; sm_stno_label_record(g_p, ++stno, NULL); continue; }
+    for (int ci = 0; ci < prog->nchildren; ci++) {
+        const AST_t *s = prog->children[ci];
+        if (!s) continue;
+        /* Icon defs are registered by polyglot_init; skip SM emission */
+        if (s->kind == AST_STMT && (int)s->ival == LANG_ICN) {
+            has_icn = 1;
+            sm_stno_label_record(g_p, ++stno, NULL);
+            continue;
+        }
         lower_stmt(s);
-        sm_stno_label_record(g_p, ++stno, (s->label && s->label[0]) ? s->label : NULL);
+        const char *lbl = (s->sval && s->sval[0]) ? s->sval : NULL;
+        sm_stno_label_record(g_p, ++stno, lbl);
     }
 
     if (has_icn) sm_emit_si(g_p, SM_BB_PUMP_PROC, "main", 0);
