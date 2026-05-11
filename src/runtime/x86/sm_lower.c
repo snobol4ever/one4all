@@ -49,6 +49,8 @@ static void init_handlers(void)
     cohort_literal_register(g_handlers);
     cohort_ref_register(g_handlers);
     cohort_arith_register(g_handlers);
+    cohort_seq_register(g_handlers);
+    cohort_pat_prim_register(g_handlers);
     g_handlers_initialized = 1;
 }
 
@@ -56,244 +58,7 @@ static void init_handlers(void)
 
 void lower_expr(LowerCtx *c, const AST_t *e);
 
-/* Extract argument names from a *fn(var,var,...) AST_FNC subtree for
- * SM_PAT_CAPTURE_FN.  Returns a GC-lifetime '\t'-separated name list, or
- * NULL if any arg is not a plain AST_VAR (callers fall back to args-on-stack). */
-static const char *sm_pat_capture_fn_arg_names(const AST_t *fnc)
-{
-    if (!fnc || fnc->nchildren <= 0) return NULL;
-    size_t total_len = 0;
-    for (int i = 0; i < fnc->nchildren; i++) {
-        const AST_t *c = fnc->children[i];
-        if (!c || c->kind != AST_VAR || !c->sval) return NULL;
-        total_len += strlen(c->sval) + 1;
-    }
-    char *buf = (char *)GC_MALLOC(total_len);
-    if (!buf) return NULL;
-    char *p = buf;
-    for (int i = 0; i < fnc->nchildren; i++) {
-        const char *name = fnc->children[i]->sval;
-        size_t n = strlen(name);
-        memcpy(p, name, n);
-        p += n;
-        *p++ = (i + 1 < fnc->nchildren) ? '\t' : '\0';
-    }
-    return buf;
-}
-
-static void lower_pat_expr(LowerCtx *c, const AST_t *e)
-{
-    SM_Program *p = c->p;
-    LabelTable *labtab = &c->labtab;
-    if (!e) return;
-
-    switch (e->kind) {
-
-    case AST_QLIT:
-        sm_emit_s(p, SM_PAT_LIT, e->sval ? e->sval : "");
-        return;
-
-    case AST_VAR:
-        sm_emit_s(p, SM_PUSH_VAR, e->sval);
-        sm_emit(p, SM_PAT_DEREF);
-        return;
-
-    case AST_ARB:      sm_emit(p, SM_PAT_ARB);     return;
-    case AST_REM:      sm_emit(p, SM_PAT_REM);      return;
-    case AST_FAIL:     sm_emit(p, SM_PAT_FAIL);     return;
-    case AST_SUCCEED:  sm_emit(p, SM_PAT_SUCCEED);  return;
-    case AST_FENCE:
-        if (e->nchildren > 0) {
-            lower_pat_expr(c, e->children[0]);
-            sm_emit(p, SM_PAT_FENCE1);
-        } else {
-            sm_emit(p, SM_PAT_FENCE);
-        }
-        return;
-    case AST_ABORT:    sm_emit(p, SM_PAT_ABORT);    return;
-    case AST_BAL:      sm_emit(p, SM_PAT_BAL);      return;
-
-    case AST_ANY:    lower_expr(c, CH0(e)); sm_emit(p, SM_PAT_ANY);    return;
-    case AST_NOTANY: lower_expr(c, CH0(e)); sm_emit(p, SM_PAT_NOTANY); return;
-    case AST_SPAN:   lower_expr(c, CH0(e)); sm_emit(p, SM_PAT_SPAN);   return;
-    case AST_BREAK:  lower_expr(c, CH0(e)); sm_emit(p, SM_PAT_BREAK);  return;
-    case AST_BREAKX: lower_expr(c, CH0(e)); sm_emit(p, SM_PAT_BREAK);  return;
-    case AST_LEN:    lower_expr(c, CH0(e)); sm_emit(p, SM_PAT_LEN);    return;
-    case AST_POS:    lower_expr(c, CH0(e)); sm_emit(p, SM_PAT_POS);    return;
-    case AST_RPOS:   lower_expr(c, CH0(e)); sm_emit(p, SM_PAT_RPOS);   return;
-    case AST_TAB:    lower_expr(c, CH0(e)); sm_emit(p, SM_PAT_TAB);    return;
-    case AST_RTAB:   lower_expr(c, CH0(e)); sm_emit(p, SM_PAT_RTAB);   return;
-    case AST_ARBNO:  LOWER1_PAT(SM_PAT_ARBNO);
-
-    case AST_SEQ:
-    case AST_CAT:
-        for (int i = 0; i < e->nchildren; i++) lower_pat_expr(c, e->children[i]);
-        for (int i = 1; i < e->nchildren; i++) sm_emit(p, SM_PAT_CAT);
-        return;
-
-    case AST_ALT:
-        for (int i = 0; i < e->nchildren; i++) lower_pat_expr(c, e->children[i]);
-        for (int i = 1; i < e->nchildren; i++) sm_emit(p, SM_PAT_ALT);
-        return;
-
-    case AST_CAPT_COND_ASGN:
-        /* child[0] = sub-pattern, child[1] = variable; a[1].i=0 → conditional (.V) */
-        lower_pat_expr(c, e->nchildren > 0 ? e->children[0] : NULL);
-        if (e->nchildren > 1 && e->children[1]) {
-            AST_t *var_expr = e->children[1];
-            if (var_expr->kind == AST_DEFER
-                    && var_expr->nchildren > 0
-                    && var_expr->children[0]
-                    && var_expr->children[0]->kind == AST_FNC
-                    && var_expr->children[0]->sval) {
-                const AST_t *fnc = var_expr->children[0];
-                const char *namelist = sm_pat_capture_fn_arg_names(fnc);
-                if (namelist || fnc->nchildren == 0) {
-                    int idx = sm_emit_s(p, SM_PAT_CAPTURE_FN, fnc->sval);
-                    p->instrs[idx].a[1].i = 0;
-                    p->instrs[idx].a[2].s = namelist;
-                } else {
-                    /* Args-on-stack path: non-AST_QLIT args deferred as compiled
-                     * SM expressions so they evaluate at match time, not build time. */
-                    for (int i = 0; i < fnc->nchildren; i++) {
-                        AST_t *arg = fnc->children[i];
-                        if (arg && arg->kind == AST_QLIT)
-                            lower_expr(c, arg);
-                        else if (arg) {
-                            int skip_jump = sm_emit_i(p, SM_JUMP, 0);
-                            int entry_pc  = sm_label(p);
-                            lower_expr(c, arg);
-                            sm_emit(p, SM_RETURN);
-                            int skip_lbl  = sm_label(p);
-                            sm_patch_jump(p, skip_jump, skip_lbl);
-                            sm_emit_ii(p, SM_PUSH_EXPRESSION, (int64_t)entry_pc, 0);
-                        } else
-                            lower_expr(c, arg);
-                    }
-                    int idx = sm_emit_s(p, SM_PAT_CAPTURE_FN_ARGS, fnc->sval);
-                    p->instrs[idx].a[1].i = 0;
-                    p->instrs[idx].a[2].i = fnc->nchildren;
-                }
-            } else {
-                int idx = sm_emit_s(p, SM_PAT_CAPTURE, var_expr->sval);
-                p->instrs[idx].a[1].i = 0;
-            }
-        }
-        return;
-    case AST_CAPT_IMMED_ASGN:
-        /* a[1].i=1 → immediate ($V) */
-        lower_pat_expr(c, e->nchildren > 0 ? e->children[0] : NULL);
-        if (e->nchildren > 1 && e->children[1]) {
-            AST_t *var_expr = e->children[1];
-            if (var_expr->kind == AST_DEFER
-                    && var_expr->nchildren > 0
-                    && var_expr->children[0]
-                    && var_expr->children[0]->kind == AST_FNC
-                    && var_expr->children[0]->sval) {
-                const AST_t *fnc = var_expr->children[0];
-                const char *namelist = sm_pat_capture_fn_arg_names(fnc);
-                if (namelist || fnc->nchildren == 0) {
-                    int idx = sm_emit_s(p, SM_PAT_CAPTURE_FN, fnc->sval);
-                    p->instrs[idx].a[1].i = 1;
-                    p->instrs[idx].a[2].s = namelist;
-                } else {
-                    for (int i = 0; i < fnc->nchildren; i++) {
-                        AST_t *arg = fnc->children[i];
-                        if (arg && arg->kind == AST_QLIT)
-                            lower_expr(c, arg);
-                        else if (arg) {
-                            int skip_jump = sm_emit_i(p, SM_JUMP, 0);
-                            int entry_pc  = sm_label(p);
-                            lower_expr(c, arg);
-                            sm_emit(p, SM_RETURN);
-                            int skip_lbl  = sm_label(p);
-                            sm_patch_jump(p, skip_jump, skip_lbl);
-                            sm_emit_ii(p, SM_PUSH_EXPRESSION, (int64_t)entry_pc, 0);
-                        } else
-                            lower_expr(c, arg);
-                    }
-                    int idx = sm_emit_s(p, SM_PAT_CAPTURE_FN_ARGS, fnc->sval);
-                    p->instrs[idx].a[1].i = 1;
-                    p->instrs[idx].a[2].i = fnc->nchildren;
-                }
-            } else {
-                int idx = sm_emit_s(p, SM_PAT_CAPTURE, var_expr->sval);
-                p->instrs[idx].a[1].i = 1;
-            }
-        }
-        return;
-    case AST_CAPT_CURSOR:
-        /* Unary @var: child[0] IS the variable name node (no sub-pattern).
-         * Binary X@V: child[0] = sub-pattern, child[1] = variable. */
-        if (e->nchildren == 1) {
-            const char *vname = (e->children[0] && e->children[0]->sval)
-                                 ? e->children[0]->sval : "";
-            sm_emit(p, SM_PAT_EPS);
-            int idx = sm_emit_s(p, SM_PAT_CAPTURE, vname);
-            p->instrs[idx].a[1].i = 2;
-        } else {
-            lower_pat_expr(c, e->nchildren > 0 ? e->children[0] : NULL);
-            if (e->nchildren > 1 && e->children[1]) {
-                int idx = sm_emit_s(p, SM_PAT_CAPTURE, e->children[1]->sval);
-                p->instrs[idx].a[1].i = 2;
-            }
-        }
-        return;
-
-    case AST_DEFER: {
-        AST_t *ch = e->nchildren > 0 ? e->children[0] : NULL;
-        /* *fn() in pattern — invoke fn at match time via SM_PAT_USERCALL so
-         * FAIL propagates as pattern FAIL and fn runs per match position.
-         * When nchildren > 0, always use the args-on-stack path: the name-stash
-         * fast path (SM_PAT_USERCALL) calls pat_user_call(fname, NULL, 0) at
-         * match time, silently discarding all args. */
-        if (ch && ch->kind == AST_FNC && ch->sval) {
-            if (ch->nchildren == 0) {
-                int idx = sm_emit_s(p, SM_PAT_USERCALL, ch->sval);
-                p->instrs[idx].a[2].s = NULL;
-            } else {
-                for (int i = 0; i < ch->nchildren; i++) {
-                    AST_t *arg = ch->children[i];
-                    if (arg && arg->kind == AST_QLIT)
-                        lower_expr(c, arg);
-                    else if (arg) {
-                        int skip_jump = sm_emit_i(p, SM_JUMP, 0);
-                        int entry_pc  = sm_label(p);
-                        lower_expr(c, arg);
-                        sm_emit(p, SM_RETURN);
-                        int skip_lbl  = sm_label(p);
-                        sm_patch_jump(p, skip_jump, skip_lbl);
-                        sm_emit_ii(p, SM_PUSH_EXPRESSION, (int64_t)entry_pc, 0);
-                    } else
-                        lower_expr(c, arg);
-                }
-                int idx = sm_emit_s(p, SM_PAT_USERCALL_ARGS, ch->sval);
-                p->instrs[idx].a[1].i = ch->nchildren;
-            }
-            return;
-        }
-        /* *var — emit SM_PAT_REFNAME so the name (not the current value)
-         * reaches the engine at match time, enabling self-recursive patterns. */
-        if (ch && ch->kind == AST_VAR && ch->sval) {
-            sm_emit_s(p, SM_PAT_REFNAME, ch->sval);
-            return;
-        }
-        lower_expr(c, ch);
-        sm_emit(p, SM_PAT_DEREF);
-        return;
-    }
-
-    case AST_FNC:
-        lower_expr(c, e);
-        sm_emit(p, SM_PAT_DEREF);
-        return;
-
-    default:
-        lower_expr(c, e);
-        sm_emit(p, SM_PAT_DEREF);
-        return;
-    }
-}
+/* lower_pat_expr and sm_pat_capture_fn_arg_names moved to lower_pat.c (SR-7). */
 
 void lower_expr(LowerCtx *c, const AST_t *e)
 {
@@ -329,43 +94,8 @@ void lower_expr(LowerCtx *c, const AST_t *e)
     /* AST_INTERROGATE, AST_NAME, AST_MNS, AST_PLS,
      * AST_ADD, AST_SUB, AST_MUL, AST_DIV, AST_MOD, AST_POW → cohort_arith */
 
-    /* ── Value-context disjunction (SNOBOL4 paren-list / Snocone ||) ── */
-    case AST_VLIST: {
-        if (e->nchildren == 0) { sm_emit(p, SM_PUSH_NULL); return; }
-        if (e->nchildren == 1) { lower_expr(c, e->children[0]); return; }
-        int njs = e->nchildren - 1;
-        int *jumps = (int *)malloc((size_t)njs * sizeof(int));
-        for (int i = 0; i < e->nchildren; i++) {
-            lower_expr(c, e->children[i]);
-            if (i < e->nchildren - 1) {
-                jumps[i] = sm_emit_i(p, SM_JUMP_S, 0);
-                sm_emit(p, SM_VOID_POP);
-            }
-        }
-        int done = sm_label(p);
-        for (int i = 0; i < njs; i++) sm_patch_jump(p, jumps[i], done);
-        free(jumps);
-        return;
-    }
-
-    /* ── String concatenation (or pattern concat if any child is AST_DEFER) ── */
-    case AST_CAT:
-    case AST_SEQ: {
-        /* If any child is AST_DEFER, this is pattern-context — lower as pattern. */
-        int has_defer = 0;
-        for (int j = 0; j < e->nchildren; j++) {
-            const AST_t *cj = e->children[j];
-            if (cj && cj->kind == AST_DEFER) { has_defer = 1; break; }
-        }
-        if (has_defer) {
-            for (int i = 0; i < e->nchildren; i++) lower_pat_expr(c, e->children[i]);
-            for (int i = 1; i < e->nchildren; i++) sm_emit(p, SM_PAT_CAT);
-        } else {
-            for (int i = 0; i < e->nchildren; i++) lower_expr(c, e->children[i]);
-            for (int i = 1; i < e->nchildren; i++) sm_emit(p, SM_CONCAT);
-        }
-        return;
-    }
+    /* AST_VLIST, AST_CAT, AST_SEQ, AST_ALT, AST_OPSYN → cohort_seq */
+    /* AST_ARB..AST_ARBNO (pattern primitives) → cohort_pat_prim */
 
     /* ── Assignment ── */
     case AST_ASSIGN:
@@ -476,23 +206,10 @@ void lower_expr(LowerCtx *c, const AST_t *e)
         sm_emit_si(p, SM_CALL_FN, "ICN_SCAN_POP", 1);
         return;
 
-    /* ── OPSYN operator dispatch ── */
-    case AST_OPSYN: {
-        /* sval is mangled "BIATFN(@)" (op char between parens)
-         * or bare "BARFN" / "AROWFN" for unary ops. */
-        const char *raw = e->sval ? e->sval : "&";
-        const char *op = raw;
-        static char op_buf[4];
-        const char *lp = strchr(raw, '(');
-        if (lp && lp[1] && lp[2] == ')') { op_buf[0] = lp[1]; op_buf[1] = '\0'; op = op_buf; }
-        else if (strcmp(raw, "BARFN")  == 0) { op = "|"; }
-        else if (strcmp(raw, "AROWFN") == 0) { op = "^"; }
-        for (int i = 0; i < e->nchildren; i++) lower_expr(c, e->children[i]);
-        sm_emit_si(p, SM_CALL_FN, op, (int64_t)e->nchildren);
-        return;
-    }
+    /* AST_OPSYN → cohort_seq */
+    /* AST_ALT, AST_ARB..AST_ARBNO, AST_CAPT_* → cohort_seq / cohort_pat_prim / cohort_capture */
 
-    /* ── Swap :=: ── */
+
     case AST_SWAP: {
         /* Inline SM sequence for simple variable lvalues.
          * Saves lhs to NV temp, writes rhs→lhs, writes saved→rhs.
@@ -527,16 +244,8 @@ void lower_expr(LowerCtx *c, const AST_t *e)
         return;
     }
 
-    /* ── Pattern primitives used as values ── */
-    case AST_ALT:
-    case AST_ARB:  case AST_REM:  case AST_FAIL: case AST_SUCCEED:
-    case AST_FENCE: case AST_ABORT: case AST_BAL:
-    case AST_ANY:  case AST_NOTANY: case AST_SPAN: case AST_BREAK: case AST_BREAKX:
-    case AST_LEN:  case AST_POS:  case AST_RPOS: case AST_TAB: case AST_RTAB:
-    case AST_ARBNO:
-    case AST_CAPT_COND_ASGN: case AST_CAPT_IMMED_ASGN: case AST_CAPT_CURSOR:
-        lower_pat_expr(c, e);
-        return;
+    /* AST_ALT, AST_ARB..AST_ARBNO → cohort_pat_prim */
+    /* AST_CAPT_COND_ASGN, AST_CAPT_IMMED_ASGN, AST_CAPT_CURSOR → cohort_capture (SR-8) */
 
     case AST_SEQ_EXPR:
         if (e->nchildren == 0) { sm_emit(p, SM_PUSH_NULL); return; }
