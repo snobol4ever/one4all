@@ -37,10 +37,10 @@ void emit_bb_xposi(emitter_t *e, int n,
     /* Binary path: if Δ != n → fail, else → succ. β → fail (no retry). */
     emit_load_delta(e);
     emit_cmp_eax_imm32(e, (uint32_t)n);
-    EV_JMP(e, lbl_fail, JMP_JNE);
-    EV_JMP(e, lbl_succ, JMP_JMP);
-    EV_LABEL(e, lbl_β);
-    EV_JMP(e, lbl_fail, JMP_JMP);
+    EMIT_JMP(e, lbl_fail, JMP_JNE);
+    EMIT_JMP(e, lbl_succ, JMP_JMP);
+    EMIT_LABEL(e, lbl_β);
+    EMIT_JMP(e, lbl_fail, JMP_JMP);
 }
 
 /* emit_bb_xrpsi — RPOS(n): succeed iff Δ == Σlen - n. */
@@ -59,8 +59,8 @@ void emit_bb_xrpsi(emitter_t *e, int n,
     emit_mov_ecx_eax(e);                /* ecx = Σlen - n */
     emit_load_delta(e);                 /* eax = Δ */
     emit_cmp_eax_ecx(e);               /* cmp Δ, Σlen-n */
-    EV_JMP(e, lbl_fail, JMP_JNE);
-    EV_JMP(e, lbl_succ, JMP_JMP);
-    EV_LABEL(e, lbl_β);
-    EV_JMP(e, lbl_fail, JMP_JMP);
+    EMIT_JMP(e, lbl_fail, JMP_JNE);
+    EMIT_JMP(e, lbl_succ, JMP_JMP);
+    EMIT_LABEL(e, lbl_β);
+    EMIT_JMP(e, lbl_fail, JMP_JMP);
 }

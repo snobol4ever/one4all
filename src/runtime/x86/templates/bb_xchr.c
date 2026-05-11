@@ -95,7 +95,7 @@ void emit_bb_xchr(emitter_t *e, PATND_t *p,
     emit_load_delta(e);                                       /* eax = Δ */
     emit_add_eax_imm32(e, (uint32_t)len);                     /* eax += len */
     emit_cmp_eax_siglen(e, TEMPLATE_ADDR_SIGLEN);             /* cmp eax, [Σlen] */
-    EV_JMP(e, lbl_fail, JMP_JG);
+    EMIT_JMP(e, lbl_fail, JMP_JG);
 
     /* memcmp(Σ+Δ, lit, len): set up rdi=Σ+Δ, rsi=lit, rdx=len */
     emit_sigma_plus_delta(e, TEMPLATE_ADDR_SIGMA);            /* rax = Σ+Δ */
@@ -124,14 +124,14 @@ void emit_bb_xchr(emitter_t *e, PATND_t *p,
     /* call memcmp — TEXT: call memcmp@PLT; BINARY: mov rax, ptr; call rax */
     emit_call_sym_plt(e, "memcmp", (uint64_t)(uintptr_t)memcmp);
     emit_test_eax_eax(e);                                     /* test eax, eax */
-    EV_JMP(e, lbl_fail, JMP_JNE);
+    EMIT_JMP(e, lbl_fail, JMP_JNE);
 
     /* success: Δ += len */
     emit_add_delta_imm(e, len);
-    EV_JMP(e, lbl_succ, JMP_JMP);
+    EMIT_JMP(e, lbl_succ, JMP_JMP);
 
     /* β: Δ -= len; fail */
-    EV_LABEL(e, lbl_β);
+    EMIT_LABEL(e, lbl_β);
     emit_sub_delta_imm(e, len);
-    EV_JMP(e, lbl_fail, JMP_JMP);
+    EMIT_JMP(e, lbl_fail, JMP_JMP);
 }

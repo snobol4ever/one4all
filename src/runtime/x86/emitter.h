@@ -365,6 +365,9 @@ FILE *emitter_text_file(emitter_t *e);
 
 #define EV_LABEL(e, lbl)      (e)->label_define((e), (lbl))
 #define EV_JMP(e, lbl, kind)  (e)->emit_jmp((e), (lbl), (kind))
+/* Preferred names for template code (EV_* kept for non-template callers). */
+#define EMIT_LABEL(e, lbl)    (e)->label_define((e), (lbl))
+#define EMIT_JMP(e, lbl, kind) (e)->emit_jmp((e), (lbl), (kind))
 #define EV_GLOBAL(e, name)    (e)->global_sym((e), (name))
 #define EV_TEXT(e, ...)       (e)->fprintf_raw((e), __VA_ARGS__)
 

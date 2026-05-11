@@ -36,7 +36,7 @@ void emit_sm_jump(emitter_t *e, int target_pc)
     EMIT_OPT(e, comment, e, "SM_JUMP");
     bb_label_t tgt;
     make_pc_label(&tgt, target_pc);
-    EV_JMP(e, &tgt, JMP_JMP);
+    EMIT_JMP(e, &tgt, JMP_JMP);
 }
 
 /* emit_sm_jump_s — conditional jump: take if rt_last_ok() != 0 (success). */
@@ -48,7 +48,7 @@ void emit_sm_jump_s(emitter_t *e, int target_pc)
     emit_test_rax_rax(e);
     bb_label_t tgt;
     make_pc_label(&tgt, target_pc);
-    EV_JMP(e, &tgt, JMP_JNE);
+    EMIT_JMP(e, &tgt, JMP_JNE);
 }
 
 /* emit_sm_jump_f — conditional jump: take if rt_last_ok() == 0 (failure). */
@@ -60,5 +60,5 @@ void emit_sm_jump_f(emitter_t *e, int target_pc)
     emit_test_rax_rax(e);
     bb_label_t tgt;
     make_pc_label(&tgt, target_pc);
-    EV_JMP(e, &tgt, JMP_JE);
+    EMIT_JMP(e, &tgt, JMP_JE);
 }

@@ -66,15 +66,15 @@ void emit_bb_xbrkx(emitter_t *e,
     emit_mov_esi_imm32(e, 0);
     emit_call_sym_plt(e, "bb_breakx", (uint64_t)(uintptr_t)bb_breakx);
     emit_test_rax_rax(e);
-    EV_JMP(e, lbl_succ, JMP_JNE);
-    EV_JMP(e, lbl_fail, JMP_JMP);
+    EMIT_JMP(e, lbl_succ, JMP_JNE);
+    EMIT_JMP(e, lbl_fail, JMP_JMP);
 
     /* beta port: call bb_breakx(z, 1) */
-    EV_LABEL(e, lbl_β);
+    EMIT_LABEL(e, lbl_β);
     emit_mov_rdi_imm64(e, (uint64_t)(uintptr_t)z);
     emit_mov_esi_imm32(e, 1);
     emit_call_sym_plt(e, "bb_breakx", (uint64_t)(uintptr_t)bb_breakx);
     emit_test_rax_rax(e);
-    EV_JMP(e, lbl_succ, JMP_JNE);
-    EV_JMP(e, lbl_fail, JMP_JMP);
+    EMIT_JMP(e, lbl_succ, JMP_JNE);
+    EMIT_JMP(e, lbl_fail, JMP_JMP);
 }

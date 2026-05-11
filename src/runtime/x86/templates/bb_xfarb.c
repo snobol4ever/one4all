@@ -34,9 +34,9 @@ void emit_bb_xeps(emitter_t *e,
         if (text_body_fn) text_body_fn(e, lbl_succ, lbl_fail, lbl_β, text_body_arg);
         return;
     }
-    EV_JMP(e, lbl_succ, JMP_JMP);
-    EV_LABEL(e, lbl_β);
-    EV_JMP(e, lbl_fail, JMP_JMP);
+    EMIT_JMP(e, lbl_succ, JMP_JMP);
+    EMIT_LABEL(e, lbl_β);
+    EMIT_JMP(e, lbl_fail, JMP_JMP);
 }
 
 /* emit_bb_xfail — FAIL: always fail (both ports). */
@@ -50,9 +50,9 @@ void emit_bb_xfail(emitter_t *e,
         if (text_body_fn) text_body_fn(e, lbl_succ, lbl_fail, lbl_β, text_body_arg);
         return;
     }
-    EV_JMP(e, lbl_fail, JMP_JMP);
-    EV_LABEL(e, lbl_β);
-    EV_JMP(e, lbl_fail, JMP_JMP);
+    EMIT_JMP(e, lbl_fail, JMP_JMP);
+    EMIT_LABEL(e, lbl_β);
+    EMIT_JMP(e, lbl_fail, JMP_JMP);
 }
 
 /* emit_bb_xfarb — ARB: greedy zero-or-more via bb_arb(z, port). */
@@ -70,13 +70,13 @@ void emit_bb_xfarb(emitter_t *e,
     emit_mov_esi_imm32(e, 0);
     emit_call_sym_plt(e, "bb_arb", (uint64_t)(uintptr_t)bb_arb);
     emit_test_rax_rax(e);
-    EV_JMP(e, lbl_succ, JMP_JNE);
-    EV_JMP(e, lbl_fail, JMP_JMP);
-    EV_LABEL(e, lbl_β);
+    EMIT_JMP(e, lbl_succ, JMP_JNE);
+    EMIT_JMP(e, lbl_fail, JMP_JMP);
+    EMIT_LABEL(e, lbl_β);
     emit_mov_rdi_imm64(e, (uint64_t)(uintptr_t)z);
     emit_mov_esi_imm32(e, 1);
     emit_call_sym_plt(e, "bb_arb", (uint64_t)(uintptr_t)bb_arb);
     emit_test_rax_rax(e);
-    EV_JMP(e, lbl_succ, JMP_JNE);
-    EV_JMP(e, lbl_fail, JMP_JMP);
+    EMIT_JMP(e, lbl_succ, JMP_JNE);
+    EMIT_JMP(e, lbl_fail, JMP_JMP);
 }
