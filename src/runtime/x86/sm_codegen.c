@@ -3392,6 +3392,33 @@ int sm_codegen(SM_Program *prog)
  * runs through the per-instruction blob chain until SM_HALT's `ret`
  * returns here.  No C dispatch loop, no per-opcode thunk.
  */
+
+/* sm_jit_unwind_call_stack — called by sm_run_with_recovery after a longjmp
+ * error recovery in jit-run mode.
+ *
+ * Problem: sno_runtime_error longjmps out of C stack frames including
+ * exec_stmt and any C function called from a JIT blob.  The C stack is
+ * unwound by longjmp, but the JIT call stack (STATE->call_stack /
+ * STATE->call_depth) lives in the SM_State heap struct and survives the
+ * longjmp intact.  If left in place across the recovery, later
+ * SM_RETURN blobs will pop stale frames and restore wrong caller_sp
+ * values, leading to corrupted r12 / negative sp / SIGSEGV.
+ *
+ * Fix: unwind the entire JIT call stack on error recovery, restoring
+ * saved NV slots so the global name-value table is consistent.  Mirrors
+ * SNOBOL4 semantics: a runtime error aborts the current statement and
+ * all active function invocations; execution resumes at top level.
+ */
+void sm_jit_unwind_call_stack(SM_State *st)
+{
+    while (st->call_depth > 0) {
+        SmCallFrame *fr = &st->call_stack[--st->call_depth];
+        for (int k = fr->nsaved - 1; k >= 0; k--)
+            NV_SET_fn(fr->saved_names[k], fr->saved_vals[k]);
+    }
+    st->sp = 0;
+}
+
 int sm_jit_run(SM_Program *prog, SM_State *st)
 {
     g_jit_prog   = prog;

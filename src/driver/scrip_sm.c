@@ -14,6 +14,7 @@
 #include "scrip_sm.h"
 #include "../runtime/x86/sm_lower.h"
 #include "../runtime/x86/sm_prog.h"           /* CH-17a: sm_label_pc_lookup */
+#include "../runtime/x86/sm_codegen.h"        /* sm_jit_unwind_call_stack */
 #include "../runtime/common/ast_clone.h"
 #include "../runtime/interp/coro_runtime.h"   /* CH-17a: proc_table */
 #include "../runtime/interp/pl_runtime.h"     /* CH-17a: g_pl_pred_table */
@@ -149,6 +150,11 @@ void sm_run_with_recovery(SM_Program *sm, sm_runner_fn runner)
              * the current instruction and continue */
             st.last_ok = 0;
             st.sp = 0;  /* reset value stack — state is undefined after error */
+            /* JIT mode: longjmp does not unwind the JIT call stack.
+             * Explicit unwind restores saved NV slots and resets call_depth.
+             * No-op when runner != sm_jit_run (interp unwinds via C stack). */
+            if (runner == sm_jit_run)
+                sm_jit_unwind_call_stack(&st);
             if (st.pc < sm->count) st.pc++;  /* skip offending instruction */
             /* drain to next SM_STNO boundary so we resume cleanly */
             while (st.pc < sm->count &&

@@ -26,6 +26,10 @@ int sm_codegen(SM_Program *prog);
  */
 int sm_jit_run(SM_Program *prog, SM_State *st);
 
+/* Unwind JIT call stack after longjmp error recovery; restores saved NV
+ * slots and resets call_depth to 0.  Called by sm_run_with_recovery. */
+void sm_jit_unwind_call_stack(SM_State *st);
+
 int sm_jit_run_plain(SM_Program *prog, SM_State *st);
 
 /* IM-5: step-limit — run at most n statements then return */
