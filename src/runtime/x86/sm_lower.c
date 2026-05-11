@@ -619,6 +619,12 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
         sm_emit_f(p, SM_PUSH_LIT_F, e->dval);
         return;
     case AST_NULL:
+        /* /E — Icon null test: succeed (yielding &null) iff E is null, else fail.
+         * Distinct from AST_NUL which is the literal &null value.
+         * Mirrors coro_value.c:AST_NULL arm and interp_eval.c:AST_NULL. */
+        lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
+        sm_emit_si(p, SM_CALL_FN, "ICN_NULL", 1);
+        return;
     case AST_NUL:
         sm_emit(p, SM_PUSH_NULL);
         return;
@@ -805,7 +811,24 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
                 char setname[256];
                 snprintf(setname, sizeof(setname), "%s_SET", lhs->sval);
                 sm_emit_si(p, SM_CALL_FN, setname, 2);
-            } else {
+            }
+            else if (lhs->kind == AST_IDX) {
+                /* Subscript assign: t[k] := v  →  rhs already on stack.
+                 * Emit: base, idx(es), IDX_SET(nc+1).
+                 * Mirrors the IDX_SET emission in lower_stmt. */
+                int nc = lhs->nchildren;
+                for (int i = 0; i < nc; i++)
+                    lower_expr(p, lt, lhs->children[i]);
+                sm_emit_si(p, SM_CALL_FN, "IDX_SET", (int64_t)(nc + 1));
+            }
+            else if (lhs->kind == AST_FIELD) {
+                /* Record field assign: r.f := v  →  rhs already on stack.
+                 * Emit: obj, fieldname_lit, FIELD_SET 3. */
+                lower_expr(p, lt, lhs->nchildren > 0 ? lhs->children[0] : NULL);
+                sm_emit_s(p, SM_PUSH_LIT_S, lhs->sval ? lhs->sval : "");
+                sm_emit_si(p, SM_CALL_FN, "FIELD_SET", 3);
+            }
+            else {
                 /* Computed lhs — push lhs expr, then generic store */
                 lower_expr(p, lt, lhs);
                 sm_emit_si(p, SM_CALL_FN, "ASGN", 2);

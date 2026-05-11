@@ -882,6 +882,269 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         }
         *out = FAILDESCR; return 1;
     }
+
+    /* CH-17g-builtin-batch (2026-05-11): SM-mode Icon builtins missing from
+     * icn_try_call_builtin_by_name.  All are verbatim ports of the AST-walk
+     * paths in interp_eval.c / coro_value.c with interp_eval(e->children[i])
+     * replaced by args[i] (pre-evaluated by SM_CALL_FN). No AST_t access. */
+
+    /* SIZE (*E) — string/list/table size.  Mirrors coro_value.c:AST_SIZE. */
+    if (!strcmp(fn,"SIZE") && nargs == 1) {
+        DESCR_t v = args[0];
+        if (IS_FAIL_fn(v)) { *out = FAILDESCR; return 1; }
+        if (v.v == DT_T)   { *out = INTVAL(v.tbl ? v.tbl->size : 0); return 1; }
+        if (v.v == DT_DATA) {
+            DESCR_t tag = FIELD_GET_fn(v,"icn_type");
+            if (tag.v==DT_S && tag.s && strcmp(tag.s,"list")==0) {
+                *out = INTVAL((int)FIELD_GET_fn(v,"frame_size").i); return 1;
+            }
+        }
+        if (IS_INT_fn(v)||IS_REAL_fn(v)) { *out = INTVAL(0); return 1; }
+        const char *s = VARVAL_fn(v); if (!s) { *out = INTVAL(0); return 1; }
+        if (strchr(s,'\x01')) {
+            long n=1; for(const char *p=s;*p;p++) if(*p=='\x01') n++;
+            *out = INTVAL(n); return 1;
+        }
+        long len = v.slen > 0 ? v.slen : (long)strlen(s);
+        *out = INTVAL(len); return 1;
+    }
+
+    /* NONNULL (\E) — succeed with E if E != null, else fail.
+     * Mirrors coro_value.c:AST_NONNULL. */
+    if (!strcmp(fn,"NONNULL") && nargs == 1) {
+        DESCR_t v = args[0];
+        if (IS_FAIL_fn(v))  { *out = FAILDESCR; return 1; }
+        if (v.v == DT_SNUL) { *out = FAILDESCR; return 1; }
+        if (v.v == DT_S && (!v.s || v.s[0]=='\0')) { *out = FAILDESCR; return 1; }
+        *out = v; return 1;
+    }
+
+    /* ICN_NULL (/E) — succeed with &null iff E is null, else fail.
+     * Mirrors coro_value.c:AST_NULL. */
+    if (!strcmp(fn,"ICN_NULL") && nargs == 1) {
+        DESCR_t v = args[0];
+        if (IS_FAIL_fn(v))  { *out = FAILDESCR; return 1; }
+        if (v.v == DT_SNUL) { *out = NULVCL; return 1; }
+        if (v.v == DT_S && (!v.s || v.s[0]=='\0')) { *out = NULVCL; return 1; }
+        *out = FAILDESCR; return 1;
+    }
+
+    /* insert(T, k [, v]) — add key k with value v (or &null) to table T.
+     * Mirrors interp_eval.c:1643. */
+    if (!strcmp(fn,"insert") && nargs >= 2) {
+        DESCR_t td = args[0];
+        if (td.v != DT_T) { *out = FAILDESCR; return 1; }
+        DESCR_t kd = args[1];
+        DESCR_t vd = (nargs >= 3) ? args[2] : NULVCL;
+        char kb[64]; const char *ks;
+        if (IS_INT_fn(kd))       { snprintf(kb,sizeof kb,"%lld",(long long)kd.i); ks=kb; }
+        else if (IS_REAL_fn(kd)) { snprintf(kb,sizeof kb,"%g",kd.r); ks=kb; }
+        else                     { ks=VARVAL_fn(kd); if(!ks) ks=""; }
+        table_set_descr(td.tbl, ks, kd, vd);
+        *out = td; return 1;
+    }
+
+    /* delete(T [, k]) — remove key k from table T.  Mirrors interp_eval.c:1655. */
+    if (!strcmp(fn,"delete") && nargs >= 1) {
+        DESCR_t td = args[0];
+        if (td.v != DT_T) { *out = FAILDESCR; return 1; }
+        DESCR_t kd = (nargs >= 2) ? args[1] : NULVCL;
+        char kb[64]; const char *ks;
+        if (IS_INT_fn(kd))       { snprintf(kb,sizeof kb,"%lld",(long long)kd.i); ks=kb; }
+        else if (IS_REAL_fn(kd)) { snprintf(kb,sizeof kb,"%g",kd.r); ks=kb; }
+        else                     { ks=VARVAL_fn(kd); if(!ks) ks=""; }
+        unsigned h=0x1505;
+        { const char *p=ks; while(*p){h=(h<<5)+h^(unsigned char)*p++;} h&=0xFF; }
+        TBPAIR_t **pp=&td.tbl->buckets[h];
+        while(*pp) {
+            if(strcmp((*pp)->key,ks)==0){TBPAIR_t *del=*pp;*pp=del->next;td.tbl->size--;break;}
+            pp=&(*pp)->next;
+        }
+        *out = td; return 1;
+    }
+
+    /* member(T [, k]) — succeed with value if k is a key, else fail.
+     * Mirrors interp_eval.c:1679. */
+    if (!strcmp(fn,"member") && nargs >= 1) {
+        DESCR_t td = args[0];
+        if (td.v != DT_T) { *out = FAILDESCR; return 1; }
+        DESCR_t kd = (nargs >= 2) ? args[1] : NULVCL;
+        char kb[64]; const char *ks;
+        if (IS_INT_fn(kd))       { snprintf(kb,sizeof kb,"%lld",(long long)kd.i); ks=kb; }
+        else if (IS_REAL_fn(kd)) { snprintf(kb,sizeof kb,"%g",kd.r); ks=kb; }
+        else                     { ks=VARVAL_fn(kd); if(!ks) ks=""; }
+        if (!table_has(td.tbl,ks)) { *out=FAILDESCR; return 1; }
+        *out = table_get(td.tbl,ks); return 1;
+    }
+
+    /* key(T) — oneshot: return first key of table (non-generator; every uses bb).
+     * Mirrors interp_eval.c:1697. */
+    if (!strcmp(fn,"key") && nargs == 1) {
+        DESCR_t td = args[0];
+        if (td.v != DT_T || !td.tbl) { *out=FAILDESCR; return 1; }
+        for (int _bi=0;_bi<TABLE_BUCKETS;_bi++)
+            if (td.tbl->buckets[_bi]) {
+                *out = td.tbl->buckets[_bi]->key_descr; return 1;
+            }
+        *out = FAILDESCR; return 1;
+    }
+
+    /* push(L, v) — prepend v to Icon list L.  Mirrors interp_eval.c:1829.
+     * Only fires for DT_DATA icnlist; Raku's SOH-string push goes to INVOKE_fn. */
+    if (!strcmp(fn,"push") && nargs == 2) {
+        DESCR_t ld = args[0]; DESCR_t vd = args[1];
+        if (ld.v != DT_DATA) return 0;  /* not an icnlist — let INVOKE_fn handle */
+        DESCR_t tag = FIELD_GET_fn(ld,"icn_type");
+        if (!(tag.v==DT_S && tag.s && strcmp(tag.s,"list")==0)) return 0;
+        int n=(int)FIELD_GET_fn(ld,"frame_size").i;
+        DESCR_t ea=FIELD_GET_fn(ld,"frame_elems");
+        DESCR_t *old=(ea.v==DT_DATA)?(DESCR_t*)ea.ptr:NULL;
+        DESCR_t *nb=GC_malloc((n+1)*sizeof(DESCR_t));
+        nb[0]=vd;
+        if(old&&n>0) memcpy(nb+1,old,n*sizeof(DESCR_t));
+        FIELD_SET_fn(ld,"frame_elems",(DESCR_t){.v=DT_DATA,.ptr=nb});
+        FIELD_SET_fn(ld,"frame_size",INTVAL(n+1));
+        *out = ld; return 1;
+    }
+
+    /* put(L, v) — append v to Icon list L.  Mirrors interp_eval.c:1843. */
+    if (!strcmp(fn,"put") && nargs == 2) {
+        DESCR_t ld = args[0]; DESCR_t vd = args[1];
+        if (ld.v != DT_DATA) return 0;
+        DESCR_t tag = FIELD_GET_fn(ld,"icn_type");
+        if (!(tag.v==DT_S && tag.s && strcmp(tag.s,"list")==0)) return 0;
+        int n=(int)FIELD_GET_fn(ld,"frame_size").i;
+        DESCR_t ea=FIELD_GET_fn(ld,"frame_elems");
+        DESCR_t *old=(ea.v==DT_DATA)?(DESCR_t*)ea.ptr:NULL;
+        DESCR_t *nb=GC_malloc((n+1)*sizeof(DESCR_t));
+        if(old&&n>0) memcpy(nb,old,n*sizeof(DESCR_t));
+        nb[n]=vd;
+        FIELD_SET_fn(ld,"frame_elems",(DESCR_t){.v=DT_DATA,.ptr=nb});
+        FIELD_SET_fn(ld,"frame_size",INTVAL(n+1));
+        *out = ld; return 1;
+    }
+
+    /* get(L) — remove and return first element.  Mirrors interp_eval.c:1857. */
+    if (!strcmp(fn,"get") && nargs == 1) {
+        DESCR_t ld = args[0];
+        if (ld.v != DT_DATA) return 0;
+        DESCR_t tag = FIELD_GET_fn(ld,"icn_type");
+        if (!(tag.v==DT_S && tag.s && strcmp(tag.s,"list")==0)) return 0;
+        DESCR_t ea=FIELD_GET_fn(ld,"frame_elems");
+        int n=(int)FIELD_GET_fn(ld,"frame_size").i;
+        DESCR_t *arr=(ea.v==DT_DATA)?(DESCR_t*)ea.ptr:NULL;
+        if(!arr||n<=0) { *out=FAILDESCR; return 1; }
+        DESCR_t ret=arr[0];
+        FIELD_SET_fn(ld,"frame_elems",(DESCR_t){.v=DT_DATA,.ptr=arr+1});
+        FIELD_SET_fn(ld,"frame_size",INTVAL(n-1));
+        *out = ret; return 1;
+    }
+
+    /* pull(L) — remove and return last element.  Mirrors interp_eval.c:1874. */
+    if (!strcmp(fn,"pull") && nargs == 1) {
+        DESCR_t ld = args[0];
+        if (ld.v != DT_DATA) return 0;
+        DESCR_t tag = FIELD_GET_fn(ld,"icn_type");
+        if (!(tag.v==DT_S && tag.s && strcmp(tag.s,"list")==0)) return 0;
+        DESCR_t ea=FIELD_GET_fn(ld,"frame_elems");
+        int n=(int)FIELD_GET_fn(ld,"frame_size").i;
+        DESCR_t *arr=(ea.v==DT_DATA)?(DESCR_t*)ea.ptr:NULL;
+        if(!arr||n<=0) { *out=FAILDESCR; return 1; }
+        DESCR_t ret=arr[n-1];
+        FIELD_SET_fn(ld,"frame_size",INTVAL(n-1));
+        *out = ret; return 1;
+    }
+
+    /* sort(L) / sortf(L, i) — sort Icon list, optionally by record field i.
+     * Mirrors interp_eval.c:2220.  Insertion sort — correct for all sizes. */
+    if ((!strcmp(fn,"sort")&&nargs==1)||(!strcmp(fn,"sortf")&&nargs==2)) {
+        DESCR_t ld = args[0];
+        if (ld.v != DT_DATA) return 0;
+        DESCR_t tag = FIELD_GET_fn(ld,"icn_type");
+        if (!(tag.v==DT_S && tag.s && strcmp(tag.s,"list")==0)) return 0;
+        DESCR_t ea=FIELD_GET_fn(ld,"frame_elems");
+        int n=(int)FIELD_GET_fn(ld,"frame_size").i;
+        if (n<=0) { *out=ld; return 1; }
+        DESCR_t *arr=(ea.v==DT_DATA)?(DESCR_t*)ea.ptr:NULL;
+        if(!arr) { *out=ld; return 1; }
+        DESCR_t *sorted=GC_malloc(n*sizeof(DESCR_t));
+        memcpy(sorted,arr,n*sizeof(DESCR_t));
+        int field_idx=(!strcmp(fn,"sortf")&&nargs==2)?(int)to_int(args[1])-1:-1;
+        for(int _i=1;_i<n;_i++){
+            DESCR_t key=sorted[_i]; int _j=_i-1;
+            while(_j>=0){
+                DESCR_t a=sorted[_j],b=key;
+                if(field_idx>=0){
+                    if(a.v==DT_DATA&&a.u){DATINST_t*_ia=(DATINST_t*)a.u;if(_ia->type&&field_idx<_ia->type->nfields)a=_ia->fields[field_idx];}
+                    if(b.v==DT_DATA&&b.u){DATINST_t*_ib=(DATINST_t*)b.u;if(_ib->type&&field_idx<_ib->type->nfields)b=_ib->fields[field_idx];}
+                }
+                int cmp;
+                if(IS_INT_fn(a)&&IS_INT_fn(b)) cmp=(a.i>b.i)?1:(a.i<b.i)?-1:0;
+                else{const char*sa=VARVAL_fn(a),*sb=VARVAL_fn(b);cmp=strcmp(sa?sa:"",sb?sb:"");}
+                if(cmp<=0) break;
+                sorted[_j+1]=sorted[_j];_j--;
+            }
+            sorted[_j+1]=key;
+        }
+        DESCR_t res=ld;
+        FIELD_SET_fn(res,"frame_elems",(DESCR_t){.v=DT_DATA,.ptr=sorted});
+        FIELD_SET_fn(res,"frame_size",INTVAL(n));
+        *out=res; return 1;
+    }
+
+    /* FIELD_GET(record, fieldname) — Icon record field read.
+     * sm_lower emits: [lower obj] + SM_PUSH_LIT_S(field) + SM_CALL_FN("FIELD_GET",2).
+     * Mirrors FIELD_GET_fn macro / sc_dat_field_get. */
+    if (!strcmp(fn,"FIELD_GET") && nargs == 2) {
+        DESCR_t obj  = args[0];
+        DESCR_t fname_d = args[1];
+        const char *fname = VARVAL_fn(fname_d);
+        if (!fname || obj.v != DT_DATA) { *out=FAILDESCR; return 1; }
+        extern DESCR_t sc_dat_field_get(const char *field, DESCR_t obj);
+        *out = sc_dat_field_get(fname, obj); return 1;
+    }
+
+    /* FIELD_SET(rhs, record, fieldname) — Icon record field write.
+     * Stack at call (TOS first): fieldname, record, rhs → popped into args[2],args[1],args[0].
+     * So: args[0]=rhs, args[1]=record, args[2]=fieldname. */
+    if (!strcmp(fn,"FIELD_SET") && nargs == 3) {
+        DESCR_t val    = args[0];
+        DESCR_t obj    = args[1];
+        DESCR_t fname_d = args[2];
+        const char *fname = VARVAL_fn(fname_d);
+        if (!fname || obj.v != DT_DATA) { *out=FAILDESCR; return 1; }
+        extern DESCR_t *data_field_ptr(const char *field, DESCR_t obj);
+        DESCR_t *cell = data_field_ptr(fname, obj);
+        if (cell) { *cell = val; *out = val; return 1; }
+        *out = FAILDESCR; return 1;
+    }
+
+    /* MAKELIST(e0, e1, ...) — Icon list literal [e0, e1, ...].
+     * sm_lower emits each element then SM_CALL_FN("MAKELIST", n).
+     * Mirrors interp_eval.c:AST_MAKELIST. */
+    if (!strcmp(fn,"MAKELIST")) {
+        static int icnlist_reg3 = 0;
+        if (!icnlist_reg3) { DEFDAT_fn("icnlist(frame_elems,frame_size,icn_type)"); icnlist_reg3 = 1; }
+        DESCR_t *elems = GC_malloc((nargs>0?nargs:1)*sizeof(DESCR_t));
+        for (int _j=0;_j<nargs;_j++) elems[_j]=args[_j];
+        DESCR_t eptr; eptr.v=DT_DATA; eptr.slen=0; eptr.ptr=(void*)elems;
+        *out = DATCON_fn("icnlist", eptr, INTVAL(nargs), STRVAL("list")); return 1;
+    }
+
+    /* RECORD_MAKE(name, field0, field1, ...) — Icon record constructor.
+     * sm_lower emits SM_PUSH_LIT_S(typename) + args + SM_CALL_FN("RECORD_MAKE", nfields+1).
+     * Mirrors the sc_dat_construct path in interp_eval.c:2260. */
+    if (!strcmp(fn,"RECORD_MAKE") && nargs >= 1) {
+        const char *rname = VARVAL_fn(args[0]);
+        if (!rname || !*rname) { *out=FAILDESCR; return 1; }
+        ScDatType *_dt = sc_dat_find_type(rname);
+        if (!_dt) { *out=FAILDESCR; return 1; }
+        DESCR_t fargs[FRAME_SLOT_MAX];
+        int nf = nargs - 1;
+        for (int _j=0;_j<nf&&_j<FRAME_SLOT_MAX;_j++) fargs[_j]=args[1+_j];
+        *out = sc_dat_construct(_dt, fargs, nf); return 1;
+    }
+
     return 0;
 }
 

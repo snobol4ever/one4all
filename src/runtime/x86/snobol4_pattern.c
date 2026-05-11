@@ -561,6 +561,41 @@ int subscript_set(DESCR_t arr, DESCR_t idx, DESCR_t val) {
         table_set_descr(arr.tbl, k ? k : "", idx, val);
         return 1;
     }
+    /* IC-5 / CH-17g-builtin-batch: DT_DATA list or record subscript assign. */
+    if (arr.v == DT_DATA) {
+        /* Icon list: L[i] := v — mutate in-place. */
+        DESCR_t tag = FIELD_GET_fn(arr, "icn_type");
+        if (tag.v == DT_S && tag.s && strcmp(tag.s, "list") == 0) {
+            int n = (int)FIELD_GET_fn(arr, "frame_size").i;
+            DESCR_t ea = FIELD_GET_fn(arr, "frame_elems");
+            DESCR_t *elems = (ea.v == DT_DATA) ? (DESCR_t *)ea.ptr : NULL;
+            int i = (int)to_int(idx);
+            if (i < 0) i = n + 1 + i + 1;
+            if (!elems || i < 1 || i > n) return 0;
+            elems[i - 1] = val;
+            return 1;
+        }
+        /* Icon record: r[i] := v or r["field"] := v — mutate field in-place. */
+        if (arr.u && arr.u->type && arr.u->fields) {
+            DATBLK_t *blk = arr.u->type;
+            if (IS_INT_fn(idx)) {
+                int i = (int)idx.i;
+                if (i < 1 || i > blk->nfields) return 0;
+                arr.u->fields[i - 1] = val;
+                return 1;
+            }
+            if (idx.v == DT_S || idx.v == DT_SNUL) {
+                const char *k = idx.s ? idx.s : "";
+                for (int i = 0; i < blk->nfields; i++)
+                    if (blk->fields[i] && strcmp(blk->fields[i], k) == 0) {
+                        arr.u->fields[i] = val;
+                        return 1;
+                    }
+                return 0;
+            }
+        }
+        return 0;
+    }
     /* SIL NONARY → ERRTYP,3 → FTLTST */
     sno_runtime_error(3, NULL);
     return 0;
