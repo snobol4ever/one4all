@@ -98,4 +98,17 @@ int bb_macros_write_to_path(const char *path);
  * to collect cap fixups for the startup preamble. */
 void bb_flat_set_cap_fixup_cb(void (*cb)(void *cap_ptr, const char *child_α_label));
 
+/* EM-MODE4-IS-MODE3-DUMP-d: shared formatter helpers exposed for use
+ * from per-box template files.  Templates call these directly to emit
+ * the `#---` rule + "# BOX KIND(args) [label]" caption that introduces
+ * a BB box's emission in TEXT mode (no-op in BINARY mode).
+ *
+ * Originally `static void` in bb_flat.c; promoted to external linkage
+ * so per-box templates (which live under the `templates` directory)
+ * can produce the same banner shape without having to duplicate the
+ * implementation. */
+void flat_emit_banner_rule(emitter_t *e, char ch);
+void flat_emit_box_banner (emitter_t *e, const char *kind,
+                           const char *args, const char *label_prefix);
+
 #endif /* BB_FLAT_H */

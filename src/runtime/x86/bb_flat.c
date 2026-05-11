@@ -18,6 +18,7 @@
 #include "emitter.h"
 #include "snobol4.h"
 #include "bb_box.h"
+#include "templates/templates.h"   /* EM-MODE4-IS-MODE3-DUMP-d: emit_bb_xchr */
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -687,7 +688,9 @@ static void patnd_to_sno_string(const PATND_t *p, char *buf, size_t cap)
  * bb3c_format's empty-col-1 fusion path.  Result: banner first, then
  * `<label>:    <first content line>` on a single fused line.
  */
-static void flat_emit_banner_rule(emitter_t *e, char ch)
+/* EM-MODE4-IS-MODE3-DUMP-d: external linkage (was static).
+ * Used from the per-box template files for the BB-box banner shape. */
+void flat_emit_banner_rule(emitter_t *e, char ch)
 {
     if (!e->is_text) return;
     char buf[BB_BANNER_RULE_LEN + 4];
@@ -720,8 +723,10 @@ static void flat_emit_pat_banner(emitter_t *e, const char *prefix, PATND_t *p)
  * box banner for symmetry, no rule below (the box's α label-line
  * follows immediately).
  */
-static void flat_emit_box_banner(emitter_t *e, const char *kind,
-                                 const char *args, const char *label_prefix)
+/* EM-MODE4-IS-MODE3-DUMP-d: external linkage (was static).
+ * Used from the per-box template files for the BB-box banner shape. */
+void flat_emit_box_banner(emitter_t *e, const char *kind,
+                          const char *args, const char *label_prefix)
 {
     if (!e->is_text) return;
     flat_emit_banner_rule(e, '-');
@@ -819,6 +824,15 @@ static void flat_emit_alt(emitter_t *e, PATND_t *p,
 }
 
 /* ── leaf: literal string ───────────────────────────────────────────────── */
+/* EM-MODE4-IS-MODE3-DUMP-d (sess 2026-05-11): retained as rollback
+ * reference but no longer called.  XCHR emission now goes through
+ * `emit_bb_xchr` in `templates/bb_xchr.c`, which has byte-for-byte
+ * the same body.  See sub-rung -d watermark.  Single-line revert:
+ * change the call in flat_emit_node's case XCHR back to
+ * flat_emit_lit(e, lit, (int)strlen(lit), lbl_succ, lbl_fail, lbl_β). */
+static void flat_emit_lit(emitter_t *e, const char *lit, int len,
+                          bb_label_t *lbl_succ, bb_label_t *lbl_fail,
+                          bb_label_t *lbl_β) __attribute__((unused));
 static void flat_emit_lit(emitter_t *e, const char *lit, int len,
                           bb_label_t *lbl_succ, bb_label_t *lbl_fail,
                           bb_label_t *lbl_β)
@@ -1081,15 +1095,13 @@ static void flat_emit_node(emitter_t *e, PATND_t *p,
     if (!p) { flat_emit_eps(e, lbl_succ, lbl_fail, lbl_β); return; }
     switch (p->kind) {
     case XCHR: {
-        const char *lit = p->STRVAL_fn ? p->STRVAL_fn : "";
-        if (e->is_text) {
-            int n = (int)strlen(lit);
-            char preview[40];
-            if (n > 24) snprintf(preview, sizeof(preview), "'%.24s...'", lit);
-            else        snprintf(preview, sizeof(preview), "'%s'", lit);
-            flat_emit_box_banner(e, "LIT", preview, lbl_succ->name);
-        }
-        flat_emit_lit(e, lit, (int)strlen(lit), lbl_succ, lbl_fail, lbl_β);
+        /* EM-MODE4-IS-MODE3-DUMP-d (sess 2026-05-11): routed through
+         * the per-box template (templates/bb_xchr.c).  Body lifted
+         * byte-for-byte from the previous inline banner + flat_emit_lit
+         * call pair.  Single-line revert if needed: replace this call
+         * with the prior 10-line inline expansion (see git log of this
+         * line). */
+        emit_bb_xchr(e, p, lbl_succ, lbl_fail, lbl_β);
         break;
     }
     case XEPS:  flat_emit_eps (e, lbl_succ, lbl_fail, lbl_β); break;
