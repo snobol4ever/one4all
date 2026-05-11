@@ -143,6 +143,9 @@ void cohort_seq_register     (LowerHandler tbl[AST_KIND_COUNT]);
 void cohort_pat_prim_register(LowerHandler tbl[AST_KIND_COUNT]);
 void cohort_capture_register (LowerHandler tbl[AST_KIND_COUNT]);
 void cohort_call_register    (LowerHandler tbl[AST_KIND_COUNT]);
+void cohort_icn_relop_register(LowerHandler tbl[AST_KIND_COUNT]);
+void cohort_icn_cset_register (LowerHandler tbl[AST_KIND_COUNT]);
+void cohort_icn_unary_register(LowerHandler tbl[AST_KIND_COUNT]);
 
 #include "../common/ast_clone.h"   /* ast_gc_clone — used by emit_push_expr */
 

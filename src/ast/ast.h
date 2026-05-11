@@ -225,6 +225,41 @@ typedef enum AST_e {
 } AST_e;
 
 /* =========================================================================
+ * AugOp_e — augmented-assignment operator codes (SR-9)
+ *
+ * Written into AST_AUGOP.ival by the Icon frontend (icon_parse.c).
+ * sm_lower.c / cohort_icn_unary.c reads these values without including
+ * the frontend's icon_lex.h — eliminating the mid-function #include.
+ *
+ * The numeric values are stable; never reorder them.
+ * ========================================================================= */
+typedef enum {
+    AUGOP_ADD       = 1,  /* +:=   */
+    AUGOP_SUB       = 2,  /* -:=   */
+    AUGOP_MUL       = 3,  /* *:=   */
+    AUGOP_DIV       = 4,  /* /:=   */
+    AUGOP_MOD       = 5,  /* %:=   */
+    AUGOP_POW       = 6,  /* ^:=   */
+    AUGOP_CONCAT    = 7,  /* ||:=  */
+    AUGOP_CSET_UNION  = 8,  /* ++:=  */
+    AUGOP_CSET_DIFF   = 9,  /* --:=  */
+    AUGOP_CSET_INTER  = 10, /* **:=  */
+    AUGOP_SCAN      = 11, /* ?:=   */
+    AUGOP_EQ        = 12, /* =:=   */
+    AUGOP_SEQ       = 13, /* ==:=  */
+    AUGOP_LT        = 14, /* <:=   */
+    AUGOP_LE        = 15, /* <=:=  */
+    AUGOP_GT        = 16, /* >:=   */
+    AUGOP_GE        = 17, /* >=:=  */
+    AUGOP_NE        = 18, /* ~=:=  */
+    AUGOP_SLT       = 19, /* <<:=  */
+    AUGOP_SLE       = 20, /* <<=:= */
+    AUGOP_SGT       = 21, /* >>:=  */
+    AUGOP_SGE       = 22, /* >>=:= */
+    AUGOP_SNE       = 23, /* ~==:= */
+} AugOp_e;
+
+/* =========================================================================
  * AST_t — unified n-ary expression node
  *
  * All structural children live in the `children` array (realloc-grown).

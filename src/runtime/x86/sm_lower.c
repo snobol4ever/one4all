@@ -53,6 +53,9 @@ static void init_handlers(void)
     cohort_pat_prim_register(g_handlers);
     cohort_capture_register(g_handlers);
     cohort_call_register(g_handlers);
+    cohort_icn_relop_register(g_handlers);
+    cohort_icn_cset_register(g_handlers);
+    cohort_icn_unary_register(g_handlers);
     g_handlers_initialized = 1;
 }
 
@@ -82,12 +85,7 @@ void lower_expr(LowerCtx *c, const AST_t *e)
 
     /* ── Literals ── */
     /* AST_QLIT, AST_CSET, AST_ILIT, AST_FLIT, AST_NUL → cohort_literal */
-    case AST_NULL:
-        /* /E — Icon null test: succeed (yielding &null) iff E is null, else fail. */
-        lower_expr(c, e->nchildren > 0 ? e->children[0] : NULL);
-        sm_emit_si(p, SM_CALL_FN, "ICN_NULL", 1);
-        return;
-    /* AST_NUL → cohort_literal */
+    /* AST_NULL → cohort_icn_unary (SR-9) */
 
     /* ── References ── */
     /* AST_VAR, AST_KEYWORD, AST_INDIRECT, AST_DEFER → cohort_ref */
@@ -102,27 +100,10 @@ void lower_expr(LowerCtx *c, const AST_t *e)
     /* AST_ASSIGN, AST_FNC, AST_IDX, AST_SCAN, AST_SWAP → cohort_call */
     /* AST_CAPT_COND_ASGN, AST_CAPT_IMMED_ASGN, AST_CAPT_CURSOR → cohort_capture */
 
-    /* ── Numeric relational comparisons — a[0].i carries the operator EKind ── */
-    case AST_EQ: case AST_NE: case AST_LT:
-    case AST_LE: case AST_GT: case AST_GE: {
-        lower_expr(c, e->nchildren > 0 ? e->children[0] : NULL);
-        lower_expr(c, e->nchildren > 1 ? e->children[1] : NULL);
-        sm_emit_i(p, SM_ACOMP, (int64_t)e->kind);
-        return;
-    }
-
-    /* ── String relational comparisons — a[0].i carries the operator EKind ── */
-    case AST_LLT: case AST_LLE: case AST_LGT:
-    case AST_LGE: case AST_LEQ: case AST_LNE:
-        lower_expr(c, e->nchildren > 0 ? e->children[0] : NULL);
-        lower_expr(c, e->nchildren > 1 ? e->children[1] : NULL);
-        sm_emit_i(p, SM_LCOMP, (int64_t)e->kind);
-        return;
-
+    /* AST_EQ/NE/LT/LE/GT/GE, AST_LLT/LLE/LGT/LGE/LEQ/LNE → cohort_icn_relop (SR-9) */
     /* AST_INTERROGATE, AST_NAME → cohort_arith */
 
     /* AST_SCAN, AST_SWAP → cohort_call (SR-8) */
-
 
     /* AST_OPSYN → cohort_seq */
     /* AST_ALT, AST_ARB..AST_ARBNO → cohort_pat_prim */
@@ -217,87 +198,7 @@ void lower_expr(LowerCtx *c, const AST_t *e)
         sm_emit(p, SM_FRETURN);
         return;
 
-    case AST_NOT: {
-        lower_expr(c, e->nchildren > 0 ? e->children[0] : NULL);
-        int js = sm_emit_i(p, SM_JUMP_S, 0);   /* succeeded → fail */
-        sm_emit(p, SM_VOID_POP);
-        sm_emit(p, SM_PUSH_NULL);
-        int jend = sm_emit_i(p, SM_JUMP, 0);
-        int fail_lbl = sm_label(p);
-        sm_patch_jump(p, js, fail_lbl);
-        sm_emit(p, SM_VOID_POP);
-        sm_emit_si(p, SM_CALL_FN, "FAIL", 0);
-        int end_lbl = sm_label(p);
-        sm_patch_jump(p, jend, end_lbl);
-        return;
-    }
-
-    /* ── Augmented assignment (+=, -=, ||=, etc.) ── */
-    case AST_AUGOP: {
-        /* Inline lowering for simple lhs (AST_VAR, AST_KEYWORD).
-         * Falls through to AUGOP call for complex lhs (subscripts, fields). */
-        const AST_t *lhs = e->nchildren > 0 ? e->children[0] : NULL;
-        const AST_t *rhs = e->nchildren > 1 ? e->children[1] : NULL;
-        int op = (int)e->ival;
-
-        int lhs_slot  = -1;
-        const char *lhs_name = NULL;
-        int lhs_is_kw = 0;
-        if (lhs && lhs->kind == AST_VAR && lhs->sval) {
-            const char *vn = lhs->sval;
-            if (c->expression_body_lowering && c->expression_scope && vn[0] && vn[0] != '&')
-                lhs_slot = scope_get(c->expression_scope, vn);
-            if (lhs_slot < 0) lhs_name = vn;
-        } else if (lhs && lhs->kind == AST_KEYWORD && lhs->sval) {
-            lhs_name = lhs->sval;
-            lhs_is_kw = 1;
-        }
-
-        if (lhs_slot >= 0 || lhs_name) {
-            if (lhs_slot >= 0)    sm_emit_i(p, SM_LOAD_FRAME, lhs_slot);
-            else if (lhs_is_kw)   sm_emit_s(p, SM_PUSH_VAR, kw_canonicalize(lhs_name));
-            else                  sm_emit_s(p, SM_PUSH_VAR, lhs_name);
-            lower_expr(c, rhs);
-            #include "../../frontend/icon/icon_lex.h"
-            switch (op) {
-            case TK_AUGPLUS:   sm_emit(p, SM_ADD);    break;
-            case TK_AUGMINUS:  sm_emit(p, SM_SUB);    break;
-            case TK_AUGSTAR:   sm_emit(p, SM_MUL);    break;
-            case TK_AUGSLASH:  sm_emit(p, SM_DIV);    break;
-            case TK_AUGMOD:    sm_emit(p, SM_MOD);    break;
-            case TK_AUGCONCAT: sm_emit(p, SM_CONCAT); break;
-            default:
-                sm_emit_i(p, SM_PUSH_LIT_I, (int64_t)op);
-                sm_emit_si(p, SM_CALL_FN, "AUGOP", 3);
-                return;
-            }
-            if (lhs_slot >= 0)  sm_emit_i(p, SM_STORE_FRAME, lhs_slot);
-            else if (lhs_is_kw) sm_emit_s(p, SM_STORE_VAR, kw_canonicalize(lhs_name));
-            else                sm_emit_s(p, SM_STORE_VAR, lhs_name);
-            return;
-        }
-        lower_expr(c, lhs);
-        lower_expr(c, rhs);
-        sm_emit_i(p, SM_PUSH_LIT_I, (int64_t)op);
-        sm_emit_si(p, SM_CALL_FN, "AUGOP", 3);
-        return;
-    }
-
-    case AST_SIZE:
-        lower_expr(c, e->nchildren > 0 ? e->children[0] : NULL);
-        sm_emit_si(p, SM_CALL_FN, "SIZE", 1);
-        return;
-
-    case AST_NONNULL:
-        lower_expr(c, e->nchildren > 0 ? e->children[0] : NULL);
-        sm_emit_si(p, SM_CALL_FN, "NONNULL", 1);
-        return;
-
-    case AST_IDENTICAL:
-        lower_expr(c, e->nchildren > 0 ? e->children[0] : NULL);
-        lower_expr(c, e->nchildren > 1 ? e->children[1] : NULL);
-        sm_emit_si(p, SM_CALL_FN, "IDENTICAL", 2);
-        return;
+    /* AST_NOT, AST_AUGOP, AST_SIZE, AST_NONNULL, AST_IDENTICAL → cohort_icn_unary (SR-9) */
 
     case AST_MAKELIST:
         for (int i = 0; i < e->nchildren; i++) lower_expr(c, e->children[i]);
@@ -496,22 +397,7 @@ void lower_expr(LowerCtx *c, const AST_t *e)
         return;
     }
 
-    case AST_LCONCAT: {
-        /* Scalar (non-generative): lower each child, emit SM_CONCAT between pairs.
-         * Generative (gen ||| gen): route through SM_BB_PUMP_AST. */
-        int has_gen = 0;
-        for (int j = 0; j < e->nchildren; j++) {
-            if (is_suspendable(e->children[j])) { has_gen = 1; break; }
-        }
-        if (!has_gen) {
-            if (e->nchildren < 1) { sm_emit(p, SM_PUSH_NULL); return; }
-            for (int i = 0; i < e->nchildren; i++) lower_expr(c, e->children[i]);
-            for (int i = 1; i < e->nchildren; i++) sm_emit(p, SM_CONCAT);
-            return;
-        }
-        sm_emit_i(p, SM_BB_PUMP_AST, (int64_t)ast_pump_table_register((AST_t *)e));
-        return;
-    }
+    /* AST_LCONCAT → cohort_icn_cset (SR-9) */
 
     case AST_BANG_BINARY:
         sm_emit_i(p, SM_BB_PUMP_AST, (int64_t)ast_pump_table_register((AST_t *)e));
