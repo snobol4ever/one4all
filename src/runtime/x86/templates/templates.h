@@ -29,10 +29,14 @@
 
 /* ── SM opcode templates ──────────────────────────────────────────────── */
 
-/* SM_HALT — pc++ then ret.  Mode-3 in-process: returns out of
- * sm_jit_run's call frame.  See templates/sm_halt.c for the
- * KNOWN OPEN ARCHITECTURAL QUESTION about mode-4 semantics. */
+/* SM_HALT — pc++ then ret.  Mode-3 in-process; mode-4: rt_halt_tos@PLT.
+ * See templates/sm_halt.c for Option C sanctioned-exception rationale. */
 void emit_sm_halt(emitter_t *e);
+
+/* SM_PUSH_LIT_I — movabs rdi, val; call rt_push_int@PLT.
+ * No mode-3/mode-4 divergence; template used by mode-4; mode-3 still
+ * uses Standard blob pending ME-4+ (sub-rung -f, sess 2026-05-11). */
+void emit_sm_push_lit_i(emitter_t *e, int64_t val);
 
 /* ── BB box templates ─────────────────────────────────────────────────── */
 

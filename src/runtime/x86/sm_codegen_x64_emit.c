@@ -65,6 +65,7 @@
 #include "snobol4.h"         /* DESCR_t, PATND_t, pat_* constructors (EM-7a) */
 #include "bb_flat.h"         /* bb_build_flat_text, bb_build_flat_text_reset (EM-7c) */
 #include "sm_emit_template.h" /* SM op template table (EM-7c-sm-macros, sess #87) */
+#include "templates/templates.h" /* per-opcode templates (EM-MODE4-IS-MODE3-DUMP-f+) */
 #include <string.h>
 
 /* -----------------------------------------------------------------------
@@ -750,21 +751,37 @@ static int emit_pc_label(FILE *out, int pc)
     return fprintf(out, ".L%d:\n", pc) < 0 ? -1 : 0;
 }
 
-static int emit_sm_halt(FILE *out, int pc)
+static int emit_halt_line(FILE *out, int pc)
 {
     (void)pc;
-    /* SM_HALT: call rt_halt_tos() which safe-pops TOS as rc
-     * if it's DT_I, else uses 0.  Driven by the SM_HALT template
-     * (one source of truth with sm_macros.s). */
+    /* SM_HALT: call rt_halt_tos() via sm_macros.s HALT macro.
+     * Mode-4 form: call rt_halt_tos@PLT (Option C sanctioned exception).
+     * Renamed from emit_sm_halt to avoid conflict with templates/sm_halt.c's
+     * emit_sm_halt(emitter_t *) (EM-MODE4-IS-MODE3-DUMP-f). */
     return sm_emit_nullary(out, sm_template_lookup(SM_HALT), NULL);
 }
 
-static int emit_sm_push_lit_i(FILE *out, const SM_Instr *ins, int pc)
+static int emit_push_lit_i_line(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    /* SM_PUSH_INT macro: movabs rdi,val / call rt_push_int.
-     * Template-driven; macro body in sm_emit_template.c shares ONE
-     * renderer with this per-call site (drift impossible). */
+    /* EM-MODE4-IS-MODE3-DUMP-f: routed through per-opcode template.
+     * emitter_text_new(out) constructs a text emitter in INVOCATION mode;
+     * emit_sm_push_lit_i (templates/sm_push_lit_i.c) emits the two-line
+     * sequence (movabs rdi,val / call rt_push_int@PLT) directly to `out`.
+     * Legacy sm_emit_int64 path retained below as __attribute__((unused))
+     * for rollback reference. */
+    emitter_t *e = emitter_text_new(out);
+    if (!e) return -1;
+    emit_sm_push_lit_i(e, ins->a[0].i);
+    emitter_free(e);
+    return 0;
+}
+
+__attribute__((unused))
+static int emit_sm_push_lit_i_legacy(FILE *out, const SM_Instr *ins, int pc)
+{
+    (void)pc;
+    /* Legacy: SM_PUSH_INT macro via sm_emit_template. Kept as rollback. */
     return sm_emit_int64(out, sm_template_lookup(SM_PUSH_LIT_I),
                          ins->a[0].i, NULL);
 }
@@ -2134,8 +2151,8 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
         int rc;
         switch (ins->op) {
             /* EM-2: halt + integer push */
-            case SM_HALT:         rc = emit_sm_halt(out, pc);            break;
-            case SM_PUSH_LIT_I:   rc = emit_sm_push_lit_i(out, ins, pc); break;
+            case SM_HALT:         rc = emit_halt_line(out, pc);          break;
+            case SM_PUSH_LIT_I:   rc = emit_push_lit_i_line(out, ins, pc); break;
 
             /* EM-3: string push, var load/store, pop, arithmetic */
             case SM_PUSH_LIT_S:   rc = emit_sm_push_lit_s(out, ins, pc); break;
