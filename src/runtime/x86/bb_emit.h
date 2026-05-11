@@ -53,12 +53,43 @@
 /* ── mode ───────────────────────────────────────────────────────────────── */
 
 typedef enum {
-    EMIT_TEXT   = 0,
-    EMIT_BINARY = 1
+    EMIT_TEXT      = 0,
+    EMIT_BINARY    = 1,
+    EMIT_MACRO_DEF = 2     /* emit .macro NAME ... .endm body (sm_macros.s regen) */
 } bb_emit_mode_t;
 
 extern bb_emit_mode_t bb_emit_mode;
 extern FILE          *bb_emit_out;   /* text mode: output FILE* (default stdout) */
+
+/* emit_mode_set — central setter for emit pass mode.
+ *   m   = EMIT_BINARY / EMIT_TEXT / EMIT_MACRO_DEF
+ *   out = FILE* for text / macro_def modes; ignored (pass NULL) for binary.
+ * Every low-level emit function consults bb_emit_mode to decide what to do.
+ * Templates and the helpers they call do not carry the mode in their args. */
+void emit_mode_set(bb_emit_mode_t m, FILE *out);
+
+/* ── three-way low-level helpers (no emitter_t *e parameter) ────────────── */
+/*
+ * Templates and template-helpers call these directly.  Each helper consults
+ * bb_emit_mode and produces one of {binary bytes, text line, macro_def line}
+ * — or nothing, when "do nothing" is the right answer for that mode.
+ *
+ * Helpers are added incrementally as templates are ported off emitter_t.
+ * Co-exist with the emitter_t vtable during the transition: existing call
+ * sites that have an `emitter_t *e` keep using e->method or the inline
+ * helpers in emitter.h; new template code calls these free-standing helpers
+ * directly.  The `t_` prefix marks them as the template-side surface and
+ * avoids collision with the existing inline `emit_*(emitter_t *e, ...)`
+ * names.  Once the vtable is gone, the inlines disappear and the `t_`
+ * prefix may be dropped in a rename pass.
+ */
+void t_comment(const char *text);
+void t_bb_box_banner(const char *kind, const char *args);
+
+/* Instruction helpers — three-way, no emitter_t parameter. */
+void t_inc_mem_r13_disp8(uint8_t disp);
+void t_ret(void);
+void t_pad_to_blob_size(void);
 
 /* ── label ──────────────────────────────────────────────────────────────── */
 

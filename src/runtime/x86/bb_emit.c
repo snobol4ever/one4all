@@ -24,6 +24,131 @@ int             bb_emit_size = 0;
 bb_patch_t      bb_patch_list[BB_PATCH_MAX];
 int             bb_patch_count = 0;
 
+/* Central mode setter — called once at the top of each emit pass.
+ * Every low-level emit function reads bb_emit_mode (and, when text-side,
+ * bb_emit_out) to decide which of the three productions to write. */
+void emit_mode_set(bb_emit_mode_t m, FILE *out)
+{
+    bb_emit_mode = m;
+    bb_emit_out  = out;
+}
+
+/* ── three-way low-level helpers (no emitter_t *e) ──────────────────────── */
+/*
+ * Each helper below contains the full three-way decision.  Templates call
+ * them as plain C functions (no `e` argument, no vtable indirection).
+ * The mode is bb_emit_mode, set by emit_mode_set() at the top of the pass.
+ *
+ * "Do nothing" is one of the three things a helper may do (e.g. comments
+ * are no-ops in binary mode; instruction encoding is a no-op in macro_def
+ * mode if the macro body is defined elsewhere).
+ *
+ * Helpers are added incrementally as templates are ported.  Each call site
+ * in the templates points at the free-standing helper instead of e->method.
+ */
+
+void t_comment(const char *text)
+{
+    FILE *f;
+    switch (bb_emit_mode) {
+    case EMIT_BINARY:
+        /* No-op: comments have no place in raw x86 bytes. */
+        return;
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF:
+        /* Both write a `    # text` line.  Macro bodies tolerate comments. */
+        bb3c_flush_pending_cjmp_only();
+        f = bb_emit_out ? bb_emit_out : stdout;
+        fprintf(f, "    # %s\n", text ? text : "");
+        return;
+    }
+}
+
+void t_bb_box_banner(const char *kind, const char *args)
+{
+    FILE *f;
+    switch (bb_emit_mode) {
+    case EMIT_BINARY:
+        /* No-op: box banners are readability scaffolding. */
+        return;
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF:
+        /* 120-char `#---` rule + `    # BOX <kind>(<args>)` caption.
+         * Matches the EM-FORMAT-BANNER-COLLAPSE-SPACE shape:
+         * no space between # and the rule character. */
+        bb3c_flush_pending_cjmp_only();
+        f = bb_emit_out ? bb_emit_out : stdout;
+        fputc('#', f);
+        for (int i = 1; i < 120; i++) fputc('-', f);
+        fputc('\n', f);
+        fprintf(f, "    # BOX %s(%s)\n",
+                kind ? kind : "?", args ? args : "");
+        return;
+    }
+}
+
+/* ── instruction helpers (three-way, no emitter_t) ─────────────────────── */
+/*
+ * Each instruction helper renders the same x86 effect three ways.
+ * BINARY:    write the exact byte sequence into bb_emit_buf via bb_emit_byte.
+ * TEXT:      write a three-column GAS line via bb3c_format(out, "", mn, args).
+ * MACRO_DEF: write the instruction as a line of a `.macro` body — currently
+ *            the same form as TEXT (GAS syntax inside .macro is the same
+ *            as outside); future shape with `\param` substitution will
+ *            diverge here.
+ */
+
+static FILE *emit_outf(void) { return bb_emit_out ? bb_emit_out : stdout; }
+
+void t_inc_mem_r13_disp8(uint8_t disp)
+{
+    /* inc dword [r13 + disp8]   — 4 bytes: 41 ff 45 <disp8>
+     * Used by SM_HALT (pc bump via [r13+20]) and any SM op that
+     * touches an SM_State integer field. */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY: {
+        bb_emit_byte(0x41); bb_emit_byte(0xFF);
+        bb_emit_byte(0x45); bb_emit_byte(disp);
+        return;
+    }
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF: {
+        char args[64];
+        snprintf(args, sizeof(args), "dword ptr [r13 + %u]", (unsigned)disp);
+        bb3c_format(emit_outf(), "", "inc", args);
+        return;
+    }
+    }
+}
+
+void t_ret(void)
+{
+    /* ret  — 1 byte: C3 */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY:
+        bb_emit_byte(0xC3);
+        return;
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF:
+        bb3c_format(emit_outf(), "", "ret", "");
+        return;
+    }
+}
+
+void t_pad_to_blob_size(void)
+{
+    /* No-op in all three modes today: mode-3 uses variable-size blobs
+     * (per-pc address table in g_blob_addrs[]); mode-4 has no fixed-blob
+     * concept; macro_def bodies don't carry blob sizes.  Kept as a hook
+     * for a future architecture where fixed-size dispatch slots return. */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY:
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF:
+        return;
+    }
+}
+
 /* ── label ──────────────────────────────────────────────────────────────── */
 
 void bb_label_init(bb_label_t *lbl, const char *name)
@@ -201,16 +326,17 @@ void bb_emit_patch_rel32(bb_label_t *lbl)
 
 void bb_emit_byte(uint8_t b)
 {
-    if (bb_emit_mode == EMIT_TEXT) {
-        /* EM-7c-bb-three-column: TEXT mode never emits .byte hex walls.
-         * Every reachable instruction routes through a named bb_insn_*
-         * helper (mnemonic) or emitter_t->emit_insn (mnemonic).  A
-         * direct bb_emit_byte from TEXT mode is a bug — caller is
-         * leaking BINARY-mode byte knowledge into the text path. */
+    if (bb_emit_mode != EMIT_BINARY) {
+        /* EM-7c-bb-three-column: TEXT / MACRO_DEF mode never emits raw
+         * bytes.  Every reachable instruction routes through a named
+         * bb_insn_* helper (mnemonic) or a three-way emit_* free
+         * function.  A direct bb_emit_byte outside BINARY is a bug —
+         * caller is leaking BINARY-mode byte knowledge into a text
+         * path. */
         fprintf(stderr,
-                "bb_emit_byte: TEXT-mode reach (b=0x%02x) — "
+                "bb_emit_byte: non-BINARY-mode reach (mode=%d, b=0x%02x) — "
                 "convert caller to a named bb_insn_* helper\n",
-                (unsigned)b);
+                (int)bb_emit_mode, (unsigned)b);
         abort();
     }
     if (bb_emit_pos >= bb_emit_size) {
