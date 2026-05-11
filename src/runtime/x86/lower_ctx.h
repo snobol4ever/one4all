@@ -149,11 +149,11 @@ static inline void emit_push_expr(LowerCtx *c, const AST_t *e)
     sm_emit_ptr(c->p, SM_PUSH_EXPR, (void *)ast_gc_clone(e));
 }
 
-#define CH0(e) ((e)->nchildren > 0 ? (e)->children[0] : NULL)
-#define CH1(e) ((e)->nchildren > 1 ? (e)->children[1] : NULL)
+#define CH0(t) ((t)->nchildren > 0 ? (t)->children[0] : NULL)
+#define CH1(t) ((t)->nchildren > 1 ? (t)->children[1] : NULL)
 
-#define LOWER2(op)     do { lower_expr(c,CH0(e));     lower_expr(c,CH1(e));     sm_emit(p,(op)); return; } while(0)
-#define LOWER1_VAL(op) do { lower_expr(c,CH0(e));                               sm_emit(p,(op)); return; } while(0)
-#define LOWER1_PAT(op) do { lower_pat_expr(c,CH0(e));                           sm_emit(p,(op)); return; } while(0)
+#define LOWER2(op)     do { lower_expr(c,CH0(t));     lower_expr(c,CH1(t));     sm_emit(p,(op)); return; } while(0)
+#define LOWER1_VAL(op) do { lower_expr(c,CH0(t));                               sm_emit(p,(op)); return; } while(0)
+#define LOWER1_PAT(op) do { lower_pat_expr(c,CH0(t));                           sm_emit(p,(op)); return; } while(0)
 
 #endif /* LOWER_CTX_H */
