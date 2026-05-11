@@ -1151,10 +1151,71 @@ static void flat_emit_xnnyc(emitter_t *e, const char *chars,
                     charset_text_body, &a);
 }
 
+/* ── integer-cursor text-body callback (EM-MODE4-IS-MODE3-DUMP-g) ────────── */
+
+extern DESCR_t bb_len  (void *zeta, int entry);
+extern DESCR_t bb_tab  (void *zeta, int entry);
+extern DESCR_t bb_rtab (void *zeta, int entry);
+
+/* Arg struct for the text-body callback. */
+typedef struct {
+    bb_box_fn   c_fn;
+    const char *c_fn_name;
+    const char *kind_name;
+    const char *lbl_prefix; /* "len" / "tab" / "rtab" — for .Llen%d_z etc. */
+    long long   num;
+    int         data_pad;   /* 0 = one long only (LEN); 1 = add padding long */
+} intcur_text_arg_t;
+
+static void intcur_text_body(emitter_t *e,
+                             bb_label_t *lbl_succ,
+                             bb_label_t *lbl_fail,
+                             bb_label_t *lbl_β,
+                             void *arg_)
+{
+    const intcur_text_arg_t *a = (const intcur_text_arg_t *)arg_;
+    char banner_args[32];
+    snprintf(banner_args, sizeof(banner_args), "%lld", a->num);
+    flat_emit_box_banner(e, a->kind_name, banner_args, lbl_succ->name);
+
+    int id = g_flat_node_id++;
+    char lbl[64];
+    snprintf(lbl, sizeof(lbl), ".L%s%d_z", a->lbl_prefix, id);
+    flat_data_section(e);
+    flat3c_label(e, lbl);
+    flat_data_long(e, a->num);
+    if (a->data_pad) flat_data_long(e, 0);
+    flat_text_section(e);
+    flat_intel_syntax(e);
+    char rdi_arg[96];
+    snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", lbl);
+    flat_box_call(e, rdi_arg, a->c_fn_name, 0);
+    flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
+    EV_LABEL(e, lbl_β);
+    flat_box_call(e, rdi_arg, a->c_fn_name, 1);
+    flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
+}
+
+static void flat_emit_xlnth(emitter_t *e, long long num,
+                             bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
+{
+    intcur_text_arg_t a = { bb_len,  "bb_len",  "LEN",  "len",  num, 0 };
+    emit_bb_xlnth(e, num, lbl_succ, lbl_fail, lbl_β, intcur_text_body, &a);
+}
+static void flat_emit_xtb(emitter_t *e, long long num,
+                           bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
+{
+    intcur_text_arg_t a = { bb_tab,  "bb_tab",  "TAB",  "tab",  num, 1 };
+    emit_bb_xtb(e, num, lbl_succ, lbl_fail, lbl_β, intcur_text_body, &a);
+}
+static void flat_emit_xrtb(emitter_t *e, long long num,
+                            bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
+{
+    intcur_text_arg_t a = { bb_rtab, "bb_rtab", "RTAB", "rtab", num, 1 };
+    emit_bb_xrtb(e, num, lbl_succ, lbl_fail, lbl_β, intcur_text_body, &a);
+}
+
 /* ── flat_emit_node dispatch ─────────────────────────────────────────────── */
-extern DESCR_t bb_len   (void *zeta, int entry);
-extern DESCR_t bb_tab   (void *zeta, int entry);
-extern DESCR_t bb_rtab  (void *zeta, int entry);
 extern DESCR_t bb_fence (void *zeta, int entry);
 extern DESCR_t bb_arb   (void *zeta, int entry);
 extern DESCR_t bb_arbno (void *zeta, int entry);
@@ -1166,7 +1227,9 @@ extern DESCR_t bb_deferred_var_exported(void *zeta, int entry);
 extern int memcmp(const void *, const void *, size_t);
 
 /* Generic two-call emitter: α calls fn(ζ,0), β calls fn(ζ,1), result nonzero=success */
-static void flat_emit_box_call(emitter_t *e, bb_box_fn fn, const char *fn_name,
+/* EM-MODE4-IS-MODE3-DUMP-g: promoted from static to extern so
+ * templates/bb_xlnth.c can reuse the alpha/beta dispatch logic. */
+void flat_emit_box_call(emitter_t *e, bb_box_fn fn, const char *fn_name,
                                void *z,
                                bb_label_t *lbl_succ, bb_label_t *lbl_fail,
                                bb_label_t *lbl_β)
@@ -1221,77 +1284,10 @@ static void flat_emit_node(emitter_t *e, PATND_t *p,
     case XANYC: flat_emit_xanyc(e, p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
     case XBRKC: flat_emit_xbrkc(e, p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
     case XNNYC: flat_emit_xnnyc(e, p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
-    case XLNTH: {
-        if (e->is_text) {
-            char banner_args[32]; snprintf(banner_args, sizeof(banner_args), "%lld", (long long)p->num);
-            flat_emit_box_banner(e, "LEN", banner_args, lbl_succ->name);
-            int id = g_flat_node_id++;
-            char lbl[64]; snprintf(lbl, sizeof(lbl), ".Llen%d_z", id);
-            flat_data_section(e);
-            flat3c_label(e, lbl);
-            flat_data_long(e, (long long)p->num);
-            flat_text_section(e);
-            flat_intel_syntax(e);
-            char rdi_arg[96]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", lbl);
-            flat_box_call(e, rdi_arg, "bb_len", 0);
-            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
-            EV_LABEL(e, lbl_β);
-            flat_box_call(e, rdi_arg, "bb_len", 1);
-            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
-        } else {
-            len_t *z = bb_len_new((int)p->num);
-            flat_emit_box_call(e, bb_len, "bb_len", z, lbl_succ, lbl_fail, lbl_β);
-        }
-        break;
-    }
-    case XTB: {
-        if (e->is_text) {
-            char banner_args[32]; snprintf(banner_args, sizeof(banner_args), "%lld", (long long)p->num);
-            flat_emit_box_banner(e, "TAB", banner_args, lbl_succ->name);
-            int id = g_flat_node_id++;
-            char lbl[64]; snprintf(lbl, sizeof(lbl), ".Ltab%d_z", id);
-            flat_data_section(e);
-            flat3c_label(e, lbl);
-            flat_data_long(e, (long long)p->num);
-            flat_data_long(e, 0);
-            flat_text_section(e);
-            flat_intel_syntax(e);
-            char rdi_arg[96]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", lbl);
-            flat_box_call(e, rdi_arg, "bb_tab", 0);
-            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
-            EV_LABEL(e, lbl_β);
-            flat_box_call(e, rdi_arg, "bb_tab", 1);
-            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
-        } else {
-            tab_t *z = bb_tab_new((int)p->num);
-            flat_emit_box_call(e, bb_tab, "bb_tab", z, lbl_succ, lbl_fail, lbl_β);
-        }
-        break;
-    }
-    case XRTB: {
-        if (e->is_text) {
-            char banner_args[32]; snprintf(banner_args, sizeof(banner_args), "%lld", (long long)p->num);
-            flat_emit_box_banner(e, "RTAB", banner_args, lbl_succ->name);
-            int id = g_flat_node_id++;
-            char lbl[64]; snprintf(lbl, sizeof(lbl), ".Lrtab%d_z", id);
-            flat_data_section(e);
-            flat3c_label(e, lbl);
-            flat_data_long(e, (long long)p->num);
-            flat_data_long(e, 0);
-            flat_text_section(e);
-            flat_intel_syntax(e);
-            char rdi_arg[96]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", lbl);
-            flat_box_call(e, rdi_arg, "bb_rtab", 0);
-            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
-            EV_LABEL(e, lbl_β);
-            flat_box_call(e, rdi_arg, "bb_rtab", 1);
-            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
-        } else {
-            rtab_t *z = bb_rtab_new((int)p->num);
-            flat_emit_box_call(e, bb_rtab, "bb_rtab", z, lbl_succ, lbl_fail, lbl_β);
-        }
-        break;
-    }
+    /* EM-MODE4-IS-MODE3-DUMP-g: integer-cursor family routed through templates. */
+    case XLNTH: flat_emit_xlnth(e, (long long)p->num, lbl_succ, lbl_fail, lbl_β); break;
+    case XTB:   flat_emit_xtb  (e, (long long)p->num, lbl_succ, lbl_fail, lbl_β); break;
+    case XRTB:  flat_emit_xrtb (e, (long long)p->num, lbl_succ, lbl_fail, lbl_β); break;
     case XFNCE: {
         if (e->is_text) {
             flat_emit_box_banner(e, "FENCE", NULL, lbl_succ->name);

@@ -117,13 +117,25 @@ void flat_emit_box_banner (emitter_t *e, const char *kind,
  * the full bb_flat.c static context.  Defined in bb_flat.c. */
 extern int g_flat_node_id;
 
-/* Callback type for the charset-family template (bb_xspnc.c).
- * bb_flat.c supplies a text-path implementation; the template supplies
- * the binary path.  This avoids externalizing bb_flat.c's static helpers. */
+/* Callback type for the charset-family template (bb_xspnc.c). */
 typedef void (*bb_charset_text_fn)(emitter_t *e,
                                    bb_label_t *lbl_succ,
                                    bb_label_t *lbl_fail,
                                    bb_label_t *lbl_β,
                                    void *arg);
+
+/* Callback type for the integer-cursor family template (bb_xlnth.c). */
+typedef void (*bb_intcur_text_fn)(emitter_t *e,
+                                  bb_label_t *lbl_succ,
+                                  bb_label_t *lbl_fail,
+                                  bb_label_t *lbl_β,
+                                  void *arg);
+
+/* flat_emit_box_call — alpha/beta dispatch for a pre-allocated zeta struct.
+ * Exposed for use by integer-cursor template (bb_xlnth.c). */
+void flat_emit_box_call(emitter_t *e, bb_box_fn fn, const char *fn_name,
+                        void *z,
+                        bb_label_t *lbl_succ, bb_label_t *lbl_fail,
+                        bb_label_t *lbl_β);
 
 #endif /* BB_FLAT_H */
