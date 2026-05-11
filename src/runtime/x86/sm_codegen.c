@@ -2299,6 +2299,110 @@ static void emit_me4_store_var_blob(const char *name, size_t trampoline_abs_off)
     emit_jmp_trampoline(trampoline_abs_off);
 }
 
+/*------------------------------------------------------------------------*/
+/* ME-9a — Nullary pattern primitives.                                    */
+/*                                                                        */
+/* Eight SM_PAT_* opcodes have the same blob shape:                       */
+/*   SM_PAT_ARB SM_PAT_REM SM_PAT_FAIL SM_PAT_SUCCEED                     */
+/*   SM_PAT_EPS SM_PAT_FENCE SM_PAT_ABORT SM_PAT_BAL                      */
+/*                                                                        */
+/* Each calls a parameter-less runtime constructor `pat_X(void)` whose    */
+/* DESCR_t return lands in rax:rdx, then pushes the result on the r12     */
+/* value stack.  Net delta: +1.  No args consumed from the stack.         */
+/*                                                                        */
+/* Mirrors emit_me4_push_null_blob exactly — same arg-less, push-1 shape, */
+/* just a different imm64 target.                                         */
+/*                                                                        */
+/* Layout (42 bytes):                                                     */
+/*    inc  dword [r13+20]      ; pc++                          4          */
+/*    sub  rsp, 8              ; align rsp to 16              \           */
+/*    mov  rax, imm64(fn)      ; load function ptr             \  20      */
+/*    call rax                                                 /          */
+/*    add  rsp, 8              ; restore                      /           */
+/*    mov  [r12], rax          ; push result.lo                4          */
+/*    mov  [r12+8], rdx        ; push result.hi                5          */
+/*    add  r12, 16             ; advance TOS                   4          */
+/*    jmp  rel32 trampoline                                    5          */
+/*                                                          = 42          */
+/*                                                                        */
+/* last_ok policy: untouched.  pat_X() constructors never fail and never  */
+/* set last_ok in mode 2; the inline blob preserves that.                 */
+/*------------------------------------------------------------------------*/
+static void emit_me9_pat_nullary_blob(void *rt_fn, size_t trampoline_abs_off)
+{
+    /* pc++                            (41 ff 45 14)                4 */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x14);
+
+    /* aligned call rt_fn — DESCR_t returned in rax:rdx          20 */
+    emit_aligned_call_imm64(rt_fn);
+
+    /* push result onto r12 stack ([r12]/[r12+8]; r12 += 16)    */
+    /* mov [r12], rax                  (49 89 04 24)                4 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x04); seg_byte(SEG_CODE, 0x24);
+    /* mov [r12+8], rdx                (49 89 54 24 08)              5 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x54); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x08);
+    /* add r12, 16                     (49 83 c4 10)                 4 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x83);
+    seg_byte(SEG_CODE, 0xc4); seg_byte(SEG_CODE, 0x10);
+
+    emit_jmp_trampoline(trampoline_abs_off);                       /* 5 */
+}
+
+/*------------------------------------------------------------------------*/
+/* ME-9b — SM_PAT_LIT.                                                    */
+/*                                                                        */
+/* Calls pat_lit(s) where s is the literal string baked as an imm64       */
+/* operand (from prog->instrs[i].a[0].s).  No stack args; net delta +1.   */
+/*                                                                        */
+/* Mirrors emit_me4_push_var_blob exactly — same one-string-arg shape,    */
+/* just a different runtime target.                                       */
+/*                                                                        */
+/* Layout (52 bytes):                                                     */
+/*    inc  dword [r13+20]      ; pc++                          4          */
+/*    mov  rdi, imm64(s)       ; literal pointer              10          */
+/*    sub  rsp, 8              ; align                        \           */
+/*    mov  rax, imm64(pat_lit)                                 \  20      */
+/*    call rax                                                 /          */
+/*    add  rsp, 8                                             /           */
+/*    mov  [r12], rax          ; push result.lo                4          */
+/*    mov  [r12+8], rdx        ; push result.hi                5          */
+/*    add  r12, 16             ; advance TOS                   4          */
+/*    jmp  rel32 trampoline                                    5          */
+/*                                                          = 52          */
+/*                                                                        */
+/* NULL safety: pat_lit() itself null-guards s (snobol4_pattern.c:84-88), */
+/* so the blob can pass a[0].s through unchecked.                         */
+/*------------------------------------------------------------------------*/
+static void emit_me9_pat_lit_blob(const char *lit, size_t trampoline_abs_off)
+{
+    /* pc++                            (41 ff 45 14)                4 */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x14);
+
+    /* mov rdi, imm64(lit)             (48 bf <imm64>)              10 */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xbf);
+    seg_u64(SEG_CODE, (uint64_t)(uintptr_t)lit);
+
+    /* aligned call pat_lit — DESCR_t in rax:rdx                  20 */
+    emit_aligned_call_imm64((void *)&pat_lit);
+
+    /* push result on r12 stack                                         */
+    /* mov [r12], rax                  (49 89 04 24)                4 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x04); seg_byte(SEG_CODE, 0x24);
+    /* mov [r12+8], rdx                (49 89 54 24 08)              5 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x54); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x08);
+    /* add r12, 16                     (49 83 c4 10)                 4 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x83);
+    seg_byte(SEG_CODE, 0xc4); seg_byte(SEG_CODE, 0x10);
+
+    emit_jmp_trampoline(trampoline_abs_off);                       /* 5 */
+}
+
 /* ── Main codegen entry point ─────────────────────────────────────────── */
 
 /*
@@ -2450,6 +2554,31 @@ int sm_codegen(SM_Program *prog)
             emit_me4_push_var_blob(prog->instrs[i].a[0].s, g_trampoline_offset);
         } else if (op == SM_STORE_VAR) {
             emit_me4_store_var_blob(prog->instrs[i].a[0].s, g_trampoline_offset);
+        } else if (op == SM_PAT_LIT) {
+            /* ME-9b: inline-native pat_lit.  String baked as imm64 from
+             * a[0].s; pat_lit null-guards internally so no extra check. */
+            emit_me9_pat_lit_blob(prog->instrs[i].a[0].s, g_trampoline_offset);
+        } else if (op == SM_PAT_ARB     || op == SM_PAT_REM    ||
+                   op == SM_PAT_FAIL    || op == SM_PAT_SUCCEED ||
+                   op == SM_PAT_EPS     || op == SM_PAT_FENCE  ||
+                   op == SM_PAT_ABORT   || op == SM_PAT_BAL) {
+            /* ME-9a: inline-native pattern primitives (nullary).  Each
+             * calls pat_X(void) via imm64 and pushes the DT_P result on
+             * r12.  No args consumed; net delta +1.  Replaces the
+             * emit_standard_blob fallback for these eight opcodes. */
+            void *rt_fn = NULL;
+            switch (op) {
+            case SM_PAT_ARB:     rt_fn = (void *)&pat_arb;     break;
+            case SM_PAT_REM:     rt_fn = (void *)&pat_rem;     break;
+            case SM_PAT_FAIL:    rt_fn = (void *)&pat_fail;    break;
+            case SM_PAT_SUCCEED: rt_fn = (void *)&pat_succeed; break;
+            case SM_PAT_EPS:     rt_fn = (void *)&pat_epsilon; break;
+            case SM_PAT_FENCE:   rt_fn = (void *)&pat_fence;   break;
+            case SM_PAT_ABORT:   rt_fn = (void *)&pat_abort;   break;
+            case SM_PAT_BAL:     rt_fn = (void *)&pat_bal;     break;
+            default: break;
+            }
+            emit_me9_pat_nullary_blob(rt_fn, g_trampoline_offset);
         } else {
             emit_standard_blob(g_handlers[op], g_trampoline_offset);
         }
