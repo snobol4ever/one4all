@@ -111,4 +111,15 @@ void emit_bb_xrpsi(emitter_t *e, int n,
  * op_enum: SM opcode integer; macro_name: GAS macro name (ADD_NUM etc.). */
 void emit_sm_arith_op(emitter_t *e, int op_enum, const char *macro_name);
 
+/* XEPS/XFAIL/XFARB (EPS/FAIL/ARB) — sub-rung -m (2026-05-11). */
+void emit_bb_xeps (emitter_t *e,
+                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β,
+                   bb_nullary_text_fn text_body_fn, void *text_body_arg);
+void emit_bb_xfail(emitter_t *e,
+                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β,
+                   bb_nullary_text_fn text_body_fn, void *text_body_arg);
+void emit_bb_xfarb(emitter_t *e,
+                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β,
+                   bb_nullary_text_fn text_body_fn, void *text_body_arg);
+
 #endif /* RUNTIME_X86_TEMPLATES_TEMPLATES_H */

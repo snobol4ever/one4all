@@ -145,6 +145,13 @@ typedef void (*bb_pos_text_fn)(emitter_t *e, int n,
                                bb_label_t *lbl_β,
                                void *arg);
 
+/* Callback type for no-operand boxes (XEPS/XFAIL/XFARB) (bb_xfarb.c). */
+typedef void (*bb_nullary_text_fn)(emitter_t *e,
+                                   bb_label_t *lbl_succ,
+                                   bb_label_t *lbl_fail,
+                                   bb_label_t *lbl_β,
+                                   void *arg);
+
 /* flat_emit_box_call — alpha/beta dispatch for a pre-allocated zeta struct.
  * Exposed for use by integer-cursor template (bb_xlnth.c). */
 void flat_emit_box_call(emitter_t *e, bb_box_fn fn, const char *fn_name,

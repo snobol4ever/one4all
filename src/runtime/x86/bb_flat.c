@@ -885,42 +885,74 @@ static void flat_emit_lit(emitter_t *e, const char *lit, int len,
 }
 
 /* ── leaf: epsilon ──────────────────────────────────────────────────────── */
+/* ── XEPS/XFAIL/XFARB text-body callbacks (EM-MODE4-IS-MODE3-DUMP-m) ──────── */
+
+static void eps_text_body(emitter_t *e,
+                          bb_label_t *lbl_succ, bb_label_t *lbl_fail,
+                          bb_label_t *lbl_β, void *arg_)
+{
+    (void)arg_;
+    flat_emit_box_banner(e, "EPS", NULL, lbl_succ->name);
+    char args[256];
+    snprintf(args, sizeof(args), "%s # EPS", lbl_succ->name);
+    flat3c_action(e, "EPS_\xCE\xB1", args);
+    EV_LABEL(e, lbl_β);
+    flat3c_action(e, "EPS_\xCE\xB2", lbl_fail->name);
+}
+
+static void fail_text_body(emitter_t *e,
+                           bb_label_t *lbl_succ, bb_label_t *lbl_fail,
+                           bb_label_t *lbl_β, void *arg_)
+{
+    (void)lbl_succ; (void)arg_;
+    flat_emit_box_banner(e, "FAIL", NULL, lbl_fail->name);
+    char args[256];
+    snprintf(args, sizeof(args), "%s # FAIL", lbl_fail->name);
+    flat3c_action(e, "FAIL_\xCE\xB1", args);
+    EV_LABEL(e, lbl_β);
+    flat3c_action(e, "FAIL_\xCE\xB2", lbl_fail->name);
+}
+
+static void arb_text_body(emitter_t *e,
+                          bb_label_t *lbl_succ, bb_label_t *lbl_fail,
+                          bb_label_t *lbl_β, void *arg_)
+{
+    (void)arg_;
+    flat_emit_box_banner(e, "ARB", NULL, lbl_succ->name);
+    int id = g_flat_node_id++;
+    char lbl[64]; snprintf(lbl, sizeof(lbl), ".Larb%d_z", id);
+    flat_data_section(e);
+    flat3c_label(e, lbl);
+    flat_data_long(e, 0);
+    flat_data_long(e, 0);
+    flat_text_section(e);
+    flat_intel_syntax(e);
+    char rdi_arg[96]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", lbl);
+    flat_box_call(e, rdi_arg, "bb_arb", 0);
+    flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
+    EV_LABEL(e, lbl_β);
+    flat_box_call(e, rdi_arg, "bb_arb", 1);
+    flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
+}
+
 static void flat_emit_eps(emitter_t *e, bb_label_t *lbl_succ,
                           bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
-    if (e->is_text) {
-        flat_emit_box_banner(e, "EPS", NULL, lbl_succ->name);
-        /* EM-7c-bb-macros: single macro call per port.
-         * EM-FORMAT-BB-COL3-COMMENTS: α-line names the box kind. */
-        char args[256];
-        snprintf(args, sizeof(args), "%s # EPS", lbl_succ->name);
-        flat3c_action(e, "EPS_\xCE\xB1", args);             /* EPS_α lbl_succ # EPS */
-        EV_LABEL(e, lbl_β);
-        flat3c_action(e, "EPS_\xCE\xB2", lbl_fail->name);  /* EPS_β lbl_fail */
-    } else {
-        EV_JMP(e, lbl_succ, JMP_JMP);
-        EV_LABEL(e, lbl_β); EV_JMP(e, lbl_fail, JMP_JMP);
-    }
+    emit_bb_xeps(e, lbl_succ, lbl_fail, lbl_β, eps_text_body, NULL);
 }
 
-/* ── leaf: always-fail ──────────────────────────────────────────────────── */
 static void flat_emit_fail(emitter_t *e, bb_label_t *lbl_succ,
                            bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
-    (void)lbl_succ;
-    if (e->is_text) {
-        flat_emit_box_banner(e, "FAIL", NULL, lbl_fail->name);
-        /* EM-FORMAT-BB-COL3-COMMENTS: α-line names the box kind. */
-        char args[256];
-        snprintf(args, sizeof(args), "%s # FAIL", lbl_fail->name);
-        flat3c_action(e, "FAIL_\xCE\xB1", args);            /* FAIL_α lbl_fail # FAIL */
-        EV_LABEL(e, lbl_β);
-        flat3c_action(e, "FAIL_\xCE\xB2", lbl_fail->name);  /* FAIL_β lbl_fail */
-    } else {
-        EV_JMP(e, lbl_fail, JMP_JMP);
-        EV_LABEL(e, lbl_β); EV_JMP(e, lbl_fail, JMP_JMP);
-    }
+    emit_bb_xfail(e, lbl_succ, lbl_fail, lbl_β, fail_text_body, NULL);
 }
+
+static void flat_emit_xfarb(emitter_t *e, bb_label_t *lbl_succ,
+                             bb_label_t *lbl_fail, bb_label_t *lbl_β)
+{
+    emit_bb_xfarb(e, lbl_succ, lbl_fail, lbl_β, arb_text_body, NULL);
+}
+
 
 /* ── leaf: POS(n) ───────────────────────────────────────────────────────── */
 /* ── XPOSI/XRPSI text-body callbacks (EM-MODE4-IS-MODE3-DUMP-k) ─────────── */
@@ -1371,29 +1403,7 @@ static void flat_emit_node(emitter_t *e, PATND_t *p,
         }
         break;
     }
-    case XFARB: {
-        if (e->is_text) {
-            flat_emit_box_banner(e, "ARB", NULL, lbl_succ->name);
-            int id = g_flat_node_id++;
-            char lbl[64]; snprintf(lbl, sizeof(lbl), ".Larb%d_z", id);
-            flat_data_section(e);
-            flat3c_label(e, lbl);
-            flat_data_long(e, 0);
-            flat_data_long(e, 0);
-            flat_text_section(e);
-            flat_intel_syntax(e);
-            char rdi_arg[96]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", lbl);
-            flat_box_call(e, rdi_arg, "bb_arb", 0);
-            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
-            EV_LABEL(e, lbl_β);
-            flat_box_call(e, rdi_arg, "bb_arb", 1);
-            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
-        } else {
-            arb_t *z = bb_arb_new();
-            flat_emit_box_call(e, bb_arb, "bb_arb", z, lbl_succ, lbl_fail, lbl_β);
-        }
-        break;
-    }
+    case XFARB: flat_emit_xfarb(e, lbl_succ, lbl_fail, lbl_β); break;
     case XSTAR: {
         if (e->is_text) {
             flat_emit_box_banner(e, "REM", NULL, lbl_succ->name);
