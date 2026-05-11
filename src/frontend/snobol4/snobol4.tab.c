@@ -194,7 +194,7 @@ typedef enum yysymbol_kind_t yysymbol_kind_t;
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-typedef struct { CODE_t *prog; AST_t **result; } PP;
+typedef struct { CODE_t *prog; AST_t **result; AST_t *ast_prog; } PP;
 static void     sno4_stmt_commit_go(void*,Token,AST_t*,AST_t*,int,AST_t*,AST_t*,AST_t*,AST_t*);
 static Lex     *g_lx;
 static void     fixup_val(AST_t*);
@@ -2251,13 +2251,38 @@ static void sno4_stmt_commit_go(void *param,Token lbl,AST_t *subj,AST_t *pat,int
     if(gf){ if(gf->kind==AST_QLIT) s->goto_f=gf->sval; else s->goto_f_expr=gf; }
     if(!pp->prog->head) pp->prog->head=pp->prog->tail=s; else{pp->prog->tail->next=s;pp->prog->tail=s;}
     /* nstmts already incremented above when assigning s->stno (SN-26-bridge-coverage-j) */
+    /* SI-4: also emit AST_STMT/AST_END directly into ast_prog when the caller
+     * wants a pure-AST result (sno_parse_ast path). This mirrors stmt_to_ast()
+     * exactly — both paths must produce byte-identical lowering output. */
+    /* SI-4: emit AST_STMT/AST_END into ast_prog for the sno_parse_ast path.
+     * Delegate to stmt_to_ast(s) so the encoding is byte-identical to the
+     * code_to_ast shim path — one canonical builder, not two. */
+    if (pp->ast_prog) {
+        AST_t *anode = stmt_to_ast(s);
+        if (pp->ast_prog->nchildren >= pp->ast_prog->nalloc) {
+            pp->ast_prog->nalloc = pp->ast_prog->nalloc ? pp->ast_prog->nalloc * 2 : 64;
+            pp->ast_prog->children = realloc(pp->ast_prog->children,
+                (size_t)pp->ast_prog->nalloc * sizeof(AST_t*));
+        }
+        pp->ast_prog->children[pp->ast_prog->nchildren++] = anode;
+    }
 }
 static AST_t *parse_expr(Lex *lx){
-    CODE_t *prog=calloc(1,sizeof*prog);PP p={prog,NULL};g_lx=lx;snobol4_parse(&p);
+    CODE_t *prog=calloc(1,sizeof*prog);PP p={prog,NULL,NULL};g_lx=lx;snobol4_parse(&p);
     return prog->head?prog->head->subject:NULL;
 }
 CODE_t *parse_program_tokens(Lex *stream){
-    CODE_t *prog=calloc(1,sizeof*prog);PP p={prog,NULL};g_lx=stream;snobol4_parse(&p);return prog;
+    CODE_t *prog=calloc(1,sizeof*prog);PP p={prog,NULL,NULL};g_lx=stream;snobol4_parse(&p);return prog;
+}
+/* parse_program_tokens_ast — SI-4: parse into CODE_t (for existing consumers)
+ * AND into a parallel AST_PROGRAM (for the lower() call path).
+ * Returns the CODE_t; sets *ast_out to the AST_PROGRAM. */
+CODE_t *parse_program_tokens_ast(Lex *stream, AST_t **ast_out){
+    CODE_t *prog=calloc(1,sizeof*prog);
+    AST_t *ast=calloc(1,sizeof*ast); ast->kind=AST_PROGRAM;
+    PP p={prog,NULL,ast};g_lx=stream;snobol4_parse(&p);
+    *ast_out=ast;
+    return prog;
 }
 CODE_t *parse_program(LineArray *lines){(void)lines;return calloc(1,sizeof(CODE_t));}
 AST_t *parse_expr_from_str(const char *src){

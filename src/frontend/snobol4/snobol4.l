@@ -533,6 +533,7 @@ int  lex_at_end(Lex *lx) { return lex_peek(lx).kind==T_EOF; }
 void lex_destroy(Lex *lx) { flex_lex_destroy(lx); }
 
 extern CODE_t *parse_program_tokens(Lex *stream);
+extern CODE_t *parse_program_tokens_ast(Lex *stream, AST_t **ast_out);
 
 CODE_t *sno_parse(FILE *f, const char *fname) {
     Lex lx; memset(&lx,0,sizeof lx);
@@ -540,6 +541,20 @@ CODE_t *sno_parse(FILE *f, const char *fname) {
     CODE_t *prog = parse_program_tokens(&lx);
     flex_lex_destroy(&lx);
     return prog;
+}
+
+/* sno_parse_ast — SI-4: parse a SNOBOL4 file, returning an AST_PROGRAM
+ * and (via out-param) the CODE_t linked list still needed for
+ * label_table_build / prescan_defines / multi-file merge. Single parse
+ * pass — both representations built in lock-step. */
+AST_t *sno_parse_ast(FILE *f, const char *fname, CODE_t **code_out) {
+    Lex lx; memset(&lx,0,sizeof lx);
+    flex_lex_open(&lx,f,fname);
+    AST_t *ast = NULL;
+    CODE_t *prog = parse_program_tokens_ast(&lx, &ast);
+    flex_lex_destroy(&lx);
+    if (code_out) *code_out = prog;
+    return ast;
 }
 
 void sno_reset(void) { sno_nerrors = 0; n_inc = 0; }

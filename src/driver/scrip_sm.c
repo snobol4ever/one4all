@@ -87,8 +87,9 @@ void sm_resolve_irrun_entry_pcs(void *prog_void)
     sm_prog_free(sm);
 }
 
-SM_Program *sm_preamble(void *prog_void){
+SM_Program *sm_preamble(void *prog_void, void *ast_prog_void){
     CODE_t *prog = (CODE_t *)prog_void;
+    AST_t  *ast_prog = (AST_t *)ast_prog_void;
     label_table_build(prog);
     prescan_defines(prog);
     g_sno_err_active = 1;   /* arm so sno_runtime_error longjmps safely */
@@ -103,7 +104,9 @@ SM_Program *sm_preamble(void *prog_void){
     uint32_t lang_mask = polyglot_lang_mask(prog);
     polyglot_init(prog, lang_mask);
 
-    SM_Program *sm = lower(code_to_ast(prog));
+    /* SI-4: prefer the pre-built ast_prog when present; fall back to
+     * code_to_ast(prog) for paths not yet migrated (Icon/Prolog/etc.). */
+    SM_Program *sm = lower(ast_prog ? ast_prog : code_to_ast(prog));
     if (!sm) {
         fprintf(stderr, "scrip: sm_lower failed\n");
         return NULL;

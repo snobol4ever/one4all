@@ -39,7 +39,11 @@
  *
  * Returns NULL on failure (sm_lower error). On success, returned pointer
  * must be freed with sm_prog_free() after run completes. */
-SM_Program *sm_preamble(void *prog);
+/* sm_preamble(prog, ast_prog)
+ * prog:     CODE_t* — label_table_build / prescan_defines / polyglot_init consumers.
+ * ast_prog: AST_t*  — preferred input to lower() when non-NULL (SI-4 SNOBOL4 path).
+ *                     When NULL, falls back to code_to_ast(prog). */
+SM_Program *sm_preamble(void *prog, void *ast_prog);
 
 /* CH-17g-irrun-lowers: run sm_lower + sm_resolve_proc_entry_pcs on prog
  * (which must already have been initialised by polyglot_init) and then free

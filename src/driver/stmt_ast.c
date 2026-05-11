@@ -32,12 +32,15 @@
 
 /* ── helpers ────────────────────────────────────────────────────────────── */
 
-static AST_t *sa_new(AST_e kind)
+/* ast_stmt_new — allocate a zeroed AST node of the given kind.
+ * Public: used by snobol4.y (SI-4) to build AST_STMT/AST_END directly. */
+AST_t *ast_stmt_new(AST_e kind)
 {
     AST_t *n = calloc(1, sizeof *n);
     n->kind = kind;
     return n;
 }
+static AST_t *sa_new(AST_e kind) { return ast_stmt_new(kind); }
 
 static void sa_add(AST_t *parent, AST_t *child)
 {
@@ -51,10 +54,11 @@ static void sa_add(AST_t *parent, AST_t *child)
 }
 
 /*
- * attr_leaf — tag node with string value in sval, no children.
+ * ast_attr_leaf — tag node with string value in sval, no children.
  * Matches tree(':tag', string_value) in Snocone.
+ * Public: used by snobol4.y (SI-4).
  */
-static AST_t *attr_leaf(const char *tag, const char *val)
+AST_t *ast_attr_leaf(const char *tag, const char *val)
 {
     AST_t *n = sa_new(AST_ATTR);
     n->sval = strdup(tag);
@@ -66,28 +70,33 @@ static AST_t *attr_leaf(const char *tag, const char *val)
     }
     return n;
 }
+static AST_t *attr_leaf(const char *tag, const char *val) { return ast_attr_leaf(tag, val); }
 
 /*
- * attr_int — tag node with integer value (stored as string in sval of child).
+ * ast_attr_int — tag node with integer value (stored as string in child sval).
+ * Public: used by snobol4.y (SI-4).
  */
-static AST_t *attr_int(const char *tag, int ival)
+AST_t *ast_attr_int(const char *tag, int ival)
 {
     char buf[32];
     snprintf(buf, sizeof buf, "%d", ival);
-    return attr_leaf(tag, buf);
+    return ast_attr_leaf(tag, buf);
 }
+static AST_t *attr_int(const char *tag, int ival) { return ast_attr_int(tag, ival); }
 
 /*
- * attr_expr — tag node with one AST_t* expression child.
+ * ast_attr_expr — tag node with one AST_t* expression child.
  * Matches tree(':tag', '', 1, expr) in Snocone.
+ * Public: used by snobol4.y (SI-4).
  */
-static AST_t *attr_expr(const char *tag, AST_t *expr)
+AST_t *ast_attr_expr(const char *tag, AST_t *expr)
 {
     AST_t *n = sa_new(AST_ATTR);
     n->sval = strdup(tag);
     sa_add(n, expr);
     return n;
 }
+static AST_t *attr_expr(const char *tag, AST_t *e) { return ast_attr_expr(tag, e); }
 
 /*
  * make_goto_attr — build a goto attribute node.

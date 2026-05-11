@@ -191,6 +191,18 @@ AST_t       *stmt_attr_find(const AST_t *stmt, const char *tag);
 AST_t       *stmt_attr_expr(const AST_t *attr);
 const char  *stmt_attr_str(const AST_t *attr);
 
+/* ---- SI-4: direct AST_STMT/AST_END builders (stmt_ast.c) -------------- */
+/* Used by snobol4.y to emit AST tree directly without the STMT_t intermediary. */
+AST_t       *ast_stmt_new(AST_e kind);
+AST_t       *ast_attr_leaf(const char *tag, const char *val);
+AST_t       *ast_attr_int(const char *tag, int ival);
+AST_t       *ast_attr_expr(const char *tag, AST_t *expr);
+
+/* sno_parse_ast — parse a SNOBOL4 file and return an AST_PROGRAM directly,
+ * with the CODE_t linked list returned via out-param for the existing
+ * label_table_build / prescan_defines consumers. Single parse pass. */
+AST_t       *sno_parse_ast(FILE *f, const char *filename, CODE_t **code_out);
+
 /* ---- error ---- */
 void sno_error(int lineno, const char *fmt, ...);
 extern int   sno_nerrors;

@@ -283,6 +283,7 @@ int main(int argc, char **argv)
     }
 
     CODE_t *prog = NULL;
+    AST_t  *ast_prog = NULL;  /* SI-4: parallel AST_PROGRAM for SNOBOL4 path */
 
     for (; argi < argc; argi++) {
         const char *input_path = argv[argi];
@@ -367,9 +368,38 @@ int main(int argc, char **argv)
         } else {
             FILE *f = fopen(input_path, "r");
             if (!f) { fprintf(stderr, "scrip: cannot open '%s'\n", input_path); return 1; }
-            sub = sno_parse(f, input_path);
+            /* SI-4: sno_parse_ast builds CODE_t (for label_table_build etc.)
+             * AND AST_PROGRAM (for lower()) in a single parse pass. */
+            AST_t *sub_ast = sno_parse_ast(f, input_path, &sub);
             fclose(f);
             if (dump_ir_bison) { ir_dump_program(sub, stdout); return 0; }
+            /* Append sub_ast's children to the running ast_prog. */
+            if (sub_ast) {
+                if (!ast_prog) {
+                    ast_prog = sub_ast;
+                } else {
+                    /* Drop trailing AST_END from running ast_prog (mirror of
+                     * CODE_t is_end stripping below). */
+                    if (ast_prog->nchildren > 0) {
+                        AST_t *last = ast_prog->children[ast_prog->nchildren - 1];
+                        if (last && last->kind == AST_END) {
+                            ast_prog->nchildren--;
+                        }
+                    }
+                    /* Append sub_ast's children to ast_prog. */
+                    for (int i = 0; i < sub_ast->nchildren; i++) {
+                        if (ast_prog->nchildren >= ast_prog->nalloc) {
+                            ast_prog->nalloc = ast_prog->nalloc
+                                ? ast_prog->nalloc * 2 : 64;
+                            ast_prog->children = realloc(ast_prog->children,
+                                (size_t)ast_prog->nalloc * sizeof(AST_t*));
+                        }
+                        ast_prog->children[ast_prog->nchildren++] = sub_ast->children[i];
+                    }
+                    free(sub_ast->children);
+                    free(sub_ast);
+                }
+            }
         }
 
         if (!sub || !sub->head) {
@@ -477,7 +507,10 @@ int main(int argc, char **argv)
     if (dump_sm && !mode_sm_run) {
         label_table_build(prog);
         prescan_defines(prog);
-        SM_Program *sm0 = lower(code_to_ast(prog));
+        /* SI-4: use ast_prog directly when the SNOBOL4 path built it;
+         * fall back to code_to_ast(prog) for paths not yet migrated
+         * (polyglot, Icon/Prolog/Raku/Snocone/Rebus — SI-5). */
+        SM_Program *sm0 = lower(ast_prog ? ast_prog : code_to_ast(prog));
         if (!sm0) { fprintf(stderr, "scrip: sm_lower failed\n"); return 1; }
         sm_prog_print(sm0, stdout);
         sm_prog_free(sm0);
@@ -490,7 +523,7 @@ int main(int argc, char **argv)
          * hand the program to sm_codegen_x64_emit, which writes an asm
          * source to stdout. The emitted asm is then assembled+linked
          * outside scrip (see scripts/test_smoke_jit_emit_x64.sh). */
-        SM_Program *sm = sm_preamble(prog);
+        SM_Program *sm = sm_preamble(prog, ast_prog);
         if (!sm) return 1;
         prog = NULL;
         if (sm_codegen_x64_emit(sm, stdout, input_path) != 0) {
@@ -527,7 +560,7 @@ int main(int argc, char **argv)
          * RS-26: sm_preamble keeps the IR alive when lang_mask contains
          * any non-SNO bit; proc_table / pred-table pointers reference
          * live IR for the BB engine. */
-        SM_Program *sm = sm_preamble(prog);
+        SM_Program *sm = sm_preamble(prog, ast_prog);
         if (!sm) return 1;
         prog = NULL;   /* SM owns its AST_t clones; for non-SNO IR stays alive via globals */
         if (dump_sm) {
@@ -540,7 +573,7 @@ int main(int argc, char **argv)
     } else if (mode_jit_run) {
         /* --jit-run: SM-LOWER → sm_codegen → sm_jit_run.
          * RS-14: shares sm_preamble + sm_run_with_recovery with --sm-run. */
-        SM_Program *sm = sm_preamble(prog);
+        SM_Program *sm = sm_preamble(prog, ast_prog);
         if (!sm) return 1;
         prog = NULL;
         if (dump_sm) { sm_prog_print(sm, stdout); sm_prog_free(sm); return 0; }
