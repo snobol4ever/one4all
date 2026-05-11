@@ -71,6 +71,16 @@ typedef struct {
     int       stack_cap;   /* current allocated capacity */
     int       last_ok;     /* 1 = last operation succeeded, 0 = failed */
     int       pc;          /* program counter: index into SM_Program */
+    /* ME-6 (mode-3 only): epilogue signal from C return-handler back to the
+     * SM-blob.  Set to 1 by me6_return_dispatch when a SmCallFrame is popped
+     * AND the SM_LABEL emitting the function entry had a push-rbp prologue;
+     * the SM_RETURN-variant blob reads it post-call and, if non-zero, emits
+     * `mov rsp, rbp ; pop rbp` to undo the prologue before jumping back to
+     * the trampoline.  Cleared by me6_return_dispatch on every call so a
+     * stale 1 from a prior return can't leak.  Lives at offset 24 from r13
+     * (verified via offsetof in build_scrip.sh wiring; see ME-6 in
+     * GOAL-MODE3-EMIT.md).  Mode-2 (sm_interp.c) never reads or writes this. */
+    int       jit_epilogue_pending;
     jmp_buf   err_jmp;     /* per-statement error recovery (SM_STNO arms it) */
     int       err_fail_pc; /* pc to jump to on runtime error (-1 = halt) */
     int       err_armed;   /* 1 if err_jmp is live */

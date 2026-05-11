@@ -201,6 +201,68 @@ static void h_freturn_f(void) { if (!STATE->last_ok) h_return_impl(1, 0); }
 static void h_nreturn_s(void) { if ( STATE->last_ok) h_return_impl(0, 1); }
 static void h_nreturn_f(void) { if (!STATE->last_ok) h_return_impl(0, 1); }
 
+/* ME-6: unified return-variant dispatcher with epilogue-pending signal.
+ *
+ * Replaces the nine separate h_return_* handlers from the SM-blob's point
+ * of view.  A single me6_return_dispatch helper is called via an imm64 by
+ * each return-variant blob; it:
+ *
+ *   - decodes the variant from `bits` (low nibble),
+ *   - evaluates the conditional gate (cond_s / cond_f / unconditional),
+ *   - if the gate holds AND there is a live SM call frame, invokes
+ *     h_return_impl(is_fret, is_nret) which pops the frame and sets
+ *     STATE->pc to the caller's resume PC,
+ *   - sets STATE->jit_epilogue_pending = 1 iff a frame was actually popped,
+ *   - returns the value of jit_epilogue_pending so the caller's blob can
+ *     conditionally emit `mov rsp, rbp; pop rbp` to undo the SM_LABEL
+ *     define_entry prologue.
+ *
+ * Bits layout (matches sm_codegen.c emit_me6_return_blob's imm32):
+ *
+ *   bit 0 — is_fret  (FRETURN family)
+ *   bit 1 — is_nret  (NRETURN family)
+ *   bit 2 — cond_s   (fire only if  STATE->last_ok)
+ *   bit 3 — cond_f   (fire only if !STATE->last_ok)
+ *
+ * The pre-call sync-r12→sp protocol from emit_standard_blob is preserved
+ * exactly (h_return_impl reads STATE->stack[STATE->sp - 1] for thunk
+ * returns).  Post-call we read STATE->jit_epilogue_pending into eax so the
+ * blob's `test eax, eax ; jz no_unwind` decides whether to unwind rbp.
+ *
+ * Top-level returns (call_depth == 0) set g_jit_halted from h_return_impl
+ * and do NOT set jit_epilogue_pending — top-level can't have entered via
+ * a define-entry SM_LABEL prologue, so there is nothing to unwind. */
+static int me6_return_dispatch(int bits) __attribute__((unused));
+static int me6_return_dispatch(int bits)
+{
+    /* Always clear the signal first — stale 1 from a prior return must
+     * not leak past a no-op variant.  Mode-2 (sm_interp.c) never reads
+     * this field, so this write is mode-3-only. */
+    STATE->jit_epilogue_pending = 0;
+
+    int is_fret = (bits >> 0) & 1;
+    int is_nret = (bits >> 1) & 1;
+    int cond_s  = (bits >> 2) & 1;
+    int cond_f  = (bits >> 3) & 1;
+
+    /* Gate */
+    if (cond_s && !STATE->last_ok) return 0;
+    if (cond_f &&  STATE->last_ok) return 0;
+
+    /* Snapshot call_depth so we can tell whether h_return_impl actually
+     * popped a frame (top-level halts without popping). */
+    int depth_before = STATE->call_depth;
+    h_return_impl(is_fret, is_nret);
+    int popped = (STATE->call_depth < depth_before);
+
+    /* Only signal an epilogue if a frame was popped.  Top-level returns
+     * set g_jit_halted and the SM_HALT-like exit path doesn't need rbp
+     * unwinding (the surrounding sm_jit_run frame's compiler-generated
+     * epilogue handles its own rbp). */
+    if (popped) STATE->jit_epilogue_pending = 1;
+    return STATE->jit_epilogue_pending;
+}
+
 static void h_stno(void) {
     /* SN-32a-stno: source stno carried as operand by sm_lower (mirror of
      * SM_STNO's interp-side fix in sm_interp.c). */
@@ -1783,6 +1845,167 @@ static size_t emit_jump_blob_skeleton(int32_t target_pc)
     return rel32_off;
 }
 
+/*
+ * emit_me6_define_entry_blob — emit the SM_LABEL blob for a DEFINE'd
+ * function entry (ME-7 flag a[2].i == 1).  Adds a single-pair native
+ * prologue (`push rbp; mov rbp, rsp`) before the standard pc-bump +
+ * trampoline-jmp shape.  No C handler call needed — h_label is a no-op
+ * for non-entry labels, and the entry-label case has nothing else to do
+ * besides snapshot rbp.
+ *
+ * Shape (15 bytes):
+ *   inc dword [r13+20]      (41 ff 45 14)  4 bytes — pc++
+ *   push rbp                (55)           1 byte  — save caller's rbp
+ *   mov rbp, rsp            (48 89 e5)     3 bytes — establish frame
+ *   jmp rel32 trampoline    (e9 <rel32>)   5 bytes — dispatch next
+ *
+ * Why pc++ before the prologue rather than after: the standard pc-bump
+ * uses the same shape (`inc dword [r13+20]`) as every other blob, so
+ * keeping it first preserves the invariant "pc advances exactly once per
+ * blob entry, before any side-effect that could fail".  The push/mov
+ * pair is straight-line C-ABI-safe code and won't fail.
+ *
+ * rbp discipline: every define-entry blob does push+mov; every paired
+ * SM_RETURN-variant blob does mov+pop conditionally (gated by the
+ * jit_epilogue_pending signal from me6_return_dispatch).  Mismatched
+ * pairs would corrupt rbp; the gate ensures we only unwind when
+ * me6_return_dispatch confirmed a frame pop, which happens only when
+ * a function called via h_call (which is what creates the call frame
+ * that body_pc's SM_LABEL define-entry was the destination of).
+ */
+static void emit_me6_define_entry_blob(size_t trampoline_abs_off) __attribute__((unused));
+static void emit_me6_define_entry_blob(size_t trampoline_abs_off)
+{
+    /* inc dword [r13+20]  (41 ff 45 14)  4 bytes — pc++ */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x14);
+
+    /* push rbp  (55)  1 byte — save caller's rbp */
+    seg_byte(SEG_CODE, 0x55);
+
+    /* mov rbp, rsp  (48 89 e5)  3 bytes — establish frame */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x89); seg_byte(SEG_CODE, 0xe5);
+
+    /* jmp rel32 trampoline.  rel32 from byte AFTER the rel32. */
+    size_t rel32_end_off = seg_offset(SEG_CODE) + 5;
+    int32_t rel = (int32_t)((int64_t)trampoline_abs_off - (int64_t)rel32_end_off);
+    seg_byte(SEG_CODE, 0xe9);
+    seg_u32(SEG_CODE, (uint32_t)rel);
+}
+
+/*
+ * emit_me6_return_blob — emit a return-variant blob (SM_RETURN /
+ * SM_FRETURN / SM_NRETURN and their _S / _F conditional siblings).
+ *
+ * Shape (variable, ~70 bytes):
+ *   inc dword [r13+20]                        4 bytes — pc++
+ *   ── sync r12 → st->sp ── (15 bytes; see emit_standard_blob) ──
+ *   mov rax, r12                              3 bytes
+ *   sub rax, [r13]                            4 bytes
+ *   sar rax, 4                                4 bytes
+ *   mov [r13+8], eax                          4 bytes
+ *   mov edi, <bits_imm32>                     5 bytes — variant arg
+ *   mov rax, &me6_return_dispatch             10 bytes — imm64
+ *   sub rsp, 8                                4 bytes — 16-byte align
+ *   call rax                                  2 bytes
+ *   add rsp, 8                                4 bytes
+ *   ── sync st->sp → r12 ── (15 bytes) ──
+ *   mov ecx, [r13+8]                          4 bytes
+ *   shl rcx, 4                                4 bytes  (use rcx — rax is the dispatch return)
+ *   add rcx, [r13]                            4 bytes
+ *   mov r12, rcx                              3 bytes
+ *   test eax, eax                             2 bytes — eax = dispatch return value
+ *   jz no_unwind  (rel8 +4 — skip mov/pop)    2 bytes
+ *   mov rsp, rbp                              3 bytes — force-restore rsp
+ *   pop rbp                                   1 byte  — restore caller's rbp
+ *   no_unwind:
+ *   jmp rel32 trampoline                      5 bytes
+ *
+ * Total: 4 + 15 + 5 + 10 + 4 + 2 + 4 + 15 + 2 + 2 + 3 + 1 + 5 = 72 bytes.
+ *
+ * Why we use rcx in the post-sync rather than rax: rax carries the
+ * dispatch helper's return value (the jit_epilogue_pending flag), which
+ * we need to test after the sync.  Using rcx for the sync arithmetic
+ * preserves rax across the sync block.
+ *
+ * The `test eax, eax ; jz no_unwind` pattern: jz fires when ZF=1
+ * (i.e. eax==0, meaning no epilogue pending), skipping the mov/pop.
+ * jnz would fire when eax!=0, executing the mov/pop.  We use jz to
+ * skip-to-no_unwind, which matches the "if no signal, skip the
+ * unwind sequence" reading.  rel8 displacement = 4 bytes (length of
+ * the mov rsp,rbp ; pop rbp sequence: 3 + 1 = 4).
+ */
+static void emit_me6_return_blob(int bits, size_t trampoline_abs_off) __attribute__((unused));
+static void emit_me6_return_blob(int bits, size_t trampoline_abs_off)
+{
+    /* inc dword [r13+20]  (41 ff 45 14)  4 bytes — pc++ */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x14);
+
+    /* ── sync r12 → st->sp ────────────────────────────────────────────── */
+    /*   mov rax, r12            (4c 89 e0)       3 bytes */
+    seg_byte(SEG_CODE, 0x4c); seg_byte(SEG_CODE, 0x89); seg_byte(SEG_CODE, 0xe0);
+    /*   sub rax, [r13]          (49 2b 45 00)    4 bytes */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x2b);
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x00);
+    /*   sar rax, 4              (48 c1 f8 04)    4 bytes */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xc1);
+    seg_byte(SEG_CODE, 0xf8); seg_byte(SEG_CODE, 0x04);
+    /*   mov [r13+8], eax        (41 89 45 08)    4 bytes */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x08);
+
+    /* mov edi, bits   (bf <imm32>)  5 bytes — argument to me6_return_dispatch */
+    seg_byte(SEG_CODE, 0xbf);
+    seg_u32(SEG_CODE, (uint32_t)bits);
+
+    /* mov rax, &me6_return_dispatch  (48 b8 <imm64>)  10 bytes */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xb8);
+    seg_u64(SEG_CODE, (uint64_t)(uintptr_t)me6_return_dispatch);
+
+    /* sub rsp, 8  (48 83 ec 08)  4 bytes — 16-byte alignment */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x83);
+    seg_byte(SEG_CODE, 0xec); seg_byte(SEG_CODE, 0x08);
+
+    /* call rax  (ff d0)  2 bytes */
+    seg_byte(SEG_CODE, 0xff); seg_byte(SEG_CODE, 0xd0);
+
+    /* add rsp, 8  (48 83 c4 08)  4 bytes */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x83);
+    seg_byte(SEG_CODE, 0xc4); seg_byte(SEG_CODE, 0x08);
+
+    /* ── sync st->sp → r12 (use rcx so rax survives for the test) ─────── */
+    /*   mov ecx, [r13+8]        (41 8b 4d 08)    4 bytes */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x4d); seg_byte(SEG_CODE, 0x08);
+    /*   shl rcx, 4              (48 c1 e1 04)    4 bytes */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xc1);
+    seg_byte(SEG_CODE, 0xe1); seg_byte(SEG_CODE, 0x04);
+    /*   add rcx, [r13]          (49 03 4d 00)    4 bytes */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x03);
+    seg_byte(SEG_CODE, 0x4d); seg_byte(SEG_CODE, 0x00);
+    /*   mov r12, rcx            (49 89 cc)       3 bytes */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89); seg_byte(SEG_CODE, 0xcc);
+
+    /* test eax, eax  (85 c0)  2 bytes — check dispatch return value */
+    seg_byte(SEG_CODE, 0x85); seg_byte(SEG_CODE, 0xc0);
+
+    /* jz no_unwind, rel8 = +4 (skip mov rsp,rbp + pop rbp)  (74 04)  2 bytes */
+    seg_byte(SEG_CODE, 0x74); seg_byte(SEG_CODE, 0x04);
+
+    /* mov rsp, rbp  (48 89 ec)  3 bytes — force-restore rsp to frame */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x89); seg_byte(SEG_CODE, 0xec);
+
+    /* pop rbp  (5d)  1 byte — restore caller's rbp */
+    seg_byte(SEG_CODE, 0x5d);
+
+    /* no_unwind: jmp rel32 trampoline */
+    size_t rel32_end_off = seg_offset(SEG_CODE) + 5;
+    int32_t rel = (int32_t)((int64_t)trampoline_abs_off - (int64_t)rel32_end_off);
+    seg_byte(SEG_CODE, 0xe9);
+    seg_u32(SEG_CODE, (uint32_t)rel);
+}
+
 /* ── ME-4-post-r12-tos inline-native blob emitters ────────────────────────
  *
  * r12 = SM value-stack TOS pointer (FORTH-style).  Top live entry is at
@@ -2159,7 +2382,27 @@ int sm_codegen(SM_Program *prog)
              * operand, fires monitor hook, sets st->sp=0 (mode-2
              * statement-boundary contract).  Neither reads nor writes
              * st->stack contents.  The post-call reload of r12 from
-             * st->stack + st->sp*16 handles h_stno's sp reset correctly. */
+             * st->stack + st->sp*16 handles h_stno's sp reset correctly.
+             *
+             * ME-6 (held — see GOAL-MODE3-EMIT.md handoff addendum sess 7,
+             * 2026-05-10): SM_LABEL with the define-entry flag
+             * (a[2].i == 1, set by sm_lower's lower_stmt when
+             * FUNC_IS_ENTRY_LABEL hits) was investigated as the prologue-
+             * emission site.  Routing it through emit_me6_define_entry_blob
+             * regressed sn7_beauty 26 → 20 because user-function bodies
+             * frequently SM_JUMP back to their own define-entry SM_LABEL
+             * (e.g. icase's `:(icase)` loop), causing the `push rbp`
+             * prologue to re-execute on every iteration without a paired
+             * pop — the saved-rbp values pollute the native stack and
+             * SM_HALT's `ret` eventually fetches a stale stack address
+             * as its return target, segfaulting in user space.  The fix
+             * requires either (a) detecting re-entry and gating the
+             * push, or (b) moving the prologue out of SM_LABEL into the
+             * h_call dispatch site so it fires exactly once per call.
+             * Both are out of scope for this session; routing reverted
+             * to the no-stack standard blob.  emit_me6_define_entry_blob
+             * is preserved in this file as architectural scaffolding;
+             * see the handoff for the next-session retry plan. */
             emit_standard_blob_no_stack(g_handlers[op], g_trampoline_offset);
         } else if (op == SM_ADD || op == SM_SUB || op == SM_MUL ||
                    op == SM_DIV || op == SM_MOD) {
