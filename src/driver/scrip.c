@@ -344,12 +344,39 @@ int main(int argc, char **argv)
             char *src = malloc(flen + 1);
             if (!src) { fprintf(stderr, "scrip: out of memory\n"); return 1; }
             fread(src, 1, flen, f); src[flen] = '\0'; fclose(f);
-            sub = lang_raku   ? raku_compile(src, input_path)
-                : lang_prolog ? prolog_compile(src, input_path)
-                : lang_icon   ? icon_compile(src, input_path)
-                : lang_rebus  ? rebus_compile(src, input_path)
-                :               snocone_compile(src, input_path);
+            AST_t *sub_ast = NULL;
+            if (lang_icon) {
+                sub = icon_compile(src, input_path, &sub_ast);
+            } else if (lang_raku) {
+                sub = raku_compile(src, input_path, &sub_ast);
+            } else if (lang_prolog) {
+                sub = prolog_compile(src, input_path, &sub_ast);
+            } else if (lang_rebus) {
+                sub = rebus_compile(src, input_path, &sub_ast);
+            } else {
+                sub = snocone_compile(src, input_path, &sub_ast);
+            }
             free(src);
+            /* SI-5: merge sub_ast into running ast_prog (same logic as SNO path) */
+            if (sub_ast) {
+                if (!ast_prog) {
+                    ast_prog = sub_ast;
+                } else {
+                    if (ast_prog->nchildren > 0) {
+                        AST_t *last = ast_prog->children[ast_prog->nchildren - 1];
+                        if (last && last->kind == AST_END) ast_prog->nchildren--;
+                    }
+                    for (int i = 0; i < sub_ast->nchildren; i++) {
+                        if (ast_prog->nchildren >= ast_prog->nalloc) {
+                            ast_prog->nalloc = ast_prog->nalloc ? ast_prog->nalloc * 2 : 64;
+                            ast_prog->children = realloc(ast_prog->children,
+                                (size_t)ast_prog->nalloc * sizeof(AST_t *));
+                        }
+                        ast_prog->children[ast_prog->nchildren++] = sub_ast->children[i];
+                    }
+                    free(sub_ast->children); free(sub_ast);
+                }
+            }
             /* SC-26 investigation: allow --dump-ir on Snocone .sc files so
              * we can diff Snocone IR vs SNOBOL4 IR for the same program. */
             if (lang_snocone && dump_ir && sub) {

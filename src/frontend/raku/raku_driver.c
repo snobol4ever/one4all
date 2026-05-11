@@ -22,8 +22,9 @@ extern CODE_t *raku_parse_string(const char *src);   /* defined below — wraps 
  * Signature unchanged from pre-FI-3.
  * Returns CODE_t* with LANG_RAKU stmts, or NULL on parse error.
  *============================================================*/
-CODE_t *raku_compile(const char *src, const char *filename) {
+CODE_t *raku_compile(const char *src, const char *filename, AST_t **out_ast) {
     if (!filename) filename = "<stdin>";
+    if (out_ast) *out_ast = NULL;
     /* Case policy is a frontend concern (cf. commit 8aa5803b for DATATYPE).
      * Raku preserves identifier spelling; tell the shared runtime to stop
      * folding at name-ingest sites. No user --case-sensitive flag required. */
@@ -34,5 +35,7 @@ CODE_t *raku_compile(const char *src, const char *filename) {
         fprintf(stderr, "raku: parse error in %s\n", filename);
         return NULL;
     }
+    /* SI-5: build AST_PROGRAM from CODE_t so sm_preamble uses native tree. */
+    if (out_ast && prog) *out_ast = code_to_ast(prog);
     return prog;
 }

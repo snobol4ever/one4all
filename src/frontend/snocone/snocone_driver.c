@@ -18,8 +18,12 @@
 /* Forward declaration — defined in snocone_parse.tab.c */
 CODE_t *snocone_parse_program(const char *src, const char *filename);
 
-CODE_t *snocone_compile(const char *source, const char *filename)
+CODE_t *snocone_compile(const char *source, const char *filename, AST_t **out_ast)
 {
     if (!filename) filename = "<stdin>";
-    return snocone_parse_program(source, filename);
+    if (out_ast) *out_ast = NULL;
+    CODE_t *prog = snocone_parse_program(source, filename);
+    /* SI-5: build AST_PROGRAM from CODE_t so sm_preamble uses native tree. */
+    if (out_ast && prog) *out_ast = code_to_ast(prog);
+    return prog;
 }

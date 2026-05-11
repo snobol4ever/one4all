@@ -8,6 +8,7 @@
 
 #include "rebus.h"
 #include "../../frontend/snobol4/scrip_cc.h"
+#include "../../ast/ast.h"
 
 /*
  * rebus_lower(rp)
@@ -21,8 +22,9 @@ CODE_t *rebus_lower(RProgram *rp);
  * rebus_compile(src, filename) — FI-1A
  *   Full pipeline: parse src string via rebus_parse(), lower via
  *   rebus_lower(), tag all STMT_t with LANG_REB. Mirrors icon_compile().
+ *   SI-5: out_ast receives AST_PROGRAM; pass NULL to discard.
  *   Returns NULL on parse or lower error.
  */
-CODE_t *rebus_compile(const char *src, const char *filename);
+CODE_t *rebus_compile(const char *src, const char *filename, AST_t **out_ast);
 
 #endif /* REBUS_LOWER_H */

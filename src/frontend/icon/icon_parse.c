@@ -871,8 +871,10 @@ void icn_parse_init(IcnParser *p, IcnLexer *lex) {
     p->peek = icn_lex_next(lex);
 }
 
-CODE_t *icn_parse_file(IcnParser *p) {
-    CODE_t *prog = calloc(1, sizeof(CODE_t));
+CODE_t *icn_parse_file(IcnParser *p, AST_t **out_ast) {
+    CODE_t *prog     = calloc(1, sizeof(CODE_t));
+    /* SI-5: build AST_PROGRAM in parallel with CODE_t */
+    AST_t  *ast_prog = ast_stmt_new(AST_PROGRAM);
     while (!check(p, TK_EOF) && !p->had_error) {
         AST_t *top = NULL;
         if (check(p, TK_PROCEDURE)) {
@@ -902,8 +904,21 @@ CODE_t *icn_parse_file(IcnParser *p) {
             if (!prog->head) prog->head = prog->tail = st;
             else           { prog->tail->next = st; prog->tail = st; }
             prog->nstmts++;
+            /* SI-5: pump each top-level item as an AST_STMT into ast_prog.
+             * Shape must match stmt_to_ast(): :lang, :line, :stno, :subj. */
+            {
+                AST_t *ast_st = ast_stmt_new(AST_STMT);
+                push_child(ast_st, ast_attr_int(":lang", LANG_ICN));
+                push_child(ast_st, ast_attr_int(":line", 0));
+                push_child(ast_st, ast_attr_int(":stno", 0));
+                push_child(ast_st, ast_attr_expr(":subj", top));
+                push_child(ast_prog, ast_st);
+            }
         }
     }
+    /* No AST_END appended: Icon CODE_t has no is_end sentinel, so code_to_ast
+     * produces no AST_END child — we match that to stay byte-identical. */
+    if (out_ast) *out_ast = ast_prog;
     return prog;
 }
 

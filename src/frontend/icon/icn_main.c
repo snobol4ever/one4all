@@ -120,7 +120,7 @@ int icn_main(int argc, char **argv) {
     /* Parse (FI-2: direct IR, no IcnNode) */
     IcnParser parser;
     icn_parse_init(&parser, &lx);
-    CODE_t *prog = icn_parse_file(&parser);
+    CODE_t *prog = icn_parse_file(&parser, NULL);
     if (parser.had_error) {
         fprintf(stderr, "parse error: %s\n", parser.errmsg);
         free(src); return 1;

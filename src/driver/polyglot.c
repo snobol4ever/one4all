@@ -395,16 +395,16 @@ CODE_t *parse_scrip_polyglot(const char *src, const char *filename)
              * U-23: these execute first (SNO section), writing to NV store
              * which Icon/Prolog can then read via icn_global / nv_get. */
         } else if (lang == LANG_ICN) {
-            sub = icon_compile(block, filename);
+            sub = icon_compile(block, filename, NULL);
             /* icon_driver.c sets st->lang=LANG_ICN (U-12) */
         } else if (lang == LANG_PL) {
-            sub = prolog_compile(block, filename);
+            sub = prolog_compile(block, filename, NULL);
             /* prolog_lower.c sets st->lang=LANG_PL (U-12) */
         } else if (lang == LANG_RAKU) {
-            sub = raku_compile(block, filename);
+            sub = raku_compile(block, filename, NULL);
             /* raku_driver.c sets st->lang=LANG_RAKU (RK-5) */
         } else if (lang == LANG_REB) {
-            sub = rebus_compile(block, filename);
+            sub = rebus_compile(block, filename, NULL);
             /* rebus_compile sets st->lang=LANG_REB (FI-1B) */
         }
         free(block);

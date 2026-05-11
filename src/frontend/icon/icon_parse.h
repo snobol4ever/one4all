@@ -37,7 +37,7 @@ void     icn_parse_init(IcnParser *p, IcnLexer *lex);
 
 /* Parse a complete Icon source file directly to IR.
  * Returns CODE_t* (caller owns) or NULL on parse error. */
-CODE_t *icn_parse_file(IcnParser *p);
+CODE_t *icn_parse_file(IcnParser *p, AST_t **out_ast);
 
 /* Parse a single expression to AST_t (useful for unit tests) */
 AST_t  *icn_parse_expr(IcnParser *p);

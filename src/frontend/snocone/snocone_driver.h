@@ -21,14 +21,16 @@
 #define SNOCONE_DRIVER_H
 
 #include "../snobol4/scrip_cc.h"   /* CODE_t */
+#include "../../ast/ast.h"
 
 /*
  * snocone_compile(source, filename)
  *   source   — complete NUL-terminated Snocone source text
  *   filename — used in error messages (may be NULL → "<stdin>")
+ *   SI-5: out_ast receives AST_PROGRAM; pass NULL to discard.
  *
  * Returns the compiled CODE_t*, or NULL on error.
  */
-CODE_t *snocone_compile(const char *source, const char *filename);
+CODE_t *snocone_compile(const char *source, const char *filename, AST_t **out_ast);
 
 #endif /* SNOCONE_DRIVER_H */
