@@ -884,9 +884,11 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 break;
             }
             g_ast_pump_active++;
+            { extern int g_lang; int saved_lang = g_lang; g_lang = LANG_ICN;
             int ticks = bb_broker(node, BB_PUMP, pump_print, NULL);
+            g_lang = saved_lang;
             g_ast_pump_active--;
-            st->last_ok = (ticks > 0);
+            st->last_ok = (ticks > 0); }
             break;
         }
 

@@ -99,6 +99,15 @@ SM_Program *sm_preamble(const AST_t *ast_prog){
         return NULL;
     }
 
+    /* Set g_lang for pure-Icon programs so SM-dispatched builtins (trim, map, etc.)
+     * use Icon semantics rather than SNOBOL4 defaults.  Must be AFTER lower()
+     * because lower_proc_skeletons resets g_lang to 0 after each proc body.
+     * Only applies when the program is EXCLUSIVELY Icon (lang_mask == ICN bit only)
+     * — polyglot programs set g_lang per-fence inside polyglot_execute. */
+    if (lang_mask == (1u << LANG_ICN)) {
+        extern int g_lang;
+        g_lang = LANG_ICN;
+    }
     /* CH-17a: resolve entry_pcs for every proc / Prolog predicate.  Pure
      * scaffolding: today every entry resolves to -1 because sm_lower does not
      * yet emit named proc-body expressions (CH-17b/d will).  Consumers still use
