@@ -1080,6 +1080,9 @@ static void lower_proc_skeletons(LowerCtx *c)
                 if (!proc->children[i]) continue;
                 lower_expr(c, proc->children[i]); sm_emit(p, SM_VOID_POP);
             }
+            /* CH-17g-proc-locals: store finalized scope so sm_call_proc can
+             * icn_scope_patch() body AST nodes for every-body AST walker. */
+            proc_table[pi].lower_sc = sc;
             c->expression_body_lowering = 0; c->expression_scope = NULL;
         }
         sm_emit(p, SM_RETURN);

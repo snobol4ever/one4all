@@ -604,6 +604,29 @@ DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs)
     for (int i = 0; i < nparams && i < nargs && i < FRAME_SLOT_MAX; i++)
         f->env[i] = args[i];
 
+    /* CH-17g-proc-locals: patch AST_VAR.ival with frame slot indices so that
+     * AST-walker code running inside every-body / bb_exec_stmt (e.g. SM_BB_PUMP_EVERY
+     * driving `every total +:= (1 to n)`) sees the correct slot for each local var.
+     * Uses the same IcnScope that lower_proc_skeletons built and stored in lower_sc,
+     * guaranteeing slot assignments match what SM_LOAD_FRAME/SM_STORE_FRAME baked in.
+     * Also fixes env_n: must cover all slots (params + locals), not just params. */
+    {
+        int found_pi = -1;
+        for (int i = 0; i < proc_count; i++) {
+            if (proc_table[i].entry_pc == entry_pc) { found_pi = i; break; }
+        }
+        if (found_pi >= 0 && proc_table[found_pi].proc) {
+            AST_t *proc = proc_table[found_pi].proc;
+            int nparams_p = (int)proc->ival;
+            int body_start = 1 + nparams_p;
+            for (int bi = body_start; bi < proc->nchildren; bi++)
+                icn_scope_patch(&proc_table[found_pi].lower_sc, proc->children[bi]);
+            /* Expand env_n to cover all slots (params + locals) */
+            int total_slots = proc_table[found_pi].lower_sc.n;
+            if (total_slots > f->env_n) f->env_n = total_slots;
+        }
+    }
+
     /* Run expression body — frame is live for SM_LOAD_FRAME / SM_STORE_FRAME */
     DESCR_t result = sm_call_expression(entry_pc);
 
@@ -1674,8 +1697,9 @@ bb_node_t coro_eval(AST_t *e) {
     /* ── IC-2b: AST_EVERY  (every gen [do body]) ──────────────────────────── */
     if (e->kind == AST_EVERY && e->nchildren >= 1) {
         icn_every_state_t *z = calloc(1, sizeof(*z));
-        z->gen  = coro_eval(e->children[0]);
-        z->body = (e->nchildren >= 2) ? e->children[1] : NULL;
+        z->gen     = coro_eval(e->children[0]);
+        z->gen_ast = e->children[0];
+        z->body    = (e->nchildren >= 2) ? e->children[1] : NULL;
         return (bb_node_t){ coro_bb_every, z, 0 };
     }
 
@@ -1967,7 +1991,18 @@ DESCR_t coro_bb_every(void *zeta, int entry) {
         ? z->gen.fn(z->gen.ζ, α)
         : z->gen.fn(z->gen.ζ, β);
     if (IS_FAIL_fn(v)) return FAILDESCR;
-    if (z->body) bb_exec_stmt(z->body);
+    if (z->body) {
+        /* Inject generator value so the body's reference to the same generator AST
+         * node (e.g. `(1 to n)` in `x := x + (1 to n)`) returns the already-produced
+         * value rather than building a fresh coro_eval and restarting from α. */
+        AST_t *saved_drive_node = coro_drive_node;
+        DESCR_t saved_drive_val = coro_drive_val;
+        coro_drive_node = z->gen_ast;
+        coro_drive_val  = v;
+        bb_exec_stmt(z->body);
+        coro_drive_node = saved_drive_node;
+        coro_drive_val  = saved_drive_val;
+    }
     return v;
 }
 

@@ -189,6 +189,7 @@ DESCR_t coro_bb_limit(void *zeta, int entry);
  *--------------------------------------------------------------------------------------------------------------------------*/
 typedef struct {
     bb_node_t  gen;
+    AST_t    *gen_ast; /* AST node of generator child — for coro_drive_node injection */
     AST_t    *body;   /* may be NULL */
     int        started;
 } icn_every_state_t;

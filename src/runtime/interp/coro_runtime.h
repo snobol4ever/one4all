@@ -32,16 +32,17 @@
  * -1 means no expression emitted yet (CH-17b will start emitting Icon/Raku proc
  * expressions; until then every entry remains -1 and consumers fall back to the
  * legacy proc-pointer path).  Once CH-17g lands, the proc field is deleted. */
-/* CH-17a: entry_pc is the SM_Program pc of the proc body's named expression.
- * CH-17c: nparams cached from proc->ival so sm_call_proc can bind args
- *         without reading the AST_t. */
-typedef struct { const char *name; AST_t *proc; int entry_pc; int nparams; } IcnProcEntry;
-
 typedef struct { AST_t *node; long cur; const char *sval; } IcnGenEntry_d;
 
 /* IM-10: moved above IcnFrame so IcnFrame.sc can embed IcnScope by value */
 typedef struct { const char *name; int slot; } IcnScopeEnt;
 typedef struct { IcnScopeEnt e[FRAME_SLOT_MAX]; int n; } IcnScope;
+
+/* CH-17a: entry_pc is the SM_Program pc of the proc body's named expression.
+ * CH-17c: nparams cached from proc->ival so sm_call_proc can bind args without reading AST_t.
+ * CH-17g-proc-locals: lower_sc stores finalized slot map from lower_proc_skeletons so
+ *   sm_call_proc can icn_scope_patch() body AST nodes for every-body AST walker. */
+typedef struct { const char *name; AST_t *proc; int entry_pc; int nparams; IcnScope lower_sc; } IcnProcEntry;
 
 typedef struct {
     DESCR_t       env[FRAME_SLOT_MAX];
