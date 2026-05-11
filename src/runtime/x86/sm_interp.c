@@ -1414,6 +1414,30 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                     goto sm_call_done;
                 }
             }
+            /* CH-17g-smcall-proc: Icon user-proc fast path.
+             * When name matches a proc_table entry with a resolved entry_pc,
+             * dispatch via sm_call_proc (frame-slot ABI) instead of the NV-binding
+             * inline path below.  This is the correct calling convention for proc
+             * bodies lowered by CH-17b'' which emit SM_LOAD_FRAME / SM_STORE_FRAME.
+             * Without this, SM_CALL_FN binds params into NV but the body reads
+             * frame slots → params always read as uninitialised FAILDESCR. */
+            if (name && g_current_sm_prog) {
+                extern int proc_count;
+                extern IcnProcEntry proc_table[];
+                for (int _pi = 0; _pi < proc_count; _pi++) {
+                    if (proc_table[_pi].entry_pc >= 0 &&
+                        proc_table[_pi].name &&
+                        strcmp(proc_table[_pi].name, name) == 0) {
+                        DESCR_t _pr = sm_call_proc(proc_table[_pi].entry_pc,
+                                                    proc_table[_pi].nparams,
+                                                    args, nargs);
+                        sm_push(st, _pr);
+                        st->last_ok = (_pr.v != DT_FAIL);
+                        goto sm_call_done;
+                    }
+                }
+            }
+
             /* DATA field accessor/mutator/constructor: when first arg is a DATA
              * instance (or name ends in _SET with second arg DT_DATA), give
              * DATA field dispatch priority over same-named builtins (e.g. 'real'). */
