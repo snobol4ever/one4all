@@ -2009,22 +2009,34 @@ static size_t emit_jump_blob_skeleton(int32_t target_pc)
 static void emit_me6_define_entry_blob(size_t trampoline_abs_off) __attribute__((unused));
 static void emit_me6_define_entry_blob(size_t trampoline_abs_off)
 {
-    /* ME-6a: SM_DEFINE_ENTRY blob.
+    /* ME-6a: SM_DEFINE_ENTRY blob (+ ME-13 rsp-alignment fix).
      *
-     * Shape (~26 bytes):
+     * Shape (~30 bytes):
      *   inc dword [r13+20]       4 bytes  — pc++
      *   mov eax, [r13+28]        4 bytes  — eax = jit_in_call
      *   mov dword [r13+28], 0    7 bytes  — jit_in_call = 0 (always clear)
      *   test eax, eax            2 bytes  — was this a real call?
-     *   jz skip  (rel8 +4)       2 bytes  — no: skip prologue
+     *   jz skip  (rel8 +8)       2 bytes  — no: skip prologue entirely
      *   push rbp                 1 byte   — save caller's rbp
-     *   mov rbp, rsp             3 bytes  — establish frame
+     *   mov rbp, rsp             3 bytes  — establish frame (16-aligned)
+     *   sub rsp, 8               4 bytes  — ME-13: restore rsp%16==8 invariant
      *   skip:
      *   jmp rel32 trampoline     5 bytes  — dispatch next
      *
      * jit_in_call lives at SM_State offset 28 ([r13+28]).
      * Cleared unconditionally before the test so a stale 1 can never leak
      * across statements.
+     *
+     * The trailing `sub rsp, 8` keeps the dispatch loop's rsp%16==8
+     * invariant intact for the user function body.  Without it, every
+     * C-ABI call inside the body has rsp=8 mod 16 at the `call rax`
+     * (instead of 0 mod 16), which breaks SSE-aligned access patterns
+     * in glibc snprintf and crashes any --jit-run program that calls
+     * a DT_I-formatting builtin (ARRAY, CONVERT, ...) from inside a
+     * DEFINE'd function.  See the comment block at the jz site below
+     * for the full reasoning.  The matching unwind in
+     * emit_me6_return_blob (`mov rsp, rbp ; pop rbp`) is unchanged:
+     * `mov rsp, rbp` strip-restores the subtract automatically.
      */
 
     /* inc dword [r13+20]  (41 ff 45 14) */
@@ -2044,14 +2056,48 @@ static void emit_me6_define_entry_blob(size_t trampoline_abs_off)
     /* test eax, eax  (85 c0) */
     seg_byte(SEG_CODE, 0x85); seg_byte(SEG_CODE, 0xc0);
 
-    /* jz skip rel8 = +4  (74 04) — skip push rbp + mov rbp,rsp */
-    seg_byte(SEG_CODE, 0x74); seg_byte(SEG_CODE, 0x04);
+    /* ME-13 (rsp-alignment fix): jz skip rel8 = +8  (74 08) — skip
+     * push rbp + mov rbp,rsp + sub rsp,8 (4 + 4 = 8 bytes).
+     *
+     * The dispatch-loop invariant is rsp % 16 == 8 at every trampoline
+     * entry (this is the post-`call`-into-JIT-entry state).  The standard
+     * blob's `sub rsp, 8 ; call rax ; add rsp, 8` then puts rsp at 0 mod
+     * 16 right at the `call rax`, which is the SysV C-ABI requirement
+     * (callee sees rsp = 8 mod 16 immediately after the call's pushed
+     * return address).
+     *
+     * `push rbp` alone moves rsp by -8, flipping the invariant from 8
+     * mod 16 to 0 mod 16.  Inside the user-function body every standard
+     * blob then makes its C-ABI call with rsp = 8 mod 16 at the `call`,
+     * which violates the ABI.  C handlers that don't use SSE/AVX align
+     * tolerate it silently; glibc snprintf uses `movaps -0xc0(%rbp)` and
+     * crashes with SIGSEGV.  Repro: any --jit-run program that calls a
+     * builtin (e.g. ARRAY, CONVERT) on a DT_I argument from inside a
+     * DEFINE'd function — VARVAL_fn formats the integer via snprintf
+     * and faults inside __vsnprintf_internal.
+     *
+     * The extra `sub rsp, 8` here restores the 8 mod 16 invariant for
+     * the function body.  The matching unwind in emit_me6_return_blob
+     * is unchanged: `mov rsp, rbp` already discards the extra subtract
+     * (rsp ends back at the value captured by `mov rbp, rsp` above,
+     * which is rsp right after `push rbp` — i.e. 0 mod 16, the pre-
+     * subtract value), and `pop rbp` then restores the original
+     * 8 mod 16 invariant for the caller's resume PC.
+     */
+    seg_byte(SEG_CODE, 0x74); seg_byte(SEG_CODE, 0x08);
 
     /* push rbp  (55) */
     seg_byte(SEG_CODE, 0x55);
 
     /* mov rbp, rsp  (48 89 e5) */
     seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x89); seg_byte(SEG_CODE, 0xe5);
+
+    /* sub rsp, 8  (48 83 ec 08)  4 bytes — ME-13 rsp-alignment fix.
+     * Restores the dispatch-loop's rsp % 16 == 8 invariant after
+     * push rbp.  Strip-restored by mov rsp,rbp in emit_me6_return_blob.
+     */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x83);
+    seg_byte(SEG_CODE, 0xec); seg_byte(SEG_CODE, 0x08);
 
     /* skip: jmp rel32 trampoline */
     size_t rel32_end_off = seg_offset(SEG_CODE) + 5;
