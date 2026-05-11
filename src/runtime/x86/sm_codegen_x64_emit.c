@@ -860,17 +860,13 @@ static int emit_sm_arith(FILE *out, const SM_Instr *ins, int pc)
 
 /* EM-4 opcodes: SM_LABEL + SM_JUMP / SM_JUMP_S / SM_JUMP_F */
 
-static int emit_sm_label(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_label_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
-    /* SM_LABEL is a no-op control-flow marker.  The .LpcN label emitted
-     * at every PC already serves as the jump target — but we render a
-     * three-column line carrying the LABEL macro name in col 2 so the
-     * pending .LpcN: pc-label is consumed and the line is never naked.
-     * The macro body is empty (.macro LABEL\n.endm), so this line
-     * assembles to nothing while keeping the .LpcN: a valid jump
-     * target on its own.  EM-7c-stmt-banner-fidelity. */
+    /* SM_LABEL: routed through template (EM-MODE4-IS-MODE3-DUMP-o). */
     (void)ins; (void)pc;
-    return sm_emit_noop(out, sm_template_lookup(SM_LABEL), NULL);
+    emit_mode_set(EMIT_TEXT, out);
+    emit_sm_label(NULL);
+    return 0;
 }
 
 static int emit_sm_jump_line(FILE *out, const SM_Instr *ins, int pc)
@@ -985,30 +981,25 @@ static int emit_sm_return(FILE *out, int pc)
  *             interp because sm_interp.c reads only a[0].i)
  * ----------------------------------------------------------------------- */
 
-static int emit_sm_stno(FILE *out, const SM_Instr *ins, int pc,
+static int emit_sm_stno_dispatch(FILE *out, const SM_Instr *ins, int pc,
                         const SrcLines *sl)
 {
+    /* SM_STNO: routed through template (EM-MODE4-IS-MODE3-DUMP-o).
+     * Compute stno/lineno/src_text here (caller context needed), then
+     * delegate banner + NOOP marker to emit_sm_stno(). */
     (void)pc;
     int stno   = (int)ins->a[0].i;
     int lineno = (int)ins->a[1].i;
 
-    /* Lineno fallback: EM-BANNER-FIDELITY landed the parser fix so every
-     * statement now carries the correct source lineno.  The stno-as-lineno
-     * fallback that existed here was the root cause of banner drift (stno=2
-     * fetched srclines[2] which is a comment line, not the stmt body).
-     * Fallback now: if lineno is 0 or out of range, present stno in the
-     * banner but suppress the source-text fetch so we never show wrong text.
-     * This is graceful degradation for any pre-fix bytecode. */
     int try_lineno = lineno;
     if (try_lineno <= 0 || (sl && try_lineno > sl->count))
-        try_lineno = 0;   /* unknown — suppress source-text, not wrong text */
+        try_lineno = 0;
 
     char line_copy[1024];
     const char *src = NULL;
     if (sl && try_lineno > 0) {
         const char *raw = srclines_get(sl, try_lineno);
         if (raw && *raw) {
-            /* Copy and strip trailing CR if present (CRLF-friendly). */
             strncpy(line_copy, raw, sizeof(line_copy) - 1);
             line_copy[sizeof(line_copy) - 1] = '\0';
             srcline_strip_cr(line_copy);
@@ -1016,24 +1007,15 @@ static int emit_sm_stno(FILE *out, const SM_Instr *ins, int pc,
         }
     }
 
-    /* If lineno was authoritatively recorded but out of range, suppress
-     * the misleading "(line N)" suffix in the banner. */
     int banner_lineno;
-    if (lineno > 0 && (!sl || lineno <= sl->count)) {
+    if (lineno > 0 && (!sl || lineno <= sl->count))
         banner_lineno = lineno;
-    } else {
-        banner_lineno = 0;            /* truly unknown — omit (line N) */
-    }
+    else
+        banner_lineno = 0;
 
-    if (emit_major_break(out, stno, banner_lineno, src) != 0) return -1;
-
-    /* SM_STNO is a source-statement boundary marker.  We render a
-     * three-column line carrying the STNO macro name in col 2 so the
-     * pending .LpcN: pc-label is consumed (and not left naked).  The
-     * macro body is empty (.macro STNO\n.endm), so this line
-     * assembles to nothing — &STNO / &STCOUNT runtime support is
-     * deferred to a later rung.  EM-7c-stmt-banner-fidelity. */
-    return sm_emit_noop(out, sm_template_lookup(SM_STNO), NULL);
+    emit_mode_set(EMIT_TEXT, out);
+    emit_sm_stno(NULL, stno, banner_lineno, src);
+    return 0;
 }
 
 /* -----------------------------------------------------------------------
@@ -2199,7 +2181,7 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
             /* EM-4: control flow.  SM_LABEL is a no-op (the .LpcN label at
              * every PC already serves as the target); SM_JUMP/S/F resolve
              * targets to baked-at-emit-time .Lpc<a[0].i>. */
-            case SM_LABEL:        rc = emit_sm_label(out, ins, pc);      break;
+            case SM_LABEL:        rc = emit_sm_label_dispatch(out, ins, pc);      break;
             case SM_JUMP:         rc = emit_sm_jump_line(out, ins, pc);   break;
             case SM_JUMP_S:       rc = emit_sm_jump_s_line(out, ins, pc); break;
             case SM_JUMP_F:       rc = emit_sm_jump_f_line(out, ins, pc); break;
@@ -2225,7 +2207,7 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
             case SM_NRETURN_F:    rc = emit_sm_return_variant(out, ins->op, pc); break;
 
             /* SM_STNO -- statement boundary; emits major page break w/ source. */
-            case SM_STNO:         rc = emit_sm_stno(out, ins, pc,
+            case SM_STNO:         rc = emit_sm_stno_dispatch(out, ins, pc,
                                                     sl_loaded ? &sl : NULL); break;
 
             /* EM-7c-variant (session #80, 2026-05-07): pattern-construction

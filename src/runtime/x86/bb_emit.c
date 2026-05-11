@@ -310,7 +310,52 @@ void t_emit_jmp(bb_label_t *target, jmp_kind_t kind)
     }
 }
 
-/* ── label ──────────────────────────────────────────────────────────────── */
+void t_noop_macro(const char *macro_name)
+{
+    /* NOOP shape: emit one three-column line with macro_name in col 2.
+     * The .LpcN: label preceding this line is consumed by bb3c_format's
+     * label-pickup path; the macro body is empty so it assembles to nothing.
+     *   BINARY:    no-op — label is placed by bb_label_define; no bytes emitted.
+     *   TEXT:      three-column line, col2 = macro_name, no operands.
+     *   MACRO_DEF: same as TEXT. */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY:
+        return;
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF:
+        bb3c_format(emit_outf(), "", macro_name, "");
+        return;
+    }
+}
+
+void t_banner_stno(int stno, int lineno, const char *src_text)
+{
+    /* Major banner for SM_STNO statement boundaries.
+     *   BINARY:    no-op.
+     *   TEXT/MACRO_DEF: flush pending label, then 120-char #= fence,
+     *     "# stmt N  (line L):  <src>" caption line, closing #= fence. */
+#define STNO_RULE \
+    "#=======================================================================================================================\n"
+    switch (bb_emit_mode) {
+    case EMIT_BINARY:
+        return;
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF: {
+        FILE *f = emit_outf();
+        bb3c_flush_pending();
+        fputs(STNO_RULE, f);
+        if (src_text && *src_text)
+            fprintf(f, "# stmt %d  (line %d):  %s\n", stno, lineno, src_text);
+        else if (lineno > 0)
+            fprintf(f, "# stmt %d  (line %d)\n", stno, lineno);
+        else
+            fprintf(f, "# stmt %d\n", stno);
+        fputs(STNO_RULE, f);
+        return;
+    }
+    }
+#undef STNO_RULE
+}
 
 void bb_label_init(bb_label_t *lbl, const char *name)
 {

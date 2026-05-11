@@ -134,6 +134,19 @@ typedef enum {
 void t_test_rax_rax(void);
 void t_emit_jmp(bb_label_t *target, jmp_kind_t kind);
 
+/* t_noop_macro — emit one three-column line with macro_name in col 2,
+ * no operands.  Used by SM_LABEL and SM_STNO templates: the .LpcN: label
+ * is consumed by the line; the macro body is empty so it assembles to nothing.
+ *   BINARY:    no-op (label placement is the caller's job via bb_label_define)
+ *   TEXT:      bb3c_format("", macro_name, "")
+ *   MACRO_DEF: same as TEXT */
+void t_noop_macro(const char *macro_name);
+
+/* t_banner_stno — emit the SM_STNO major banner.
+ *   BINARY:    no-op
+ *   TEXT/MACRO_DEF: 120-char #= rule, "# stmt N  (line L):  <src>", #= rule */
+void t_banner_stno(int stno, int lineno, const char *src_text);
+
 /* ── binary mode state ──────────────────────────────────────────────────── */
 
 extern bb_buf_t  bb_emit_buf;   /* current pool buffer */

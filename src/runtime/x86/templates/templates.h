@@ -125,4 +125,11 @@ void emit_sm_concat    (emitter_t *e);
 void emit_sm_push_null (emitter_t *e);
 void emit_sm_coerce_num(emitter_t *e);
 
+/* SM_LABEL / SM_STNO structural markers — sub-rung -o (2026-05-11).
+ * BINARY: no-op (label system places .LpcN; no x86 bytes).
+ * TEXT:   LABEL → one three-column LABEL macro line.
+ *         STNO  → 120-char #= banner + STNO macro line. */
+void emit_sm_label(emitter_t *e);
+void emit_sm_stno (emitter_t *e, int stno, int lineno, const char *src_text);
+
 #endif /* RUNTIME_X86_TEMPLATES_TEMPLATES_H */
