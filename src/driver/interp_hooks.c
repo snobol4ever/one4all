@@ -109,7 +109,7 @@ DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
      * so label_lookup always returns NULL. SM-bodied functions are dispatched
      * by the RS-11 block below via sm_label_pc_lookup. */
     const char *_entry = FUNC_ENTRY_fn(name);
-    STMT_t *_body = NULL;
+    const AST_t *_body = NULL;
     if (!g_current_sm_prog) {
         _body = _entry ? label_lookup(_entry) : NULL;
         if (!_body) _body = label_lookup(name);

@@ -51,6 +51,7 @@ void icn_record_register(const char *spec);  /* IC-5: register record type at in
 extern int label_count;     /* needed by polyglot_init for sno_label_start */
 void    label_table_build(const AST_t *prog);
 const AST_t *label_lookup(const char *name);
+extern const AST_t *g_exec_prog;  /* SI-6: program tree for call_user_function body walk */
 void    prescan_defines(const AST_t *prog);
 
 /* ── Core interpreter entry points ────────────────────────────────────── */

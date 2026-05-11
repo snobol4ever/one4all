@@ -37,9 +37,14 @@ static inline int           s_has (const AST_t *s, const char *tag) {
 static inline int           s_int (const AST_t *s, const char *tag) {
     const char *v = s_str(s, tag); return v ? atoi(v) : 0; }
 
+/* SI-6: global program tree — set at execute_program entry so call_user_function
+ * can walk AST_STMT children forward from a label_lookup result. */
+const AST_t *g_exec_prog = NULL;
+
 void execute_program(const AST_t *prog)
 {
     NO_AST_WALK_GUARD("execute_program");
+    g_exec_prog = prog;
     polyglot_init(prog, polyglot_lang_mask(prog));   /* U-14 / FI-8: language-selective init */
     g_lang = 0;  /* SNOBOL4 mode */
 
@@ -54,43 +59,64 @@ void execute_program(const AST_t *prog)
      * Terminal errors (code 20-23, 26-27, 29-31, 39) exit the loop. */
     g_sno_err_active = 1;
 
-    /* Hoist per-iteration state above setjmp: C99 forbids goto crossing an
-     * initializer, and longjmp re-enters at the setjmp call each iteration. */
-    int         ci        = 0;   /* index into prog->children[] */
-    int         stno      = 0;
-    int         succeeded = 1;
-    DESCR_t     subj_val  = NULVCL;
-    const char *subj_name = NULL;
-    const char *target    = NULL;
-    int         nch       = prog ? prog->nchildren : 0;
+    /* Hoist per-iteration state above setjmp: C99 says variables declared
+     * inside the while body are indeterminate after longjmp re-enters at the
+     * setjmp call.  All per-stmt locals must live above the while so they
+     * survive longjmp and remain valid when the error handler at setjmp
+     * reads goto_f / goto_f_expr.  Re-assign from s at top of each iteration
+     * (after the NULL/END early-continue guards). */
+    int              ci        = 0;   /* index into prog->children[] */
+    int              stno      = 0;
+    int              succeeded = 1;
+    DESCR_t          subj_val  = NULVCL;
+    const char      *subj_name = NULL;
+    const char      *target    = NULL;
+    int              nch       = prog ? prog->nchildren : 0;
+    const AST_t     *s         = NULL;
+    int              s_is_end  = 0;
+    const char      *s_label   = NULL;
+    int              s_lang    = 0;
+    int              s_has_eq  = 0;
+    AST_t           *s_subject = NULL;
+    AST_t           *s_pattern = NULL;
+    AST_t           *s_repl    = NULL;
+    AST_t           *go_s_attr = NULL;
+    AST_t           *go_f_attr = NULL;
+    AST_t           *go_u_attr = NULL;
+    const char      *goto_s    = NULL;
+    const char      *goto_f    = NULL;
+    const char      *goto_u    = NULL;
+    AST_t           *goto_s_expr = NULL;
+    AST_t           *goto_f_expr = NULL;
+    AST_t           *goto_u_expr = NULL;
 
     while (ci < nch) {
-        const AST_t *s = prog->children[ci];
+        s = prog->children[ci];
         if (!s) { ci++; continue; }
 
         if (s->kind == AST_END) break;  /* U-23: polyglot multi-section dispatch handles remaining modules */
 
-        /* SI-6: read stmt fields via attrs */
-        int         s_is_end  = (s->kind == AST_END);
-        const char *s_label   = s_str(s, ":lbl");
-        int         s_lang    = s_int(s, ":lang");
-        int         s_has_eq  = s_has(s, ":eq");
-        AST_t      *s_subject = s_expr(s, ":subj");
-        AST_t      *s_pattern = s_expr(s, ":pat");
-        AST_t      *s_repl    = s_expr(s, ":repl");
+        /* SI-6: re-assign per-stmt fields from s each iteration (hoisted above while). */
+        s_is_end  = (s->kind == AST_END);
+        s_label   = s_str(s, ":lbl");
+        s_lang    = s_int(s, ":lang");
+        s_has_eq  = s_has(s, ":eq");
+        s_subject = s_expr(s, ":subj");
+        s_pattern = s_expr(s, ":pat");
+        s_repl    = s_expr(s, ":repl");
 
         /* goto attrs — may be static label (leaf child) or expr */
-        AST_t *go_s_attr = stmt_attr_find(s, ":goS");
-        AST_t *go_f_attr = stmt_attr_find(s, ":goF");
-        AST_t *go_u_attr = stmt_attr_find(s, ":go");
+        go_s_attr = stmt_attr_find(s, ":goS");
+        go_f_attr = stmt_attr_find(s, ":goF");
+        go_u_attr = stmt_attr_find(s, ":go");
         /* static labels (leaf child of attr node or NULL) */
-        const char *goto_s      = go_s_attr ? stmt_attr_str(go_s_attr)  : NULL;
-        const char *goto_f      = go_f_attr ? stmt_attr_str(go_f_attr)  : NULL;
-        const char *goto_u      = go_u_attr ? stmt_attr_str(go_u_attr)  : NULL;
+        goto_s      = go_s_attr ? stmt_attr_str(go_s_attr)  : NULL;
+        goto_f      = go_f_attr ? stmt_attr_str(go_f_attr)  : NULL;
+        goto_u      = go_u_attr ? stmt_attr_str(go_u_attr)  : NULL;
         /* computed labels (expr child when no leaf) */
-        AST_t *goto_s_expr = (go_s_attr && !goto_s) ? stmt_attr_expr(go_s_attr) : NULL;
-        AST_t *goto_f_expr = (go_f_attr && !goto_f) ? stmt_attr_expr(go_f_attr) : NULL;
-        AST_t *goto_u_expr = (go_u_attr && !goto_u) ? stmt_attr_expr(go_u_attr) : NULL;
+        goto_s_expr = (go_s_attr && !goto_s) ? stmt_attr_expr(go_s_attr) : NULL;
+        goto_f_expr = (go_f_attr && !goto_f) ? stmt_attr_expr(go_f_attr) : NULL;
+        goto_u_expr = (go_u_attr && !goto_u) ? stmt_attr_expr(go_u_attr) : NULL;
 
         /* Empty statement (blank source line — Green Book treats blank
          * lines as empty statements, SPITBOL/CSNOBOL4 advance &STNO but
