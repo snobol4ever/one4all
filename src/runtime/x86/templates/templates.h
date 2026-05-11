@@ -99,4 +99,12 @@ void emit_sm_jump  (emitter_t *e, int target_pc);
 void emit_sm_jump_s(emitter_t *e, int target_pc);
 void emit_sm_jump_f(emitter_t *e, int target_pc);
 
+/* XPOSI/XRPSI (POS/RPOS) — sub-rung -k (2026-05-11). */
+void emit_bb_xposi(emitter_t *e, int n,
+                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β,
+                   bb_pos_text_fn text_body_fn, void *text_body_arg);
+void emit_bb_xrpsi(emitter_t *e, int n,
+                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β,
+                   bb_pos_text_fn text_body_fn, void *text_body_arg);
+
 #endif /* RUNTIME_X86_TEMPLATES_TEMPLATES_H */

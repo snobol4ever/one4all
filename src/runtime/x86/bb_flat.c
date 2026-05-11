@@ -923,55 +923,50 @@ static void flat_emit_fail(emitter_t *e, bb_label_t *lbl_succ,
 }
 
 /* ── leaf: POS(n) ───────────────────────────────────────────────────────── */
+/* ── XPOSI/XRPSI text-body callbacks (EM-MODE4-IS-MODE3-DUMP-k) ─────────── */
+
+static void pos_text_body(emitter_t *e, int n,
+                          bb_label_t *lbl_succ, bb_label_t *lbl_fail,
+                          bb_label_t *lbl_β, void *arg_)
+{
+    (void)arg_;
+    char banner_args[32]; snprintf(banner_args, sizeof(banner_args), "%d", n);
+    flat_emit_box_banner(e, "POS", banner_args, lbl_succ->name);
+    char args[256];
+    snprintf(args, sizeof(args), "%d, %s, %s # POS(%d)",
+             n, lbl_succ->name, lbl_fail->name, n);
+    flat3c_action(e, "POS_\xCE\xB1", args);   /* POS_α */
+    EV_LABEL(e, lbl_β);
+    flat3c_action(e, "POS_\xCE\xB2", lbl_fail->name);  /* POS_β */
+}
+
+static void rpos_text_body(emitter_t *e, int n,
+                           bb_label_t *lbl_succ, bb_label_t *lbl_fail,
+                           bb_label_t *lbl_β, void *arg_)
+{
+    (void)arg_;
+    char banner_args[32]; snprintf(banner_args, sizeof(banner_args), "%d", n);
+    flat_emit_box_banner(e, "RPOS", banner_args, lbl_succ->name);
+    char args[256];
+    snprintf(args, sizeof(args), "%d, %s, %s # RPOS(%d)",
+             n, lbl_succ->name, lbl_fail->name, n);
+    flat3c_action(e, "RPOS_\xCE\xB1", args);   /* RPOS_α */
+    EV_LABEL(e, lbl_β);
+    flat3c_action(e, "RPOS_\xCE\xB2", lbl_fail->name);  /* RPOS_β */
+}
+
 static void flat_emit_pos(emitter_t *e, int n, bb_label_t *lbl_succ,
                           bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
-    if (e->is_text) {
-        char banner_args[32]; snprintf(banner_args, sizeof(banner_args), "%d", n);
-        flat_emit_box_banner(e, "POS", banner_args, lbl_succ->name);
-        /* EM-7c-bb-macros: POS_α n, lbl_succ, lbl_fail
-         * EM-FORMAT-BB-COL3-COMMENTS: α-line names the box kind + arg. */
-        char args[256];
-        snprintf(args, sizeof(args), "%d, %s, %s # POS(%d)",
-                 n, lbl_succ->name, lbl_fail->name, n);
-        flat3c_action(e, "POS_\xCE\xB1", args);  /* POS_α */
-        EV_LABEL(e, lbl_β);
-        flat3c_action(e, "POS_\xCE\xB2", lbl_fail->name);  /* POS_β */
-    } else {
-        emit_load_delta(e);
-        emit_cmp_eax_imm32(e, (uint32_t)n);
-        EV_JMP(e, lbl_fail, JMP_JNE);
-        EV_JMP(e, lbl_succ, JMP_JMP);
-        EV_LABEL(e, lbl_β); EV_JMP(e, lbl_fail, JMP_JMP);
-    }
+    emit_bb_xposi(e, n, lbl_succ, lbl_fail, lbl_β, pos_text_body, NULL);
 }
 
-/* ── leaf: RPOS(n) ──────────────────────────────────────────────────────── */
 static void flat_emit_rpos(emitter_t *e, int n, bb_label_t *lbl_succ,
                            bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
-    if (e->is_text) {
-        char banner_args[32]; snprintf(banner_args, sizeof(banner_args), "%d", n);
-        flat_emit_box_banner(e, "RPOS", banner_args, lbl_succ->name);
-        /* EM-7c-bb-macros: RPOS_α n, lbl_succ, lbl_fail
-         * EM-FORMAT-BB-COL3-COMMENTS: α-line names the box kind + arg. */
-        char args[256];
-        snprintf(args, sizeof(args), "%d, %s, %s # RPOS(%d)",
-                 n, lbl_succ->name, lbl_fail->name, n);
-        flat3c_action(e, "RPOS_\xCE\xB1", args);  /* RPOS_α */
-        EV_LABEL(e, lbl_β);
-        flat3c_action(e, "RPOS_\xCE\xB2", lbl_fail->name);  /* RPOS_β */
-    } else {
-        emit_load_siglen(e, ADDR_SIGLEN);     /* eax = Σlen */
-        emit_sub_eax_imm32(e, (uint32_t)n);  /* eax = Σlen - n */
-        emit_mov_ecx_eax(e);                 /* ecx = Σlen - n */
-        emit_load_delta(e);                  /* eax = Δ */
-        emit_cmp_eax_ecx(e);                 /* cmp Δ, Σlen-n */
-        EV_JMP(e, lbl_fail, JMP_JNE);
-        EV_JMP(e, lbl_succ, JMP_JMP);
-        EV_LABEL(e, lbl_β); EV_JMP(e, lbl_fail, JMP_JMP);
-    }
+    emit_bb_xrpsi(e, n, lbl_succ, lbl_fail, lbl_β, rpos_text_body, NULL);
 }
+
 
 /* ── leaf: charset (ANY/NOTANY/SPAN/BRK) ───────────────────────────────── */
 /* EM-MODE4-IS-MODE3-DUMP-e: charset family now routed through
