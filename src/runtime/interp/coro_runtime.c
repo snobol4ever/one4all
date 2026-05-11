@@ -799,8 +799,12 @@ static void proc_trampoline(void) {
     Icn_coro_stage_t st = coro_stage;        /* copy before first yield */
     active_coro = st.ss;
     DESCR_t result;
-    /* CH-17c: dispatch via SM expression when entry_pc is resolved */
-    if (st.entry_pc >= 0)
+    /* CH-17c: dispatch via SM expression when entry_pc is resolved.
+     * Guard on g_current_sm_prog: under --ir-run, sm_resolve_irrun_entry_pcs
+     * populates entry_pc then frees the SM_Program (g_current_sm_prog=NULL).
+     * In that case fall back to the IR walker (coro_call). */
+    extern SM_Program *g_current_sm_prog;
+    if (st.entry_pc >= 0 && g_current_sm_prog != NULL)
         result = sm_call_proc(st.entry_pc, st.nparams, st.args, st.nargs);
     else
         result = coro_call(st.proc, st.args, st.nargs);
