@@ -2658,6 +2658,22 @@ int sm_codegen(SM_Program *prog)
             default: break;
             }
             emit_me9_pat_charset_blob(helper, g_trampoline_offset);
+        } else if (op == SM_PAT_ARBNO || op == SM_PAT_FENCE1) {
+            /* ME-9e: inline-native unary-pattern combinators.  Pop one
+             * DESCR_t (inner pat), call pat_arbno(inner) or
+             * pat_fence_p(inner) directly — both have the exact
+             * DESCR_t(DESCR_t) signature with no coercion or guard
+             * needed.  Same blob shape as ME-9c/ME-9d (single-DESCR_t-arg,
+             * net delta 0) — reuses emit_me9_pat_charset_blob.  No me9_*
+             * helper indirection because the runtime entry points already
+             * match the signature exactly. */
+            void *fn = NULL;
+            switch (op) {
+            case SM_PAT_ARBNO:  fn = (void *)&pat_arbno;    break;
+            case SM_PAT_FENCE1: fn = (void *)&pat_fence_p;  break;
+            default: break;
+            }
+            emit_me9_pat_charset_blob(fn, g_trampoline_offset);
         } else if (op == SM_PAT_ARB     || op == SM_PAT_REM    ||
                    op == SM_PAT_FAIL    || op == SM_PAT_SUCCEED ||
                    op == SM_PAT_EPS     || op == SM_PAT_FENCE  ||
