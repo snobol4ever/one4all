@@ -3,7 +3,7 @@
 #include "../emitter.h"
 #include "../bb_emit.h"
 
-void emit_sm_nullary_rt(emitter_t *e,
+void emit_sm_rtcall(emitter_t *e,
                          const char *comment_str,
                          const char *macro_name,
                          const char *rt_sym)
@@ -16,7 +16,7 @@ void emit_sm_nullary_rt(emitter_t *e,
     t_pad_to_blob_size();
 }
 
-void emit_sm_pat_nullary_rt(emitter_t *e,
+void emit_sm_pat_rtcall(emitter_t *e,
                               const char *comment_str,
                               const char *macro_name,
                               const char *rt_sym)

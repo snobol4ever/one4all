@@ -5,6 +5,6 @@
 
 void emit_sm_load_frame(emitter_t *e)
 {
-    emit_sm_nullary_rt(e, "SM_LOAD_FRAME — push IcnFrame slot (M5)",
+    emit_sm_rtcall(e, "SM_LOAD_FRAME — push IcnFrame slot (M5)",
                        "LOAD_FRAME", "rt_unhandled_sm");
 }

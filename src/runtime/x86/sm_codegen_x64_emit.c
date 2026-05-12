@@ -758,7 +758,7 @@ static int emit_halt_line(FILE *out, int pc)
      * Mode-4 form: call rt_halt_tos@PLT (Option C sanctioned exception).
      * Renamed from emit_sm_halt to avoid conflict with templates/sm_halt.c's
      * emit_sm_halt(emitter_t *) (EM-MODE4-IS-MODE3-DUMP-f). */
-    return sm_emit_nullary(out, sm_template_lookup(SM_HALT), NULL);
+    return sm_emit_rtcall(out, sm_template_lookup(SM_HALT), NULL);
 }
 
 static int emit_push_lit_i_line(FILE *out, const SM_Instr *ins, int pc)
@@ -821,7 +821,7 @@ static int emit_sm_pop(FILE *out, int pc)
      * emitter_text_new(out) constructs a text emitter in INVOCATION mode;
      * emit_sm_void_pop (templates/sm_void_pop.c) emits:
      *   call rt_pop_void@PLT
-     * directly to `out`.  Legacy sm_emit_nullary path retained below
+     * directly to `out`.  Legacy sm_emit_rtcall path retained below
      * as __attribute__((unused)) for rollback reference. */
     emitter_t *e = emitter_text_new(out);
     if (!e) return -1;
@@ -834,7 +834,7 @@ __attribute__((unused))
 static int emit_sm_pop_legacy(FILE *out, int pc)
 {
     (void)pc;
-    return sm_emit_nullary(out, sm_template_lookup(SM_VOID_POP), NULL);
+    return sm_emit_rtcall(out, sm_template_lookup(SM_VOID_POP), NULL);
 }
 
 static int emit_sm_arith(FILE *out, const SM_Instr *ins, int pc)
@@ -2028,14 +2028,14 @@ static int emit_sm_pat_usercall_args_dispatch(FILE *out, const SM_Instr *ins, in
  * pattern opcode (SPAN/BREAK/ANY/NOTANY/LEN/POS/RPOS/TAB/RTAB/ARB/
  * ARBNO/REM/FENCE/FENCE1/FAIL/ABORT/SUCCEED/BAL/EPS/CAT/ALT/DEREF/
  * BOXVAL) has its own template entry; sm_template_lookup picks the
- * right one and sm_emit_nullary writes the macro call.  No annotation
+ * right one and sm_emit_rtcall writes the macro call.  No annotation
  * needed — the macro name in col 2 is self-describing. */
 static int emit_sm_pat_noarg(FILE *out, sm_opcode_t op, int pc)
 {
     (void)pc;
     const sm_op_template_t *t = sm_template_lookup(op);
     if (!t) return -1;
-    return sm_emit_nullary(out, t, NULL);
+    return sm_emit_rtcall(out, t, NULL);
 }
 
 /* SM_EXEC_STMT for a variant pattern: emit a rt_match_variant call.

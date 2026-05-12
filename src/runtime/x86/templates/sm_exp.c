@@ -5,6 +5,6 @@
 
 void emit_sm_exp(emitter_t *e)
 {
-    emit_sm_nullary_rt(e, "SM_EXP — pop 2, push base**exp",
+    emit_sm_rtcall(e, "SM_EXP — pop 2, push base**exp",
                        "EXP_NUM", "rt_exp");
 }

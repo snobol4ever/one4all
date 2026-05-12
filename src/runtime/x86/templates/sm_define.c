@@ -5,6 +5,6 @@
 
 void emit_sm_define(emitter_t *e)
 {
-    emit_sm_nullary_rt(e, "SM_DEFINE — no-op: function definition prescan",
+    emit_sm_rtcall(e, "SM_DEFINE — no-op: function definition prescan",
                        "DEFINE", "rt_define");
 }

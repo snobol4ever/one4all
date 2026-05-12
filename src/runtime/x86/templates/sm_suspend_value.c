@@ -5,6 +5,6 @@
 
 void emit_sm_suspend_value(emitter_t *e)
 {
-    emit_sm_nullary_rt(e, "SM_SUSPEND_VALUE — coroutine yield (M5)",
+    emit_sm_rtcall(e, "SM_SUSPEND_VALUE — coroutine yield (M5)",
                        "SUSPEND_VALUE", "rt_unhandled_sm");
 }

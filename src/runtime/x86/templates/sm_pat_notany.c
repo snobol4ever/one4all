@@ -5,6 +5,6 @@
 
 void emit_sm_pat_notany(emitter_t *e)
 {
-    emit_sm_pat_nullary_rt(e, "SM_PAT_NOTANY — pop charset string, push NOTANY pattern",
+    emit_sm_pat_rtcall(e, "SM_PAT_NOTANY — pop charset string, push NOTANY pattern",
                            "PAT_NOTANY", "rt_pat_notany");
 }

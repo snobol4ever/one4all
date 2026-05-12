@@ -5,6 +5,6 @@
 
 void emit_sm_store_frame(emitter_t *e)
 {
-    emit_sm_nullary_rt(e, "SM_STORE_FRAME — pop into IcnFrame slot (M5)",
+    emit_sm_rtcall(e, "SM_STORE_FRAME — pop into IcnFrame slot (M5)",
                        "STORE_FRAME", "rt_unhandled_sm");
 }

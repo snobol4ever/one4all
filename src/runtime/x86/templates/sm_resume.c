@@ -5,6 +5,6 @@
 
 void emit_sm_resume(emitter_t *e)
 {
-    emit_sm_nullary_rt(e, "SM_RESUME — generator resume marker (M5)",
+    emit_sm_rtcall(e, "SM_RESUME — generator resume marker (M5)",
                        "RESUME", "rt_unhandled_sm");
 }

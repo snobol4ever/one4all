@@ -52,7 +52,7 @@
  * UNHANDLED  -- i32 op_enum; trap shape
  * --------------------------------------------------------------------- */
 typedef enum {
-    SM_TPL_NULLARY = 0,
+    SM_TPL_RTCALL = 0,
     SM_TPL_INT64,
     SM_TPL_LBL,
     SM_TPL_LBLOPT,           /* label-or-null, no extra int */
@@ -148,7 +148,7 @@ int sm_emit_template(FILE *out, const sm_op_template_t *t,
 
 /* Convenience: fill-and-emit for the hottest shapes, so the dispatcher
  * site doesn't have to construct sm_emit_args_t every time. */
-int sm_emit_nullary    (FILE *out, const sm_op_template_t *t,
+int sm_emit_rtcall    (FILE *out, const sm_op_template_t *t,
                         const char *anno);
 int sm_emit_int64      (FILE *out, const sm_op_template_t *t,
                         int64_t v, const char *anno);

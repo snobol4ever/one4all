@@ -83,15 +83,15 @@ const char *sm_emit_consume_pc_label(void)
 
 static const sm_op_template_t g_sm_templates[] = {
     /* Value push/pop/store */
-    { SM_HALT,         "HALT",         "rt_halt_tos",     SM_TPL_NULLARY,    0, 0 },
+    { SM_HALT,         "HALT",         "rt_halt_tos",     SM_TPL_RTCALL,    0, 0 },
     { SM_PUSH_LIT_I,   "PUSH_INT",     "rt_push_int",     SM_TPL_INT64,      0, 0 },
     { SM_PUSH_LIT_S,   "PUSH_STR",     "rt_push_str",     SM_TPL_LBL_INT32,  0, 0 },
     { SM_PUSH_VAR,     "PUSH_VAR",     "rt_nv_get",       SM_TPL_LBL,        0, 0 },
     { SM_STORE_VAR,    "STORE_VAR",    "rt_nv_set",       SM_TPL_LBL,        0, 0 },
-    { SM_VOID_POP,          "VOID_POP",          "rt_pop_void",     SM_TPL_NULLARY,    0, 0 },
-    { SM_PUSH_NULL,    "PUSH_NULL",    "rt_push_null",    SM_TPL_NULLARY,    0, 0 },
-    { SM_CONCAT,       "CONCAT",       "rt_concat",       SM_TPL_NULLARY,    0, 0 },
-    { SM_COERCE_NUM,   "COERCE_NUM",   "rt_coerce_num",   SM_TPL_NULLARY,    0, 0 },
+    { SM_VOID_POP,          "VOID_POP",          "rt_pop_void",     SM_TPL_RTCALL,    0, 0 },
+    { SM_PUSH_NULL,    "PUSH_NULL",    "rt_push_null",    SM_TPL_RTCALL,    0, 0 },
+    { SM_CONCAT,       "CONCAT",       "rt_concat",       SM_TPL_RTCALL,    0, 0 },
+    { SM_COERCE_NUM,   "COERCE_NUM",   "rt_coerce_num",   SM_TPL_RTCALL,    0, 0 },
 
     /* Arithmetic.  EM-7c follow-up: each op gets its own named no-arg
      * macro.  Op-enum is baked into the macro body via t->const_a, not
@@ -123,28 +123,28 @@ static const sm_op_template_t g_sm_templates[] = {
     { SM_CALL_FN,         "CALL_FN",         "rt_call",         SM_TPL_LBL_INT32,  0, 0 },
 
     /* Pattern construction (no-arg shape) */
-    { SM_PAT_SPAN,     "PAT_SPAN",     "rt_pat_span",     SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_BREAK,    "PAT_BREAK",    "rt_pat_break",    SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_ANY,      "PAT_ANY",      "rt_pat_any",      SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_NOTANY,   "PAT_NOTANY",   "rt_pat_notany",   SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_LEN,      "PAT_LEN",      "rt_pat_len",      SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_POS,      "PAT_POS",      "rt_pat_pos",      SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_RPOS,     "PAT_RPOS",     "rt_pat_rpos",     SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_TAB,      "PAT_TAB",      "rt_pat_tab",      SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_RTAB,     "PAT_RTAB",     "rt_pat_rtab",     SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_ARB,      "PAT_ARB",      "rt_pat_arb",      SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_ARBNO,    "PAT_ARBNO",    "rt_pat_arbno",    SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_REM,      "PAT_REM",      "rt_pat_rem",      SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_FENCE0,    "PAT_FENCE",    "rt_pat_fence",    SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_FENCE1,   "PAT_FENCE1",   "rt_pat_fence1",   SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_FAIL,     "PAT_FAIL",     "rt_pat_fail",     SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_ABORT,    "PAT_ABORT",    "rt_pat_abort",    SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_SUCCEED,  "PAT_SUCCEED",  "rt_pat_succeed",  SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_BAL,      "PAT_BAL",      "rt_pat_bal",      SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_EPS,      "PAT_EPS",      "rt_pat_eps",      SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_CAT,      "PAT_CAT",      "rt_pat_cat",      SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_ALT,      "PAT_ALT",      "rt_pat_alt",      SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_DEREF,    "PAT_DEREF",    "rt_pat_deref",    SM_TPL_NULLARY,    0, 0 },
+    { SM_PAT_SPAN,     "PAT_SPAN",     "rt_pat_span",     SM_TPL_RTCALL,    0, 0 },
+    { SM_PAT_BREAK,    "PAT_BREAK",    "rt_pat_break",    SM_TPL_RTCALL,    0, 0 },
+    { SM_PAT_ANY,      "PAT_ANY",      "rt_pat_any",      SM_TPL_RTCALL,    0, 0 },
+    { SM_PAT_NOTANY,   "PAT_NOTANY",   "rt_pat_notany",   SM_TPL_RTCALL,    0, 0 },
+    { SM_PAT_LEN,      "PAT_LEN",      "rt_pat_len",      SM_TPL_RTCALL,    0, 0 },
+    { SM_PAT_POS,      "PAT_POS",      "rt_pat_pos",      SM_TPL_RTCALL,    0, 0 },
+    { SM_PAT_RPOS,     "PAT_RPOS",     "rt_pat_rpos",     SM_TPL_RTCALL,    0, 0 },
+    { SM_PAT_TAB,      "PAT_TAB",      "rt_pat_tab",      SM_TPL_RTCALL,    0, 0 },
+    { SM_PAT_RTAB,     "PAT_RTAB",     "rt_pat_rtab",     SM_TPL_RTCALL,    0, 0 },
+    { SM_PAT_ARB,      "PAT_ARB",      "rt_pat_arb",      SM_TPL_RTCALL,    0, 0 },
+    { SM_PAT_ARBNO,    "PAT_ARBNO",    "rt_pat_arbno",    SM_TPL_RTCALL,    0, 0 },
+    { SM_PAT_REM,      "PAT_REM",      "rt_pat_rem",      SM_TPL_RTCALL,    0, 0 },
+    { SM_PAT_FENCE0,    "PAT_FENCE",    "rt_pat_fence",    SM_TPL_RTCALL,    0, 0 },
+    { SM_PAT_FENCE1,   "PAT_FENCE1",   "rt_pat_fence1",   SM_TPL_RTCALL,    0, 0 },
+    { SM_PAT_FAIL,     "PAT_FAIL",     "rt_pat_fail",     SM_TPL_RTCALL,    0, 0 },
+    { SM_PAT_ABORT,    "PAT_ABORT",    "rt_pat_abort",    SM_TPL_RTCALL,    0, 0 },
+    { SM_PAT_SUCCEED,  "PAT_SUCCEED",  "rt_pat_succeed",  SM_TPL_RTCALL,    0, 0 },
+    { SM_PAT_BAL,      "PAT_BAL",      "rt_pat_bal",      SM_TPL_RTCALL,    0, 0 },
+    { SM_PAT_EPS,      "PAT_EPS",      "rt_pat_eps",      SM_TPL_RTCALL,    0, 0 },
+    { SM_PAT_CAT,      "PAT_CAT",      "rt_pat_cat",      SM_TPL_RTCALL,    0, 0 },
+    { SM_PAT_ALT,      "PAT_ALT",      "rt_pat_alt",      SM_TPL_RTCALL,    0, 0 },
+    { SM_PAT_DEREF,    "PAT_DEREF",    "rt_pat_deref",    SM_TPL_RTCALL,    0, 0 },
     /* SM_PAT_BOXVAL removed by ME-1 */
 
     /* Pattern construction (one-string-or-NULL shape) */
@@ -176,11 +176,11 @@ static const sm_op_template_t g_sm_templates[] = {
     { SM_STNO,         "STNO",         NULL,                    SM_TPL_NOOP,       0, 0 },
 
     /* Opcodes added sess 2026-05-12 (EM-TEMPLATE-COMPLETE). */
-    { SM_PUSH_NULL_NOFLIP, "PUSH_NULL_NOFLIP", "rt_push_null_noflip", SM_TPL_NULLARY, 0, 0 },
-    { SM_EXP,          "EXP_NUM",      "rt_exp",          SM_TPL_NULLARY,    0, 0 },
-    { SM_NEG,          "NEGATE",       "rt_neg",          SM_TPL_NULLARY,    0, 0 },
-    { SM_DEFINE_ENTRY, "DEFINE_ENTRY", "rt_define_entry", SM_TPL_NULLARY,    0, 0 },
-    { SM_DEFINE,       "DEFINE",       "rt_define",       SM_TPL_NULLARY,    0, 0 },
+    { SM_PUSH_NULL_NOFLIP, "PUSH_NULL_NOFLIP", "rt_push_null_noflip", SM_TPL_RTCALL, 0, 0 },
+    { SM_EXP,          "EXP_NUM",      "rt_exp",          SM_TPL_RTCALL,    0, 0 },
+    { SM_NEG,          "NEGATE",       "rt_neg",          SM_TPL_RTCALL,    0, 0 },
+    { SM_DEFINE_ENTRY, "DEFINE_ENTRY", "rt_define_entry", SM_TPL_RTCALL,    0, 0 },
+    { SM_DEFINE,       "DEFINE",       "rt_define",       SM_TPL_RTCALL,    0, 0 },
     /* Generator / M5 opcodes — trap via rt_unhandled_sm at runtime. */
     { SM_SUSPEND,        "SUSPEND",        "rt_unhandled_sm", SM_TPL_ARITH, SM_SUSPEND,        0 },
     { SM_RESUME,         "RESUME",         "rt_unhandled_sm", SM_TPL_ARITH, SM_RESUME,         0 },
@@ -313,7 +313,7 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
      *   Col 3 (free):    args/operands */
     char macro_def[64];
     switch (t->kind) {
-    case SM_TPL_NULLARY:
+    case SM_TPL_RTCALL:
         snprintf(macro_def, sizeof(macro_def), "%s", t->macro_name);
         macro_line(out, "", ".macro", macro_def);
         { char ct[64]; snprintf(ct, sizeof(ct), "%s@PLT", t->runtime);
@@ -544,7 +544,7 @@ static int build_args_col(char *buf, int cap, const sm_op_template_t *t,
 {
     int n = 0;
     switch (t->kind) {
-    case SM_TPL_NULLARY:
+    case SM_TPL_RTCALL:
     case SM_TPL_RET:
     case SM_TPL_NOOP:
         n = snprintf(buf, cap, "");  /* no args */
@@ -792,7 +792,7 @@ int sm_emit_template(FILE *out, const sm_op_template_t *t,
 
 /* ---- Convenience wrappers ----------------------------------------- */
 
-int sm_emit_nullary(FILE *out, const sm_op_template_t *t, const char *anno)
+int sm_emit_rtcall(FILE *out, const sm_op_template_t *t, const char *anno)
 {
     sm_emit_args_t a = { 0 };
     a.anno = anno;
@@ -905,7 +905,7 @@ int sm_emit_call_expression(FILE *out, const sm_op_template_t *t, int target_pc)
 
 int sm_emit_ret(FILE *out, const sm_op_template_t *t, const char *anno)
 {
-    return sm_emit_nullary(out, t, anno);
+    return sm_emit_rtcall(out, t, anno);
 }
 
 int sm_emit_ret_var(FILE *out, int kind, int cond, int pc, const char *anno)

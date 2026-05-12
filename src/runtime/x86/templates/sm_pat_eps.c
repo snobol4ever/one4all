@@ -5,6 +5,6 @@
 
 void emit_sm_pat_eps(emitter_t *e)
 {
-    emit_sm_pat_nullary_rt(e, "SM_PAT_EPS — push epsilon pattern",
+    emit_sm_pat_rtcall(e, "SM_PAT_EPS — push epsilon pattern",
                            "PAT_EPS", "rt_pat_eps");
 }
