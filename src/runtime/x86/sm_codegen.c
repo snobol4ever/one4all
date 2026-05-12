@@ -1257,6 +1257,48 @@ static void h_call(void)
         return;
     }
 
+    /* Phase B — Prolog SM_CALL_FN JIT mirrors (parity with sm_interp.c PB-1..PB-4).
+     * Must appear before the generic INVOKE_fn fallthrough. */
+    if (name && strcmp(name, "PL_UNIFY") == 0 && nargs == 0) {
+        /* B1: PL_UNIFY — pop DT_E TT_UNIFY node, unify its two children. */
+        DESCR_t expr_d = POP();
+        tree_t *node   = (tree_t *)expr_d.ptr;
+        if (!node || node->n < 2) { STATE->last_ok = 0; return; }
+        Term *t1 = pl_unified_term_from_expr(node->c[0], g_pl_env);
+        Term *t2 = pl_unified_term_from_expr(node->c[1], g_pl_env);
+        STATE->last_ok = unify(t1, t2, &g_pl_trail);
+        return;
+    }
+    if (name && strcmp(name, "PL_CUT") == 0 && nargs == 0) {
+        /* B2: PL_CUT — pop DT_E (ignored), set cut flag. */
+        POP();
+        g_pl_cut_flag = 1;
+        STATE->last_ok = 1;
+        return;
+    }
+    if (name && strcmp(name, "PL_TRAIL_MARK") == 0 && nargs == 0) {
+        /* B3: PL_TRAIL_MARK — push current trail top as DT_I. */
+        DESCR_t d; d.v = DT_I; d.i = (int64_t)trail_mark(&g_pl_trail); d.ptr = NULL;
+        PUSH(d);
+        STATE->last_ok = 1;
+        return;
+    }
+    if (name && strcmp(name, "PL_TRAIL_UNWIND") == 0 && nargs == 0) {
+        /* B3: PL_TRAIL_UNWIND — pop DT_I mark, unwind trail. */
+        DESCR_t mark_d = POP();
+        trail_unwind(&g_pl_trail, (int)mark_d.i);
+        STATE->last_ok = 1;
+        return;
+    }
+    if (name && strcmp(name, "PL_BUILTIN") == 0 && nargs == 0) {
+        /* B4: PL_BUILTIN — pop DT_E goal node, drive via interp_exec_pl_builtin. */
+        DESCR_t expr_d = POP();
+        tree_t *goal   = (tree_t *)expr_d.ptr;
+        if (!goal) { STATE->last_ok = 0; return; }
+        STATE->last_ok = interp_exec_pl_builtin(goal, g_pl_env);
+        return;
+    }
+
     DESCR_t args[32];
     if (nargs > 32) nargs = 32;
     for (int k = nargs - 1; k >= 0; k--) args[k] = POP();
