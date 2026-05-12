@@ -3119,7 +3119,20 @@ static STMT_t *sc_make_cond_fail_stmt(ScParseState *st, tree_t *cond, char *fail
     STMT_t *s = stmt_new();
     s->lineno = lineno;
     s->stno   = ++st->code->nstmts;
-    s->subject = cond;
+    /* Mirror sc_append_stmt: unwrap TT_ASSIGN before sc_split_subject_pattern
+     * so `if (subj ? pat = repl)` correctly sets subject/pattern/replacement/has_eq.
+     * Without this, TT_ASSIGN(TT_SCAN(subj,pat),repl) is left as the subject
+     * and sc_split_subject_pattern sees no TT_SCAN at top level — pattern stays
+     * NULL, lower_stmt never emits SM_EXEC_STMT, write-back never happens. */
+    if (cond && cond->t == TT_ASSIGN && cond->n == 2) {
+        s->subject     = cond->c[0];
+        s->replacement = cond->c[1];
+        s->has_eq      = 1;
+        free(cond->c);
+        free(cond);
+    } else {
+        s->subject = cond;
+    }
     sc_split_subject_pattern(&s->subject, &s->pattern);
     s->goto_f = fail_target;
     return s;

@@ -34,7 +34,7 @@ RUNTIME=(
     "$SD/ShiftReduce.sc"
     "$SD/tdump.sc"
     "$SD/gen.sc"
-    # "$SD/qize.sc"   # omitted: Append bug (see SL-2)
+    "$SD/qize.sc"
     "$SD/semantic.sc"
     "$SD/omega.sc"
     "$SD/trace.sc"
