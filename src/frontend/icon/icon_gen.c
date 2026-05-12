@@ -14,10 +14,13 @@
 #include "icon_gen.h"
 #include "../ast/ast.h"            /* tree_t, tree_e, TT_TO, TT_TO_BY, TT_ITERATE, TT_SUSPEND, TT_FNC */
 #include "../../runtime/common/coerce.h"  /* descr_to_str_icn (D-1/D-2 RS-6) */
+#include "../../runtime/interp/coro_runtime.h"  /* CORO_STACK_SZ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ucontext.h>
+#include <sys/mman.h>
+#include <unistd.h>
 
 /*============================================================================================================================
  * B-3: coro_bb_to — TT_TO Byrd box  (i to j)
@@ -216,8 +219,13 @@ DESCR_t coro_bb_suspend(void *zeta, int entry) {
         /* First α: set up and enter the coroutine */
         z->started = 1;
         getcontext(&z->gen_ctx);
+        /* IB-10 post: use CORO_STACK_SZ (now 1MB) and install a guard page at
+         * the bottom of the malloc'd stack so overflow gives a clean SIGSEGV
+         * rather than silently corrupting adjacent heap/mmap regions. */
+        { static long _pg = 0; if (!_pg) _pg = sysconf(_SC_PAGESIZE);
+          mprotect(z->stack, (size_t)_pg, PROT_NONE); }
         z->gen_ctx.uc_stack.ss_sp   = z->stack;
-        z->gen_ctx.uc_stack.ss_size = 256 * 1024;
+        z->gen_ctx.uc_stack.ss_size = CORO_STACK_SZ;
         z->gen_ctx.uc_link          = NULL;
         /* RK-21: if using gather trampoline, pass ss via the static staging pointer
          * (makecontext cannot pass pointer args portably on x86-64). */

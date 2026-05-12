@@ -18,6 +18,10 @@
  * Constants
  *------------------------------------------------------------------------*/
 #define FRAME_SLOT_MAX        64
+/* IB-10 post: coro stack size — raised 256KB→1MB to accommodate _usercall_hook's
+ * ~400KB -O0 frame.  Defined here (not in coro_runtime.c) so icon_gen.c can
+ * use it for the uc_stack.ss_size argument to makecontext. */
+#define CORO_STACK_SZ         (1024 * 1024)
 #define PROC_TABLE_MAX       256
 #define FRAME_DEPTH_MAX         16
 #define FRAME_STACK_MAX      256

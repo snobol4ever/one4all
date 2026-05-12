@@ -851,8 +851,7 @@ static void proc_trampoline(void) {
 }
 
 /* F-4 RS-7: coro_alloc — suspend-state factory, eliminates duplicate
- * calloc+malloc pattern. Stack size is a single constant here. */
-#define CORO_STACK_SZ (256 * 1024)
+ * calloc+malloc pattern. Stack size defined as CORO_STACK_SZ in coro_runtime.h. */
 static coro_t *coro_alloc(void (*trampoline)(void)) {
     coro_t *ss = calloc(1, sizeof(*ss));
     ss->stack      = malloc(CORO_STACK_SZ);
