@@ -145,7 +145,7 @@ static tree_t *lower_term(Term *t) {
             return e;
         }
         case TERM_VAR: {
-            tree_t *e = ast_node_new(TERM_VAR);
+            tree_t *e = ast_node_new(TT_VAR);
             int slot = t->saved_slot;  /* -1 = anonymous wildcard */
             char buf[32];
             if (slot < 0) {
@@ -346,8 +346,8 @@ static tree_t *lower_clause(PlClause *cl, PredKey key) {
         if (cl->body[i]) ASSIGN_ANON(cl->body[i]);
 
     int n_vars = next_anon;
-    ec->v.ival = n_vars;              /* EnvLayout.n_vars */
-    ec->v.dval = (double)key.arity;  /* EnvLayout.n_args */
+    ec->v.dval = (double)key.arity;  /* EnvLayout.n_args — set FIRST (union: dval and ival share memory) */
+    ec->v.ival = n_vars;              /* EnvLayout.n_vars — set SECOND so it is not clobbered by dval */
 
     /* Add head argument nodes */
     if (cl->head) {

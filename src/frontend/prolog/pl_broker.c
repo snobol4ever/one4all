@@ -598,7 +598,7 @@ bb_node_t pl_box_choice_call(tree_t *goal, Term **env) {
     static int g_wildcard_slot = 100000;
     for (int i = 0; i < arity; i++) {
         tree_t *ch = goal->c[i];
-        if (ch && ch->t == TERM_VAR && (int)ch->v.ival == -1)
+        if (ch && ch->t == TT_VAR && (int)ch->v.ival == -1)
             caller_args[i] = term_new_var(g_wildcard_slot++);
         else
             caller_args[i] = pl_unified_term_from_expr(ch, env);
