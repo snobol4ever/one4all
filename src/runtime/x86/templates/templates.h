@@ -148,4 +148,49 @@ void emit_sm_call_fn(emitter_t *e, const char *name_lbl,
 void emit_sm_return(emitter_t *e);
 void emit_sm_return_variant(emitter_t *e, int kind, int cond, int pc);
 
+/* SM_PAT_* opcode templates — sub-rung -r (2026-05-11).
+ *
+ * Nullary group (sm_pat_nullary.c) — no args at call site; pop value(s)
+ * from stack, call rt_pat_*, push result pattern. */
+void emit_sm_pat_eps        (emitter_t *e);
+void emit_sm_pat_arb        (emitter_t *e);
+void emit_sm_pat_rem        (emitter_t *e);
+void emit_sm_pat_fail       (emitter_t *e);
+void emit_sm_pat_succeed    (emitter_t *e);
+void emit_sm_pat_abort      (emitter_t *e);
+void emit_sm_pat_bal        (emitter_t *e);
+void emit_sm_pat_fence      (emitter_t *e);
+void emit_sm_pat_fence1     (emitter_t *e);
+void emit_sm_pat_span       (emitter_t *e);
+void emit_sm_pat_break      (emitter_t *e);
+void emit_sm_pat_any        (emitter_t *e);
+void emit_sm_pat_notany     (emitter_t *e);
+void emit_sm_pat_len        (emitter_t *e);
+void emit_sm_pat_pos        (emitter_t *e);
+void emit_sm_pat_rpos       (emitter_t *e);
+void emit_sm_pat_tab        (emitter_t *e);
+void emit_sm_pat_rtab       (emitter_t *e);
+void emit_sm_pat_arbno      (emitter_t *e);
+void emit_sm_pat_cat        (emitter_t *e);
+void emit_sm_pat_alt        (emitter_t *e);
+void emit_sm_pat_deref      (emitter_t *e);
+
+/* String-arg group (sm_pat_lbl.c) — one strtab label argument. */
+void emit_sm_pat_lit        (emitter_t *e, const char *name_lbl, uint64_t name_ptr);
+void emit_sm_pat_refname    (emitter_t *e, const char *name_lbl, uint64_t name_ptr);
+void emit_sm_pat_usercall   (emitter_t *e, const char *name_lbl, uint64_t name_ptr);
+
+/* String+int group (sm_pat_capture.c) — strtab label + integer. */
+void emit_sm_pat_capture        (emitter_t *e, const char *name_lbl, uint64_t name_ptr, int kind);
+void emit_sm_pat_usercall_args  (emitter_t *e, const char *name_lbl, uint64_t name_ptr, int nargs);
+
+/* Three-arg group (sm_pat_capture_fn.c) — fname + is_imm + namelist/nargs. */
+void emit_sm_pat_capture_fn     (emitter_t *e,
+                                  const char *fname_lbl, uint64_t fname_ptr,
+                                  int is_imm,
+                                  const char *namelist_lbl, uint64_t namelist_ptr);
+void emit_sm_pat_capture_fn_args(emitter_t *e,
+                                  const char *fname_lbl, uint64_t fname_ptr,
+                                  int is_imm, int nargs);
+
 #endif /* RUNTIME_X86_TEMPLATES_TEMPLATES_H */

@@ -342,6 +342,65 @@ void t_lea_rdi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr)
     }
 }
 
+void t_lea_rdx_strtab_sym(const char *sym_label, uint64_t in_proc_ptr)
+{
+    /* Load address of a strtab string into rdx.  Parallel to
+     * t_lea_rdi_strtab_sym; used for the third argument (namelist) in
+     * SM_PAT_CAPTURE_FN and SM_PAT_CAPTURE_FN_ARGS templates.
+     *
+     *   BINARY:    movabs rdx, <in_proc_ptr>  — 10 bytes: 48 BA <8>
+     *   TEXT:      lea rdx, [rip + sym_label]
+     *   MACRO_DEF: lea rdx, [rip + \namelist_lbl] */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY: {
+        /* MOV RDX, imm64: REX.W(48) + B8+r(BA for rdx=2) + 8-byte imm */
+        uint64_t v = in_proc_ptr;
+        bb_emit_byte(0x48); bb_emit_byte(0xBA);
+        bb_emit_byte((uint8_t)(v      )); bb_emit_byte((uint8_t)(v >>  8));
+        bb_emit_byte((uint8_t)(v >> 16)); bb_emit_byte((uint8_t)(v >> 24));
+        bb_emit_byte((uint8_t)(v >> 32)); bb_emit_byte((uint8_t)(v >> 40));
+        bb_emit_byte((uint8_t)(v >> 48)); bb_emit_byte((uint8_t)(v >> 56));
+        return;
+    }
+    case EMIT_TEXT: {
+        char args[80];
+        snprintf(args, sizeof(args), "rdx, [rip + %s]",
+                 sym_label ? sym_label : "??sym??");
+        bb3c_format(emit_outf(), "", "lea", args);
+        return;
+    }
+    case EMIT_MACRO_DEF:
+        bb3c_format(emit_outf(), "", "lea", "rdx, [rip + \\namelist_lbl]");
+        return;
+    }
+}
+
+void t_mov_edx_imm32(int val)
+{
+    /* mov edx, <imm32>  — 5 bytes: BA <val32>  (MOV EDX, imm32)
+     *   BINARY:    BA <val32>
+     *   TEXT:      mov edx, <val>
+     *   MACRO_DEF: mov edx, \nargs   (parameter reference) */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY: {
+        uint32_t u = (uint32_t)val;
+        bb_emit_byte(0xBA);
+        bb_emit_byte((uint8_t)(u      )); bb_emit_byte((uint8_t)(u >>  8));
+        bb_emit_byte((uint8_t)(u >> 16)); bb_emit_byte((uint8_t)(u >> 24));
+        return;
+    }
+    case EMIT_TEXT: {
+        char args[32];
+        snprintf(args, sizeof(args), "edx, %d", val);
+        bb3c_format(emit_outf(), "", "mov", args);
+        return;
+    }
+    case EMIT_MACRO_DEF:
+        bb3c_format(emit_outf(), "", "mov", "edx, \\nargs");
+        return;
+    }
+}
+
 void t_mov_esi_imm32(int val)
 {
     /* mov esi, <imm32>   — 5 bytes: B8+reg  (BE <val32>)

@@ -88,6 +88,10 @@ RT_PIC_SRCS := \
     $(RT)/x86/templates/bb_xfarb.c \
     $(RT)/x86/templates/sm_call_fn.c \
     $(RT)/x86/templates/sm_return.c \
+    $(RT)/x86/templates/sm_pat_nullary.c \
+    $(RT)/x86/templates/sm_pat_lbl.c \
+    $(RT)/x86/templates/sm_pat_capture.c \
+    $(RT)/x86/templates/sm_pat_capture_fn.c \
     $(RT)/x86/bb_boxes.c \
     $(RT)/x86/bb_broker.c \
     $(SRC)/frontend/snobol4/snobol4.tab.c \
@@ -257,6 +261,10 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_label_stno.c -o $(OBJ)/template_sm_label_stno.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_call_fn.c -o $(OBJ)/template_sm_call_fn.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_return.c -o $(OBJ)/template_sm_return.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_pat_nullary.c -o $(OBJ)/template_sm_pat_nullary.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_pat_lbl.c -o $(OBJ)/template_sm_pat_lbl.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_pat_capture.c -o $(OBJ)/template_sm_pat_capture.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_pat_capture_fn.c -o $(OBJ)/template_sm_pat_capture_fn.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xbrkx.c -o $(OBJ)/template_bb_xbrkx.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xposi.c -o $(OBJ)/template_bb_xposi.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xfarb.c -o $(OBJ)/template_bb_xfarb.o

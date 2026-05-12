@@ -1870,7 +1870,7 @@ static const char *pat_arg_label(char *lbl_buf, size_t lbl_buf_n,
 
 /* SM_PAT_LIT: a[0].s = literal string.  Driven by SM_PAT_LIT template
  * (LBLOPT shape — single source of truth with sm_macros). */
-static int emit_sm_pat_lit(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_pat_lit_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     char lbl[64], anno[128];
@@ -1884,7 +1884,7 @@ static int emit_sm_pat_lit(FILE *out, const SM_Instr *ins, int pc)
 }
 
 /* SM_PAT_REFNAME: a[0].s = var name. */
-static int emit_sm_pat_refname(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_pat_refname_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     char lbl[64], anno[128];
@@ -1898,7 +1898,7 @@ static int emit_sm_pat_refname(FILE *out, const SM_Instr *ins, int pc)
 }
 
 /* SM_PAT_CAPTURE: a[0].s = varname, a[1].i = kind (0/1/2). */
-static int emit_sm_pat_capture(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_pat_capture_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     char lbl[64], anno[80];
@@ -1915,7 +1915,7 @@ static int emit_sm_pat_capture(FILE *out, const SM_Instr *ins, int pc)
 
 /* SM_PAT_CAPTURE_FN: . *func() / $ *func() — a[0].s=fname, a[1].i=is_imm,
  *                    a[2].s=namelist.  LBLOPT3 shape. */
-static int emit_sm_pat_capture_fn(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_pat_capture_fn_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     char fname_lbl[64], nl_lbl[64], anno[160];
@@ -1931,7 +1931,7 @@ static int emit_sm_pat_capture_fn(FILE *out, const SM_Instr *ins, int pc)
 }
 
 /* SM_PAT_CAPTURE_FN_ARGS: a[0].s=fname, a[1].i=is_imm, a[2].i=nargs. */
-static int emit_sm_pat_capture_fn_args(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_pat_capture_fn_args_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     char fname_lbl[64], anno[128];
@@ -1946,7 +1946,7 @@ static int emit_sm_pat_capture_fn_args(FILE *out, const SM_Instr *ins, int pc)
 }
 
 /* SM_PAT_USERCALL: bare *func() — a[0].s=fname. */
-static int emit_sm_pat_usercall(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_pat_usercall_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     char lbl[64], anno[128];
@@ -1960,7 +1960,7 @@ static int emit_sm_pat_usercall(FILE *out, const SM_Instr *ins, int pc)
 }
 
 /* SM_PAT_USERCALL_ARGS: a[0].s=fname, a[1].i=nargs. */
-static int emit_sm_pat_usercall_args(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_pat_usercall_args_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     char lbl[64], anno[128];
@@ -2242,13 +2242,13 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
              * → direct bb_box_fn call, not through bb_broker.  See
              * GOAL-MODE4-EMIT.md "Design Discoveries" section; the bb_pool-
              * per-variant-node ideal is a follow-up rung. */
-            case SM_PAT_LIT:      rc = emit_sm_pat_lit(out, ins, pc);     break;
-            case SM_PAT_REFNAME:  rc = emit_sm_pat_refname(out, ins, pc); break;
-            case SM_PAT_CAPTURE:      rc = emit_sm_pat_capture(out, ins, pc); break;
-            case SM_PAT_CAPTURE_FN:   rc = emit_sm_pat_capture_fn(out, ins, pc); break;
-            case SM_PAT_CAPTURE_FN_ARGS: rc = emit_sm_pat_capture_fn_args(out, ins, pc); break;
-            case SM_PAT_USERCALL:     rc = emit_sm_pat_usercall(out, ins, pc); break;
-            case SM_PAT_USERCALL_ARGS: rc = emit_sm_pat_usercall_args(out, ins, pc); break;
+            case SM_PAT_LIT:      rc = emit_sm_pat_lit_dispatch(out, ins, pc);     break;
+            case SM_PAT_REFNAME:  rc = emit_sm_pat_refname_dispatch(out, ins, pc); break;
+            case SM_PAT_CAPTURE:      rc = emit_sm_pat_capture_dispatch(out, ins, pc); break;
+            case SM_PAT_CAPTURE_FN:   rc = emit_sm_pat_capture_fn_dispatch(out, ins, pc); break;
+            case SM_PAT_CAPTURE_FN_ARGS: rc = emit_sm_pat_capture_fn_args_dispatch(out, ins, pc); break;
+            case SM_PAT_USERCALL:     rc = emit_sm_pat_usercall_dispatch(out, ins, pc); break;
+            case SM_PAT_USERCALL_ARGS: rc = emit_sm_pat_usercall_args_dispatch(out, ins, pc); break;
             case SM_PAT_SPAN:
             case SM_PAT_BREAK:
             case SM_PAT_ANY:

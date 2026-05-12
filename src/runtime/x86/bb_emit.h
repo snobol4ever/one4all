@@ -141,8 +141,10 @@ void t_emit_jmp(bb_label_t *target, jmp_kind_t kind);
  *   TEXT:      bb3c_format("", macro_name, "")
  *   MACRO_DEF: same as TEXT */
 void t_lea_rdi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr);
+void t_lea_rdx_strtab_sym(const char *sym_label, uint64_t in_proc_ptr);
 void t_mov_esi_imm32(int val);
 void t_mov_edi_imm32(int val);
+void t_mov_edx_imm32(int val);
 void t_test_eax_eax(void);
 void t_jz_retskip(int pc);
 void t_retskip_label(int pc);
