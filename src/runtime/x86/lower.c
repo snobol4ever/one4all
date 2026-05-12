@@ -1113,14 +1113,7 @@ static void lower_choice(const tree_t *t)
     }
 }
 
-/* PB-7: lower_prolog_child deleted — TT_CLAUSE legacy fallthrough (emit_push_expr + SM_BB_ONCE) removed.
- * All Prolog AST kinds that reach lower_expr must be handled explicitly above. */
-static void lower_prolog_child(const tree_t *t)
-{
-    fprintf(stderr, "FATAL: lower_prolog_child reached for kind=%d sval=%s — legacy SM_BB_ONCE deleted (PB-7)\n",
-            t ? t->t : -1, (t && t->v.sval) ? t->v.sval : "(null)");
-    abort();
-}
+
 
 /*── Statement lowering ──────────────────────────────────────────────────────
  * lower_stmt reads TT_STMT / TT_END nodes produced by a frontend.
@@ -1382,7 +1375,7 @@ void lower_expr(const tree_t *t)
     case TT_CUT:   emit_push_expr(t); sm_emit_si(g_p, SM_CALL_FN, "PL_CUT", 0);   return; /* PB-2 */
     case TT_TRAIL_MARK:   sm_emit_si(g_p, SM_CALL_FN, "PL_TRAIL_MARK",   0); return; /* PB-3 */
     case TT_TRAIL_UNWIND: sm_emit_si(g_p, SM_CALL_FN, "PL_TRAIL_UNWIND", 0); return; /* PB-3 */
-    case TT_CLAUSE: lower_prolog_child(t); return;
+    case TT_CLAUSE: lower_unhandled(t); return;  /* PB-7: tombstone deleted; TT_CLAUSE not emitted into lower_expr */
     /* not yet implemented (TT_REVASSIGN, TT_REVSWAP) */
     default:                                   lower_unhandled(t);     return;
     }
