@@ -145,7 +145,6 @@ static void lower_keyword(const tree_t *t) { sm_emit_s(g_p, SM_PUSH_VAR, kw_cano
 
 static void lower_indirect(const tree_t *t)
 {
-    SM_Program *p = g_p;
     /* $.var[idx] fast path: bypass INDIR_GET, emit PUSH_VAR + IDX directly. */
     const tree_t *ch = T0(t);
     if (ch && ch->t == TT_NAME && ch->n == 1) {
@@ -153,14 +152,14 @@ static void lower_indirect(const tree_t *t)
         if (inner && inner->t == TT_IDX && inner->n >= 2
                 && inner->c[0] && inner->c[0]->t == TT_VAR
                 && inner->c[0]->v.sval) {
-            sm_emit_s(p, SM_PUSH_VAR, inner->c[0]->v.sval);
+            sm_emit_s(g_p, SM_PUSH_VAR, inner->c[0]->v.sval);
             for (int i = 1; i < inner->n; i++) lower_expr( inner->c[i]);
-            sm_emit_si(p, SM_CALL_FN, "IDX", (int64_t)inner->n);
+            sm_emit_si(g_p, SM_CALL_FN, "IDX", (int64_t)inner->n);
             return;
         }
     }
     lower_expr(ch);
-    sm_emit_si(p, SM_CALL_FN, "INDIR_GET", 1);
+    sm_emit_si(g_p, SM_CALL_FN, "INDIR_GET", 1);
 }
 
 static void lower_defer(const tree_t *t)
@@ -175,10 +174,9 @@ static void lower_interrogate(const tree_t *t) { lower_expr(T0(t)); }
 
 static void lower_name(const tree_t *t)
 {
-    SM_Program *p = g_p;
     const char *vname = (T0(t) && T0(t)->v.sval) ? T0(t)->v.sval : "";
-    sm_emit_s(p, SM_PUSH_LIT_S, vname);
-    sm_emit_si(p, SM_CALL_FN, "NAME_PUSH", 1);
+    sm_emit_s(g_p, SM_PUSH_LIT_S, vname);
+    sm_emit_si(g_p, SM_CALL_FN, "NAME_PUSH", 1);
 }
 
 static void lower_mns(const tree_t *t) { LOWER1_VAL(SM_NEG); }
@@ -194,41 +192,39 @@ static void lower_pow(const tree_t *t) { LOWER2(SM_EXP); }
 
 static void lower_vlist(const tree_t *t)
 {
-    SM_Program *p = g_p;
-    if (t->n == 0) { sm_emit(p, SM_PUSH_NULL); return; }
+    if (t->n == 0) { sm_emit(g_p, SM_PUSH_NULL); return; }
     if (t->n == 1) { lower_expr(t->c[0]); return; }
     int n = t->n - 1;
     int *jumps = (int *)malloc((size_t)n * sizeof(int));
     for (int i = 0; i < t->n; i++) {
         lower_expr(t->c[i]);
-        if (i < t->n - 1) { jumps[i] = sm_emit_i(p, SM_JUMP_S, 0); sm_emit(p, SM_VOID_POP); }
+        if (i < t->n - 1) { jumps[i] = sm_emit_i(g_p, SM_JUMP_S, 0); sm_emit(g_p, SM_VOID_POP); }
     }
-    int done = sm_label(p);
-    for (int i = 0; i < n; i++) sm_patch_jump(p, jumps[i], done);
+    int done = sm_label(g_p);
+    for (int i = 0; i < n; i++) sm_patch_jump(g_p, jumps[i], done);
     free(jumps);
 }
 
 static void lower_cat_seq(const tree_t *t)
 {
-    SM_Program *p = g_p;
     /* Icon & conjunction uses TT_SEQ but is goal-directed, not string concat.
      * When lowering an Icon statement, emit JUMP_F between children so that
      * a failing operand short-circuits the whole conjunction.
      * SNOBOL4/Snocone TT_SEQ (pattern concatenation) is unaffected. */
     if (t->t == TT_SEQ && g_lang == LANG_ICN) {
-        if (t->n == 0) { sm_emit(p, SM_PUSH_NULL); return; }
+        if (t->n == 0) { sm_emit(g_p, SM_PUSH_NULL); return; }
         if (t->n == 1) { lower_expr(t->c[0]); return; }
         int njumps = t->n - 1;
         int *fail_jumps = (int *)GC_MALLOC((size_t)njumps * sizeof(int));
         for (int i = 0; i < t->n; i++) {
             lower_expr(t->c[i]);
             if (i < t->n - 1) {
-                fail_jumps[i] = sm_emit_i(p, SM_JUMP_F, 0); /* -> done with FAILDESCR */
-                sm_emit(p, SM_VOID_POP);
+                fail_jumps[i] = sm_emit_i(g_p, SM_JUMP_F, 0); /* -> done with FAILDESCR */
+                sm_emit(g_p, SM_VOID_POP);
             }
         }
-        int done_lbl = sm_label(p);
-        for (int i = 0; i < njumps; i++) sm_patch_jump(p, fail_jumps[i], done_lbl);
+        int done_lbl = sm_label(g_p);
+        for (int i = 0; i < njumps; i++) sm_patch_jump(g_p, fail_jumps[i], done_lbl);
         return;
     }
     int has_defer = 0;
@@ -236,10 +232,10 @@ static void lower_cat_seq(const tree_t *t)
         if (t->c[i] && t->c[i]->t == TT_DEFER) has_defer = 1;
     if (has_defer) {
         for (int i = 0; i < t->n; i++) lower_pat_expr(t->c[i]);
-        for (int i = 1; i < t->n; i++) sm_emit(p, SM_PAT_CAT);
+        for (int i = 1; i < t->n; i++) sm_emit(g_p, SM_PAT_CAT);
     } else {
         for (int i = 0; i < t->n; i++) lower_expr(t->c[i]);
-        for (int i = 1; i < t->n; i++) sm_emit(p, SM_CONCAT);
+        for (int i = 1; i < t->n; i++) sm_emit(g_p, SM_CONCAT);
     }
 }
 
@@ -247,7 +243,6 @@ static void lower_alt  (const tree_t *t) { lower_pat_expr(t); }
 
 static void lower_opsyn(const tree_t *t)
 {
-    SM_Program *p = g_p;
     const char *raw = t->v.sval ? t->v.sval : "&";
     char op_buf[4];   /* local — lower_expr is re-entrant; static would be clobbered */
     const char *op = raw;
@@ -256,7 +251,7 @@ static void lower_opsyn(const tree_t *t)
     else if (strcmp(raw, "BARFN")  == 0) op = "|";
     else if (strcmp(raw, "AROWFN") == 0) op = "^";
     for (int i = 0; i < t->n; i++) lower_expr(t->c[i]);
-    sm_emit_si(p, SM_CALL_FN, op, (int64_t)t->n);
+    sm_emit_si(g_p, SM_CALL_FN, op, (int64_t)t->n);
 }
 
 /*── Pattern-context lowering ────────────────────────────────────────────────*/
@@ -297,7 +292,6 @@ static void emit_pat_fn_args(const tree_t *fnc)
  * Handles variable, *fn(), and *fn(args) targets. */
 static void emit_pat_capture(const tree_t *var_node, int mode)
 {
-    SM_Program *p = g_p;
     if (var_node && var_node->t == TT_DEFER
             && var_node->n > 0
             && var_node->c[0]
@@ -306,55 +300,54 @@ static void emit_pat_capture(const tree_t *var_node, int mode)
         const tree_t *fnc = var_node->c[0];
         const char *names = sm_pat_capture_fn_arg_names(fnc);
         if (names || fnc->n == 0) {
-            int idx = sm_emit_s(p, SM_PAT_CAPTURE_FN, fnc->v.sval);
-            p->instrs[idx].a[1].i = mode; p->instrs[idx].a[2].s = names;
+            int idx = sm_emit_s(g_p, SM_PAT_CAPTURE_FN, fnc->v.sval);
+            g_p->instrs[idx].a[1].i = mode; g_p->instrs[idx].a[2].s = names;
         } else {
             emit_pat_fn_args(fnc);
-            int idx = sm_emit_s(p, SM_PAT_CAPTURE_FN_ARGS, fnc->v.sval);
-            p->instrs[idx].a[1].i = mode; p->instrs[idx].a[2].i = fnc->n;
+            int idx = sm_emit_s(g_p, SM_PAT_CAPTURE_FN_ARGS, fnc->v.sval);
+            g_p->instrs[idx].a[1].i = mode; g_p->instrs[idx].a[2].i = fnc->n;
         }
     } else {
-        int idx = sm_emit_s(p, SM_PAT_CAPTURE, var_node ? var_node->v.sval : "");
-        p->instrs[idx].a[1].i = mode;
+        int idx = sm_emit_s(g_p, SM_PAT_CAPTURE, var_node ? var_node->v.sval : "");
+        g_p->instrs[idx].a[1].i = mode;
     }
 }
 
 void lower_pat_expr(const tree_t *t)
 {
-    SM_Program *p = g_p;
     if (!t) return;
     switch (t->t) {
-    case TT_QLIT:  sm_emit_s(p, SM_PAT_LIT, t->v.sval ? t->v.sval : ""); return;
-    case TT_VAR:   sm_emit_s(p, SM_PUSH_VAR, t->v.sval); sm_emit(p, SM_PAT_DEREF); return;
-    case TT_ARB:   sm_emit(p, SM_PAT_ARB);    return;
-    case TT_REM:   sm_emit(p, SM_PAT_REM);    return;
-    case TT_FAIL:  sm_emit(p, SM_PAT_FAIL);   return;
-    case TT_SUCCEED: sm_emit(p, SM_PAT_SUCCEED); return;
-    case TT_ABORT: sm_emit(p, SM_PAT_ABORT);  return;
-    case TT_BAL:   sm_emit(p, SM_PAT_BAL);    return;
+    case TT_QLIT:  sm_emit_s(g_p, SM_PAT_LIT, t->v.sval ? t->v.sval : ""); return;
+    case TT_VAR:   sm_emit_s(g_p, SM_PUSH_VAR, t->v.sval); sm_emit(g_p, SM_PAT_DEREF); return;
+    case TT_ARB:   sm_emit(g_p, SM_PAT_ARB);    return;
+    case TT_REM:   sm_emit(g_p, SM_PAT_REM);    return;
+    case TT_FAIL:  sm_emit(g_p, SM_PAT_FAIL);   return;
+    case TT_SUCCEED: sm_emit(g_p, SM_PAT_SUCCEED); return;
+    case TT_ABORT: sm_emit(g_p, SM_PAT_ABORT);  return;
+    case TT_BAL:   sm_emit(g_p, SM_PAT_BAL);    return;
     case TT_FENCE:
-        if (t->n > 0) { lower_pat_expr(t->c[0]); sm_emit(p, SM_PAT_FENCE1); }
-        else                    sm_emit(p, SM_PAT_FENCE);
+        if (t->n > 0) { lower_pat_expr(t->c[0]); sm_emit(g_p, SM_PAT_FENCE1); }
+        else                    sm_emit(g_p, SM_PAT_FENCE);
         return;
-    case TT_ANY:    lower_expr(T0(t)); sm_emit(p, SM_PAT_ANY);    return;
-    case TT_NOTANY: lower_expr(T0(t)); sm_emit(p, SM_PAT_NOTANY); return;
-    case TT_SPAN:   lower_expr(T0(t)); sm_emit(p, SM_PAT_SPAN);   return;
-    case TT_BREAK:  lower_expr(T0(t)); sm_emit(p, SM_PAT_BREAK);  return;
-    case TT_BREAKX: lower_expr(T0(t)); sm_emit(p, SM_PAT_BREAK);  return;
-    case TT_LEN:    lower_expr(T0(t)); sm_emit(p, SM_PAT_LEN);    return;
-    case TT_POS:    lower_expr(T0(t)); sm_emit(p, SM_PAT_POS);    return;
-    case TT_RPOS:   lower_expr(T0(t)); sm_emit(p, SM_PAT_RPOS);   return;
-    case TT_TAB:    lower_expr(T0(t)); sm_emit(p, SM_PAT_TAB);    return;
-    case TT_RTAB:   lower_expr(T0(t)); sm_emit(p, SM_PAT_RTAB);   return;
-    case TT_ARBNO:  lower_pat_expr(T0(t)); sm_emit(p, SM_PAT_ARBNO); return;
+    case TT_ANY:    lower_expr(T0(t)); sm_emit(g_p, SM_PAT_ANY);    return;
+    case TT_NOTANY: lower_expr(T0(t)); sm_emit(g_p, SM_PAT_NOTANY); return;
+    case TT_SPAN:   lower_expr(T0(t)); sm_emit(g_p, SM_PAT_SPAN);   return;
+    case TT_BREAK:  lower_expr(T0(t)); sm_emit(g_p, SM_PAT_BREAK);  return;
+    case TT_BREAKX: lower_expr(T0(t)); sm_emit(g_p, SM_PAT_BREAK);  return;
+    case TT_LEN:    lower_expr(T0(t)); sm_emit(g_p, SM_PAT_LEN);    return;
+    case TT_POS:    lower_expr(T0(t)); sm_emit(g_p, SM_PAT_POS);    return;
+    case TT_RPOS:   lower_expr(T0(t)); sm_emit(g_p, SM_PAT_RPOS);   return;
+    case TT_TAB:    lower_expr(T0(t)); sm_emit(g_p, SM_PAT_TAB);    return;
+    case TT_RTAB:   lower_expr(T0(t)); sm_emit(g_p, SM_PAT_RTAB);   return;
+    case TT_ARBNO:  lower_pat_expr(T0(t)); sm_emit(g_p, SM_PAT_ARBNO); return;
     case TT_SEQ:
     case TT_CAT:
         for (int i = 0; i < t->n; i++) lower_pat_expr(t->c[i]);
-        for (int i = 1; i < t->n; i++) sm_emit(p, SM_PAT_CAT);
+        for (int i = 1; i < t->n; i++) sm_emit(g_p, SM_PAT_CAT);
         return;
     case TT_ALT:
         for (int i = 0; i < t->n; i++) lower_pat_expr(t->c[i]);
-        for (int i = 1; i < t->n; i++) sm_emit(p, SM_PAT_ALT);
+        for (int i = 1; i < t->n; i++) sm_emit(g_p, SM_PAT_ALT);
         return;
     case TT_CAPT_COND_ASGN:
         lower_pat_expr(T0(t));
@@ -366,7 +359,7 @@ void lower_pat_expr(const tree_t *t)
         return;
     case TT_CAPT_CURSOR:
         if (t->n == 1) {
-            sm_emit(p, SM_PAT_EPS);
+            sm_emit(g_p, SM_PAT_EPS);
             emit_pat_capture(t->c[0], 2);
         } else {
             lower_pat_expr(T0(t));
@@ -378,22 +371,22 @@ void lower_pat_expr(const tree_t *t)
         /* *fn() in pattern — run fn at each match position via SM_PAT_USERCALL. */
         if (ch && ch->t == TT_FNC && ch->v.sval) {
             if (ch->n == 0) {
-                int idx = sm_emit_s(p, SM_PAT_USERCALL, ch->v.sval);
-                p->instrs[idx].a[2].s = NULL;
+                int idx = sm_emit_s(g_p, SM_PAT_USERCALL, ch->v.sval);
+                g_p->instrs[idx].a[2].s = NULL;
             } else {
                 emit_pat_fn_args(ch);
-                int idx = sm_emit_s(p, SM_PAT_USERCALL_ARGS, ch->v.sval);
-                p->instrs[idx].a[1].i = ch->n;
+                int idx = sm_emit_s(g_p, SM_PAT_USERCALL_ARGS, ch->v.sval);
+                g_p->instrs[idx].a[1].i = ch->n;
             }
             return;
         }
         /* *var — push by name so self-recursive patterns resolve at match time. */
-        if (ch && ch->t == TT_VAR && ch->v.sval) { sm_emit_s(p, SM_PAT_REFNAME, ch->v.sval); return; }
-        lower_expr(ch); sm_emit(p, SM_PAT_DEREF);
+        if (ch && ch->t == TT_VAR && ch->v.sval) { sm_emit_s(g_p, SM_PAT_REFNAME, ch->v.sval); return; }
+        lower_expr(ch); sm_emit(g_p, SM_PAT_DEREF);
         return;
     }
     default:
-        lower_expr(t); sm_emit(p, SM_PAT_DEREF);
+        lower_expr(t); sm_emit(g_p, SM_PAT_DEREF);
         return;
     }
 }
@@ -402,78 +395,73 @@ void lower_pat_expr(const tree_t *t)
 
 static void lower_fnc(const tree_t *t)
 {
-    SM_Program *p = g_p;
     int nargs = t->n;
 
     /* EVAL(*expr) — inline the thunked expression, call SM_CALL_EXPRESSION. */
     if (nargs == 1 && t->v.sval && strcmp(t->v.sval, "EVAL") == 0
             && t->c[0] && t->c[0]->t == TT_DEFER) {
         const tree_t *inner = T0(t->c[0]);
-        int skip = sm_emit_i(p, SM_JUMP, 0), entry = sm_label(p);
-        if (inner) lower_expr(inner); else sm_emit(p, SM_PUSH_NULL);
-        sm_emit(p, SM_RETURN);
-        sm_patch_jump(p, skip, sm_label(p));
-        sm_emit_ii(p, SM_CALL_EXPRESSION, (int64_t)entry, 0);
+        int skip = sm_emit_i(g_p, SM_JUMP, 0), entry = sm_label(g_p);
+        if (inner) lower_expr(inner); else sm_emit(g_p, SM_PUSH_NULL);
+        sm_emit(g_p, SM_RETURN);
+        sm_patch_jump(g_p, skip, sm_label(g_p));
+        sm_emit_ii(g_p, SM_CALL_EXPRESSION, (int64_t)entry, 0);
         return;
     }
     /* Icon-style call: sval==NULL, children[0] is the callee name node. */
     if (!t->v.sval && nargs >= 1 && t->c[0] && t->c[0]->v.sval) {
         const char *fn = t->c[0]->v.sval;
         for (int i = 1; i < nargs; i++) lower_expr(t->c[i]);
-        sm_emit_si(p, SM_CALL_FN, fn, (int64_t)(nargs - 1));
+        sm_emit_si(g_p, SM_CALL_FN, fn, (int64_t)(nargs - 1));
         return;
     }
     for (int i = 0; i < nargs; i++) lower_expr(t->c[i]);
-    sm_emit_si(p, SM_CALL_FN, t->v.sval ? t->v.sval : "", (int64_t)nargs);
+    sm_emit_si(g_p, SM_CALL_FN, t->v.sval ? t->v.sval : "", (int64_t)nargs);
 }
 
 static void lower_idx(const tree_t *t)
 {
-    SM_Program *p = g_p;
     for (int i = 0; i < t->n; i++) lower_expr(t->c[i]);
-    sm_emit_si(p, SM_CALL_FN, "IDX", (int64_t)t->n);
+    sm_emit_si(g_p, SM_CALL_FN, "IDX", (int64_t)t->n);
 }
 
 static void lower_assign(const tree_t *t)
 {
-    SM_Program *p = g_p;
     lower_expr(T1(t));   /* rhs first */
     const tree_t *lhs = T0(t);
     if (!lhs) return;
     if (lhs->t == TT_VAR)     { emit_var_store( lhs->v.sval ? lhs->v.sval : ""); return; }
-    if (lhs->t == TT_KEYWORD) { sm_emit_s(p, SM_STORE_VAR, kw_canonicalize(lhs->v.sval)); return; }
+    if (lhs->t == TT_KEYWORD) { sm_emit_s(g_p, SM_STORE_VAR, kw_canonicalize(lhs->v.sval)); return; }
     if (lhs->t == TT_FNC && lhs->v.sval) {
         lower_expr( T0(lhs));
         char set[256]; snprintf(set, sizeof set, "%s_SET", lhs->v.sval);
-        sm_emit_si(p, SM_CALL_FN, set, 2); return;
+        sm_emit_si(g_p, SM_CALL_FN, set, 2); return;
     }
     if (lhs->t == TT_IDX) {
         for (int i = 0; i < lhs->n; i++) lower_expr( lhs->c[i]);
-        sm_emit_si(p, SM_CALL_FN, "IDX_SET", (int64_t)(lhs->n + 1)); return;
+        sm_emit_si(g_p, SM_CALL_FN, "IDX_SET", (int64_t)(lhs->n + 1)); return;
     }
     if (lhs->t == TT_FIELD) {
         lower_expr( T0(lhs));
-        sm_emit_s(p, SM_PUSH_LIT_S, lhs->v.sval ? lhs->v.sval : "");
-        sm_emit_si(p, SM_CALL_FN, "FIELD_SET", 3); return;
+        sm_emit_s(g_p, SM_PUSH_LIT_S, lhs->v.sval ? lhs->v.sval : "");
+        sm_emit_si(g_p, SM_CALL_FN, "FIELD_SET", 3); return;
     }
     lower_expr(lhs);
-    sm_emit_si(p, SM_CALL_FN, "ASGN", 2);
+    sm_emit_si(g_p, SM_CALL_FN, "ASGN", 2);
 }
 
 static void lower_scan(const tree_t *t)
 {
-    SM_Program *p = g_p;
-    if (t->n < 1) { sm_emit(p, SM_PUSH_NULL); return; }
+    if (t->n < 1) { sm_emit(g_p, SM_PUSH_NULL); return; }
     lower_expr(t->c[0]);
-    sm_emit_si(p, SM_CALL_FN, "ICN_SCAN_PUSH", 1);
-    sm_emit(p, SM_VOID_POP);
-    if (t->n > 1) lower_expr(t->c[1]); else sm_emit(p, SM_PUSH_NULL);
-    sm_emit_si(p, SM_CALL_FN, "ICN_SCAN_POP", 1);
+    sm_emit_si(g_p, SM_CALL_FN, "ICN_SCAN_PUSH", 1);
+    sm_emit(g_p, SM_VOID_POP);
+    if (t->n > 1) lower_expr(t->c[1]); else sm_emit(g_p, SM_PUSH_NULL);
+    sm_emit_si(g_p, SM_CALL_FN, "ICN_SCAN_POP", 1);
 }
 
 static void lower_swap(const tree_t *t)
 {
-    SM_Program *p = g_p;
     /* Inline fast path for two plain variables: save→copy→restore.
      * Uses SM_PUSH_VAR / SM_STORE_VAR (not emit_var_load/store) intentionally —
      * __icn_swap_tmp__ is a synthetic global scratch and must never land in a frame slot. */
@@ -481,29 +469,27 @@ static void lower_swap(const tree_t *t)
             && T0(t)->t == TT_VAR && T1(t)->t == TT_VAR) {
         const char *ln = T0(t)->v.sval ? T0(t)->v.sval : "";
         const char *rn = T1(t)->v.sval ? T1(t)->v.sval : "";
-        emit_var_load( ln); sm_emit_s(p, SM_STORE_VAR, "__icn_swap_tmp__"); sm_emit(p, SM_VOID_POP);
+        emit_var_load( ln); sm_emit_s(g_p, SM_STORE_VAR, "__icn_swap_tmp__"); sm_emit(g_p, SM_VOID_POP);
         emit_var_load( rn); emit_var_store( ln);
-        sm_emit_s(p, SM_PUSH_VAR, "__icn_swap_tmp__"); emit_var_store( rn);
-        sm_emit(p, SM_VOID_POP);
+        sm_emit_s(g_p, SM_PUSH_VAR, "__icn_swap_tmp__"); emit_var_store( rn);
+        sm_emit(g_p, SM_VOID_POP);
         return;
     }
     lower_expr(T0(t)); lower_expr(T1(t));
-    sm_emit_si(p, SM_CALL_FN, "SWAP", 2);
+    sm_emit_si(g_p, SM_CALL_FN, "SWAP", 2);
 }
 
 /*── Relational operators ────────────────────────────────────────────────────*/
 
 static void lower_acomp(const tree_t *t)
 {
-    SM_Program *p = g_p;
     lower_expr(T0(t)); lower_expr(T1(t));
-    sm_emit_i(p, SM_ACOMP, (int64_t)t->t);
+    sm_emit_i(g_p, SM_ACOMP, (int64_t)t->t);
 }
 static void lower_lcomp(const tree_t *t)
 {
-    SM_Program *p = g_p;
     lower_expr(T0(t)); lower_expr(T1(t));
-    sm_emit_i(p, SM_LCOMP, (int64_t)t->t);
+    sm_emit_i(g_p, SM_LCOMP, (int64_t)t->t);
 }
 
 /*── Cset / list ops ─────────────────────────────────────────────────────────*/
@@ -512,17 +498,16 @@ static void lower_cset_op(const tree_t *t) { emit_push_expr(t); }
 
 static void lower_lconcat(const tree_t *t)
 {
-    SM_Program *p = g_p;
     int has_gen = 0;
     for (int i = 0; i < t->n && !has_gen; i++)
         if (is_suspendable(t->c[i])) has_gen = 1;
     if (!has_gen) {
-        if (t->n < 1) { sm_emit(p, SM_PUSH_NULL); return; }
+        if (t->n < 1) { sm_emit(g_p, SM_PUSH_NULL); return; }
         for (int i = 0; i < t->n; i++) lower_expr(t->c[i]);
-        for (int i = 1; i < t->n; i++) sm_emit(p, SM_CONCAT);
+        for (int i = 1; i < t->n; i++) sm_emit(g_p, SM_CONCAT);
         return;
     }
-    sm_emit_i(p, SM_BB_PUMP_AST, (int64_t)ast_pump_table_register((tree_t *)t));
+    sm_emit_i(g_p, SM_BB_PUMP_AST, (int64_t)ast_pump_table_register((tree_t *)t));
 }
 
 /*── Unary Icon ops ──────────────────────────────────────────────────────────*/
@@ -539,14 +524,13 @@ static void lower_random  (const tree_t *t)
 
 static void lower_not(const tree_t *t)
 {
-    SM_Program *p = g_p;
     lower_expr(T0(t));
-    int js = sm_emit_i(p, SM_JUMP_S, 0);
-    sm_emit(p, SM_VOID_POP); sm_emit(p, SM_PUSH_NULL);
-    int jend = sm_emit_i(p, SM_JUMP, 0);
-    int flbl = sm_label(p); sm_patch_jump(p, js, flbl);
-    sm_emit(p, SM_VOID_POP); sm_emit_si(p, SM_CALL_FN, "FAIL", 0);
-    sm_patch_jump(p, jend, sm_label(p));
+    int js = sm_emit_i(g_p, SM_JUMP_S, 0);
+    sm_emit(g_p, SM_VOID_POP); sm_emit(g_p, SM_PUSH_NULL);
+    int jend = sm_emit_i(g_p, SM_JUMP, 0);
+    int flbl = sm_label(g_p); sm_patch_jump(g_p, js, flbl);
+    sm_emit(g_p, SM_VOID_POP); sm_emit_si(g_p, SM_CALL_FN, "FAIL", 0);
+    sm_patch_jump(g_p, jend, sm_label(g_p));
 }
 
 /* Emit the store half of an augmented-assignment fast path. */
@@ -597,60 +581,55 @@ static void lower_augop(const tree_t *t)
 
 static void lower_seq_expr(const tree_t *t)
 {
-    SM_Program *p = g_p;
-    if (t->n == 0) { sm_emit(p, SM_PUSH_NULL); return; }
+    if (t->n == 0) { sm_emit(g_p, SM_PUSH_NULL); return; }
     for (int i = 0; i < t->n; i++) {
         lower_expr(t->c[i]);
-        if (i < t->n - 1) sm_emit(p, SM_VOID_POP);
+        if (i < t->n - 1) sm_emit(g_p, SM_VOID_POP);
     }
 }
 
 static void lower_if(const tree_t *t)
 {
-    SM_Program *p = g_p;
-    if (t->n < 1) { sm_emit(p, SM_PUSH_NULL); return; }
+    if (t->n < 1) { sm_emit(g_p, SM_PUSH_NULL); return; }
     lower_expr(t->c[0]);
-    int jf = sm_emit_i(p, SM_JUMP_F, 0);
-    sm_emit(p, SM_VOID_POP);
-    if (t->n > 1) lower_expr(t->c[1]); else sm_emit(p, SM_PUSH_NULL);
-    int jend = sm_emit_i(p, SM_JUMP, 0);
-    sm_patch_jump(p, jf, sm_label(p));
-    sm_emit(p, SM_VOID_POP);
-    if (t->n > 2) lower_expr(t->c[2]); else sm_emit(p, SM_PUSH_NULL);
-    sm_patch_jump(p, jend, sm_label(p));
+    int jf = sm_emit_i(g_p, SM_JUMP_F, 0);
+    sm_emit(g_p, SM_VOID_POP);
+    if (t->n > 1) lower_expr(t->c[1]); else sm_emit(g_p, SM_PUSH_NULL);
+    int jend = sm_emit_i(g_p, SM_JUMP, 0);
+    sm_patch_jump(g_p, jf, sm_label(g_p));
+    sm_emit(g_p, SM_VOID_POP);
+    if (t->n > 2) lower_expr(t->c[2]); else sm_emit(g_p, SM_PUSH_NULL);
+    sm_patch_jump(g_p, jend, sm_label(g_p));
 }
 
 /* Shared body for while/until — differs only in which jump exits. */
 static void lower_while_until(const tree_t *t, int exit_on_success)
 {
-    SM_Program *p = g_p;
-    int top = sm_label(p);
-    if (t->n < 1) { sm_emit(p, SM_PUSH_NULL); return; }
+    int top = sm_label(g_p);
+    if (t->n < 1) { sm_emit(g_p, SM_PUSH_NULL); return; }
     lower_expr(t->c[0]);
-    int jx = exit_on_success ? sm_emit_i(p, SM_JUMP_S, 0) : sm_emit_i(p, SM_JUMP_F, 0);
-    sm_emit(p, SM_VOID_POP);
-    if (t->n > 1) { lower_expr(t->c[1]); sm_emit(p, SM_VOID_POP); }
-    sm_emit_i(p, SM_JUMP, top);
-    sm_patch_jump(p, jx, sm_label(p));
-    sm_emit(p, SM_VOID_POP); sm_emit(p, SM_PUSH_NULL);
+    int jx = exit_on_success ? sm_emit_i(g_p, SM_JUMP_S, 0) : sm_emit_i(g_p, SM_JUMP_F, 0);
+    sm_emit(g_p, SM_VOID_POP);
+    if (t->n > 1) { lower_expr(t->c[1]); sm_emit(g_p, SM_VOID_POP); }
+    sm_emit_i(g_p, SM_JUMP, top);
+    sm_patch_jump(g_p, jx, sm_label(g_p));
+    sm_emit(g_p, SM_VOID_POP); sm_emit(g_p, SM_PUSH_NULL);
 }
 static void lower_while(const tree_t *t) { lower_while_until(t, 0); }
 static void lower_until(const tree_t *t) { lower_while_until(t, 1); }
 
 static void lower_repeat(const tree_t *t)
 {
-    SM_Program *p = g_p;
-    int top = sm_label(p);
-    if (t->n > 0) { lower_expr(t->c[0]); sm_emit(p, SM_VOID_POP); }
-    sm_emit_i(p, SM_JUMP, top);
-    sm_emit(p, SM_PUSH_NULL);
+    int top = sm_label(g_p);
+    if (t->n > 0) { lower_expr(t->c[0]); sm_emit(g_p, SM_VOID_POP); }
+    sm_emit_i(g_p, SM_JUMP, top);
+    sm_emit(g_p, SM_PUSH_NULL);
 }
 
 static void lower_loop_break(const tree_t *t)
 {
-    SM_Program *p = g_p;
-    if (t->n > 0) lower_expr(t->c[0]); else sm_emit(p, SM_PUSH_NULL);
-    sm_emit_i(p, SM_JUMP, p->count + 1);  /* sentinel: sm_interp detects self+1 as break */
+    if (t->n > 0) lower_expr(t->c[0]); else sm_emit(g_p, SM_PUSH_NULL);
+    sm_emit_i(g_p, SM_JUMP, g_p->count + 1);  /* sentinel: sm_interp detects self+1 as break */
 }
 
 /* TT_LOOP_NEXT is Icon `next` / Snocone `continue`.  The SM interp handles
@@ -660,9 +639,8 @@ static void lower_loop_next(const tree_t *t) { (void)t; sm_emit(g_p, SM_PUSH_NUL
 
 static void lower_return(const tree_t *t)
 {
-    SM_Program *p = g_p;
-    if (t->n > 0) lower_expr(t->c[0]); else sm_emit(p, SM_PUSH_NULL);
-    sm_emit(p, SM_RETURN);
+    if (t->n > 0) lower_expr(t->c[0]); else sm_emit(g_p, SM_PUSH_NULL);
+    sm_emit(g_p, SM_RETURN);
 }
 
 static void lower_proc_fail(const tree_t *t)
@@ -734,25 +712,22 @@ static void lower_case(const tree_t *t)
 
 static void lower_makelist(const tree_t *t)
 {
-    SM_Program *p = g_p;
     for (int i = 0; i < t->n; i++) lower_expr(t->c[i]);
-    sm_emit_si(p, SM_CALL_FN, "MAKELIST", (int64_t)t->n);
+    sm_emit_si(g_p, SM_CALL_FN, "MAKELIST", (int64_t)t->n);
 }
 
 static void lower_record(const tree_t *t)
 {
-    SM_Program *p = g_p;
-    sm_emit_s(p, SM_PUSH_LIT_S, t->v.sval ? t->v.sval : "");
+    sm_emit_s(g_p, SM_PUSH_LIT_S, t->v.sval ? t->v.sval : "");
     for (int i = 0; i < t->n; i++) lower_expr(t->c[i]);
-    sm_emit_si(p, SM_CALL_FN, "RECORD_MAKE", (int64_t)t->n + 1);
+    sm_emit_si(g_p, SM_CALL_FN, "RECORD_MAKE", (int64_t)t->n + 1);
 }
 
 static void lower_field(const tree_t *t)
 {
-    SM_Program *p = g_p;
     lower_expr(T0(t));
-    sm_emit_s(p, SM_PUSH_LIT_S, t->v.sval ? t->v.sval : "");
-    sm_emit_si(p, SM_CALL_FN, "FIELD_GET", 2);
+    sm_emit_s(g_p, SM_PUSH_LIT_S, t->v.sval ? t->v.sval : "");
+    sm_emit_si(g_p, SM_CALL_FN, "FIELD_GET", 2);
 }
 
 static void lower_global(const tree_t *t) { (void)t; sm_emit(g_p, SM_PUSH_NULL); }
@@ -760,33 +735,31 @@ static void lower_global(const tree_t *t) { (void)t; sm_emit(g_p, SM_PUSH_NULL);
 static void lower_initial(const tree_t *t)
 {
     /* Once-on-first-call guard: NV sentinel per AST node pointer. */
-    SM_Program *p = g_p;
     char sentinel[64];
     snprintf(sentinel, sizeof sentinel, "__initial_%lx__", (unsigned long)(uintptr_t)t);
-    sm_emit_s(p, SM_PUSH_VAR, sentinel);
-    sm_emit_si(p, SM_CALL_FN, "NONNULL", 1);
-    int skip = sm_emit_i(p, SM_JUMP_S, 0);
-    sm_emit(p, SM_VOID_POP);
+    sm_emit_s(g_p, SM_PUSH_VAR, sentinel);
+    sm_emit_si(g_p, SM_CALL_FN, "NONNULL", 1);
+    int skip = sm_emit_i(g_p, SM_JUMP_S, 0);
+    sm_emit(g_p, SM_VOID_POP);
     for (int i = 0; i < t->n; i++) {
         if (!t->c[i]) continue;
-        lower_expr(t->c[i]); sm_emit(p, SM_VOID_POP);
+        lower_expr(t->c[i]); sm_emit(g_p, SM_VOID_POP);
     }
-    sm_emit_i(p, SM_PUSH_LIT_I, 1);
-    sm_emit_s(p, SM_STORE_VAR, sentinel); sm_emit(p, SM_VOID_POP);
-    int done = sm_emit_i(p, SM_JUMP, 0);
-    sm_patch_jump(p, skip, sm_label(p)); sm_emit(p, SM_VOID_POP);
-    sm_patch_jump(p, done, sm_label(p)); sm_emit(p, SM_PUSH_NULL);
+    sm_emit_i(g_p, SM_PUSH_LIT_I, 1);
+    sm_emit_s(g_p, SM_STORE_VAR, sentinel); sm_emit(g_p, SM_VOID_POP);
+    int done = sm_emit_i(g_p, SM_JUMP, 0);
+    sm_patch_jump(g_p, skip, sm_label(g_p)); sm_emit(g_p, SM_VOID_POP);
+    sm_patch_jump(g_p, done, sm_label(g_p)); sm_emit(g_p, SM_PUSH_NULL);
 }
 
 /*── String sections ─────────────────────────────────────────────────────────*/
 
 static void lower_section_3(const tree_t *t, const char *fn)
 {
-    SM_Program *p = g_p;
     if (t->n >= 3) {
         lower_expr(t->c[0]); lower_expr(t->c[1]); lower_expr(t->c[2]);
-        sm_emit_si(p, SM_CALL_FN, fn, 3);
-    } else sm_emit(p, SM_PUSH_NULL);
+        sm_emit_si(g_p, SM_CALL_FN, fn, 3);
+    } else sm_emit(g_p, SM_PUSH_NULL);
 }
 static void lower_section      (const tree_t *t) { lower_section_3(t, "ICN_SECTION_RANGE"); }
 static void lower_section_plus (const tree_t *t) { lower_section_3(t, "ICN_SECTION_PLUS");  }
@@ -803,55 +776,54 @@ static void lower_bang_binary  (const tree_t *t)
 static void emit_range_coroutine(const tree_t *lo_expr,
                                   const tree_t *hi_expr, const tree_t *step_expr)
 {
-    SM_Program *p = g_p;
-    int skip = sm_emit_i(p, SM_JUMP, 0), entry = sm_label(p);
-    sm_emit(p, SM_RESUME);
-    if (lo_expr) lower_expr(lo_expr); else sm_emit_i(p, SM_PUSH_LIT_I, 0);
-    sm_emit_i(p, SM_STORE_GLOCAL, 0); sm_emit(p, SM_VOID_POP);
-    if (hi_expr) lower_expr(hi_expr); else sm_emit_i(p, SM_PUSH_LIT_I, 0);
-    sm_emit_i(p, SM_STORE_GLOCAL, 1); sm_emit(p, SM_VOID_POP);
+    int skip = sm_emit_i(g_p, SM_JUMP, 0), entry = sm_label(g_p);
+    sm_emit(g_p, SM_RESUME);
+    if (lo_expr) lower_expr(lo_expr); else sm_emit_i(g_p, SM_PUSH_LIT_I, 0);
+    sm_emit_i(g_p, SM_STORE_GLOCAL, 0); sm_emit(g_p, SM_VOID_POP);
+    if (hi_expr) lower_expr(hi_expr); else sm_emit_i(g_p, SM_PUSH_LIT_I, 0);
+    sm_emit_i(g_p, SM_STORE_GLOCAL, 1); sm_emit(g_p, SM_VOID_POP);
     if (step_expr) {
         lower_expr(step_expr);
-        sm_emit_i(p, SM_STORE_GLOCAL, 3); sm_emit(p, SM_VOID_POP);
+        sm_emit_i(g_p, SM_STORE_GLOCAL, 3); sm_emit(g_p, SM_VOID_POP);
     }
-    sm_emit_i(p, SM_LOAD_GLOCAL, 0);
-    sm_emit_i(p, SM_STORE_GLOCAL, 2); sm_emit(p, SM_VOID_POP);
-    int loop = sm_label(p);
+    sm_emit_i(g_p, SM_LOAD_GLOCAL, 0);
+    sm_emit_i(g_p, SM_STORE_GLOCAL, 2); sm_emit(g_p, SM_VOID_POP);
+    int loop = sm_label(g_p);
     if (!step_expr) {
         /* Simple: exit when cur > hi */
-        sm_emit_i(p, SM_LOAD_GLOCAL, 2); sm_emit_i(p, SM_LOAD_GLOCAL, 1);
-        sm_emit(p, SM_ICMP_GT);
-        int exit = sm_emit_i(p, SM_JUMP_S, 0);
-        sm_emit_i(p, SM_LOAD_GLOCAL, 2); sm_emit(p, SM_SUSPEND);
-        sm_emit_i(p, SM_LOAD_GLOCAL, 2); sm_emit_i(p, SM_INCR, 1);
-        sm_emit_i(p, SM_STORE_GLOCAL, 2); sm_emit(p, SM_VOID_POP);
-        sm_emit_i(p, SM_JUMP, loop);
-        sm_patch_jump(p, exit, sm_label(p));
+        sm_emit_i(g_p, SM_LOAD_GLOCAL, 2); sm_emit_i(g_p, SM_LOAD_GLOCAL, 1);
+        sm_emit(g_p, SM_ICMP_GT);
+        int exit = sm_emit_i(g_p, SM_JUMP_S, 0);
+        sm_emit_i(g_p, SM_LOAD_GLOCAL, 2); sm_emit(g_p, SM_SUSPEND);
+        sm_emit_i(g_p, SM_LOAD_GLOCAL, 2); sm_emit_i(g_p, SM_INCR, 1);
+        sm_emit_i(g_p, SM_STORE_GLOCAL, 2); sm_emit(g_p, SM_VOID_POP);
+        sm_emit_i(g_p, SM_JUMP, loop);
+        sm_patch_jump(g_p, exit, sm_label(g_p));
     } else {
         /* Stepped: branch on sign of step */
-        sm_emit_i(p, SM_LOAD_GLOCAL, 3); sm_emit_i(p, SM_PUSH_LIT_I, 0);
-        sm_emit(p, SM_ICMP_LT);
-        int neg = sm_emit_i(p, SM_JUMP_S, 0);
-        sm_emit_i(p, SM_LOAD_GLOCAL, 2); sm_emit_i(p, SM_LOAD_GLOCAL, 1);
-        sm_emit(p, SM_ICMP_GT);
-        int exit_pos = sm_emit_i(p, SM_JUMP_S, 0);
-        int body = sm_emit_i(p, SM_JUMP, 0);
-        sm_patch_jump(p, neg, sm_label(p));
-        sm_emit_i(p, SM_LOAD_GLOCAL, 2); sm_emit_i(p, SM_LOAD_GLOCAL, 1);
-        sm_emit(p, SM_ICMP_LT);
-        int exit_neg = sm_emit_i(p, SM_JUMP_S, 0);
-        sm_patch_jump(p, body, sm_label(p));
-        sm_emit_i(p, SM_LOAD_GLOCAL, 2); sm_emit(p, SM_SUSPEND);
-        sm_emit_i(p, SM_LOAD_GLOCAL, 2); sm_emit_i(p, SM_LOAD_GLOCAL, 3);
-        sm_emit(p, SM_ADD); sm_emit_i(p, SM_STORE_GLOCAL, 2); sm_emit(p, SM_VOID_POP);
-        sm_emit_i(p, SM_JUMP, loop);
-        int exit_pc = sm_label(p);
-        sm_patch_jump(p, exit_pos, exit_pc); sm_patch_jump(p, exit_neg, exit_pc);
+        sm_emit_i(g_p, SM_LOAD_GLOCAL, 3); sm_emit_i(g_p, SM_PUSH_LIT_I, 0);
+        sm_emit(g_p, SM_ICMP_LT);
+        int neg = sm_emit_i(g_p, SM_JUMP_S, 0);
+        sm_emit_i(g_p, SM_LOAD_GLOCAL, 2); sm_emit_i(g_p, SM_LOAD_GLOCAL, 1);
+        sm_emit(g_p, SM_ICMP_GT);
+        int exit_pos = sm_emit_i(g_p, SM_JUMP_S, 0);
+        int body = sm_emit_i(g_p, SM_JUMP, 0);
+        sm_patch_jump(g_p, neg, sm_label(g_p));
+        sm_emit_i(g_p, SM_LOAD_GLOCAL, 2); sm_emit_i(g_p, SM_LOAD_GLOCAL, 1);
+        sm_emit(g_p, SM_ICMP_LT);
+        int exit_neg = sm_emit_i(g_p, SM_JUMP_S, 0);
+        sm_patch_jump(g_p, body, sm_label(g_p));
+        sm_emit_i(g_p, SM_LOAD_GLOCAL, 2); sm_emit(g_p, SM_SUSPEND);
+        sm_emit_i(g_p, SM_LOAD_GLOCAL, 2); sm_emit_i(g_p, SM_LOAD_GLOCAL, 3);
+        sm_emit(g_p, SM_ADD); sm_emit_i(g_p, SM_STORE_GLOCAL, 2); sm_emit(g_p, SM_VOID_POP);
+        sm_emit_i(g_p, SM_JUMP, loop);
+        int exit_pc = sm_label(g_p);
+        sm_patch_jump(g_p, exit_pos, exit_pc); sm_patch_jump(g_p, exit_neg, exit_pc);
     }
-    sm_emit(p, SM_PUSH_NULL); sm_emit(p, SM_RETURN);
-    sm_patch_jump(p, skip, sm_label(p));
-    sm_emit_ii(p, SM_PUSH_EXPRESSION, (int64_t)entry, 0);
-    sm_emit(p, SM_BB_PUMP_SM);
+    sm_emit(g_p, SM_PUSH_NULL); sm_emit(g_p, SM_RETURN);
+    sm_patch_jump(g_p, skip, sm_label(g_p));
+    sm_emit_ii(g_p, SM_PUSH_EXPRESSION, (int64_t)entry, 0);
+    sm_emit(g_p, SM_BB_PUMP_SM);
 }
 
 static void lower_to   (const tree_t *t) { emit_range_coroutine(T0(t), T1(t), NULL); }
@@ -864,16 +836,15 @@ static void lower_every(const tree_t *t)
 
 static void lower_suspend(const tree_t *t)
 {
-    SM_Program *p = g_p;
     if (t->n > 0 && t->c[0]) lower_expr(t->c[0]);
-    else sm_emit(p, SM_PUSH_NULL);
-    int jf = sm_emit_i(p, SM_JUMP_F, 0);
-    sm_emit(p, SM_SUSPEND_VALUE);
-    if (t->n > 1 && t->c[1]) { lower_expr(t->c[1]); sm_emit(p, SM_VOID_POP); }
-    sm_emit(p, SM_PUSH_NULL);
-    int jdone = sm_emit_i(p, SM_JUMP, 0);
-    sm_patch_jump(p, jf, sm_label(p));
-    sm_patch_jump(p, jdone, sm_label(p));
+    else sm_emit(g_p, SM_PUSH_NULL);
+    int jf = sm_emit_i(g_p, SM_JUMP_F, 0);
+    sm_emit(g_p, SM_SUSPEND_VALUE);
+    if (t->n > 1 && t->c[1]) { lower_expr(t->c[1]); sm_emit(g_p, SM_VOID_POP); }
+    sm_emit(g_p, SM_PUSH_NULL);
+    int jdone = sm_emit_i(g_p, SM_JUMP, 0);
+    sm_patch_jump(g_p, jf, sm_label(g_p));
+    sm_patch_jump(g_p, jdone, sm_label(g_p));
 }
 
 static void lower_bb_pump_ast(const tree_t *t)
@@ -886,13 +857,12 @@ static void lower_limit(const tree_t *t) { emit_push_expr(t); sm_emit(g_p, SM_BB
 
 static void lower_choice(const tree_t *t)
 {
-    SM_Program *p = g_p;
     if (t->v.sval) {
         const char *sl = strrchr(t->v.sval, '/');
         int arity = sl ? atoi(sl + 1) : 0;
-        sm_emit_si(p, SM_BB_ONCE_PROC, t->v.sval, (int64_t)arity);
+        sm_emit_si(g_p, SM_BB_ONCE_PROC, t->v.sval, (int64_t)arity);
     } else {
-        emit_push_expr(t); sm_emit(p, SM_BB_ONCE);
+        emit_push_expr(t); sm_emit(g_p, SM_BB_ONCE);
     }
 }
 
@@ -932,20 +902,19 @@ static int attr_int_of(const tree_t *s, const char *tag)
 
 void lower_stmt(const tree_t *s)
 {
-    SM_Program *p = g_p;
     LabelTable *tbl = &g_labtab;
 
     /* TT_END — the END statement */
     if (s->t == TT_END) {
         const char *lbl = attr_str_of(s, ":lbl");
         if (lbl && lbl[0]) {
-            int lbl_idx = sm_label_named(p, lbl);
+            int lbl_idx = sm_label_named(g_p, lbl);
             labtab_define(tbl, lbl, lbl_idx);
         }
         int stno   = attr_int_of(s, ":stno");
         int lineno = attr_int_of(s, ":line");
-        sm_emit_ii(p, SM_STNO, (int64_t)stno, (int64_t)lineno);
-        sm_emit(p, SM_HALT);
+        sm_emit_ii(g_p, SM_STNO, (int64_t)stno, (int64_t)lineno);
+        sm_emit(g_p, SM_HALT);
         return;
     }
 
@@ -981,15 +950,15 @@ void lower_stmt(const tree_t *s)
         return;
 
     if (label && label[0]) {
-        int lbl_idx = sm_label_named(p, label);
+        int lbl_idx = sm_label_named(g_p, label);
         labtab_define(tbl, label, lbl_idx);
         if (FUNC_IS_ENTRY_LABEL(label)) {
-            p->instrs[p->count - 1].a[2].i = 1;
-            sm_emit(p, SM_DEFINE_ENTRY);
+            g_p->instrs[g_p->count - 1].a[2].i = 1;
+            sm_emit(g_p, SM_DEFINE_ENTRY);
         }
     }
 
-    sm_emit_ii(p, SM_STNO, (int64_t)stno, (int64_t)lineno);
+    sm_emit_ii(g_p, SM_STNO, (int64_t)stno, (int64_t)lineno);
     /* LANG_ICN statements are registered by polyglot_init and lowered as Icon proc
      * skeletons in lower_proc_skeletons(); they must not reach lower_stmt.
      * This guard is a safety net for any future code path that might slip through. */
@@ -998,59 +967,59 @@ void lower_stmt(const tree_t *s)
     if (lang == LANG_PL) {
         if (subject && subject->t == TT_CHOICE && subject->v.sval) {
             const char *sl = strrchr(subject->v.sval, '/');
-            sm_emit_si(p, SM_BB_ONCE_PROC, subject->v.sval, (int64_t)(sl ? atoi(sl+1) : 0));
+            sm_emit_si(g_p, SM_BB_ONCE_PROC, subject->v.sval, (int64_t)(sl ? atoi(sl+1) : 0));
         } else {
-            if (subject) lower_expr(subject); else sm_emit(p, SM_PUSH_NULL);
-            sm_emit(p, SM_BB_ONCE);
+            if (subject) lower_expr(subject); else sm_emit(g_p, SM_PUSH_NULL);
+            sm_emit(g_p, SM_BB_ONCE);
         }
         goto emit_gotos;
     }
 
     if (pattern) {
         lower_pat_expr(pattern);
-        if (subject) lower_expr(subject); else sm_emit(p, SM_PUSH_NULL);
+        if (subject) lower_expr(subject); else sm_emit(g_p, SM_PUSH_NULL);
         if (has_eq && replacement) lower_expr(replacement);
-        else if (has_eq)           sm_emit_si(p, SM_PUSH_LIT_S, "", 0);
-        else                       sm_emit_i(p, SM_PUSH_LIT_I, 0);
+        else if (has_eq)           sm_emit_si(g_p, SM_PUSH_LIT_S, "", 0);
+        else                       sm_emit_i(g_p, SM_PUSH_LIT_I, 0);
         const char *sname = (subject && (subject->t == TT_VAR
                               || subject->t == TT_KEYWORD)) ? subject->v.sval : NULL;
-        sm_emit_si(p, SM_EXEC_STMT, sname, (int64_t)has_eq);
+        sm_emit_si(g_p, SM_EXEC_STMT, sname, (int64_t)has_eq);
         goto emit_gotos;
     }
 
     if (subject) {
         if (has_eq) {
-            if (replacement) lower_expr(replacement); else sm_emit(p, SM_PUSH_NULL);
+            if (replacement) lower_expr(replacement); else sm_emit(g_p, SM_PUSH_NULL);
             const tree_t *lhs = subject;
             if (lhs->t == TT_VAR || lhs->t == TT_KEYWORD) {
-                sm_emit_s(p, SM_STORE_VAR, lhs->v.sval ? lhs->v.sval : "");
+                sm_emit_s(g_p, SM_STORE_VAR, lhs->v.sval ? lhs->v.sval : "");
             } else if (lhs->t == TT_INDIRECT) {
-                lower_expr(T0(lhs)); sm_emit_si(p, SM_CALL_FN, "ASGN_INDIR", 2);
+                lower_expr(T0(lhs)); sm_emit_si(g_p, SM_CALL_FN, "ASGN_INDIR", 2);
             } else if (lhs->t == TT_IDX) {
                 for (int i = 0; i < lhs->n; i++) lower_expr(lhs->c[i]);
-                sm_emit_si(p, SM_CALL_FN, "IDX_SET", (int64_t)(lhs->n + 1));
+                sm_emit_si(g_p, SM_CALL_FN, "IDX_SET", (int64_t)(lhs->n + 1));
             } else if (lhs->t == TT_FNC && lhs->v.sval) {
                 if (lhs->n == 0) {
-                    sm_emit_si(p, SM_CALL_FN, "NRETURN_ASGN", 1);
-                    p->instrs[p->count - 1].a[1].s = GC_strdup(lhs->v.sval);
+                    sm_emit_si(g_p, SM_CALL_FN, "NRETURN_ASGN", 1);
+                    g_p->instrs[g_p->count - 1].a[1].s = GC_strdup(lhs->v.sval);
                 } else if (strcasecmp(lhs->v.sval, "ITEM") == 0) {
                     for (int i = 0; i < lhs->n; i++) lower_expr(lhs->c[i]);
-                    sm_emit_si(p, SM_CALL_FN, "ITEM_SET", (int64_t)(lhs->n + 1));
+                    sm_emit_si(g_p, SM_CALL_FN, "ITEM_SET", (int64_t)(lhs->n + 1));
                 } else {
                     lower_expr(T0(lhs));
                     char set[256]; snprintf(set, sizeof set, "%s_SET", lhs->v.sval);
-                    sm_emit_si(p, SM_CALL_FN, set, 2);
+                    sm_emit_si(g_p, SM_CALL_FN, set, 2);
                 }
             } else {
-                lower_expr(lhs); sm_emit_si(p, SM_CALL_FN, "ASGN", 2);
+                lower_expr(lhs); sm_emit_si(g_p, SM_CALL_FN, "ASGN", 2);
             }
         } else {
             if (subject->t == TT_VAR && subject->v.sval) {
-                if (strcasecmp(subject->v.sval, "RETURN")  == 0) { sm_emit(p, SM_RETURN);  goto emit_gotos; }
-                if (strcasecmp(subject->v.sval, "FRETURN") == 0) { sm_emit(p, SM_FRETURN); goto emit_gotos; }
-                if (strcasecmp(subject->v.sval, "NRETURN") == 0) { sm_emit(p, SM_NRETURN); goto emit_gotos; }
+                if (strcasecmp(subject->v.sval, "RETURN")  == 0) { sm_emit(g_p, SM_RETURN);  goto emit_gotos; }
+                if (strcasecmp(subject->v.sval, "FRETURN") == 0) { sm_emit(g_p, SM_FRETURN); goto emit_gotos; }
+                if (strcasecmp(subject->v.sval, "NRETURN") == 0) { sm_emit(g_p, SM_NRETURN); goto emit_gotos; }
             }
-            lower_expr(subject); sm_emit(p, SM_VOID_POP);
+            lower_expr(subject); sm_emit(g_p, SM_VOID_POP);
         }
     }
 
@@ -1058,7 +1027,7 @@ emit_gotos:
     if (!goto_u && !goto_u_expr && !goto_s && !goto_s_expr
             && !goto_f && !goto_f_expr) return;
     if (goto_u && goto_u[0]) { emit_goto(SM_JUMP,   goto_u); return; }
-    if (goto_u_expr) { sm_emit_s(p, SM_PUSH_LIT_S, "(computed-goto)"); sm_emit(p, SM_JUMP_INDIR); return; }
+    if (goto_u_expr) { sm_emit_s(g_p, SM_PUSH_LIT_S, "(computed-goto)"); sm_emit(g_p, SM_JUMP_INDIR); return; }
     if (goto_s && goto_s[0]) emit_goto(SM_JUMP_S, goto_s);
     if (goto_f && goto_f[0]) emit_goto(SM_JUMP_F, goto_f);
 }
@@ -1196,14 +1165,13 @@ static void build_proc_scope(IcnScope *sc, const tree_t *proc, int body_start)
 
 static void lower_proc_skeletons(void)
 {
-    SM_Program *p = g_p;
 
     for (int pi = 0; pi < proc_count; pi++) {
         const char *nm = proc_table[pi].name;
         if (!nm || !*nm) continue;
         tree_t *proc = proc_table[pi].proc;
-        int skip = sm_emit_i(p, SM_JUMP, 0);
-        sm_label_named(p, nm);
+        int skip = sm_emit_i(g_p, SM_JUMP, 0);
+        sm_label_named(g_p, nm);
         if (proc) {
             int body_start = 1 + (int)proc->v.ival;
             IcnScope sc; build_proc_scope(&sc, proc, body_start);
@@ -1214,22 +1182,22 @@ static void lower_proc_skeletons(void)
             g_lang = LANG_ICN;
             for (int i = body_start; i < proc->n; i++) {
                 if (!proc->c[i]) continue;
-                lower_expr( proc->c[i]); sm_emit(p, SM_VOID_POP);
+                lower_expr( proc->c[i]); sm_emit(g_p, SM_VOID_POP);
             }
             g_lang = 0;          /* restore to LANG_SNO */
             g_in_proc_body = 0; g_proc_scope = NULL;
         }
-        sm_emit(p, SM_RETURN);
-        sm_patch_jump(p, skip, sm_label(p));
+        sm_emit(g_p, SM_RETURN);
+        sm_patch_jump(g_p, skip, sm_label(g_p));
     }
 
     for (int b = 0; b < PL_PRED_TABLE_SIZE_FWD; b++) {
         for (Pl_PredEntry *e = g_pl_pred_table.buckets[b]; e; e = e->next) {
             if (!e->key || !*e->key) continue;
-            int skip = sm_emit_i(p, SM_JUMP, 0);
-            sm_label_named(p, e->key);
-            sm_emit(p, SM_RETURN);
-            sm_patch_jump(p, skip, sm_label(p));
+            int skip = sm_emit_i(g_p, SM_JUMP, 0);
+            sm_label_named(g_p, e->key);
+            sm_emit(g_p, SM_RETURN);
+            sm_patch_jump(g_p, skip, sm_label(g_p));
         }
     }
 }
