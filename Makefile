@@ -92,6 +92,9 @@ RT_PIC_SRCS := \
     $(RT)/x86/templates/sm_pat_lbl.c \
     $(RT)/x86/templates/sm_pat_capture.c \
     $(RT)/x86/templates/sm_pat_capture_fn.c \
+    $(RT)/x86/templates/sm_var.c \
+    $(RT)/x86/templates/sm_push_lit_s.c \
+    $(RT)/x86/templates/sm_exec_stmt.c \
     $(RT)/x86/bb_boxes.c \
     $(RT)/x86/bb_broker.c \
     $(SRC)/frontend/snobol4/snobol4.tab.c \
@@ -265,6 +268,9 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_pat_lbl.c -o $(OBJ)/template_sm_pat_lbl.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_pat_capture.c -o $(OBJ)/template_sm_pat_capture.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_pat_capture_fn.c -o $(OBJ)/template_sm_pat_capture_fn.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_var.c -o $(OBJ)/template_sm_var.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_push_lit_s.c -o $(OBJ)/template_sm_push_lit_s.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_exec_stmt.c -o $(OBJ)/template_sm_exec_stmt.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xbrkx.c -o $(OBJ)/template_bb_xbrkx.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xposi.c -o $(OBJ)/template_bb_xposi.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xfarb.c -o $(OBJ)/template_bb_xfarb.o

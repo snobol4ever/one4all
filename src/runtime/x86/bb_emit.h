@@ -145,6 +145,8 @@ void t_lea_rdx_strtab_sym(const char *sym_label, uint64_t in_proc_ptr);
 void t_mov_esi_imm32(int val);
 void t_mov_edi_imm32(int val);
 void t_mov_edx_imm32(int val);
+void t_movabs_rdi_entry(uint64_t entry_ptr);
+void t_call_sym_param(const char *sym_or_param);
 void t_test_eax_eax(void);
 void t_jz_retskip(int pc);
 void t_retskip_label(int pc);

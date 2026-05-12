@@ -788,7 +788,7 @@ static int emit_sm_push_lit_i_legacy(FILE *out, const SM_Instr *ins, int pc)
 
 /* EM-3 opcodes */
 
-static int emit_sm_push_lit_s(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_push_lit_s_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     const char *s    = ins->a[0].s ? ins->a[0].s : "";
@@ -801,7 +801,7 @@ static int emit_sm_push_lit_s(FILE *out, const SM_Instr *ins, int pc)
                              lbl, (int)slen, anno);
 }
 
-static int emit_sm_push_var(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_push_var_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     const char *name = ins->a[0].s ? ins->a[0].s : "";
@@ -811,7 +811,7 @@ static int emit_sm_push_var(FILE *out, const SM_Instr *ins, int pc)
     return sm_emit_lbl(out, sm_template_lookup(SM_PUSH_VAR), lbl, anno);
 }
 
-static int emit_sm_store_var(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_store_var_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     const char *name = ins->a[0].s ? ins->a[0].s : "";
@@ -946,14 +946,14 @@ static int emit_sm_jump_f_line(FILE *out, const SM_Instr *ins, int pc)
  * shapes.  EM-5's gate doesn't exercise them.
  * ----------------------------------------------------------------------- */
 
-static int emit_sm_push_expression(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_push_expression_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     return sm_emit_push_expression(out, sm_template_lookup(SM_PUSH_EXPRESSION),
                               ins->a[0].i, (int)ins->a[1].i);
 }
 
-static int emit_sm_call_expression(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_call_expression_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     return sm_emit_call_expression(out, sm_template_lookup(SM_CALL_EXPRESSION),
@@ -2183,9 +2183,9 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
             case SM_PUSH_LIT_I:   rc = emit_push_lit_i_line(out, ins, pc); break;
 
             /* EM-3: string push, var load/store, pop, arithmetic */
-            case SM_PUSH_LIT_S:   rc = emit_sm_push_lit_s(out, ins, pc); break;
-            case SM_PUSH_VAR:     rc = emit_sm_push_var(out, ins, pc);   break;
-            case SM_STORE_VAR:    rc = emit_sm_store_var(out, ins, pc);  break;
+            case SM_PUSH_LIT_S:   rc = emit_sm_push_lit_s_dispatch(out, ins, pc); break;
+            case SM_PUSH_VAR:     rc = emit_sm_push_var_dispatch(out, ins, pc);   break;
+            case SM_STORE_VAR:    rc = emit_sm_store_var_dispatch(out, ins, pc);  break;
             case SM_VOID_POP:          rc = emit_sm_pop(out, pc);             break;
             case SM_ADD:
             case SM_SUB:
@@ -2202,8 +2202,8 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
             case SM_JUMP_F:       rc = emit_sm_jump_f_line(out, ins, pc); break;
 
             /* EM-5: expression descriptor push expression call, return. */
-            case SM_PUSH_EXPRESSION:   rc = emit_sm_push_expression(out, ins, pc); break;
-            case SM_CALL_EXPRESSION:   rc = emit_sm_call_expression(out, ins, pc); break;
+            case SM_PUSH_EXPRESSION:   rc = emit_sm_push_expression_dispatch(out, ins, pc); break;
+            case SM_CALL_EXPRESSION:   rc = emit_sm_call_expression_dispatch(out, ins, pc); break;
             case SM_RETURN:       rc = emit_sm_return_dispatch(out, pc);          break;
 
             /* EM-7-pre keepers: SM_CALL_FN (general) + SM_CONCAT + SM_PUSH_NULL +

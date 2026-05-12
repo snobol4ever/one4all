@@ -522,6 +522,56 @@ void t_retskip_label(int pc)
     }
 }
 
+void t_movabs_rdi_entry(uint64_t entry_ptr)
+{
+    /* movabs rdi, <entry>  — 10 bytes: 48 BF <8>
+     * Used by SM_PUSH_EXPRESSION to load a function/chunk entry point.
+     *   BINARY:    48 BF <entry_ptr as 8 bytes>
+     *   TEXT:      movabs rdi, <entry_ptr>
+     *   MACRO_DEF: movabs rdi, \entry   (parameter reference) */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY: {
+        uint64_t v = entry_ptr;
+        bb_emit_byte(0x48); bb_emit_byte(0xBF);
+        bb_emit_byte((uint8_t)(v      )); bb_emit_byte((uint8_t)(v >>  8));
+        bb_emit_byte((uint8_t)(v >> 16)); bb_emit_byte((uint8_t)(v >> 24));
+        bb_emit_byte((uint8_t)(v >> 32)); bb_emit_byte((uint8_t)(v >> 40));
+        bb_emit_byte((uint8_t)(v >> 48)); bb_emit_byte((uint8_t)(v >> 56));
+        return;
+    }
+    case EMIT_TEXT: {
+        char args[32];
+        snprintf(args, sizeof(args), "rdi, 0x%llx", (unsigned long long)entry_ptr);
+        bb3c_format(emit_outf(), "", "movabs", args);
+        return;
+    }
+    case EMIT_MACRO_DEF:
+        bb3c_format(emit_outf(), "", "movabs", "rdi, \\entry");
+        return;
+    }
+}
+
+void t_call_sym_param(const char *sym_or_param)
+{
+    /* call <sym_or_param>
+     * Used by SM_CALL_EXPRESSION to call a chunk entry point.
+     *   BINARY:    not yet wired (uses standard_blob)
+     *   TEXT:      call <sym_or_param>
+     *   MACRO_DEF: call \tgt   (parameter reference) */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY:
+        /* BINARY path uses standard_blob; this helper is TEXT/MACRO_DEF only. */
+        return;
+    case EMIT_TEXT: {
+        bb3c_format(emit_outf(), "", "call", sym_or_param ? sym_or_param : "??tgt??");
+        return;
+    }
+    case EMIT_MACRO_DEF:
+        bb3c_format(emit_outf(), "", "call", "\\tgt");
+        return;
+    }
+}
+
 void t_noop_macro(const char *macro_name)
 {
     /* NOOP shape: emit one three-column line with macro_name in col 2.

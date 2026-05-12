@@ -193,4 +193,22 @@ void emit_sm_pat_capture_fn_args(emitter_t *e,
                                   const char *fname_lbl, uint64_t fname_ptr,
                                   int is_imm, int nargs);
 
+/* SM_PUSH_VAR / SM_STORE_VAR — sub-rung -s (2026-05-11).
+ * Both take a strtab label (SM_TPL_LBL): lea rdi,[rip+\lbl]; call rt@PLT. */
+void emit_sm_push_var  (emitter_t *e, const char *name_lbl, uint64_t name_ptr);
+void emit_sm_store_var (emitter_t *e, const char *name_lbl, uint64_t name_ptr);
+
+/* SM_PUSH_LIT_S — sub-rung -s (2026-05-11).
+ * SM_TPL_LBL_INT32: lea rdi,[rip+\lbl]; mov esi,\n; call rt_push_str@PLT. */
+void emit_sm_push_lit_s(emitter_t *e,
+                         const char *str_lbl, uint64_t str_ptr, int len);
+
+/* SM_PUSH_EXPRESSION / SM_CALL_EXPRESSION / SM_EXEC_STMT — sub-rung -s.
+ * MACRO_DEF source of truth for the expression/statement execution macros. */
+void emit_sm_push_expression(emitter_t *e, uint64_t entry_ptr, int arity);
+void emit_sm_call_expression (emitter_t *e, const char *tgt_sym);
+void emit_sm_exec_stmt       (emitter_t *e,
+                               const char *subj_lbl, uint64_t subj_ptr,
+                               int has_repl);
+
 #endif /* RUNTIME_X86_TEMPLATES_TEMPLATES_H */
