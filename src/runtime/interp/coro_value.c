@@ -494,6 +494,10 @@ DESCR_t bb_eval_value(tree_t *e)
      * Builtin path evaluates args through bb_eval_value then calls icn_call_builtin
      * (already IR-free).  Mirror of interp_eval.c TT_FNC case but recursion-safe. */
     case TT_FNC: {
+        /* IJ-2: injection check — outer driver (e.g. coro_bb_cat driving key(t) inside t[key(t)])
+         * staged a value for this exact node. Return it directly rather than re-evaluating,
+         * which would build a fresh generator box and restart from alpha. */
+        if (coro_drive_node && e == coro_drive_node) return coro_drive_val;
         if (e->n < 1) return NULVCL;
         const char *fn = e->c[0] ? e->c[0]->v.sval : NULL;
         if (!fn) return NULVCL;
