@@ -1074,31 +1074,14 @@ static void lower_limit(const tree_t *t) { emit_push_expr(t); sm_emit(g_p, SM_BB
  *   skip: SM_PUSH_EXPRESSION entry
  *         SM_BB_PUMP_SM
  */
+/* IB-2: lower_iterate — Icon !E generator.
+ * Replaces SM coroutine with SM_BB_PUMP_AST. coro_eval handles TT_ITERATE
+ * correctly — dispatches on subject type (string/list/table/record). */
 static void lower_iterate(const tree_t *t)
 {
-    if (!t || t->n < 1 || !t->c[0]) {
-        sm_emit(g_p, SM_PUSH_NULL); return;
-    }
-    /* Only apply pure-SM coroutine for Icon */
+    if (!t || t->n < 1 || !t->c[0]) { sm_emit(g_p, SM_PUSH_NULL); return; }
     if (g_lang != LANG_ICN) { lower_bb_pump_ast(t); return; }
-
-    int skip  = sm_emit_i(g_p, SM_JUMP, 0);
-    int entry = sm_label(g_p);
-    sm_emit(g_p, SM_RESUME);
-    lower_expr(t->c[0]);               /* evaluate operand → TOS */
-    sm_emit_i(g_p, SM_STORE_GLOCAL, 0); sm_emit(g_p, SM_VOID_POP);
-    sm_emit_i(g_p, SM_PUSH_LIT_I, 0);
-    sm_emit_i(g_p, SM_STORE_GLOCAL, 1); sm_emit(g_p, SM_VOID_POP);
-    int loop = sm_label(g_p);
-    sm_emit_si(g_p, SM_CALL_FN, "ICN_BANG_NEXT", 0);
-    int jdone = sm_emit_i(g_p, SM_JUMP_F, 0);
-    sm_emit(g_p, SM_SUSPEND_VALUE);
-    sm_emit_i(g_p, SM_JUMP, loop);
-    sm_patch_jump(g_p, jdone, sm_label(g_p));
-    sm_emit(g_p, SM_PUSH_NULL); sm_emit(g_p, SM_RETURN);
-    sm_patch_jump(g_p, skip, sm_label(g_p));
-    sm_emit_ii(g_p, SM_PUSH_EXPRESSION, (int64_t)entry, 0);
-    sm_emit(g_p, SM_BB_PUMP_SM);
+    sm_emit_i(g_p, SM_BB_PUMP_AST, (int64_t)ast_pump_table_register((tree_t *)t));
 }
 
 /*── Prolog ──────────────────────────────────────────────────────────────────*/
