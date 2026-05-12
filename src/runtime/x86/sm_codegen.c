@@ -3245,250 +3245,177 @@ int sm_codegen(SM_Program *prog)
         g_blob_addrs[i] = scrip_segs[SEG_CODE].base + off_before;
         sm_opcode_t op = prog->instrs[i].op;
 
-        if (op == SM_HALT) {
-            /* EM-MODE4-IS-MODE3-DUMP-c (sess 2026-05-11): SM_HALT
-             * routed through the per-opcode template
-             * (templates/sm_halt.c) via the binary-emitter capture-
-             * and-flush adapter.  Single-line revert if needed:
-             * replace with `emit_halt_blob();`. */
+        /* EDP-3 (sess 2026-05-12): converted from if-else chain to switch.
+         * Semantics unchanged; each case calls the same emit_me*_blob()
+         * helper as before.  The switch makes sm_codegen a thin dispatch
+         * and enables future EDP-4 migration to template functions. */
+        switch (op) {
+        case SM_HALT:
+            /* EM-MODE4-IS-MODE3-DUMP-c: routed through per-opcode template
+             * via binary-emitter capture-and-flush adapter. */
             emit_halt_blob_via_template();
-        } else if (op == SM_JUMP) {
+            break;
+        case SM_JUMP: {
             int32_t target_pc = (int32_t)prog->instrs[i].a[0].i;
             size_t rel32_off = emit_jump_blob_skeleton(target_pc);
             jump_indices[jump_count]    = i;
             jump_rel32_offs[jump_count] = rel32_off;
             jump_count++;
-        } else if (op == SM_JUMP_S || op == SM_JUMP_F) {
-            /* ME-5: inline-native conditional jump.  Reads st->last_ok via
-             * [r13+16] (no PLT call needed since r13 = &SM_State).  Direct
-             * rel32 to both target and fall-through — bypasses the
-             * trampoline indirect-jump dispatch for both arms.
-             *
-             * Two rel32 patches per blob:
-             *   - target: first rel32 (offset returned by skeleton)
-             *   - fallthru: second rel32 (deterministic at first_off + 13)
-             *
-             * Pass 2 patches both.  We record each as a separate jump
-             * entry; the patcher distinguishes by stuffing a tag in the
-             * upper bits of jump_indices[] — no, cleaner: record both as
-             * positive entries with i = (PC of source blob) and an
-             * auxiliary array `jump_is_fallthru[j]` that says which arm.
-             * Simpler still: emit two records into the existing arrays,
-             * each with its own (rel32_off, target_pc).  We extend
-             * jump_indices to carry the literal target_pc to use, not the
-             * source-PC index. */
+            break;
+        }
+        case SM_JUMP_S:
+        case SM_JUMP_F: {
+            /* ME-5: inline-native conditional jump.  Two rel32 patches per blob
+             * (target arm + fall-through arm); both recorded for pass-2 patching.
+             * jump_indices entries are tagged negative to distinguish from SM_JUMP. */
             int take_on_nonzero = (op == SM_JUMP_S) ? 1 : 0;
             int32_t target_pc   = (int32_t)prog->instrs[i].a[0].i;
             int32_t fallthru_pc = i + 1;
             size_t target_rel32_off  = emit_cond_jump_blob_skeleton(
                                           take_on_nonzero, target_pc, fallthru_pc);
             size_t fallthru_rel32_off = target_rel32_off + 13;
-
-            /* Record both patch sites.  jump_indices[j] is repurposed to
-             * carry the destination_pc directly (not the source-PC index)
-             * for ME-5 cond-jump entries.  We tag this by storing
-             * (-(target_pc + 1)) in jump_indices to distinguish from the
-             * SM_JUMP entries (which store the source-PC index i >= 0).
-             * Pass 2 detects the tag and reads the target from the
-             * record directly. */
             jump_indices[jump_count]    = -(target_pc + 1);   /* tagged: target = -ji - 1 */
             jump_rel32_offs[jump_count] = target_rel32_off;
             jump_count++;
             jump_indices[jump_count]    = -(fallthru_pc + 1);
             jump_rel32_offs[jump_count] = fallthru_rel32_off;
             jump_count++;
-        } else if (op == SM_LABEL) {
-            /* ME-14: TRULY stackless no-op blob (pc++ + jmp trampoline).
-             * SM_LABEL's handler h_label is a literal no-op; emitting a
-             * C call + sp→r12 reload was destroying r12 growth from
-             * preceding inline-native blobs.  See emit_label_blob docstring. */
+            break;
+        }
+        case SM_LABEL:
+            /* ME-14: TRULY stackless no-op blob (pc++ + jmp trampoline). */
             emit_label_blob(g_trampoline_offset);
-        } else if (op == SM_STNO) {
-            /* ME-5: stack-resetting handler — h_stno explicitly writes
-             * st->sp = 0, so the post-sync reload of r12 from the fresh
-             * sp value is correct and intentional. */
+            break;
+        case SM_STNO:
+            /* ME-5: stack-resetting handler — h_stno writes st->sp = 0. */
             emit_standard_blob_no_stack(g_handlers[op], g_trampoline_offset);
-        } else if (op == SM_DEFINE_ENTRY) {
-            /* ME-6a: conditional prologue blob.  Reads STATE->jit_in_call
-             * ([r13+28]); does `push rbp; mov rbp, rsp` only when flag is 1
-             * (entered via h_call), then clears the flag.  Goto paths that
-             * land on the define-entry SM_LABEL and advance to SM_DEFINE_ENTRY
-             * see jit_in_call==0 and skip the prologue entirely. */
+            break;
+        case SM_DEFINE_ENTRY:
+            /* ME-6a: conditional prologue blob (push rbp / mov rbp,rsp when
+             * jit_in_call==1; no-op on internal :(fname) goto paths). */
             emit_me6_define_entry_blob(g_trampoline_offset);
-        } else if (op == SM_RETURN   || op == SM_FRETURN  || op == SM_NRETURN  ||
-                   op == SM_RETURN_S || op == SM_RETURN_F ||
-                   op == SM_FRETURN_S || op == SM_FRETURN_F ||
-                   op == SM_NRETURN_S || op == SM_NRETURN_F) {
-            /* ME-6a: return-variant blobs.  Call me6_return_dispatch with
-             * variant bits; conditionally pop rbp if jit_epilogue_pending. */
+            break;
+        case SM_RETURN:
+        case SM_FRETURN:
+        case SM_NRETURN:
+        case SM_RETURN_S:
+        case SM_RETURN_F:
+        case SM_FRETURN_S:
+        case SM_FRETURN_F:
+        case SM_NRETURN_S:
+        case SM_NRETURN_F: {
+            /* ME-6a: return-variant blobs.  bits encodes kind (F/N) + cond (S/F). */
             int bits = 0;
             if (op == SM_FRETURN   || op == SM_FRETURN_S || op == SM_FRETURN_F) bits |= 1;
             if (op == SM_NRETURN   || op == SM_NRETURN_S || op == SM_NRETURN_F) bits |= 2;
             if (op == SM_RETURN_S  || op == SM_FRETURN_S || op == SM_NRETURN_S) bits |= 4;
             if (op == SM_RETURN_F  || op == SM_FRETURN_F || op == SM_NRETURN_F) bits |= 8;
             emit_me6_return_blob(bits, g_trampoline_offset);
-        } else if (op == SM_ADD || op == SM_SUB || op == SM_MUL ||
-                   op == SM_DIV || op == SM_MOD) {
-            /* ME-4: inline-native arithmetic.  Args loaded from r12-stack,
-             * me4_arith called with values in registers, result stored back.
-             * No g_handlers[] indirection; no h_arith implicit-stack call. */
+            break;
+        }
+        case SM_ADD:
+        case SM_SUB:
+        case SM_MUL:
+        case SM_DIV:
+        case SM_MOD:
+            /* ME-4: inline-native arithmetic via me4_arith(). */
             emit_me4_arith_blob(op, g_trampoline_offset);
-        } else if (op == SM_CONCAT) {
+            break;
+        case SM_CONCAT:
             emit_me4_concat_blob(g_trampoline_offset);
-        } else if (op == SM_COERCE_NUM) {
+            break;
+        case SM_COERCE_NUM:
             emit_me4_coerce_num_blob(g_trampoline_offset);
-        } else if (op == SM_PUSH_NULL) {
+            break;
+        case SM_PUSH_NULL:
             emit_me4_push_null_blob(g_trampoline_offset);
-        } else if (op == SM_PUSH_VAR) {
+            break;
+        case SM_PUSH_VAR:
             emit_me4_push_var_blob(prog->instrs[i].a[0].s, g_trampoline_offset);
-        } else if (op == SM_STORE_VAR) {
+            break;
+        case SM_STORE_VAR:
             emit_me4_store_var_blob(prog->instrs[i].a[0].s, g_trampoline_offset);
-        } else if (op == SM_PAT_LIT) {
-            /* ME-9b: inline-native pat_lit.  String baked as imm64 from
-             * a[0].s; pat_lit null-guards internally so no extra check. */
+            break;
+        case SM_PAT_LIT:
+            /* ME-9b: string baked as imm64; pat_lit null-guards internally. */
             emit_me9_pat_lit_blob(prog->instrs[i].a[0].s, g_trampoline_offset);
-        } else if (op == SM_PAT_ANY || op == SM_PAT_NOTANY ||
-                   op == SM_PAT_SPAN || op == SM_PAT_BREAK) {
-            /* ME-9c: inline-native charset constructors.  Pop one DESCR_t,
-             * coerce via VARVAL_fn (in me9_* helper), call pat constructor,
-             * write result back.  Net delta 0. */
-            void *helper = NULL;
-            switch (op) {
-            case SM_PAT_ANY:    helper = (void *)&me9_pat_any;    break;
-            case SM_PAT_NOTANY: helper = (void *)&me9_pat_notany; break;
-            case SM_PAT_SPAN:   helper = (void *)&me9_pat_span;   break;
-            case SM_PAT_BREAK:  helper = (void *)&me9_pat_break;  break;
-            default: break;
-            }
-            emit_me9_pat_charset_blob(helper, g_trampoline_offset);
-        } else if (op == SM_PAT_LEN  || op == SM_PAT_POS  || op == SM_PAT_RPOS ||
-                   op == SM_PAT_TAB  || op == SM_PAT_RTAB) {
-            /* ME-9d: inline-native integer-arg constructors.  Pop one
-             * DESCR_t, helper checks v==DT_I (else 0), calls pat
-             * constructor.  Same blob shape as ME-9c (single-DESCR_t-arg,
-             * net delta 0) — reuses emit_me9_pat_charset_blob. */
-            void *helper = NULL;
-            switch (op) {
-            case SM_PAT_LEN:  helper = (void *)&me9_pat_len;  break;
-            case SM_PAT_POS:  helper = (void *)&me9_pat_pos;  break;
-            case SM_PAT_RPOS: helper = (void *)&me9_pat_rpos; break;
-            case SM_PAT_TAB:  helper = (void *)&me9_pat_tab;  break;
-            case SM_PAT_RTAB: helper = (void *)&me9_pat_rtab; break;
-            default: break;
-            }
-            emit_me9_pat_charset_blob(helper, g_trampoline_offset);
-        } else if (op == SM_PAT_ARBNO || op == SM_PAT_FENCE1) {
-            /* ME-9e: inline-native unary-pattern combinators.  Pop one
-             * DESCR_t (inner pat), call pat_arbno(inner) or
-             * pat_fence_p(inner) directly — both have the exact
-             * DESCR_t(DESCR_t) signature with no coercion or guard
-             * needed.  Same blob shape as ME-9c/ME-9d (single-DESCR_t-arg,
-             * net delta 0) — reuses emit_me9_pat_charset_blob.  No me9_*
-             * helper indirection because the runtime entry points already
-             * match the signature exactly. */
-            void *fn = NULL;
-            switch (op) {
-            case SM_PAT_ARBNO:  fn = (void *)&pat_arbno;    break;
-            case SM_PAT_FENCE1: fn = (void *)&pat_fence_p;  break;
-            default: break;
-            }
-            emit_me9_pat_charset_blob(fn, g_trampoline_offset);
-        } else if (op == SM_PAT_CAT || op == SM_PAT_ALT) {
-            /* ME-9f: inline-native binary-pattern combinators.  Pop
-             * right (TOS) and left (TOS-1), call pat_cat(left,right) or
-             * pat_alt(left,right) directly — both have signature
-             * DESCR_t(DESCR_t,DESCR_t) so no me9_* helper needed.
-             * Net delta −1 (pop 2, push 1). */
-            void *fn = NULL;
-            switch (op) {
-            case SM_PAT_CAT: fn = (void *)&pat_cat; break;
-            case SM_PAT_ALT: fn = (void *)&pat_alt; break;
-            default: break;
-            }
-            emit_me9_pat_binary_blob(fn, g_trampoline_offset);
-        } else if (op == SM_PAT_DEREF) {
-            /* ME-9g: variable-as-pattern.  Pop one DESCR_t, helper
-             * (me9_pat_deref) does the 3-way DT_P/DT_S/else dispatch
-             * (DT_P pass-through, DT_S → pat_lit, else pat_ref(VARVAL_fn)).
-             * Keeping the type-discrimination in C rather than x86 is
-             * the explicit Group G design choice. Net delta 0 — reuses
-             * emit_me9_pat_charset_blob (single-DESCR_t-arg). */
-            emit_me9_pat_charset_blob((void *)&me9_pat_deref, g_trampoline_offset);
-        } else if (op == SM_PAT_REFNAME) {
-            /* ME-9g: *var in pattern context — build XDSAR from the
-             * literal name baked in a[0].s.  pat_ref null-guards
-             * internally.  No stack args; net delta +1.  Same shape as
-             * emit_me9_pat_lit_blob (different imm64 call target). */
+            break;
+        case SM_PAT_ANY:
+            emit_me9_pat_charset_blob((void *)&me9_pat_any,    g_trampoline_offset); break;
+        case SM_PAT_NOTANY:
+            emit_me9_pat_charset_blob((void *)&me9_pat_notany, g_trampoline_offset); break;
+        case SM_PAT_SPAN:
+            emit_me9_pat_charset_blob((void *)&me9_pat_span,   g_trampoline_offset); break;
+        case SM_PAT_BREAK:
+            emit_me9_pat_charset_blob((void *)&me9_pat_break,  g_trampoline_offset); break;
+        case SM_PAT_LEN:
+            emit_me9_pat_charset_blob((void *)&me9_pat_len,    g_trampoline_offset); break;
+        case SM_PAT_POS:
+            emit_me9_pat_charset_blob((void *)&me9_pat_pos,    g_trampoline_offset); break;
+        case SM_PAT_RPOS:
+            emit_me9_pat_charset_blob((void *)&me9_pat_rpos,   g_trampoline_offset); break;
+        case SM_PAT_TAB:
+            emit_me9_pat_charset_blob((void *)&me9_pat_tab,    g_trampoline_offset); break;
+        case SM_PAT_RTAB:
+            emit_me9_pat_charset_blob((void *)&me9_pat_rtab,   g_trampoline_offset); break;
+        case SM_PAT_ARBNO:
+            emit_me9_pat_charset_blob((void *)&pat_arbno,      g_trampoline_offset); break;
+        case SM_PAT_FENCE1:
+            emit_me9_pat_charset_blob((void *)&pat_fence_p,    g_trampoline_offset); break;
+        case SM_PAT_CAT:
+            emit_me9_pat_binary_blob((void *)&pat_cat, g_trampoline_offset); break;
+        case SM_PAT_ALT:
+            emit_me9_pat_binary_blob((void *)&pat_alt, g_trampoline_offset); break;
+        case SM_PAT_DEREF:
+            emit_me9_pat_charset_blob((void *)&me9_pat_deref,  g_trampoline_offset); break;
+        case SM_PAT_REFNAME:
             emit_me9_pat_refname_blob(prog->instrs[i].a[0].s, g_trampoline_offset);
-        } else if (op == SM_PAT_CAPTURE) {
-            /* ME-10: . / $ variable capture.  Pop child, build assign
-             * pattern from baked vn + kind.  Net delta 0. */
-            emit_me10_pat_capture_blob(
-                prog->instrs[i].a[0].s,
-                prog->instrs[i].a[1].i,
-                g_trampoline_offset);
-        } else if (op == SM_PAT_CAPTURE_FN) {
-            /* ME-10: . *func() / $ *func() — call-cap pattern.  Pop
-             * child, build XCALLCAP from baked fname/is_imm/namelist.
-             * Net delta 0. */
-            emit_me10_pat_capture_fn_blob(
-                prog->instrs[i].a[0].s,
-                prog->instrs[i].a[1].i,
-                prog->instrs[i].a[2].s,
-                g_trampoline_offset);
-        } else if (op == SM_PAT_USERCALL) {
-            /* ME-10: bare *func() in pattern context (no child wrapper).
-             * Build XATP deferred-usercall.  Net delta +1.  Same blob
-             * shape as emit_me9_pat_refname_blob (imm64 string arg,
-             * push 1) with me10_pat_usercall as call target. */
+            break;
+        case SM_PAT_CAPTURE:
+            emit_me10_pat_capture_blob(prog->instrs[i].a[0].s,
+                                       prog->instrs[i].a[1].i,
+                                       g_trampoline_offset);
+            break;
+        case SM_PAT_CAPTURE_FN:
+            emit_me10_pat_capture_fn_blob(prog->instrs[i].a[0].s,
+                                          prog->instrs[i].a[1].i,
+                                          prog->instrs[i].a[2].s,
+                                          g_trampoline_offset);
+            break;
+        case SM_PAT_USERCALL:
             emit_me10_pat_usercall_blob(prog->instrs[i].a[0].s, g_trampoline_offset);
-        /* SM_PAT_CAPTURE_FN_ARGS, SM_PAT_USERCALL_ARGS — variadic, runtime-
-         * determined nargs.  Stay on emit_standard_blob fallback: the
-         * C handlers already manipulate STATE->stack via the sync
-         * protocol, and an inline blob would still have to sync r12↔sp
-         * around the call.  No correctness or speed win to inlining. */
-        } else if (op == SM_PAT_ARB     || op == SM_PAT_REM    ||
-                   op == SM_PAT_FAIL    || op == SM_PAT_SUCCEED ||
-                   op == SM_PAT_EPS     || op == SM_PAT_FENCE0  ||
-                   op == SM_PAT_ABORT   || op == SM_PAT_BAL) {
-            /* ME-9a: inline-native pattern primitives (nullary).  Each
-             * calls pat_X(void) via imm64 and pushes the DT_P result on
-             * r12.  No args consumed; net delta +1.  Replaces the
-             * emit_standard_blob fallback for these eight opcodes. */
-            void *rt_fn = NULL;
-            switch (op) {
-            case SM_PAT_ARB:     rt_fn = (void *)&pat_arb;     break;
-            case SM_PAT_REM:     rt_fn = (void *)&pat_rem;     break;
-            case SM_PAT_FAIL:    rt_fn = (void *)&pat_fail;    break;
-            case SM_PAT_SUCCEED: rt_fn = (void *)&pat_succeed; break;
-            case SM_PAT_EPS:     rt_fn = (void *)&pat_epsilon; break;
-            case SM_PAT_FENCE0:   rt_fn = (void *)&pat_fence;   break;
-            case SM_PAT_ABORT:   rt_fn = (void *)&pat_abort;   break;
-            case SM_PAT_BAL:     rt_fn = (void *)&pat_bal;     break;
-            default: break;
-            }
-            emit_me9_pat_nullary_blob(rt_fn, g_trampoline_offset);
-        } else if (op == SM_EXEC_STMT) {
-            /* ME-11: inline-native statement execution boundary.
-             * Pop pat (TOS-2), subj (TOS-1), repl (TOS) from r12 stack;
-             * bake sn (a[0].s) and has_repl (a[1].i) as imm64 args;
-             * call me11_exec_stmt which forwards to exec_stmt.
-             * Net delta: -3 (pop 3 DESCR_t slots). */
-            emit_me11_exec_stmt_blob(
-                prog->instrs[i].a[0].s,
-                prog->instrs[i].a[1].i,
-                g_trampoline_offset);
-        } else if (op == SM_BB_PUMP || op == SM_BB_ONCE) {
-            /* ME-12: inline-native Byrd-box broker drive.  Pop one DESCR_t
-             * (tree_t* in .ptr), call me12_bb_pump or me12_bb_once which
-             * forwards to coro_eval + bb_broker.  Net delta: -1.
-             * SM_SUSPEND_VALUE stays on emit_standard_blob fallback —
-             * see emit_me12_bb_blob comment for rationale. */
-            void *helper = (op == SM_BB_PUMP) ? (void *)&me12_bb_pump
-                                              : (void *)&me12_bb_once;
-            emit_me12_bb_blob(helper, g_trampoline_offset);
-        } else {
+            break;
+        /* SM_PAT_CAPTURE_FN_ARGS, SM_PAT_USERCALL_ARGS: variadic nargs — stay on
+         * emit_standard_blob fallback; C handlers manipulate STATE->stack directly. */
+        case SM_PAT_ARB:
+            emit_me9_pat_nullary_blob((void *)&pat_arb,     g_trampoline_offset); break;
+        case SM_PAT_REM:
+            emit_me9_pat_nullary_blob((void *)&pat_rem,     g_trampoline_offset); break;
+        case SM_PAT_FAIL:
+            emit_me9_pat_nullary_blob((void *)&pat_fail,    g_trampoline_offset); break;
+        case SM_PAT_SUCCEED:
+            emit_me9_pat_nullary_blob((void *)&pat_succeed, g_trampoline_offset); break;
+        case SM_PAT_EPS:
+            emit_me9_pat_nullary_blob((void *)&pat_epsilon, g_trampoline_offset); break;
+        case SM_PAT_FENCE0:
+            emit_me9_pat_nullary_blob((void *)&pat_fence,   g_trampoline_offset); break;
+        case SM_PAT_ABORT:
+            emit_me9_pat_nullary_blob((void *)&pat_abort,   g_trampoline_offset); break;
+        case SM_PAT_BAL:
+            emit_me9_pat_nullary_blob((void *)&pat_bal,     g_trampoline_offset); break;
+        case SM_EXEC_STMT:
+            /* ME-11: pop pat/subj/repl from r12 stack; bake sn+has_repl as args. */
+            emit_me11_exec_stmt_blob(prog->instrs[i].a[0].s,
+                                     prog->instrs[i].a[1].i,
+                                     g_trampoline_offset);
+            break;
+        case SM_BB_PUMP:
+            emit_me12_bb_blob((void *)&me12_bb_pump, g_trampoline_offset); break;
+        case SM_BB_ONCE:
+            emit_me12_bb_blob((void *)&me12_bb_once, g_trampoline_offset); break;
+        default:
             emit_standard_blob(g_handlers[op], g_trampoline_offset);
+            break;
         }
         /* Variable size — no equality check, just continue.  Each emit_*
          * helper writes its own self-consistent byte count. */
