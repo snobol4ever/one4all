@@ -173,29 +173,6 @@ typedef enum {
      * DT_NUL at end so the trailing VOID_POP is balanced. */
     SM_BB_PUMP_EVERY,
 
-    /* GOAL-ICON-BB-COMPLETE Phase A: unified BB pump for legacy-fallthrough kinds.
-     *
-     * Replaces the per-kind emit_push_expr + SM_BB_PUMP for AST kinds that still
-     * hit the legacy fallthrough block (lower.c:1410-1418):
-     *   TT_BANG_BINARY, TT_LIMIT, TT_RANDOM, TT_SECTION, TT_SECTION_MINUS,
-     *   TT_SECTION_PLUS, and generative TT_LCONCAT.
-     *
-     * Encoding:  a[0].i = ast_pump_id  (index into g_ast_pump_table)
-     * No tree_t* in SM bytecode — the table holds borrowed pointers registered
-     * at lower-time by ast_pump_table_register().
-     *
-     * Runtime handler: lookup AST → coro_eval → bb_broker(BB_PUMP).
-     * Net stack delta: +1 (pushes the generator's result or NULVCL on fail).
-     *
-     * Stack discipline mirrors SM_BB_PUMP_EVERY: pushes one descriptor so the
-     * trailing SM_VOID_POP from the proc-body balances.  For value-context
-     * callers (e.g. `every write(l ! gen)`) the pushed value IS the result;
-     * for stmt-context callers it is discarded by VOID_POP.
-     *
-     * Shared by all Phase A kinds — the coro_eval dispatch inside the handler
-     * routes to the correct coro_bb_* function via the AST kind in the node. */
-    SM_BB_PUMP_AST,
-
     /* GOAL-ICON-BB-COMPLETE rung13: single-tick SM generator drive for pure-SM every.
      * a[0].i = entry_pc  — the SM pc of the inner generator's coroutine body.
      * a[1].i = slot_id   — index into FRAME.every_gen[] (per-call; baked at lower-time).

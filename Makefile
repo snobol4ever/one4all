@@ -171,7 +171,6 @@ RT_PIC_SRCS := \
     $(RT)/x86/templates/sm_bb_pump_case.c \
     $(RT)/x86/templates/sm_bb_pump_sm.c \
     $(RT)/x86/templates/sm_bb_pump_every.c \
-    $(RT)/x86/templates/sm_bb_pump_ast.c \
     $(RT)/x86/templates/sm_pat_eps.c \
     $(RT)/x86/templates/sm_pat_arb.c \
     $(RT)/x86/templates/sm_pat_rem.c \
@@ -426,7 +425,6 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_bb_once.c -o $(OBJ)/template_sm_bb_once.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_bb_once_proc.c -o $(OBJ)/template_sm_bb_once_proc.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_bb_pump.c -o $(OBJ)/template_sm_bb_pump.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_bb_pump_ast.c -o $(OBJ)/template_sm_bb_pump_ast.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_bb_pump_case.c -o $(OBJ)/template_sm_bb_pump_case.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_bb_pump_every.c -o $(OBJ)/template_sm_bb_pump_every.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_bb_pump_proc.c -o $(OBJ)/template_sm_bb_pump_proc.o

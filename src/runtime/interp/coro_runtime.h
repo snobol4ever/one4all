@@ -165,7 +165,8 @@ tree_t *find_leaf_suspendable(tree_t *e);
 
 /* A0 — SCRIP_NO_AST_WALK tripwire.  Set to 1 while SM dispatch is active;
  * guards in coro_eval / interp_eval / etc. abort if the env var is set.
- * g_ast_pump_active: re-entrant counter for SM_BB_PUMP_AST (Phase A bridge). */
+ * g_ast_pump_active: re-entrant counter for intentional coro_eval bridges
+ * (SM_BB_PUMP_EVERY and similar — exempts these from the tripwire). */
 extern int g_sm_dispatch_active;
 extern int g_ast_pump_active;
 

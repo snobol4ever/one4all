@@ -538,7 +538,8 @@ static void lower_lconcat(const tree_t *t)
         for (int i = 1; i < t->n; i++) sm_emit(g_p, SM_CONCAT);
         return;
     }
-    sm_emit_i(g_p, SM_BB_PUMP_AST, (int64_t)ast_pump_table_register((tree_t *)t));
+    if (g_lang == LANG_ICN) { fprintf(stderr, "BUG: Icon AST pump — kind %d\n", t->t); abort(); }
+    lower_unhandled(t);  /* non-ICN generative lconcat not yet migrated */
 }
 
 /*── Unary Icon ops ──────────────────────────────────────────────────────────*/
@@ -784,23 +785,19 @@ static void lower_section_3(const tree_t *t, const char *fn)
 }
 static void lower_bang_binary  (const tree_t *t)
 {
-    sm_emit_i(g_p, SM_BB_PUMP_AST, (int64_t)ast_pump_table_register((tree_t *)t));
+    fprintf(stderr, "BUG: Icon AST pump — kind %d\n", t->t); abort();
 }
 
 /*── Generator coroutines ────────────────────────────────────────────────────*/
 
 /* Emit an SM coroutine body for integer range lo..hi [by step].
  * glocal slots: 0=lo, 1=hi, 2=cur, (3=step for to_by). */
-/* IB-1: lower_to / lower_to_by — Icon integer range generator.
- * Replaces SM coroutine (SM_RESUME/SM_SUSPEND/SM_BB_PUMP_SM) with SM_BB_PUMP_AST.
- * coro_eval handles TT_TO / TT_TO_BY correctly — evaluates lo/hi/step, allocates
- * icn_to_state_t, returns bb_node_t{ coro_bb_to, z }.  SM_BB_PUMP_AST routes there.
- * GATE-6: SM_BB_PUMP_SM / SM_RESUME / SM_SUSPEND / SM_STORE_GLOCAL no longer emitted. */
+/* IB-1: lower_to / lower_to_by — Icon integer range generator. Native BB template. */
 static void lower_to(const tree_t *t) {
-    sm_emit_i(g_p, SM_BB_PUMP_AST, (int64_t)ast_pump_table_register((tree_t *)t));
+    fprintf(stderr, "BUG: Icon AST pump — kind %d\n", t->t); abort();
 }
 static void lower_to_by(const tree_t *t) {
-    sm_emit_i(g_p, SM_BB_PUMP_AST, (int64_t)ast_pump_table_register((tree_t *)t));
+    fprintf(stderr, "BUG: Icon AST pump — kind %d\n", t->t); abort();
 }
 
 /* GOAL-ICON-BB-COMPLETE rung13: find the first TT_ALTERNATE that is a direct
@@ -1044,44 +1041,15 @@ static void lower_suspend(const tree_t *t)
     sm_patch_jump(g_p, jdone, sm_label(g_p));
 }
 
-static void lower_bb_pump_ast(const tree_t *t)
-{
-    sm_emit_i(g_p, SM_BB_PUMP_AST, (int64_t)ast_pump_table_register((tree_t *)t));
-}
 static void lower_limit(const tree_t *t) { emit_push_expr(t); sm_emit(g_p, SM_BB_PUMP); }
 
-/* GOAL-ICON-BB-COMPLETE rung15: !E iterate — pure SM coroutine.
- * Emits an inline coroutine that evaluates E once, stores in GLOCAL[0],
- * then calls ICN_BANG_NEXT each tick to yield one element (string char,
- * list element, table value, or record field).  ICN_BANG_NEXT reads/writes
- * GLOCAL[0..4] directly; pos is in GLOCAL[1].
- *
- * Coroutine shape (mirrors emit_range_coroutine):
- *   SM_JUMP skip
- *   entry: SM_RESUME
- *     lower_expr(operand)     ; container → TOS
- *     SM_STORE_GLOCAL 0       ; GLOCAL[0] = container; TOS unchanged
- *     SM_VOID_POP
- *     SM_PUSH_LIT_I 0
- *     SM_STORE_GLOCAL 1       ; GLOCAL[1] = pos = 0
- *     SM_VOID_POP
- *   loop: SM_CALL_FN "ICN_BANG_NEXT" 0   ; → next element or FAIL
- *     SM_JUMP_F done
- *     SM_SUSPEND_VALUE        ; yield the element
- *     SM_JUMP loop
- *   done: SM_PUSH_NULL
- *         SM_RETURN
- *   skip: SM_PUSH_EXPRESSION entry
- *         SM_BB_PUMP_SM
- */
-/* IB-2: lower_iterate — Icon !E generator.
- * Replaces SM coroutine with SM_BB_PUMP_AST. coro_eval handles TT_ITERATE
- * correctly — dispatches on subject type (string/list/table/record). */
+/* IB-2: lower_iterate — Icon !E generator. Native BB template.
+ * Non-ICN fallback (Rebus/Raku) not yet migrated — emits SM_PUSH_NULL. */
 static void lower_iterate(const tree_t *t)
 {
     if (!t || t->n < 1 || !t->c[0]) { sm_emit(g_p, SM_PUSH_NULL); return; }
-    if (g_lang != LANG_ICN) { lower_bb_pump_ast(t); return; }
-    sm_emit_i(g_p, SM_BB_PUMP_AST, (int64_t)ast_pump_table_register((tree_t *)t));
+    if (g_lang != LANG_ICN) { lower_unhandled(t); return; }
+    fprintf(stderr, "BUG: Icon AST pump — kind %d\n", t->t); abort();
 }
 
 /*── Prolog ──────────────────────────────────────────────────────────────────*/
@@ -1366,7 +1334,7 @@ void lower_expr(const tree_t *t)
      * already on stack from SM_GEN_TICK — emit nothing. Otherwise legacy AST pump. */
     case TT_ALTERNATE:
         if (t == g_hoist_alt) return;   /* hoisted: TOS already has the yielded arm value */
-        lower_bb_pump_ast(t); return;
+        fprintf(stderr, "BUG: Icon AST pump — kind %d\n", t->t); abort();
     case TT_ITERATE:             lower_iterate(t);       return; /* rung15 */
     case TT_EVERY:                            lower_every(t);         return;
     /* Prolog */

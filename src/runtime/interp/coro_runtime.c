@@ -29,8 +29,8 @@
 /* A0 — SCRIP_NO_AST_WALK tripwire guard.  Paste at top of every AST-walker
  * entry point.  Aborts only when SCRIP_NO_AST_WALK is set AND SM dispatch
  * is active — proving SM dispatch never reaches the AST walker.
- * Exception: g_ast_pump_active > 0 means SM_BB_PUMP_AST is on the call stack
- * (Phase A intentional bridge) — permit coro_eval in that case. */
+ * Exception: g_ast_pump_active > 0 means an intentional coro_eval bridge
+ * (SM_BB_PUMP_EVERY or similar) is on the call stack — permit coro_eval. */
 #define NO_AST_WALK_GUARD(fn_name) \
     do { if (g_sm_dispatch_active && !g_ast_pump_active && getenv("SCRIP_NO_AST_WALK")) { \
         fprintf(stderr, "FATAL: " fn_name " reached from SM dispatch\n"); \

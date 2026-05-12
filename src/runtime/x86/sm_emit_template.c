@@ -193,7 +193,6 @@ static const sm_op_template_t g_sm_templates[] = {
     { SM_BB_PUMP_CASE,   "BB_PUMP_CASE",   "rt_unhandled_sm", SM_TPL_ARITH, SM_BB_PUMP_CASE,   0 },
     { SM_BB_PUMP_SM,     "BB_PUMP_SM",     "rt_unhandled_sm", SM_TPL_ARITH, SM_BB_PUMP_SM,     0 },
     { SM_BB_PUMP_EVERY,  "BB_PUMP_EVERY",  "rt_unhandled_sm", SM_TPL_ARITH, SM_BB_PUMP_EVERY,  0 },
-    { SM_BB_PUMP_AST,    "BB_PUMP_AST",    "rt_unhandled_sm", SM_TPL_ARITH, SM_BB_PUMP_AST,    0 },
     { SM_LOAD_GLOCAL,    "LOAD_GLOCAL",    "rt_unhandled_sm", SM_TPL_ARITH, SM_LOAD_GLOCAL,    0 },
     { SM_STORE_GLOCAL,   "STORE_GLOCAL",   "rt_unhandled_sm", SM_TPL_ARITH, SM_STORE_GLOCAL,   0 },
     { SM_ICMP_GT,        "ICMP_GT",        "rt_unhandled_sm", SM_TPL_ARITH, SM_ICMP_GT,        0 },
