@@ -1247,7 +1247,7 @@ emit_gotos:
     if (!goto_u && !goto_u_expr && !goto_s && !goto_s_expr
             && !goto_f && !goto_f_expr) return;
     if (goto_u && goto_u[0]) { emit_goto(SM_JUMP,   goto_u); return; }
-    if (goto_u_expr) { sm_emit_s(g_p, SM_PUSH_LIT_S, "(computed-goto)"); sm_emit(g_p, SM_JUMP_INDIR); return; }
+    if (goto_u_expr) { /* computed goto: parser produces Error 24; unreachable */ return; }
     if (goto_s && goto_s[0]) emit_goto(SM_JUMP_S, goto_s);
     if (goto_f && goto_f[0]) emit_goto(SM_JUMP_F, goto_f);
 }

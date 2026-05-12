@@ -181,10 +181,7 @@ static const char *opnames[SM_OPCODE_COUNT] = {
     "SM_RETURN_S","SM_RETURN_F","SM_FRETURN_S","SM_FRETURN_F","SM_NRETURN_S","SM_NRETURN_F",
     "SM_DEFINE_ENTRY",
     "SM_DEFINE",
-    "SM_JUMP_INDIR","SM_SELBRA",
-    "SM_STATE_PUSH","SM_STATE_POP",
-    "SM_INCR","SM_DECR","SM_LCOMP","SM_RCOMP","SM_TRIM","SM_ACOMP",
-    "SM_SPCINT","SM_SPREAL",
+    "SM_INCR","SM_DECR","SM_LCOMP","SM_ACOMP",
     /* SM_PAT_BOXVAL removed by ME-1 */
     "SM_SUSPEND","SM_RESUME","SM_LOAD_GLOCAL","SM_STORE_GLOCAL","SM_ICMP_GT","SM_ICMP_LT",
     "SM_LOAD_FRAME","SM_STORE_FRAME",
@@ -221,7 +218,7 @@ void sm_prog_print(const SM_Program *p, FILE *out)
             case SM_PAT_LEN: case SM_PAT_POS: case SM_PAT_RPOS:
             case SM_PAT_TAB: case SM_PAT_RTAB:
             case SM_INCR: case SM_DECR:
-            case SM_LCOMP: case SM_RCOMP: case SM_TRIM:
+            case SM_LCOMP:
             case SM_ACOMP:  /* CH-17g-runtime-bridge-acomp: a[0].i = operator EKind */
                 fprintf(out, " i=%lld", (long long)in->a[0].i);
                 break;
@@ -233,9 +230,6 @@ void sm_prog_print(const SM_Program *p, FILE *out)
             case SM_JUMP:
             case SM_JUMP_S:
             case SM_JUMP_F:
-                fprintf(out, " -> %lld", (long long)in->a[0].i);
-                break;
-            case SM_JUMP_INDIR:
                 fprintf(out, " -> %lld", (long long)in->a[0].i);
                 break;
             /* string + int */

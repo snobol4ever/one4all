@@ -270,23 +270,11 @@ typedef enum {
     SM_DEFINE_ENTRY,
     SM_DEFINE,
 
-    /* Type dispatch / indirect */
-    SM_JUMP_INDIR,
-    SM_SELBRA,
-
-    /* State save/restore */
-    SM_STATE_PUSH,
-    SM_STATE_POP,
-
     /* Integer arithmetic */
     SM_INCR,
     SM_DECR,
     SM_LCOMP,
-    SM_RCOMP,
-    SM_TRIM,
     SM_ACOMP,
-    SM_SPCINT,
-    SM_SPREAL,
 
     /* SM_PAT_BOXVAL deleted by ME-1 — pat-stack unified with value stack */
 
