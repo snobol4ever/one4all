@@ -403,8 +403,15 @@ DESCR_t bb_eval_value(tree_t *e)
             return NULVCL;
         }
         int slot = e->_id;   /* SI-13: slot stored in _id, v.sval preserved */
-        if (slot >= 0 && slot < FRAME.env_n) return FRAME.env[slot];
-        if (slot < 0 && e->v.sval) return NV_GET_fn(e->v.sval);
+        if (slot >= 0 && slot < FRAME.env_n) {
+            DESCR_t sv = FRAME.env[slot];
+            /* If slot is unset (DT_SNUL/zero — never written via SM_STORE_FRAME),
+             * fall through to NV lookup.  This handles static vars whose initial{}
+             * assignments use SM_STORE_VAR (NV) because build_proc_scope removes
+             * them from the scope to force NV storage during lower_proc_skeletons. */
+            if (sv.v != 0) return sv;
+        }
+        if (e->v.sval) return NV_GET_fn(e->v.sval);
         return NULVCL;
     }
 
