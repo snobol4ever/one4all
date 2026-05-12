@@ -1,58 +1,6 @@
-/*
- * templates/sm_pat_nullary.c — nullary SM_PAT_* opcode templates.
- *
- * Covers all SM_PAT_* opcodes that take no arguments at the call site
- * (SM_TPL_NULLARY in g_sm_templates[]).  Each pops one or more DESCR_t
- * values from the value stack, calls a runtime pattern-constructor, and
- * pushes the result pattern back.  At mode-4 emit time these opcodes are
- * absorbed into a Phase-2 invariant blob; the three-column line in the
- * .s file is a NOP comment (see emit_sm_pat_baked in
- * sm_codegen_x64_emit.c).  At MACRO_DEF time this file is the source of
- * truth for each PAT_* macro body in sm_macros.s.
- *
- * Pattern: identical to sm_nullary_rt.c (SM_CONCAT / PUSH_NULL /
- * COERCE_NUM): t_macro_begin / t_call_sym_plt / t_macro_end /
- * t_pad_to_blob_size.  No mode-3 / mode-4 divergence.
- *
- * Opcodes covered:
- *   SM_PAT_EPS      PAT_EPS      rt_pat_eps      (epsilon / always-succeed)
- *   SM_PAT_ARB      PAT_ARB      rt_pat_arb      (ARB — greedy 0+)
- *   SM_PAT_REM      PAT_REM      rt_pat_rem      (REM — rest of subject)
- *   SM_PAT_FAIL     PAT_FAIL     rt_pat_fail     (FAIL — always fail)
- *   SM_PAT_SUCCEED  PAT_SUCCEED  rt_pat_succeed  (SUCCEED — always succeed)
- *   SM_PAT_ABORT    PAT_ABORT    rt_pat_abort    (ABORT — terminate match)
- *   SM_PAT_BAL      PAT_BAL      rt_pat_bal      (BAL — balanced string)
- *   SM_PAT_FENCE    PAT_FENCE    rt_pat_fence    (FENCE — no-backtrack gate)
- *   SM_PAT_FENCE1   PAT_FENCE1   rt_pat_fence1   (FENCE(p) — child pattern)
- *   SM_PAT_SPAN     PAT_SPAN     rt_pat_span     (SPAN(cs) — pop cs arg)
- *   SM_PAT_BREAK    PAT_BREAK    rt_pat_break    (BREAK(cs) — pop cs arg)
- *   SM_PAT_ANY      PAT_ANY      rt_pat_any      (ANY(cs)   — pop cs arg)
- *   SM_PAT_NOTANY   PAT_NOTANY   rt_pat_notany   (NOTANY(cs)— pop cs arg)
- *   SM_PAT_LEN      PAT_LEN      rt_pat_len      (LEN(n)    — pop n arg)
- *   SM_PAT_POS      PAT_POS      rt_pat_pos      (POS(n)    — pop n arg)
- *   SM_PAT_RPOS     PAT_RPOS     rt_pat_rpos     (RPOS(n)   — pop n arg)
- *   SM_PAT_TAB      PAT_TAB      rt_pat_tab      (TAB(n)    — pop n arg)
- *   SM_PAT_RTAB     PAT_RTAB     rt_pat_rtab     (RTAB(n)   — pop n arg)
- *   SM_PAT_ARBNO    PAT_ARBNO    rt_pat_arbno    (ARBNO(p)  — pop p arg)
- *   SM_PAT_CAT      PAT_CAT      rt_pat_cat      (p1 p2 cat — pop 2)
- *   SM_PAT_ALT      PAT_ALT      rt_pat_alt      (p1|p2 alt — pop 2)
- *   SM_PAT_DEREF    PAT_DEREF    rt_pat_deref    (*var deref — pop v)
- *
- * Sub-rung: EM-MODE4-IS-MODE3-DUMP-r (GOAL-MODE4-EMIT).
- * Session:  2026-05-11, Claude Sonnet 4.6.
- *
- * Authors: Lon Jones Cherryholmes · Claude Sonnet 4.6
- * Sprint:  EM-MODE4-IS-MODE3-DUMP-r / GOAL-MODE4-EMIT
- */
-
-#include "../emitter.h"   /* unused emitter_t * param; caller compat */
+#include "../emitter.h"
 #include "../bb_emit.h"
 
-/* emit_sm_pat_nullary_rt — shared body for all nullary PAT_* templates.
- *   comment_str:  inline annotation, e.g. "SM_PAT_ARB"
- *   macro_name:   GAS macro name, e.g. "PAT_ARB"
- *   rt_sym:       PLT symbol, e.g. "rt_pat_arb"
- */
 static void emit_sm_pat_nullary_rt(emitter_t *e,
                                     const char *comment_str,
                                     const char *macro_name,
