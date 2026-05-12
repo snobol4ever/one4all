@@ -979,8 +979,7 @@ tree_t *find_leaf_suspendable(tree_t *e) {
  * re-evaluates the full TT_CAT expression each tick to produce the concatenated
  * result string.  Handles the polyglot case: every write("ICN: " || (1 to 3)).
  *--------------------------------------------------------------------------------------------------------------------------*/
-typedef struct { bb_node_t gen; tree_t *cat_expr; tree_t *leaf; } icn_cat_gen_state_t;
-static DESCR_t coro_bb_cat(void *zeta, int entry) {
+DESCR_t coro_bb_cat(void *zeta, int entry) {
     /* IC-9 fix (2026-05-01): per-tick re-eval of cat_expr can itself fail
      * (e.g. s[0 to 7] where s[0] is OOB).  Per Icon GDE semantics, a per-tick
      * failure should not exhaust the box — the underlying generator may still

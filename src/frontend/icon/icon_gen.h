@@ -224,6 +224,8 @@ typedef struct {
 } icn_seq_state_t;
 DESCR_t coro_bb_seq_expr(void *zeta, int entry);
 
+typedef struct { bb_node_t gen; struct tree_t *cat_expr; struct tree_t *leaf; } icn_cat_gen_state_t;
+DESCR_t coro_bb_cat(void *zeta, int entry);
 bb_node_t coro_eval(tree_t *e);
 
 /* RK-21: gather coroutine trampoline — defined in icn_runtime.c, referenced in icon_gen.c */

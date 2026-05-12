@@ -316,5 +316,15 @@ void emit_bb_icon_iterate(emitter_t *e,
                           bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
 void emit_bb_icon_alt(emitter_t *e,
                       bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
+void emit_bb_icon_every(emitter_t *e,
+                        bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
+void emit_bb_icon_limit(emitter_t *e,
+                        bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
+void emit_bb_icon_bang(emitter_t *e,
+                       bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
+void emit_bb_icon_lconcat(emitter_t *e,
+                          bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
+void emit_bb_icon_seq(emitter_t *e,
+                      bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
 
 #endif /* RUNTIME_X86_TEMPLATES_TEMPLATES_H */

@@ -100,6 +100,11 @@ RT_PIC_SRCS := \
     $(RT)/x86/templates/bb_icon_to.c \
     $(RT)/x86/templates/bb_icon_iterate.c \
     $(RT)/x86/templates/bb_icon_alt.c \
+    $(RT)/x86/templates/bb_icon_every.c \
+    $(RT)/x86/templates/bb_icon_limit.c \
+    $(RT)/x86/templates/bb_icon_bang.c \
+    $(RT)/x86/templates/bb_icon_lconcat.c \
+    $(RT)/x86/templates/bb_icon_seq.c \
     $(RT)/x86/templates/bb_xcat.c \
     $(RT)/x86/templates/bb_xor.c \
     $(RT)/x86/templates/bb_xbrkx.c \
@@ -518,6 +523,11 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_icon_to.c -o $(OBJ)/template_bb_icon_to.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_icon_iterate.c -o $(OBJ)/template_bb_icon_iterate.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_icon_alt.c -o $(OBJ)/template_bb_icon_alt.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_icon_every.c -o $(OBJ)/template_bb_icon_every.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_icon_limit.c -o $(OBJ)/template_bb_icon_limit.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_icon_bang.c -o $(OBJ)/template_bb_icon_bang.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_icon_lconcat.c -o $(OBJ)/template_bb_icon_lconcat.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_icon_seq.c -o $(OBJ)/template_bb_icon_seq.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xcat.c -o $(OBJ)/template_bb_xcat.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xor.c -o $(OBJ)/template_bb_xor.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_emit_template.c -o $(OBJ)/sm_emit_template.o

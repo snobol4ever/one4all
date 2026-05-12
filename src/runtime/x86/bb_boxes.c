@@ -811,3 +811,10 @@ icn_record_iterate_state_t *icon_record_iterate_new(void) { return calloc(1, siz
 
 /* ───── Icon alternate (A|B) ───── */
 icn_alternate_state_t *icon_alt_new(void) { return calloc(1, sizeof(icn_alternate_state_t)); }
+
+/* ───── Icon every / limit / bang / lconcat / seq ───── */
+icn_every_state_t       *icon_every_new(void)   { return calloc(1, sizeof(icn_every_state_t)); }
+icn_limit_state_t       *icon_limit_new(void)   { return calloc(1, sizeof(icn_limit_state_t)); }
+icn_bang_binary_state_t *icon_bang_new(void)    { return calloc(1, sizeof(icn_bang_binary_state_t)); }
+void                    *icon_lconcat_new(void) { return calloc(1, sizeof(icn_cat_gen_state_t)); }
+icn_seq_state_t         *icon_seq_new(void)     { return calloc(1, sizeof(icn_seq_state_t)); }
