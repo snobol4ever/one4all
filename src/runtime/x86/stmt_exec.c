@@ -126,31 +126,7 @@ char     subject_data[65536] = {0};
  * (used by bb_build below; the dyn/ box files are the canonical forms)
  * ══════════════════════════════════════════════════════════════════════════ */
 
-/* ── Simple boxes — defined in runtime/x86/bb_boxes.c ────────── */
-/* Types shared with bb_*.c via bb_box.h — do NOT redefine here.           */
-extern DESCR_t bb_lit(void *zeta, int entry);
-extern DESCR_t bb_len(void *zeta, int entry);
-extern DESCR_t bb_span(void *zeta, int entry);
-extern DESCR_t bb_any(void *zeta, int entry);
-extern DESCR_t bb_notany(void *zeta, int entry);
-extern DESCR_t bb_brk(void *zeta, int entry);
-extern DESCR_t bb_breakx(void *zeta, int entry);
-extern DESCR_t bb_arb(void *zeta, int entry);
-extern DESCR_t bb_rem(void *zeta, int entry);
-extern DESCR_t bb_succeed(void *zeta, int entry);
-extern DESCR_t bb_fail(void *zeta, int entry);
-extern DESCR_t bb_eps(void *zeta, int entry);
-extern DESCR_t bb_pos(void *zeta, int entry);
-extern DESCR_t bb_rpos(void *zeta, int entry);
-extern DESCR_t bb_tab(void *zeta, int entry);
-extern DESCR_t bb_rtab(void *zeta, int entry);
-extern DESCR_t bb_fence(void *zeta, int entry);
-extern DESCR_t bb_abort(void *zeta, int entry);
-extern DESCR_t bb_bal(void *zeta, int entry);
-extern bal_t  *bb_bal_new(void);
-extern DESCR_t bb_alt(void *zeta, int entry);
-extern DESCR_t bb_seq(void *zeta, int entry);
-extern DESCR_t bb_arbno(void *zeta, int entry);
+/* ── EDP-9: C box externs deleted; all paths use bb_build_brokered / bb_*_emit_binary ── */
 
 /* ── Complex boxes — defined below (need bb_node_t / bb_build / DESCR_t) ─ */
 /* bb_capture, bb_atp, bb_deferred_var remain here until MILESTONE-BOX-UNIFY */
@@ -678,56 +654,38 @@ static DESCR_t bb_deferred_var(void *zeta, int entry)
                                     ζ->child_state = NULL;
                                     ζ->child_size  = 0;
                                 } else {
-                                    eps_t *ez = calloc(1, sizeof(eps_t));
-                                    ζ->child_fn    = bb_eps;
-                                    ζ->child_state = ez;
-                                    ζ->child_size  = sizeof(eps_t);
+                                    /* EDP-9: bb_eps C box deleted; use binary blob */
+                                    ζ->child_fn    = bb_eps_emit_binary();
+                                    ζ->child_state = NULL;
+                                    ζ->child_size  = 0;
                                 }
                                 rebuilt = 1;
                             }
                         } else if (val.v == DT_S && val.s) {
                             /* String value: always treat as fresh literal.
-                             * Compare pointer for stability (interned strings). */
-                            lit_t *lz = (lit_t *)ζ->child_state;
-                            if (!lz || lz->lit != val.s) {
-                                lz = calloc(1, sizeof(lit_t));
-                                lz->lit = val.s;
-                                lz->len = (int)strlen(val.s);
-                                ζ->child_fn     = bb_lit;
-                                ζ->child_state      = lz;
-                                ζ->child_size = sizeof(lit_t);
+                             * EDP-9: bb_lit C box deleted; use bb_lit_emit_binary. */
+                            bb_box_fn lfn = bb_lit_emit_binary(val.s, (int)strlen(val.s));
+                            if (lfn && lfn != ζ->child_fn) {
+                                ζ->child_fn    = lfn;
+                                ζ->child_state = NULL;
+                                ζ->child_size  = 0;
                                 rebuilt = 1;
                             }
                         } else {
                             if (!ζ->child_fn) {
-                                eps_t *ez = calloc(1, sizeof(eps_t));
-                                ζ->child_fn     = bb_eps;
-                                ζ->child_state      = ez;
-                                ζ->child_size = sizeof(eps_t);
+                                /* EDP-9: bb_eps C box deleted; use binary blob */
+                                ζ->child_fn    = bb_eps_emit_binary();
+                                ζ->child_state = NULL;
+                                ζ->child_size  = 0;
                                 rebuilt = 1;
                             }
                         }
 
                         /* DYN-12 extended: do NOT memset config-only boxes.
-                         * Config-only boxes have state that is purely build-time
-                         * configuration (e.g. chars ptr in bb_any/bb_notany/bb_span/
-                         * bb_brk). Zeroing nulls the ptr -> strchr(NULL,...) -> fail
-                         * on every ARBNO retry iteration. bb_lit already excluded
-                         * (DYN-12); extend guard to all config-only box types. */
-                        /* DYN-12 extended: bb_arbno carries its own α/β-managed
-                         * iteration state (depth, cap, stack).  Zeroing it
-                         * between deferred-var re-uses corrupts the inner ARBNO
-                         * when *name resolves to the same PATND_t* on every
-                         * iteration (val.p == ζ->child_state → rebuilt=0 →
-                         * memset wipes cap→0, stack→NULL → crash/wrong-match).
-                         * The ARBNO box self-resets at every α entry; no external
-                         * reset is needed or safe.  SB-5c.1 fix. */
-                        int _config_only = (ζ->child_fn == bb_lit
-                                         || ζ->child_fn == bb_any
-                                         || ζ->child_fn == bb_notany
-                                         || ζ->child_fn == bb_span
-                                         || ζ->child_fn == bb_brk
-                                         || ζ->child_fn == bb_arbno);
+                         * EDP-9: C boxes gone; brokered/binary blobs have no
+                         * mutable ζ_state (child_state=NULL), so memset is
+                         * a no-op — _config_only guard simplified. */
+                        int _config_only = (ζ->child_state == NULL);
                         if (!rebuilt && ζ->child_state && ζ->child_size && !_config_only)
                             memset(ζ->child_state, 0, ζ->child_size);
                     }
@@ -893,10 +851,11 @@ int exec_stmt(const char  *subj_name,
                 g_bin_hits++;
                 g_cache_hits++;
             } else {
-                /* M-DYN-FLAT: try flat-glob first (whole invariant tree in one buffer) */
+                /* EDP-9: bb_build_binary (C boxes) deleted; use bb_build_brokered.
+                 * Try flat-glob first (whole invariant tree, no C-ABI frame needed),
+                 * then brokered (C-ABI wrapped flat blob for broker call). */
                 bb_box_fn bfn = bb_build_flat(pp);
-                if (!bfn)
-                    bfn = bb_build_binary(pp);  /* fallback: per-node trampolines */
+                if (!bfn) bfn = bb_build_brokered(pp);
                 if (bfn) {
                     root.fn     = bfn;
                     root.ζ      = NULL;
@@ -910,8 +869,7 @@ int exec_stmt(const char  *subj_name,
             }
         } else if (g_bb_mode == BB_MODE_BROKERED || g_bb_mode == BB_MODE_DRIVER) {
             /* EM-BB-PURGE-1 / EDP-7: brokered blob — C-ABI wrapper around
-             * flat BB body.  bb_broker calls fn(NULL, port) via C call.
-             * Falls back to C bb_build() if pattern not flat-eligible. */
+             * flat BB body.  bb_broker calls fn(NULL, port) via C call. */
             PATND_t *pp = (PATND_t *)pat.p;
             bb_box_fn bfn = bb_build_brokered(pp);
             if (bfn) {
@@ -922,16 +880,14 @@ int exec_stmt(const char  *subj_name,
             }
         }
         if (!bin_done) {
-            /* EDP-8: bb_build() deleted. Non-flat-eligible patterns (XVAR etc.)
-             * fall back to epsilon — safe degenerate until EDP-9 adds full coverage. */
-            eps_t *eζ = calloc(1, sizeof(eps_t));
-            root.fn     = bb_eps;
-            root.ζ      = eζ;
-            root.ζ_size = sizeof(eps_t);
+            /* EDP-9: Non-flat-eligible patterns fall back to epsilon binary blob. */
+            root.fn     = bb_eps_emit_binary();
+            root.ζ      = NULL;
+            root.ζ_size = 0;
         }
     } else if (pat.v == DT_S && pat.s) {
         int bin_done = 0;
-        if (g_bb_mode == BB_MODE_LIVE) {
+        {   /* EDP-9: use bb_lit_emit_binary for all modes (no C bb_lit box) */
             bb_box_fn bfn = bb_lit_emit_binary(pat.s, (int)strlen(pat.s));
             if (bfn) {
                 root.fn  = bfn;
@@ -941,16 +897,16 @@ int exec_stmt(const char  *subj_name,
             }
         }
         if (!bin_done) {
-            lit_t *lζ = calloc(1, sizeof(lit_t));
-            lζ->lit = pat.s;
-            lζ->len = (int)strlen(pat.s);
-            root.fn = bb_lit;
-            root.ζ  = lζ;
+            /* bb_lit_emit_binary failed (pool exhausted) — epsilon binary fallback */
+            root.fn     = bb_eps_emit_binary();
+            root.ζ      = NULL;
+            root.ζ_size = 0;
         }
     } else {
-        eps_t *eζ = calloc(1, sizeof(eps_t));
-        root.fn = bb_eps;
-        root.ζ  = eζ;
+        /* EDP-9: bb_eps C box deleted; use bb_eps_emit_binary */
+        bb_box_fn efn = bb_eps_emit_binary();
+        if (efn) { root.fn = efn; root.ζ = NULL; root.ζ_size = 0; }
+        else { root.fn = NULL; root.ζ = NULL; root.ζ_size = 0; }
     }
 
     /* ── Phase 3: run match ─────────────────────────────────────────── */
@@ -1220,7 +1176,7 @@ int deferred_var_test(void)
     bb_box_fn bfn = bb_build_brokered(&dsar_node);
     bb_node_t dvar;
     if (bfn) { dvar.fn = bfn; dvar.ζ = NULL; dvar.ζ_size = 0; }
-    else { eps_t *ez = calloc(1,sizeof(eps_t)); dvar.fn=bb_eps; dvar.ζ=ez; dvar.ζ_size=sizeof(eps_t); }
+    else { dvar.fn = bb_eps_emit_binary(); dvar.ζ = NULL; dvar.ζ_size = 0; }
 
     int ok = 1;
 

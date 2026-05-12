@@ -978,10 +978,6 @@ static void flat_emit_charset_call(emitter_t *e, bb_box_fn c_fn,
 
 /* ── charset text-body callback (EM-MODE4-IS-MODE3-DUMP-e) ──────────────── */
 
-extern DESCR_t bb_span  (void *zeta, int entry);
-extern DESCR_t bb_brk   (void *zeta, int entry);
-extern DESCR_t bb_any   (void *zeta, int entry);
-extern DESCR_t bb_notany(void *zeta, int entry);
 
 /* Arg struct passed to the text-body callback from the per-kind wrappers. */
 typedef struct {
@@ -1053,7 +1049,6 @@ static void charset_text_body(emitter_t *e,
 
 /* ── XBRKX text-body callback (EM-MODE4-IS-MODE3-DUMP-i) ─────────────────── */
 
-extern DESCR_t  bb_breakx(void *zeta, int entry);
 extern brkx_t  *bb_breakx_new(const char *chars);
 
 /* Arg struct passed to the brkx text-body callback. */
@@ -1100,22 +1095,19 @@ static void brkx_text_body(emitter_t *e,
     snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", zlbl);
     flat3c_action(e, "lea", rdi_arg);
     flat3c_action(e, "mov", "esi, 0");
-    emit_call_sym_plt(e, "bb_breakx", (uint64_t)(uintptr_t)bb_breakx);
+    emit_call_sym_plt(e, "bb_breakx", 0);
     flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
 
     EV_LABEL(e, lbl_β);
     flat3c_action(e, "lea", rdi_arg);
     flat3c_action(e, "mov", "esi, 1");
-    emit_call_sym_plt(e, "bb_breakx", (uint64_t)(uintptr_t)bb_breakx);
+    emit_call_sym_plt(e, "bb_breakx", 0);
     flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
 }
 
 
 /* ── integer-cursor text-body callback (EM-MODE4-IS-MODE3-DUMP-g) ────────── */
 
-extern DESCR_t bb_len  (void *zeta, int entry);
-extern DESCR_t bb_tab  (void *zeta, int entry);
-extern DESCR_t bb_rtab (void *zeta, int entry);
 
 /* Arg struct for the text-body callback. */
 typedef struct {
@@ -1158,14 +1150,6 @@ static void intcur_text_body(emitter_t *e,
 
 
 /* ── flat_emit_node dispatch ─────────────────────────────────────────────── */
-extern DESCR_t bb_fence (void *zeta, int entry);
-extern DESCR_t bb_arb   (void *zeta, int entry);
-extern DESCR_t bb_arbno (void *zeta, int entry);
-extern DESCR_t bb_breakx(void *zeta, int entry);
-extern DESCR_t bb_rem   (void *zeta, int entry);
-extern DESCR_t bb_cap   (void *zeta, int entry);
-extern DESCR_t bb_atp   (void *zeta, int entry);
-extern DESCR_t bb_deferred_var_exported(void *zeta, int entry);
 extern int memcmp(const void *, const void *, size_t);
 
 /* Generic two-call emitter: α calls fn(ζ,0), β calls fn(ζ,1), result nonzero=success */
@@ -1231,10 +1215,10 @@ static void flat_emit_node(emitter_t *e, PATND_t *p,
     case XRPSI: emit_bb_xrpsi(e, (int)p->num, lbl_succ, lbl_fail, lbl_β); break;
     case XCAT:  flat_emit_xcat(e, p, lbl_succ, lbl_fail, lbl_β); break;
     case XOR:   flat_emit_alt (e, p, lbl_succ, lbl_fail, lbl_β); break;
-    case XSPNC: emit_bb_charset(e, bb_span,   "bb_span",   "SPAN",   p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
-    case XANYC: emit_bb_charset(e, bb_any,    "bb_any",    "ANY",    p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
-    case XBRKC: emit_bb_charset(e, bb_brk,    "bb_brk",    "BREAK",  p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
-    case XNNYC: emit_bb_charset(e, bb_notany, "bb_notany", "NOTANY", p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
+    case XSPNC: emit_bb_charset(e, NULL,   "bb_span",   "SPAN",   p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
+    case XANYC: emit_bb_charset(e, NULL,    "bb_any",    "ANY",    p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
+    case XBRKC: emit_bb_charset(e, NULL,    "bb_brk",    "BREAK",  p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
+    case XNNYC: emit_bb_charset(e, NULL, "bb_notany", "NOTANY", p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
     case XLNTH: emit_bb_xlnth(e, (long long)p->num, lbl_succ, lbl_fail, lbl_β); break;
     case XTB:   emit_bb_xtb  (e, (long long)p->num, lbl_succ, lbl_fail, lbl_β); break;
     case XRTB:  emit_bb_xrtb (e, (long long)p->num, lbl_succ, lbl_fail, lbl_β); break;
@@ -1539,4 +1523,431 @@ int bb_macros_write_to_path(const char *path)
     bm_endm (f);
     fprintf(f, "# === END bb macro library ===\n");
     return fclose(f) == 0 ? 0 : -1;
+}
+
+/* EDP-9: static helpers moved from bb_build.c */
+static void emit_load_int_global(const int *addr)
+{
+    /* mov rax, imm64 */
+    bb_emit_byte(0x48); bb_emit_byte(0xB8);
+    bb_emit_u64((uint64_t)(uintptr_t)addr);
+    /* mov eax, [rax] */
+    bb_emit_byte(0x8B); bb_emit_byte(0x00);
+}
+
+/* emit:  mov rax, imm64(&global_ptr) / mov rax, [rax]
+ * Loads a 64-bit pointer global (const char *).
+ * Result in rax. */
+static void emit_load_ptr_global(const char **addr)
+{
+    /* mov rax, imm64 */
+    bb_emit_byte(0x48); bb_emit_byte(0xB8);
+    bb_emit_u64((uint64_t)(uintptr_t)addr);
+    /* mov rax, [rax]  — 48 8B 00 */
+    bb_emit_byte(0x48); bb_emit_byte(0x8B); bb_emit_byte(0x00);
+}
+
+/* emit:  mov rax, imm64(&global) / add eax, imm32(val) / mov [rax], eax
+ * Adds val to a 32-bit global. Clobbers rax, ecx. */
+static void emit_add_int_global(const int *addr, int32_t val)
+{
+    /* mov rcx, imm64(&global) */
+    bb_emit_byte(0x48); bb_emit_byte(0xB9);
+    bb_emit_u64((uint64_t)(uintptr_t)addr);
+    /* mov eax, [rcx] */
+    bb_emit_byte(0x8B); bb_emit_byte(0x01);
+    /* add eax, imm32 */
+    bb_emit_byte(0x05); bb_emit_u32((uint32_t)val);
+    /* mov [rcx], eax */
+    bb_emit_byte(0x89); bb_emit_byte(0x01);
+}
+
+/* emit:  mov rax, imm64(&global) / sub eax, imm32(val) / mov [rax], eax */
+static void emit_sub_int_global(const int *addr, int32_t val)
+{
+    /* mov rcx, imm64(&global) */
+    bb_emit_byte(0x48); bb_emit_byte(0xB9);
+    bb_emit_u64((uint64_t)(uintptr_t)addr);
+    /* mov eax, [rcx] */
+    bb_emit_byte(0x8B); bb_emit_byte(0x01);
+    /* sub eax, imm32 */
+    bb_emit_byte(0x2D); bb_emit_u32((uint32_t)val);
+    /* mov [rcx], eax */
+    bb_emit_byte(0x89); bb_emit_byte(0x01);
+}
+
+
+
+/* EDP-9: moved from bb_build.c — no C box deps */
+
+/*
+ * Emits the LIT box as x86-64 binary, mirroring bb_lit.s exactly.
+ *
+ * bb_lit.s structure (annotated):
+ *
+ *   bb_lit(rdi=ζ, esi=entry):
+ *     push rbx; push r12             ; callee-saves
+ *     sub  rsp, 16                   ; stack slot for spec_t (σ@0, δ@8)
+ *     cmp  esi, 0
+ *     je   LIT_α
+ *     jmp  LIT_β
+ *
+ *   LIT_α:
+ *     Δ + len > Σlen  →  LIT_ω          ; bounds check
+ *     memcmp(Σ+Δ, lit, len) ≠ 0 → LIT_ω
+ *     [rsp+0] = Σ+Δ                  ; σ
+ *     [rsp+8] = len                  ; δ
+ *     Δ += len
+ *     jmp LIT_γ
+ *
+ *   LIT_β:
+ *     Δ -= len
+ *     jmp LIT_ω
+ *
+ *   LIT_γ:
+ *     rax = [rsp+0]; rdx = [rsp+8]  ; return spec(σ, δ)
+ *     add rsp,16; pop r12; pop rbx; ret
+ *
+ *   LIT_ω:
+ *     xor eax,eax; xor edx,edx      ; return spec_empty
+ *     add rsp,16; pop r12; pop rbx; ret
+ *
+ * Binary adaptation:
+ *   - ζ->lit / ζ->len replaced by baked imm64/imm32
+ *   - Σ/Δ/Σlen accessed via absolute imm64 pointer loads
+ *   - memcmp called via mov rax,imm64(&memcmp) / call rax
+ *   - push rbx/r12 replaced by push rbx/push r12 (same bytes, kept for ABI)
+ *
+ * Returns NULL on allocation failure.
+ */
+
+/* forward declaration of memcmp for address capture */
+extern int memcmp(const void *, const void *, size_t);
+
+/* forward declarations */
+extern DESCR_t bb_seq(void *zeta, int entry);
+extern DESCR_t bb_tab(void *zeta, int entry);
+extern DESCR_t bb_rtab(void *zeta, int entry);
+
+/* M-DYN-B7: capture box — unified in bb_boxes.c (SN-20 session 17).
+ * Single source across all three modes; no _exported wrapper needed. */
+extern DESCR_t bb_cap(void *zeta, int entry);
+
+/* cap_t + bb_cap_new canonical declarations come from bb_box.h
+ * (SN-21c: bb_capture → bb_cap port). */
+
+/* M-DYN-B10: exported shim for static box function in stmt_exec.c.
+ * SN-21e: bb_callcap_exported is gone — the XCALLCAP emitter now trampolines
+ * directly to bb_cap with an NM_CALL NAME_t, just like XNME / XFNME. */
+extern DESCR_t bb_deferred_var_exported(void *zeta, int entry);
+
+/* Mirror of deferred_var_t from stmt_exec.c */
+typedef struct {
+    const char *name;
+    bb_box_fn   child_fn;
+    void       *child_state;
+    size_t      child_size;
+    int         in_progress;
+} deferred_var_t_bin;
+extern void *bb_dvar_bin_new(const char *name);
+
+/* bb_arbno, bb_fail, bb_atp are in separate .c files — directly linkable */
+extern DESCR_t bb_arbno(void *zeta, int entry);
+extern void   *bb_arbno_new(bb_box_fn fn, void *state);
+extern DESCR_t bb_fail(void *zeta, int entry);
+extern DESCR_t bb_atp(void *zeta, int entry);
+
+static bb_box_fn bb_build_binary_node(PATND_t *p);
+
+/* ── DESCR_t return ABI helpers ─────────────────────────────────────────────
+ * The bb_broker (U-3/U-9) casts bb_box_fn to univ_box_fn returning DESCR_t.
+ * On x86-64 SysV ABI a 16-byte struct return goes rax=first8, rdx=second8.
+ *
+ *   DESCR_t layout: { DTYPE_t v(4), uint32_t slen(4), union { char *s ... }(8) }
+ *     → rax = (slen << 32) | v ,  rdx = s
+ *   FAILDESCR  = { v=DT_FAIL=99, slen=0, .i=0 }
+ *     → rax = 0x63 (99), rdx = 0
+ *
+ * Old (broken) ABI was raw spec_t { const char *σ; int δ; } → rax=σ, rdx=δ.
+ * On the broken path IS_FAIL_fn(spec_empty) = (0 == DT_FAIL) = false, so every
+ * failure looked like a match.  Session #72 root cause.
+ *
+ * These helpers replace the previous LIT_γ/LIT_ω epilogue stubs.
+ *--------------------------------------------------------------------------*/
+
+/* Emit the success-path return:  given [rsp+stk_off+0]=σ, [rsp+stk_off+8]=δ,
+ * pack DESCR_t{v=DT_S, slen=δ, s=σ} into rax:rdx.  Does NOT emit the
+ * stack-cleanup epilogue or ret — caller is responsible for those. */
+static void emit_descr_success_from_stack(int stk_off)
+{
+    /* mov rdx, [rsp+stk_off+0]      48 8B 54 24 <off>            — rdx = σ */
+    bb_emit_byte(0x48); bb_emit_byte(0x8B); bb_emit_byte(0x54); bb_emit_byte(0x24);
+    bb_emit_byte((uint8_t)stk_off);
+    /* mov eax, [rsp+stk_off+8]      8B 44 24 <off+8>             — eax = δ (low 32) */
+    bb_emit_byte(0x8B); bb_emit_byte(0x44); bb_emit_byte(0x24);
+    bb_emit_byte((uint8_t)(stk_off + 8));
+    /* shl rax, 32                   48 C1 E0 20                  — rax = δ << 32 */
+    bb_emit_byte(0x48); bb_emit_byte(0xC1); bb_emit_byte(0xE0); bb_emit_byte(0x20);
+    /* or  al, 1                     0C 01                        — rax |= DT_S */
+    bb_emit_byte(0x0C); bb_emit_byte(0x01);
+}
+
+/* Emit the failure-path return: rax = DT_FAIL (99), rdx = 0.
+ * Does NOT emit the stack-cleanup epilogue or ret — caller is responsible. */
+static void emit_descr_fail(void)
+{
+    /* mov eax, 99                   B8 63 00 00 00              — rax = DT_FAIL */
+    bb_emit_byte(0xB8); bb_emit_u32(99);
+    /* xor edx, edx                  31 D2                       — rdx = 0 */
+    bb_emit_byte(0x31); bb_emit_byte(0xD2);
+}
+
+bb_box_fn bb_lit_emit_binary(const char *lit, int len)
+{
+#define BUF_SIZE 768
+
+    bb_buf_t buf = bb_alloc(BUF_SIZE);
+    if (!buf) return NULL;
+
+    bb_emit_mode = EMIT_BINARY_WIRED;
+    bb_emit_begin(buf, BUF_SIZE);
+
+    /* ── labels ──────────────────────────────────────────────────────── */
+    bb_label_t lbl_α, lbl_β, lbl_γ, lbl_ω;
+    bb_label_init(&lbl_α, "LIT_α");
+    bb_label_init(&lbl_β, "LIT_β");
+    bb_label_init(&lbl_γ, "LIT_γ");
+    bb_label_init(&lbl_ω, "LIT_ω");
+
+    /* ── prologue ─────────────────────────────────────────────────────
+     *   push rbx          53
+     *   push r12          41 54
+     *   sub  rsp, 16      48 83 EC 10   (stack slot for spec_t)
+     *   cmp  esi, 0       83 FE 00
+     *   je   LIT_α        74 xx
+     *   jmp  LIT_β        EB xx
+     * ─────────────────────────────────────────────────────────────── */
+    bb_emit_byte(0x53);                         /* push rbx */
+    bb_emit_byte(0x41); bb_emit_byte(0x54);     /* push r12 */
+    bb_insn_sub_rsp_imm8(16);                   /* sub rsp, 16 */
+    bb_insn_cmp_esi_imm8(0);                    /* cmp esi, 0 */
+    bb_insn_je_rel8(&lbl_α);                    /* je LIT_α  (α is always nearby — backward) */
+    bb_insn_jmp_rel32(&lbl_β);                  /* jmp LIT_β (β is far — use rel32) */
+
+    /* ── LIT_α: bounds check + memcmp ────────────────────────────────
+     *   eax = Δ
+     *   eax += len
+     *   cmp eax, Σlen
+     *   jg  LIT_ω
+     *   call memcmp(Σ+Δ, lit, len)
+     *   test eax, eax
+     *   jne LIT_ω
+     *   [rsp+0] = Σ+Δ  (rax = Σ, movsxd rcx,Δ, lea rax,[rax+rcx])
+     *   [rsp+8] = len
+     *   Δ += len
+     *   jmp LIT_γ
+     * ─────────────────────────────────────────────────────────────── */
+    bb_label_define(&lbl_α);
+
+    /* eax = Δ */
+    emit_load_int_global(&Δ);           /* mov rax,&Δ; mov eax,[rax] */
+    /* eax += len */
+    bb_emit_byte(0x05); bb_emit_u32((uint32_t)len);  /* add eax, imm32(len) */
+    /* cmp eax, Σlen  →  mov rcx,&Σlen; cmp eax,[rcx] */
+    bb_emit_byte(0x48); bb_emit_byte(0xB9);
+    bb_emit_u64((uint64_t)(uintptr_t)&Σlen);  /* mov rcx, imm64(&Σlen) */
+    bb_emit_byte(0x3B); bb_emit_byte(0x01); /* cmp eax, [rcx] */
+    /* jg LIT_ω  (rel32 — α body is ~160 bytes, beyond rel8 range) */
+    bb_emit_byte(0x0F); bb_emit_byte(0x8F); bb_emit_patch_rel32(&lbl_ω);
+
+    /* memcmp(Σ+Δ, lit, len):
+     *   rdi = Σ+Δ
+     *   rsi = lit (imm64)
+     *   rdx = len (imm32)
+     *   call [imm64(&memcmp)]
+     */
+
+    /* compute Σ+Δ into rdi */
+    emit_load_ptr_global(&Σ);           /* rax = Σ */
+    /* movsxd rcx, [&Δ] */
+    bb_emit_byte(0x48); bb_emit_byte(0xB9);
+    bb_emit_u64((uint64_t)(uintptr_t)&Δ);   /* mov rcx, imm64(&Δ) */
+    bb_emit_byte(0x48); bb_emit_byte(0x63); bb_emit_byte(0x09); /* movsxd rcx,[rcx] */
+    /* lea rdi, [rax+rcx] */
+    bb_emit_byte(0x48); bb_emit_byte(0x8D); bb_emit_byte(0x3C); bb_emit_byte(0x08);
+
+    /* rsi = lit (imm64) */
+    bb_emit_byte(0x48); bb_emit_byte(0xBE);
+    bb_emit_u64((uint64_t)(uintptr_t)lit);
+
+    /* rdx = len (imm32, zero-extended) */
+    bb_emit_byte(0x48); bb_emit_byte(0xBA);
+    bb_emit_u64((uint64_t)(uint32_t)len);
+
+    /* mov rax, imm64(&memcmp); call rax */
+    bb_emit_byte(0x48); bb_emit_byte(0xB8);
+    bb_emit_u64((uint64_t)(uintptr_t)memcmp);
+    bb_insn_call_rax();
+
+    /* test eax, eax */
+    bb_emit_byte(0x85); bb_emit_byte(0xC0);
+    /* jne LIT_ω */
+    bb_insn_jne_rel32(&lbl_ω);      /* jne LIT_ω (rel32) */
+
+    /* σ = Σ+Δ  →  store at [rsp+0] */
+    emit_load_ptr_global(&Σ);           /* rax = Σ */
+    bb_emit_byte(0x48); bb_emit_byte(0xB9);
+    bb_emit_u64((uint64_t)(uintptr_t)&Δ);
+    bb_emit_byte(0x48); bb_emit_byte(0x63); bb_emit_byte(0x09); /* movsxd rcx,[rcx] */
+    bb_emit_byte(0x48); bb_emit_byte(0x8D); bb_emit_byte(0x04); bb_emit_byte(0x08); /* lea rax,[rax+rcx] */
+    /* mov [rsp+0], rax */
+    bb_emit_byte(0x48); bb_emit_byte(0x89); bb_emit_byte(0x04); bb_emit_byte(0x24);
+
+    /* δ = len  →  store at [rsp+8] */
+    /* mov dword [rsp+8], imm32(len) */
+    bb_emit_byte(0xC7); bb_emit_byte(0x44); bb_emit_byte(0x24); bb_emit_byte(0x08);
+    bb_emit_u32((uint32_t)len);
+
+    /* Δ += len */
+    emit_add_int_global(&Δ, len);
+
+    /* jmp LIT_γ (rel32) */
+    bb_insn_jmp_rel32(&lbl_γ);
+
+    /* ── LIT_β: Δ -= len; jmp LIT_ω ──────────────────────────────── */
+    bb_label_define(&lbl_β);
+    emit_sub_int_global(&Δ, len);
+    /* jmp LIT_ω (rel32) */
+    bb_insn_jmp_rel32(&lbl_ω);
+
+    /* ── LIT_γ: return DESCR_t{v=DT_S, slen=δ, s=σ} ──────────────── */
+    bb_label_define(&lbl_γ);
+    /* σ is at [rsp+0], δ is at [rsp+8] */
+    emit_descr_success_from_stack(0);
+    /* epilogue */
+    bb_insn_add_rsp_imm8(16);
+    bb_emit_byte(0x41); bb_emit_byte(0x5C);  /* pop r12 */
+    bb_emit_byte(0x5B);                       /* pop rbx */
+    bb_insn_ret();
+
+    /* ── LIT_ω: return FAILDESCR ──────────────────────────────────── */
+    bb_label_define(&lbl_ω);
+    emit_descr_fail();
+    /* epilogue */
+    bb_insn_add_rsp_imm8(16);
+    bb_emit_byte(0x41); bb_emit_byte(0x5C);  /* pop r12 */
+    bb_emit_byte(0x5B);                       /* pop rbx */
+    bb_insn_ret();
+
+    /* ── seal ─────────────────────────────────────────────────────── */
+    int nbytes = bb_emit_end();
+    if (nbytes <= 0 || nbytes > BUF_SIZE) {
+        bb_free(buf, BUF_SIZE);
+        return NULL;
+    }
+    bb_seal(buf, (size_t)nbytes);
+    return (bb_box_fn)buf;
+
+#undef BUF_SIZE
+}
+
+/* ── bb_eps_emit_binary ─────────────────────────────────────────────────── */
+/*
+ * Emits the EPS box as x86-64 binary.  EPS has a `done` flag in its zeta,
+ * but since in the binary path we bake all args at emit time and EPS needs
+ * no per-instance state (binary path: stateless single-shot), we emit the
+ * simplest correct version:
+ *
+ *   EPS α: always succeeds — return spec(Σ+Δ, 0)
+ *   EPS β: always fails    — return spec_empty
+ *
+ * This is correct for the binary path because bb_build_binary is called
+ * fresh per statement execution (no cross-statement state).  The done flag
+ * in the C path guards against double-γ on backtrack, but our binary boxes
+ * are rebuilt each time, so this is safe.
+ *
+ * ABI: DESCR_t fn(void *zeta_ignored, int entry)
+ *   rdi = zeta (ignored)
+ *   esi = entry (0=α → succeed, 1=β → fail)
+ *
+ * Layout:
+ *   prologue: push rbx; push r12; sub rsp,16
+ *   cmp esi,0; je EPS_α; jmp EPS_β
+ *   EPS_α: rax = Σ+Δ; [rsp+0]=rax; [rsp+8]=0; jmp EPS_γ
+ *   EPS_β: jmp EPS_ω
+ *   EPS_γ: rax=[rsp+0]; rdx=[rsp+8]; epilogue; ret
+ *   EPS_ω: xor eax,eax; xor edx,edx; epilogue; ret
+ */
+bb_box_fn bb_eps_emit_binary(void)
+{
+#define EPS_BUF_SIZE 256
+
+    bb_buf_t buf = bb_alloc(EPS_BUF_SIZE);
+    if (!buf) return NULL;
+
+    bb_emit_mode = EMIT_BINARY_WIRED;
+    bb_emit_begin(buf, EPS_BUF_SIZE);
+
+    bb_label_t lbl_α, lbl_β, lbl_γ, lbl_ω;
+    bb_label_init(&lbl_α, "EPS_α");
+    bb_label_init(&lbl_β, "EPS_β");
+    bb_label_init(&lbl_γ, "EPS_γ");
+    bb_label_init(&lbl_ω, "EPS_ω");
+
+    /* prologue */
+    bb_emit_byte(0x53);                         /* push rbx */
+    bb_emit_byte(0x41); bb_emit_byte(0x54);     /* push r12 */
+    bb_insn_sub_rsp_imm8(16);                   /* sub rsp, 16 */
+    bb_insn_cmp_esi_imm8(0);                    /* cmp esi, 0 */
+    bb_insn_je_rel8(&lbl_α);                    /* je EPS_α */
+    bb_insn_jmp_rel32(&lbl_β);                  /* jmp EPS_β */
+
+    /* EPS_α: σ = Σ+Δ, δ = 0 */
+    bb_label_define(&lbl_α);
+
+    /* rax = Σ (load ptr global) */
+    emit_load_ptr_global(&Σ);                   /* rax = Σ */
+    /* movsxd rcx, [&Δ] */
+    bb_emit_byte(0x48); bb_emit_byte(0xB9);
+    bb_emit_u64((uint64_t)(uintptr_t)&Δ);       /* mov rcx, imm64(&Δ) */
+    bb_emit_byte(0x48); bb_emit_byte(0x63); bb_emit_byte(0x09); /* movsxd rcx,[rcx] */
+    /* lea rax, [rax+rcx]  →  Σ+Δ */
+    bb_emit_byte(0x48); bb_emit_byte(0x8D); bb_emit_byte(0x04); bb_emit_byte(0x08);
+    /* mov [rsp+0], rax  — σ */
+    bb_emit_byte(0x48); bb_emit_byte(0x89); bb_emit_byte(0x04); bb_emit_byte(0x24);
+    /* mov qword [rsp+8], 0  — δ = 0 */
+    bb_emit_byte(0x48); bb_emit_byte(0xC7); bb_emit_byte(0x44); bb_emit_byte(0x24);
+    bb_emit_byte(0x08); bb_emit_u32(0);
+    /* jmp EPS_γ */
+    bb_insn_jmp_rel32(&lbl_γ);
+
+    /* EPS_β: → ω */
+    bb_label_define(&lbl_β);
+    bb_insn_jmp_rel32(&lbl_ω);
+
+    /* EPS_γ: return DESCR_t{v=DT_S, slen=0, s=Σ+Δ} */
+    bb_label_define(&lbl_γ);
+    emit_descr_success_from_stack(0);
+    bb_insn_add_rsp_imm8(16);
+    bb_emit_byte(0x41); bb_emit_byte(0x5C);      /* pop r12 */
+    bb_emit_byte(0x5B);                          /* pop rbx */
+    bb_insn_ret();
+
+    /* EPS_ω: return FAILDESCR */
+    bb_label_define(&lbl_ω);
+    emit_descr_fail();
+    bb_insn_add_rsp_imm8(16);
+    bb_emit_byte(0x41); bb_emit_byte(0x5C);      /* pop r12 */
+    bb_emit_byte(0x5B);                          /* pop rbx */
+    bb_insn_ret();
+
+    int nbytes = bb_emit_end();
+    if (nbytes <= 0 || nbytes > EPS_BUF_SIZE) {
+        bb_free(buf, EPS_BUF_SIZE);
+        return NULL;
+    }
+    bb_seal(buf, (size_t)nbytes);
+    return (bb_box_fn)buf;
+
+#undef EPS_BUF_SIZE
 }

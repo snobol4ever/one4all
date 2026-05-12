@@ -189,7 +189,6 @@ void emit_bb_icon_to_by(emitter_t *e,
                    1, lbl_succ, lbl_fail);
 }
 /*====================================================================================================================*/
-extern DESCR_t bb_abort(void *zeta, int entry);
 extern abort_t *bb_abort_new(void);
 void emit_bb_xabrt(emitter_t *e,
                    bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
@@ -197,14 +196,13 @@ void emit_bb_xabrt(emitter_t *e,
     (void)e;
     t_bb_box_banner("ABORT", "");
     abort_t *z = bb_abort_new();
-    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_abort", (uint64_t)(uintptr_t)bb_abort,
+    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_abort", 0,
                    0, lbl_succ, lbl_fail);
     t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_abort", (uint64_t)(uintptr_t)bb_abort,
+    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_abort", 0,
                    1, lbl_succ, lbl_fail);
 }
 /*====================================================================================================================*/
-extern DESCR_t bb_arbno(void *zeta, int entry);
 extern void   *bb_arbno_new(bb_box_fn fn, void *state);
 void emit_bb_xarbn(emitter_t *e, bb_box_fn child_fn,
                    bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
@@ -212,14 +210,13 @@ void emit_bb_xarbn(emitter_t *e, bb_box_fn child_fn,
     (void)e;
     t_bb_box_banner("ARBNO", "");
     void *z = bb_arbno_new(child_fn, NULL);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_arbno", (uint64_t)(uintptr_t)bb_arbno,
+    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_arbno", 0,
                    0, lbl_succ, lbl_fail);
     t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_arbno", (uint64_t)(uintptr_t)bb_arbno,
+    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_arbno", 0,
                    1, lbl_succ, lbl_fail);
 }
 /*====================================================================================================================*/
-extern DESCR_t bb_atp(void *zeta, int entry);
 extern atp_t  *bb_atp_new(const char *varname);
 void emit_bb_xatp(emitter_t *e, const char *varname,
                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
@@ -248,14 +245,13 @@ void emit_bb_xatp(emitter_t *e, const char *varname,
     }
     (void)e;
     atp_t *z = bb_atp_new(varname ? varname : "");
-    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_atp", (uint64_t)(uintptr_t)bb_atp,
+    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_atp", 0,
                    0, lbl_succ, lbl_fail);
     t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_atp", (uint64_t)(uintptr_t)bb_atp,
+    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_atp", 0,
                    1, lbl_succ, lbl_fail);
 }
 /*====================================================================================================================*/
-extern DESCR_t bb_bal(void *zeta, int entry);
 extern bal_t  *bb_bal_new(void);
 void emit_bb_xbal(emitter_t *e,
                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
@@ -263,10 +259,10 @@ void emit_bb_xbal(emitter_t *e,
     (void)e;
     t_bb_box_banner("BAL", "");
     bal_t *z = bb_bal_new();
-    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_bal", (uint64_t)(uintptr_t)bb_bal,
+    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_bal", 0,
                    0, lbl_succ, lbl_fail);
     t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_bal", (uint64_t)(uintptr_t)bb_bal,
+    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_bal", 0,
                    1, lbl_succ, lbl_fail);
 }
 /*====================================================================================================================*/
@@ -280,14 +276,13 @@ void emit_bb_xbrkx(emitter_t *e,
 {
     (void)e;
     brkx_t *z = bb_breakx_new(chars);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_breakx", (uint64_t)(uintptr_t)bb_breakx,
+    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_breakx", 0,
                    0, lbl_succ, lbl_fail);
     t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_breakx", (uint64_t)(uintptr_t)bb_breakx,
+    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_breakx", 0,
                    1, lbl_succ, lbl_fail);
 }
 /*====================================================================================================================*/
-extern DESCR_t bb_cap(void *zeta, int entry);
 extern cap_t  *bb_cap_new_call(bb_box_fn child_fn, void *child_state,
                                 const char *fnc_name,
                                 DESCR_t *fnc_args, int fnc_nargs,
@@ -301,10 +296,10 @@ void emit_bb_xcallcap(emitter_t *e, bb_box_fn child_fn,
     t_bb_box_banner("CALLCAP", fnc_name ? fnc_name : "");
     cap_t *z = bb_cap_new_call(child_fn, NULL, fnc_name,
                                 NULL, 0, NULL, 0, 0 );
-    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_cap", (uint64_t)(uintptr_t)bb_cap,
+    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_cap", 0,
                    0, lbl_succ, lbl_fail);
     t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_cap", (uint64_t)(uintptr_t)bb_cap,
+    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_cap", 0,
                    1, lbl_succ, lbl_fail);
 }
 /*====================================================================================================================*/
@@ -367,7 +362,6 @@ void emit_bb_xchr(emitter_t *e, PATND_t *p,
     t_emit_jmp(lbl_fail, JMP_JMP);
 }
 /*====================================================================================================================*/
-extern DESCR_t bb_deferred_var_exported(void *zeta, int entry);
 extern void   *bb_dvar_bin_new(const char *name);
 void emit_bb_xdsar(emitter_t *e, const char *varname,
                    bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
@@ -402,11 +396,11 @@ void emit_bb_xdsar(emitter_t *e, const char *varname,
     (void)e;
     void *z = bb_dvar_bin_new(varname ? varname : "");
     t_bb_port_call((uint64_t)(uintptr_t)z, "bb_deferred_var_exported",
-                   (uint64_t)(uintptr_t)bb_deferred_var_exported,
+                   0,
                    0, lbl_succ, lbl_fail);
     t_label_define(lbl_β);
     t_bb_port_call((uint64_t)(uintptr_t)z, "bb_deferred_var_exported",
-                   (uint64_t)(uintptr_t)bb_deferred_var_exported,
+                   0,
                    1, lbl_succ, lbl_fail);
 }
 /*====================================================================================================================*/
@@ -430,7 +424,6 @@ void emit_bb_xfail(emitter_t *e,
     t_emit_jmp(lbl_fail, JMP_JMP);
 }
 /*====================================================================================================================*/
-extern DESCR_t bb_arb(void *zeta, int entry);
 extern arb_t  *bb_arb_new(void);
 void emit_bb_xfarb(emitter_t *e,
                    bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
@@ -438,14 +431,13 @@ void emit_bb_xfarb(emitter_t *e,
     (void)e;
     t_bb_box_banner("ARB", "");
     arb_t *z = bb_arb_new();
-    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_arb", (uint64_t)(uintptr_t)bb_arb,
+    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_arb", 0,
                    0, lbl_succ, lbl_fail);
     t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_arb", (uint64_t)(uintptr_t)bb_arb,
+    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_arb", 0,
                    1, lbl_succ, lbl_fail);
 }
 /*====================================================================================================================*/
-extern DESCR_t bb_fence(void *zeta, int entry);
 extern fence_t *bb_fence_new(void);
 void emit_bb_xfnce(emitter_t *e,
                    bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
@@ -457,14 +449,13 @@ void emit_bb_xfnce(emitter_t *e,
     }
     (void)e;
     fence_t *z = bb_fence_new();
-    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_fence", (uint64_t)(uintptr_t)bb_fence,
+    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_fence", 0,
                    0, lbl_succ, lbl_fail);
     t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_fence", (uint64_t)(uintptr_t)bb_fence,
+    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_fence", 0,
                    1, lbl_succ, lbl_fail);
 }
 /*====================================================================================================================*/
-extern DESCR_t bb_cap(void *zeta, int entry);
 extern cap_t  *bb_cap_new(bb_box_fn child_fn, void *child_state,
                            const char *varname, DESCR_t *var_ptr, int immediate);
 void emit_bb_xfnme(emitter_t *e, bb_box_fn child_fn, const char *varname,
@@ -473,19 +464,16 @@ void emit_bb_xfnme(emitter_t *e, bb_box_fn child_fn, const char *varname,
     (void)e;
     t_bb_box_banner("CAP_IMM", varname ? varname : "");
     cap_t *z = bb_cap_new(child_fn, NULL, varname, NULL, 1 );
-    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_cap", (uint64_t)(uintptr_t)bb_cap,
+    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_cap", 0,
                    0, lbl_succ, lbl_fail);
     t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_cap", (uint64_t)(uintptr_t)bb_cap,
+    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_cap", 0,
                    1, lbl_succ, lbl_fail);
 }
 /*====================================================================================================================*/
 extern len_t  *bb_len_new (int n);
 extern tab_t  *bb_tab_new (int n);
 extern rtab_t *bb_rtab_new(int n);
-extern DESCR_t bb_len  (void *zeta, int entry);
-extern DESCR_t bb_tab  (void *zeta, int entry);
-extern DESCR_t bb_rtab (void *zeta, int entry);
 void emit_bb_intcur(emitter_t *e,
                     bb_box_fn c_fn,
                     const char *c_fn_name,
@@ -495,29 +483,25 @@ void emit_bb_intcur(emitter_t *e,
                     bb_label_t *lbl_fail,
                     bb_label_t *lbl_β)
 {
-    (void)kind_name; (void)e;
+    (void)kind_name; (void)e; (void)c_fn;  /* EDP-9: c_fn pointer unused; use c_fn_name */
     void *z;
-    if      (c_fn == bb_len)  z = bb_len_new ((int)num);
-    else if (c_fn == bb_tab)  z = bb_tab_new ((int)num);
-    else if (c_fn == bb_rtab) z = bb_rtab_new((int)num);
-    else {
-        int *raw = calloc(2, sizeof(int));
-        raw[0] = (int)num;
-        z = raw;
-    }
-    t_bb_port_call((uint64_t)(uintptr_t)z, c_fn_name, (uint64_t)(uintptr_t)c_fn,
+    if      (!c_fn_name || !c_fn_name[0]) { int *r = calloc(2,sizeof(int)); r[0]=(int)num; z=r; }
+    else if (c_fn_name[3] == 'l') z = bb_len_new ((int)num);  /* bb_len  */
+    else if (c_fn_name[3] == 't') z = bb_tab_new ((int)num);  /* bb_tab  */
+    else if (c_fn_name[3] == 'r') z = bb_rtab_new((int)num);  /* bb_rtab */
+    else { int *r = calloc(2, sizeof(int)); r[0] = (int)num; z = r; }
+    t_bb_port_call((uint64_t)(uintptr_t)z, c_fn_name, 0,
                    0, lbl_succ, lbl_fail);
     t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, c_fn_name, (uint64_t)(uintptr_t)c_fn,
+    t_bb_port_call((uint64_t)(uintptr_t)z, c_fn_name, 0,
                    1, lbl_succ, lbl_fail);
 }
 void emit_bb_xlnth(emitter_t *e, long long num,
                    bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
-    emit_bb_intcur(e, bb_len, "bb_len", "LEN", num, lbl_succ, lbl_fail, lbl_β);
+    emit_bb_intcur(e, NULL, "bb_len", "LEN", num, lbl_succ, lbl_fail, lbl_β);
 }
 /*====================================================================================================================*/
-extern DESCR_t bb_cap(void *zeta, int entry);
 extern cap_t  *bb_cap_new(bb_box_fn child_fn, void *child_state,
                            const char *varname, DESCR_t *var_ptr, int immediate);
 void emit_bb_xnme(emitter_t *e, bb_box_fn child_fn, const char *varname,
@@ -526,10 +510,10 @@ void emit_bb_xnme(emitter_t *e, bb_box_fn child_fn, const char *varname,
     (void)e;
     t_bb_box_banner("CAP_COND", varname ? varname : "");
     cap_t *z = bb_cap_new(child_fn, NULL, varname, NULL, 0 );
-    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_cap", (uint64_t)(uintptr_t)bb_cap,
+    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_cap", 0,
                    0, lbl_succ, lbl_fail);
     t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_cap", (uint64_t)(uintptr_t)bb_cap,
+    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_cap", 0,
                    1, lbl_succ, lbl_fail);
 }
 /*====================================================================================================================*/
@@ -568,11 +552,10 @@ void emit_bb_xrpsi(emitter_t *e, int n,
 }
 /*====================================================================================================================*/
 extern rtab_t *bb_rtab_new(int n);
-extern DESCR_t bb_rtab(void *zeta, int entry);
 void emit_bb_xrtb(emitter_t *e, long long num,
                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
-    emit_bb_intcur(e, bb_rtab, "bb_rtab", "RTAB", num, lbl_succ, lbl_fail, lbl_β);
+    emit_bb_intcur(e, NULL, "bb_rtab", "RTAB", num, lbl_succ, lbl_fail, lbl_β);
 }
 /*====================================================================================================================*/
 void emit_bb_charset(emitter_t *e,
@@ -584,18 +567,17 @@ void emit_bb_charset(emitter_t *e,
                      bb_label_t *lbl_fail,
                      bb_label_t *lbl_β)
 {
-    (void)kind_name; (void)e;
+    (void)kind_name; (void)e; (void)c_fn;  /* EDP-9: c_fn deleted; use c_fn_name only */
     typedef struct { const char *chars; int delta; } cs_t;
     cs_t *z = calloc(1, sizeof(cs_t));
     z->chars = chars;
-    t_bb_port_call((uint64_t)(uintptr_t)z, c_fn_name, (uint64_t)(uintptr_t)c_fn,
+    t_bb_port_call((uint64_t)(uintptr_t)z, c_fn_name, 0,
                    0, lbl_succ, lbl_fail);
     t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, c_fn_name, (uint64_t)(uintptr_t)c_fn,
+    t_bb_port_call((uint64_t)(uintptr_t)z, c_fn_name, 0,
                    1, lbl_succ, lbl_fail);
 }
 /*====================================================================================================================*/
-extern DESCR_t bb_rem(void *zeta, int entry);
 extern rem_t  *bb_rem_new(void);
 void emit_bb_xstar(emitter_t *e,
                    bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
@@ -607,14 +589,13 @@ void emit_bb_xstar(emitter_t *e,
     }
     (void)e;
     rem_t *z = bb_rem_new();
-    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_rem", (uint64_t)(uintptr_t)bb_rem,
+    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_rem", 0,
                    0, lbl_succ, lbl_fail);
     t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_rem", (uint64_t)(uintptr_t)bb_rem,
+    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_rem", 0,
                    1, lbl_succ, lbl_fail);
 }
 /*====================================================================================================================*/
-extern DESCR_t bb_succeed(void *zeta, int entry);
 extern succeed_t *bb_succeed_new(void);
 void emit_bb_xsucf(emitter_t *e,
                    bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
@@ -622,19 +603,18 @@ void emit_bb_xsucf(emitter_t *e,
     (void)e;
     t_bb_box_banner("SUCCEED", "");
     succeed_t *z = bb_succeed_new();
-    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_succeed", (uint64_t)(uintptr_t)bb_succeed,
+    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_succeed", 0,
                    0, lbl_succ, lbl_fail);
     t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_succeed", (uint64_t)(uintptr_t)bb_succeed,
+    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_succeed", 0,
                    1, lbl_succ, lbl_fail);
 }
 /*====================================================================================================================*/
 extern tab_t  *bb_tab_new(int n);
-extern DESCR_t bb_tab(void *zeta, int entry);
 void emit_bb_xtb(emitter_t *e, long long num,
                  bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
-    emit_bb_intcur(e, bb_tab, "bb_tab", "TAB", num, lbl_succ, lbl_fail, lbl_β);
+    emit_bb_intcur(e, NULL, "bb_tab", "TAB", num, lbl_succ, lbl_fail, lbl_β);
 }
 /*====================================================================================================================*/
 void emit_bb_xvar(emitter_t *e,

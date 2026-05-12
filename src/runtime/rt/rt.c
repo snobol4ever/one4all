@@ -491,7 +491,7 @@ void rt_init(int argc, char **argv)
      * brokered model.  Mode-3 with --bb-live is described in
      * GOAL-MODE4-EMIT.md as "mode-4's existence proof"; we want emitted
      * binaries to take the same code path. */
-    g_bb_mode = BB_MODE_LIVE;
+    g_bb_mode = BB_MODE_BROKERED;  /* EDP-9: C boxes deleted; brokered blobs for all modes */
 
     register_fn("IDENT",  _rt_IDENT,  1, 2);
     register_fn("DIFFER", _rt_DIFFER, 1, 2);
