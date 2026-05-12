@@ -1777,6 +1777,7 @@ int bb_macros_write_to_path(const char *path)
     FILE *f = fopen(path, "w");
     if (!f) return -1;
     fprintf(f, "# === BEGIN bb macro library (EM-7c-bb-macros) ===\n");
+    fprintf(f, "                        .intel_syntax    noprefix\n");
     fprintf(f, "# One named .macro/.endm per leaf-box port.  Three-column shape.\n");
     fprintf(f, "# GAS expands to byte-identical inline x86 (same as emit_* emissions).\n");
     /* DELTA_LOAD: eax = [r10] */

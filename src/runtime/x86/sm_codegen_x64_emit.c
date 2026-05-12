@@ -764,17 +764,10 @@ static int emit_halt_line(FILE *out, int pc)
 static int emit_push_lit_i_line(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    /* EM-MODE4-IS-MODE3-DUMP-f: routed through per-opcode template.
-     * emitter_text_new(out) constructs a text emitter in INVOCATION mode;
-     * emit_sm_push_lit_i (templates/sm_push_lit_i.c) emits the two-line
-     * sequence (movabs rdi,val / call rt_push_int@PLT) directly to `out`.
-     * Legacy sm_emit_int64 path retained below as __attribute__((unused))
-     * for rollback reference. */
-    emitter_t *e = emitter_text_new(out);
-    if (!e) return -1;
-    emit_sm_push_lit_i(e, ins->a[0].i);
-    emitter_free(e);
-    return 0;
+    /* TEXT mode: emit macro invocation line via render_call_line.
+     * Template path (emitter_text_new) expands body inline — wrong for TEXT. */
+    return sm_emit_int64(out, sm_template_lookup(SM_PUSH_LIT_I),
+                         ins->a[0].i, NULL);
 }
 
 __attribute__((unused))

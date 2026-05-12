@@ -688,7 +688,8 @@ int sm_emit_macro_library(FILE *out)
         "# EM-7c-sm-macros: one macro per opcode group; bodies and per-call\n"
         "#   emissions share one renderer in sm_emit_template.c, so the\n"
         "#   .s and the C dispatcher cannot drift -- they are paired by\n"
-        "#   shape kind in render_macro_body() / render_call_line().\n",
+        "#   shape kind in render_macro_body() / render_call_line().\n"
+        "                        .intel_syntax    noprefix\n",
         out) == EOF) return -1;
 
     /* Helper: emit a template's macro IF it hasn't been emitted yet. */
