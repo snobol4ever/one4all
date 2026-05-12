@@ -136,6 +136,8 @@ DESCR_t sm_call_expression(int entry_pc);
  */
 SmGenState *sm_gen_state_new(int entry_pc);
 int bb_broker_drive_sm(SmGenState *gs, void (*body_fn)(DESCR_t val, void *arg), void *arg);
+/* GOAL-ICON-BB-COMPLETE rung13: drive one tick; push result into *out; return 1 on success, 0 exhausted. */
+int bb_broker_drive_sm_one(SmGenState *gs, DESCR_t *out);
 
 /* CHUNKS-step14b: the active SmGenState (set by bb_broker_drive_sm around
  * each sm_interp_run call).  Used by SM_SUSPEND, SM_LOAD_GLOCAL,

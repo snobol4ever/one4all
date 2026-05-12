@@ -176,7 +176,7 @@ static const char *opnames[SM_OPCODE_COUNT] = {
     "SM_PAT_USERCALL",
     "SM_PAT_USERCALL_ARGS",
     "SM_EXEC_STMT",
-    "SM_BB_PUMP","SM_BB_ONCE","SM_BB_ONCE_PROC","SM_BB_PUMP_PROC","SM_BB_PUMP_CASE","SM_BB_PUMP_SM","SM_BB_PUMP_EVERY","SM_BB_PUMP_AST","SM_SUSPEND_VALUE",
+    "SM_BB_PUMP","SM_BB_ONCE","SM_BB_ONCE_PROC","SM_BB_PUMP_PROC","SM_BB_PUMP_CASE","SM_BB_PUMP_SM","SM_BB_PUMP_EVERY","SM_BB_PUMP_AST","SM_GEN_TICK","SM_SUSPEND_VALUE",
     "SM_CALL_FN","SM_RETURN","SM_FRETURN","SM_NRETURN",
     "SM_RETURN_S","SM_RETURN_F","SM_FRETURN_S","SM_FRETURN_F","SM_NRETURN_S","SM_NRETURN_F",
     "SM_DEFINE_ENTRY",
@@ -289,6 +289,9 @@ void sm_prog_print(const SM_Program *p, FILE *out)
                  * a[2].i = 1 if this label is a DEFINE'd-function entry point. */
                 if (in->a[0].s) fprintf(out, " s=\"%s\"", in->a[0].s);
                 if (in->a[2].i) fprintf(out, " define_entry=1");
+                break;
+            case SM_GEN_TICK:
+                fprintf(out, " entry_pc=%lld slot=%lld", (long long)in->a[0].i, (long long)in->a[1].i);
                 break;
             default:
                 break;

@@ -1092,6 +1092,25 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             break;
         }
 
+        /* GOAL-ICON-BB-COMPLETE rung13: single-tick SM generator drive for pure-SM every.
+         * a[0].i = entry_pc, a[1].i = slot_id into FRAME.every_gen[].
+         * Creates SmGenState on first call (slot==NULL), then drives one tick.
+         * Pushes yielded value + sets last_ok=1 on success; FAILDESCR + last_ok=0 on exhaustion. */
+        case SM_GEN_TICK: {
+            int entry_pc = (int)ins->a[0].i;
+            int slot_id  = (int)ins->a[1].i;
+            if (slot_id < 0 || slot_id >= EVERY_GEN_SLOT_MAX) {
+                st->last_ok = 0; sm_push(st, FAILDESCR); break;
+            }
+            if (!FRAME.every_gen[slot_id])
+                FRAME.every_gen[slot_id] = sm_gen_state_new(entry_pc);
+            DESCR_t out = FAILDESCR;
+            int ok = bb_broker_drive_sm_one(FRAME.every_gen[slot_id], &out);
+            st->last_ok = ok;
+            sm_push(st, ok ? out : FAILDESCR);
+            break;
+        }
+
         /* CHUNKS-step17i-suspend: yield primitive for `suspend E [do body]`.
          *
          * Pops one value (the yield value) from the SM stack.  If we're
@@ -2066,4 +2085,45 @@ int bb_broker_drive_sm(SmGenState *gs, void (*body_fn)(DESCR_t val, void *arg), 
     }
 
     return ticks;
+}
+
+/* GOAL-ICON-BB-COMPLETE rung13: bb_broker_drive_sm_one — drive one tick.
+ * Returns 1 and writes yielded value into *out on success.
+ * Returns 0 (exhausted) when the generator has reached SM_RETURN/SM_HALT.
+ * Mirrors bb_broker_drive_sm's inner loop body, but exits after one tick. */
+int bb_broker_drive_sm_one(SmGenState *gs, DESCR_t *out)
+{
+    SM_Program *prog = g_current_sm_prog;
+    if (!prog || !gs || gs->started == 2) { *out = FAILDESCR; return 0; }
+
+    SM_State *st = GC_malloc(sizeof(SM_State));
+    sm_state_init(st);
+    st->pc      = gs->resume_pc;
+    st->last_ok = gs->last_ok;
+
+    if (gs->sp > 0 && gs->stack) {
+        if (gs->sp > st->stack_cap) {
+            st->stack     = GC_realloc(st->stack, gs->sp * sizeof(DESCR_t));
+            st->stack_cap = gs->sp;
+        }
+        memcpy(st->stack, gs->stack, gs->sp * sizeof(DESCR_t));
+        st->sp = gs->sp;
+    }
+
+    SmGenState *outer_gs = g_current_gen_state;
+    g_current_gen_state  = gs;
+    gs->started = 1;
+
+    int rc = sm_interp_run(prog, st);
+
+    g_current_gen_state = outer_gs;
+
+    if (rc == SM_INTERP_SUSPENDED) {
+        *out = gs->yielded;
+        return 1;
+    } else {
+        gs->started = 2;
+        *out = FAILDESCR;
+        return 0;
+    }
 }

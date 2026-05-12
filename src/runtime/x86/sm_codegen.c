@@ -52,6 +52,7 @@
 #include "../ast/ast.h"
 #include "../../frontend/snobol4/scrip_cc.h"  /* tree_t, TT_FNC for SM_PAT_CAPTURE_FN */
 #include "bb_broker.h"   /* SN-9b: SM_BB_PUMP / SM_BB_ONCE handlers */
+#include "../../runtime/interp/coro_runtime.h"  /* GOAL-ICON-BB-COMPLETE rung13: FRAME, EVERY_GEN_SLOT_MAX, IcnFrame */
 #include "templates/templates.h"  /* EM-MODE4-IS-MODE3-DUMP-c: per-opcode templates */
 #include "bb_emit.h"              /* EM-MODE4-IS-MODE3-DUMP-c: capture-and-flush adapter */
 #include "emitter.h"              /* EM-MODE4-IS-MODE3-DUMP-c: emitter_t */
@@ -561,6 +562,24 @@ static void h_bb_pump_every(void)
     g_ast_pump_active--;
     STATE->last_ok = (ticks > 0);
     PUSH(NULVCL);
+}
+
+/* GOAL-ICON-BB-COMPLETE rung13: JIT mirror of SM_GEN_TICK in sm_interp.c.
+ * Single-tick drive of a per-frame SmGenState for pure-SM every loops.
+ * a[0].i = entry_pc, a[1].i = slot_id into FRAME.every_gen[]. */
+static void h_gen_tick(void)
+{
+    int entry_pc = (int)CUR_INS->a[0].i;
+    int slot_id  = (int)CUR_INS->a[1].i;
+    if (slot_id < 0 || slot_id >= EVERY_GEN_SLOT_MAX) {
+        STATE->last_ok = 0; PUSH(FAILDESCR); return;
+    }
+    if (!FRAME.every_gen[slot_id])
+        FRAME.every_gen[slot_id] = sm_gen_state_new(entry_pc);
+    DESCR_t out = FAILDESCR;
+    int ok = bb_broker_drive_sm_one(FRAME.every_gen[slot_id], &out);
+    STATE->last_ok = ok;
+    PUSH(ok ? out : FAILDESCR);
 }
 
 /* GOAL-ICON-BB-COMPLETE Phase A: JIT mirror of SM_BB_PUMP_AST in sm_interp.c.
@@ -1539,6 +1558,7 @@ static void init_handler_table(void)
     g_handlers[SM_BB_PUMP_SM]   = h_bb_pump_sm;
     g_handlers[SM_BB_PUMP_EVERY] = h_bb_pump_every;
     g_handlers[SM_BB_PUMP_AST]   = h_bb_pump_ast;   /* GOAL-ICON-BB-COMPLETE Phase A */
+    g_handlers[SM_GEN_TICK]      = h_gen_tick;       /* GOAL-ICON-BB-COMPLETE rung13 */
     g_handlers[SM_SUSPEND_VALUE] = h_suspend_value;   /* CHUNKS-step17i-suspend */
     g_handlers[SM_SUSPEND]      = h_suspend;   /* CHUNKS-step14: named FATAL — JIT gen is M5 */
     g_handlers[SM_RESUME]       = h_resume;    /* CHUNKS-step14: named FATAL — JIT gen is M5 */

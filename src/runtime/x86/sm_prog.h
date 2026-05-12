@@ -196,6 +196,27 @@ typedef enum {
      * routes to the correct coro_bb_* function via the AST kind in the node. */
     SM_BB_PUMP_AST,
 
+    /* GOAL-ICON-BB-COMPLETE rung13: single-tick SM generator drive for pure-SM every.
+     * a[0].i = entry_pc  — the SM pc of the inner generator's coroutine body.
+     * a[1].i = slot_id   — index into FRAME.every_gen[] (per-call; baked at lower-time).
+     *
+     * Behaviour:
+     *   1. If FRAME.every_gen[slot_id] == NULL: create sm_gen_state_new(entry_pc), store.
+     *   2. Drive the SmGenState one tick via bb_broker_drive_sm_one().
+     *   3. On tick success: push yielded value, last_ok = 1.
+     *   4. On exhaustion:   push FAILDESCR,    last_ok = 0.
+     *
+     * The every-loop lower_every emits:
+     *   [loop_top:] SM_GEN_TICK entry_pc slot_id
+     *               SM_JUMP_F done
+     *               [lower body; SM_VOID_POP]
+     *               SM_JUMP loop_top
+     *   [done:]     SM_PUSH_NULL          ; every is void in stmt context
+     *
+     * Not a statement-level construct — no trailing VOID_POP needed on this opcode
+     * (the loop structure handles all stack balance). */
+    SM_GEN_TICK,
+
     /* CHUNKS-step17i-suspend: TT_SUSPEND `suspend E [do body]` — yield-to-caller.
      *
      * Stack discipline: pops one value (the yield value).  Pushes nothing.

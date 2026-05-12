@@ -59,6 +59,27 @@ static LabelTable   g_labtab;
 static int          g_in_proc_body;
 static IcnScope    *g_proc_scope;
 static unsigned long long g_unhandled_kinds[LOWER_UNHANDLED_WORDS];
+/* GOAL-ICON-BB-COMPLETE rung13: per-compile slot counter for SM_GEN_TICK.
+ * Each lower_every call claims a unique slot in FRAME.every_gen[]. Reset in sm_lower(). */
+static int          g_every_gen_slot_next = 0;
+/* GOAL-ICON-BB-COMPLETE rung13: hoisted alternate context for lower_every */
+static const tree_t *g_hoist_alt   = NULL;
+static int           g_hoist_entry = -1;
+static int           g_hoist_slot  = -1;
+
+/* GOAL-ICON-BB-COMPLETE rung13: Icon-aware suspendable check that includes TT_SEQ.
+ * is_suspendable() (coro_runtime.c) intentionally excludes TT_SEQ to avoid breaking
+ * the interp_eval TT_EVERY augop path. We need TT_SEQ here in the lowering layer only. */
+static int lower_is_suspendable_icn(const tree_t *e)
+{
+    if (!e) return 0;
+    if (e->t == TT_SEQ) {
+        for (int i = 0; i < e->n; i++)
+            if (lower_is_suspendable_icn(e->c[i])) return 1;
+        return 0;
+    }
+    return is_suspendable((tree_t *)e);
+}
 
 extern int g_lang;   /* set per-statement in lower_stmt; read by lower_cat_seq */
 
@@ -826,9 +847,123 @@ static void emit_range_coroutine(const tree_t *lo_expr,
 static void lower_to   (const tree_t *t) { emit_range_coroutine(T0(t), T1(t), NULL); }
 static void lower_to_by(const tree_t *t) { emit_range_coroutine(T0(t), T1(t), T2(t)); }
 
+/* GOAL-ICON-BB-COMPLETE rung13: find the first TT_ALTERNATE that is a direct
+ * RHS of a TT_ASSIGN (or direct child of the gen expr root). Only these can be
+ * safely hoisted — alternates nested inside TT_LIMIT/TT_FNC/etc. must not be hoisted
+ * because the outer construct's semantics depend on driving the alternate. */
+static const tree_t *find_first_alternate(const tree_t *t)
+{
+    if (!t) return NULL;
+    /* Direct alternate at this level */
+    if (t->t == TT_ALTERNATE) return t;
+    /* TT_ASSIGN: only look in the RHS (c[1]) */
+    if (t->t == TT_ASSIGN && t->n >= 2)
+        return find_first_alternate(t->c[1]);
+    /* TT_SEQ (Icon conjunction): search children for assign-level alternates */
+    if (t->t == TT_SEQ) {
+        for (int i = 0; i < t->n; i++) {
+            const tree_t *found = find_first_alternate(t->c[i]);
+            if (found) return found;
+        }
+    }
+    /* Relops / arith: search only one level deep for direct TT_ASSIGN children */
+    for (int i = 0; i < t->n; i++) {
+        if (t->c[i] && t->c[i]->t == TT_ASSIGN) {
+            const tree_t *found = find_first_alternate(t->c[i]);
+            if (found) return found;
+        }
+    }
+    return NULL;
+}
+
+/* GOAL-ICON-BB-COMPLETE rung13: emit TT_ALTERNATE as a pure-SM coroutine.
+ * Each arm: lower_expr(arm_i) then SM_SUSPEND (yields arm value to outer SM_GEN_TICK).
+ * After resume, stack is empty; the arm value is available via gs->yielded (pushed
+ * by SM_GEN_TICK onto the outer stack). */
+static void lower_alternate_gen(const tree_t *t)
+{
+    if (!t || t->n == 0) { sm_emit(g_p, SM_PUSH_NULL); return; }
+    for (int i = 0; i < t->n; i++) {
+        lower_expr(t->c[i]);
+        sm_emit(g_p, SM_SUSPEND);
+    }
+    /* Exhausted — SM_PUSH_NULL + SM_RETURN emitted by caller (lower_every) */
+}
+
+/* GOAL-ICON-BB-COMPLETE rung13: pure-SM every loop.
+ *
+ * Hoists the first TT_ALTERNATE in gen_expr as an inner coroutine.
+ * The outer loop:
+ *   SM_GEN_TICK → get one arm value → run body → loop
+ * where "body" is the full gen_expr with the TT_ALTERNATE replaced by
+ * a SM_LOAD_GLOCAL from the hoisted value (which SM_GEN_TICK puts into
+ * a per-tick glocal via SM_STORE_GLOCAL before the body runs).
+ *
+ * Actually: SM_GEN_TICK pushes the yielded value onto the outer stack.
+ * The outer expression body then uses that TOS value via normal STORE_FRAME
+ * (for the assignment). We intercept the TT_ALTERNATE dispatch below to
+ * emit "pop TOS as the pre-yielded value" by checking g_hoist_alt.
+ *
+ * Layout:
+ *   SM_JUMP skip                   ; over alt coroutine body
+ *   alt_entry: SM_RESUME
+ *   [lower_alternate_gen(alt_t)]   ; push each arm, SM_SUSPEND
+ *   SM_PUSH_NULL; SM_RETURN        ; exhausted
+ *   skip:
+ *   loop_top:
+ *   SM_GEN_TICK alt_entry slot     ; one arm value → TOS, last_ok
+ *   SM_JUMP_F done                 ; exhausted
+ *   [lower_expr(gen_expr) with g_hoist_alt set]  ; uses TOS value directly
+ *   SM_VOID_POP                    ; discard gen_expr result (side-effects done)
+ *   [if c[1]: lower_expr(body); SM_VOID_POP]
+ *   SM_JUMP loop_top
+ *   done:
+ *   SM_PUSH_NULL                   ; every is void
+ */
 static void lower_every(const tree_t *t)
 {
-    sm_emit_i(g_p, SM_BB_PUMP_EVERY, (int64_t)every_table_register((tree_t *)t));
+    if (t->n < 1) { sm_emit(g_p, SM_PUSH_NULL); return; }
+    const tree_t *gen_expr = t->c[0];
+    const tree_t *body     = (t->n > 1) ? t->c[1] : NULL;
+
+    /* Only apply pure-SM path for Icon with a TT_ALTERNATE generator */
+    const tree_t *alt_t = (g_lang == LANG_ICN) ? find_first_alternate(gen_expr) : NULL;
+    if (!alt_t) {        sm_emit_i(g_p, SM_BB_PUMP_EVERY, (int64_t)every_table_register((tree_t *)t));
+        return;
+    }
+
+    /* Allocate per-call gen slot */
+    int slot = g_every_gen_slot_next++;
+    if (slot >= EVERY_GEN_SLOT_MAX) {
+        sm_emit_i(g_p, SM_BB_PUMP_EVERY, (int64_t)every_table_register((tree_t *)t));
+        return;
+    }
+
+    /* Emit the inner alternation coroutine */
+    int skip = sm_emit_i(g_p, SM_JUMP, 0);
+    int entry = sm_label(g_p);
+    sm_emit(g_p, SM_RESUME);
+    lower_alternate_gen(alt_t);
+    sm_emit(g_p, SM_PUSH_NULL); sm_emit(g_p, SM_RETURN);
+    sm_patch_jump(g_p, skip, sm_label(g_p));
+
+    /* Emit the every loop.  Set g_hoist_alt so lower_expr(TT_ALTERNATE)
+     * treats the hoisted alt as "value already on stack from SM_GEN_TICK". */
+    int loop_top = sm_label(g_p);
+    sm_emit_ii(g_p, SM_GEN_TICK, (int64_t)entry, (int64_t)slot);
+    int jdone = sm_emit_i(g_p, SM_JUMP_F, 0);
+    /* TOS = arm value from SM_GEN_TICK.  Set hoist context so lower_expr
+     * of the TT_ALTERNATE inside gen_expr is a no-op (value already on stack). */
+    const tree_t *prev_hoist = g_hoist_alt;
+    int prev_entry = g_hoist_entry, prev_slot = g_hoist_slot;
+    g_hoist_alt = alt_t; g_hoist_entry = entry; g_hoist_slot = slot;
+    lower_expr(gen_expr);
+    g_hoist_alt = prev_hoist; g_hoist_entry = prev_entry; g_hoist_slot = prev_slot;
+    sm_emit(g_p, SM_VOID_POP);
+    if (body) { lower_expr(body); sm_emit(g_p, SM_VOID_POP); }
+    sm_emit_i(g_p, SM_JUMP, loop_top);
+    sm_patch_jump(g_p, jdone, sm_label(g_p));
+    sm_emit(g_p, SM_PUSH_NULL);
 }
 
 static void lower_suspend(const tree_t *t)
@@ -1096,7 +1231,12 @@ void lower_expr(const tree_t *t)
     case TT_TO:                               lower_to(t);            return;
     case TT_TO_BY:                            lower_to_by(t);         return;
     case TT_LIMIT:                            lower_limit(t);         return;
-    case TT_ALTERNATE: case TT_ITERATE:      lower_bb_pump_ast(t);   return;
+    /* GOAL-ICON-BB-COMPLETE rung13: if this is the hoisted alternate, value is
+     * already on stack from SM_GEN_TICK — emit nothing. Otherwise legacy AST pump. */
+    case TT_ALTERNATE:
+        if (t == g_hoist_alt) return;   /* hoisted: TOS already has the yielded arm value */
+        lower_bb_pump_ast(t); return;
+    case TT_ITERATE:             lower_bb_pump_ast(t);   return;
     case TT_EVERY:                            lower_every(t);         return;
     /* Prolog */
     case TT_CHOICE:                           lower_choice(t);        return;
@@ -1193,6 +1333,7 @@ SM_Program *lower(const tree_t *prog)
     g_p            = sm_prog_new();
     g_in_proc_body = 0;
     g_proc_scope   = NULL;
+    g_every_gen_slot_next = 0;   /* GOAL-ICON-BB-COMPLETE rung13: reset slot counter */
     labtab_init(&g_labtab);
     for (int i = 0; i < LOWER_UNHANDLED_WORDS; i++) g_unhandled_kinds[i] = 0;
 

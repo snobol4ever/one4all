@@ -21,12 +21,17 @@
 #define PROC_TABLE_MAX       256
 #define FRAME_DEPTH_MAX         16
 #define FRAME_STACK_MAX      256
+#define EVERY_GEN_SLOT_MAX    16   /* GOAL-ICON-BB-COMPLETE: max nested every-gen coroutines per frame */
 #define SCAN_STACK_MAX  16
 #define GLOBAL_MAX      64
 
 /*------------------------------------------------------------------------
  * Types
  *------------------------------------------------------------------------*/
+/* GOAL-ICON-BB-COMPLETE: forward-declare SmGenState (defined in sm_interp.h)
+ * so IcnFrame can hold per-call SM generator states for pure-SM every loops. */
+struct SmGenState;
+
 /* CH-17a: entry_pc is the SM_Program pc of the proc body's named expression.
  * Populated by sm_resolve_proc_entry_pcs(SM_Program*) after sm_lower runs.
  * -1 means no expression emitted yet (CH-17b will start emitting Icon/Raku proc
@@ -61,6 +66,10 @@ typedef struct {
     int           suspending;   /* 1 = procedure is suspending a value     */
     DESCR_t       suspend_val;  /* the value being suspended               */
     tree_t       *suspend_do;   /* do-clause to run on resumption, or NULL */
+    /* GOAL-ICON-BB-COMPLETE: per-call SM generator states for pure-SM every loops.
+     * Indexed by slot id baked at lower-time (SM_GEN_TICK a[1].i).
+     * NULL = not yet started; non-NULL = active or exhausted SmGenState. */
+    struct SmGenState *every_gen[EVERY_GEN_SLOT_MAX];
 } IcnFrame;
 
 /*------------------------------------------------------------------------
