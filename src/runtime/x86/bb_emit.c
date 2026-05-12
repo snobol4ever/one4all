@@ -1552,3 +1552,166 @@ void t_load_siglen_sub_cmp_delta(int n, uint64_t siglen_addr,
     }
     }
 }
+
+void t_lea_rsi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr)
+{
+    switch (bb_emit_mode) {
+    case EMIT_BINARY:
+        /* mov rsi, imm64 — 48 BE <8> */
+        bb_emit_byte(0x48); bb_emit_byte(0xBE);
+        bb_emit_byte((uint8_t)(in_proc_ptr      ));
+        bb_emit_byte((uint8_t)(in_proc_ptr >>  8));
+        bb_emit_byte((uint8_t)(in_proc_ptr >> 16));
+        bb_emit_byte((uint8_t)(in_proc_ptr >> 24));
+        bb_emit_byte((uint8_t)(in_proc_ptr >> 32));
+        bb_emit_byte((uint8_t)(in_proc_ptr >> 40));
+        bb_emit_byte((uint8_t)(in_proc_ptr >> 48));
+        bb_emit_byte((uint8_t)(in_proc_ptr >> 56));
+        return;
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF: {
+        FILE *f = emit_outf();
+        char args[80];
+        snprintf(args, sizeof(args), "rcx, [rip + %s]",
+                 sym_label ? sym_label : "??sym??");
+        bb3c_format(f, "", "lea", args);
+        bb3c_format(f, "", "mov", "rsi, rcx");
+        return;
+    }
+    }
+}
+
+void t_add_delta_imm(int v)
+{
+    switch (bb_emit_mode) {
+    case EMIT_BINARY:
+        /* mov eax, [r10]  — 41 8B 02 */
+        bb_emit_byte(0x41); bb_emit_byte(0x8B); bb_emit_byte(0x02);
+        /* add eax, imm32  — 05 <4> */
+        bb_emit_byte(0x05);
+        bb_emit_byte((uint8_t)((uint32_t)v      ));
+        bb_emit_byte((uint8_t)((uint32_t)v >>  8));
+        bb_emit_byte((uint8_t)((uint32_t)v >> 16));
+        bb_emit_byte((uint8_t)((uint32_t)v >> 24));
+        /* mov [r10], eax  — 41 89 02 */
+        bb_emit_byte(0x41); bb_emit_byte(0x89); bb_emit_byte(0x02);
+        return;
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF: {
+        FILE *f = emit_outf();
+        bb3c_format(f, "", "mov", "eax, [r10]");
+        char args[32]; snprintf(args, sizeof(args), "eax, %d", v);
+        bb3c_format(f, "", "add", args);
+        bb3c_format(f, "", "mov", "[r10], eax");
+        return;
+    }
+    }
+}
+
+void t_sub_delta_imm(int v)
+{
+    switch (bb_emit_mode) {
+    case EMIT_BINARY:
+        /* mov eax, [r10]  — 41 8B 02 */
+        bb_emit_byte(0x41); bb_emit_byte(0x8B); bb_emit_byte(0x02);
+        /* sub eax, imm32  — 2D <4> */
+        bb_emit_byte(0x2D);
+        bb_emit_byte((uint8_t)((uint32_t)v      ));
+        bb_emit_byte((uint8_t)((uint32_t)v >>  8));
+        bb_emit_byte((uint8_t)((uint32_t)v >> 16));
+        bb_emit_byte((uint8_t)((uint32_t)v >> 24));
+        /* mov [r10], eax  — 41 89 02 */
+        bb_emit_byte(0x41); bb_emit_byte(0x89); bb_emit_byte(0x02);
+        return;
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF: {
+        FILE *f = emit_outf();
+        bb3c_format(f, "", "mov", "eax, [r10]");
+        char args[32]; snprintf(args, sizeof(args), "eax, %d", v);
+        bb3c_format(f, "", "sub", args);
+        bb3c_format(f, "", "mov", "[r10], eax");
+        return;
+    }
+    }
+}
+
+void t_sigma_plus_delta_to_rdi(uint64_t sigma_addr, uint64_t siglen_addr)
+{
+    (void)siglen_addr;
+    switch (bb_emit_mode) {
+    case EMIT_BINARY:
+        /* mov rcx, &Σ  — 48 B9 <8> */
+        bb_emit_byte(0x48); bb_emit_byte(0xB9);
+        bb_emit_byte((uint8_t)(sigma_addr      ));
+        bb_emit_byte((uint8_t)(sigma_addr >>  8));
+        bb_emit_byte((uint8_t)(sigma_addr >> 16));
+        bb_emit_byte((uint8_t)(sigma_addr >> 24));
+        bb_emit_byte((uint8_t)(sigma_addr >> 32));
+        bb_emit_byte((uint8_t)(sigma_addr >> 40));
+        bb_emit_byte((uint8_t)(sigma_addr >> 48));
+        bb_emit_byte((uint8_t)(sigma_addr >> 56));
+        /* mov rax, [rcx]  — 48 8B 01 */
+        bb_emit_byte(0x48); bb_emit_byte(0x8B); bb_emit_byte(0x01);
+        /* movsxd rcx, [r10]  — 49 63 0A */
+        bb_emit_byte(0x49); bb_emit_byte(0x63); bb_emit_byte(0x0A);
+        /* lea rax, [rax+rcx]  — 48 8D 04 08 */
+        bb_emit_byte(0x48); bb_emit_byte(0x8D); bb_emit_byte(0x04); bb_emit_byte(0x08);
+        /* mov rdi, rax  — 48 89 C7 */
+        bb_emit_byte(0x48); bb_emit_byte(0x89); bb_emit_byte(0xC7);
+        return;
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF: {
+        FILE *f = emit_outf();
+        char args[80];
+        snprintf(args, sizeof(args), "rcx, 0x%llx", (unsigned long long)sigma_addr);
+        bb3c_format(f, "", "mov", args);
+        bb3c_format(f, "", "mov", "rax, [rcx]");
+        bb3c_format(f, "", "movsxd", "rcx, [r10]");
+        bb3c_format(f, "", "lea", "rax, [rax+rcx]");
+        bb3c_format(f, "", "mov", "rdi, rax");
+        return;
+    }
+    }
+}
+
+void t_bounds_check_delta_plus_len(int len, uint64_t siglen_addr, bb_label_t *lbl_fail)
+{
+    switch (bb_emit_mode) {
+    case EMIT_BINARY:
+        /* mov eax, [r10]  — 41 8B 02 */
+        bb_emit_byte(0x41); bb_emit_byte(0x8B); bb_emit_byte(0x02);
+        /* add eax, imm32  — 05 <4> */
+        bb_emit_byte(0x05);
+        bb_emit_byte((uint8_t)((uint32_t)len      ));
+        bb_emit_byte((uint8_t)((uint32_t)len >>  8));
+        bb_emit_byte((uint8_t)((uint32_t)len >> 16));
+        bb_emit_byte((uint8_t)((uint32_t)len >> 24));
+        /* mov rcx, &Σlen  — 48 B9 <8> */
+        bb_emit_byte(0x48); bb_emit_byte(0xB9);
+        bb_emit_byte((uint8_t)(siglen_addr      ));
+        bb_emit_byte((uint8_t)(siglen_addr >>  8));
+        bb_emit_byte((uint8_t)(siglen_addr >> 16));
+        bb_emit_byte((uint8_t)(siglen_addr >> 24));
+        bb_emit_byte((uint8_t)(siglen_addr >> 32));
+        bb_emit_byte((uint8_t)(siglen_addr >> 40));
+        bb_emit_byte((uint8_t)(siglen_addr >> 48));
+        bb_emit_byte((uint8_t)(siglen_addr >> 56));
+        /* cmp eax, [rcx]  — 3B 01 */
+        bb_emit_byte(0x3B); bb_emit_byte(0x01);
+        t_emit_jmp(lbl_fail, JMP_JG);
+        return;
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF: {
+        FILE *f = emit_outf();
+        bb3c_format(f, "", "mov", "eax, [r10]");
+        char args[32]; snprintf(args, sizeof(args), "eax, %d", len);
+        bb3c_format(f, "", "add", args);
+        snprintf(args, sizeof(args), "0x%llx", (unsigned long long)siglen_addr);
+        char full[80]; snprintf(full, sizeof(full), "rcx, %s", args);
+        bb3c_format(f, "", "mov", full);
+        bb3c_format(f, "", "cmp", "eax, [rcx]");
+        t_emit_jmp(lbl_fail, JMP_JG);
+        return;
+    }
+    }
+}

@@ -1276,12 +1276,12 @@ static void flat_emit_node(emitter_t *e, PATND_t *p,
     switch (p->kind) {
     case XCHR: {
         /* EM-MODE4-IS-MODE3-DUMP-d (sess 2026-05-11): routed through
-         * the per-box template (templates/bb_xchr.c).  Body lifted
-         * byte-for-byte from the previous inline banner + flat_emit_lit
-         * call pair.  Single-line revert if needed: replace this call
-         * with the prior 10-line inline expansion (see git log of this
-         * line). */
-        emit_bb_xchr(e, p, lbl_succ, lbl_fail, lbl_β);
+         * the per-box template (templates/bb_xchr.c).
+         * EM-TEMPLATE-PURITY-3: pass interned strtab label for text mode. */
+        const char *lit = (p && p->STRVAL_fn) ? p->STRVAL_fn : "";
+        const char *lit_label = (g_flat_intern_str && e->is_text)
+                                ? g_flat_intern_str(e, lit) : NULL;
+        emit_bb_xchr(e, p, lit_label, lbl_succ, lbl_fail, lbl_β);
         break;
     }
     case XEPS:  flat_emit_eps (e, lbl_succ, lbl_fail, lbl_β); break;

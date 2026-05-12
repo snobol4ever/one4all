@@ -45,8 +45,10 @@ void emit_sm_void_pop(emitter_t *e);
 
 /* ── BB box templates ─────────────────────────────────────────────────── */
 
-/* XCHR — literal-string-match box.  Sub-rung -d (2026-05-11). */
+/* XCHR — literal-string-match box.  Sub-rung -d (2026-05-11).
+ * EM-TEMPLATE-PURITY-3: lit_label added; is_text guards removed. */
 void emit_bb_xchr(emitter_t *e, PATND_t *p,
+                  const char *lit_label,
                   bb_label_t *lbl_succ, bb_label_t *lbl_fail,
                   bb_label_t *lbl_β);
 

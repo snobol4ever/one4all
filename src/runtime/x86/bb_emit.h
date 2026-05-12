@@ -185,6 +185,32 @@ void t_load_delta_cmp_imm(int n, bb_label_t *lbl_succ, bb_label_t *lbl_fail);
 void t_load_siglen_sub_cmp_delta(int n, uint64_t siglen_addr,
                                  bb_label_t *lbl_succ, bb_label_t *lbl_fail);
 
+/* t_lea_rsi_strtab_sym — load strtab string address into rsi.
+ *   BINARY:    mov rsi, in_proc_ptr  (48 BE <8>)
+ *   TEXT:      lea rcx, [rip + sym_label]; mov rsi, rcx
+ *   MACRO_DEF: same as TEXT with \lbl parameter */
+void t_lea_rsi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr);
+
+/* t_add_delta_imm — Δ += v  (load, add imm32, store back via [r10]).
+ *   BINARY: mov eax,[r10]; add eax,imm32; mov [r10],eax
+ *   TEXT:   three-column lines. */
+void t_add_delta_imm(int v);
+
+/* t_sub_delta_imm — Δ -= v  (load, sub imm32, store back via [r10]).
+ *   BINARY: mov eax,[r10]; sub eax,imm32; mov [r10],eax
+ *   TEXT:   three-column lines. */
+void t_sub_delta_imm(int v);
+
+/* t_sigma_plus_delta_to_rdi — rdi = Σ + Δ.
+ *   BINARY: movabs rcx,&Σ; mov rax,[rcx]; movsxd rcx,[r10]; lea rax,[rax+rcx]; mov rdi,rax
+ *   TEXT:   three-column lines. */
+void t_sigma_plus_delta_to_rdi(uint64_t sigma_addr, uint64_t siglen_addr);
+
+/* t_bounds_check_delta_plus_len — eax = Δ + len; cmp eax, Σlen; jg lbl_fail.
+ *   BINARY: mov eax,[r10]; add eax,imm32; movabs rcx,&Σlen; cmp eax,[rcx]; jg fail
+ *   TEXT:   three-column lines. */
+void t_bounds_check_delta_plus_len(int len, uint64_t siglen_addr, bb_label_t *lbl_fail);
+
 /* ── binary mode state ──────────────────────────────────────────────────── */
 
 extern bb_buf_t  bb_emit_buf;   /* current pool buffer */
