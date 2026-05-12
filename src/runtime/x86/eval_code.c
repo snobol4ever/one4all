@@ -331,7 +331,35 @@ DESCR_t eval_node(tree_t *e)
          * SL-13 step 3 (Snocone --ir-run pattern captures not updating vars). */
         DESCR_t name;
         tree_t *tgt = e->c[1];
-        if (tgt && tgt->t == TT_VAR && tgt->v.sval) {
+        /* SL-13c (sess 2026-05-12, Claude Opus 4.7): pat . *Func(args) parses
+         * as TT_CAPT_COND_ASGN(pat, TT_DEFER(TT_FNC Func args...)).  Unwrap
+         * TT_DEFER first to expose the inner TT_FNC / TT_VAR.  Confirmed via
+         * --dump-ir on `p = LEN(0) . *Foo('direct')`. */
+        tree_t *dtgt = (tgt && tgt->t == TT_DEFER && tgt->n > 0) ? tgt->c[0] : NULL;
+        if (dtgt && dtgt->t == TT_FNC && dtgt->v.sval) {
+            /* . *Func(args) — deferred user-function call.  Eagerly evaluating
+             * via eval_node(tgt) returns a DT_E frozen expression which
+             * pat_assign_cond cannot consume.  Build pat_assign_callcap which
+             * the bb_build XCALLCAP handler lowers to an NM_CALL NAME_t that
+             * fires g_user_call_hook at match-commit time, passing the
+             * captured substring as the first arg per dot-star semantics.
+             * Mirrors SM path SM_PAT_CAPTURE_FN_ARGS (sm_interp.c:743).
+             * Authority: SPITBOL Manual v3.7 Ch.18 (Patterns), pp.86-87. */
+            int nargs = dtgt->n;
+            DESCR_t *argv = NULL;
+            if (nargs > 0) {
+                argv = (DESCR_t *)GC_MALLOC((size_t)nargs * sizeof(DESCR_t));
+                for (int i = 0; i < nargs; i++)
+                    argv[i] = eval_node(dtgt->c[i]);
+            }
+            const char *fname = dtgt->v.sval;
+            return pat_assign_callcap(pat, fname, argv, nargs);
+        } else if (dtgt && dtgt->t == TT_VAR && dtgt->v.sval) {
+            /* . *var — deferred name reference.  The capture target's identity
+             * is the variable named at dtgt->v.sval; build a NAME of that
+             * variable so pat_assign_cond captures into it at match time. */
+            name = NAME_fn(dtgt->v.sval);
+        } else if (tgt && tgt->t == TT_VAR && tgt->v.sval) {
             name = NAME_fn(tgt->v.sval);
         } else if (tgt && tgt->t == TT_KEYWORD && tgt->v.sval) {
             char kbuf[128];
@@ -365,7 +393,24 @@ DESCR_t eval_node(tree_t *e)
          * never an evaluated value (SPITBOL Manual Ch. 18, p. 87). */
         DESCR_t name;
         tree_t *tgt = e->c[1];
-        if (tgt && tgt->t == TT_VAR && tgt->v.sval) {
+        /* SL-13c: $ *Func(args) parses as TT_DEFER(TT_FNC ...) — unwrap. */
+        tree_t *dtgt = (tgt && tgt->t == TT_DEFER && tgt->n > 0) ? tgt->c[0] : NULL;
+        if (dtgt && dtgt->t == TT_FNC && dtgt->v.sval) {
+            /* $ *Func(args) — immediate-capture deferred user-function call.
+             * Same shape as TT_CAPT_COND_ASGN TT_FNC branch but uses imm=1. */
+            int nargs = dtgt->n;
+            DESCR_t *argv = NULL;
+            if (nargs > 0) {
+                argv = (DESCR_t *)GC_MALLOC((size_t)nargs * sizeof(DESCR_t));
+                for (int i = 0; i < nargs; i++)
+                    argv[i] = eval_node(dtgt->c[i]);
+            }
+            const char *fname = dtgt->v.sval;
+            return pat_assign_callcap_named_imm(pat, fname, argv, nargs, NULL, 0);
+        } else if (dtgt && dtgt->t == TT_VAR && dtgt->v.sval) {
+            /* $ *var — deferred name reference. */
+            name = NAME_fn(dtgt->v.sval);
+        } else if (tgt && tgt->t == TT_VAR && tgt->v.sval) {
             name = NAME_fn(tgt->v.sval);
         } else if (tgt && tgt->t == TT_KEYWORD && tgt->v.sval) {
             char kbuf[128];

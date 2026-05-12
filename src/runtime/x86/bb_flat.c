@@ -1599,7 +1599,13 @@ static int flat_is_eligible(PATND_t *p)
      * NULL at bb_boxes.c:541.  Until recursive child-blob emission lands in the
      * binary path, fall back to bb_build_binary (which builds the child correctly
      * via bb_build_binary_node — see bb_build.c:bb_nme_emit_binary). */
-    if (p->kind == XNME || p->kind == XFNME || p->kind == XARBN) return 0;
+    /* SL-13c (sess 2026-05-12, Claude Opus 4.7): XCALLCAP also has no
+     * flat_emit_node case — falls to `default` which emits a β→fail stub,
+     * silently dropping pat . *Fn() deferred calls.  bb_build_binary has a
+     * proper bb_callcap_emit_binary handler (bb_build.c:1219) that wires the
+     * trampoline to bb_cap with NM_CALL.  Excluding XCALLCAP from flat
+     * eligibility routes us there until a real flat XCALLCAP emitter lands. */
+    if (p->kind == XNME || p->kind == XFNME || p->kind == XARBN || p->kind == XCALLCAP) return 0;
     for (int i = 0; i < p->nchildren; i++)
         if (!flat_is_eligible(p->children[i])) return 0;
     return 1;
