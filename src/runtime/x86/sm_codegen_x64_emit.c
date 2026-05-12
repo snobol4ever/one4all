@@ -450,11 +450,13 @@ static int strtab_emit_rodata(FILE *out)
  * If no named labels exist, emits nothing (returns 0). */
 static int emit_expression_registry(FILE *out, const SM_Program *prog)
 {
-    /* Count named labels first so we can skip the section if none. */
+    /* Count function-entry labels only (a[2].i == 1, set by lower.c when
+     * FUNC_IS_ENTRY_LABEL is true).  Plain goto labels (a[2].i == 0) must
+     * not appear in the expression registry — they are not callable chunks. */
     int n = 0;
     for (int i = 0; i < prog->count; i++) {
         const SM_Instr *ins = &prog->instrs[i];
-        if (ins->op == SM_LABEL && ins->a[0].s && *ins->a[0].s)
+        if (ins->op == SM_LABEL && ins->a[0].s && *ins->a[0].s && ins->a[2].i == 1)
             n++;
     }
     if (n == 0) return 0;
@@ -465,7 +467,8 @@ static int emit_expression_registry(FILE *out, const SM_Program *prog)
 
     for (int i = 0; i < prog->count; i++) {
         const SM_Instr *ins = &prog->instrs[i];
-        if (ins->op != SM_LABEL || !ins->a[0].s || !*ins->a[0].s) continue;
+        /* Only function-entry labels (a[2].i == 1); skip goto labels. */
+        if (ins->op != SM_LABEL || !ins->a[0].s || !*ins->a[0].s || ins->a[2].i != 1) continue;
 
         int str_idx = strtab_lookup(ins->a[0].s);
         if (str_idx < 0) continue;  /* should not happen after strtab_collect */
