@@ -829,151 +829,17 @@ static const tree_t *find_first_alternate(const tree_t *t)
     return NULL;
 }
 
-/* GOAL-ICON-BB-COMPLETE rung13: emit TT_ALTERNATE as a pure-SM coroutine.
- * Each arm: lower_expr(arm_i) then SM_SUSPEND (yields arm value to outer SM_GEN_TICK).
- * After resume, stack is empty; the arm value is available via gs->yielded (pushed
- * by SM_GEN_TICK onto the outer stack). */
-static void lower_alternate_gen(const tree_t *t)
-{
-    if (!t || t->n == 0) { sm_emit(g_p, SM_PUSH_NULL); return; }
-    for (int i = 0; i < t->n; i++) {
-        lower_expr(t->c[i]);
-        sm_emit(g_p, SM_SUSPEND);
-    }
-    /* Exhausted — SM_PUSH_NULL + SM_RETURN emitted by caller (lower_every) */
-}
-
-/* GOAL-ICON-BB-COMPLETE rung13: pure-SM every loop.
- *
- * Hoists the first TT_ALTERNATE in gen_expr as an inner coroutine.
- * The outer loop:
- *   SM_GEN_TICK → get one arm value → run body → loop
- * where "body" is the full gen_expr with the TT_ALTERNATE replaced by
- * a SM_LOAD_GLOCAL from the hoisted value (which SM_GEN_TICK puts into
- * a per-tick glocal via SM_STORE_GLOCAL before the body runs).
- *
- * Actually: SM_GEN_TICK pushes the yielded value onto the outer stack.
- * The outer expression body then uses that TOS value via normal STORE_FRAME
- * (for the assignment). We intercept the TT_ALTERNATE dispatch below to
- * emit "pop TOS as the pre-yielded value" by checking g_hoist_alt.
- *
- * Layout:
- *   SM_JUMP skip                   ; over alt coroutine body
- *   alt_entry: SM_RESUME
- *   [lower_alternate_gen(alt_t)]   ; push each arm, SM_SUSPEND
- *   SM_PUSH_NULL; SM_RETURN        ; exhausted
- *   skip:
- *   loop_top:
- *   SM_GEN_TICK alt_entry slot     ; one arm value → TOS, last_ok
- *   SM_JUMP_F done                 ; exhausted
- *   [lower_expr(gen_expr) with g_hoist_alt set]  ; uses TOS value directly
- *   SM_VOID_POP                    ; discard gen_expr result (side-effects done)
- *   [if c[1]: lower_expr(body); SM_VOID_POP]
- *   SM_JUMP loop_top
- *   done:
- *   SM_PUSH_NULL                   ; every is void
- */
-/* GOAL-ICON-BB-COMPLETE rung14: emit `every (E \ N) [do body]` as pure SM.
- * Two slots: slot_inner drives E (must be TT_ALTERNATE or TT_TO/TT_TO_BY);
- * slot_limit drives the limit-counting wrapper coroutine.
- * GLOCAL[0] inside the limit coroutine holds the remaining count (integer).
- *
- * Coroutine layout:
- *   [inner_alt coroutine: SM_JUMP skip_inner / entry_inner: SM_RESUME / lower_alternate_gen / SM_PUSH_NULL / SM_RETURN / skip_inner:]
- *   [limit coroutine:     SM_JUMP skip_limit / entry_limit: SM_RESUME / lower(limit_n)→STORE_GLOCAL[0] /
- *                          loop: SM_GEN_TICK entry_inner slot_inner / SM_JUMP_F done /
- *                                SM_LOAD_GLOCAL[0] / SM_PUSH_LIT_I 0 / SM_ICMP_GT / SM_JUMP_F done /
- *                                SM_LOAD_GLOCAL[0] / SM_DECR / SM_STORE_GLOCAL[0] / SM_VOID_POP /
- *                                SM_SUSPEND / SM_JUMP loop /
- *                         done: SM_PUSH_NULL / SM_RETURN / skip_limit:]
- *   [every loop:          loop_top: SM_GEN_TICK entry_limit slot_limit / SM_JUMP_F jdone /
- *                                   lower(body) / SM_VOID_POP / SM_JUMP loop_top /
- *                         jdone: SM_PUSH_NULL]
- */
+/* IB-10 (2026-05-12): SM coroutine body purged.  The rung13/rung14 pure-SM
+ * coroutine implementation (SM_RESUME / SM_STORE_GLOCAL / SM_SUSPEND_VALUE
+ * etc) was the WRONG approach — see GOAL-ICON-BB-NATIVE.md "Why
+ * GOAL-ICON-BB-COMPLETE was wrong".  All Icon TT_LIMIT-as-every gen-exprs
+ * now route through SM_BB_PUMP_EVERY → coro_eval → bb_broker, the
+ * statement-level dispatch that IB-1..IB-8 left in place as the correct
+ * fallback while flat-BB templates land for individual constructs. */
 static void lower_limit_every(const tree_t *limit_node, const tree_t *body)
 {
-    const tree_t *inner_expr = (limit_node->n >= 1) ? limit_node->c[0] : NULL;
-    const tree_t *limit_n    = (limit_node->n >= 2) ? limit_node->c[1] : NULL;
-    if (!inner_expr || !limit_n) {
-        sm_emit_i(g_p, SM_BB_PUMP_EVERY, (int64_t)every_table_register((tree_t *)limit_node));
-        return;
-    }
-
-    /* Find the alternate inside inner_expr (same rules as lower_every) */
-    const tree_t *alt_t = find_first_alternate(inner_expr);
-    if (!alt_t) {
-        sm_emit_i(g_p, SM_BB_PUMP_EVERY, (int64_t)every_table_register((tree_t *)limit_node));
-        return;
-    }
-
-    /* Allocate two gen slots: inner and limit wrapper */
-    int slot_inner = g_every_gen_slot_next++;
-    int slot_limit = g_every_gen_slot_next++;
-    if (slot_limit >= EVERY_GEN_SLOT_MAX) {
-        g_every_gen_slot_next -= 2;
-        sm_emit_i(g_p, SM_BB_PUMP_EVERY, (int64_t)every_table_register((tree_t *)limit_node));
-        return;
-    }
-
-    /* --- Inner alt coroutine --- */
-    int skip_inner = sm_emit_i(g_p, SM_JUMP, 0);
-    int entry_inner = sm_label(g_p);
-    sm_emit(g_p, SM_RESUME);
-    lower_alternate_gen(alt_t);
-    sm_emit(g_p, SM_PUSH_NULL); sm_emit(g_p, SM_RETURN);
-    sm_patch_jump(g_p, skip_inner, sm_label(g_p));
-
-    /* --- Limit wrapper coroutine --- */
-    int skip_limit = sm_emit_i(g_p, SM_JUMP, 0);
-    int entry_limit = sm_label(g_p);
-    sm_emit(g_p, SM_RESUME);
-    /* Init counter from limit expression (runs once on first entry) */
-    lower_expr(limit_n);
-    sm_emit_i(g_p, SM_STORE_GLOCAL, 0); sm_emit(g_p, SM_VOID_POP);
-    int loop_lim = sm_label(g_p);
-    /* Drive inner generator one tick.
-     * SM_GEN_TICK pushes yielded_val (ok) or FAILDESCR (fail); SM_ICMP_GT pops 2, sets last_ok only. */
-    sm_emit_ii(g_p, SM_GEN_TICK, (int64_t)entry_inner, (int64_t)slot_inner);
-    int done_lim1 = sm_emit_i(g_p, SM_JUMP_F, 0);   /* inner exhausted: TOS=FAILDESCR */
-    /* TOS=yielded_val.  Check counter > 0 (ICMP_GT pops 2, no push). */
-    sm_emit_i(g_p, SM_LOAD_GLOCAL, 0);
-    sm_emit_i(g_p, SM_PUSH_LIT_I, 0);
-    sm_emit(g_p, SM_ICMP_GT);
-    int done_lim2 = sm_emit_i(g_p, SM_JUMP_F, 0);   /* counter==0: TOS=yielded_val */
-    /* counter-- */
-    sm_emit_i(g_p, SM_LOAD_GLOCAL, 0);
-    sm_emit_i(g_p, SM_DECR, 1);
-    sm_emit_i(g_p, SM_STORE_GLOCAL, 0); sm_emit(g_p, SM_VOID_POP);
-    /* TOS = yielded_val; suspend (pops and yields it to outer SM_GEN_TICK) */
-    sm_emit(g_p, SM_SUSPEND);
-    sm_emit_i(g_p, SM_JUMP, loop_lim);
-    /* done_lim1: TOS = FAILDESCR from failed SM_GEN_TICK — pop before exit */
-    sm_patch_jump(g_p, done_lim1, sm_label(g_p));
-    sm_emit(g_p, SM_VOID_POP);
-    int skip_to_exit = sm_emit_i(g_p, SM_JUMP, 0);
-    /* done_lim2: TOS = yielded_val from counter==0 check — pop before exit */
-    sm_patch_jump(g_p, done_lim2, sm_label(g_p));
-    sm_emit(g_p, SM_VOID_POP);
-    sm_patch_jump(g_p, skip_to_exit, sm_label(g_p));
-    sm_emit(g_p, SM_PUSH_NULL); sm_emit(g_p, SM_RETURN);
-    sm_patch_jump(g_p, skip_limit, sm_label(g_p));
-
-    /* --- Outer every loop drives limit coroutine --- */
-    int loop_top = sm_label(g_p);
-    sm_emit_ii(g_p, SM_GEN_TICK, (int64_t)entry_limit, (int64_t)slot_limit);
-    int jdone = sm_emit_i(g_p, SM_JUMP_F, 0);
-    /* TOS = yielded value; hoist so lower_expr(TT_LIMIT) is a no-op */
-    const tree_t *prev_hoist = g_hoist_alt; int prev_entry = g_hoist_entry, prev_slot = g_hoist_slot;
-    g_hoist_alt = alt_t; g_hoist_entry = entry_inner; g_hoist_slot = slot_inner;
-    /* gen_expr is the TT_LIMIT node: lower it as if its value is already on stack.
-     * We don't descend into it — the limit coroutine already handled it.
-     * Just discard the yielded value after body. */
-    g_hoist_alt = prev_hoist; g_hoist_entry = prev_entry; g_hoist_slot = prev_slot;
-    sm_emit(g_p, SM_VOID_POP);   /* discard gen value (stmt context) */
-    if (body) { lower_expr(body); sm_emit(g_p, SM_VOID_POP); }
-    sm_emit_i(g_p, SM_JUMP, loop_top);
-    sm_patch_jump(g_p, jdone, sm_label(g_p));
-    sm_emit(g_p, SM_PUSH_NULL);
+    (void)body;
+    sm_emit_i(g_p, SM_BB_PUMP_EVERY, (int64_t)every_table_register((tree_t *)limit_node));
 }
 
 static void lower_every(const tree_t *t)
@@ -988,44 +854,14 @@ static void lower_every(const tree_t *t)
         return;
     }
 
-    /* Only apply pure-SM path for Icon with a TT_ALTERNATE generator */
-    const tree_t *alt_t = (g_lang == LANG_ICN) ? find_first_alternate(gen_expr) : NULL;
-    if (!alt_t) {        sm_emit_i(g_p, SM_BB_PUMP_EVERY, (int64_t)every_table_register((tree_t *)t));
-        return;
-    }
-
-    /* Allocate per-call gen slot */
-    int slot = g_every_gen_slot_next++;
-    if (slot >= EVERY_GEN_SLOT_MAX) {
-        sm_emit_i(g_p, SM_BB_PUMP_EVERY, (int64_t)every_table_register((tree_t *)t));
-        return;
-    }
-
-    /* Emit the inner alternation coroutine */
-    int skip = sm_emit_i(g_p, SM_JUMP, 0);
-    int entry = sm_label(g_p);
-    sm_emit(g_p, SM_RESUME);
-    lower_alternate_gen(alt_t);
-    sm_emit(g_p, SM_PUSH_NULL); sm_emit(g_p, SM_RETURN);
-    sm_patch_jump(g_p, skip, sm_label(g_p));
-
-    /* Emit the every loop.  Set g_hoist_alt so lower_expr(TT_ALTERNATE)
-     * treats the hoisted alt as "value already on stack from SM_GEN_TICK". */
-    int loop_top = sm_label(g_p);
-    sm_emit_ii(g_p, SM_GEN_TICK, (int64_t)entry, (int64_t)slot);
-    int jdone = sm_emit_i(g_p, SM_JUMP_F, 0);
-    /* TOS = arm value from SM_GEN_TICK.  Set hoist context so lower_expr
-     * of the TT_ALTERNATE inside gen_expr is a no-op (value already on stack). */
-    const tree_t *prev_hoist = g_hoist_alt;
-    int prev_entry = g_hoist_entry, prev_slot = g_hoist_slot;
-    g_hoist_alt = alt_t; g_hoist_entry = entry; g_hoist_slot = slot;
-    lower_expr(gen_expr);
-    g_hoist_alt = prev_hoist; g_hoist_entry = prev_entry; g_hoist_slot = prev_slot;
-    sm_emit(g_p, SM_VOID_POP);
-    if (body) { lower_expr(body); sm_emit(g_p, SM_VOID_POP); }
-    sm_emit_i(g_p, SM_JUMP, loop_top);
-    sm_patch_jump(g_p, jdone, sm_label(g_p));
-    sm_emit(g_p, SM_PUSH_NULL);
+    /* IB-10 (2026-05-12): SM coroutine path purged.  Was: hoisted-alt rung13
+     * pure-SM every loop emitting SM_RESUME / SM_GEN_TICK / SM_SUSPEND.
+     * Route every Icon `every` statement through SM_BB_PUMP_EVERY → coro_eval
+     * → bb_broker, the statement-level dispatch that is the correct fallback
+     * until flat-BB templates (emit_bb_icn_every from IB-4) supersede it for
+     * the specific shapes they cover. */
+    (void)body;
+    sm_emit_i(g_p, SM_BB_PUMP_EVERY, (int64_t)every_table_register((tree_t *)t));
 }
 
 static void lower_suspend(const tree_t *t)
