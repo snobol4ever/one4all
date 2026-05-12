@@ -50,8 +50,9 @@ void emit_bb_xchr(emitter_t *e, PATND_t *p,
                   bb_label_t *lbl_succ, bb_label_t *lbl_fail,
                   bb_label_t *lbl_β);
 
-/* Charset-family (SPAN/BREAK/ANY/NOTANY) — sub-rung -e (2026-05-11). */
-#include "../bb_flat.h"   /* bb_box_fn, bb_charset_text_fn, bb_intcur_text_fn */
+/* Charset-family (SPAN/BREAK/ANY/NOTANY) — sub-rung -e (2026-05-11).
+ * EM-TEMPLATE-PURITY-2: callback params removed; t_bb_port_call used. */
+#include "../bb_flat.h"   /* bb_box_fn */
 
 void emit_bb_charset(emitter_t *e,
                      bb_box_fn c_fn,
@@ -60,11 +61,10 @@ void emit_bb_charset(emitter_t *e,
                      const char *chars,
                      bb_label_t *lbl_succ,
                      bb_label_t *lbl_fail,
-                     bb_label_t *lbl_β,
-                     bb_charset_text_fn text_body_fn,
-                     void *text_body_arg);
+                     bb_label_t *lbl_β);
 
-/* Integer-cursor family (LEN/TAB/RTAB) — sub-rung -g (2026-05-11). */
+/* Integer-cursor family (LEN/TAB/RTAB) — sub-rung -g (2026-05-11).
+ * EM-TEMPLATE-PURITY-2: callback params removed; t_bb_port_call used. */
 void emit_bb_intcur(emitter_t *e,
                     bb_box_fn c_fn,
                     const char *c_fn_name,
@@ -72,27 +72,21 @@ void emit_bb_intcur(emitter_t *e,
                     long long num,
                     bb_label_t *lbl_succ,
                     bb_label_t *lbl_fail,
-                    bb_label_t *lbl_β,
-                    bb_intcur_text_fn text_body_fn,
-                    void *text_body_arg);
+                    bb_label_t *lbl_β);
 void emit_bb_xlnth(emitter_t *e, long long num,
-                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β,
-                   bb_intcur_text_fn text_fn, void *text_arg);
+                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
 void emit_bb_xtb  (emitter_t *e, long long num,
-                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β,
-                   bb_intcur_text_fn text_fn, void *text_arg);
+                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
 void emit_bb_xrtb (emitter_t *e, long long num,
-                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β,
-                   bb_intcur_text_fn text_fn, void *text_arg);
+                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
 
-/* XBRKX (BREAKX) — break-from-variable box. Sub-rung -i (2026-05-11). */
+/* XBRKX (BREAKX) — break-from-variable box. Sub-rung -i (2026-05-11).
+ * EM-TEMPLATE-PURITY-2: callback params removed; t_bb_port_call used. */
 void emit_bb_xbrkx(emitter_t *e,
                    const char *chars,
                    bb_label_t *lbl_succ,
                    bb_label_t *lbl_fail,
-                   bb_label_t *lbl_β,
-                   bb_brkx_text_fn text_body_fn,
-                   void *text_body_arg);
+                   bb_label_t *lbl_β);
 
 /* SM_JUMP family — sub-rung -j (2026-05-11). */
 void emit_sm_jump  (emitter_t *e, int target_pc);

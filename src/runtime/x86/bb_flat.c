@@ -1075,29 +1075,25 @@ static void flat_emit_xspnc(emitter_t *e, const char *chars,
                              bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     charset_text_arg_t a = { bb_span,   "bb_span",   "SPAN",   chars };
-    emit_bb_charset(e, bb_span, "bb_span", "SPAN", chars, lbl_succ, lbl_fail, lbl_β,
-                    charset_text_body, &a);
+    emit_bb_charset(e, bb_span, "bb_span", "SPAN", chars, lbl_succ, lbl_fail, lbl_β);
 }
 static void flat_emit_xbrkc(emitter_t *e, const char *chars,
                              bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     charset_text_arg_t a = { bb_brk,    "bb_brk",    "BREAK",  chars };
-    emit_bb_charset(e, bb_brk, "bb_brk", "BREAK", chars, lbl_succ, lbl_fail, lbl_β,
-                    charset_text_body, &a);
+    emit_bb_charset(e, bb_brk, "bb_brk", "BREAK", chars, lbl_succ, lbl_fail, lbl_β);
 }
 static void flat_emit_xanyc(emitter_t *e, const char *chars,
                              bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     charset_text_arg_t a = { bb_any,    "bb_any",    "ANY",    chars };
-    emit_bb_charset(e, bb_any, "bb_any", "ANY", chars, lbl_succ, lbl_fail, lbl_β,
-                    charset_text_body, &a);
+    emit_bb_charset(e, bb_any, "bb_any", "ANY", chars, lbl_succ, lbl_fail, lbl_β);
 }
 static void flat_emit_xnnyc(emitter_t *e, const char *chars,
                              bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     charset_text_arg_t a = { bb_notany, "bb_notany", "NOTANY", chars };
-    emit_bb_charset(e, bb_notany, "bb_notany", "NOTANY", chars, lbl_succ, lbl_fail, lbl_β,
-                    charset_text_body, &a);
+    emit_bb_charset(e, bb_notany, "bb_notany", "NOTANY", chars, lbl_succ, lbl_fail, lbl_β);
 }
 
 /* ── XBRKX text-body callback (EM-MODE4-IS-MODE3-DUMP-i) ─────────────────── */
@@ -1163,7 +1159,7 @@ static void flat_emit_xbrkx(emitter_t *e, const char *chars,
                              bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     brkx_text_arg_t a = { chars };
-    emit_bb_xbrkx(e, chars, lbl_succ, lbl_fail, lbl_β, brkx_text_body, &a);
+    emit_bb_xbrkx(e, chars, lbl_succ, lbl_fail, lbl_β);
 }
 
 /* ── integer-cursor text-body callback (EM-MODE4-IS-MODE3-DUMP-g) ────────── */
@@ -1215,19 +1211,19 @@ static void flat_emit_xlnth(emitter_t *e, long long num,
                              bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     intcur_text_arg_t a = { bb_len,  "bb_len",  "LEN",  "len",  num, 0 };
-    emit_bb_xlnth(e, num, lbl_succ, lbl_fail, lbl_β, intcur_text_body, &a);
+    emit_bb_xlnth(e, num, lbl_succ, lbl_fail, lbl_β);
 }
 static void flat_emit_xtb(emitter_t *e, long long num,
                            bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     intcur_text_arg_t a = { bb_tab,  "bb_tab",  "TAB",  "tab",  num, 1 };
-    emit_bb_xtb(e, num, lbl_succ, lbl_fail, lbl_β, intcur_text_body, &a);
+    emit_bb_xtb(e, num, lbl_succ, lbl_fail, lbl_β);
 }
 static void flat_emit_xrtb(emitter_t *e, long long num,
                             bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     intcur_text_arg_t a = { bb_rtab, "bb_rtab", "RTAB", "rtab", num, 1 };
-    emit_bb_xrtb(e, num, lbl_succ, lbl_fail, lbl_β, intcur_text_body, &a);
+    emit_bb_xrtb(e, num, lbl_succ, lbl_fail, lbl_β);
 }
 
 /* ── flat_emit_node dispatch ─────────────────────────────────────────────── */

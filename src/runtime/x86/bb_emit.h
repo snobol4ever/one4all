@@ -157,6 +157,34 @@ void t_noop_macro(const char *macro_name);
  *   TEXT/MACRO_DEF: 120-char #= rule, "# stmt N  (line L):  <src>", #= rule */
 void t_banner_stno(int stno, int lineno, const char *src_text);
 
+/* ── BB port helpers (EM-TEMPLATE-PURITY-2) ────────────────────────────── */
+
+/* t_label_define — define a label at the current emit position.
+ *   BINARY:    resolves offset + patches forward refs.
+ *   TEXT:      emits "name:\n". */
+void t_label_define(bb_label_t *lbl);
+
+/* t_bb_port_call — emit one α or β port body for a stateful box.
+ *   Pattern: mov rdi, zeta_ptr; mov esi, port; call fn@PLT;
+ *            test rax, rax; jne lbl_succ; jmp lbl_fail.
+ *   TEXT: three-column lines.  BINARY: raw bytes.
+ *   `port` is 0 for α, 1 for β. */
+void t_bb_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fallback,
+                    int port, bb_label_t *lbl_succ, bb_label_t *lbl_fail);
+
+/* t_load_delta_cmp_imm — load cursor (Δ), compare to n, jump.
+ *   Pattern: eax = Δ; cmp eax, n; jne lbl_fail; jmp lbl_succ.
+ *   BINARY: mov eax,[r10]; cmp eax,imm32; jne; jmp.
+ *   TEXT: three-column lines. */
+void t_load_delta_cmp_imm(int n, bb_label_t *lbl_succ, bb_label_t *lbl_fail);
+
+/* t_load_siglen_sub_cmp_delta — load Σlen, subtract n, compare to Δ, jump.
+ *   Pattern: eax = Σlen; eax -= n; ecx = eax; eax = Δ; cmp eax, ecx;
+ *            jne lbl_fail; jmp lbl_succ.  Used by RPOS(n).
+ *   BINARY: raw bytes.  TEXT: three-column lines. */
+void t_load_siglen_sub_cmp_delta(int n, uint64_t siglen_addr,
+                                 bb_label_t *lbl_succ, bb_label_t *lbl_fail);
+
 /* ── binary mode state ──────────────────────────────────────────────────── */
 
 extern bb_buf_t  bb_emit_buf;   /* current pool buffer */

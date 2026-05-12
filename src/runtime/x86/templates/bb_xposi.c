@@ -5,17 +5,10 @@
 void emit_bb_xposi(emitter_t *e, int n,
                    bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
-    if (!e) return;
-
+    (void)e;
     char args[32]; snprintf(args, sizeof(args), "%d", n);
-    EMIT_OPT(e, bb_box_banner, e, "POS", args);
-    EMIT_OPT(e, comment,       e, "POS(n): succeed iff Δ == n");
-
-    emit_load_delta(e);
-    emit_cmp_eax_imm32(e, (uint32_t)n);
-    EMIT_JMP(e, lbl_fail, JMP_JNE);
-    EMIT_JMP(e, lbl_succ, JMP_JMP);
-
-    EMIT_LABEL(e, lbl_β);
-    EMIT_JMP(e, lbl_fail, JMP_JMP);
+    t_bb_box_banner("POS", args);
+    t_load_delta_cmp_imm(n, lbl_succ, lbl_fail);
+    t_label_define(lbl_β);
+    t_emit_jmp(lbl_fail, JMP_JMP);
 }

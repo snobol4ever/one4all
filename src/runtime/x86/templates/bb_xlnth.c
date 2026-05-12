@@ -18,18 +18,9 @@ void emit_bb_intcur(emitter_t *e,
                     long long num,
                     bb_label_t *lbl_succ,
                     bb_label_t *lbl_fail,
-                    bb_label_t *lbl_β,
-                    bb_intcur_text_fn text_body_fn,
-                    void *text_body_arg)
+                    bb_label_t *lbl_β)
 {
-    (void)kind_name;
-    if (!e) return;
-
-    if (e->is_text) {
-        if (text_body_fn) text_body_fn(e, lbl_succ, lbl_fail, lbl_β, text_body_arg);
-        return;
-    }
-
+    (void)kind_name; (void)e;
     void *z;
     if      (c_fn == bb_len)  z = bb_len_new ((int)num);
     else if (c_fn == bb_tab)  z = bb_tab_new ((int)num);
@@ -39,13 +30,15 @@ void emit_bb_intcur(emitter_t *e,
         raw[0] = (int)num;
         z = raw;
     }
-
-    flat_emit_box_call(e, c_fn, c_fn_name, z, lbl_succ, lbl_fail, lbl_β);
+    t_bb_port_call((uint64_t)(uintptr_t)z, c_fn_name, (uint64_t)(uintptr_t)c_fn,
+                   0, lbl_succ, lbl_fail);
+    t_label_define(lbl_β);
+    t_bb_port_call((uint64_t)(uintptr_t)z, c_fn_name, (uint64_t)(uintptr_t)c_fn,
+                   1, lbl_succ, lbl_fail);
 }
 
 void emit_bb_xlnth(emitter_t *e, long long num,
-                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β,
-                   bb_intcur_text_fn text_fn, void *text_arg)
+                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
-    emit_bb_intcur(e, bb_len, "bb_len", "LEN", num, lbl_succ, lbl_fail, lbl_β, text_fn, text_arg);
+    emit_bb_intcur(e, bb_len, "bb_len", "LEN", num, lbl_succ, lbl_fail, lbl_β);
 }
