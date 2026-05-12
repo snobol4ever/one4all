@@ -85,8 +85,10 @@ t_emit_jmp(target, kind)
 t_noop_macro(macro_name)
 t_banner_stno(stno, lineno, src_text)
 t_lea_rdi_strtab_sym(sym_label, in_proc_ptr)
+t_lea_rdx_strtab_sym(sym_label, in_proc_ptr)
 t_mov_esi_imm32(val)
 t_mov_edi_imm32(val)
+t_mov_edx_imm32(val)
 t_test_eax_eax()
 t_jz_retskip(pc)
 t_retskip_label(pc)
@@ -103,23 +105,27 @@ src/runtime/x86/
     emitter.h                  (emitter_t struct — parameter compat only)
     bb_emit.h / bb_emit.c      t_* helpers + bb_emit_mode switch
     templates/
-        sm_halt.c              one C file per SM opcode
-        sm_push_lit_i.c
-        sm_void_pop.c
-        sm_jump.c
-        sm_arith.c
-        sm_nullary_rt.c
-        sm_label_stno.c
-        sm_call_fn.c
-        sm_return.c
-        …
-        bb_xchr.c              one C file per BB box
-        bb_xspnc.c
-        bb_xlnth.c
-        bb_xbrkx.c
-        bb_xposi.c
-        bb_xfarb.c
-        …
+        sm_halt.c              SM_HALT
+        sm_push_lit_i.c        SM_PUSH_LIT_I
+        sm_void_pop.c          SM_VOID_POP
+        sm_jump.c              SM_JUMP/S/F
+        sm_arith.c             SM_ADD/SUB/MUL/DIV/MOD
+        sm_nullary_rt.c        SM_CONCAT/PUSH_NULL/COERCE_NUM
+        sm_label_stno.c        SM_LABEL/SM_STNO
+        sm_call_fn.c           SM_CALL_FN (MACRO_DEF only)
+        sm_return.c            SM_RETURN/RETURN_VARIANT (MACRO_DEF only)
+        sm_pat_nullary.c       SM_PAT_EPS/ARB/REM/FAIL/SUCCEED/ABORT/BAL/
+                               FENCE/FENCE1/SPAN/BREAK/ANY/NOTANY/LEN/POS/
+                               RPOS/TAB/RTAB/ARBNO/CAT/ALT/DEREF
+        sm_pat_lbl.c           SM_PAT_LIT/REFNAME/USERCALL
+        sm_pat_capture.c       SM_PAT_CAPTURE/USERCALL_ARGS
+        sm_pat_capture_fn.c    SM_PAT_CAPTURE_FN/CAPTURE_FN_ARGS
+        bb_xchr.c              ⚠ still uses is_text/EMIT_JMP — EM-TEMPLATE-PURITY
+        bb_xspnc.c             ⚠ still uses is_text/callback  — EM-TEMPLATE-PURITY
+        bb_xlnth.c             ⚠ still uses is_text/callback  — EM-TEMPLATE-PURITY
+        bb_xbrkx.c             ⚠ still uses is_text/callback  — EM-TEMPLATE-PURITY
+        bb_xposi.c             ⚠ still uses EMIT_OPT/EMIT_JMP — EM-TEMPLATE-PURITY
+        bb_xfarb.c             ⚠ still uses EMIT_OPT/EMIT_JMP — EM-TEMPLATE-PURITY
 ```
 
 ---
