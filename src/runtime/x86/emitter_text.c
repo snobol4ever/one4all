@@ -113,6 +113,11 @@ static void text_emit_insn(emitter_t *e, const bb_insn_desc_t *d)
     case BB_INSN_LEA_R10_SYM:
         emit3c_op(e,"lea","r10, [rip + %s]", d->sym ? d->sym : "??sym??");
         CTX(e)->pos += 7; break;
+    /* push r10 / pop r10 — preserve flat-BB LOCAL across runtime call (2 bytes each) */
+    case BB_INSN_PUSH_R10:
+        emit3c_op(e,"push","r10", NULL); CTX(e)->pos += 2; break;
+    case BB_INSN_POP_R10:
+        emit3c_op(e,"pop","r10", NULL); CTX(e)->pos += 2; break;
     }
 }
 

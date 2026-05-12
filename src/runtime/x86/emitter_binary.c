@@ -81,6 +81,9 @@ static void binary_emit_insn(emitter_t *e, const bb_insn_desc_t *d)
     case BB_INSN_CALL_SYM_PLT: b2(0x48,0xB8); imm64(a0); b2(0xFF,0xD0); break;
     /* LEA_R10_SYM → mov r10, imm64 (binary: movabs r10, addr) */
     case BB_INSN_LEA_R10_SYM:  b2(0x49,0xBA); imm64(a0); break;
+    /* push r10 / pop r10 — preserve flat-BB LOCAL across runtime call */
+    case BB_INSN_PUSH_R10:     b2(0x41,0x52); break;
+    case BB_INSN_POP_R10:      b2(0x41,0x5A); break;
     }
 }
 

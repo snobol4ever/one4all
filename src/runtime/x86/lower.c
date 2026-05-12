@@ -1003,6 +1003,12 @@ void lower_stmt(const tree_t *s)
         if (FUNC_IS_ENTRY_LABEL(label)) {
             g_p->instrs[g_p->count - 1].a[2].i = 1;
             sm_emit(g_p, SM_DEFINE_ENTRY);
+            /* EM-MODE4-IS-MODE3-DUMP-DEFINE-ENTRY-LOOP: internal :(fname) gotos must
+             * skip the DEFINE_ENTRY prologue.  External call (rt_call → chunk_reg_lookup
+             * → call_native_chunk) reaches the function via expression registry pointing
+             * at SM_LABEL+1 = SM_DEFINE_ENTRY.  Internal goto reaches it via labtab.
+             * Re-point the labtab entry to the PC AFTER SM_DEFINE_ENTRY. */
+            tbl->labels[tbl->nlabels - 1].instr_idx = g_p->count;
         }
     }
 

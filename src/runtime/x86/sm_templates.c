@@ -1,0 +1,711 @@
+#include "emitter.h"
+#include "bb_emit.h"
+#include "templates.h"
+#include "sm_prog.h"
+static void emit_sm_rtcall(emitter_t *e, const char *comment_str, const char *macro_name, const char *rt_sym);
+static void emit_sm_pat_rtcall(emitter_t *e, const char *comment_str, const char *macro_name, const char *rt_sym);
+static void emit_sm_lbl_rt(emitter_t *e, const char *comment_str, const char *macro_name, const char *rt_sym, const char *name_lbl, uint64_t name_ptr);
+/*====================================================================================================================*/
+void emit_sm_acomp(emitter_t *e, int op)
+{
+    (void)e;
+    t_comment("SM_ACOMP — numeric compare, op=EKind");
+    static const char *const params[] = { "op" };
+    t_macro_begin("ACOMP", params, 1);
+    t_mov_edi_imm32(op);
+    t_call_sym_plt("rt_acomp", 0);
+    t_macro_end();
+    t_pad_to_blob_size();
+}
+/*====================================================================================================================*/
+void emit_sm_arith_op(emitter_t *e, int op_enum, const char *macro_name)
+{
+    (void)e;
+    t_comment(macro_name ? macro_name : "SM_ARITH");
+    t_macro_begin(macro_name ? macro_name : "ARITH", NULL, 0);
+    t_mov_rdi_imm64((uint64_t)(unsigned)op_enum);
+    t_call_sym_plt("rt_arith", 0);
+    t_macro_end();
+    t_pad_to_blob_size();
+}
+void emit_sm_add(emitter_t *e)
+{
+    emit_sm_arith_op(e, SM_ADD, "ADD_NUM");
+}
+void emit_sm_sub(emitter_t *e)
+{
+    emit_sm_arith_op(e, SM_SUB, "SUB_NUM");
+}
+void emit_sm_mul(emitter_t *e)
+{
+    emit_sm_arith_op(e, SM_MUL, "MUL_NUM");
+}
+void emit_sm_div(emitter_t *e)
+{
+    emit_sm_arith_op(e, SM_DIV, "DIV_NUM");
+}
+void emit_sm_mod(emitter_t *e)
+{
+    emit_sm_arith_op(e, SM_MOD, "MOD_NUM");
+}
+/*====================================================================================================================*/
+void emit_sm_bb_once(emitter_t *e)
+{
+    emit_sm_rtcall(e, "SM_BB_ONCE — run BB once (M5)",
+                       "BB_ONCE", "rt_unhandled_sm");
+}
+/*====================================================================================================================*/
+void emit_sm_bb_once_proc(emitter_t *e)
+{
+    emit_sm_rtcall(e, "SM_BB_ONCE_PROC — Prolog proc BB once (M5)",
+                       "BB_ONCE_PROC", "rt_unhandled_sm");
+}
+/*====================================================================================================================*/
+void emit_sm_bb_pump(emitter_t *e)
+{
+    emit_sm_rtcall(e, "SM_BB_PUMP — drive BB generator (M5)",
+                       "BB_PUMP", "rt_unhandled_sm");
+}
+/*====================================================================================================================*/
+void emit_sm_bb_pump_case(emitter_t *e)
+{
+    emit_sm_rtcall(e, "SM_BB_PUMP_CASE — Raku case BB pump (M5)",
+                       "BB_PUMP_CASE", "rt_unhandled_sm");
+}
+/*====================================================================================================================*/
+void emit_sm_bb_pump_every(emitter_t *e)
+{
+    emit_sm_rtcall(e, "SM_BB_PUMP_EVERY — every-generator BB pump (M5)",
+                       "BB_PUMP_EVERY", "rt_unhandled_sm");
+}
+/*====================================================================================================================*/
+void emit_sm_bb_pump_proc(emitter_t *e)
+{
+    emit_sm_rtcall(e, "SM_BB_PUMP_PROC — Icon proc BB pump (M5)",
+                       "BB_PUMP_PROC", "rt_unhandled_sm");
+}
+/*====================================================================================================================*/
+void emit_sm_bb_pump_sm(emitter_t *e)
+{
+    emit_sm_rtcall(e, "SM_BB_PUMP_SM — migrated SM BB pump (M5)",
+                       "BB_PUMP_SM", "rt_unhandled_sm");
+}
+/*====================================================================================================================*/
+void emit_sm_call_fn(emitter_t *e, const char *name_lbl,
+                     uint64_t name_ptr, int nargs)
+{
+    (void)e;
+    (void)name_lbl;
+    (void)name_ptr;
+    (void)nargs;
+    t_comment("SM_CALL_FN — call named function via rt_call(name, nargs)");
+    static const char *const params[] = { "lbl", "n" };
+    t_macro_begin("CALL_FN", params, 2);
+    t_lea_rdi_strtab_sym(NULL, 0);
+    t_mov_esi_imm32(0);
+    t_call_sym_plt("rt_call", 0);
+    t_macro_end();
+    t_pad_to_blob_size();
+}
+/*====================================================================================================================*/
+void emit_sm_decr(emitter_t *e, int64_t n)
+{
+    (void)e;
+    t_comment("SM_DECR — decrement TOS by immediate n");
+    static const char *const params[] = { "n" };
+    t_macro_begin("DECR", params, 1);
+    t_mov_rdi_imm64((uint64_t)n);
+    t_call_sym_plt("rt_decr", 0);
+    t_macro_end();
+    t_pad_to_blob_size();
+}
+/*====================================================================================================================*/
+void emit_sm_define(emitter_t *e)
+{
+    emit_sm_rtcall(e, "SM_DEFINE — no-op: function definition prescan",
+                       "DEFINE", "rt_define");
+}
+/*====================================================================================================================*/
+void emit_sm_define_entry(emitter_t *e)
+{
+    emit_sm_rtcall(e, "SM_DEFINE_ENTRY — no-op: function entry marker",
+                       "DEFINE_ENTRY", "rt_define_entry");
+}
+/*====================================================================================================================*/
+void emit_sm_push_expression(emitter_t *e, uint64_t entry_ptr, int arity)
+{
+    (void)e;
+    t_comment("SM_PUSH_EXPRESSION — push expression descriptor (entry, arity)");
+    static const char *const params[] = { "entry", "arity" };
+    t_macro_begin("PUSH_EXPRESSION", params, 2);
+    t_movabs_rdi_entry(entry_ptr);
+    t_mov_esi_imm32(arity);
+    t_call_sym_plt("rt_push_expression_descr", 0);
+    t_macro_end();
+    t_pad_to_blob_size();
+}
+void emit_sm_call_expression(emitter_t *e, const char *tgt_sym)
+{
+    (void)e;
+    t_comment("SM_CALL_EXPRESSION — call expression chunk directly");
+    static const char *const params[] = { "tgt" };
+    t_macro_begin("CALL_EXPRESSION", params, 1);
+    t_call_sym_param(tgt_sym);
+    t_macro_end();
+    t_pad_to_blob_size();
+}
+void emit_sm_exec_stmt(emitter_t *e,
+                        const char *subj_lbl, uint64_t subj_ptr,
+                        int has_repl)
+{
+    (void)e;
+    t_comment("SM_EXEC_STMT — execute pattern statement via rt_match_variant");
+    static const char *const params[] = { "has_repl", "subj_lbl" };
+    t_macro_begin("EXEC_STMT_VARIANT", params, 2);
+    t_lea_rdi_strtab_sym(subj_lbl, subj_ptr);
+    t_mov_esi_imm32(has_repl);
+    t_call_sym_plt("rt_match_variant", 0);
+    t_macro_end();
+    t_pad_to_blob_size();
+}
+/*====================================================================================================================*/
+void emit_sm_exp(emitter_t *e)
+{
+    emit_sm_rtcall(e, "SM_EXP — pop 2, push base**exp",
+                       "EXP_NUM", "rt_exp");
+}
+/*====================================================================================================================*/
+void emit_sm_gen_tick(emitter_t *e)
+{
+    emit_sm_rtcall(e, "SM_GEN_TICK — drive generator one tick (M5)",
+                       "GEN_TICK", "rt_unhandled_sm");
+}
+/*====================================================================================================================*/
+void emit_sm_halt(emitter_t *e)
+{
+    (void)e;
+    t_comment("SM_HALT — exit sm_jit_run via ret");
+    t_inc_mem_r13_disp8(20);
+    t_ret();
+    t_pad_to_blob_size();
+}
+/*====================================================================================================================*/
+static void emit_sm_rtcall(emitter_t *e,
+                         const char *comment_str,
+                         const char *macro_name,
+                         const char *rt_sym)
+{
+    (void)e;
+    t_comment(comment_str);
+    t_macro_begin(macro_name, NULL, 0);
+    t_call_sym_plt(rt_sym, 0);
+    t_macro_end();
+    t_pad_to_blob_size();
+}
+static void emit_sm_pat_rtcall(emitter_t *e,
+                              const char *comment_str,
+                              const char *macro_name,
+                              const char *rt_sym)
+{
+    (void)e;
+    t_comment(comment_str);
+    t_macro_begin(macro_name, NULL, 0);
+    t_call_sym_plt(rt_sym, 0);
+    t_macro_end();
+    t_pad_to_blob_size();
+}
+/*====================================================================================================================*/
+void emit_sm_icmp_gt(emitter_t *e)
+{
+    emit_sm_rtcall(e, "SM_ICMP_GT — integer compare > (M5)",
+                       "ICMP_GT", "rt_unhandled_sm");
+}
+/*====================================================================================================================*/
+void emit_sm_icmp_lt(emitter_t *e)
+{
+    emit_sm_rtcall(e, "SM_ICMP_LT — integer compare < (M5)",
+                       "ICMP_LT", "rt_unhandled_sm");
+}
+/*====================================================================================================================*/
+void emit_sm_incr(emitter_t *e, int64_t n)
+{
+    (void)e;
+    t_comment("SM_INCR — increment TOS by immediate n");
+    static const char *const params[] = { "n" };
+    t_macro_begin("INCR", params, 1);
+    t_mov_rdi_imm64((uint64_t)n);
+    t_call_sym_plt("rt_incr", 0);
+    t_macro_end();
+    t_pad_to_blob_size();
+}
+/*====================================================================================================================*/
+static void make_pc_label(bb_label_t *lbl, int target_pc)
+{
+    bb_label_initf(lbl, ".L%d", target_pc);
+}
+void emit_sm_jump(emitter_t *e, int target_pc)
+{
+    (void)e;
+    t_comment("SM_JUMP — unconditional jump");
+    bb_label_t tgt;
+    make_pc_label(&tgt, target_pc);
+    t_emit_jmp(&tgt, JMP_JMP);
+}
+void emit_sm_jump_s(emitter_t *e, int target_pc)
+{
+    (void)e;
+    t_comment("SM_JUMP_S — jump if last_ok");
+    t_call_sym_plt("rt_last_ok", 0);
+    t_test_rax_rax();
+    bb_label_t tgt;
+    make_pc_label(&tgt, target_pc);
+    t_emit_jmp(&tgt, JMP_JNE);
+}
+void emit_sm_jump_f(emitter_t *e, int target_pc)
+{
+    (void)e;
+    t_comment("SM_JUMP_F — jump if not last_ok");
+    t_call_sym_plt("rt_last_ok", 0);
+    t_test_rax_rax();
+    bb_label_t tgt;
+    make_pc_label(&tgt, target_pc);
+    t_emit_jmp(&tgt, JMP_JE);
+}
+/*====================================================================================================================*/
+void emit_sm_label(emitter_t *e)
+{
+    (void)e;
+    t_noop_macro("LABEL");
+}
+void emit_sm_stno(emitter_t *e, int stno, int lineno, const char *src_text)
+{
+    (void)e;
+    t_banner_stno(stno, lineno, src_text);
+    t_noop_macro("STNO");
+}
+/*====================================================================================================================*/
+void emit_sm_lcomp(emitter_t *e, int op)
+{
+    (void)e;
+    t_comment("SM_LCOMP — lexicographic string compare, op=EKind");
+    static const char *const params[] = { "op" };
+    t_macro_begin("LCOMP", params, 1);
+    t_mov_edi_imm32(op);
+    t_call_sym_plt("rt_lcomp", 0);
+    t_macro_end();
+    t_pad_to_blob_size();
+}
+/*====================================================================================================================*/
+void emit_sm_load_frame(emitter_t *e)
+{
+    emit_sm_rtcall(e, "SM_LOAD_FRAME — push IcnFrame slot (M5)",
+                       "LOAD_FRAME", "rt_unhandled_sm");
+}
+/*====================================================================================================================*/
+void emit_sm_load_glocal(emitter_t *e)
+{
+    emit_sm_rtcall(e, "SM_LOAD_GLOCAL — push gen-local slot (M5)",
+                       "LOAD_GLOCAL", "rt_unhandled_sm");
+}
+/*====================================================================================================================*/
+void emit_sm_neg(emitter_t *e)
+{
+    emit_sm_rtcall(e, "SM_NEG — negate TOS",
+                       "NEGATE", "rt_neg");
+}
+/*====================================================================================================================*/
+static void emit_sm_pat_lbl_int_rt(emitter_t *e,
+                                    const char *comment_str,
+                                    const char *macro_name,
+                                    const char *rt_sym,
+                                    const char *name_lbl,
+                                    uint64_t name_ptr,
+                                    int n)
+{
+    (void)e;
+    t_comment(comment_str);
+    static const char *const params[] = { "lbl", "n" };
+    t_macro_begin(macro_name, params, 2);
+    t_lea_rdi_strtab_sym(name_lbl, name_ptr);
+    t_mov_esi_imm32(n);
+    t_call_sym_plt(rt_sym, 0);
+    t_macro_end();
+    t_pad_to_blob_size();
+}
+void emit_sm_pat_capture(emitter_t *e,
+                          const char *name_lbl, uint64_t name_ptr, int kind)
+{
+    emit_sm_pat_lbl_int_rt(e,
+                            "SM_PAT_CAPTURE — pop child, push capture(varname, kind)",
+                            "PAT_CAPTURE", "rt_pat_capture",
+                            name_lbl, name_ptr, kind);
+}
+void emit_sm_pat_usercall_args(emitter_t *e,
+                                const char *name_lbl, uint64_t name_ptr, int nargs)
+{
+    emit_sm_pat_lbl_int_rt(e,
+                            "SM_PAT_USERCALL_ARGS — push *func(args) user-call pattern",
+                            "PAT_USERCALL_ARGS", "rt_pat_usercall_args",
+                            name_lbl, name_ptr, nargs);
+}
+/*====================================================================================================================*/
+void emit_sm_pat_capture_fn(emitter_t *e,
+                             const char *fname_lbl, uint64_t fname_ptr,
+                             int is_imm,
+                             const char *namelist_lbl, uint64_t namelist_ptr)
+{
+    (void)e;
+    t_comment("SM_PAT_CAPTURE_FN — pop child, push . *func() / $ *func() capture");
+    static const char *const params[] = { "is_imm", "fname_lbl", "namelist_lbl" };
+    t_macro_begin("PAT_CAPTURE_FN", params, 3);
+    t_lea_rdi_strtab_sym(fname_lbl, fname_ptr);
+    t_mov_esi_imm32(is_imm);
+    t_lea_rdx_strtab_sym(namelist_lbl, namelist_ptr);
+    t_call_sym_plt("rt_pat_capture_fn", 0);
+    t_macro_end();
+    t_pad_to_blob_size();
+}
+void emit_sm_pat_capture_fn_args(emitter_t *e,
+                                  const char *fname_lbl, uint64_t fname_ptr,
+                                  int is_imm, int nargs)
+{
+    (void)e;
+    t_comment("SM_PAT_CAPTURE_FN_ARGS — pop child, push *func(args) capture");
+    static const char *const params[] = { "is_imm", "nargs", "fname_lbl" };
+    t_macro_begin("PAT_CAPTURE_FN_ARGS", params, 3);
+    t_lea_rdi_strtab_sym(fname_lbl, fname_ptr);
+    t_mov_esi_imm32(is_imm);
+    t_mov_edx_imm32(nargs);
+    t_call_sym_plt("rt_pat_capture_fn_args", 0);
+    t_macro_end();
+    t_pad_to_blob_size();
+}
+/*====================================================================================================================*/
+static void emit_sm_pat_lbl_rt(emitter_t *e,
+                                const char *comment_str,
+                                const char *macro_name,
+                                const char *rt_sym,
+                                const char *name_lbl,
+                                uint64_t name_ptr)
+{
+    (void)e;
+    t_comment(comment_str);
+    static const char *const params[] = { "lbl" };
+    t_macro_begin(macro_name, params, 1);
+    t_lea_rdi_strtab_sym(name_lbl, name_ptr);
+    t_call_sym_plt(rt_sym, 0);
+    t_macro_end();
+    t_pad_to_blob_size();
+}
+void emit_sm_pat_lit(emitter_t *e, const char *name_lbl, uint64_t name_ptr)
+{
+    emit_sm_pat_lbl_rt(e,
+                       "SM_PAT_LIT — push literal-string match pattern",
+                       "PAT_LIT", "rt_pat_lit",
+                       name_lbl, name_ptr);
+}
+void emit_sm_pat_refname(emitter_t *e, const char *name_lbl, uint64_t name_ptr)
+{
+    emit_sm_pat_lbl_rt(e,
+                       "SM_PAT_REFNAME — push *varname pattern (deref by name)",
+                       "PAT_REFNAME", "rt_pat_refname",
+                       name_lbl, name_ptr);
+}
+void emit_sm_pat_usercall(emitter_t *e, const char *name_lbl, uint64_t name_ptr)
+{
+    emit_sm_pat_lbl_rt(e,
+                       "SM_PAT_USERCALL — push *func() user-call pattern",
+                       "PAT_USERCALL", "rt_pat_usercall",
+                       name_lbl, name_ptr);
+}
+/*====================================================================================================================*/
+void emit_sm_pat_eps(emitter_t *e)
+{
+    emit_sm_pat_rtcall(e, "SM_PAT_EPS — push epsilon pattern",
+                           "PAT_EPS", "rt_pat_eps");
+}
+void emit_sm_pat_arb(emitter_t *e)
+{
+    emit_sm_pat_rtcall(e, "SM_PAT_ARB — push ARB (greedy 0+) pattern",
+                           "PAT_ARB", "rt_pat_arb");
+}
+void emit_sm_pat_rem(emitter_t *e)
+{
+    emit_sm_pat_rtcall(e, "SM_PAT_REM — push REM (rest of subject) pattern",
+                           "PAT_REM", "rt_pat_rem");
+}
+void emit_sm_pat_fail(emitter_t *e)
+{
+    emit_sm_pat_rtcall(e, "SM_PAT_FAIL — push FAIL (always fail) pattern",
+                           "PAT_FAIL", "rt_pat_fail");
+}
+void emit_sm_pat_succeed(emitter_t *e)
+{
+    emit_sm_pat_rtcall(e, "SM_PAT_SUCCEED — push SUCCEED (always succeed) pattern",
+                           "PAT_SUCCEED", "rt_pat_succeed");
+}
+void emit_sm_pat_abort(emitter_t *e)
+{
+    emit_sm_pat_rtcall(e, "SM_PAT_ABORT — push ABORT (terminate match) pattern",
+                           "PAT_ABORT", "rt_pat_abort");
+}
+void emit_sm_pat_bal(emitter_t *e)
+{
+    emit_sm_pat_rtcall(e, "SM_PAT_BAL — push BAL (balanced string) pattern",
+                           "PAT_BAL", "rt_pat_bal");
+}
+void emit_sm_pat_fence(emitter_t *e)
+{
+    emit_sm_pat_rtcall(e, "SM_PAT_FENCE0 — push FENCE (no-backtrack gate)",
+                           "PAT_FENCE", "rt_pat_fence");
+}
+void emit_sm_pat_fence1(emitter_t *e)
+{
+    emit_sm_pat_rtcall(e, "SM_PAT_FENCE1 — pop child, push FENCE(child)",
+                           "PAT_FENCE1", "rt_pat_fence1");
+}
+void emit_sm_pat_span(emitter_t *e)
+{
+    emit_sm_pat_rtcall(e, "SM_PAT_SPAN — pop charset, push SPAN(cs)",
+                           "PAT_SPAN", "rt_pat_span");
+}
+void emit_sm_pat_break(emitter_t *e)
+{
+    emit_sm_pat_rtcall(e, "SM_PAT_BREAK — pop charset, push BREAK(cs)",
+                           "PAT_BREAK", "rt_pat_break");
+}
+void emit_sm_pat_any(emitter_t *e)
+{
+    emit_sm_pat_rtcall(e, "SM_PAT_ANY — pop charset, push ANY(cs)",
+                           "PAT_ANY", "rt_pat_any");
+}
+void emit_sm_pat_notany(emitter_t *e)
+{
+    emit_sm_pat_rtcall(e, "SM_PAT_NOTANY — pop charset, push NOTANY(cs)",
+                           "PAT_NOTANY", "rt_pat_notany");
+}
+void emit_sm_pat_len(emitter_t *e)
+{
+    emit_sm_pat_rtcall(e, "SM_PAT_LEN — pop integer n, push LEN(n)",
+                           "PAT_LEN", "rt_pat_len");
+}
+void emit_sm_pat_pos(emitter_t *e)
+{
+    emit_sm_pat_rtcall(e, "SM_PAT_POS — pop integer n, push POS(n)",
+                           "PAT_POS", "rt_pat_pos");
+}
+void emit_sm_pat_rpos(emitter_t *e)
+{
+    emit_sm_pat_rtcall(e, "SM_PAT_RPOS — pop integer n, push RPOS(n)",
+                           "PAT_RPOS", "rt_pat_rpos");
+}
+void emit_sm_pat_tab(emitter_t *e)
+{
+    emit_sm_pat_rtcall(e, "SM_PAT_TAB — pop integer n, push TAB(n)",
+                           "PAT_TAB", "rt_pat_tab");
+}
+void emit_sm_pat_rtab(emitter_t *e)
+{
+    emit_sm_pat_rtcall(e, "SM_PAT_RTAB — pop integer n, push RTAB(n)",
+                           "PAT_RTAB", "rt_pat_rtab");
+}
+void emit_sm_pat_arbno(emitter_t *e)
+{
+    emit_sm_pat_rtcall(e, "SM_PAT_ARBNO — pop child pattern, push ARBNO(child)",
+                           "PAT_ARBNO", "rt_pat_arbno");
+}
+void emit_sm_pat_cat(emitter_t *e)
+{
+    emit_sm_pat_rtcall(e, "SM_PAT_CAT — pop right+left patterns, push CAT(l,r)",
+                           "PAT_CAT", "rt_pat_cat");
+}
+void emit_sm_pat_alt(emitter_t *e)
+{
+    emit_sm_pat_rtcall(e, "SM_PAT_ALT — pop right+left patterns, push ALT(l,r)",
+                           "PAT_ALT", "rt_pat_alt");
+}
+void emit_sm_pat_deref(emitter_t *e)
+{
+    emit_sm_pat_rtcall(e, "SM_PAT_DEREF — pop value, deref to pattern",
+                           "PAT_DEREF", "rt_pat_deref");
+}
+/*====================================================================================================================*/
+void emit_sm_push_expr(emitter_t *e, uint64_t ptr_val)
+{
+    (void)e;
+    t_comment("SM_PUSH_EXPR — push frozen DT_E expression descriptor");
+    static const char *const params[] = { "ptr" };
+    t_macro_begin("PUSH_EXPR", params, 1);
+    t_mov_rdi_imm64(ptr_val);
+    t_call_sym_plt("rt_push_expr", 0);
+    t_macro_end();
+    t_pad_to_blob_size();
+}
+/*====================================================================================================================*/
+void emit_sm_push_lit_f(emitter_t *e, double val)
+{
+    (void)e;
+    t_comment("SM_PUSH_LIT_F — push real literal");
+    static const char *const params[] = { "val" };
+    t_macro_begin("PUSH_REAL", params, 1);
+    uint64_t bits;
+    __builtin_memcpy(&bits, &val, 8);
+    t_mov_rdi_imm64(bits);
+    t_call_sym_plt("rt_push_real_bits", 0);
+    t_macro_end();
+    t_pad_to_blob_size();
+}
+/*====================================================================================================================*/
+void emit_sm_push_lit_i(emitter_t *e, int64_t val)
+{
+    (void)e;
+    t_comment("SM_PUSH_LIT_I — push integer literal");
+    static const char *const params[] = { "val" };
+    t_macro_begin("PUSH_INT", params, 1);
+    t_mov_rdi_imm64((uint64_t)val);
+    t_call_sym_plt("rt_push_int", 0);
+    t_macro_end();
+    t_pad_to_blob_size();
+}
+/*====================================================================================================================*/
+void emit_sm_push_lit_s(emitter_t *e,
+                         const char *str_lbl, uint64_t str_ptr, int len)
+{
+    (void)e;
+    t_comment("SM_PUSH_LIT_S — push string literal via rt_push_str(s, len)");
+    static const char *const params[] = { "lbl", "n" };
+    t_macro_begin("PUSH_STR", params, 2);
+    t_lea_rdi_strtab_sym(str_lbl, str_ptr);
+    t_mov_esi_imm32(len);
+    t_call_sym_plt("rt_push_str", 0);
+    t_macro_end();
+    t_pad_to_blob_size();
+}
+/*====================================================================================================================*/
+void emit_sm_push_null_noflip(emitter_t *e)
+{
+    emit_sm_rtcall(e, "SM_PUSH_NULL_NOFLIP — push null, preserve last_ok",
+                       "PUSH_NULL_NOFLIP", "rt_push_null_noflip");
+}
+/*====================================================================================================================*/
+void emit_sm_resume(emitter_t *e)
+{
+    emit_sm_rtcall(e, "SM_RESUME — generator resume marker (M5)",
+                       "RESUME", "rt_unhandled_sm");
+}
+/*====================================================================================================================*/
+void emit_sm_return(emitter_t *e)
+{
+    (void)e;
+    t_comment("SM_RETURN — native return");
+    t_macro_begin("RETURN", NULL, 0);
+    t_ret();
+    t_macro_end();
+    t_pad_to_blob_size();
+}
+void emit_sm_return_variant(emitter_t *e, int kind, int cond, int pc)
+{
+    (void)e;
+    t_comment("SM_RETURN_VARIANT — conditional/typed return via rt_do_return");
+    static const char *const params[] = { "kind", "cond", "pc" };
+    t_macro_begin("RETURN_VARIANT", params, 3);
+    t_mov_edi_imm32(kind);
+    t_mov_esi_imm32(cond);
+    t_call_sym_plt("rt_do_return", 0);
+    t_test_eax_eax();
+    t_jz_retskip(pc);
+    t_ret();
+    t_retskip_label(pc);
+    t_macro_end();
+    t_pad_to_blob_size();
+}
+void emit_sm_freturn(emitter_t *e, int pc)    { emit_sm_return_variant(e, 1, 0, pc); }
+void emit_sm_nreturn(emitter_t *e, int pc)    { emit_sm_return_variant(e, 2, 0, pc); }
+void emit_sm_return_s(emitter_t *e, int pc)   { emit_sm_return_variant(e, 0, 1, pc); }
+void emit_sm_return_f(emitter_t *e, int pc)   { emit_sm_return_variant(e, 0, 2, pc); }
+void emit_sm_freturn_s(emitter_t *e, int pc)  { emit_sm_return_variant(e, 1, 1, pc); }
+void emit_sm_freturn_f(emitter_t *e, int pc)  { emit_sm_return_variant(e, 1, 2, pc); }
+void emit_sm_nreturn_s(emitter_t *e, int pc)  { emit_sm_return_variant(e, 2, 1, pc); }
+void emit_sm_nreturn_f(emitter_t *e, int pc)  { emit_sm_return_variant(e, 2, 2, pc); }
+/*====================================================================================================================*/
+void emit_sm_concat(emitter_t *e)
+{
+    emit_sm_rtcall(e, "SM_CONCAT — pop right+left, push concat result",
+                       "CONCAT", "rt_concat");
+}
+void emit_sm_push_null(emitter_t *e)
+{
+    emit_sm_rtcall(e, "SM_PUSH_NULL — push null descriptor",
+                       "PUSH_NULL", "rt_push_null");
+}
+void emit_sm_coerce_num(emitter_t *e)
+{
+    emit_sm_rtcall(e, "SM_COERCE_NUM — coerce TOS string to number",
+                       "COERCE_NUM", "rt_coerce_num");
+}
+/*====================================================================================================================*/
+void emit_sm_store_frame(emitter_t *e)
+{
+    emit_sm_rtcall(e, "SM_STORE_FRAME — pop into IcnFrame slot (M5)",
+                       "STORE_FRAME", "rt_unhandled_sm");
+}
+/*====================================================================================================================*/
+void emit_sm_store_glocal(emitter_t *e)
+{
+    emit_sm_rtcall(e, "SM_STORE_GLOCAL — pop into gen-local slot (M5)",
+                       "STORE_GLOCAL", "rt_unhandled_sm");
+}
+/*====================================================================================================================*/
+void emit_sm_suspend(emitter_t *e)
+{
+    emit_sm_rtcall(e, "SM_SUSPEND — generator suspend (M5)",
+                       "SUSPEND", "rt_unhandled_sm");
+}
+/*====================================================================================================================*/
+void emit_sm_suspend_value(emitter_t *e)
+{
+    emit_sm_rtcall(e, "SM_SUSPEND_VALUE — coroutine yield (M5)",
+                       "SUSPEND_VALUE", "rt_unhandled_sm");
+}
+/*====================================================================================================================*/
+static void emit_sm_lbl_rt(emitter_t *e,
+                             const char *comment_str,
+                             const char *macro_name,
+                             const char *rt_sym,
+                             const char *name_lbl,
+                             uint64_t name_ptr)
+{
+    (void)e;
+    t_comment(comment_str);
+    static const char *const params[] = { "lbl" };
+    t_macro_begin(macro_name, params, 1);
+    t_lea_rdi_strtab_sym(name_lbl, name_ptr);
+    t_call_sym_plt(rt_sym, 0);
+    t_macro_end();
+    t_pad_to_blob_size();
+}
+void emit_sm_push_var(emitter_t *e, const char *name_lbl, uint64_t name_ptr)
+{
+    emit_sm_lbl_rt(e,
+                   "SM_PUSH_VAR — push value of named variable via rt_nv_get",
+                   "PUSH_VAR", "rt_nv_get",
+                   name_lbl, name_ptr);
+}
+void emit_sm_store_var(emitter_t *e, const char *name_lbl, uint64_t name_ptr)
+{
+    emit_sm_lbl_rt(e,
+                   "SM_STORE_VAR — store TOS into named variable via rt_nv_set",
+                   "STORE_VAR", "rt_nv_set",
+                   name_lbl, name_ptr);
+}
+/*====================================================================================================================*/
+void emit_sm_void_pop(emitter_t *e)
+{
+    (void)e;
+    t_comment("SM_VOID_POP — pop and discard TOS");
+    t_macro_begin("VOID_POP", NULL, 0);
+    t_call_sym_plt("rt_pop_void", 0);
+    t_macro_end();
+    t_pad_to_blob_size();
+}
+/*====================================================================================================================*/

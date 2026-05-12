@@ -53,7 +53,7 @@
 #include "../../frontend/snobol4/scrip_cc.h"  /* tree_t, TT_FNC for SM_PAT_CAPTURE_FN */
 #include "bb_broker.h"   /* SN-9b: SM_BB_PUMP / SM_BB_ONCE handlers */
 #include "../../runtime/interp/coro_runtime.h"  /* GOAL-ICON-BB-COMPLETE rung13: FRAME, EVERY_GEN_SLOT_MAX, IcnFrame */
-#include "templates/templates.h"  /* EM-MODE4-IS-MODE3-DUMP-c: per-opcode templates */
+#include "templates.h"  /* EM-MODE4-IS-MODE3-DUMP-c: per-opcode templates */
 #include "bb_emit.h"              /* EM-MODE4-IS-MODE3-DUMP-c: capture-and-flush adapter */
 #include "emitter.h"              /* EM-MODE4-IS-MODE3-DUMP-c: emitter_t */
 

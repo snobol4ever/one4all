@@ -80,84 +80,8 @@ RT_PIC_SRCS := \
     $(RT)/x86/emitter_macro_def.c \
     $(RT)/x86/bb_build.c \
     $(RT)/x86/bb_flat.c \
-    $(RT)/x86/templates/bb_xchr.c \
-    $(RT)/x86/templates/bb_xspnc.c \
-    $(RT)/x86/templates/bb_xlnth.c \
-    $(RT)/x86/templates/bb_xtb.c \
-    $(RT)/x86/templates/bb_xrtb.c \
-    $(RT)/x86/templates/bb_xstar.c \
-    $(RT)/x86/templates/bb_xabrt.c \
-    $(RT)/x86/templates/bb_xsucf.c \
-    $(RT)/x86/templates/bb_xbal.c \
-    $(RT)/x86/templates/bb_xvar.c \
-    $(RT)/x86/templates/bb_xfnce.c \
-    $(RT)/x86/templates/bb_xatp.c \
-    $(RT)/x86/templates/bb_xdsar.c \
-    $(RT)/x86/templates/bb_xnme.c \
-    $(RT)/x86/templates/bb_xfnme.c \
-    $(RT)/x86/templates/bb_xcallcap.c \
-    $(RT)/x86/templates/bb_xarbn.c \
-    $(RT)/x86/templates/bb_icon_to.c \
-    $(RT)/x86/templates/bb_icon_iterate.c \
-    $(RT)/x86/templates/bb_icon_alt.c \
-    $(RT)/x86/templates/bb_icon_every.c \
-    $(RT)/x86/templates/bb_icon_limit.c \
-    $(RT)/x86/templates/bb_icon_bang.c \
-    $(RT)/x86/templates/bb_icon_lconcat.c \
-    $(RT)/x86/templates/bb_icon_seq.c \
-    $(RT)/x86/templates/bb_xcat.c \
-    $(RT)/x86/templates/bb_xor.c \
-    $(RT)/x86/templates/bb_xbrkx.c \
-    $(RT)/x86/templates/bb_xposi.c \
-    $(RT)/x86/templates/bb_xrpsi.c \
-    $(RT)/x86/templates/bb_xfarb.c \
-    $(RT)/x86/templates/bb_xeps.c \
-    $(RT)/x86/templates/bb_xfail.c \
-    $(RT)/x86/templates/sm_halt.c \
-    $(RT)/x86/templates/sm_push_lit_i.c \
-    $(RT)/x86/templates/sm_void_pop.c \
-    $(RT)/x86/templates/sm_call_fn.c \
-    $(RT)/x86/templates/sm_push_lit_s.c \
-    $(RT)/x86/templates/sm_helpers.c \
-    $(RT)/x86/templates/sm_exp.c \
-    $(RT)/x86/templates/sm_neg.c \
-    $(RT)/x86/templates/sm_push_null_noflip.c \
-    $(RT)/x86/templates/sm_var.c \
-    $(RT)/x86/templates/sm_jump.c \
-    $(RT)/x86/templates/sm_label_stno.c \
-    $(RT)/x86/templates/sm_push_lit_f.c \
-    $(RT)/x86/templates/sm_push_expr.c \
-    $(RT)/x86/templates/sm_incr.c \
-    $(RT)/x86/templates/sm_decr.c \
-    $(RT)/x86/templates/sm_acomp.c \
-    $(RT)/x86/templates/sm_lcomp.c \
-    $(RT)/x86/templates/sm_define_entry.c \
-    $(RT)/x86/templates/sm_define.c \
-    $(RT)/x86/templates/sm_suspend.c \
-    $(RT)/x86/templates/sm_resume.c \
-    $(RT)/x86/templates/sm_suspend_value.c \
-    $(RT)/x86/templates/sm_gen_tick.c \
-    $(RT)/x86/templates/sm_load_glocal.c \
-    $(RT)/x86/templates/sm_store_glocal.c \
-    $(RT)/x86/templates/sm_icmp_gt.c \
-    $(RT)/x86/templates/sm_icmp_lt.c \
-    $(RT)/x86/templates/sm_load_frame.c \
-    $(RT)/x86/templates/sm_store_frame.c \
-    $(RT)/x86/templates/sm_bb_pump.c \
-    $(RT)/x86/templates/sm_bb_once.c \
-    $(RT)/x86/templates/sm_bb_once_proc.c \
-    $(RT)/x86/templates/sm_bb_pump_proc.c \
-    $(RT)/x86/templates/sm_bb_pump_case.c \
-    $(RT)/x86/templates/sm_bb_pump_sm.c \
-    $(RT)/x86/templates/sm_bb_pump_every.c \
-    $(RT)/x86/templates/sm_pat_lbl.c \
-    $(RT)/x86/templates/sm_pat_capture.c \
-    $(RT)/x86/templates/sm_pat_capture_fn.c \
-    $(RT)/x86/templates/sm_arith.c \
-    $(RT)/x86/templates/sm_rtcall.c \
-    $(RT)/x86/templates/sm_return.c \
-    $(RT)/x86/templates/sm_exec_stmt.c \
-    $(RT)/x86/templates/sm_pat_rtcall.c \
+    $(RT)/x86/bb_templates.c \
+    $(RT)/x86/sm_templates.c \
     \
     $(RT)/x86/bb_boxes.c \
     $(RT)/x86/bb_broker.c \
@@ -376,84 +300,8 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/lower_ctx.c  -o $(OBJ)/lower_ctx.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_image.c   -o $(OBJ)/sm_image.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_codegen.c -o $(OBJ)/sm_codegen.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_halt.c -o $(OBJ)/template_sm_halt.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_push_lit_i.c -o $(OBJ)/template_sm_push_lit_i.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_void_pop.c -o $(OBJ)/template_sm_void_pop.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_call_fn.c -o $(OBJ)/template_sm_call_fn.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_push_lit_s.c -o $(OBJ)/template_sm_push_lit_s.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_helpers.c -o $(OBJ)/template_sm_helpers.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_acomp.c -o $(OBJ)/template_sm_acomp.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_bb_once.c -o $(OBJ)/template_sm_bb_once.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_bb_once_proc.c -o $(OBJ)/template_sm_bb_once_proc.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_bb_pump.c -o $(OBJ)/template_sm_bb_pump.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_bb_pump_case.c -o $(OBJ)/template_sm_bb_pump_case.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_bb_pump_every.c -o $(OBJ)/template_sm_bb_pump_every.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_bb_pump_proc.c -o $(OBJ)/template_sm_bb_pump_proc.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_bb_pump_sm.c -o $(OBJ)/template_sm_bb_pump_sm.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_decr.c -o $(OBJ)/template_sm_decr.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_define.c -o $(OBJ)/template_sm_define.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_define_entry.c -o $(OBJ)/template_sm_define_entry.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_exp.c -o $(OBJ)/template_sm_exp.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_gen_tick.c -o $(OBJ)/template_sm_gen_tick.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_icmp_gt.c -o $(OBJ)/template_sm_icmp_gt.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_icmp_lt.c -o $(OBJ)/template_sm_icmp_lt.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_incr.c -o $(OBJ)/template_sm_incr.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_jump.c -o $(OBJ)/template_sm_jump.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_label_stno.c -o $(OBJ)/template_sm_label_stno.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_lcomp.c -o $(OBJ)/template_sm_lcomp.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_load_frame.c -o $(OBJ)/template_sm_load_frame.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_load_glocal.c -o $(OBJ)/template_sm_load_glocal.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_neg.c -o $(OBJ)/template_sm_neg.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_pat_lbl.c -o $(OBJ)/template_sm_pat_lbl.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_pat_capture.c -o $(OBJ)/template_sm_pat_capture.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_pat_capture_fn.c -o $(OBJ)/template_sm_pat_capture_fn.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_push_expr.c -o $(OBJ)/template_sm_push_expr.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_push_lit_f.c -o $(OBJ)/template_sm_push_lit_f.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_push_null_noflip.c -o $(OBJ)/template_sm_push_null_noflip.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_var.c -o $(OBJ)/template_sm_var.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_resume.c -o $(OBJ)/template_sm_resume.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_store_frame.c -o $(OBJ)/template_sm_store_frame.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_store_glocal.c -o $(OBJ)/template_sm_store_glocal.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_suspend.c -o $(OBJ)/template_sm_suspend.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_suspend_value.c -o $(OBJ)/template_sm_suspend_value.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xbrkx.c -o $(OBJ)/template_bb_xbrkx.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xposi.c -o $(OBJ)/template_bb_xposi.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xrpsi.c -o $(OBJ)/template_bb_xrpsi.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xfarb.c -o $(OBJ)/template_bb_xfarb.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xeps.c -o $(OBJ)/template_bb_xeps.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xfail.c -o $(OBJ)/template_bb_xfail.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xchr.c -o $(OBJ)/template_bb_xchr.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xspnc.c -o $(OBJ)/template_bb_xspnc.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xlnth.c -o $(OBJ)/template_bb_xlnth.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xtb.c -o $(OBJ)/template_bb_xtb.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xrtb.c -o $(OBJ)/template_bb_xrtb.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xstar.c -o $(OBJ)/template_bb_xstar.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xabrt.c -o $(OBJ)/template_bb_xabrt.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xsucf.c -o $(OBJ)/template_bb_xsucf.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xbal.c -o $(OBJ)/template_bb_xbal.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xvar.c -o $(OBJ)/template_bb_xvar.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xfnce.c -o $(OBJ)/template_bb_xfnce.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xatp.c -o $(OBJ)/template_bb_xatp.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xdsar.c -o $(OBJ)/template_bb_xdsar.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xnme.c -o $(OBJ)/template_bb_xnme.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xfnme.c -o $(OBJ)/template_bb_xfnme.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xcallcap.c -o $(OBJ)/template_bb_xcallcap.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xarbn.c -o $(OBJ)/template_bb_xarbn.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_icon_to.c -o $(OBJ)/template_bb_icon_to.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_icon_iterate.c -o $(OBJ)/template_bb_icon_iterate.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_icon_alt.c -o $(OBJ)/template_bb_icon_alt.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_icon_every.c -o $(OBJ)/template_bb_icon_every.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_icon_limit.c -o $(OBJ)/template_bb_icon_limit.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_icon_bang.c -o $(OBJ)/template_bb_icon_bang.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_icon_lconcat.c -o $(OBJ)/template_bb_icon_lconcat.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_icon_seq.c -o $(OBJ)/template_bb_icon_seq.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xcat.c -o $(OBJ)/template_bb_xcat.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xor.c -o $(OBJ)/template_bb_xor.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_arith.c -o $(OBJ)/template_sm_arith.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_rtcall.c -o $(OBJ)/template_sm_rtcall.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_return.c -o $(OBJ)/template_sm_return.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_exec_stmt.c -o $(OBJ)/template_sm_exec_stmt.o
-	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_pat_rtcall.c -o $(OBJ)/template_sm_pat_rtcall.o
+	$(CC) $(CRT)   -c $(RT)/x86/sm_templates.c -o $(OBJ)/sm_templates.o
+	$(CC) $(CRT)   -c $(RT)/x86/bb_templates.c -o $(OBJ)/bb_templates.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_emit_template.c -o $(OBJ)/sm_emit_template.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_codegen_x64_emit.c -o $(OBJ)/sm_codegen_x64_emit.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_globals.c -o $(OBJ)/interp_globals.o

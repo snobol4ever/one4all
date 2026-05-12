@@ -18,7 +18,7 @@
 #include "emitter.h"
 #include "snobol4.h"
 #include "bb_box.h"
-#include "templates/templates.h"   /* EM-MODE4-IS-MODE3-DUMP-d: emit_bb_xchr */
+#include "templates.h"   /* EM-MODE4-IS-MODE3-DUMP-d: emit_bb_xchr */
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -402,11 +402,13 @@ static void flat_box_call(emitter_t *e, const char *rdi_load,
                           const char *fn, int mode)
 {
     if (!e->is_text) return;
+    flat3c_action(e, "push", "r10");
     flat3c_action(e, "lea", rdi_load);
     char esi_arg[32]; snprintf(esi_arg, sizeof(esi_arg), "esi, %d", mode);
     flat3c_action(e, "mov", esi_arg);
     char call_arg[64]; snprintf(call_arg, sizeof(call_arg), "%s@PLT", fn);
     flat3c_action(e, "call", call_arg);
+    flat3c_action(e, "pop", "r10");
 }
 
 /* Variant: arbno's box call uses a slot pointer dereference rather than
@@ -415,6 +417,7 @@ static void flat_box_call_slot(emitter_t *e, const char *slot_lbl,
                                const char *fn, int mode)
 {
     if (!e->is_text) return;
+    flat3c_action(e, "push", "r10");
     char rdi_arg[160]; snprintf(rdi_arg, sizeof(rdi_arg),
                                 "rdi, qword ptr [rip + %s]", slot_lbl);
     flat3c_action(e, "mov", rdi_arg);
@@ -422,6 +425,7 @@ static void flat_box_call_slot(emitter_t *e, const char *slot_lbl,
     flat3c_action(e, "mov", esi_arg);
     char call_arg[64]; snprintf(call_arg, sizeof(call_arg), "%s@PLT", fn);
     flat3c_action(e, "call", call_arg);
+    flat3c_action(e, "pop", "r10");
 }
 
 /* EM-FORMAT-BB-LAW (TRIPLE-FUSION): emit
@@ -1245,9 +1249,19 @@ void flat_emit_box_call(emitter_t *e, bb_box_fn fn, const char *fn_name,
                                bb_label_t *lbl_succ, bb_label_t *lbl_fail,
                                bb_label_t *lbl_β)
 {
+    /* Save/restore r10 around each runtime call.  r10 holds the flat-BB
+     * BLOB's LOCAL (Δ pointer, loaded by lea r10, [rip + Δ_data] in the
+     * α-preamble) and must persist across the call so the γ-body can
+     * dereference it via `movslq (%r10), %rcx`.  r10 is caller-saved by
+     * the AMD64 SysV ABI — the called runtime function is free to clobber
+     * it.  Per ARCH-x86.md §"Intra-BLOB vs extra-BLOB jumps": source BLOB
+     * push/pops r10 around any outbound call where control resumes inside
+     * the same BLOB.  Port calls always resume inside the BLOB. */
+    emit_push_r10(e);
     emit_mov_rdi_imm64(e, (uint64_t)(uintptr_t)z);
     emit_mov_esi_imm32(e, 0);
     emit_call_sym_plt(e, fn_name, (uint64_t)(uintptr_t)fn);
+    emit_pop_r10(e);
     if (e->is_text) {
         flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
     } else {
@@ -1256,9 +1270,11 @@ void flat_emit_box_call(emitter_t *e, bb_box_fn fn, const char *fn_name,
         EV_JMP(e, lbl_fail, JMP_JMP);
     }
     EV_LABEL(e, lbl_β);
+    emit_push_r10(e);
     emit_mov_rdi_imm64(e, (uint64_t)(uintptr_t)z);
     emit_mov_esi_imm32(e, 1);
     emit_call_sym_plt(e, fn_name, (uint64_t)(uintptr_t)fn);
+    emit_pop_r10(e);
     if (e->is_text) {
         flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
     } else {

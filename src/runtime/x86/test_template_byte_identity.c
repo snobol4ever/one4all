@@ -19,7 +19,7 @@
  */
 
 #include "emitter.h"
-#include "templates/templates.h"
+#include "templates.h"
 #include "bb_emit.h"
 #include <stdio.h>
 #include <string.h>

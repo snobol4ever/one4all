@@ -105,6 +105,10 @@ typedef enum {
     /* TEXT:   call sym@PLT           (PLT-indirect function call)            */
     /* BINARY: mov rax, a0; call rax  (imm64 + indirect-call fallback)        */
     BB_INSN_CALL_SYM_PLT,
+    /* push r10               41 52      — save flat-BB LOCAL across runtime call */
+    BB_INSN_PUSH_R10,
+    /* pop r10                41 5A      — restore flat-BB LOCAL after runtime call */
+    BB_INSN_POP_R10,
 } bb_insn_kind_t;
 
 typedef struct {
@@ -441,6 +445,12 @@ static inline void emit_call_sym_plt(emitter_t *e, const char *sym, uint64_t fn_
     bb_insn_desc_t d = {BB_INSN_CALL_SYM_PLT, fn_fallback, 0, 0, sym};
     e->emit_insn(e, &d);
 }
+
+static inline void emit_push_r10(emitter_t *e)
+{ emit_insn0(e, BB_INSN_PUSH_R10); }
+
+static inline void emit_pop_r10(emitter_t *e)
+{ emit_insn0(e, BB_INSN_POP_R10); }
 
 /* r10 = &Δ */
 static inline void emit_load_r10_delta_ptr(emitter_t *e, uint64_t addr)

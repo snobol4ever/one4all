@@ -1554,9 +1554,36 @@ void t_label_define(bb_label_t *lbl)
 void t_bb_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fallback,
                     int port, bb_label_t *lbl_succ, bb_label_t *lbl_fail)
 {
+    /* Save/restore r10 around the call.  r10 holds the flat-BB BLOB's LOCAL
+     * (lea r10, [rip + Δ_data] from the α-preamble) and must persist across
+     * the call so the γ-body can do `mov ... [r10+N]`.  r10 is caller-saved
+     * by the AMD64 SysV ABI — the called runtime function is free to clobber
+     * it.  Per ARCH-x86.md §"Intra-BLOB vs extra-BLOB jumps": the source
+     * BLOB push/pops r10 around any outbound call where control resumes
+     * inside the same BLOB.  Port calls always resume inside the BLOB. */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:
+        bb_emit_byte(0x41); bb_emit_byte(0x52);   /* push r10 */
+        break;
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF:
+        bb3c_format(emit_outf(), "", "push", "r10");
+        break;
+    }
     t_mov_rdi_imm64(zeta_ptr);
     t_mov_esi_imm32(port);
     t_call_sym_plt(fn_name, fn_fallback);
+    switch (bb_emit_mode) {
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:
+        bb_emit_byte(0x41); bb_emit_byte(0x5A);   /* pop r10 */
+        break;
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF:
+        bb3c_format(emit_outf(), "", "pop", "r10");
+        break;
+    }
     t_test_rax_rax();
     t_emit_jmp(lbl_succ, JMP_JNE);
     t_emit_jmp(lbl_fail, JMP_JMP);
