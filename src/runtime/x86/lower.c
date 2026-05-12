@@ -46,7 +46,7 @@
 
 void lower_expr    (const tree_t *t);
 void lower_pat_expr(const tree_t *t);
-void lower_stmt    (const tree_t *s);  /* SI-3: s is TT_STMT or TT_END */
+void lower_stmt    (const tree_t *s);
 
 /*── File-scope lowering state ───────────────────────────────────────────────
  * lower() initializes these before the pass; all handlers read/write them.
@@ -58,6 +58,8 @@ static LabelTable   g_labtab;
 static int          g_in_proc_body;
 static IcnScope    *g_proc_scope;
 static unsigned long long g_unhandled_kinds[LOWER_UNHANDLED_WORDS];
+
+extern int g_lang;   /* set per-statement in lower_stmt; read by lower_cat_seq */
 
 static void emit_push_expr(const tree_t *t)
 {
@@ -98,57 +100,43 @@ static int emit_goto(sm_opcode_t op, const char *target)
     return idx;
 }
 
-/* Helpers: read a child safely. */
-#define T0(t) ((t)->n > 0 ? (t)->c[0] : NULL)
-#define T1(t) ((t)->n > 1 ? (t)->c[1] : NULL)
-#define T2(t) ((t)->n > 2 ? (t)->c[2] : NULL)
-
-/* One-liner handlers for arithmetic and unary ops. */
-#define CALL1(fn) do { lower_expr(T0(t)); sm_emit_si(p,SM_CALL_FN,(fn),1); } while(0)
-#define CALL2(fn) do { lower_expr(T0(t)); lower_expr(T1(t)); sm_emit_si(p,SM_CALL_FN,(fn),2); } while(0)
-
 /* Inline frame-slot load for a named variable, falling back to NV store. */
 static void emit_var_load(const char *vn)
 {
-    SM_Program *p = g_p;
     if (g_in_proc_body && g_proc_scope && vn[0] && vn[0] != '&') {
         int slot = scope_get(g_proc_scope, vn);
-        if (slot >= 0) { sm_emit_i(p, SM_LOAD_FRAME, slot); return; }
+        if (slot >= 0) { sm_emit_i(g_p, SM_LOAD_FRAME, slot); return; }
     }
-    sm_emit_s(p, SM_PUSH_VAR, vn);
+    sm_emit_s(g_p, SM_PUSH_VAR, vn);
 }
 
-/* Inline frame-slot store for a named variable, falling back to NV store. */
 static void emit_var_store(const char *vn)
 {
-    SM_Program *p = g_p;
     if (g_in_proc_body && g_proc_scope && vn[0] && vn[0] != '&') {
         int slot = scope_get(g_proc_scope, vn);
-        if (slot >= 0) { sm_emit_i(p, SM_STORE_FRAME, slot); return; }
+        if (slot >= 0) { sm_emit_i(g_p, SM_STORE_FRAME, slot); return; }
     }
-    sm_emit_s(p, SM_STORE_VAR, vn);
+    sm_emit_s(g_p, SM_STORE_VAR, vn);
 }
 
 /* Emit a thunked SM expression (JUMP/body/RETURN/PUSH_EXPRESSION).
  * Used by DEFER, EVAL, and pattern-capture argument lowering. */
 static void emit_thunk(const tree_t *body)
 {
-    SM_Program *p = g_p;
-    int skip = sm_emit_i(p, SM_JUMP, 0);
-    int entry = sm_label(p);
-    if (body) lower_expr(body); else sm_emit(p, SM_PUSH_NULL);
-    sm_emit(p, SM_RETURN);
-    sm_patch_jump(p, skip, sm_label(p));
-    sm_emit_ii(p, SM_PUSH_EXPRESSION, (int64_t)entry, 0);
+    int skip = sm_emit_i(g_p, SM_JUMP, 0);
+    int entry = sm_label(g_p);
+    if (body) lower_expr(body); else sm_emit(g_p, SM_PUSH_NULL);
+    sm_emit(g_p, SM_RETURN);
+    sm_patch_jump(g_p, skip, sm_label(g_p));
+    sm_emit_ii(g_p, SM_PUSH_EXPRESSION, (int64_t)entry, 0);
 }
 
 /*── Literals ────────────────────────────────────────────────────────────────*/
 
-static void lower_qlit(const tree_t *t) { sm_emit_s(g_p, SM_PUSH_LIT_S, t->v.sval ? t->v.sval : ""); }
-static void lower_cset(const tree_t *t) { sm_emit_s(g_p, SM_PUSH_LIT_S, t->v.sval ? t->v.sval : ""); }
-static void lower_ilit(const tree_t *t) { sm_emit_i(g_p, SM_PUSH_LIT_I, (int64_t)t->v.ival); }
-static void lower_flit(const tree_t *t) { sm_emit_f(g_p, SM_PUSH_LIT_F, t->v.dval); }
-static void lower_nul (const tree_t *t) { (void)t; sm_emit(g_p, SM_PUSH_NULL); }
+static void lower_strlit(const tree_t *t) { sm_emit_s(g_p, SM_PUSH_LIT_S, t->v.sval ? t->v.sval : ""); }
+static void lower_ilit  (const tree_t *t) { sm_emit_i(g_p, SM_PUSH_LIT_I, (int64_t)t->v.ival); }
+static void lower_flit  (const tree_t *t) { sm_emit_f(g_p, SM_PUSH_LIT_F, t->v.dval); }
+static void lower_nul   (const tree_t *t) { (void)t; sm_emit(g_p, SM_PUSH_NULL); }
 
 /*── Variable references ─────────────────────────────────────────────────────*/
 
@@ -193,14 +181,14 @@ static void lower_name(const tree_t *t)
     sm_emit_si(p, SM_CALL_FN, "NAME_PUSH", 1);
 }
 
-static void lower_mns(const tree_t *t) { SM_Program *p = g_p; LOWER1_VAL(SM_NEG); }
-static void lower_pls(const tree_t *t) { SM_Program *p = g_p; LOWER1_VAL(SM_COERCE_NUM); }
-static void lower_add(const tree_t *t) { SM_Program *p = g_p; LOWER2(SM_ADD); }
-static void lower_sub(const tree_t *t) { SM_Program *p = g_p; LOWER2(SM_SUB); }
-static void lower_mul(const tree_t *t) { SM_Program *p = g_p; LOWER2(SM_MUL); }
-static void lower_div(const tree_t *t) { SM_Program *p = g_p; LOWER2(SM_DIV); }
-static void lower_mod(const tree_t *t) { SM_Program *p = g_p; LOWER2(SM_MOD); }
-static void lower_pow(const tree_t *t) { SM_Program *p = g_p; LOWER2(SM_EXP); }
+static void lower_mns(const tree_t *t) { LOWER1_VAL(SM_NEG); }
+static void lower_pls(const tree_t *t) { LOWER1_VAL(SM_COERCE_NUM); }
+static void lower_add(const tree_t *t) { LOWER2(SM_ADD); }
+static void lower_sub(const tree_t *t) { LOWER2(SM_SUB); }
+static void lower_mul(const tree_t *t) { LOWER2(SM_MUL); }
+static void lower_div(const tree_t *t) { LOWER2(SM_DIV); }
+static void lower_mod(const tree_t *t) { LOWER2(SM_MOD); }
+static void lower_pow(const tree_t *t) { LOWER2(SM_EXP); }
 
 /*── Sequences and alternation ───────────────────────────────────────────────*/
 
@@ -227,7 +215,6 @@ static void lower_cat_seq(const tree_t *t)
      * When lowering an Icon statement, emit JUMP_F between children so that
      * a failing operand short-circuits the whole conjunction.
      * SNOBOL4/Snocone TT_SEQ (pattern concatenation) is unaffected. */
-    extern int g_lang;
     if (t->t == TT_SEQ && g_lang == LANG_ICN) {
         if (t->n == 0) { sm_emit(p, SM_PUSH_NULL); return; }
         if (t->n == 1) { lower_expr(t->c[0]); return; }
@@ -540,14 +527,14 @@ static void lower_lconcat(const tree_t *t)
 
 /*── Unary Icon ops ──────────────────────────────────────────────────────────*/
 
-static void lower_nonnull (const tree_t *t) { SM_Program *p=g_p; CALL1("NONNULL"); }
-static void lower_null    (const tree_t *t) { SM_Program *p=g_p; CALL1("ICN_NULL"); }
-static void lower_size    (const tree_t *t) { SM_Program *p=g_p; CALL1("SIZE"); }
-static void lower_identical(const tree_t *t){ SM_Program *p=g_p; CALL2("IDENTICAL"); }
+static void lower_nonnull (const tree_t *t) { lower_expr(T0(t)); sm_emit_si(g_p, SM_CALL_FN, "NONNULL",    1); }
+static void lower_null    (const tree_t *t) { lower_expr(T0(t)); sm_emit_si(g_p, SM_CALL_FN, "ICN_NULL",  1); }
+static void lower_size    (const tree_t *t) { lower_expr(T0(t)); sm_emit_si(g_p, SM_CALL_FN, "SIZE",      1); }
+static void lower_identical(const tree_t *t){ lower_expr(T0(t)); lower_expr(T1(t)); sm_emit_si(g_p, SM_CALL_FN, "IDENTICAL", 2); }
 static void lower_random  (const tree_t *t)
 {
-    SM_Program *p = g_p;
-    if (t->n >= 1) { CALL1("ICN_RANDOM"); } else { sm_emit(p, SM_PUSH_NULL); }
+    if (t->n >= 1) { lower_expr(T0(t)); sm_emit_si(g_p, SM_CALL_FN, "ICN_RANDOM", 1); }
+    else           { sm_emit(g_p, SM_PUSH_NULL); }
 }
 
 static void lower_not(const tree_t *t)
@@ -562,9 +549,16 @@ static void lower_not(const tree_t *t)
     sm_patch_jump(p, jend, sm_label(p));
 }
 
+/* Emit the store half of an augmented-assignment fast path. */
+static void emit_augop_store(int lslot, int is_kw, const char *lname)
+{
+    if      (lslot >= 0) sm_emit_i(g_p, SM_STORE_FRAME, lslot);
+    else if (is_kw)      sm_emit_s(g_p, SM_STORE_VAR, kw_canonicalize(lname));
+    else                 sm_emit_s(g_p, SM_STORE_VAR, lname);
+}
+
 static void lower_augop(const tree_t *t)
 {
-    SM_Program *p = g_p;
     const tree_t *lhs = T0(t), *rhs = T1(t);
     int op = (int)t->v.ival;
     /* Fast path: simple variable or keyword lhs — inline load/op/store. */
@@ -577,33 +571,26 @@ static void lower_augop(const tree_t *t)
         lname = lhs->v.sval; is_kw = 1;
     }
     if (lslot >= 0 || lname) {
-        if      (lslot >= 0) sm_emit_i(p, SM_LOAD_FRAME, lslot);
-        else if (is_kw)      sm_emit_s(p, SM_PUSH_VAR, kw_canonicalize(lname));
-        else                 sm_emit_s(p, SM_PUSH_VAR, lname);
+        if      (lslot >= 0) sm_emit_i(g_p, SM_LOAD_FRAME, lslot);
+        else if (is_kw)      sm_emit_s(g_p, SM_PUSH_VAR, kw_canonicalize(lname));
+        else                 sm_emit_s(g_p, SM_PUSH_VAR, lname);
         lower_expr(rhs);
-        int done = 1;
         switch (op) {
-        case TK_AUGPLUS:   sm_emit(p, SM_ADD);    break;
-        case TK_AUGMINUS:  sm_emit(p, SM_SUB);    break;
-        case TK_AUGSTAR:   sm_emit(p, SM_MUL);    break;
-        case TK_AUGSLASH:  sm_emit(p, SM_DIV);    break;
-        case TK_AUGMOD:    sm_emit(p, SM_MOD);    break;
-        case TK_AUGCONCAT: sm_emit(p, SM_CONCAT); break;
+        case TK_AUGPLUS:   sm_emit(g_p, SM_ADD);    emit_augop_store(lslot, is_kw, lname); return;
+        case TK_AUGMINUS:  sm_emit(g_p, SM_SUB);    emit_augop_store(lslot, is_kw, lname); return;
+        case TK_AUGSTAR:   sm_emit(g_p, SM_MUL);    emit_augop_store(lslot, is_kw, lname); return;
+        case TK_AUGSLASH:  sm_emit(g_p, SM_DIV);    emit_augop_store(lslot, is_kw, lname); return;
+        case TK_AUGMOD:    sm_emit(g_p, SM_MOD);    emit_augop_store(lslot, is_kw, lname); return;
+        case TK_AUGCONCAT: sm_emit(g_p, SM_CONCAT); emit_augop_store(lslot, is_kw, lname); return;
         default:
-            sm_emit_i(p, SM_PUSH_LIT_I, (int64_t)op);
-            sm_emit_si(p, SM_CALL_FN, "AUGOP", 3);
-            done = 0; break;
+            sm_emit_i(g_p, SM_PUSH_LIT_I, (int64_t)op);
+            sm_emit_si(g_p, SM_CALL_FN, "AUGOP", 3);
+            return;
         }
-        if (done) {
-            if      (lslot >= 0) sm_emit_i(p, SM_STORE_FRAME, lslot);
-            else if (is_kw)      sm_emit_s(p, SM_STORE_VAR, kw_canonicalize(lname));
-            else                 sm_emit_s(p, SM_STORE_VAR, lname);
-        }
-        return;
     }
     lower_expr(lhs); lower_expr(rhs);
-    sm_emit_i(p, SM_PUSH_LIT_I, (int64_t)op);
-    sm_emit_si(p, SM_CALL_FN, "AUGOP", 3);
+    sm_emit_i(g_p, SM_PUSH_LIT_I, (int64_t)op);
+    sm_emit_si(g_p, SM_CALL_FN, "AUGOP", 3);
 }
 
 /*── Control flow ────────────────────────────────────────────────────────────*/
@@ -683,10 +670,19 @@ static void lower_proc_fail(const tree_t *t)
     (void)t; sm_emit(g_p, SM_PUSH_NULL); sm_emit(g_p, SM_FRETURN);
 }
 
+/* Wrap expr in a JUMP/body/RETURN/PUSH_EXPRESSION thunk for Raku case dispatch. */
+static void emit_case_chunk(const tree_t *expr)
+{
+    int skip = sm_emit_i(g_p, SM_JUMP, 0), entry = sm_label(g_p);
+    lower_expr(expr);
+    sm_emit(g_p, SM_RETURN);
+    sm_patch_jump(g_p, skip, sm_label(g_p));
+    sm_emit_ii(g_p, SM_PUSH_EXPRESSION, (int64_t)entry, 0);
+}
+
 static void lower_case(const tree_t *t)
 {
-    SM_Program *p = g_p;
-    if (t->n < 1) { sm_emit(p, SM_PUSH_NULL); return; }
+    if (t->n < 1) { sm_emit(g_p, SM_PUSH_NULL); return; }
 
     /* Raku triple layout: (n-1) divisible by 3, child[1] is ILIT or NUL. */
     int is_raku = (t->n >= 4 && (t->n - 1) % 3 == 0
@@ -697,48 +693,41 @@ static void lower_case(const tree_t *t)
         /* Icon pair layout: topic + (val,body)* + [default] */
         int nc = t->n - 1, has_def = nc % 2, npairs = nc / 2;
         lower_expr(t->c[0]);
-        sm_emit_s(p, SM_STORE_VAR, "__case_topic__"); sm_emit(p, SM_VOID_POP);
+        sm_emit_s(g_p, SM_STORE_VAR, "__case_topic__"); sm_emit(g_p, SM_VOID_POP);
         int *end_jumps = (int *)GC_MALLOC((size_t)(npairs > 0 ? npairs : 1) * sizeof(int));
         int nend = 0;
         for (int i = 0; i < npairs; i++) {
-            sm_emit_s(p, SM_PUSH_VAR, "__case_topic__");
+            sm_emit_s(g_p, SM_PUSH_VAR, "__case_topic__");
             lower_expr(t->c[1 + i*2]);
-            sm_emit_si(p, SM_CALL_FN, "ICN_CASE_EQ", 2);
-            int jf = sm_emit_i(p, SM_JUMP_F, 0);
-            sm_emit(p, SM_VOID_POP);
+            sm_emit_si(g_p, SM_CALL_FN, "ICN_CASE_EQ", 2);
+            int jf = sm_emit_i(g_p, SM_JUMP_F, 0);
+            sm_emit(g_p, SM_VOID_POP);
             lower_expr(t->c[2 + i*2]);
-            if (nend < 64) end_jumps[nend++] = sm_emit_i(p, SM_JUMP, 0);
-            sm_patch_jump(p, jf, sm_label(p)); sm_emit(p, SM_VOID_POP);
+            if (nend < 64) end_jumps[nend++] = sm_emit_i(g_p, SM_JUMP, 0);
+            sm_patch_jump(g_p, jf, sm_label(g_p)); sm_emit(g_p, SM_VOID_POP);
         }
-        if (has_def) lower_expr(t->c[t->n - 1]); else sm_emit(p, SM_PUSH_NULL);
-        int end = sm_label(p);
-        for (int i = 0; i < nend; i++) sm_patch_jump(p, end_jumps[i], end);
+        if (has_def) lower_expr(t->c[t->n - 1]); else sm_emit(g_p, SM_PUSH_NULL);
+        int end = sm_label(g_p);
+        for (int i = 0; i < nend; i++) sm_patch_jump(g_p, end_jumps[i], end);
         return;
     }
 
     /* Raku triple layout: topic + (cmp_kind, val, body)* + [default triple] */
-    #define CHUNK(expr) do { \
-        int _s=sm_emit_i(p,SM_JUMP,0), _e=sm_label(p); \
-        lower_expr((expr)); sm_emit(p,SM_RETURN); \
-        sm_patch_jump(p,_s,sm_label(p)); \
-        sm_emit_ii(p,SM_PUSH_EXPRESSION,(int64_t)_e,0); } while(0)
-
     int ntriples = (t->n - 1) / 3, has_def = 0, def_idx = -1;
     if (ntriples > 0) {
         tree_t *last_cmp = t->c[1 + (ntriples-1)*3];
         if (last_cmp && last_cmp->t == TT_NUL) { has_def = 1; def_idx = ntriples - 1; }
     }
-    CHUNK(t->c[0]);
+    emit_case_chunk(t->c[0]);
     for (int i = 0; i < ntriples; i++) {
         if (i == def_idx) continue;
         int base = 1 + i*3;
         tree_t *cmp = t->c[base];
-        sm_emit_i(p, SM_PUSH_LIT_I, (int64_t)((cmp && cmp->t == TT_ILIT) ? cmp->v.ival : TT_EQ));
-        CHUNK(t->c[base+1]); CHUNK(t->c[base+2]);
+        sm_emit_i(g_p, SM_PUSH_LIT_I, (int64_t)((cmp && cmp->t == TT_ILIT) ? cmp->v.ival : TT_EQ));
+        emit_case_chunk(t->c[base+1]); emit_case_chunk(t->c[base+2]);
     }
-    if (has_def) { CHUNK(t->c[1 + def_idx*3 + 2]); }
-    sm_emit_ii(p, SM_BB_PUMP_CASE, (int64_t)(ntriples - has_def), (int64_t)has_def);
-    #undef CHUNK
+    if (has_def) { emit_case_chunk(t->c[1 + def_idx*3 + 2]); }
+    sm_emit_ii(g_p, SM_BB_PUMP_CASE, (int64_t)(ntriples - has_def), (int64_t)has_def);
 }
 
 /*── Data constructors ───────────────────────────────────────────────────────*/
@@ -913,12 +902,10 @@ static void lower_prolog_child(const tree_t *t)
 }
 
 /*── Statement lowering ──────────────────────────────────────────────────────
- * SI-3 (pure tree): lower_stmt reads TT_STMT / TT_END.
+ * lower_stmt reads TT_STMT / TT_END nodes produced by a frontend.
  *
- * Pure tree shape: t/v/n/c (kind/sval-or-ival-or-dval/nchildren/children[]).
  * TT_STMT children are tagged attribute nodes (kind=TT_ATTR, sval=tag).
  * Access via stmt_attr_find(s, ":tag") → attr node; stmt_attr_expr(attr) → expr.
- *
  * Tags: :lbl :lang :line :stno :subj :pat :eq :repl :goS :goF :go
  *────────────────────────────────────────────────────────────────────────────*/
 
@@ -964,8 +951,8 @@ void lower_stmt(const tree_t *s)
 
     /* TT_STMT — read tagged attributes */
     const char *label   = attr_str_of(s, ":lbl");
-    int         lang    = attr_int_of(s, ":lang");   /* 0 = LANG_SNO if absent */
-    { extern int g_lang; g_lang = lang; }             /* propagate to lower_cat_seq etc. */
+    int         lang    = attr_int_of(s, ":lang");
+    g_lang = lang;   /* propagates to lower_cat_seq: seq in Icon context = conjunction */
     int         stno    = attr_int_of(s, ":stno");
     int         lineno  = attr_int_of(s, ":line");
     tree_t      *subject = attr_expr_of(s, ":subj");
@@ -1086,7 +1073,7 @@ void lower_expr(const tree_t *t)
     if (!t) { sm_emit(g_p, SM_PUSH_NULL); return; }
     switch (t->t) {
     /* literals */
-    case TT_QLIT: case TT_CSET:              lower_qlit(t);          return;
+    case TT_QLIT: case TT_CSET:              lower_strlit(t);        return;
     case TT_ILIT:                             lower_ilit(t);          return;
     case TT_FLIT:                             lower_flit(t);          return;
     case TT_NUL:                              lower_nul(t);           return;
@@ -1222,16 +1209,14 @@ static void lower_proc_skeletons(void)
             IcnScope sc; build_proc_scope(&sc, proc, body_start);
             proc_table[pi].lower_sc = sc;
             g_proc_scope = &sc; g_in_proc_body = 1;
-            /* All proc bodies use Icon conjunction-style lowering regardless of
-             * source language: TT_SEQ in a proc body means goal-directed conjunction
-             * (JUMP_F short-circuit), not SNOBOL4 string concatenation.  lower_cat_seq
-             * keys on g_lang==LANG_ICN to choose the right emission. */
-            { extern int g_lang; g_lang = LANG_ICN; }
+            /* All proc bodies use Icon conjunction-style lowering: TT_SEQ means
+             * goal-directed conjunction (JUMP_F short-circuit), not string concat. */
+            g_lang = LANG_ICN;
             for (int i = body_start; i < proc->n; i++) {
                 if (!proc->c[i]) continue;
                 lower_expr( proc->c[i]); sm_emit(p, SM_VOID_POP);
             }
-            { extern int g_lang; g_lang = 0; }          /* restore to LANG_SNO */
+            g_lang = 0;          /* restore to LANG_SNO */
             g_in_proc_body = 0; g_proc_scope = NULL;
         }
         sm_emit(p, SM_RETURN);
@@ -1250,8 +1235,8 @@ static void lower_proc_skeletons(void)
 }
 
 /*── Public entry point ──────────────────────────────────────────────────────
- * SI-3: lower() takes TT_PROGRAM node produced by code_to_ast() (SI-2 shim)
- * or directly by a frontend (SI-4+).  No CODE_t / STMT_t access here.
+ * lower() takes a TT_PROGRAM node produced by a frontend.
+ * Children must be TT_STMT / TT_END nodes.
  *────────────────────────────────────────────────────────────────────────────*/
 
 SM_Program *lower(const tree_t *prog)

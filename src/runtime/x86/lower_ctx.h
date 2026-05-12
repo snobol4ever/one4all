@@ -51,9 +51,8 @@ void expression_scope_walk(IcnScope *sc, tree_t *e);
 #define T1(t) ((t)->n > 1 ? (t)->c[1] : NULL)
 #define T2(t) ((t)->n > 2 ? (t)->c[2] : NULL)
 
-/* These macros assume the handler has `SM_Program *p = g_p;` in scope. */
-#define LOWER2(op)     do { lower_expr(T0(t)); lower_expr(T1(t)); sm_emit(p,(op)); return; } while(0)
-#define LOWER1_VAL(op) do { lower_expr(T0(t));                    sm_emit(p,(op)); return; } while(0)
-#define LOWER1_PAT(op) do { lower_pat_expr(T0(t));                sm_emit(p,(op)); return; } while(0)
+#define LOWER2(op)     do { lower_expr(T0(t)); lower_expr(T1(t)); sm_emit(g_p,(op)); return; } while(0)
+#define LOWER1_VAL(op) do { lower_expr(T0(t));                    sm_emit(g_p,(op)); return; } while(0)
+#define LOWER1_PAT(op) do { lower_pat_expr(T0(t));                sm_emit(g_p,(op)); return; } while(0)
 
 #endif /* LOWER_CTX_H */
