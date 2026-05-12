@@ -2891,8 +2891,10 @@ static tree_t *sc_clone_expr_simple(tree_t *e) {
  * ========================================================================= */
 
 static char *sc_label_new(ScParseState *st, const char *prefix) {
+    static int global_label_seq = 0;  /* persists across files — prevents collision */
     char buf[64];
-    snprintf(buf, sizeof buf, "%s_%04d", prefix, ++st->label_seq);
+    (void)st->label_seq;  /* keep field; not used for numbering */
+    snprintf(buf, sizeof buf, "%s_%04d", prefix, ++global_label_seq);
     return strdup(buf);
 }
 
@@ -3621,9 +3623,7 @@ static struct SwitchHead *sc_switch_head_new(ScParseState *st, tree_t *disc) {
     /* Allocate synthetic tmp variable name + the three switch-control labels.
      * Order matters for predictable label numbering: tmp-var, end, default
      * are all allocated up front; per-case labels come later as bodies parse. */
-    char buf[64];
-    snprintf(buf, sizeof buf, "_Lswitch_t_%04d", ++st->label_seq);
-    h->tmp_name      = strdup(buf);
+    h->tmp_name      = sc_label_new(st, "_Lswitch_t");
     h->end_label     = sc_label_new(st, "_Lend");
     h->default_label = sc_label_new(st, "_Ldefault");
     h->has_default   = 0;
