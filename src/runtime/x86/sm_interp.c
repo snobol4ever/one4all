@@ -2004,6 +2004,14 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
         case SM_STORE_FRAME: {
             int slot = (int)ins->a[0].i;
             DESCR_t v = sm_pop(st);
+            /* Icon semantics: if RHS is FAIL, assignment does not occur; propagate fail.
+             * Mirrors SM_STORE_VAR's FAILDESCR guard. Without this, `while line := read()`
+             * never exits because FAILDESCR stored into slot + last_ok=1 keeps the loop going. */
+            if (v.v == DT_FAIL) {
+                sm_push(st, FAILDESCR);
+                st->last_ok = 0;
+                break;
+            }
             if (icn_frame_env_active() && slot >= 0) {
                 icn_frame_env_store(slot, v);
                 sm_push(st, v);
