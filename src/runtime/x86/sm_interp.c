@@ -808,6 +808,22 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             break;
         }
 
+        case SM_BB_EVAL: {
+            /* SM_BB_EVAL — Icon A|B (TT_ALTERNATE) in value context.
+             * a[0].i = every_table id; look up tree_t*, call bb_eval_value.
+             * bb_eval_value handles TT_ALTERNATE via coro_eval(e)+α with correct frame.
+             * Integer id avoids ast_gc_clone (which triggers GC mid-lowering). */
+            int eval_id    = (int)ins->a[0].i;
+            tree_t *expr   = every_table_lookup(eval_id);
+            if (!expr) { st->last_ok = 0; sm_push(st, FAILDESCR); break; }
+            g_ast_pump_active++;
+            DESCR_t val = bb_eval_value(expr);
+            g_ast_pump_active--;
+            st->last_ok = !IS_FAIL_fn(val);
+            sm_push(st, val);
+            break;
+        }
+
         /* CH-17f: Prolog goal dispatch by predicate key — replaces legacy
          * lower_expr(TT_CHOICE) + SM_BB_ONCE.  a[0].s = "name/arity" key,
          * a[1].i = arity.  Looks up Pl_PredEntry; if entry_pc >= 0 AND the

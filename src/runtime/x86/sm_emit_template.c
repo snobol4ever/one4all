@@ -188,6 +188,7 @@ static const sm_op_template_t g_sm_templates[] = {
     { SM_GEN_TICK,       "GEN_TICK",       "rt_unhandled_sm", SM_TPL_ARITH, SM_GEN_TICK,       0 },
     { SM_BB_PUMP,        "BB_PUMP",        "rt_unhandled_sm", SM_TPL_ARITH, SM_BB_PUMP,        0 },
     { SM_BB_ONCE,        "BB_ONCE",        "rt_unhandled_sm", SM_TPL_ARITH, SM_BB_ONCE,        0 },
+    { SM_BB_EVAL,        "BB_EVAL",        "rt_unhandled_sm", SM_TPL_ARITH, SM_BB_EVAL,        0 },
     { SM_BB_ONCE_PROC,   "BB_ONCE_PROC",   "rt_unhandled_sm", SM_TPL_ARITH, SM_BB_ONCE_PROC,   0 },
     { SM_BB_PUMP_PROC,   "BB_PUMP_PROC",   "rt_unhandled_sm", SM_TPL_ARITH, SM_BB_PUMP_PROC,   0 },
     { SM_BB_PUMP_CASE,   "BB_PUMP_CASE",   "rt_unhandled_sm", SM_TPL_ARITH, SM_BB_PUMP_CASE,   0 },

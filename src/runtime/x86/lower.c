@@ -85,6 +85,7 @@ extern int g_lang;   /* set per-statement in lower_stmt; read by lower_cat_seq *
 
 static void emit_push_expr(const tree_t *t)
 {
+    if (!t) { sm_emit(g_p, SM_PUSH_NULL); return; }
     sm_emit_ptr(g_p, SM_PUSH_EXPR, (void *)ast_gc_clone(t));
 }
 
@@ -1172,11 +1173,13 @@ void lower_expr(const tree_t *t)
     case TT_TO:                               lower_to(t);            return;
     case TT_TO_BY:                            lower_to_by(t);         return;
     case TT_LIMIT:                            lower_limit(t);         return;
-    /* GOAL-ICON-BB-COMPLETE rung13: if this is the hoisted alternate, value is
-     * already on stack from SM_GEN_TICK — emit nothing. Otherwise legacy AST pump. */
+    /* IB-3: TT_ALTERNATE in sub-expression / value context (A|B goal-directed OR).
+     * SM_BB_EVAL: a[0].i = every_table id; handler calls bb_eval_value(expr) → push result.
+     * Registered by id to avoid ast_gc_clone (which triggers GC, invalidating live AST nodes).
+     * Statement-level every-loop drives via SM_BB_PUMP_EVERY (in lower_every). */
     case TT_ALTERNATE:
-        if (t == g_hoist_alt) return;   /* hoisted: TOS already has the yielded arm value */
-        fprintf(stderr, "BUG: Icon AST pump — kind %d\n", t->t); abort();
+        if (g_lang != LANG_ICN) { lower_unhandled(t); return; }
+        sm_emit_i(g_p, SM_BB_EVAL, (int64_t)every_table_register((tree_t *)t)); return;
     case TT_ITERATE:             lower_iterate(t);       return; /* rung15 */
     case TT_EVERY:                            lower_every(t);         return;
     /* Prolog */

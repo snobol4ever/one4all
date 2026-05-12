@@ -110,9 +110,13 @@ typedef enum {
      *             pushes tick count as DT_I.  For Icon 'every' / generator loops.
      * SM_BB_ONCE: pops bb_node_t* from value stack; calls bb_broker(root,BB_ONCE,NULL,NULL);
      *             sets st->last_ok.  For Prolog goal dispatch.
+     * SM_BB_EVAL: a[0].i = every_table id (tree_t* registered at lower-time, no GC clone).
+     *             Calls bb_eval_value(expr); pushes DESCR_t result; sets last_ok.
+     *             For Icon A|B (TT_ALTERNATE) in value context.
      * Note: BB_SCAN is already wired via SM_EXEC_STMT → exec_stmt → bb_broker(BB_SCAN). */
     SM_BB_PUMP,
     SM_BB_ONCE,
+    SM_BB_EVAL,
     /* CH-17f: Prolog goal dispatch identified by predicate key + arity.
      * Replaces the legacy lower_expr(TT_CHOICE) + SM_BB_ONCE wrapper that
      * pushed a raw tree_t* and called coro_eval(TT_CHOICE) at runtime.

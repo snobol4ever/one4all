@@ -1561,6 +1561,9 @@ static void init_handler_table(void)
     /* SN-9b: BB broker — Icon (PUMP) and Prolog (ONCE) generator dispatch. */
     g_handlers[SM_BB_PUMP]      = h_bb_pump;
     g_handlers[SM_BB_ONCE]      = h_bb_once;
+    /* SM_BB_EVAL: Icon A|B in value context — coro_eval + α port + push value.
+     * JIT path falls back to rt_unhandled_sm (mode-3 not yet implemented). */
+    g_handlers[SM_BB_EVAL]      = NULL;  /* rt_unhandled triggers sm_interp fallback */
     /* CH-17f: Prolog name-driven BB_ONCE dispatch — replaces the legacy
      * lower_expr(TT_CHOICE) + SM_BB_ONCE wrapper. */
     g_handlers[SM_BB_ONCE_PROC] = h_bb_once_proc;
