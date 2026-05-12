@@ -1373,6 +1373,64 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 break;
             }
 
+            /* GOAL-ICON-BB-COMPLETE rung15: ICN_BANG_NEXT — one tick of !E iteration.
+             * Called with nargs=0 (no stack args).  Reads container from GLOCAL[0],
+             * position from GLOCAL[1].  Dispatches on container type:
+             *   DT_S / DT_SNUL : string character iteration (pos = byte offset)
+             *   DT_DATA / list  : list element iteration (pos = element index)
+             *   DT_DATA / record: record field iteration (pos = field index)
+             *   DT_T            : table value iteration (pos = flat entry index across buckets)
+             * Advances GLOCAL[1] by 1 on each successful tick.
+             * Pushes next element on success (last_ok=1), FAILDESCR on exhaustion (last_ok=0).
+             * Mirrors coro_bb_iterate / coro_bb_list_iterate / coro_bb_tbl_iterate /
+             * coro_bb_record_iterate in icon_gen.c. */
+            if (name && strcmp(name, "ICN_BANG_NEXT") == 0) {
+                DESCR_t result = FAILDESCR;
+                if (!g_current_gen_state) { sm_push(st, FAILDESCR); st->last_ok = 0; break; }
+                DESCR_t container = g_current_gen_state->locals[0];
+                long    pos       = g_current_gen_state->locals[1].i;
+                /* String / cset character iteration */
+                if (container.v == DT_S || container.v == DT_SNUL) {
+                    const char *s = container.s ? container.s : "";
+                    long slen = container.slen > 0 ? (long)container.slen : (long)strlen(s);
+                    if (pos < slen) {
+                        char *ch = GC_malloc(2); ch[0] = s[pos]; ch[1] = '\0';
+                        result = (DESCR_t){ .v = DT_S, .slen = 1, .s = ch };
+                    }
+                } else if (container.v == DT_DATA && container.u) {
+                    /* List vs record: list has icn_type == "list" */
+                    DESCR_t tag = FIELD_GET_fn(container, "icn_type");
+                    if (tag.v == DT_S && tag.s && strcmp(tag.s, "list") == 0) {
+                        /* List element iteration */
+                        DESCR_t ea = FIELD_GET_fn(container, "frame_elems");
+                        int n = (int)FIELD_GET_fn(container, "frame_size").i;
+                        DESCR_t *elems = (ea.v == DT_DATA) ? (DESCR_t *)ea.ptr : NULL;
+                        if (elems && pos < n) result = elems[pos];
+                    } else if (container.u->type && container.u->type->nfields > 0 && container.u->fields) {
+                        /* Record field iteration */
+                        int n = container.u->type->nfields;
+                        if (pos < n) result = container.u->fields[pos];
+                    }
+                } else if (container.v == DT_T && container.tbl) {
+                    /* Table value iteration: walk flat across all buckets.
+                     * pos is the flat entry index.  Re-scan from bucket 0 each tick —
+                     * O(N) per tick but correct and simple; tables are rarely large. */
+                    long seen = 0;
+                    for (int b = 0; b < TABLE_BUCKETS; b++) {
+                        for (TBPAIR_t *bp = container.tbl->buckets[b]; bp; bp = bp->next) {
+                            if (seen == pos) { result = bp->val; goto icn_bang_done; }
+                            seen++;
+                        }
+                    }
+                }
+                icn_bang_done:
+                if (!IS_FAIL_fn(result))
+                    g_current_gen_state->locals[1].i = pos + 1;
+                sm_push(st, result);
+                st->last_ok = !IS_FAIL_fn(result);
+                break;
+            }
+
             /* GOAL-ICON-BB-COMPLETE A2: ICN_SECTION_RANGE/PLUS/MINUS
              * Stack (pushed by sm_lower in order): string, lo, hi → TOS=hi
              * Mirrors bb_section() in coro_value.c exactly.

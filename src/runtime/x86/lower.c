@@ -1094,6 +1094,57 @@ static void lower_bb_pump_ast(const tree_t *t)
 }
 static void lower_limit(const tree_t *t) { emit_push_expr(t); sm_emit(g_p, SM_BB_PUMP); }
 
+/* GOAL-ICON-BB-COMPLETE rung15: !E iterate — pure SM coroutine.
+ * Emits an inline coroutine that evaluates E once, stores in GLOCAL[0],
+ * then calls ICN_BANG_NEXT each tick to yield one element (string char,
+ * list element, table value, or record field).  ICN_BANG_NEXT reads/writes
+ * GLOCAL[0..4] directly; pos is in GLOCAL[1].
+ *
+ * Coroutine shape (mirrors emit_range_coroutine):
+ *   SM_JUMP skip
+ *   entry: SM_RESUME
+ *     lower_expr(operand)     ; container → TOS
+ *     SM_STORE_GLOCAL 0       ; GLOCAL[0] = container; TOS unchanged
+ *     SM_VOID_POP
+ *     SM_PUSH_LIT_I 0
+ *     SM_STORE_GLOCAL 1       ; GLOCAL[1] = pos = 0
+ *     SM_VOID_POP
+ *   loop: SM_CALL_FN "ICN_BANG_NEXT" 0   ; → next element or FAIL
+ *     SM_JUMP_F done
+ *     SM_SUSPEND_VALUE        ; yield the element
+ *     SM_JUMP loop
+ *   done: SM_PUSH_NULL
+ *         SM_RETURN
+ *   skip: SM_PUSH_EXPRESSION entry
+ *         SM_BB_PUMP_SM
+ */
+static void lower_iterate(const tree_t *t)
+{
+    if (!t || t->n < 1 || !t->c[0]) {
+        sm_emit(g_p, SM_PUSH_NULL); return;
+    }
+    /* Only apply pure-SM coroutine for Icon */
+    if (g_lang != LANG_ICN) { lower_bb_pump_ast(t); return; }
+
+    int skip  = sm_emit_i(g_p, SM_JUMP, 0);
+    int entry = sm_label(g_p);
+    sm_emit(g_p, SM_RESUME);
+    lower_expr(t->c[0]);               /* evaluate operand → TOS */
+    sm_emit_i(g_p, SM_STORE_GLOCAL, 0); sm_emit(g_p, SM_VOID_POP);
+    sm_emit_i(g_p, SM_PUSH_LIT_I, 0);
+    sm_emit_i(g_p, SM_STORE_GLOCAL, 1); sm_emit(g_p, SM_VOID_POP);
+    int loop = sm_label(g_p);
+    sm_emit_si(g_p, SM_CALL_FN, "ICN_BANG_NEXT", 0);
+    int jdone = sm_emit_i(g_p, SM_JUMP_F, 0);
+    sm_emit(g_p, SM_SUSPEND_VALUE);
+    sm_emit_i(g_p, SM_JUMP, loop);
+    sm_patch_jump(g_p, jdone, sm_label(g_p));
+    sm_emit(g_p, SM_PUSH_NULL); sm_emit(g_p, SM_RETURN);
+    sm_patch_jump(g_p, skip, sm_label(g_p));
+    sm_emit_ii(g_p, SM_PUSH_EXPRESSION, (int64_t)entry, 0);
+    sm_emit(g_p, SM_BB_PUMP_SM);
+}
+
 /*── Prolog ──────────────────────────────────────────────────────────────────*/
 
 /* Emit SM_BB_ONCE_PROC for a named predicate, parsing arity from "name/n". */
@@ -1345,7 +1396,7 @@ void lower_expr(const tree_t *t)
     case TT_ALTERNATE:
         if (t == g_hoist_alt) return;   /* hoisted: TOS already has the yielded arm value */
         lower_bb_pump_ast(t); return;
-    case TT_ITERATE:             lower_bb_pump_ast(t);   return;
+    case TT_ITERATE:             lower_iterate(t);       return; /* rung15 */
     case TT_EVERY:                            lower_every(t);         return;
     /* Prolog */
     case TT_CHOICE:                           lower_choice(t);        return;
