@@ -30,13 +30,13 @@ extern int64_t kw_case;   /* &CASE: 0=fold, 1=sensitive; default 1 matches SPITB
 #include "driver/polyglot.h"
 #include "runtime/x86/lower.h"   /* CH-17g-irrun-lowers: sm_lower */
 #include "runtime/x86/sm_prog.h"    /* CH-17g-irrun-lowers: sm_prog_free */
-#include "driver/scrip_sm.h"        /* CH-17g-irrun-lowers: sm_resolve_irrun_entry_pcs */
+/* PB-8: scrip_sm.h include removed — sm_resolve_irrun_entry_pcs deleted */
 
 ScripModuleRegistry g_registry;   /* zero-initialised; nmod==0 for single-lang */
 
 /* CH-17g-irrun-lowers: set by scrip.c --ir-run non-SNO path to populate
  * entry_pcs before proc_table_call dispatches.  Default 0. */
-int g_irrun_lowers = 0;
+/* PB-8: g_irrun_lowers deleted (CH-17g-irrun-execution: --ir-run now uses sm_preamble directly) */
 
 /* SI-6: stmt_attr accessor helpers (mirrors interp_exec.c) */
 static inline int           s_int(const tree_t *s, const char *tag) {
@@ -268,9 +268,7 @@ void polyglot_execute(const tree_t *prog) {
     }
     uint32_t mask = polyglot_lang_mask(prog);
     polyglot_init(prog, mask);
-    /* CH-17g-irrun-lowers: if requested, run sm_lower to resolve entry_pcs */
-    if (g_irrun_lowers)
-        sm_resolve_irrun_entry_pcs(prog);
+    /* PB-8: g_irrun_lowers hook deleted — --ir-run now routes through sm_preamble */
     if (slang == LANG_ICN) {
         g_lang = 1;
         for (int i = 0; i < proc_count; i++) {

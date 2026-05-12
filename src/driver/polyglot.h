@@ -23,7 +23,7 @@ extern int g_fi8_pl_init_count;
  * sm_resolve_proc_entry_pcs after polyglot_init so entry_pcs are
  * populated before proc_table_call dispatches.  Set by scrip.c for
  * the --ir-run non-SNO path.  Default 0 (disabled). */
-extern int g_irrun_lowers;
+/* PB-8: g_irrun_lowers deleted */
 
 uint32_t polyglot_lang_mask(const tree_t *prog);
 void     polyglot_init   (const tree_t *prog, uint32_t lang_mask);

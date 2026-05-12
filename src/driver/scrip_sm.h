@@ -40,7 +40,7 @@ SM_Program *sm_preamble(const tree_t *ast_prog);
 
 /* CH-17g-irrun-lowers: run sm_lower + sm_resolve_proc_entry_pcs on ast_prog
  * and then free the SM_Program. */
-void sm_resolve_irrun_entry_pcs(const tree_t *ast_prog);
+/* PB-8: sm_resolve_irrun_entry_pcs deleted */
 
 /* Driver-mode runner signature: takes program + state, returns
  *   0  = normal halt

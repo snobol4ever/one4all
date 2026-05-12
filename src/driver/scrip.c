@@ -544,11 +544,14 @@ int main(int argc, char **argv)
         sm_run_with_recovery(sm, sm_jit_run);
         sm_prog_free(sm);
     } else if (has_non_sno) {
-        /* CH-17g-irrun-lowers: lower to SM to resolve entry_pcs before
-         * polyglot_execute dispatches through proc_table_call. */
-        g_irrun_lowers = 1;
-        polyglot_execute(ast_prog);
-        g_irrun_lowers = 0;
+        /* PB-8 / CH-17g-irrun-execution: route --ir-run non-SNO through the
+         * same sm_preamble + sm_run_with_recovery pipeline as --sm-run.
+         * This gives the SM interpreter control over backtracking for Prolog
+         * and Icon proc bodies, replacing the legacy polyglot_execute AST walker. */
+        SM_Program *sm = sm_preamble(ast_prog);
+        if (!sm) return 1;
+        sm_run_with_recovery(sm, sm_interp_run);
+        sm_prog_free(sm);
     } else {
         execute_program(ast_prog);
     }

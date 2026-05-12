@@ -69,18 +69,7 @@ static void sm_resolve_proc_entry_pcs(SM_Program *p)
                 pl_total, pl_resolved);
 }
 
-/* CH-17g-irrun-lowers: lower prog to SM, resolve entry_pcs, discard SM.
- * Called by polyglot_execute when g_irrun_lowers is set. */
-void sm_resolve_irrun_entry_pcs(const tree_t *ast_prog)
-{
-    SM_Program *sm = lower(ast_prog);
-    if (!sm) {
-        fprintf(stderr, "scrip: sm_lower failed in irrun-lowers\n");
-        return;
-    }
-    sm_resolve_proc_entry_pcs(sm);
-    sm_prog_free(sm);
-}
+/* PB-8: sm_resolve_irrun_entry_pcs deleted — --ir-run now uses sm_preamble directly */
 
 SM_Program *sm_preamble(const tree_t *ast_prog){
     label_table_build(ast_prog);
