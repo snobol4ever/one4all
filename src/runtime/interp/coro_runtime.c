@@ -622,25 +622,62 @@ DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs)
      * Uses the same IcnScope that lower_proc_skeletons built and stored in lower_sc,
      * guaranteeing slot assignments match what SM_LOAD_FRAME/SM_STORE_FRAME baked in.
      * Also fixes env_n: must cover all slots (params + locals), not just params. */
+    int found_pi = -1;
+    tree_t *found_proc = NULL;
     {
-        int found_pi = -1;
         for (int i = 0; i < proc_count; i++) {
             if (proc_table[i].entry_pc == entry_pc) { found_pi = i; break; }
         }
         if (found_pi >= 0 && proc_table[found_pi].proc) {
-            tree_t *proc = proc_table[found_pi].proc;
-            int nparams_p = proc->_id;   /* SI-13 fix */
+            found_proc = proc_table[found_pi].proc;
+            int nparams_p = found_proc->_id;   /* SI-13 fix */
             int body_start = 1 + nparams_p;
-            for (int bi = body_start; bi < proc->n; bi++)
-                icn_scope_patch(&proc_table[found_pi].lower_sc, proc->c[bi]);
+            for (int bi = body_start; bi < found_proc->n; bi++)
+                icn_scope_patch(&proc_table[found_pi].lower_sc, found_proc->c[bi]);
             /* Expand env_n to cover all slots (params + locals) */
             int total_slots = proc_table[found_pi].lower_sc.n;
             if (total_slots > f->env_n) f->env_n = total_slots;
+
+            /* IC-9: restore static variables into frame slots on proc entry.
+             * Mirrors coro_call's static-restore loop at coro_runtime.c:508-526. */
+            IcnScope *sc = &proc_table[found_pi].lower_sc;
+            for (int bi = body_start; bi < found_proc->n; bi++) {
+                tree_t *st = found_proc->c[bi];
+                if (!st || st->t != TT_GLOBAL || st->v.ival != 1) continue;
+                for (int j = 0; j < st->n; j++) {
+                    tree_t *vn = st->c[j];
+                    if (!vn || !vn->v.sval) continue;
+                    int slot = scope_get(sc, vn->v.sval);
+                    if (slot < 0 || slot >= f->env_n) continue;
+                    DESCR_t saved;
+                    if (static_get(found_proc, vn->v.sval, &saved))
+                        f->env[slot] = saved;
+                }
+            }
         }
     }
 
     /* Run expression body — frame is live for SM_LOAD_FRAME / SM_STORE_FRAME */
     DESCR_t result = sm_call_expression(entry_pc);
+
+    /* IC-9: persist static variables back to table on proc exit.
+     * Mirrors coro_call's static-persist loop at coro_runtime.c:568-578. */
+    if (found_pi >= 0 && found_proc) {
+        IcnScope *sc = &proc_table[found_pi].lower_sc;
+        int nparams_p = found_proc->_id;
+        int body_start = 1 + nparams_p;
+        for (int bi = body_start; bi < found_proc->n; bi++) {
+            tree_t *st = found_proc->c[bi];
+            if (!st || st->t != TT_GLOBAL || st->v.ival != 1) continue;
+            for (int j = 0; j < st->n; j++) {
+                tree_t *vn = st->c[j];
+                if (!vn || !vn->v.sval) continue;
+                int slot = scope_get(sc, vn->v.sval);
+                if (slot < 0 || slot >= f->env_n) continue;
+                static_set(found_proc, vn->v.sval, f->env[slot]);
+            }
+        }
+    }
 
     /* Pop frame */
     icn_init_save_frame();
