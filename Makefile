@@ -205,6 +205,7 @@ RT_PIC_SRCS := \
     $(SRC)/runtime/interp/scan_builtins.c \
     $(SRC)/runtime/interp/raku_builtins.c \
     $(SRC)/runtime/interp/pl_runtime.c \
+    $(SRC)/runtime/interp/icn_box_rt.c \
     $(SRC)/runtime/common/coerce.c \
     $(SRC)/runtime/common/ast_clone.c \
     $(SRC)/driver/interp_globals.c \
@@ -396,6 +397,7 @@ scrip:
 	$(CC) $(CRT)   -c $(SRC)/runtime/interp/raku_builtins.c -o $(OBJ)/raku_builtins.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/interp/scan_builtins.c -o $(OBJ)/scan_builtins.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/interp/pl_runtime.c  -o $(OBJ)/pl_runtime.o
+	$(CC) $(CRT)   -c $(SRC)/runtime/interp/icn_box_rt.c  -o $(OBJ)/icn_box_rt.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/common/coerce.c      -o $(OBJ)/coerce.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/common/ast_clone.c    -o $(OBJ)/ast_clone.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_prog.c    -o $(OBJ)/sm_prog.o
