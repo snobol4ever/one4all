@@ -91,6 +91,13 @@ RT_PIC_SRCS := \
     $(RT)/x86/templates/bb_xfarb.c \
     $(RT)/x86/templates/bb_xeps.c \
     $(RT)/x86/templates/bb_xfail.c \
+    $(RT)/x86/templates/sm_halt.c \
+    $(RT)/x86/templates/sm_push_lit_i.c \
+    $(RT)/x86/templates/sm_void_pop.c \
+    $(RT)/x86/templates/sm_jump.c \
+    $(RT)/x86/templates/sm_arith.c \
+    $(RT)/x86/templates/sm_nullary_rt.c \
+    $(RT)/x86/templates/sm_label_stno.c \
     $(RT)/x86/templates/sm_call_fn.c \
     $(RT)/x86/templates/sm_return.c \
     $(RT)/x86/templates/sm_pat_nullary.c \
@@ -102,16 +109,71 @@ RT_PIC_SRCS := \
     $(RT)/x86/templates/sm_exec_stmt.c \
     $(RT)/x86/bb_boxes.c \
     $(RT)/x86/bb_broker.c \
+    $(RT)/x86/sm_prog.c \
+    $(RT)/x86/sm_interp.c \
+    $(RT)/x86/lower.c \
+    $(RT)/x86/lower_ctx.c \
+    $(RT)/x86/sm_image.c \
+    $(RT)/x86/sm_codegen.c \
+    $(RT)/x86/sm_emit_template.c \
+    $(RT)/x86/sm_codegen_x64_emit.c \
+    $(SRC)/runtime/interp/coro_runtime.c \
+    $(SRC)/runtime/interp/coro_value.c \
+    $(SRC)/runtime/interp/coro_stmt.c \
+    $(SRC)/runtime/interp/scan_builtins.c \
+    $(SRC)/runtime/interp/raku_builtins.c \
+    $(SRC)/runtime/interp/pl_runtime.c \
+    $(SRC)/runtime/common/coerce.c \
+    $(SRC)/runtime/common/ast_clone.c \
+    $(SRC)/driver/interp_globals.c \
+    $(SRC)/driver/interp_label.c \
+    $(SRC)/driver/interp_call.c \
+    $(SRC)/driver/interp_eval.c \
+    $(SRC)/driver/interp_ref.c \
+    $(SRC)/driver/interp_hooks.c \
+    $(SRC)/driver/interp_data.c \
+    $(SRC)/driver/interp_exec.c \
+    $(SRC)/driver/scrip_sm.c \
+    $(SRC)/driver/sync_monitor.c \
+    $(SRC)/driver/polyglot.c \
+    $(SRC)/driver/stmt_ast.c \
+    $(SRC)/ast/ast_print.c \
     $(SRC)/frontend/snobol4/snobol4.tab.c \
-    $(SRC)/frontend/snobol4/snobol4.lex.c
+    $(SRC)/frontend/snobol4/snobol4.lex.c \
+    $(SRC)/frontend/icon/icon_gen.c \
+    $(SRC)/frontend/icon/icon_runtime.c \
+    $(SRC)/frontend/icon/icon_parse.c \
+    $(SRC)/frontend/icon/icon_lex.c \
+    $(SRC)/frontend/icon/icon_driver.c \
+    $(SRC)/frontend/prolog/prolog_lex.c \
+    $(SRC)/frontend/prolog/prolog_parse.c \
+    $(SRC)/frontend/prolog/prolog_lower.c \
+    $(SRC)/frontend/prolog/prolog_atom.c \
+    $(SRC)/frontend/prolog/prolog_builtin.c \
+    $(SRC)/frontend/prolog/prolog_unify.c \
+    $(SRC)/frontend/prolog/prolog_driver.c \
+    $(SRC)/frontend/prolog/pl_broker.c \
+    $(SRC)/frontend/snocone/snocone_lex.c \
+    $(SRC)/frontend/snocone/snocone_parse.tab.c \
+    $(SRC)/frontend/snocone/snocone_driver.c \
+    $(SRC)/frontend/raku/raku.tab.c \
+    $(SRC)/frontend/raku/raku.lex.c \
+    $(SRC)/frontend/raku/raku_driver.c \
+    $(SRC)/frontend/raku/raku_re.c \
+    $(SRC)/frontend/rebus/rebus.tab.c \
+    $(SRC)/frontend/rebus/lex.rebus.c \
+    $(SRC)/frontend/rebus/rebus_lower.c \
+    $(SRC)/frontend/rebus/rebus_emit.c \
+    $(SRC)/frontend/rebus/rebus_print.c
 
 out/libscrip_rt.so: $(RT_PIC_SRCS) $(RT)/rt/rt.h
 	@mkdir -p out
 	$(CC) -O0 -g $(WARN) -fPIC -shared \
 	    -I$(SRC) -I$(RT)/x86 -I$(RT) -I$(RT)/rt \
-	    -DDYN_ENGINE_LINKED \
+	    -I$(SRC)/frontend/snobol4 -I$(SRC)/frontend/raku \
+	    -DDYN_ENGINE_LINKED -DIR_DEFINE_NAMES \
 	    $(RT_PIC_SRCS) \
-	    -lgc -lm \
+	    -lgc -lm -Wl,--allow-multiple-definition \
 	    -o out/libscrip_rt.so
 	@echo "Built: out/libscrip_rt.so"
 

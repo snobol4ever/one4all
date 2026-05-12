@@ -1171,8 +1171,9 @@ int rt_do_return(int kind, int cond)
 #include "../../runtime/x86/sm_prog.h"    /* sm_opcode_name */
 
 /* sm_call_expression: used by eval_code.c when a DT_E expression is EVAL'd.
- * Not exercised in EM-6 SNOBOL4 pattern gate (no expression-via-EVAL paths). */
-DESCR_t sm_call_expression(int entry_pc)
+ * Not exercised in EM-6 SNOBOL4 pattern gate (no expression-via-EVAL paths).
+ * Weak so the real sm_interp.c definition wins when full runtime is linked. */
+__attribute__((weak)) DESCR_t sm_call_expression(int entry_pc)
 {
     fprintf(stderr,
         "libscrip_rt: sm_call_expression(%d) called — DT_E EVAL dispatch "
@@ -1181,8 +1182,8 @@ DESCR_t sm_call_expression(int entry_pc)
 }
 
 /* sm_opcode_name: used by sm_interp diagnostics pulled in via sm_interp.h.
- * Provide a minimal implementation for the .so. */
-const char *sm_opcode_name(sm_opcode_t op)
+ * Weak so the real sm_prog.c definition wins when full runtime is linked. */
+__attribute__((weak)) const char *sm_opcode_name(sm_opcode_t op)
 {
     (void)op;
     return "?";
@@ -1190,7 +1191,9 @@ const char *sm_opcode_name(sm_opcode_t op)
 
 /* _is_pat_fnc_name / _expr_is_pat: used by eval_pat.c.
  * These decide at eval time whether a function call is pattern-returning.
- * Not exercised in EM-6 gate; safe stubs. */
+ * Not exercised in EM-6 gate; safe stubs.
+ * Declared __attribute__((weak)) so the real interp_eval.c definitions
+ * override when libscrip_rt.so includes the full runtime. */
 #include "../../driver/interp_private.h"
-int _is_pat_fnc_name(const char *s)  { (void)s; return 0; }
-int _expr_is_pat(tree_t *e)          { (void)e; return 0; }
+__attribute__((weak)) int _is_pat_fnc_name(const char *s)  { (void)s; return 0; }
+__attribute__((weak)) int _expr_is_pat(tree_t *e)          { (void)e; return 0; }
