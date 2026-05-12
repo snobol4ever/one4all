@@ -68,6 +68,12 @@
 #include "templates.h" /* per-opcode templates (EM-MODE4-IS-MODE3-DUMP-f+) */
 #include <string.h>
 
+/* EDP-2: inline GAS mode flag — set by --jit-emit-inline via scrip.c. */
+int g_jit_emit_inline = 0;
+
+/* TEXT_MODE: pick EMIT_TEXT_INLINE or EMIT_TEXT depending on the flag. */
+#define TEXT_MODE() (g_jit_emit_inline ? EMIT_TEXT_INLINE : EMIT_TEXT)
+
 /* -----------------------------------------------------------------------
  * Source-line cache (EM-4-readability)
  *
@@ -860,7 +866,7 @@ static int emit_sm_label_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     /* SM_LABEL: routed through template (EM-MODE4-IS-MODE3-DUMP-o). */
     (void)ins; (void)pc;
-    emit_mode_set(EMIT_TEXT, out);
+    emit_mode_set(TEXT_MODE(), out);
     emit_sm_label(NULL);
     return 0;
 }
@@ -1009,7 +1015,7 @@ static int emit_sm_stno_dispatch(FILE *out, const SM_Instr *ins, int pc,
     else
         banner_lineno = 0;
 
-    emit_mode_set(EMIT_TEXT, out);
+    emit_mode_set(TEXT_MODE(), out);
     emit_sm_stno(NULL, stno, banner_lineno, src);
     return 0;
 }
@@ -1043,7 +1049,7 @@ static int emit_sm_stno_dispatch(FILE *out, const SM_Instr *ins, int pc,
 static int emit_sm_concat_dispatch(FILE *out, int pc)
 {
     (void)pc;
-    emit_mode_set(EMIT_TEXT, out);
+    emit_mode_set(TEXT_MODE(), out);
     emit_sm_concat(NULL);
     return 0;
 }
@@ -1051,7 +1057,7 @@ static int emit_sm_concat_dispatch(FILE *out, int pc)
 static int emit_sm_push_null_dispatch(FILE *out, int pc)
 {
     (void)pc;
-    emit_mode_set(EMIT_TEXT, out);
+    emit_mode_set(TEXT_MODE(), out);
     emit_sm_push_null(NULL);
     return 0;
 }
@@ -1059,7 +1065,7 @@ static int emit_sm_push_null_dispatch(FILE *out, int pc)
 static int emit_sm_coerce_num_dispatch(FILE *out, int pc)
 {
     (void)pc;
-    emit_mode_set(EMIT_TEXT, out);
+    emit_mode_set(TEXT_MODE(), out);
     emit_sm_coerce_num(NULL);
     return 0;
 }
@@ -1067,7 +1073,7 @@ static int emit_sm_coerce_num_dispatch(FILE *out, int pc)
 static int emit_sm_push_null_noflip_dispatch(FILE *out, int pc)
 {
     (void)pc;
-    emit_mode_set(EMIT_TEXT, out);
+    emit_mode_set(TEXT_MODE(), out);
     emit_sm_push_null_noflip(NULL);
     return 0;
 }
@@ -1075,7 +1081,7 @@ static int emit_sm_push_null_noflip_dispatch(FILE *out, int pc)
 static int emit_sm_push_lit_f_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    emit_mode_set(EMIT_TEXT, out);
+    emit_mode_set(TEXT_MODE(), out);
     emit_sm_push_lit_f(NULL, ins->a[0].f);
     return 0;
 }
@@ -1083,7 +1089,7 @@ static int emit_sm_push_lit_f_dispatch(FILE *out, const SM_Instr *ins, int pc)
 static int emit_sm_push_expr_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    emit_mode_set(EMIT_TEXT, out);
+    emit_mode_set(TEXT_MODE(), out);
     emit_sm_push_expr(NULL, (uint64_t)(uintptr_t)ins->a[0].ptr);
     return 0;
 }
@@ -1091,7 +1097,7 @@ static int emit_sm_push_expr_dispatch(FILE *out, const SM_Instr *ins, int pc)
 static int emit_sm_incr_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    emit_mode_set(EMIT_TEXT, out);
+    emit_mode_set(TEXT_MODE(), out);
     emit_sm_incr(NULL, ins->a[0].i);
     return 0;
 }
@@ -1099,7 +1105,7 @@ static int emit_sm_incr_dispatch(FILE *out, const SM_Instr *ins, int pc)
 static int emit_sm_decr_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    emit_mode_set(EMIT_TEXT, out);
+    emit_mode_set(TEXT_MODE(), out);
     emit_sm_decr(NULL, ins->a[0].i);
     return 0;
 }
@@ -1107,7 +1113,7 @@ static int emit_sm_decr_dispatch(FILE *out, const SM_Instr *ins, int pc)
 static int emit_sm_acomp_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    emit_mode_set(EMIT_TEXT, out);
+    emit_mode_set(TEXT_MODE(), out);
     emit_sm_acomp(NULL, (int)ins->a[0].i);
     return 0;
 }
@@ -1115,7 +1121,7 @@ static int emit_sm_acomp_dispatch(FILE *out, const SM_Instr *ins, int pc)
 static int emit_sm_lcomp_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    emit_mode_set(EMIT_TEXT, out);
+    emit_mode_set(TEXT_MODE(), out);
     emit_sm_lcomp(NULL, (int)ins->a[0].i);
     return 0;
 }
@@ -2113,19 +2119,21 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
      * sm_emit_macro_library_to_path()).  We always (re)write it here so a
      * fresh emit run cannot pick up a stale header, and the
      * write-then-include pair is atomic from the caller's perspective. */
-    if (sm_emit_macro_library_to_path("sm_macros.s") != 0) {
-        fprintf(stderr,
-                "sm_codegen_x64_emit: failed to write sm_macros.s "
-                "(working directory writable?)\n");
-        return -1;
+    if (!g_jit_emit_inline) {
+        if (sm_emit_macro_library_to_path("sm_macros.s") != 0) {
+            fprintf(stderr,
+                    "sm_codegen_x64_emit: failed to write sm_macros.s "
+                    "(working directory writable?)\n");
+            return -1;
+        }
+        if (emit_three_column_line(out, "", ".include", "\"sm_macros.s\"", NULL) != 0) return -1;
+        /* EM-7c-bb-macros: write BB macro library alongside sm_macros.s. */
+        if (bb_macros_write_to_path("bb_macros.s") != 0) {
+            fprintf(stderr, "sm_codegen_x64_emit: failed to write bb_macros.s\n");
+            return -1;
+        }
+        if (emit_three_column_line(out, "", ".include", "\"bb_macros.s\"", NULL) != 0) return -1;
     }
-    if (emit_three_column_line(out, "", ".include", "\"sm_macros.s\"", NULL) != 0) return -1;
-    /* EM-7c-bb-macros: write BB macro library alongside sm_macros.s. */
-    if (bb_macros_write_to_path("bb_macros.s") != 0) {
-        fprintf(stderr, "sm_codegen_x64_emit: failed to write bb_macros.s\n");
-        return -1;
-    }
-    if (emit_three_column_line(out, "", ".include", "\"bb_macros.s\"", NULL) != 0) return -1;
 
     /* EM-6: collect all string literals and variable names into the string
      * table, then emit them in .section .rodata before .text.  This makes
@@ -2266,7 +2274,7 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
              * SM_DEFINE is a no-op macro (function definition already handled by
              * the expression registry at emit time). */
             case SM_DEFINE_ENTRY: rc = sm_emit_rtcall(out, sm_template_lookup(SM_DEFINE_ENTRY), NULL); break;
-            case SM_DEFINE:       rc = sm_emit_rtcall(out, sm_template_lookup(SM_DEFINE),       NULL); break;
+            case SM_DEFINE:       rc = sm_emit_rtcall(out, sm_template_lookup(SM_DEFINE), NULL); break;
 
             /* EM-7-pre keepers: SM_CALL_FN (general) + SM_CONCAT + SM_PUSH_NULL +
              * SM_COERCE_NUM + conditional return variants. */
@@ -2319,28 +2327,28 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
             /* Variant-path PAT opcodes: each emits its rt_pat_*@PLT call via
              * sm_emit_rtcall.  These are all registered as SM_TPL_RTCALL in
              * g_sm_templates[].  They must NOT fall through to SM_EXEC_STMT. */
-            case SM_PAT_SPAN:    rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_SPAN),    NULL); break;
-            case SM_PAT_BREAK:   rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_BREAK),   NULL); break;
-            case SM_PAT_ANY:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_ANY),     NULL); break;
-            case SM_PAT_NOTANY:  rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_NOTANY),  NULL); break;
-            case SM_PAT_LEN:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_LEN),     NULL); break;
-            case SM_PAT_POS:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_POS),     NULL); break;
-            case SM_PAT_RPOS:    rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_RPOS),    NULL); break;
-            case SM_PAT_TAB:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_TAB),     NULL); break;
-            case SM_PAT_RTAB:    rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_RTAB),    NULL); break;
-            case SM_PAT_ARB:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_ARB),     NULL); break;
-            case SM_PAT_ARBNO:   rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_ARBNO),   NULL); break;
-            case SM_PAT_REM:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_REM),     NULL); break;
-            case SM_PAT_FENCE0:  rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_FENCE0),  NULL); break;
-            case SM_PAT_FENCE1:  rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_FENCE1),  NULL); break;
-            case SM_PAT_FAIL:    rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_FAIL),    NULL); break;
-            case SM_PAT_ABORT:   rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_ABORT),   NULL); break;
+            case SM_PAT_SPAN:    rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_SPAN), NULL); break;
+            case SM_PAT_BREAK:   rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_BREAK), NULL); break;
+            case SM_PAT_ANY:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_ANY), NULL); break;
+            case SM_PAT_NOTANY:  rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_NOTANY), NULL); break;
+            case SM_PAT_LEN:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_LEN), NULL); break;
+            case SM_PAT_POS:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_POS), NULL); break;
+            case SM_PAT_RPOS:    rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_RPOS), NULL); break;
+            case SM_PAT_TAB:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_TAB), NULL); break;
+            case SM_PAT_RTAB:    rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_RTAB), NULL); break;
+            case SM_PAT_ARB:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_ARB), NULL); break;
+            case SM_PAT_ARBNO:   rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_ARBNO), NULL); break;
+            case SM_PAT_REM:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_REM), NULL); break;
+            case SM_PAT_FENCE0:  rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_FENCE0), NULL); break;
+            case SM_PAT_FENCE1:  rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_FENCE1), NULL); break;
+            case SM_PAT_FAIL:    rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_FAIL), NULL); break;
+            case SM_PAT_ABORT:   rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_ABORT), NULL); break;
             case SM_PAT_SUCCEED: rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_SUCCEED), NULL); break;
-            case SM_PAT_BAL:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_BAL),     NULL); break;
-            case SM_PAT_EPS:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_EPS),     NULL); break;
-            case SM_PAT_CAT:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_CAT),     NULL); break;
-            case SM_PAT_ALT:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_ALT),     NULL); break;
-            case SM_PAT_DEREF:   rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_DEREF),   NULL); break;
+            case SM_PAT_BAL:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_BAL), NULL); break;
+            case SM_PAT_EPS:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_EPS), NULL); break;
+            case SM_PAT_CAT:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_CAT), NULL); break;
+            case SM_PAT_ALT:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_ALT), NULL); break;
+            case SM_PAT_DEREF:   rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_DEREF), NULL); break;
             /* SM_PAT_BOXVAL removed by ME-1 */
 
             /* SM_EXEC_STMT for a variant pattern (invariant patterns are

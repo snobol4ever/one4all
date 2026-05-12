@@ -119,6 +119,7 @@ int main(int argc, char **argv)
      * sibling sub-flags of `--jit-emit`. */
     int opt_jit_emit       = 0;  /* --jit-emit : enables standalone backend emission */
     int opt_emit_x64       = 0;  /* --x64      : x86-64 backend selector */
+    int opt_jit_emit_inline = 0; /* --jit-emit-inline : inline GAS (no macros) */
 
     /* Byrd Box pattern mode — independent switch (default: --bb-driver) */
     int bb_driver          = 0;  /* --bb-driver : pattern matching via driver/broker */
@@ -155,6 +156,7 @@ int main(int argc, char **argv)
         /* M-JITEM-X64 / EM-1 — standalone-asm emission */
         else if (strcmp(argv[argi], "--jit-emit")      == 0) { opt_jit_emit       = 1; argi++; }
         else if (strcmp(argv[argi], "--x64")           == 0) { opt_emit_x64       = 1; argi++; }
+        else if (strcmp(argv[argi], "--jit-emit-inline") == 0) { opt_jit_emit_inline = 1; opt_jit_emit = 1; argi++; }
         /* BB pattern mode */
         else if (strcmp(argv[argi], "--bb-driver")     == 0) { bb_driver          = 1; argi++; }
         else if (strcmp(argv[argi], "--bb-live")       == 0) { bb_live            = 1; argi++; }
@@ -482,6 +484,7 @@ int main(int argc, char **argv)
          * hand the program to sm_codegen_x64_emit, which writes an asm
          * source to stdout. The emitted asm is then assembled+linked
          * outside scrip (see scripts/test_smoke_jit_emit_x64.sh). */
+        g_jit_emit_inline = opt_jit_emit_inline;  /* EDP-2 */
         SM_Program *sm = sm_preamble(ast_prog);
         if (!sm) return 1;
         if (sm_codegen_x64_emit(sm, stdout, input_path) != 0) {

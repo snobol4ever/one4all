@@ -709,3 +709,21 @@ void emit_sm_void_pop(emitter_t *e)
     t_pad_to_blob_size();
 }
 /*====================================================================================================================*/
+/*====================================================================================================================*/
+void emit_sm_bb_pump_ast(emitter_t *e)
+{
+    (void)e;
+    emit_sm_rtcall(e, "SM_BB_PUMP_AST — drive BB generator via AST pump", "BB_PUMP_AST", "rt_bb_pump_ast");
+}
+/*====================================================================================================================*/
+void emit_sm_unhandled_op(emitter_t *e, int op)
+{
+    (void)e;
+    t_comment("SM_UNHANDLED — trap for unimplemented opcode");
+    static const char *const params[] = { "op" };
+    t_macro_begin("UNHANDLED", params, 1);
+    t_mov_edi_imm32(op);
+    t_call_sym_plt("rt_unhandled_op", 0);
+    t_macro_end();
+    t_pad_to_blob_size();
+}

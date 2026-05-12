@@ -65,7 +65,8 @@ typedef enum {
     EMIT_TEXT             = 0,
     EMIT_BINARY_WIRED     = 1,
     EMIT_BINARY_BROKERED  = 2,   /* per-box blobs, C ABI entry, rdi=ζ, ret */
-    EMIT_MACRO_DEF        = 3    /* emit .macro NAME ... .endm body (sm_macros.s regen) */
+    EMIT_MACRO_DEF        = 3,   /* emit .macro NAME ... .endm body (sm_macros.s regen) */
+    EMIT_TEXT_INLINE      = 4    /* inline GAS; t_macro_begin/end are no-ops */
 } bb_emit_mode_t;
 
 extern bb_emit_mode_t bb_emit_mode;

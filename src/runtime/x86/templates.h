@@ -257,6 +257,7 @@ void emit_sm_bb_pump_case  (emitter_t *e);
 void emit_sm_bb_pump_sm    (emitter_t *e);
 void emit_sm_bb_pump_every (emitter_t *e);
 void emit_sm_bb_pump_ast   (emitter_t *e);
+void emit_sm_unhandled_op  (emitter_t *e, int op);
 void emit_sm_load_glocal   (emitter_t *e);
 void emit_sm_store_glocal  (emitter_t *e);
 void emit_sm_icmp_gt       (emitter_t *e);

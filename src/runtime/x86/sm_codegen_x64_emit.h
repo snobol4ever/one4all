@@ -39,6 +39,10 @@
  */
 int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path);
 
+/* EDP-2: when non-zero, mode-4 emits inline GAS (no macro invocations).
+ * Set by --jit-emit-inline in scrip.c before calling sm_codegen_x64_emit. */
+extern int g_jit_emit_inline;
+
 /*
  * EM-7a: Phase-2 SM simulator helpers.
  *

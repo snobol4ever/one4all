@@ -778,19 +778,12 @@ int sm_emit_macro_library(FILE *out)
     #undef EMIT_IF_NEW
 
     /* EM-7c-sm-three-column-verify (2026-05-09): trailing '\\n\\n'
-     * produced one blank line at end-of-file — flagged by the audit.
+     * produced one blank line at end-of-file -- flagged by the audit.
      * Drop the second '\\n'. */
     if (fputs("# === END sm macro library ===\n", out) == EOF) return -1;
     return 0;
 }
 
-/* sm_emit_macro_library_to_path:
- *
- * Open `path` for writing and emit the macro library to it as a
- * standalone GAS source file.  Used by the emitter driver to ship
- * sm_macros.s once per emission run, alongside the .s output.
- * The .s file pulls the macros in via `.include "sm_macros.s"`.
- */
 int sm_emit_macro_library_to_path(const char *path)
 {
     if (!path || !*path) return -1;

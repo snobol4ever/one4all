@@ -61,8 +61,10 @@ void t_comment(const char *text)
     case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         /* No-op: comments have no place in raw x86 bytes. */
         return;
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         /* Both write a `    # text` line.  Macro bodies tolerate comments. */
         bb3c_flush_pending_cjmp_only();
         f = bb_emit_out ? bb_emit_out : stdout;
@@ -79,8 +81,10 @@ void t_bb_box_banner(const char *kind, const char *args)
     case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         /* No-op: box banners are readability scaffolding. */
         return;
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         /* 120-char `#---` rule + `    # BOX <kind>(<args>)` caption.
          * Matches the EM-FORMAT-BANNER-COLLAPSE-SPACE shape:
          * no space between # and the rule character. */
@@ -120,8 +124,10 @@ void t_inc_mem_r13_disp8(uint8_t disp)
         bb_emit_byte(0x45); bb_emit_byte(disp);
         return;
     }
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF: {
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         char args[64];
         snprintf(args, sizeof(args), "dword ptr [r13 + %u]", (unsigned)disp);
         bb3c_format(emit_outf(), "", "inc", args);
@@ -138,9 +144,12 @@ void t_ret(void)
     case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         bb_emit_byte(0xC3);
         return;
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         if (bb_emit_mode == EMIT_TEXT && g_in_text_macro_body) return;
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         bb3c_format(emit_outf(), "", "ret", "");
         return;
     }
@@ -158,9 +167,12 @@ void t_push_rbp_frame(void)
         /* sub rsp, 8 */
         bb_emit_byte(0x48); bb_emit_byte(0x83); bb_emit_byte(0xEC); bb_emit_byte(0x08);
         return;
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         if (bb_emit_mode == EMIT_TEXT && g_in_text_macro_body) return;
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         bb3c_format(emit_outf(), "", "push", "rbp");
         bb3c_format(emit_outf(), "", "mov",  "rbp, rsp");
         bb3c_format(emit_outf(), "", "sub",  "rsp, 8");
@@ -180,9 +192,12 @@ void t_pop_rbp_frame_ret(void)
         /* ret */
         bb_emit_byte(0xC3);
         return;
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         if (bb_emit_mode == EMIT_TEXT && g_in_text_macro_body) return;
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         bb3c_format(emit_outf(), "", "mov", "rsp, rbp");
         bb3c_format(emit_outf(), "", "pop", "rbp");
         bb3c_format(emit_outf(), "", "ret", "");
@@ -199,6 +214,7 @@ void t_pad_to_blob_size(void)
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
         return;
@@ -223,9 +239,12 @@ void t_mov_rdi_imm64(uint64_t val)
         bb_emit_byte((uint8_t)(val >> 56));
         return;
     }
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF: {
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         if (bb_emit_mode == EMIT_TEXT && g_in_text_macro_body) return;
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         char args[64];
         snprintf(args, sizeof(args), "rdi, 0x%llx", (unsigned long long)val);
         bb3c_format(emit_outf(), "", "mov", args);
@@ -259,9 +278,12 @@ void t_call_sym_plt(const char *sym, uint64_t fn_fallback)
         bb_emit_byte(0xFF); bb_emit_byte(0xD0);
         return;
     }
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF: {
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         if (bb_emit_mode == EMIT_TEXT && g_in_text_macro_body) return;
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         char args[80];
         snprintf(args, sizeof(args), "%s@PLT", sym ? sym : "??sym??");
         bb3c_format(emit_outf(), "", "call", args);
@@ -282,6 +304,7 @@ void t_macro_begin(const char *name, const char *const *params, int nparams)
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         return;
+    case EMIT_TEXT_INLINE: return;
     case EMIT_TEXT: {
         bb3c_flush_pending_cjmp_only();
         FILE *f = emit_outf();
@@ -299,9 +322,11 @@ void t_macro_begin(const char *name, const char *const *params, int nparams)
         FILE *f = emit_outf();
         fprintf(f, ".macro %s", name ? name : "?");
         for (int i = 0; i < nparams; i++) {
-            fprintf(f, " %s", params && params[i] ? params[i] : "?");
+            fprintf(f, "%s%s", (i == 0 ? " " : ", "),
+                    params && params[i] ? params[i] : "?");
         }
         fputc('\n', f);
+        g_in_text_macro_body = 1;  /* allow body t_* output until t_macro_end */
         return;
     }
     }
@@ -317,12 +342,14 @@ void t_macro_end(void)
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         return;
+    case EMIT_TEXT_INLINE: return;
     case EMIT_TEXT:
         g_in_text_macro_body = 0;  /* body suppression ends here */
         return;
     case EMIT_MACRO_DEF:
         bb3c_flush_pending_cjmp_only();
         fputs(".endm\n", emit_outf());
+        g_in_text_macro_body = 0;  /* body ends */
         return;
     }
 }
@@ -338,8 +365,10 @@ void t_test_rax_rax(void)
     case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         bb_emit_byte(0x48); bb_emit_byte(0x85); bb_emit_byte(0xC0);
         return;
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         bb3c_format(emit_outf(), "", "test", "rax, rax");
         return;
     }
@@ -359,8 +388,10 @@ void t_emit_jmp(bb_label_t *target, jmp_kind_t kind)
     static const char *const mn_tab[] = { "jmp", "je", "jne", "jl", "jge", "jg" };
     const char *mn = ((unsigned)kind < 6) ? mn_tab[kind] : "jmp";
     switch (bb_emit_mode) {
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         bb3c_emit_jmp(emit_outf(), mn, target->name);
         return;
     case EMIT_BINARY_WIRED:
@@ -395,8 +426,10 @@ void t_lea_rdi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr)
     case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         t_mov_rdi_imm64(in_proc_ptr);
         return;
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT: {
-        if (g_in_text_macro_body) return;
+        if (g_in_text_macro_body) return;  /* TEXT: suppress macro body */
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         char args[80];
         snprintf(args, sizeof(args), "rdi, [rip + %s]",
                  sym_label ? sym_label : "??sym??");
@@ -432,8 +465,10 @@ void t_lea_rdx_strtab_sym(const char *sym_label, uint64_t in_proc_ptr)
         bb_emit_byte((uint8_t)(v >> 48)); bb_emit_byte((uint8_t)(v >> 56));
         return;
     }
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT: {
-        if (g_in_text_macro_body) return;
+        if (g_in_text_macro_body) return;  /* TEXT: suppress macro body */
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         char args[80];
         snprintf(args, sizeof(args), "rdx, [rip + %s]",
                  sym_label ? sym_label : "??sym??");
@@ -461,8 +496,10 @@ void t_mov_edx_imm32(int val)
         bb_emit_byte((uint8_t)(u >> 16)); bb_emit_byte((uint8_t)(u >> 24));
         return;
     }
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT: {
-        if (g_in_text_macro_body) return;
+        if (g_in_text_macro_body) return;  /* TEXT: suppress macro body */
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         char args[32];
         snprintf(args, sizeof(args), "edx, %d", val);
         bb3c_format(emit_outf(), "", "mov", args);
@@ -493,8 +530,10 @@ void t_mov_esi_imm32(int val)
         bb_emit_byte((uint8_t)(u >> 24));
         return;
     }
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT: {
-        if (g_in_text_macro_body) return;
+        if (g_in_text_macro_body) return;  /* TEXT: suppress macro body */
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         char args[32];
         snprintf(args, sizeof(args), "esi, %d", val);
         bb3c_format(emit_outf(), "", "mov", args);
@@ -523,8 +562,10 @@ void t_mov_edi_imm32(int val)
         bb_emit_byte((uint8_t)(u >> 24));
         return;
     }
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT: {
-        if (g_in_text_macro_body) return;
+        if (g_in_text_macro_body) return;  /* TEXT: suppress macro body */
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         char args[32];
         snprintf(args, sizeof(args), "edi, %d", val);
         bb3c_format(emit_outf(), "", "mov", args);
@@ -546,9 +587,12 @@ void t_test_eax_eax(void)
     case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         bb_emit_byte(0x85); bb_emit_byte(0xC0);
         return;
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         if (bb_emit_mode == EMIT_TEXT && g_in_text_macro_body) return;
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         bb3c_format(emit_outf(), "", "test", "eax, eax");
         return;
     }
@@ -567,8 +611,10 @@ void t_jz_retskip(int pc)
          * Emit NOP placeholder so binary mode is at least structurally safe. */
         bb_emit_byte(0x90);
         return;
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT: {
-        if (g_in_text_macro_body) return;
+        if (g_in_text_macro_body) return;  /* TEXT: suppress macro body */
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         char args[40];
         snprintf(args, sizeof(args), ".Lretskip_%d", pc);
         bb3c_format(emit_outf(), "", "jz", args);
@@ -591,8 +637,10 @@ void t_retskip_label(int pc)
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         return;
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT: {
-        if (g_in_text_macro_body) return;
+        if (g_in_text_macro_body) return;  /* TEXT: suppress macro body */
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         FILE *f = emit_outf();
         fprintf(f, ".Lretskip_%d:\n", pc);
         return;
@@ -623,8 +671,10 @@ void t_movabs_rdi_entry(uint64_t entry_ptr)
         bb_emit_byte((uint8_t)(v >> 48)); bb_emit_byte((uint8_t)(v >> 56));
         return;
     }
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT: {
-        if (g_in_text_macro_body) return;
+        if (g_in_text_macro_body) return;  /* TEXT: suppress macro body */
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         char args[32];
         snprintf(args, sizeof(args), "rdi, 0x%llx", (unsigned long long)entry_ptr);
         bb3c_format(emit_outf(), "", "movabs", args);
@@ -648,6 +698,7 @@ void t_call_sym_param(const char *sym_or_param)
     case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         /* BINARY path uses standard_blob; this helper is TEXT/MACRO_DEF only. */
         return;
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT: {
         bb3c_format(emit_outf(), "", "call", sym_or_param ? sym_or_param : "??tgt??");
         return;
@@ -670,8 +721,10 @@ void t_noop_macro(const char *macro_name)
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         return;
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         bb3c_format(emit_outf(), "", macro_name, "");
         return;
     }
@@ -689,8 +742,10 @@ void t_banner_stno(int stno, int lineno, const char *src_text)
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         return;
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF: {
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         FILE *f = emit_outf();
         bb3c_flush_pending();
         fputs(STNO_RULE, f);
@@ -1566,8 +1621,10 @@ void t_bb_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fallback
     case EMIT_BINARY_BROKERED:
         bb_emit_byte(0x41); bb_emit_byte(0x52);   /* push r10 */
         break;
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         bb3c_format(emit_outf(), "", "push", "r10");
         break;
     }
@@ -1579,8 +1636,10 @@ void t_bb_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fallback
     case EMIT_BINARY_BROKERED:
         bb_emit_byte(0x41); bb_emit_byte(0x5A);   /* pop r10 */
         break;
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         bb3c_format(emit_outf(), "", "pop", "r10");
         break;
     }
@@ -1605,8 +1664,10 @@ void t_load_delta_cmp_imm(int n, bb_label_t *lbl_succ, bb_label_t *lbl_fail)
         t_emit_jmp(lbl_fail, JMP_JNE);
         t_emit_jmp(lbl_succ, JMP_JMP);
         return;
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF: {
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         FILE *f = emit_outf();
         bb3c_format(f, "", "mov", "eax, [r10]");
         char args[32]; snprintf(args, sizeof(args), "eax, %d", n);
@@ -1651,8 +1712,10 @@ void t_load_siglen_sub_cmp_delta(int n, uint64_t siglen_addr,
         t_emit_jmp(lbl_fail, JMP_JNE);
         t_emit_jmp(lbl_succ, JMP_JMP);
         return;
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF: {
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         FILE *f = emit_outf();
         char args[64];
         snprintf(args, sizeof(args), "rcx, 0x%llx", (unsigned long long)siglen_addr);
@@ -1686,8 +1749,10 @@ void t_lea_rsi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr)
         bb_emit_byte((uint8_t)(in_proc_ptr >> 48));
         bb_emit_byte((uint8_t)(in_proc_ptr >> 56));
         return;
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF: {
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         FILE *f = emit_outf();
         char args[80];
         snprintf(args, sizeof(args), "rcx, [rip + %s]",
@@ -1715,8 +1780,10 @@ void t_add_delta_imm(int v)
         /* mov [r10], eax  — 41 89 02 */
         bb_emit_byte(0x41); bb_emit_byte(0x89); bb_emit_byte(0x02);
         return;
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF: {
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         FILE *f = emit_outf();
         bb3c_format(f, "", "mov", "eax, [r10]");
         char args[32]; snprintf(args, sizeof(args), "eax, %d", v);
@@ -1743,8 +1810,10 @@ void t_sub_delta_imm(int v)
         /* mov [r10], eax  — 41 89 02 */
         bb_emit_byte(0x41); bb_emit_byte(0x89); bb_emit_byte(0x02);
         return;
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF: {
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         FILE *f = emit_outf();
         bb3c_format(f, "", "mov", "eax, [r10]");
         char args[32]; snprintf(args, sizeof(args), "eax, %d", v);
@@ -1780,8 +1849,10 @@ void t_sigma_plus_delta_to_rdi(uint64_t sigma_addr, uint64_t siglen_addr)
         /* mov rdi, rax  — 48 89 C7 */
         bb_emit_byte(0x48); bb_emit_byte(0x89); bb_emit_byte(0xC7);
         return;
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF: {
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         FILE *f = emit_outf();
         char args[80];
         snprintf(args, sizeof(args), "rcx, 0x%llx", (unsigned long long)sigma_addr);
@@ -1822,8 +1893,10 @@ void t_bounds_check_delta_plus_len(int len, uint64_t siglen_addr, bb_label_t *lb
         bb_emit_byte(0x3B); bb_emit_byte(0x01);
         t_emit_jmp(lbl_fail, JMP_JG);
         return;
+    case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF: {
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         FILE *f = emit_outf();
         bb3c_format(f, "", "mov", "eax, [r10]");
         char args[32]; snprintf(args, sizeof(args), "eax, %d", len);
