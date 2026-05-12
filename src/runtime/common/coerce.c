@@ -60,7 +60,7 @@ DESCR_t shared_arith(DESCR_t l, DESCR_t r, sm_opcode_t op)
             if (r.i >= 0) {
                 int64_t base = l.i, exp = r.i, res = 1;
                 while (exp-- > 0) res *= base;
-                return INTVAL(res);
+                return REALVAL((double)res);  /* Icon ^ always returns real */
             }
             return REALVAL(pow((double)l.i, (double)r.i));
         default: break;
