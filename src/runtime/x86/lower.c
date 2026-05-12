@@ -79,20 +79,23 @@ static void lower_unhandled(const tree_t *t)
 static int emit_goto(sm_opcode_t op, const char *target)
 {
     if (!target) return -1;
-    if (strcasecmp(target, "RETURN")  == 0) {
-        if (op == SM_JUMP_S) return sm_emit(g_p, SM_RETURN_S);
-        if (op == SM_JUMP_F) return sm_emit(g_p, SM_RETURN_F);
-        return sm_emit(g_p, SM_RETURN);
-    }
-    if (strcasecmp(target, "FRETURN") == 0) {
-        if (op == SM_JUMP_S) return sm_emit(g_p, SM_FRETURN_S);
-        if (op == SM_JUMP_F) return sm_emit(g_p, SM_FRETURN_F);
-        return sm_emit(g_p, SM_FRETURN);
-    }
-    if (strcasecmp(target, "NRETURN") == 0) {
-        if (op == SM_JUMP_S) return sm_emit(g_p, SM_NRETURN_S);
-        if (op == SM_JUMP_F) return sm_emit(g_p, SM_NRETURN_F);
-        return sm_emit(g_p, SM_NRETURN);
+    /* RETURN/FRETURN/NRETURN as goto-targets: pick the row, then the column
+     * (op == JUMP_S → success, JUMP_F → fail, else unconditional). */
+    static const struct {
+        const char *name;
+        sm_opcode_t plain, succ, fail;
+    } ret_kinds[] = {
+        { "RETURN",  SM_RETURN,  SM_RETURN_S,  SM_RETURN_F  },
+        { "FRETURN", SM_FRETURN, SM_FRETURN_S, SM_FRETURN_F },
+        { "NRETURN", SM_NRETURN, SM_NRETURN_S, SM_NRETURN_F },
+    };
+    for (unsigned i = 0; i < sizeof ret_kinds / sizeof ret_kinds[0]; i++) {
+        if (strcasecmp(target, ret_kinds[i].name) == 0) {
+            sm_opcode_t emit_op = (op == SM_JUMP_S) ? ret_kinds[i].succ
+                                : (op == SM_JUMP_F) ? ret_kinds[i].fail
+                                :                     ret_kinds[i].plain;
+            return sm_emit(g_p, emit_op);
+        }
     }
     int idx = sm_emit_i(g_p, op, 0);
     int resolved = labtab_find(&g_labtab, target);
@@ -238,8 +241,6 @@ static void lower_cat_seq(const tree_t *t)
         for (int i = 1; i < t->n; i++) sm_emit(g_p, SM_CONCAT);
     }
 }
-
-static void lower_alt  (const tree_t *t) { lower_pat_expr(t); }
 
 static void lower_opsyn(const tree_t *t)
 {
@@ -505,8 +506,6 @@ static void lower_lcomp(const tree_t *t) { lower_comp(t, SM_LCOMP); }
 
 /*── Cset / list ops ─────────────────────────────────────────────────────────*/
 
-static void lower_cset_op(const tree_t *t) { emit_push_expr(t); }
-
 static void lower_lconcat(const tree_t *t)
 {
     int has_gen = 0;
@@ -762,9 +761,6 @@ static void lower_section_3(const tree_t *t, const char *fn)
         sm_emit_si(g_p, SM_CALL_FN, fn, 3);
     } else sm_emit(g_p, SM_PUSH_NULL);
 }
-static void lower_section      (const tree_t *t) { lower_section_3(t, "ICN_SECTION_RANGE"); }
-static void lower_section_plus (const tree_t *t) { lower_section_3(t, "ICN_SECTION_PLUS");  }
-static void lower_section_minus(const tree_t *t) { lower_section_3(t, "ICN_SECTION_MINUS"); }
 static void lower_bang_binary  (const tree_t *t)
 {
     sm_emit_i(g_p, SM_BB_PUMP_AST, (int64_t)ast_pump_table_register((tree_t *)t));
@@ -1041,7 +1037,7 @@ void lower_expr(const tree_t *t)
     /* sequences */
     case TT_VLIST:                            lower_vlist(t);         return;
     case TT_CAT: case TT_SEQ:                lower_cat_seq(t);       return;
-    case TT_ALT:                              lower_alt(t);           return;
+    case TT_ALT:                              lower_pat_expr(t);      return;
     case TT_OPSYN:                            lower_opsyn(t);         return;
     /* pattern primitives — delegate to lower_pat_expr */
     case TT_ARB:    case TT_ARBNO:  case TT_POS:    case TT_RPOS:
@@ -1063,7 +1059,7 @@ void lower_expr(const tree_t *t)
                                                lower_lcomp(t);         return;
     /* cset / list */
     case TT_CSET_COMPL: case TT_CSET_UNION: case TT_CSET_DIFF: case TT_CSET_INTER:
-                                               lower_cset_op(t);       return;
+                                               emit_push_expr(t);      return;
     case TT_LCONCAT:                          lower_lconcat(t);       return;
     /* unary Icon */
     case TT_NONNULL:                          lower_nonnull(t);       return;
@@ -1091,9 +1087,9 @@ void lower_expr(const tree_t *t)
     case TT_GLOBAL:                           lower_global(t);        return;
     case TT_INITIAL:                          lower_initial(t);       return;
     /* sections */
-    case TT_SECTION:                          lower_section(t);       return;
-    case TT_SECTION_PLUS:                     lower_section_plus(t);  return;
-    case TT_SECTION_MINUS:                    lower_section_minus(t); return;
+    case TT_SECTION:                          lower_section_3(t, "ICN_SECTION_RANGE"); return;
+    case TT_SECTION_PLUS:                     lower_section_3(t, "ICN_SECTION_PLUS");  return;
+    case TT_SECTION_MINUS:                    lower_section_3(t, "ICN_SECTION_MINUS"); return;
     case TT_BANG_BINARY:                      lower_bang_binary(t);   return;
     /* generators */
     case TT_SUSPEND:                          lower_suspend(t);       return;
