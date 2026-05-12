@@ -221,6 +221,23 @@ void t_sigma_plus_delta_to_rdi(uint64_t sigma_addr, uint64_t siglen_addr);
  *   TEXT:   three-column lines. */
 void t_bounds_check_delta_plus_len(int len, uint64_t siglen_addr, bb_label_t *lbl_fail);
 
+/* t_push_rbp_frame — establish a C-style stack frame at function entry.
+ * Emits: push rbp; mov rbp, rsp; sub rsp, 8
+ * The sub rsp,8 maintains the (rsp+8) mod 16 == 0 ABI invariant after
+ * the push rbp.  Required at the entry of every mode-4 user-function body
+ * (SM_DEFINE_ENTRY) because cfn() is called from call_native_chunk via a
+ * C-ABI call, and the body subsequently makes C-ABI calls (rt_match_variant
+ * etc.) whose callees use SSE-aligned access (movaps -0x60(%rbp)).
+ *   BINARY: bytes 55 48 89 E5 48 83 EC 08
+ *   TEXT:   three-column lines (push, mov, sub) */
+void t_push_rbp_frame(void);
+
+/* t_pop_rbp_frame_ret — undo t_push_rbp_frame and return.
+ * Emits: mov rsp, rbp; pop rbp; ret  (the mov rsp,rbp strips the sub rsp,8).
+ *   BINARY: bytes 48 89 EC 5D C3
+ *   TEXT:   three-column lines (mov, pop, ret) */
+void t_pop_rbp_frame_ret(void);
+
 /* ── binary mode state ──────────────────────────────────────────────────── */
 
 extern bb_buf_t  bb_emit_buf;   /* current pool buffer */

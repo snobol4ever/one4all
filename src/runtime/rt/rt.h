@@ -334,6 +334,11 @@ typedef struct {
     void (*set_last_ok)(int x);
 } rt_vstack_ops_t;
 
+/* rt_in_native_chunk(): non-zero when executing inside call_native_chunk.
+ * exec_stmt uses this to skip bb_build_flat (deep stack) and fall back to
+ * bb_build_binary (shallow stack) when called from a JIT user-function body. */
+int rt_in_native_chunk(void);
+
 #ifdef __cplusplus
 }
 #endif

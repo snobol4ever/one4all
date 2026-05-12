@@ -146,6 +146,50 @@ void t_ret(void)
     }
 }
 
+void t_push_rbp_frame(void)
+{
+    switch (bb_emit_mode) {
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:
+        /* push rbp */
+        bb_emit_byte(0x55);
+        /* mov rbp, rsp */
+        bb_emit_byte(0x48); bb_emit_byte(0x89); bb_emit_byte(0xE5);
+        /* sub rsp, 8 */
+        bb_emit_byte(0x48); bb_emit_byte(0x83); bb_emit_byte(0xEC); bb_emit_byte(0x08);
+        return;
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF:
+        if (bb_emit_mode == EMIT_TEXT && g_in_text_macro_body) return;
+        bb3c_format(emit_outf(), "", "push", "rbp");
+        bb3c_format(emit_outf(), "", "mov",  "rbp, rsp");
+        bb3c_format(emit_outf(), "", "sub",  "rsp, 8");
+        return;
+    }
+}
+
+void t_pop_rbp_frame_ret(void)
+{
+    switch (bb_emit_mode) {
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:
+        /* mov rsp, rbp */
+        bb_emit_byte(0x48); bb_emit_byte(0x89); bb_emit_byte(0xEC);
+        /* pop rbp */
+        bb_emit_byte(0x5D);
+        /* ret */
+        bb_emit_byte(0xC3);
+        return;
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF:
+        if (bb_emit_mode == EMIT_TEXT && g_in_text_macro_body) return;
+        bb3c_format(emit_outf(), "", "mov", "rsp, rbp");
+        bb3c_format(emit_outf(), "", "pop", "rbp");
+        bb3c_format(emit_outf(), "", "ret", "");
+        return;
+    }
+}
+
 void t_pad_to_blob_size(void)
 {
     /* No-op in all three modes today: mode-3 uses variable-size blobs

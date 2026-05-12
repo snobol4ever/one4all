@@ -82,6 +82,11 @@ extern DESCR_t (*g_user_call_hook)(const char *name, DESCR_t *args, int nargs);
 #include "sil_macros.h"   /* SIL macro translations — RT + SM axes */
 #include "bb_build.h"
 #include "../x86/bb_flat.h"     /* bb_lit_emit_binary — M-DYN-B1 */
+/* rt_in_native_chunk lives in libscrip_rt.so (mode-4 only).  In the scrip
+ * binary (mode-1/2/3) it is never set — provide a weak fallback that returns
+ * 0 so the call resolves cleanly even when libscrip_rt is not linked. */
+int rt_in_native_chunk(void) __attribute__((weak));
+int rt_in_native_chunk(void) { return 0; }
 
 /* SN-6b: DT_E thaw in bb_deferred_var needs tree_t + TT_FNC/TT_VAR kinds and
  * eval_node() for argument evaluation. Mirrors snobol4_pattern.c's pat_to_patnd. */

@@ -205,6 +205,9 @@ static int     g_pat_sp = 0;
 
 static int     g_halt_rc  = 0;
 static int     g_halt_set = 0;
+static int     g_native_chunk_depth = 0;  /* re-entrancy depth for call_native_chunk */
+
+int rt_in_native_chunk(void) { return g_native_chunk_depth > 0; }
 /* g_last_ok moved above into backend section; default backend reads/writes
  * it via _default_get_last_ok / _default_set_last_ok. */
 
@@ -421,7 +424,9 @@ static DESCR_t call_native_chunk(const char *fname, void *fn,
      * reads/writes the global vstack and NV table directly. */
     typedef void (*chunk_fn_t)(void);
     chunk_fn_t cfn = (chunk_fn_t)fn;
+    g_native_chunk_depth++;
     cfn();
+    g_native_chunk_depth--;
 
     /* SNOBOL4 user-function retval convention: read NV[fname].  Mirrors
      * sm_interp.c:1208-1210 user-function branch.  If the body never

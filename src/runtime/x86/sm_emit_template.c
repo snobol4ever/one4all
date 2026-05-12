@@ -318,12 +318,34 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
         macro_line(out, "", ".macro", macro_def);
         { char ct[64]; snprintf(ct, sizeof(ct), "%s@PLT", t->runtime);
           macro_line(out, "", "call", ct); }
+        /* SM_DEFINE_ENTRY: establish a C-style stack frame so the user-function
+         * body maintains the SysV AMD64 ABI invariant (rsp+8) mod 16 == 0 at
+         * every nested `call`.  Without this, calls to rt_match_variant etc.
+         * arrive with rsp misaligned, and downstream movaps -0x60(%rbp) in
+         * libc/snobol4 internals SIGSEGVs.  Mirrors mode-3's ME-6a/ME-13
+         * prologue in sm_codegen.c. */
+        /* SM_DEFINE_ENTRY: enter the C-ABI prologue (push rbp; mov rbp,rsp).
+         * cfn() is entered via a C-ABI `call` from call_native_chunk, so rsp%16==8
+         * at entry to the body.  The bare `push rbp` brings rsp to %16==0; the
+         * matching `mov rbp,rsp` puts rbp at %16==0 too, satisfying
+         * movaps -0x60(%rbp) in downstream callees (bb_build, etc.).
+         * NO additional `sub rsp,8` here — that would flip alignment back to 8
+         * and re-introduce the SIGSEGV.  See mode-3's ME-6a/ME-13 for the
+         * different invariant in that path. */
+        if (strcmp(t->macro_name, "DEFINE_ENTRY") == 0) {
+            macro_line(out, "", "push", "rbp");
+            macro_line(out, "", "mov",  "rbp, rsp");
+        }
         macro_line(out, "", ".endm", "");
         return 0;
 
     case SM_TPL_RET:
         snprintf(macro_def, sizeof(macro_def), "%s", t->macro_name);
         macro_line(out, "", ".macro", macro_def);
+        /* Undo the C frame established by SM_DEFINE_ENTRY: strip the
+         * sub rsp,8 via mov rsp,rbp, restore caller's rbp, then ret. */
+        macro_line(out, "", "mov",  "rsp, rbp");
+        macro_line(out, "", "pop",  "rbp");
         macro_line(out, "", "ret", "");
         macro_line(out, "", ".endm", "");
         return 0;
@@ -468,6 +490,9 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
           macro_line(out, "", "call", ct); }
         macro_line(out, "", "test", "eax, eax");
         macro_line(out, "", "jz", ".Lretskip_\\pc");
+        /* Undo the C frame established by SM_DEFINE_ENTRY before returning. */
+        macro_line(out, "", "mov", "rsp, rbp");
+        macro_line(out, "", "pop", "rbp");
         macro_line(out, "", "ret", "");
         fprintf(out, ".Lretskip_\\pc\\():\n");  /* GAS local label hack: must stay as-is */
         macro_line(out, "", ".endm", "");
