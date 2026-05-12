@@ -178,20 +178,9 @@ static DESCR_t bb_deferred_var(void *zeta, int entry);
 
 
 /* ══════════════════════════════════════════════════════════════════════════
- * Phase 2: bb_build_from_patnd — walk PATND_t tree, return root bb_box_fn
+ * Phase 2: pattern build — bb_build_brokered (EM-BB-PURGE-3)
+ * bb_build() deleted in EDP-8; brokered blob path via bb_flat.c.
  * ══════════════════════════════════════════════════════════════════════════ */
-
-/*
- * Each build function allocates a typed state struct (ζ) and returns:
- *   fn  — the box function pointer
- *   *ζζ — the state pointer (passed to fn on first call)
- *
- * We return through a small wrapper struct to keep the API clean.
- */
-/* bb_node_t is defined in bb_box.h */
-
-/* forward declaration for recursion */
-bb_node_t bb_build(PATND_t *p);
 
 /* flush_pending_captures now external, declared in bb_box.h */
 
@@ -575,428 +564,6 @@ static DESCR_t bb_usercall(void *zeta, int entry)
  * handling backtrack bookkeeping on every box, no event queue is needed.
  */
 
-/* ══════════════════════════════════════════════════════════════════════════ */
-
-bb_node_t bb_build(PATND_t *p)
-{
-    bb_node_t n = { NULL, NULL };
-    if (!p) {
-        /* null node → epsilon */
-        eps_t *ζ = calloc(1, sizeof(eps_t));
-        n.fn = bb_eps;
-        n.ζ  = ζ;
-        n.ζ_size = sizeof(*ζ);
-                                                              return n;
-    }
-
-    /* ── M-DYN-OPT: invariance cache ────────────────────────────────── */
-    /*
-     * If this node's subtree is provably invariant (no runtime variable
-     * reads, no side-effecting captures), check the cache first.
-     * On hit: return a fresh ζ copy of the cached template — O(ζ_size)
-     * memcpy instead of O(depth) tree walk + calloc chain.
-     * On miss: build normally, then insert into cache for next time.
-     */
-    int is_invariant = patnd_is_invariant(p);
-    if (is_invariant) {
-        cache_slot_t *slot = cache_find(p);
-        if (slot && slot->key == p) {
-            g_cache_hits++;
-                                                              return cache_get_fresh(slot);
-        }
-        g_cache_misses++;
-        /* fall through — build it, then insert below */
-    }
-
-    switch (p->kind) {
-
-    /* ── literal string ─────────────────────────────────────────────── */
-    case XCHR: {
-        lit_t *ζ = calloc(1, sizeof(lit_t));
-        ζ->lit = p->STRVAL_fn ? p->STRVAL_fn : "";
-        ζ->len = (int)strlen(ζ->lit);
-        n.fn = bb_lit;
-        n.ζ  = ζ;
-        n.ζ_size = sizeof(*ζ);
-        break;
-    }
-
-    /* ── POS(n) ─────────────────────────────────────────────────────── */
-    case XPOSI: {
-        pos_t *ζ = calloc(1, sizeof(pos_t));
-        ζ->n = (int)p->num;
-        n.fn = bb_pos;
-        n.ζ  = ζ;
-        n.ζ_size = sizeof(*ζ);
-        break;
-    }
-
-    /* ── RPOS(n) ────────────────────────────────────────────────────── */
-    case XRPSI: {
-        rpos_t *ζ = calloc(1, sizeof(rpos_t));
-        ζ->n = (int)p->num;
-        n.fn = bb_rpos;
-        n.ζ  = ζ;
-        n.ζ_size = sizeof(*ζ);
-        break;
-    }
-
-    /* ── LEN(n) ─────────────────────────────────────────────────────── */
-    case XLNTH: {
-        len_t *ζ = calloc(1, sizeof(len_t));
-        ζ->n = (int)p->num;
-        n.fn = bb_len;
-        n.ζ  = ζ;
-        n.ζ_size = sizeof(*ζ);
-        break;
-    }
-
-    /* ── SPAN(chars) ────────────────────────────────────────────────── */
-    case XSPNC: {
-        span_t *ζ = calloc(1, sizeof(span_t));
-        ζ->chars = p->STRVAL_fn ? p->STRVAL_fn : "";
-        n.fn = bb_span;
-        n.ζ  = ζ;
-        n.ζ_size = sizeof(*ζ);
-        break;
-    }
-
-    /* ── BREAK(chars) ───────────────────────────────────────────────── */
-    case XBRKC: {
-        brk_t *ζ = calloc(1, sizeof(brk_t));
-        ζ->chars = p->STRVAL_fn ? p->STRVAL_fn : "";
-        n.fn = bb_brk;
-        n.ζ  = ζ;
-        n.ζ_size = sizeof(*ζ);
-        break;
-    }
-
-    /* ── BREAKX(chars) ──────────────────────────────────────────────── */
-    case XBRKX: {
-        brkx_t *ζ = calloc(1, sizeof(brkx_t));
-        ζ->chars = p->STRVAL_fn ? p->STRVAL_fn : "";
-        n.fn = bb_breakx;
-        n.ζ  = ζ;
-        n.ζ_size = sizeof(*ζ);
-        break;
-    }
-
-    /* ── ANY(chars) ─────────────────────────────────────────────────── */
-    case XANYC: {
-        any_t *ζ = calloc(1, sizeof(any_t));
-        ζ->chars = p->STRVAL_fn ? p->STRVAL_fn : "";
-        n.fn = bb_any;
-        n.ζ  = ζ;
-        n.ζ_size = sizeof(*ζ);
-        break;
-    }
-
-    /* ── NOTANY(chars) ──────────────────────────────────────────────── */
-    case XNNYC: {
-        notany_t *ζ = calloc(1, sizeof(notany_t));
-        ζ->chars = p->STRVAL_fn ? p->STRVAL_fn : "";
-        n.fn = bb_notany;
-        n.ζ  = ζ;
-        n.ζ_size = sizeof(*ζ);
-        break;
-    }
-
-    /* ── ARB ────────────────────────────────────────────────────────── */
-    case XFARB: {
-        arb_t *ζ = calloc(1, sizeof(arb_t));
-        n.fn = bb_arb;
-        n.ζ  = ζ;
-        n.ζ_size = sizeof(*ζ);
-        break;
-    }
-
-    /* ── REM ────────────────────────────────────────────────────────── */
-    case XSTAR: {
-        rem_t *ζ = calloc(1, sizeof(rem_t));
-        n.fn = bb_rem;
-        n.ζ  = ζ;
-        n.ζ_size = sizeof(*ζ);
-        break;
-    }
-
-    /* ── SUCCEED ────────────────────────────────────────────────────── */
-    case XSUCF: {
-        succeed_t *ζ = calloc(1, sizeof(succeed_t));
-        n.fn = bb_succeed;
-        n.ζ  = ζ;
-        n.ζ_size = sizeof(*ζ);
-        break;
-    }
-
-    /* ── FAIL ───────────────────────────────────────────────────────── */
-    case XFAIL: {
-        fail_t *ζ = calloc(1, sizeof(fail_t));
-        n.fn = bb_fail;
-        n.ζ  = ζ;
-        n.ζ_size = sizeof(*ζ);
-        break;
-    }
-
-    /* ── EPSILON ────────────────────────────────────────────────────── */
-    case XEPS: {
-        eps_t *ζ = calloc(1, sizeof(eps_t));
-        n.fn = bb_eps;
-        n.ζ  = ζ;
-        n.ζ_size = sizeof(*ζ);
-        break;
-    }
-
-    /* ── CONCATENATION (n-ary, fold-right into bb_seq pairs) ────────── */
-    case XCAT: {
-        if (p->nchildren == 0) { n = bb_build(NULL); break; }
-        if (p->nchildren == 1) { n = bb_build(p->children[0]); break; }
-        /* Fold right: seq(children[0], seq(children[1], ...)) */
-        n = bb_build(p->children[p->nchildren - 1]);
-        for (int i = p->nchildren - 2; i >= 0; i--) {
-            seq_t *ζ = calloc(1, sizeof(seq_t));
-            bb_node_t l = bb_build(p->children[i]);
-            ζ->left.fn    = l.fn;  ζ->left.state  = l.ζ;
-            ζ->right.fn   = n.fn;  ζ->right.state = n.ζ;
-            bb_node_t seq_n;
-            seq_n.fn = bb_seq;
-            seq_n.ζ  = ζ;
-            seq_n.ζ_size = sizeof(*ζ);
-            n = seq_n;
-        }
-        break;
-    }
-
-    /* ── ALTERNATION (n-ary, direct children[] iteration) ──────────── */
-    case XOR: {
-        alt_t *ζ = calloc(1, sizeof(alt_t));
-        int nc = p->nchildren;
-        ζ->cap      = nc > BB_ALT_INIT ? nc : BB_ALT_INIT;
-        ζ->children = malloc(ζ->cap * sizeof(bchild_t));
-        for (int i = 0; i < nc; i++) {
-            bb_node_t arm         = bb_build(p->children[i]);
-            ζ->children[i].fn    = arm.fn;
-            ζ->children[i].state = arm.ζ;
-        }
-        ζ->n = nc;
-        n.fn = bb_alt;
-        n.ζ  = ζ;
-        n.ζ_size = sizeof(*ζ);
-        break;
-    }
-
-    /* ── ARBNO(body) ────────────────────────────────────────────────── */
-    case XARBN: {
-        arbno_t *ζ = calloc(1, sizeof(arbno_t));
-        bb_node_t body = bb_build(p->nchildren > 0 ? p->children[0] : NULL);
-        ζ->fn    = body.fn;
-        ζ->state = body.ζ;
-        ζ->cap   = ARBNO_INIT;
-        ζ->stack = malloc(ζ->cap * sizeof(aframe_t));
-        n.fn = bb_arbno;
-        n.ζ  = ζ;
-        n.ζ_size = sizeof(*ζ);
-        break;
-    }
-
-    /* ── IMMEDIATE CAPTURE: pat $ var ───────────────────────────────── */
-    case XFNME: {
-        bb_node_t child = bb_build(p->nchildren > 0 ? p->children[0] : NULL);
-        /* SN-6 Bug #1d: DT_N with slen==0 carries name string in .s (NAMEVAL).
-         * Mirror of bb_build.c bb_fnme_emit_binary — preserve name so
-         * NAME_commit reaches NV_SET_fn() and fires I/O hooks (OUTPUT, PUNCH). */
-        const char *varname = (p->var.v == DT_S && p->var.s) ? p->var.s :
-                              (p->var.v == DT_N && p->var.slen == 0 && p->var.s) ? p->var.s : NULL;
-        DESCR_t    *var_ptr = (p->var.v == DT_N && p->var.slen == 1 && p->var.ptr)
-                              ? (DESCR_t*)p->var.ptr : NULL;
-        cap_t *ζ = bb_cap_new(child.fn, child.ζ, varname, var_ptr, 1 /*immediate=1*/);
-        /* XFNME is immediate=1 — no registration needed; unified bb_cap
-         * registers on CAP_α only when !immediate (XNME path). */
-        n.fn = bb_cap;
-        n.ζ  = ζ;
-        n.ζ_size = sizeof(*ζ);
-        break;
-    }
-
-    /* ── CONDITIONAL CAPTURE: pat . var ─────────────────────────────── */
-    case XNME: {
-        bb_node_t child = bb_build(p->nchildren > 0 ? p->children[0] : NULL);
-        /* SN-6 Bug #1d: DT_N with slen==0 carries name string in .s (NAMEVAL).
-         * Mirror of bb_build.c bb_nme_emit_binary — preserve name so
-         * NAME_commit reaches NV_SET_fn() and fires I/O hooks (OUTPUT, PUNCH).
-         * Without this, `S ? "x" ARB . OUTPUT` writes into a raw DESCR_t cell
-         * and no output appears under --sm-run (word1.sno). */
-        const char *varname = (p->var.v == DT_S && p->var.s) ? p->var.s :
-                              (p->var.v == DT_N && p->var.slen == 0 && p->var.s) ? p->var.s : NULL;
-        DESCR_t    *var_ptr = (p->var.v == DT_N && p->var.slen == 1 && p->var.ptr)
-                              ? (DESCR_t*)p->var.ptr : NULL;
-        cap_t *ζ = bb_cap_new(child.fn, child.ζ, varname, var_ptr, 0 /*immediate=0*/);
-        n.fn = bb_cap;
-        n.ζ  = ζ;
-        n.ζ_size = sizeof(*ζ);
-        break;
-    }
-
-    /* ── CALLCAP: pat . *func() — deferred-function capture target ─── */
-    case XCALLCAP: {
-        bb_node_t child = bb_build(p->nchildren > 0 ? p->children[0] : NULL);
-        /* SN-21d: single bb_cap box with NM_CALL NAME_t.  Deferred (.) flow
-         * pushes an NM_CALL entry on γ; NAME_commit fires it via
-         * name_commit_value → g_user_call_hook.  TL-2 arg-name deferred
-         * resolution is handled inside name_commit_value. */
-        cap_t *ζ = bb_cap_new_call(child.fn, child.ζ,
-                                    p->STRVAL_fn,
-                                    p->args, p->nargs,
-                                    p->arg_names, p->n_arg_names,
-                                    p->imm /*SN-26c-parseerr-f: 0=. 1=$ */);
-        n.fn = bb_cap;
-        n.ζ  = ζ;
-        n.ζ_size = sizeof(*ζ);
-        break;
-    }
-
-    /* ── DEFERRED VAR REF: *name — resolved at match time ───────────── */
-    case XDSAR:
-    /* ── VAR holding a pattern — resolved at match time ────────────── */
-    case XVAR: {
-        /*
-         * DYN-4: defer NV_GET_fn to Phase 3 (α port of deferred_var_t).
-         * DYN-3 resolved here (Phase 2 / build time) — correct only for
-         * non-mutating patterns.  DYN-4 is exact: *X always sees the
-         * value X holds at the moment each match attempt begins.
-         *
-         * Store only the variable name; the box fetches live at α.
-         */
-        const char *name = (p->kind == XDSAR) ? p->STRVAL_fn
-                         : (p->var.v == DT_S)  ? p->var.s : NULL;
-        if (name && *name) {
-            deferred_var_t *ζ = calloc(1, sizeof(deferred_var_t));
-            ζ->name     = name;
-            ζ->child_fn = NULL;
-            ζ->child_state  = NULL;
-            ζ->child_size = 0;
-            n.fn     = bb_deferred_var;
-            n.ζ      = ζ;
-            n.ζ_size = sizeof(deferred_var_t);
-        n.ζ_size = sizeof(*ζ);
-        } else {
-            /* no name — epsilon (degenerate, shouldn't arise) */
-            eps_t *ζ = calloc(1, sizeof(eps_t));
-            n.fn = bb_eps;
-            n.ζ  = ζ;
-        n.ζ_size = sizeof(*ζ);
-        }
-        break;
-    }
-
-    /* ── TAB(n) — advance cursor TO absolute position n ─────────────── */
-    case XTB: {
-        /* TAB(n): if Δ <= n, advance Δ to n (zero-width match at n).
-         * Distinct from POS(n): POS requires Δ==n; TAB allows Δ<=n. */
-        tab_t *ζ = calloc(1, sizeof(tab_t));
-        ζ->n = (int)p->num;
-        n.fn = bb_tab;
-        n.ζ  = ζ;
-        n.ζ_size = sizeof(*ζ);
-        break;
-    }
-
-    /* ── RTAB(n) — advance cursor TO position (Ω-n) from right ──────── */
-    case XRTB: {
-        rtab_t *ζ = calloc(1, sizeof(rtab_t));
-        ζ->n = (int)p->num;
-        n.fn = bb_rtab;
-        n.ζ  = ζ;
-        n.ζ_size = sizeof(*ζ);
-        break;
-    }
-
-    /* ── FENCE — cut: γ on α, ω on all β (no backtrack across fence) ── */
-    case XFNCE: {
-        if (p->nchildren == 0) {
-            /* FENCE0: bare FENCE — seal only */
-            fence_t *ζ = calloc(1, sizeof(fence_t));
-            n.fn = bb_fence;
-            n.ζ  = ζ;
-            n.ζ_size = sizeof(*ζ);
-        } else {
-            /* FENCE1: FENCE(P) — sequence child then seal.
-             * Child fails → ω (fail). Child succeeds → seal (β cuts). */
-            bb_node_t child = bb_build(p->children[0]);
-            fence_t *fζ = calloc(1, sizeof(fence_t));
-            bb_node_t fence_n; fence_n.fn= bb_fence; fence_n.ζ=fζ; fence_n.ζ_size=sizeof(*fζ);
-            seq_t *sζ = calloc(1, sizeof(seq_t));
-            sζ->left.fn    = child.fn;   sζ->left.state  = child.ζ;
-            sζ->right.fn   = fence_n.fn; sζ->right.state = fence_n.ζ;
-            n.fn = bb_seq;
-            n.ζ  = sζ;
-            n.ζ_size = sizeof(*sζ);
-        }
-        break;
-    }
-
-    /* ── ABORT — immediate match failure, no backtracking ───────────── */
-    case XABRT: {
-        abort_t *ζ = calloc(1, sizeof(abort_t));
-        n.fn = bb_abort;
-        n.ζ  = ζ;
-        n.ζ_size = sizeof(*ζ);
-        break;
-    }
-
-    /* ── ATP (@var) — cursor-position capture ───────────────────────────── */
-    case XATP: {
-        /* XATP with STRVAL_fn=="@" is the cursor-capture operator built by
-         * pat_at_cursor().  args[0].s holds the variable name.
-         * On α: write Δ as DT_I into varname, succeed (epsilon).
-         * On β: fail (no backtrack). */
-        if (p->STRVAL_fn && strcmp(p->STRVAL_fn, "@") == 0) {
-            const char *varname = (p->nargs >= 1 && p->args[0].v == DT_S)
-                                  ? p->args[0].s : "";
-            atp_t *ζ = calloc(1, sizeof(atp_t));
-            ζ->varname = varname;
-            n.fn     = bb_atp;
-            n.ζ      = ζ;
-            n.ζ_size = sizeof(atp_t);
-            break;
-        }
-        /* Other XATP: deferred user-function call — fire at match time */
-        usercall_t *ζ2 = calloc(1, sizeof(usercall_t));
-        ζ2->name  = p->STRVAL_fn;
-        ζ2->args  = p->args;
-        ζ2->nargs = p->nargs;
-        n.fn     = bb_usercall;
-        n.ζ      = ζ2;
-        n.ζ_size = sizeof(*ζ2);
-        break;
-    }
-
-    /* ── BAL ────────────────────────────────────────────────────────────── */
-    case XBAL: {
-        bal_t *ζ = bb_bal_new();
-        n.fn     = bb_bal;
-        n.ζ      = ζ;
-        n.ζ_size = sizeof(*ζ);
-        break;
-    }
-
-    /* ── unimplemented: epsilon stub (logged) ────────────────────────── */
-    default: {
-        fprintf(stderr, "stmt_exec: unimplemented XKIND %d — using epsilon\n",
-                (int)p->kind);
-        eps_t *ζ = calloc(1, sizeof(eps_t));
-        n.fn = bb_eps;
-        n.ζ  = ζ;
-        n.ζ_size = sizeof(*ζ);
-        break;
-    }
-    } /* switch */
-
-    /* ── M-DYN-OPT: insert into cache if invariant ───────────────────── */
-    if (is_invariant)
-        cache_insert(p, n);
-
-                                                              return n;
-}
 
 /* ── bb_deferred_var — defined here, after bb_build (needs bb_node_t) ───── */
 /*
@@ -1036,7 +603,6 @@ static DESCR_t bb_deferred_var(void *zeta, int entry)
 
                         /* Re-resolve on every α: live NV lookup */
                         DESCR_t val = NV_GET_fn(ζ->name);
-                        bb_node_t child;
                         int rebuilt = 0;
 
 #ifndef STMT_EXEC_STANDALONE
@@ -1103,11 +669,20 @@ static DESCR_t bb_deferred_var(void *zeta, int entry)
 
                         if (val.v == DT_P && val.p) {
                             if (val.p != ζ->child_state || !ζ->child_fn) {
-                                /* Value changed (or first call): rebuild */
-                                child = bb_build((PATND_t *)val.p);
-                                ζ->child_fn  = child.fn;
-                                ζ->child_state = child.ζ;
-                                ζ->child_size = child.ζ_size;
+                                /* Value changed (or first call): rebuild via brokered path.
+                                 * EDP-8: bb_build() deleted; use bb_build_brokered with
+                                 * eps fallback for non-flat-eligible patterns. */
+                                bb_box_fn bfn = bb_build_brokered((PATND_t *)val.p);
+                                if (bfn) {
+                                    ζ->child_fn    = bfn;
+                                    ζ->child_state = NULL;
+                                    ζ->child_size  = 0;
+                                } else {
+                                    eps_t *ez = calloc(1, sizeof(eps_t));
+                                    ζ->child_fn    = bb_eps;
+                                    ζ->child_state = ez;
+                                    ζ->child_size  = sizeof(eps_t);
+                                }
                                 rebuilt = 1;
                             }
                         } else if (val.v == DT_S && val.s) {
@@ -1333,7 +908,7 @@ int exec_stmt(const char  *subj_name,
                     g_bin_misses++;
                 }
             }
-        } else if (g_bb_mode == BB_MODE_BROKERED) {
+        } else if (g_bb_mode == BB_MODE_BROKERED || g_bb_mode == BB_MODE_DRIVER) {
             /* EM-BB-PURGE-1 / EDP-7: brokered blob — C-ABI wrapper around
              * flat BB body.  bb_broker calls fn(NULL, port) via C call.
              * Falls back to C bb_build() if pattern not flat-eligible. */
@@ -1347,7 +922,12 @@ int exec_stmt(const char  *subj_name,
             }
         }
         if (!bin_done) {
-            root = bb_build((PATND_t *)pat.p);
+            /* EDP-8: bb_build() deleted. Non-flat-eligible patterns (XVAR etc.)
+             * fall back to epsilon — safe degenerate until EDP-9 adds full coverage. */
+            eps_t *eζ = calloc(1, sizeof(eps_t));
+            root.fn     = bb_eps;
+            root.ζ      = eζ;
+            root.ζ_size = sizeof(eps_t);
         }
     } else if (pat.v == DT_S && pat.s) {
         int bin_done = 0;
@@ -1549,8 +1129,8 @@ int cache_test_run(const char *lit, int n_iters)
     cache_reset();
 
     for (int i = 0; i < n_iters; i++) {
-        bb_node_t n = bb_build(&node);
-        (void)n;   /* result used for correctness only; we test cache counters */
+        bb_box_fn bfn = bb_build_brokered(&node);  /* EDP-8: bb_build deleted */
+        (void)bfn;   /* result used for correctness only; we test cache counters */
     }
 
     int hits = 0, misses = 0;
@@ -1635,9 +1215,12 @@ int deferred_var_test(void)
     dsar_node.args  = NULL;
     dsar_node.nargs = 0;
 
-    /* Build the deferred box via bb_build */
+    /* Build the deferred box via bb_build_brokered (EDP-8: bb_build deleted) */
     cache_reset();
-    bb_node_t dvar = bb_build(&dsar_node);
+    bb_box_fn bfn = bb_build_brokered(&dsar_node);
+    bb_node_t dvar;
+    if (bfn) { dvar.fn = bfn; dvar.ζ = NULL; dvar.ζ_size = 0; }
+    else { eps_t *ez = calloc(1,sizeof(eps_t)); dvar.fn=bb_eps; dvar.ζ=ez; dvar.ζ_size=sizeof(eps_t); }
 
     int ok = 1;
 
