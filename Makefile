@@ -85,6 +85,20 @@ RT_PIC_SRCS := \
     $(RT)/x86/templates/bb_xlnth.c \
     $(RT)/x86/templates/bb_xtb.c \
     $(RT)/x86/templates/bb_xrtb.c \
+    $(RT)/x86/templates/bb_xstar.c \
+    $(RT)/x86/templates/bb_xabrt.c \
+    $(RT)/x86/templates/bb_xsucf.c \
+    $(RT)/x86/templates/bb_xbal.c \
+    $(RT)/x86/templates/bb_xvar.c \
+    $(RT)/x86/templates/bb_xfnce.c \
+    $(RT)/x86/templates/bb_xatp.c \
+    $(RT)/x86/templates/bb_xdsar.c \
+    $(RT)/x86/templates/bb_xnme.c \
+    $(RT)/x86/templates/bb_xfnme.c \
+    $(RT)/x86/templates/bb_xcallcap.c \
+    $(RT)/x86/templates/bb_xarbn.c \
+    $(RT)/x86/templates/bb_xcat.c \
+    $(RT)/x86/templates/bb_xor.c \
     $(RT)/x86/templates/bb_xbrkx.c \
     $(RT)/x86/templates/bb_xposi.c \
     $(RT)/x86/templates/bb_xrpsi.c \
@@ -484,6 +498,20 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xlnth.c -o $(OBJ)/template_bb_xlnth.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xtb.c -o $(OBJ)/template_bb_xtb.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xrtb.c -o $(OBJ)/template_bb_xrtb.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xstar.c -o $(OBJ)/template_bb_xstar.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xabrt.c -o $(OBJ)/template_bb_xabrt.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xsucf.c -o $(OBJ)/template_bb_xsucf.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xbal.c -o $(OBJ)/template_bb_xbal.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xvar.c -o $(OBJ)/template_bb_xvar.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xfnce.c -o $(OBJ)/template_bb_xfnce.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xatp.c -o $(OBJ)/template_bb_xatp.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xdsar.c -o $(OBJ)/template_bb_xdsar.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xnme.c -o $(OBJ)/template_bb_xnme.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xfnme.c -o $(OBJ)/template_bb_xfnme.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xcallcap.c -o $(OBJ)/template_bb_xcallcap.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xarbn.c -o $(OBJ)/template_bb_xarbn.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xcat.c -o $(OBJ)/template_bb_xcat.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xor.c -o $(OBJ)/template_bb_xor.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_emit_template.c -o $(OBJ)/sm_emit_template.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_codegen_x64_emit.c -o $(OBJ)/sm_codegen_x64_emit.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_globals.c -o $(OBJ)/interp_globals.o

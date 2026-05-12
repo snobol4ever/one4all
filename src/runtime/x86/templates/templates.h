@@ -264,4 +264,47 @@ void emit_sm_icmp_lt       (emitter_t *e);
 void emit_sm_load_frame    (emitter_t *e);
 void emit_sm_store_frame   (emitter_t *e);
 
+
+/* ── New BB box templates (sess 2026-05-12, EM-TEMPLATE-COMPLETE) ─────── */
+
+/* Nullary-stateful BB boxes (same shape as XFARB/XEPS/XFAIL). */
+void emit_bb_xstar(emitter_t *e,
+                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
+void emit_bb_xabrt(emitter_t *e,
+                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
+void emit_bb_xsucf(emitter_t *e,
+                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
+void emit_bb_xbal (emitter_t *e,
+                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
+void emit_bb_xfnce(emitter_t *e,
+                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
+
+/* Variant — β→fail stub (never flat-eligible). */
+void emit_bb_xvar (emitter_t *e,
+                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
+
+/* Composite — structural stubs (handled inline by flat_emit_node). */
+void emit_bb_xcat (emitter_t *e,
+                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
+void emit_bb_xor  (emitter_t *e,
+                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
+
+/* String-arg stateful boxes. */
+void emit_bb_xatp (emitter_t *e, const char *varname,
+                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
+void emit_bb_xdsar(emitter_t *e, const char *varname,
+                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
+
+/* Child-fn + string boxes (capture family). */
+void emit_bb_xnme (emitter_t *e, bb_box_fn child_fn, const char *varname,
+                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
+void emit_bb_xfnme(emitter_t *e, bb_box_fn child_fn, const char *varname,
+                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
+void emit_bb_xcallcap(emitter_t *e, bb_box_fn child_fn, const char *fnc_name,
+                      bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
+
+/* Child-fn box (ARBNO). */
+void emit_bb_xarbn(emitter_t *e, bb_box_fn child_fn,
+                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
+
 #endif /* RUNTIME_X86_TEMPLATES_TEMPLATES_H */
