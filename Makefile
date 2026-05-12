@@ -149,7 +149,7 @@ out/libscrip_rt.so: $(RT_PIC_SRCS) $(RT)/rt/rt.h
 	    -I$(SRC)/frontend/snobol4 -I$(SRC)/frontend/raku \
 	    -DDYN_ENGINE_LINKED -DIR_DEFINE_NAMES \
 	    $(RT_PIC_SRCS) \
-	    -lgc -lm -Wl,--allow-multiple-definition \
+	    -lgc -lm \
 	    -o out/libscrip_rt.so
 	@echo "Built: out/libscrip_rt.so"
 
@@ -336,7 +336,7 @@ scrip-monitor:
 	      -c $(SRC)/driver/csnobol4_shim.c -o $(OBJ)/csnobol4_shim_csn.o
 	$(CC) $(CRT) -DWITH_CSNOBOL4=1 \
 	      -c $(SRC)/driver/sync_monitor.c -o $(OBJ)/sync_monitor_csn.o
-	$(CC) -m64 -no-pie -Wl,--allow-multiple-definition \
+	$(CC) -m64 -no-pie \
 	      $(OBJ)/csnobol4_shim_csn.o $(OBJ)/sync_monitor_csn.o \
 	      $(filter-out $(OBJ)/sync_monitor.o $(OBJ)/sync_monitor_csn.o $(OBJ)/csnobol4_shim.o $(OBJ)/csnobol4_shim_csn.o $(OBJ)/scrip_driver.o, $(wildcard $(OBJ)/*.o)) \
 	      $(OBJ)/scrip_driver.o \
