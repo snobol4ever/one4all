@@ -227,6 +227,20 @@ void t_sigma_plus_delta_to_rdi(uint64_t sigma_addr, uint64_t siglen_addr);
  *   TEXT:   three-column lines. */
 void t_bounds_check_delta_plus_len(int len, uint64_t siglen_addr, bb_label_t *lbl_fail);
 
+/* t_brokered_prologue — emit C-ABI entry for a brokered per-box blob (EDP-6).
+ * Wraps the flat BB in a C function: push rbp; mov rbp, rsp
+ * The broker calls fn(zeta, port) via C call; this establishes the frame.
+ *   BINARY: 55 48 89 E5
+ *   TEXT:   three-column lines (push rbp; mov rbp, rsp) */
+void t_brokered_prologue(void);
+
+/* t_brokered_epilogue_ret — emit C-ABI exit for a brokered per-box blob (EDP-6).
+ * Closes the C frame and returns result to broker.
+ *   result: 1 for γ (success), 0 for ω (failure)
+ *   BINARY: mov eax, result; pop rbp; ret  (B8 <4> 5D C3)
+ *   TEXT:   three-column lines */
+void t_brokered_epilogue_ret(int result);
+
 /* t_push_rbp_frame — establish a C-style stack frame at function entry.
  * Emits: push rbp; mov rbp, rsp; sub rsp, 8
  * The sub rsp,8 maintains the (rsp+8) mod 16 == 0 ABI invariant after

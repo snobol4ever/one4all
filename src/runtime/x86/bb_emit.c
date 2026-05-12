@@ -209,6 +209,59 @@ void t_pop_rbp_frame_ret(void)
     }
 }
 
+/* EM-BB-PURGE-1 / EDP-6 — C-ABI wrapper helpers for brokered blobs.
+ * t_brokered_prologue: push rbp; mov rbp, rsp
+ * t_brokered_epilogue_ret(result): mov eax, result; pop rbp; ret
+ * The broker calls fn(zeta, port) via C call; these establish/tear down the
+ * frame around the flat BB body (which is identical in WIRED and BROKERED). */
+
+void t_brokered_prologue(void)
+{
+    switch (bb_emit_mode) {
+    case EMIT_BINARY_BROKERED:
+    case EMIT_BINARY_WIRED:
+        bb_emit_byte(0x55);                              /* push rbp */
+        bb_emit_byte(0x48); bb_emit_byte(0x89); bb_emit_byte(0xE5); /* mov rbp, rsp */
+        return;
+    case EMIT_TEXT_INLINE:
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF:
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        bb3c_format(emit_outf(), "", "push", "rbp");
+        bb3c_format(emit_outf(), "", "mov",  "rbp, rsp");
+        return;
+    }
+}
+
+void t_brokered_epilogue_ret(int result)
+{
+    switch (bb_emit_mode) {
+    case EMIT_BINARY_BROKERED:
+    case EMIT_BINARY_WIRED: {
+        /* mov eax, imm32 */
+        bb_emit_byte(0xB8);
+        bb_emit_byte((uint8_t)((uint32_t)result      ));
+        bb_emit_byte((uint8_t)((uint32_t)result >>  8));
+        bb_emit_byte((uint8_t)((uint32_t)result >> 16));
+        bb_emit_byte((uint8_t)((uint32_t)result >> 24));
+        bb_emit_byte(0x5D);   /* pop rbp */
+        bb_emit_byte(0xC3);   /* ret */
+        return;
+    }
+    case EMIT_TEXT_INLINE:
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF: {
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        FILE *f = emit_outf();
+        char arg[32]; snprintf(arg, sizeof(arg), "eax, %d", result);
+        bb3c_format(f, "", "mov", arg);
+        bb3c_format(f, "", "pop", "rbp");
+        bb3c_format(f, "", "ret", "");
+        return;
+    }
+    }
+}
+
 void t_pad_to_blob_size(void)
 {
     /* No-op in all three modes today: mode-3 uses variable-size blobs
