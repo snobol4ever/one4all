@@ -1392,9 +1392,27 @@ bb_node_t coro_eval(tree_t *e) {
         }
         DESCR_t sv = bb_eval_value(e->c[0]);
         const char *loopvar = e->v.sval;
-        /* IC-8: coerce numeric scalars to image-string before string-iterate path (D-1) */
-        sv = descr_to_str_icn(sv);
-        /* IC-3: DT_T table iteration — !T yields each value */
+        /* IC-5: DT_DATA icnlist — !L yields each element.
+         * Must check BEFORE descr_to_str_icn which clobbers DT_DATA to string. */
+        if (sv.v == DT_DATA) {
+            DESCR_t tag = FIELD_GET_fn(sv, "icn_type");
+            if (tag.v == DT_S && tag.s && strcmp(tag.s, "list") == 0) {
+                icn_list_iterate_state_t *lz = calloc(1, sizeof(*lz));
+                lz->list_obj = sv;  /* live DT_DATA — re-read each tick so put() mutations are visible */
+                lz->pos      = 0;
+                return (bb_node_t){ coro_bb_list_iterate, lz, 0 };
+            }
+            /* IC-9 (2026-05-01): DT_DATA record — !R yields each field value.
+             * Must also precede descr_to_str_icn for the same reason. */
+            if (sv.u && sv.u->type && sv.u->type->nfields > 0) {
+                icn_record_iterate_state_t *rz = calloc(1, sizeof(*rz));
+                rz->inst = sv;
+                rz->pos  = 0;
+                return (bb_node_t){ coro_bb_record_iterate, rz, 0 };
+            }
+        }
+        /* IC-3: DT_T table iteration — !T yields each value.
+         * Also check before string coercion. */
         if (sv.v == DT_T) {
             icn_tbl_iterate_state_t *z = calloc(1, sizeof(*z));
             z->tbl = sv.tbl;
@@ -1402,6 +1420,9 @@ bb_node_t coro_eval(tree_t *e) {
             z->entry = NULL;
             return (bb_node_t){ coro_bb_tbl_iterate, z, 0 };
         }
+        /* IC-8: coerce numeric scalars to image-string before string-iterate path (D-1).
+         * Only reached for string/numeric — DT_DATA/DT_T handled above. */
+        sv = descr_to_str_icn(sv);
         if (!IS_FAIL_fn(sv) && sv.s && (loopvar || strchr(sv.s, '\x01'))) {
             /* Raku array mode: route to coro_bb_raku_array */
             icn_raku_array_state_t *z = calloc(1, sizeof(*z));
@@ -1417,28 +1438,6 @@ bb_node_t coro_eval(tree_t *e) {
                 p = sep + 1;
             }
             return (bb_node_t){ coro_bb_raku_array, z, 0 };
-        }
-        /* IC-5: DT_DATA icnlist — !L yields each element */
-        if (sv.v == DT_DATA) {
-            DESCR_t tag = FIELD_GET_fn(sv, "icn_type");
-            if (tag.v == DT_S && tag.s && strcmp(tag.s, "list") == 0) {
-                icn_list_iterate_state_t *lz = calloc(1, sizeof(*lz));
-                lz->list_obj = sv;  /* live DT_DATA — re-read each tick so put() mutations are visible */
-                lz->pos      = 0;
-                return (bb_node_t){ coro_bb_list_iterate, lz, 0 };
-            }
-            /* IC-9 (2026-05-01): DT_DATA record — !R yields each field value.
-             * Only routes here when the DT_DATA carries a real DATINST_t with a type
-             * (lists themselves also use DT_DATA but with the icnlist shape above and
-             * an frame_elems pointer that wouldn't have a usable .u->type).  Falls
-             * through to char-iterate if type is missing — keeps the historical
-             * char-iterate-on-string-shaped-DT_DATA behaviour for any other path. */
-            if (sv.u && sv.u->type && sv.u->type->nfields > 0) {
-                icn_record_iterate_state_t *rz = calloc(1, sizeof(*rz));
-                rz->inst = sv;
-                rz->pos  = 0;
-                return (bb_node_t){ coro_bb_record_iterate, rz, 0 };
-            }
         }
         /* Icon char mode */
         icn_iterate_state_t *z = calloc(1, sizeof(*z));
