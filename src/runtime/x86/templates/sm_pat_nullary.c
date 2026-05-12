@@ -58,7 +58,7 @@ void emit_sm_pat_bal(emitter_t *e)
 
 void emit_sm_pat_fence(emitter_t *e)
 {
-    emit_sm_pat_nullary_rt(e, "SM_PAT_FENCE — push FENCE (no-backtrack gate)",
+    emit_sm_pat_nullary_rt(e, "SM_PAT_FENCE0 — push FENCE (no-backtrack gate)",
                            "PAT_FENCE", "rt_pat_fence");
 }
 

@@ -1,6 +1,7 @@
 #include "../emitter.h"
 #include "../bb_emit.h"
 #include "templates.h"
+#include "sm_helpers.h"
 
 void emit_sm_push_null(emitter_t *e)
 {

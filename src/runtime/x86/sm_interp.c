@@ -639,7 +639,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
         case SM_PAT_FAIL:    sm_push(st, pat_fail());    break;
         case SM_PAT_SUCCEED: sm_push(st, pat_succeed()); break;
         case SM_PAT_EPS:     sm_push(st, pat_epsilon()); break;
-        case SM_PAT_FENCE:   sm_push(st, pat_fence());   break;
+        case SM_PAT_FENCE0:   sm_push(st, pat_fence());   break;
         case SM_PAT_FENCE1:  { DESCR_t _ch = sm_pop(st); sm_push(st, pat_fence_p(_ch)); } break;
         case SM_PAT_ABORT:   sm_push(st, pat_abort());   break;
         case SM_PAT_BAL:     sm_push(st, pat_bal());     break;

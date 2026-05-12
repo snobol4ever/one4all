@@ -56,7 +56,7 @@
  *   rt_pat_arb        — SM_PAT_ARB    (no arg)
  *   rt_pat_arbno      — SM_PAT_ARBNO  (pops inner from patstack)
  *   rt_pat_rem        — SM_PAT_REM
- *   rt_pat_fence      — SM_PAT_FENCE
+ *   rt_pat_fence      — SM_PAT_FENCE0
  *   rt_pat_fence1     — SM_PAT_FENCE1 (pops child from patstack)
  *   rt_pat_fail       — SM_PAT_FAIL
  *   rt_pat_abort      — SM_PAT_ABORT
@@ -215,7 +215,22 @@ void rt_push_null(void);
 /* SM_COERCE_NUM: pop TOS, coerce string→int/real if needed, push result. */
 void rt_coerce_num(void);
 
-/* SM_CALL_FN: general function call.
+/* New SM opcode rt_* entries (sess 2026-05-12). */
+void rt_push_real(double v);
+void rt_push_real_bits(uint64_t bits);
+void rt_push_null_noflip(void);
+void rt_push_expr(void *ptr);
+void rt_exp(void);
+void rt_neg(void);
+void rt_incr(int64_t n);
+void rt_decr(int64_t n);
+void rt_acomp(int op);
+void rt_lcomp(int op);
+void rt_define_entry(void);
+void rt_define(void);
+void rt_unhandled_sm(int op);
+
+
  * name:  function name (INDIR_GET / NAME_PUSH / IDX / ... or user/builtin).
  * nargs: number of arguments already popped from SM vstack into the runtime's
  *        internal arg buffer by the emitter's call-setup sequence.

@@ -1,6 +1,7 @@
 #include "../emitter.h"
 #include "../bb_emit.h"
 #include "templates.h"
+#include "sm_helpers.h"
 
 void emit_sm_pat_abort(emitter_t *e)
 {

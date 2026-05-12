@@ -1061,6 +1061,62 @@ static int emit_sm_coerce_num_dispatch(FILE *out, int pc)
     return 0;
 }
 
+static int emit_sm_push_null_noflip_dispatch(FILE *out, int pc)
+{
+    (void)pc;
+    emit_mode_set(EMIT_TEXT, out);
+    emit_sm_push_null_noflip(NULL);
+    return 0;
+}
+
+static int emit_sm_push_lit_f_dispatch(FILE *out, const SM_Instr *ins, int pc)
+{
+    (void)pc;
+    emit_mode_set(EMIT_TEXT, out);
+    emit_sm_push_lit_f(NULL, ins->a[0].f);
+    return 0;
+}
+
+static int emit_sm_push_expr_dispatch(FILE *out, const SM_Instr *ins, int pc)
+{
+    (void)pc;
+    emit_mode_set(EMIT_TEXT, out);
+    emit_sm_push_expr(NULL, (uint64_t)(uintptr_t)ins->a[0].ptr);
+    return 0;
+}
+
+static int emit_sm_incr_dispatch(FILE *out, const SM_Instr *ins, int pc)
+{
+    (void)pc;
+    emit_mode_set(EMIT_TEXT, out);
+    emit_sm_incr(NULL, ins->a[0].i);
+    return 0;
+}
+
+static int emit_sm_decr_dispatch(FILE *out, const SM_Instr *ins, int pc)
+{
+    (void)pc;
+    emit_mode_set(EMIT_TEXT, out);
+    emit_sm_decr(NULL, ins->a[0].i);
+    return 0;
+}
+
+static int emit_sm_acomp_dispatch(FILE *out, const SM_Instr *ins, int pc)
+{
+    (void)pc;
+    emit_mode_set(EMIT_TEXT, out);
+    emit_sm_acomp(NULL, (int)ins->a[0].i);
+    return 0;
+}
+
+static int emit_sm_lcomp_dispatch(FILE *out, const SM_Instr *ins, int pc)
+{
+    (void)pc;
+    emit_mode_set(EMIT_TEXT, out);
+    emit_sm_lcomp(NULL, (int)ins->a[0].i);
+    return 0;
+}
+
 /* SM_CALL_FN: general function call.  All dispatch (pseudo-calls, builtins,
  * user-defined) lives in rt_call(name, nargs).
  *   a[0].s = function name (interned in strtab)
@@ -1323,7 +1379,7 @@ DESCR_t sm_phase2_to_patnd(const SM_Program *prog,
         case SM_PAT_BAL:
             simstack_push(&ss, make_pat_val(pat_bal(), 0));
             break;
-        case SM_PAT_FENCE:
+        case SM_PAT_FENCE0:
             /* FENCE graph is fixed — not variant */
             simstack_push(&ss, make_pat_val(pat_fence(), 0));
             break;
@@ -2174,6 +2230,8 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
             /* EM-2: halt + integer push */
             case SM_HALT:         rc = emit_halt_line(out, pc);          break;
             case SM_PUSH_LIT_I:   rc = emit_push_lit_i_line(out, ins, pc); break;
+            case SM_PUSH_LIT_F:   rc = emit_sm_push_lit_f_dispatch(out, ins, pc);  break;
+            case SM_PUSH_EXPR:    rc = emit_sm_push_expr_dispatch(out, ins, pc);   break;
 
             /* EM-3: string push, var load/store, pop, arithmetic */
             case SM_PUSH_LIT_S:   rc = emit_sm_push_lit_s_dispatch(out, ins, pc); break;
@@ -2204,7 +2262,12 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
             case SM_CALL_FN:         rc = emit_sm_call_dispatch(out, ins, pc); break;
             case SM_CONCAT:       rc = emit_sm_concat_dispatch(out, pc);      break;
             case SM_PUSH_NULL:    rc = emit_sm_push_null_dispatch(out, pc);   break;
+            case SM_PUSH_NULL_NOFLIP: rc = emit_sm_push_null_noflip_dispatch(out, pc); break;
             case SM_COERCE_NUM:   rc = emit_sm_coerce_num_dispatch(out, pc);  break;
+            case SM_INCR:         rc = emit_sm_incr_dispatch(out, ins, pc);   break;
+            case SM_DECR:         rc = emit_sm_decr_dispatch(out, ins, pc);   break;
+            case SM_ACOMP:        rc = emit_sm_acomp_dispatch(out, ins, pc);  break;
+            case SM_LCOMP:        rc = emit_sm_lcomp_dispatch(out, ins, pc);  break;
             case SM_FRETURN:
             case SM_NRETURN:
             case SM_RETURN_S:
@@ -2254,7 +2317,7 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
             case SM_PAT_ARB:
             case SM_PAT_ARBNO:
             case SM_PAT_REM:
-            case SM_PAT_FENCE:
+            case SM_PAT_FENCE0:
             case SM_PAT_FENCE1:
             case SM_PAT_FAIL:
             case SM_PAT_ABORT:

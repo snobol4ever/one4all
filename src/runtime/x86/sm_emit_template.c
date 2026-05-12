@@ -135,7 +135,7 @@ static const sm_op_template_t g_sm_templates[] = {
     { SM_PAT_ARB,      "PAT_ARB",      "rt_pat_arb",      SM_TPL_NULLARY,    0, 0 },
     { SM_PAT_ARBNO,    "PAT_ARBNO",    "rt_pat_arbno",    SM_TPL_NULLARY,    0, 0 },
     { SM_PAT_REM,      "PAT_REM",      "rt_pat_rem",      SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_FENCE,    "PAT_FENCE",    "rt_pat_fence",    SM_TPL_NULLARY,    0, 0 },
+    { SM_PAT_FENCE0,    "PAT_FENCE",    "rt_pat_fence",    SM_TPL_NULLARY,    0, 0 },
     { SM_PAT_FENCE1,   "PAT_FENCE1",   "rt_pat_fence1",   SM_TPL_NULLARY,    0, 0 },
     { SM_PAT_FAIL,     "PAT_FAIL",     "rt_pat_fail",     SM_TPL_NULLARY,    0, 0 },
     { SM_PAT_ABORT,    "PAT_ABORT",    "rt_pat_abort",    SM_TPL_NULLARY,    0, 0 },
@@ -174,6 +174,40 @@ static const sm_op_template_t g_sm_templates[] = {
      * body is empty. */
     { SM_LABEL,        "LABEL",        NULL,                    SM_TPL_NOOP,       0, 0 },
     { SM_STNO,         "STNO",         NULL,                    SM_TPL_NOOP,       0, 0 },
+
+    /* Opcodes added sess 2026-05-12 (EM-TEMPLATE-COMPLETE). */
+    { SM_PUSH_NULL_NOFLIP, "PUSH_NULL_NOFLIP", "rt_push_null_noflip", SM_TPL_NULLARY, 0, 0 },
+    { SM_EXP,          "EXP_NUM",      "rt_exp",          SM_TPL_NULLARY,    0, 0 },
+    { SM_NEG,          "NEGATE",       "rt_neg",          SM_TPL_NULLARY,    0, 0 },
+    { SM_DEFINE_ENTRY, "DEFINE_ENTRY", "rt_define_entry", SM_TPL_NULLARY,    0, 0 },
+    { SM_DEFINE,       "DEFINE",       "rt_define",       SM_TPL_NULLARY,    0, 0 },
+    /* Generator / M5 opcodes — trap via rt_unhandled_sm at runtime. */
+    { SM_SUSPEND,        "SUSPEND",        "rt_unhandled_sm", SM_TPL_ARITH, SM_SUSPEND,        0 },
+    { SM_RESUME,         "RESUME",         "rt_unhandled_sm", SM_TPL_ARITH, SM_RESUME,         0 },
+    { SM_SUSPEND_VALUE,  "SUSPEND_VALUE",  "rt_unhandled_sm", SM_TPL_ARITH, SM_SUSPEND_VALUE,  0 },
+    { SM_GEN_TICK,       "GEN_TICK",       "rt_unhandled_sm", SM_TPL_ARITH, SM_GEN_TICK,       0 },
+    { SM_BB_PUMP,        "BB_PUMP",        "rt_unhandled_sm", SM_TPL_ARITH, SM_BB_PUMP,        0 },
+    { SM_BB_ONCE,        "BB_ONCE",        "rt_unhandled_sm", SM_TPL_ARITH, SM_BB_ONCE,        0 },
+    { SM_BB_ONCE_PROC,   "BB_ONCE_PROC",   "rt_unhandled_sm", SM_TPL_ARITH, SM_BB_ONCE_PROC,   0 },
+    { SM_BB_PUMP_PROC,   "BB_PUMP_PROC",   "rt_unhandled_sm", SM_TPL_ARITH, SM_BB_PUMP_PROC,   0 },
+    { SM_BB_PUMP_CASE,   "BB_PUMP_CASE",   "rt_unhandled_sm", SM_TPL_ARITH, SM_BB_PUMP_CASE,   0 },
+    { SM_BB_PUMP_SM,     "BB_PUMP_SM",     "rt_unhandled_sm", SM_TPL_ARITH, SM_BB_PUMP_SM,     0 },
+    { SM_BB_PUMP_EVERY,  "BB_PUMP_EVERY",  "rt_unhandled_sm", SM_TPL_ARITH, SM_BB_PUMP_EVERY,  0 },
+    { SM_BB_PUMP_AST,    "BB_PUMP_AST",    "rt_unhandled_sm", SM_TPL_ARITH, SM_BB_PUMP_AST,    0 },
+    { SM_LOAD_GLOCAL,    "LOAD_GLOCAL",    "rt_unhandled_sm", SM_TPL_ARITH, SM_LOAD_GLOCAL,    0 },
+    { SM_STORE_GLOCAL,   "STORE_GLOCAL",   "rt_unhandled_sm", SM_TPL_ARITH, SM_STORE_GLOCAL,   0 },
+    { SM_ICMP_GT,        "ICMP_GT",        "rt_unhandled_sm", SM_TPL_ARITH, SM_ICMP_GT,        0 },
+    { SM_ICMP_LT,        "ICMP_LT",        "rt_unhandled_sm", SM_TPL_ARITH, SM_ICMP_LT,        0 },
+    { SM_LOAD_FRAME,     "LOAD_FRAME",     "rt_unhandled_sm", SM_TPL_ARITH, SM_LOAD_FRAME,     0 },
+    { SM_STORE_FRAME,    "STORE_FRAME",    "rt_unhandled_sm", SM_TPL_ARITH, SM_STORE_FRAME,    0 },
+    /* Int-arg ops (INCR/DECR bake n; ACOMP/LCOMP bake op-enum in const_a). */
+    { SM_INCR,    "INCR",    "rt_incr",  SM_TPL_ARITH, 0 /* n from a[0].i, not const_a */, 0 },
+    { SM_DECR,    "DECR",    "rt_decr",  SM_TPL_ARITH, 0, 0 },
+    { SM_ACOMP,   "ACOMP",   "rt_acomp", SM_TPL_ARITH, 0 /* op from a[0].i */, 0 },
+    { SM_LCOMP,   "LCOMP",   "rt_lcomp", SM_TPL_ARITH, 0, 0 },
+    /* FRETURN/NRETURN/RETURN_S/F family: handled as special cases in
+     * sm_codegen_x64_emit.c (same path as RETURN_VARIANT). */
+    /* SM_PUSH_LIT_F / SM_PUSH_EXPR: special-cased in sm_codegen_x64_emit.c. */
 };
 
 #define G_SM_TEMPLATES_N (int)(sizeof(g_sm_templates) / sizeof(g_sm_templates[0]))

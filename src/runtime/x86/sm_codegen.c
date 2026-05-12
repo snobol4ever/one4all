@@ -1512,7 +1512,7 @@ static void init_handler_table(void)
     g_handlers[SM_PAT_ARBNO]   = h_pat_arbno;
     g_handlers[SM_PAT_REM]     = h_pat_rem;
     g_handlers[SM_PAT_BAL]     = h_pat_bal;
-    g_handlers[SM_PAT_FENCE]   = h_pat_fence;
+    g_handlers[SM_PAT_FENCE0]   = h_pat_fence;
     g_handlers[SM_PAT_FENCE1]  = h_pat_fence1;
     g_handlers[SM_PAT_ABORT]   = h_pat_abort;
     g_handlers[SM_PAT_FAIL]    = h_pat_fail;
@@ -2613,7 +2613,7 @@ static void emit_me4_store_var_blob(const char *name, size_t trampoline_abs_off)
 /*                                                                        */
 /* Eight SM_PAT_* opcodes have the same blob shape:                       */
 /*   SM_PAT_ARB SM_PAT_REM SM_PAT_FAIL SM_PAT_SUCCEED                     */
-/*   SM_PAT_EPS SM_PAT_FENCE SM_PAT_ABORT SM_PAT_BAL                      */
+/*   SM_PAT_EPS SM_PAT_FENCE0 SM_PAT_ABORT SM_PAT_BAL                      */
 /*                                                                        */
 /* Each calls a parameter-less runtime constructor `pat_X(void)` whose    */
 /* DESCR_t return lands in rax:rdx, then pushes the result on the r12     */
@@ -3437,7 +3437,7 @@ int sm_codegen(SM_Program *prog)
          * around the call.  No correctness or speed win to inlining. */
         } else if (op == SM_PAT_ARB     || op == SM_PAT_REM    ||
                    op == SM_PAT_FAIL    || op == SM_PAT_SUCCEED ||
-                   op == SM_PAT_EPS     || op == SM_PAT_FENCE  ||
+                   op == SM_PAT_EPS     || op == SM_PAT_FENCE0  ||
                    op == SM_PAT_ABORT   || op == SM_PAT_BAL) {
             /* ME-9a: inline-native pattern primitives (nullary).  Each
              * calls pat_X(void) via imm64 and pushes the DT_P result on
@@ -3450,7 +3450,7 @@ int sm_codegen(SM_Program *prog)
             case SM_PAT_FAIL:    rt_fn = (void *)&pat_fail;    break;
             case SM_PAT_SUCCEED: rt_fn = (void *)&pat_succeed; break;
             case SM_PAT_EPS:     rt_fn = (void *)&pat_epsilon; break;
-            case SM_PAT_FENCE:   rt_fn = (void *)&pat_fence;   break;
+            case SM_PAT_FENCE0:   rt_fn = (void *)&pat_fence;   break;
             case SM_PAT_ABORT:   rt_fn = (void *)&pat_abort;   break;
             case SM_PAT_BAL:     rt_fn = (void *)&pat_bal;     break;
             default: break;

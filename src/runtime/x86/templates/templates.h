@@ -207,4 +207,61 @@ void emit_sm_exec_stmt       (emitter_t *e,
                                const char *subj_lbl, uint64_t subj_ptr,
                                int has_repl);
 
+/* ── New templates added sess 2026-05-12 (EM-TEMPLATE-COMPLETE) ──────── */
+
+/* SM_PUSH_LIT_F — push real literal via rt_push_real_bits (bit-pattern in rdi). */
+void emit_sm_push_lit_f(emitter_t *e, double val);
+
+/* SM_PUSH_EXPR — push frozen DT_E descriptor (ptr in rdi). */
+void emit_sm_push_expr(emitter_t *e, uint64_t ptr_val);
+
+/* SM_PUSH_NULL_NOFLIP — push null, preserve last_ok. */
+void emit_sm_push_null_noflip(emitter_t *e);
+
+/* SM_EXP / SM_NEG — arithmetic. */
+void emit_sm_exp(emitter_t *e);
+void emit_sm_neg(emitter_t *e);
+
+/* SM_INCR / SM_DECR — pop TOS, add/sub immediate n, push. */
+void emit_sm_incr(emitter_t *e, int64_t n);
+void emit_sm_decr(emitter_t *e, int64_t n);
+
+/* SM_ACOMP / SM_LCOMP — comparison, op=EKind. */
+void emit_sm_acomp(emitter_t *e, int op);
+void emit_sm_lcomp(emitter_t *e, int op);
+
+/* SM_DEFINE_ENTRY / SM_DEFINE — no-op markers. */
+void emit_sm_define_entry(emitter_t *e);
+void emit_sm_define(emitter_t *e);
+
+/* FRETURN/NRETURN/RETURN_S/F family — all delegate to emit_sm_return_variant. */
+void emit_sm_freturn  (emitter_t *e, int pc);
+void emit_sm_nreturn  (emitter_t *e, int pc);
+void emit_sm_return_s (emitter_t *e, int pc);
+void emit_sm_return_f (emitter_t *e, int pc);
+void emit_sm_freturn_s(emitter_t *e, int pc);
+void emit_sm_freturn_f(emitter_t *e, int pc);
+void emit_sm_nreturn_s(emitter_t *e, int pc);
+void emit_sm_nreturn_f(emitter_t *e, int pc);
+
+/* M5 generator opcodes — trap via rt_unhandled_sm. */
+void emit_sm_suspend       (emitter_t *e);
+void emit_sm_resume        (emitter_t *e);
+void emit_sm_suspend_value (emitter_t *e);
+void emit_sm_gen_tick      (emitter_t *e);
+void emit_sm_bb_pump       (emitter_t *e);
+void emit_sm_bb_once       (emitter_t *e);
+void emit_sm_bb_once_proc  (emitter_t *e);
+void emit_sm_bb_pump_proc  (emitter_t *e);
+void emit_sm_bb_pump_case  (emitter_t *e);
+void emit_sm_bb_pump_sm    (emitter_t *e);
+void emit_sm_bb_pump_every (emitter_t *e);
+void emit_sm_bb_pump_ast   (emitter_t *e);
+void emit_sm_load_glocal   (emitter_t *e);
+void emit_sm_store_glocal  (emitter_t *e);
+void emit_sm_icmp_gt       (emitter_t *e);
+void emit_sm_icmp_lt       (emitter_t *e);
+void emit_sm_load_frame    (emitter_t *e);
+void emit_sm_store_frame   (emitter_t *e);
+
 #endif /* RUNTIME_X86_TEMPLATES_TEMPLATES_H */

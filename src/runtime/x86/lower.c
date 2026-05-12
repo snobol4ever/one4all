@@ -356,7 +356,7 @@ void lower_pat_expr(const tree_t *t)
     case TT_BAL:   sm_emit(g_p, SM_PAT_BAL);    return;
     case TT_FENCE:
         if (t->n > 0) { lower_pat_expr(t->c[0]); sm_emit(g_p, SM_PAT_FENCE1); }
-        else                    sm_emit(g_p, SM_PAT_FENCE);
+        else                    sm_emit(g_p, SM_PAT_FENCE0);
         return;
     case TT_ANY:    lower_expr(T0(t)); sm_emit(g_p, SM_PAT_ANY);    return;
     case TT_NOTANY: lower_expr(T0(t)); sm_emit(g_p, SM_PAT_NOTANY); return;

@@ -972,7 +972,151 @@ void rt_coerce_num(void)
     LAST_OK_SET(1);
 }
 
-/* SM_CALL_FN helpers — pseudo-calls inlined here to avoid a full INVOKE_fn round trip.
+/* ── New rt_* entries for missing SM opcode templates ─────────────────── */
+
+void rt_push_real(double v)
+{
+    vstack_push(REALVAL(v));
+    LAST_OK_SET(1);
+}
+
+void rt_push_real_bits(uint64_t bits)
+{
+    /* SM_PUSH_LIT_F: integer register carries the double's bit pattern. */
+    double v;
+    __builtin_memcpy(&v, &bits, 8);
+    vstack_push(REALVAL(v));
+    LAST_OK_SET(1);
+}
+
+void rt_push_null_noflip(void)
+{
+    /* SM_PUSH_NULL_NOFLIP: push null but preserve last_ok (used after EXEC_STMT). */
+    vstack_push(NULVCL);
+    /* intentionally do NOT set LAST_OK */
+}
+
+void rt_push_expr(void *ptr)
+{
+    /* SM_PUSH_EXPR: push frozen DT_E expression descriptor. */
+    DESCR_t d;
+    d.v    = DT_E;
+    d.slen = 0;
+    d.ptr  = ptr;
+    vstack_push(d);
+    LAST_OK_SET(1);
+}
+
+void rt_exp(void)
+{
+    /* SM_EXP: pop right (exponent) then left (base); push base**exp. */
+    DESCR_t r = vstack_pop();
+    DESCR_t l = vstack_pop();
+    if (l.v == DT_FAIL || r.v == DT_FAIL) {
+        vstack_push(FAILDESCR); LAST_OK_SET(0); return;
+    }
+    double base = (l.v == DT_R) ? l.r : (double)l.i;
+    double expo = (r.v == DT_R) ? r.r : (double)r.i;
+    double res  = EXP_R_fn(REALVAL(base), REALVAL(expo)).r;
+    vstack_push(REALVAL(res));
+    LAST_OK_SET(1);
+}
+
+void rt_neg(void)
+{
+    /* SM_NEG: negate TOS. */
+    DESCR_t v = vstack_pop();
+    if (v.v == DT_I) vstack_push(INTVAL(-v.i));
+    else              vstack_push(REALVAL(-to_real(v)));
+    LAST_OK_SET(1);
+}
+
+void rt_incr(int64_t n)
+{
+    /* SM_INCR: pop TOS, add n, push result. */
+    DESCR_t v = vstack_pop();
+    vstack_push(INTVAL(v.i + n));
+    LAST_OK_SET(1);
+}
+
+void rt_decr(int64_t n)
+{
+    /* SM_DECR: pop TOS, subtract n, push result. */
+    DESCR_t v = vstack_pop();
+    vstack_push(INTVAL(v.i - n));
+    LAST_OK_SET(1);
+}
+
+void rt_acomp(int op)
+{
+    /* SM_ACOMP: numeric compare.  Pop right then left.  Icon-style: on success
+     * push right and set last_ok=1; on failure push FAILDESCR and clear. */
+    DESCR_t r = vstack_pop();
+    DESCR_t l = vstack_pop();
+    if (l.v == DT_FAIL || r.v == DT_FAIL) {
+        vstack_push(FAILDESCR); LAST_OK_SET(0); return;
+    }
+    if (l.v == DT_SNUL) l = INTVAL(0);
+    if (r.v == DT_SNUL) r = INTVAL(0);
+    double lv = (l.v == DT_R) ? l.r : (double)l.i;
+    double rv = (r.v == DT_R) ? r.r : (double)r.i;
+    int ok;
+    switch (op) {
+        case TT_EQ: ok = (lv == rv); break;
+        case TT_NE: ok = (lv != rv); break;
+        case TT_LT: ok = (lv <  rv); break;
+        case TT_LE: ok = (lv <= rv); break;
+        case TT_GT: ok = (lv >  rv); break;
+        case TT_GE: ok = (lv >= rv); break;
+        default:    ok = (lv == rv); break;
+    }
+    vstack_push(ok ? r : FAILDESCR);
+    LAST_OK_SET(ok ? 1 : 0);
+}
+
+void rt_lcomp(int op)
+{
+    /* SM_LCOMP: lexicographic string compare. Pop right then left. Icon-style. */
+    DESCR_t r = vstack_pop();
+    DESCR_t l = vstack_pop();
+    if (l.v == DT_FAIL || r.v == DT_FAIL) {
+        vstack_push(FAILDESCR); LAST_OK_SET(0); return;
+    }
+    const char *ls = VARVAL_fn(l); if (!ls) ls = "";
+    const char *rs = VARVAL_fn(r); if (!rs) rs = "";
+    int cmp = strcmp(ls, rs);
+    int ok;
+    switch (op) {
+        case TT_LLT: ok = (cmp <  0); break;
+        case TT_LLE: ok = (cmp <= 0); break;
+        case TT_LGT: ok = (cmp >  0); break;
+        case TT_LGE: ok = (cmp >= 0); break;
+        case TT_LEQ: ok = (cmp == 0); break;
+        case TT_LNE: ok = (cmp != 0); break;
+        default:     ok = (cmp == 0); break;
+    }
+    vstack_push(ok ? r : FAILDESCR);
+    LAST_OK_SET(ok ? 1 : 0);
+}
+
+void rt_define_entry(void)
+{
+    /* SM_DEFINE_ENTRY: no-op in mode-4 (mode-3 blob does conditional push rbp). */
+}
+
+void rt_define(void)
+{
+    /* SM_DEFINE: function definition handled by prescan; no-op at runtime. */
+}
+
+void rt_unhandled_sm(int op)
+{
+    /* Template placeholder for SM opcodes not yet implemented in mode-4 (M5). */
+    fprintf(stderr, "libscrip_rt: unhandled SM opcode %d in emitted binary (M5 territory)\n", op);
+    abort();
+}
+
+ — pseudo-calls inlined here to avoid a full INVOKE_fn round trip.
  * The full pseudo-call vocabulary mirrors sm_interp.c's SM_CALL_FN handler. */
 extern DESCR_t subscript_get(DESCR_t arr, DESCR_t idx);
 extern DESCR_t subscript_get2(DESCR_t arr, DESCR_t i, DESCR_t j);
