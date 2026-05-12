@@ -808,3 +808,6 @@ icn_iterate_state_t     *icon_iterate_new(void)        { return calloc(1, sizeof
 icn_list_iterate_state_t *icon_list_iterate_new(void)  { return calloc(1, sizeof(icn_list_iterate_state_t)); }
 icn_tbl_iterate_state_t  *icon_tbl_iterate_new(void)   { return calloc(1, sizeof(icn_tbl_iterate_state_t)); }
 icn_record_iterate_state_t *icon_record_iterate_new(void) { return calloc(1, sizeof(icn_record_iterate_state_t)); }
+
+/* ───── Icon alternate (A|B) ───── */
+icn_alternate_state_t *icon_alt_new(void) { return calloc(1, sizeof(icn_alternate_state_t)); }

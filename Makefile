@@ -99,6 +99,7 @@ RT_PIC_SRCS := \
     $(RT)/x86/templates/bb_xarbn.c \
     $(RT)/x86/templates/bb_icon_to.c \
     $(RT)/x86/templates/bb_icon_iterate.c \
+    $(RT)/x86/templates/bb_icon_alt.c \
     $(RT)/x86/templates/bb_xcat.c \
     $(RT)/x86/templates/bb_xor.c \
     $(RT)/x86/templates/bb_xbrkx.c \
@@ -516,6 +517,7 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xarbn.c -o $(OBJ)/template_bb_xarbn.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_icon_to.c -o $(OBJ)/template_bb_icon_to.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_icon_iterate.c -o $(OBJ)/template_bb_icon_iterate.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_icon_alt.c -o $(OBJ)/template_bb_icon_alt.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xcat.c -o $(OBJ)/template_bb_xcat.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xor.c -o $(OBJ)/template_bb_xor.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_emit_template.c -o $(OBJ)/sm_emit_template.o
