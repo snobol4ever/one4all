@@ -1166,12 +1166,21 @@ static void emit_prolog_call_arity0(const char *sval)
 static void lower_choice(const tree_t *t)
 {
     if (t->v.sval) emit_prolog_call(t->v.sval);
-    else           { emit_push_expr(t); sm_emit(g_p, SM_BB_ONCE); }
+    else {
+        /* PB-7: unnamed TT_CHOICE fallthrough (SM_BB_ONCE) deleted.
+         * All TT_CHOICE nodes must be named by prolog_lower.c. */
+        fprintf(stderr, "FATAL: lower_choice unnamed TT_CHOICE reached — legacy SM_BB_ONCE deleted (PB-7)\n");
+        abort();
+    }
 }
 
+/* PB-7: lower_prolog_child deleted — TT_CLAUSE legacy fallthrough (emit_push_expr + SM_BB_ONCE) removed.
+ * All Prolog AST kinds that reach lower_expr must be handled explicitly above. */
 static void lower_prolog_child(const tree_t *t)
 {
-    emit_push_expr(t); sm_emit(g_p, SM_BB_ONCE);
+    fprintf(stderr, "FATAL: lower_prolog_child reached for kind=%d sval=%s — legacy SM_BB_ONCE deleted (PB-7)\n",
+            t ? t->t : -1, (t && t->v.sval) ? t->v.sval : "(null)");
+    abort();
 }
 
 /*── Statement lowering ──────────────────────────────────────────────────────
@@ -1289,8 +1298,11 @@ void lower_stmt(const tree_t *s)
             sm_emit_si(g_p, SM_CALL_FN, "PL_BUILTIN", 0);
         }
         else {
-            if (subject) lower_expr(subject); else sm_emit(g_p, SM_PUSH_NULL);
-            sm_emit(g_p, SM_BB_ONCE);
+            /* PB-7: unnamed LANG_PL stmt fallthrough (lower_expr + SM_BB_ONCE) deleted.
+             * All LANG_PL stmt subjects must be TT_CHOICE (named) or TT_FNC directives. */
+            fprintf(stderr, "FATAL: lower_stmt LANG_PL unnamed subject kind=%d sval=%s — legacy SM_BB_ONCE deleted (PB-7)\n",
+                    subject ? subject->t : -1, (subject && subject->v.sval) ? subject->v.sval : "(null)");
+            abort();
         }
         goto emit_gotos;
     }
