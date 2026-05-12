@@ -1154,6 +1154,15 @@ static void emit_prolog_call(const char *sval)
     sm_emit_si(g_p, SM_BB_ONCE_PROC, sval, (int64_t)(sl ? atoi(sl + 1) : 0));
 }
 
+/* TT_CHOICE stmt calls (Pass 3 predicate-def stmts) use arity=0 to match IR
+ * semantics: interp_eval calls pl_box_choice with arity=0 regardless of actual
+ * predicate arity, so head unification is skipped and non-zero-arity predicates
+ * fail fast without producing spurious side-effect output. */
+static void emit_prolog_call_arity0(const char *sval)
+{
+    sm_emit_si(g_p, SM_BB_ONCE_PROC, sval, 0);
+}
+
 static void lower_choice(const tree_t *t)
 {
     if (t->v.sval) emit_prolog_call(t->v.sval);
@@ -1263,7 +1272,7 @@ void lower_stmt(const tree_t *s)
          * This mirrors IR mode where interp_eval runs every LANG_PL stmt.
          * Predicates that fail (wrong arity etc.) do so silently. */
         if (subject && subject->t == TT_CHOICE && subject->v.sval) {
-            emit_prolog_call(subject->v.sval);
+            emit_prolog_call_arity0(subject->v.sval);
             goto emit_gotos;
         }
         if (subject && subject->t == TT_FNC && subject->v.sval
