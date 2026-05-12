@@ -1181,6 +1181,109 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         *out = sc_dat_construct(_dt, fargs, nf); return 1;
     }
 
+    /* open(filename[, mode]) — open a file, return INTVAL(fh_idx) as file descriptor.
+     * Reuses raku_fh_alloc to store FILE* by integer index.
+     * Icon modes: "r"=read (default), "w"=write, "a"=append. */
+    if (!strcmp(fn,"open") && (nargs == 1 || nargs == 2)) {
+        const char *path = (args[0].v == DT_S || args[0].v == DT_SNUL) ? args[0].s : NULL;
+        if (!path) { *out = FAILDESCR; return 1; }
+        const char *mode = (nargs == 2 && (args[1].v == DT_S||args[1].v == DT_SNUL) && args[1].s)
+                           ? args[1].s : "r";
+        const char *cmode = "r";
+        if (strstr(mode,"w")) cmode = "w";
+        else if (strstr(mode,"a")) cmode = "a";
+        FILE *fp = fopen(path, cmode);
+        if (!fp) { *out = FAILDESCR; return 1; }
+        int idx = raku_fh_alloc(fp);
+        if (idx < 0) { fclose(fp); *out = FAILDESCR; return 1; }
+        *out = INTVAL(idx); return 1;
+    }
+
+    /* close(fh) — close a file handle. */
+    if (!strcmp(fn,"close") && nargs == 1) {
+        if (IS_INT_fn(args[0])) {
+            int idx = (int)args[0].i;
+            FILE *fp = raku_fh_get(idx);
+            if (fp) { fclose(fp); raku_fh_free(idx); }
+        }
+        *out = args[0]; return 1;
+    }
+
+    /* read(fh) — read one line from file handle. */
+    if (!strcmp(fn,"read") && nargs == 1) {
+        FILE *fp = IS_INT_fn(args[0]) ? raku_fh_get((int)args[0].i) : NULL;
+        if (!fp) { *out = FAILDESCR; return 1; }
+        char buf[4096];
+        if (!fgets(buf, sizeof buf, fp)) { *out = FAILDESCR; return 1; }
+        size_t len = strlen(buf);
+        if (len > 0 && buf[len-1] == '\n') buf[--len] = '\0';
+        if (len > 0 && buf[len-1] == '\r') buf[--len] = '\0';
+        *out = STRVAL(GC_strdup(buf)); return 1;
+    }
+
+    /* reads(fh, n) — read n bytes from file handle. */
+    if (!strcmp(fn,"reads") && nargs == 2) {
+        FILE *fp = IS_INT_fn(args[0]) ? raku_fh_get((int)args[0].i) : NULL;
+        if (!fp) { *out = FAILDESCR; return 1; }
+        int n = (int)to_int(args[1]);
+        if (n <= 0) { *out = FAILDESCR; return 1; }
+        char *buf = GC_malloc(n + 1);
+        int got = (int)fread(buf, 1, (size_t)n, fp);
+        if (got <= 0) { *out = FAILDESCR; return 1; }
+        buf[got] = '\0';
+        DESCR_t r; r.v = DT_S; r.slen = (uint32_t)got; r.s = buf;
+        *out = r; return 1;
+    }
+
+    /* IDENTICAL(a,b) — Icon === operator as function (a === b). */
+    if (!strcmp(fn,"IDENTICAL") && nargs == 2) {
+        DESCR_t a = args[0], b = args[1];
+        int same = (a.v == b.v);
+        if (same) {
+            if      (a.v == DT_I)               same = (a.i == b.i);
+            else if (a.v == DT_R)               same = (a.r == b.r);
+            else if (a.v == DT_S || a.v == DT_SNUL)
+                same = (a.s == b.s || (a.s && b.s && strcmp(a.s,b.s)==0));
+            else                                same = (a.ptr == b.ptr);
+        }
+        *out = same ? b : FAILDESCR; return 1;
+    }
+
+    /* set([list]) — create a set (table with keys=members, vals=1).
+     * Icon: set() creates empty set; set(L) creates from list. */
+    if (!strcmp(fn,"set") && nargs <= 1) {
+        TBBLK_t *tbl = table_new();
+        if (nargs == 1 && args[0].v == DT_DATA) {
+            DESCR_t tag = FIELD_GET_fn(args[0], "icn_type");
+            if (tag.v == DT_S && tag.s && strcmp(tag.s,"list")==0) {
+                DESCR_t ea = FIELD_GET_fn(args[0], "frame_elems");
+                int n = (int)FIELD_GET_fn(args[0], "frame_size").i;
+                DESCR_t *elems = (ea.v == DT_DATA) ? (DESCR_t *)ea.ptr : NULL;
+                if (elems) for (int _i = 0; _i < n; _i++)
+                    table_set_descr(tbl, NULL, elems[_i], INTVAL(1));
+            }
+        }
+        *out = TABLE_VAL(tbl); return 1;
+    }
+
+    /* ASGN(rhs, target) — assignment as builtin (called from emit_lhs_store
+     * for non-standard LHS forms).  Propagates FAILDESCR. */
+    if (!strcmp(fn,"ASGN") && nargs == 2) {
+        DESCR_t rhs = args[0];
+        if (IS_FAIL_fn(rhs)) { *out = FAILDESCR; return 1; }
+        DESCR_t lref = args[1];
+        if (lref.v == DT_S && lref.s) NV_SET_fn(lref.s, rhs);
+        *out = rhs; return 1;
+    }
+
+    /* variable(name) — return current value of named variable. */
+    if (!strcmp(fn,"variable") && nargs == 1) {
+        const char *vname = (args[0].v == DT_S || args[0].v == DT_SNUL) ? args[0].s : NULL;
+        if (!vname) { *out = FAILDESCR; return 1; }
+        DESCR_t v = NV_GET_fn(vname);
+        *out = IS_FAIL_fn(v) ? FAILDESCR : v; return 1;
+    }
+
     return 0;
 }
 
