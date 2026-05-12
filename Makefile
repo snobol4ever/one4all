@@ -83,9 +83,14 @@ RT_PIC_SRCS := \
     $(RT)/x86/templates/bb_xchr.c \
     $(RT)/x86/templates/bb_xspnc.c \
     $(RT)/x86/templates/bb_xlnth.c \
+    $(RT)/x86/templates/bb_xtb.c \
+    $(RT)/x86/templates/bb_xrtb.c \
     $(RT)/x86/templates/bb_xbrkx.c \
     $(RT)/x86/templates/bb_xposi.c \
+    $(RT)/x86/templates/bb_xrpsi.c \
     $(RT)/x86/templates/bb_xfarb.c \
+    $(RT)/x86/templates/bb_xeps.c \
+    $(RT)/x86/templates/bb_xfail.c \
     $(RT)/x86/templates/sm_call_fn.c \
     $(RT)/x86/templates/sm_return.c \
     $(RT)/x86/templates/sm_pat_nullary.c \
@@ -273,10 +278,15 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_exec_stmt.c -o $(OBJ)/template_sm_exec_stmt.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xbrkx.c -o $(OBJ)/template_bb_xbrkx.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xposi.c -o $(OBJ)/template_bb_xposi.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xrpsi.c -o $(OBJ)/template_bb_xrpsi.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xfarb.c -o $(OBJ)/template_bb_xfarb.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xeps.c -o $(OBJ)/template_bb_xeps.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xfail.c -o $(OBJ)/template_bb_xfail.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xchr.c -o $(OBJ)/template_bb_xchr.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xspnc.c -o $(OBJ)/template_bb_xspnc.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xlnth.c -o $(OBJ)/template_bb_xlnth.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xtb.c -o $(OBJ)/template_bb_xtb.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xrtb.c -o $(OBJ)/template_bb_xrtb.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_emit_template.c -o $(OBJ)/sm_emit_template.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_codegen_x64_emit.c -o $(OBJ)/sm_codegen_x64_emit.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_globals.c -o $(OBJ)/interp_globals.o
