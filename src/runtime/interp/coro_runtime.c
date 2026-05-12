@@ -1787,6 +1787,23 @@ bb_node_t coro_eval(tree_t *e) {
         return (bb_node_t){ coro_bb_seq_expr, z, 0 };
     }
 
+    /* ── IJ-1: TT_SEQ (Icon conjunction &) as generator ────────────────────────────────
+     * `every (x := (1|2|3|4|5)) > 2 & write(x)` parses as
+     * TT_EVERY(TT_SEQ(TT_GT(TT_ASSIGN(x,alt),2), write(x))).
+     * coro_eval(TT_SEQ) was falling through to oneshot, which eagerly called
+     * bb_eval_value(TT_SEQ) — first child (x:=1)>2 fails for x=1,2 so
+     * the oneshot stored FAILDESCR and the entire every produced nothing.
+     * Fix: when c[0] is suspendable, treat TT_SEQ as a filter conjunction:
+     * drive c[0] as the generator; exec c[1] as the body per tick.
+     * Reuse icn_every_state_t / coro_bb_every (same alpha/beta semantics). */
+    if (e->t == TT_SEQ && e->n >= 2 && is_suspendable(e->c[0])) {
+        icn_every_state_t *z = calloc(1, sizeof(*z));
+        z->gen     = coro_eval(e->c[0]);
+        z->gen_ast = e->c[0];
+        z->body    = e->c[1];
+        return (bb_node_t){ coro_bb_every, z, 0 };
+    }
+
     /* ── IC-7: TT_NONNULL (\E) as generator — filter: pass values, skip null ──
      * every write(\(1 to 3)) — drive inner gen, yield each non-null value.   */
     if (e->t == TT_NONNULL && e->n >= 1 && is_suspendable(e->c[0])) {
