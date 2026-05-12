@@ -41,6 +41,11 @@
  */
 bb_box_fn bb_build_flat(PATND_t *p);
 
+/* EM-BB-PURGE-1 / EDP-7: Emit pattern tree as one brokered blob with C-ABI
+ * frame (push rbp; ... ; pop rbp; ret).  bb_broker calls fn(NULL, port) via
+ * C call; γ/ω exits return eax=1/99.  Returns NULL if not flat-eligible. */
+bb_box_fn bb_build_brokered(PATND_t *p);
+
 /*
  * EM-7b: TEXT-mode counterpart to bb_build_flat.
  *

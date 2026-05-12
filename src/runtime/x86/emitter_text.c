@@ -118,6 +118,8 @@ static void text_emit_insn(emitter_t *e, const bb_insn_desc_t *d)
         emit3c_op(e,"push","r10", NULL); CTX(e)->pos += 2; break;
     case BB_INSN_POP_R10:
         emit3c_op(e,"pop","r10", NULL); CTX(e)->pos += 2; break;
+    case BB_INSN_POP_RBP:
+        emit3c_op(e,"pop","rbp", NULL); CTX(e)->pos += 1; break;
     }
 }
 

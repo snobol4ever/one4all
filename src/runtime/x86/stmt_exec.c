@@ -1333,6 +1333,18 @@ int exec_stmt(const char  *subj_name,
                     g_bin_misses++;
                 }
             }
+        } else if (g_bb_mode == BB_MODE_BROKERED) {
+            /* EM-BB-PURGE-1 / EDP-7: brokered blob — C-ABI wrapper around
+             * flat BB body.  bb_broker calls fn(NULL, port) via C call.
+             * Falls back to C bb_build() if pattern not flat-eligible. */
+            PATND_t *pp = (PATND_t *)pat.p;
+            bb_box_fn bfn = bb_build_brokered(pp);
+            if (bfn) {
+                root.fn     = bfn;
+                root.ζ      = NULL;
+                root.ζ_size = 0;
+                bin_done    = 1;
+            }
         }
         if (!bin_done) {
             root = bb_build((PATND_t *)pat.p);

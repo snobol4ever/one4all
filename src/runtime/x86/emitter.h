@@ -109,6 +109,8 @@ typedef enum {
     BB_INSN_PUSH_R10,
     /* pop r10                41 5A      — restore flat-BB LOCAL after runtime call */
     BB_INSN_POP_R10,
+    /* pop rbp                5D         — restore frame after brokered call */
+    BB_INSN_POP_RBP,
 } bb_insn_kind_t;
 
 typedef struct {
@@ -451,6 +453,9 @@ static inline void emit_push_r10(emitter_t *e)
 
 static inline void emit_pop_r10(emitter_t *e)
 { emit_insn0(e, BB_INSN_POP_R10); }
+
+static inline void emit_pop_rbp(emitter_t *e)
+{ emit_insn0(e, BB_INSN_POP_RBP); }
 
 /* r10 = &Δ */
 static inline void emit_load_r10_delta_ptr(emitter_t *e, uint64_t addr)

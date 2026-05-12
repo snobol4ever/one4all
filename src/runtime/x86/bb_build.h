@@ -12,7 +12,7 @@
  * BB_MODE_DRIVER (default): pattern matching via driver/broker (C box calls).
  * BB_MODE_LIVE:             live-wired — route phase 3 through bb_build_binary().
  */
-typedef enum { BB_MODE_DRIVER = 0, BB_MODE_LIVE = 1 } bb_mode_t;
+typedef enum { BB_MODE_DRIVER = 0, BB_MODE_LIVE = 1, BB_MODE_BROKERED = 2 } bb_mode_t;
 extern bb_mode_t g_bb_mode;
 
 /*

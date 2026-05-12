@@ -1284,7 +1284,7 @@ static int flat_is_eligible(PATND_t *p)
 
 /* ── shared emission body ─────────────────────────────────────────────────── */
 static int flat_emit_body(emitter_t *e, PATND_t *p,
-                            const char *prefix, int text_externalise)
+                            const char *prefix, int text_externalise, int brokered)
 {
     bb_label_t lbl_α, lbl_α_body, lbl_succ, lbl_fail, lbl_β;
     bb_label_initf(&lbl_α,      "%s_α",      prefix);
@@ -1335,12 +1335,14 @@ static int flat_emit_body(emitter_t *e, PATND_t *p,
     emit_sigma_plus_delta(e, ADDR_SIGMA);  /* rax = Σ+Δ */
     emit_mov_rdx_rax(e);                  /* rdx = Σ+Δ (σ) */
     emit_mov_eax_imm32(e, 1);             /* rax = DT_S=1 */
+    if (brokered) emit_pop_rbp(e);
     emit_ret(e);
 
     /* PAT_ω: failure → return DT_FAIL=99 */
     EV_LABEL(e, &lbl_fail);
     emit_mov_eax_imm32(e, 99);
     emit_xor_edx_edx(e);
+    if (brokered) emit_pop_rbp(e);
     emit_ret(e);
 
     /* EM-FORMAT-BB-DATA-CONSOLIDATE: flush all deferred data as ONE
@@ -1375,9 +1377,37 @@ bb_box_fn bb_build_flat(PATND_t *p)
     g_flat_slot_count = 0; g_flat_node_id = 0;
     emitter_t *e = emitter_binary_new(buf, FLAT_BUF_MAX);
     if (!e) { bb_free(buf, FLAT_BUF_MAX); return NULL; }
-    flat_emit_body(e, p, "pat_flat", 0);
+    flat_emit_body(e, p, "pat_flat", 0, 0);
     int nbytes = emitter_end(e);
     emitter_free(e);
+    if (nbytes <= 0 || nbytes > FLAT_BUF_MAX) { bb_free(buf, FLAT_BUF_MAX); return NULL; }
+    bb_seal(buf, (size_t)nbytes);
+    return (bb_box_fn)buf;
+}
+
+/* ── bb_build_brokered — EM-BB-PURGE-1 / EDP-7 ───────────────────────────
+ * Emit the whole invariant pattern tree as one contiguous x86-64 blob
+ * wrapped in a C-ABI frame so bb_broker can call fn(ζ, port) via C call.
+ * Shape: push rbp; mov rbp, rsp; <flat BB body (brokered=1)>
+ * The flat BB body's γ/ω exits emit pop rbp; ret instead of plain ret.
+ * ζ=NULL at call time — all state is baked into the blob (r10=&Δ).
+ * Returns NULL if the pattern is not flat-eligible. */
+bb_box_fn bb_build_brokered(PATND_t *p)
+{
+    if (!flat_is_eligible(p)) return NULL;
+    bb_buf_t buf = bb_alloc(FLAT_BUF_MAX);
+    if (!buf) return NULL;
+    g_flat_slot_count = 0; g_flat_node_id = 0;
+    emit_mode_set(EMIT_BINARY_BROKERED, NULL);
+    emitter_t *e = emitter_binary_new(buf, FLAT_BUF_MAX);
+    if (!e) { bb_free(buf, FLAT_BUF_MAX); emit_mode_set(EMIT_BINARY_WIRED, NULL); return NULL; }
+    /* C-ABI prologue: push rbp; mov rbp, rsp — emitted before flat BB body */
+    bb_emit_byte(0x55);                                          /* push rbp */
+    bb_emit_byte(0x48); bb_emit_byte(0x89); bb_emit_byte(0xE5); /* mov rbp, rsp */
+    flat_emit_body(e, p, "pat_brok", 0, 1);
+    int nbytes = emitter_end(e);
+    emitter_free(e);
+    emit_mode_set(EMIT_BINARY_WIRED, NULL);
     if (nbytes <= 0 || nbytes > FLAT_BUF_MAX) { bb_free(buf, FLAT_BUF_MAX); return NULL; }
     bb_seal(buf, (size_t)nbytes);
     return (bb_box_fn)buf;
@@ -1393,7 +1423,7 @@ int bb_build_flat_text(PATND_t *p, FILE *out, const char *prefix)
     emitter_t *e = emitter_text_new(out);
     if (!e) return -1;
     e->intern_str = g_flat_intern_str;  /* wire strtab callback if set */
-    int rc = flat_emit_body(e, p, prefix, 1);
+    int rc = flat_emit_body(e, p, prefix, 1, 0);
     emitter_end(e);
     emitter_free(e);
     /* EM-FORMAT-BB lone-label fusion: flush any pending label before returning,
