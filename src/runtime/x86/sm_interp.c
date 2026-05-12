@@ -1464,6 +1464,35 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 break;
             }
 
+            /* PB-2: PL_CUT — honest TT_CUT lowering (no coro_eval).
+             * emit_push_expr(TT_CUT node) + SM_CALL_FN "PL_CUT" 0.
+             * Pops DT_E (ignored), sets g_pl_cut_flag=1, succeeds. */
+            if (name && strcmp(name, "PL_CUT") == 0 && nargs == 0) {
+                sm_pop(st);   /* discard DT_E — node carries no data */
+                g_pl_cut_flag = 1;
+                st->last_ok = 1;
+                break;
+            }
+
+            /* PB-3: PL_TRAIL_MARK — save trail top into SM value stack.
+             * Used when lower.c emits TT_TRAIL_MARK (not yet emitted by prolog_lower).
+             * SM_CALL_FN "PL_TRAIL_MARK" 0: pushes trail mark as DT_I. */
+            if (name && strcmp(name, "PL_TRAIL_MARK") == 0 && nargs == 0) {
+                DESCR_t d; d.v = DT_I; d.i = (int64_t)trail_mark(&g_pl_trail); d.ptr = NULL;
+                sm_push(st, d);
+                st->last_ok = 1;
+                break;
+            }
+
+            /* PB-3: PL_TRAIL_UNWIND — restore trail to mark pushed by PL_TRAIL_MARK.
+             * SM_CALL_FN "PL_TRAIL_UNWIND" 0: pops mark DT_I, calls trail_unwind. */
+            if (name && strcmp(name, "PL_TRAIL_UNWIND") == 0 && nargs == 0) {
+                DESCR_t mark_d = sm_pop(st);
+                trail_unwind(&g_pl_trail, (int)mark_d.i);
+                st->last_ok = 1;
+                break;
+            }
+
             /* SN-6: SNOBOL4 semantics — if any argument is FAIL, the call fails
              * without invoking the function. This is what allows
              * CHARS + SIZE(INPUT) :F(DONE) to branch when INPUT hits EOF:

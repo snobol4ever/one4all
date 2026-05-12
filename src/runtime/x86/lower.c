@@ -1350,8 +1350,10 @@ void lower_expr(const tree_t *t)
     /* Prolog */
     case TT_CHOICE:                           lower_choice(t);        return;
     case TT_UNIFY: emit_push_expr(t); sm_emit_si(g_p, SM_CALL_FN, "PL_UNIFY", 0); return; /* PB-1 */
-    case TT_CLAUSE: case TT_CUT:
-    case TT_TRAIL_MARK: case TT_TRAIL_UNWIND: lower_prolog_child(t); return;
+    case TT_CUT:   emit_push_expr(t); sm_emit_si(g_p, SM_CALL_FN, "PL_CUT", 0);   return; /* PB-2 */
+    case TT_TRAIL_MARK:   sm_emit_si(g_p, SM_CALL_FN, "PL_TRAIL_MARK",   0); return; /* PB-3 */
+    case TT_TRAIL_UNWIND: sm_emit_si(g_p, SM_CALL_FN, "PL_TRAIL_UNWIND", 0); return; /* PB-3 */
+    case TT_CLAUSE: lower_prolog_child(t); return;
     /* not yet implemented (TT_REVASSIGN, TT_REVSWAP) */
     default:                                   lower_unhandled(t);     return;
     }
