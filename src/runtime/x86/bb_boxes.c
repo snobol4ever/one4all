@@ -9,40 +9,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* ───── lit ───── */
-/* _XCHR     LIT         literal string match */
 
 
-lit_t *bb_lit_new(const char *lit, int len)
-{ lit_t *ζ=calloc(1,sizeof(lit_t)); ζ->lit=lit; ζ->len=len; return ζ; }
 
-/* ───── seq ───── */
-/* _XCAT     SEQ         concatenation: left then right; β retries right then left */
 
-#pragma GCC diagnostic ignored "-Wmisleading-indentation"
-typedef struct { bb_box_fn fn; void *state; } bb_child_t;
-typedef struct { bb_child_t left; bb_child_t right; spec_t matched; } seq_t;
 
-seq_t *bb_seq_new(bb_box_fn lf, void *ls, bb_box_fn rf, void *rs)
-{ seq_t *ζ=calloc(1,sizeof(seq_t)); ζ->left.fn=lf; ζ->left.state=ls; ζ->right.fn=rf; ζ->right.state=rs; return ζ; }
-
-/* ───── alt ───── */
-/* _XOR      ALT         alternation: try each child on α; β retries same child only */
-
-#pragma GCC diagnostic ignored "-Wmisleading-indentation"
-#define BB_ALT_INIT 4
-typedef struct { bb_box_fn fn; void *state; } bb_altchild_t;
-typedef struct { int n; int cap; bb_altchild_t *children; int current; int position; spec_t result; } alt_t;
-
-alt_t *bb_alt_new(int n, bb_box_fn *fns)
-{
-    alt_t *ζ = calloc(1, sizeof(alt_t));
-    ζ->cap      = n > BB_ALT_INIT ? n : BB_ALT_INIT;
-    ζ->children = malloc(ζ->cap * sizeof(bb_altchild_t));
-    ζ->n = n;
-    for (int i = 0; i < n; i++) ζ->children[i].fn = fns[i];
-    return ζ;
-}
 
 /* ───── arb ───── */
 /* _XFARB    ARB         match 0..n chars lazily; β extends by 1 */
@@ -69,33 +40,13 @@ arbno_t *bb_arbno_new(bb_box_fn fn, void *state)
     return ζ;
 }
 
-/* ───── any ───── */
-/* _XANYC    ANY         match one char if in set */
 
 
-any_t *bb_any_new(const char *chars)
-{ any_t *ζ=calloc(1,sizeof(any_t)); ζ->chars=chars; return ζ; }
-
-/* ───── notany ───── */
-/* _XNNYC    NOTANY      match one char if NOT in set */
 
 
-notany_t *bb_notany_new(const char *chars)
-{ notany_t *ζ=calloc(1,sizeof(notany_t)); ζ->chars=chars; return ζ; }
-
-/* ───── span ───── */
-/* _XSPNC    SPAN        longest prefix of chars in set (≥1) */
 
 
-span_t *bb_span_new(const char *chars)
-{ span_t *ζ=calloc(1,sizeof(span_t)); ζ->chars=chars; return ζ; }
 
-/* ───── brk ───── */
-/* _XBRKC    BRK         scan to first char in set (may be zero-width) */
-
-
-brk_t *bb_brk_new(const char *chars)
-{ brk_t *ζ=calloc(1,sizeof(brk_t)); ζ->chars=chars; return ζ; }
 
 /* ───── breakx ───── */
 /* _XBRKX    BREAKX      like BRK but fails on zero advance */
@@ -111,12 +62,7 @@ brkx_t *bb_breakx_new(const char *chars)
 len_t *bb_len_new(int n)
 { len_t *ζ=calloc(1,sizeof(len_t)); ζ->n=n; return ζ; }
 
-/* ───── pos ───── */
-/* _XPOSI    POS         assert cursor == n (zero-width) */
 
-
-pos_t *bb_pos_new(int n)
-{ pos_t *ζ=calloc(1,sizeof(pos_t)); ζ->n=n; return ζ; }
 
 /* ───── tab ───── */
 /* _XTB      TAB         advance cursor TO absolute position n */
@@ -132,12 +78,7 @@ tab_t *bb_tab_new(int n)
 rem_t *bb_rem_new(void)
 { return calloc(1,sizeof(rem_t)); }
 
-/* ───── eps ───── */
-/* _XEPS     EPS         zero-width success once; done flag prevents double-γ */
 
-
-eps_t *bb_eps_new(void)
-{ return calloc(1,sizeof(eps_t)); }
 
 /* ───── bal ───── */
 /* _XBAL     BAL         balanced parens — matches a "balanced" string:
@@ -156,29 +97,9 @@ bal_t *bb_bal_new(void)
 abort_t *bb_abort_new(void)
 { return calloc(1,sizeof(abort_t)); }
 
-/* ───── not ───── */
-/* _XNOT     NOT         \X — succeed iff X fails; β always ω (no retry) */
 
-/* o$nta/b/c three-entry semantics mapped to two-entry BB:
- *   α: run child with α; if child γ → NOT_ω (child succeeded → we fail);
- *                         if child ω → NOT_γ zero-width (child failed → we succeed)
- *   β: unconditional NOT_ω — negation succeeds at most once per position */
-typedef struct { bb_box_fn fn; void *state; int start; } not_t;
 
-not_t *bb_not_new(bb_box_fn fn, void *state)
-{ not_t *ζ=calloc(1,sizeof(not_t)); ζ->fn=fn; ζ->state=state; return ζ; }
 
-/* ───── interr ───── */
-/* _XINT     INTERR      ?X — null result if X succeeds; ω if X fails (o$int) */
-
-/* o$int: replace operand with null, continue.
- * In BB terms: run child; if child γ → discard match, return zero-width at
- * the *original* cursor (null string); if child ω → propagate ω.
- * β: unconditional ω — interrogation succeeds at most once. */
-typedef struct { bb_box_fn fn; void *state; int start; } interr_t;
-
-interr_t *bb_interr_new(bb_box_fn fn, void *state)
-{ interr_t *ζ=calloc(1,sizeof(interr_t)); ζ->fn=fn; ζ->state=state; return ζ; }
 
 /* ───── capture ───── */
 /* _XNME/_XFNME  CAPTURE     $ writes on every γ; . buffers for Phase-5 commit
@@ -325,19 +246,9 @@ atp_t *bb_atp_new(const char *varname)
 fence_t *bb_fence_new(void)
 { return calloc(1,sizeof(fence_t)); }
 
-/* ───── fail ───── */
-/* _XFAIL    FAIL        always ω — force backtrack */
 
 
-fail_t *bb_fail_new(void)
-{ return calloc(1,sizeof(fail_t)); }
 
-/* ───── rpos ───── */
-/* _XRPSI    RPOS        assert cursor == Σlen-n (zero-width) */
-
-
-rpos_t *bb_rpos_new(int n)
-{ rpos_t *ζ=calloc(1,sizeof(rpos_t)); ζ->n=n; return ζ; }
 
 /* ───── rtab ───── */
 /* _XRTB     RTAB        advance cursor TO position Σlen-n */

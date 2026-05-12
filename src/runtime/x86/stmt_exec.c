@@ -160,36 +160,6 @@ static DESCR_t bb_deferred_var(void *zeta, int entry);
 
 /* flush_pending_captures now external, declared in bb_box.h */
 
-/* Box state types are now in bb_box.h (canonical).
- * lit_t / pos_t etc. were private aliases — replaced with canonical names.
- * Complex composite types (alt_t, seq_t, arbno_t) remain here. */
-#define BB_ALT_INIT 4
-typedef struct { bb_box_fn fn; void *state; }   bchild_t;
-typedef struct {
-    int       n;
-    int       cap;
-    bchild_t *children;
-    int       current;
-    int       position;
-    spec_t    result;
-} alt_t;
-
-typedef struct {
-    bchild_t left;
-    bchild_t right;
-    spec_t    matched;
-} seq_t;
-
-#define ARBNO_INIT 8
-typedef struct { spec_t matched; int start; void *nam_mark; } aframe_t;  /* TL-2: nam_mark must mirror bb_boxes.c arbno_frame_t */
-typedef struct {
-    bb_box_fn  fn;
-    void      *state;
-    int        depth;
-    int        cap;
-    aframe_t  *stack;
-} arbno_t;
-
 /* ══════════════════════════════════════════════════════════════════════════
  * M-DYN-OPT — Invariance detection and node cache
  *

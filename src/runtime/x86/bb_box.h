@@ -114,24 +114,12 @@ typedef struct {
     size_t     ζ_size;
 } bb_node_t;
 
-/* ── box state typedefs — ONE definition, used by bb_*.c, stmt_exec.c, bb_*.s ─
- * Each box's private state struct lives here.  bb_build() in stmt_exec.c
- * allocates these; the box functions cast zeta to the appropriate type.
- * Named with _t suffix; the .s files use field offsets matching these layouts. */
-typedef struct { const char *lit; int len; }          lit_t;
+/* ── box state typedefs — used by bb_templates.c and bb_flat.c ──────────── */
 typedef struct { int n; }                              len_t;
-typedef struct { const char *chars; int δ; }          span_t;
-typedef struct { const char *chars; }                  any_t;
-typedef struct { const char *chars; }                  notany_t;
-typedef struct { const char *chars; int δ; }          brk_t;
 typedef struct { const char *chars; int δ; }          brkx_t;
 typedef struct { int count; int start; }              arb_t;
 typedef struct { int dummy; }                          rem_t;
 typedef struct { int dummy; }                          succeed_t;
-typedef struct { int dummy; }                          fail_t;
-typedef struct { int done; }                           eps_t;
-typedef struct { int n; }                              pos_t;
-typedef struct { int n; }                              rpos_t;
 typedef struct { int n; int advance; }                tab_t;
 typedef struct { int n; int advance; }                rtab_t;
 typedef struct { int fired; }                          fence_t;
@@ -193,11 +181,6 @@ extern void      clear_pending_flags(void);
 
 extern DESCR_t bb_atp(void *zeta, int entry);
 extern atp_t   *bb_atp_new(const char *varname);
-
-/* bb_build: construct a live box node from a pattern tree node.
- * Defined in stmt_exec.c; declared here so bb_boxes.c can call it. */
-struct _PATND_t;  /* forward declaration */
-bb_node_t bb_build(struct _PATND_t *p);
 
 /* EM-7c (GOAL-MODE4-EMIT): mode-4 entry for pre-built BB blobs.
  * The mode-4 emitter bakes invariant pattern sub-trees as flat .text
