@@ -225,7 +225,7 @@ bb_box_fn bb_lit_emit_binary(const char *lit, int len)
     bb_buf_t buf = bb_alloc(BUF_SIZE);
     if (!buf) return NULL;
 
-    bb_emit_mode = EMIT_BINARY;
+    bb_emit_mode = EMIT_BINARY_WIRED;
     bb_emit_begin(buf, BUF_SIZE);
 
     /* ── labels ──────────────────────────────────────────────────────── */
@@ -401,7 +401,7 @@ bb_box_fn bb_eps_emit_binary(void)
     bb_buf_t buf = bb_alloc(EPS_BUF_SIZE);
     if (!buf) return NULL;
 
-    bb_emit_mode = EMIT_BINARY;
+    bb_emit_mode = EMIT_BINARY_WIRED;
     bb_emit_begin(buf, EPS_BUF_SIZE);
 
     bb_label_t lbl_α, lbl_β, lbl_γ, lbl_ω;
@@ -495,7 +495,7 @@ bb_box_fn bb_pos_emit_binary(int n)
     bb_buf_t buf = bb_alloc(POS_BUF_SIZE);
     if (!buf) return NULL;
 
-    bb_emit_mode = EMIT_BINARY;
+    bb_emit_mode = EMIT_BINARY_WIRED;
     bb_emit_begin(buf, POS_BUF_SIZE);
 
     bb_label_t lbl_α, lbl_β, lbl_γ, lbl_ω;
@@ -561,7 +561,7 @@ bb_box_fn bb_rpos_emit_binary(int n)
     bb_buf_t buf = bb_alloc(RPOS_BUF_SIZE);
     if (!buf) return NULL;
 
-    bb_emit_mode = EMIT_BINARY;
+    bb_emit_mode = EMIT_BINARY_WIRED;
     bb_emit_begin(buf, RPOS_BUF_SIZE);
 
     bb_label_t lbl_α, lbl_β, lbl_γ, lbl_ω;
@@ -662,7 +662,7 @@ static bb_box_fn charset_emit_trampoline(void *zeta, bb_box_fn target_fn)
 {
     bb_buf_t tbuf = bb_alloc(CHARSET_TRAM_SIZE);
     if (!tbuf) { free(zeta); return NULL; }
-    bb_emit_mode = EMIT_BINARY;
+    bb_emit_mode = EMIT_BINARY_WIRED;
     bb_emit_begin(tbuf, CHARSET_TRAM_SIZE);
     /* mov rdi, imm64(zeta) */
     bb_emit_byte(0x48); bb_emit_byte(0xBF);
@@ -729,7 +729,7 @@ static bb_box_fn bb_rem_emit_binary(void)
     if (!z) return NULL;
     bb_buf_t tbuf = bb_alloc(REM_TRAM_SIZE);
     if (!tbuf) { free(z); return NULL; }
-    bb_emit_mode = EMIT_BINARY;
+    bb_emit_mode = EMIT_BINARY_WIRED;
     bb_emit_begin(tbuf, REM_TRAM_SIZE);
     bb_emit_byte(0x48); bb_emit_byte(0xBF);
     bb_emit_u64((uint64_t)(uintptr_t)z);
@@ -787,7 +787,7 @@ static bb_box_fn bb_alt_emit_binary(PATND_t *p)
 #define ALT_TRAM_SIZE 32
     bb_buf_t tbuf = bb_alloc(ALT_TRAM_SIZE);
     if (!tbuf) { free(z->children); free(z); return NULL; }
-    bb_emit_mode = EMIT_BINARY;
+    bb_emit_mode = EMIT_BINARY_WIRED;
     bb_emit_begin(tbuf, ALT_TRAM_SIZE);
     bb_emit_byte(0x48); bb_emit_byte(0xBF);
     bb_emit_u64((uint64_t)(uintptr_t)z);
@@ -858,7 +858,7 @@ static bb_box_fn bb_nme_emit_binary(PATND_t *p)
 #define NME_TRAM_SIZE 32
     bb_buf_t tbuf = bb_alloc(NME_TRAM_SIZE);
     if (!tbuf) { free(z); return NULL; }
-    bb_emit_mode = EMIT_BINARY;
+    bb_emit_mode = EMIT_BINARY_WIRED;
     bb_emit_begin(tbuf, NME_TRAM_SIZE);
 
     /* mov rdi, imm64(z) */
@@ -895,7 +895,7 @@ static bb_box_fn bb_fnme_emit_binary(PATND_t *p)
 #define FNME_TRAM_SIZE 32
     bb_buf_t tbuf = bb_alloc(FNME_TRAM_SIZE);
     if (!tbuf) { free(z); return NULL; }
-    bb_emit_mode = EMIT_BINARY;
+    bb_emit_mode = EMIT_BINARY_WIRED;
     bb_emit_begin(tbuf, FNME_TRAM_SIZE);
 
     bb_emit_byte(0x48); bb_emit_byte(0xBF);
@@ -933,7 +933,7 @@ static bb_box_fn bb_len_emit_binary(int n)
 
     bb_buf_t tbuf = bb_alloc(LEN_TRAM_SIZE);
     if (!tbuf) { free(z); return NULL; }
-    bb_emit_mode = EMIT_BINARY;
+    bb_emit_mode = EMIT_BINARY_WIRED;
     bb_emit_begin(tbuf, LEN_TRAM_SIZE);
 
     /* mov rdi, imm64(z) */
@@ -974,7 +974,7 @@ static bb_box_fn bb_tab_emit_binary(int n)
 
     bb_buf_t tbuf = bb_alloc(TAB_TRAM_SIZE);
     if (!tbuf) { free(z); return NULL; }
-    bb_emit_mode = EMIT_BINARY;
+    bb_emit_mode = EMIT_BINARY_WIRED;
     bb_emit_begin(tbuf, TAB_TRAM_SIZE);
 
     /* mov rdi, imm64(z) */
@@ -1006,7 +1006,7 @@ static bb_box_fn bb_rtab_emit_binary(int n)
 
     bb_buf_t tbuf = bb_alloc(RTAB_TRAM_SIZE);
     if (!tbuf) { free(z); return NULL; }
-    bb_emit_mode = EMIT_BINARY;
+    bb_emit_mode = EMIT_BINARY_WIRED;
     bb_emit_begin(tbuf, RTAB_TRAM_SIZE);
 
     /* mov rdi, imm64(z) */
@@ -1039,7 +1039,7 @@ static bb_box_fn bb_fail_emit_binary(void)
 
     bb_buf_t tbuf = bb_alloc(FAIL_TRAM_SIZE);
     if (!tbuf) { free(dummy); return NULL; }
-    bb_emit_mode = EMIT_BINARY;
+    bb_emit_mode = EMIT_BINARY_WIRED;
     bb_emit_begin(tbuf, FAIL_TRAM_SIZE);
 
     /* mov rdi, imm64(dummy) */
@@ -1073,7 +1073,7 @@ static bb_box_fn bb_fence_emit_binary(void)
 
     bb_buf_t tbuf = bb_alloc(FENCE_TRAM_SIZE);
     if (!tbuf) { free(z); return NULL; }
-    bb_emit_mode = EMIT_BINARY;
+    bb_emit_mode = EMIT_BINARY_WIRED;
     bb_emit_begin(tbuf, FENCE_TRAM_SIZE);
 
     /* mov rdi, imm64(z) */
@@ -1109,7 +1109,7 @@ static bb_box_fn bb_atp_emit_binary(const char *varname)
 
     bb_buf_t tbuf = bb_alloc(ATP_TRAM_SIZE);
     if (!tbuf) { free(z); return NULL; }
-    bb_emit_mode = EMIT_BINARY;
+    bb_emit_mode = EMIT_BINARY_WIRED;
     bb_emit_begin(tbuf, ATP_TRAM_SIZE);
 
     /* mov rdi, imm64(z) */
@@ -1143,7 +1143,7 @@ static bb_box_fn bb_dsar_emit_binary(const char *name)
 
     bb_buf_t tbuf = bb_alloc(DSAR_TRAM_SIZE);
     if (!tbuf) { free(z); return NULL; }
-    bb_emit_mode = EMIT_BINARY;
+    bb_emit_mode = EMIT_BINARY_WIRED;
     bb_emit_begin(tbuf, DSAR_TRAM_SIZE);
 
     /* mov rdi, imm64(z) */
@@ -1197,7 +1197,7 @@ static bb_box_fn bb_arbn_emit_binary(PATND_t *p)
 
     bb_buf_t tbuf = bb_alloc(ARBN_TRAM_SIZE);
     if (!tbuf) { free(z); return NULL; }
-    bb_emit_mode = EMIT_BINARY;
+    bb_emit_mode = EMIT_BINARY_WIRED;
     bb_emit_begin(tbuf, ARBN_TRAM_SIZE);
 
     /* mov rdi, imm64(z) */
@@ -1239,7 +1239,7 @@ static bb_box_fn bb_callcap_emit_binary(PATND_t *p)
 
     bb_buf_t tbuf = bb_alloc(CALLCAP_TRAM_SIZE);
     if (!tbuf) { free(z); return NULL; }
-    bb_emit_mode = EMIT_BINARY;
+    bb_emit_mode = EMIT_BINARY_WIRED;
     bb_emit_begin(tbuf, CALLCAP_TRAM_SIZE);
 
     /* mov rdi, imm64(z) */
@@ -1381,7 +1381,7 @@ static bb_box_fn bb_build_binary_node(PATND_t *p)
 #define TRAM_BUF_SIZE 64
             bb_buf_t tbuf = bb_alloc(TRAM_BUF_SIZE);
             if (!tbuf) { free(seq_zeta); return NULL; }
-            bb_emit_mode = EMIT_BINARY;
+            bb_emit_mode = EMIT_BINARY_WIRED;
             bb_emit_begin(tbuf, TRAM_BUF_SIZE);
 
             /* mov rdi, imm64(seq_zeta) */
@@ -1432,7 +1432,7 @@ static bb_box_fn bb_build_binary_node(PATND_t *p)
 #define FENCE1_TRAM_SIZE 64
         bb_buf_t tbuf = bb_alloc(FENCE1_TRAM_SIZE);
         if (!tbuf) { free(seq_zeta); return NULL; }
-        bb_emit_mode = EMIT_BINARY;
+        bb_emit_mode = EMIT_BINARY_WIRED;
         bb_emit_begin(tbuf, FENCE1_TRAM_SIZE);
         bb_emit_byte(0x48); bb_emit_byte(0xBF);
         bb_emit_u64((uint64_t)(uintptr_t)seq_zeta);

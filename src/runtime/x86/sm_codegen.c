@@ -2009,7 +2009,7 @@ static void emit_halt_blob_via_template(void)
     bb_buf_t capture = buf;   /* bb_buf_t is `uint8_t *` (bb_pool.h:32) */
 
     /* Construct a binary emitter that targets the capture buffer.
-     * emitter_binary_new() also sets bb_emit_mode = EMIT_BINARY and
+     * emitter_binary_new() also sets bb_emit_mode = EMIT_BINARY_WIRED and
      * calls bb_emit_begin(buf, size) which resets bb_emit_pos = 0. */
     emitter_t *e = emitter_binary_new(capture, (int)sizeof(buf));
     if (!e) {

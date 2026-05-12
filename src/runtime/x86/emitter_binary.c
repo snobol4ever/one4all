@@ -88,7 +88,7 @@ static void binary_emit_insn(emitter_t *e, const bb_insn_desc_t *d)
 static void binary_label_define(emitter_t *e, bb_label_t *lbl)
 {
     (void)e;
-    bb_emit_mode_t s = bb_emit_mode; bb_emit_mode = EMIT_BINARY;
+    bb_emit_mode_t s = bb_emit_mode; bb_emit_mode = EMIT_BINARY_WIRED;
     bb_label_define(lbl);
     bb_emit_mode = s;
 }
@@ -259,7 +259,7 @@ emitter_t *emitter_binary_new(bb_buf_t buf, int size)
     emitter_t *e = malloc(sizeof(emitter_t));
     if (!e) return NULL;
     *e = binary_tmpl; e->ctx = NULL;
-    bb_emit_mode = EMIT_BINARY;
+    bb_emit_mode = EMIT_BINARY_WIRED;
     bb_emit_begin(buf, size);
     return e;
 }

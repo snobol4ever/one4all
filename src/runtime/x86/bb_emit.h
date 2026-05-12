@@ -8,15 +8,24 @@
  * -----------
  * bb_emit_mode controls all output:
  *
- *   EMIT_TEXT   — write NASM assembly text to bb_emit_out (FILE*).
+ *   EMIT_TEXT   — write GAS assembly text to bb_emit_out (FILE*).
  *                 Labels are symbolic strings.  Output is a .s file
- *                 fed to NASM → ELF → linker.  This is the current
- *                 proven static path.
+ *                 fed to GAS → ELF → linker.
  *
- *   EMIT_BINARY — write raw x86-64 bytes into the current bb_pool
- *                 buffer via bb_emit_buf / bb_emit_pos.
- *                 Labels are byte offsets.  Forward refs are tracked
- *                 in a patch list and resolved when labels are defined.
+ *   EMIT_BINARY_WIRED — write raw x86-64 bytes into the current bb_pool
+ *                 buffer (flat/live mode).  One contiguous blob for the
+ *                 entire pattern tree.  Boxes jmp directly to each other's
+ *                 α/β/γ/ω labels within the blob.  Broker calls the blob
+ *                 ONCE at α entry (esi=0); backtracking is internal jmp.
+ *                 r10 = &Δ loaded in preamble; rdi=ζ ignored (ζ=NULL).
+ *
+ *   EMIT_BINARY_BROKERED — write raw x86-64 bytes into bb_pool, one
+ *                 blob per box (brokered mode).  Each blob has a full
+ *                 C ABI entry: rdi=ζ heap struct, esi=port discriminator
+ *                 (cmp esi,0; je α; jmp β), ret to return to broker.
+ *                 Broker calls fn(ζ,0) for α and fn(ζ,1) for β separately.
+ *
+ *   EMIT_MACRO_DEF — emit .macro NAME ... .endm body (sm_macros.s regen).
  *
  * LABEL SYSTEM
  * ------------
@@ -53,16 +62,17 @@
 /* ── mode ───────────────────────────────────────────────────────────────── */
 
 typedef enum {
-    EMIT_TEXT      = 0,
-    EMIT_BINARY    = 1,
-    EMIT_MACRO_DEF = 2     /* emit .macro NAME ... .endm body (sm_macros.s regen) */
+    EMIT_TEXT             = 0,
+    EMIT_BINARY_WIRED     = 1,
+    EMIT_BINARY_BROKERED  = 2,   /* per-box blobs, C ABI entry, rdi=ζ, ret */
+    EMIT_MACRO_DEF        = 3    /* emit .macro NAME ... .endm body (sm_macros.s regen) */
 } bb_emit_mode_t;
 
 extern bb_emit_mode_t bb_emit_mode;
 extern FILE          *bb_emit_out;   /* text mode: output FILE* (default stdout) */
 
 /* emit_mode_set — central setter for emit pass mode.
- *   m   = EMIT_BINARY / EMIT_TEXT / EMIT_MACRO_DEF
+ *   m   = EMIT_BINARY_WIRED / EMIT_BINARY_BROKERED / EMIT_TEXT / EMIT_MACRO_DEF
  *   out = FILE* for text / macro_def modes; ignored (pass NULL) for binary.
  * Every low-level emit function consults bb_emit_mode to decide what to do.
  * Templates and the helpers they call do not carry the mode in their args. */

@@ -51,7 +51,8 @@ void t_comment(const char *text)
 {
     FILE *f;
     switch (bb_emit_mode) {
-    case EMIT_BINARY:
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         /* No-op: comments have no place in raw x86 bytes. */
         return;
     case EMIT_TEXT:
@@ -68,7 +69,8 @@ void t_bb_box_banner(const char *kind, const char *args)
 {
     FILE *f;
     switch (bb_emit_mode) {
-    case EMIT_BINARY:
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         /* No-op: box banners are readability scaffolding. */
         return;
     case EMIT_TEXT:
@@ -106,7 +108,8 @@ void t_inc_mem_r13_disp8(uint8_t disp)
      * Used by SM_HALT (pc bump via [r13+20]) and any SM op that
      * touches an SM_State integer field. */
     switch (bb_emit_mode) {
-    case EMIT_BINARY: {
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */ {
         bb_emit_byte(0x41); bb_emit_byte(0xFF);
         bb_emit_byte(0x45); bb_emit_byte(disp);
         return;
@@ -125,7 +128,8 @@ void t_ret(void)
 {
     /* ret  — 1 byte: C3 */
     switch (bb_emit_mode) {
-    case EMIT_BINARY:
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         bb_emit_byte(0xC3);
         return;
     case EMIT_TEXT:
@@ -142,7 +146,8 @@ void t_pad_to_blob_size(void)
      * concept; macro_def bodies don't carry blob sizes.  Kept as a hook
      * for a future architecture where fixed-size dispatch slots return. */
     switch (bb_emit_mode) {
-    case EMIT_BINARY:
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
         return;
@@ -154,7 +159,8 @@ void t_mov_rdi_imm64(uint64_t val)
     /* mov rdi, imm64   — 10 bytes: 48 BF <8>
      * Used to load a value or a baked pointer into the first arg reg. */
     switch (bb_emit_mode) {
-    case EMIT_BINARY: {
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */ {
         bb_emit_byte(0x48); bb_emit_byte(0xBF);
         bb_emit_byte((uint8_t)(val      ));
         bb_emit_byte((uint8_t)(val >>  8));
@@ -187,7 +193,8 @@ void t_call_sym_plt(const char *sym, uint64_t fn_fallback)
      *   TEXT:   emit `call <sym>@PLT` — GAS resolves via PLT at link time.
      *   MACRO_DEF: same form as TEXT (sym is a fixed name in the macro). */
     switch (bb_emit_mode) {
-    case EMIT_BINARY: {
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */ {
         bb_emit_byte(0x48); bb_emit_byte(0xB8);
         bb_emit_byte((uint8_t)(fn_fallback      ));
         bb_emit_byte((uint8_t)(fn_fallback >>  8));
@@ -219,7 +226,8 @@ void t_macro_begin(const char *name, const char *const *params, int nparams)
      *   TEXT:      `    NAME p1, p2, ...` invocation line.
      *   MACRO_DEF: `.macro NAME p1 p2 ...` definition opener. */
     switch (bb_emit_mode) {
-    case EMIT_BINARY:
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         return;
     case EMIT_TEXT: {
         bb3c_flush_pending_cjmp_only();
@@ -252,7 +260,8 @@ void t_macro_end(void)
      *   TEXT:   no-op (invocation has no closer).
      *   MACRO_DEF: emit `.endm`. */
     switch (bb_emit_mode) {
-    case EMIT_BINARY:
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
     case EMIT_TEXT:
         return;
     case EMIT_MACRO_DEF:
@@ -269,7 +278,8 @@ void t_test_rax_rax(void)
      *   TEXT:      `test rax, rax`
      *   MACRO_DEF: same as TEXT */
     switch (bb_emit_mode) {
-    case EMIT_BINARY:
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         bb_emit_byte(0x48); bb_emit_byte(0x85); bb_emit_byte(0xC0);
         return;
     case EMIT_TEXT:
@@ -297,7 +307,8 @@ void t_emit_jmp(bb_label_t *target, jmp_kind_t kind)
     case EMIT_MACRO_DEF:
         bb3c_emit_jmp(emit_outf(), mn, target->name);
         return;
-    case EMIT_BINARY:
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         switch (kind) {
         case JMP_JMP: bb_insn_jmp_rel32(target);  return;
         case JMP_JE:  bb_insn_je_rel8(target);    return;
@@ -324,7 +335,8 @@ void t_lea_rdi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr)
      *   MACRO_DEF: `lea rdi, [rip + \lbl]`      — same as TEXT but \lbl
      *              is the macro parameter name, not a concrete label. */
     switch (bb_emit_mode) {
-    case EMIT_BINARY:
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         t_mov_rdi_imm64(in_proc_ptr);
         return;
     case EMIT_TEXT: {
@@ -352,7 +364,8 @@ void t_lea_rdx_strtab_sym(const char *sym_label, uint64_t in_proc_ptr)
      *   TEXT:      lea rdx, [rip + sym_label]
      *   MACRO_DEF: lea rdx, [rip + \namelist_lbl] */
     switch (bb_emit_mode) {
-    case EMIT_BINARY: {
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */ {
         /* MOV RDX, imm64: REX.W(48) + B8+r(BA for rdx=2) + 8-byte imm */
         uint64_t v = in_proc_ptr;
         bb_emit_byte(0x48); bb_emit_byte(0xBA);
@@ -382,7 +395,8 @@ void t_mov_edx_imm32(int val)
      *   TEXT:      mov edx, <val>
      *   MACRO_DEF: mov edx, \nargs   (parameter reference) */
     switch (bb_emit_mode) {
-    case EMIT_BINARY: {
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */ {
         uint32_t u = (uint32_t)val;
         bb_emit_byte(0xBA);
         bb_emit_byte((uint8_t)(u      )); bb_emit_byte((uint8_t)(u >>  8));
@@ -409,7 +423,8 @@ void t_mov_esi_imm32(int val)
      *   TEXT:      mov esi, <val>
      *   MACRO_DEF: mov esi, \n   (parameter reference) */
     switch (bb_emit_mode) {
-    case EMIT_BINARY: {
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */ {
         /* MOV ESI, imm32: opcode B8+r where r=6 for ESI → 0xBE */
         uint32_t u = (uint32_t)val;
         bb_emit_byte(0xBE);
@@ -438,7 +453,8 @@ void t_mov_edi_imm32(int val)
      *   TEXT:      mov edi, <val>
      *   MACRO_DEF: mov edi, \kind   (param reference for first RETURN_VARIANT arg) */
     switch (bb_emit_mode) {
-    case EMIT_BINARY: {
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */ {
         uint32_t u = (uint32_t)val;
         bb_emit_byte(0xBF);
         bb_emit_byte((uint8_t)(u      ));
@@ -465,7 +481,8 @@ void t_test_eax_eax(void)
      *   BINARY:    85 C0
      *   TEXT/MACRO_DEF: test eax, eax */
     switch (bb_emit_mode) {
-    case EMIT_BINARY:
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         bb_emit_byte(0x85); bb_emit_byte(0xC0);
         return;
     case EMIT_TEXT:
@@ -482,7 +499,8 @@ void t_jz_retskip(int pc)
      *   TEXT:      jz  .Lretskip_<pc>
      *   MACRO_DEF: jz  .Lretskip_\pc\()   (GAS param ref + empty paste) */
     switch (bb_emit_mode) {
-    case EMIT_BINARY:
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         /* Mode-3 uses standard_blob; template not called in BINARY mode.
          * Emit NOP placeholder so binary mode is at least structurally safe. */
         bb_emit_byte(0x90);
@@ -507,7 +525,8 @@ void t_retskip_label(int pc)
      *   MACRO_DEF: .Lretskip_\pc\():   (GAS param ref + empty paste avoids
      *              concatenation ambiguity) */
     switch (bb_emit_mode) {
-    case EMIT_BINARY:
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         return;
     case EMIT_TEXT: {
         FILE *f = emit_outf();
@@ -530,7 +549,8 @@ void t_movabs_rdi_entry(uint64_t entry_ptr)
      *   TEXT:      movabs rdi, <entry_ptr>
      *   MACRO_DEF: movabs rdi, \entry   (parameter reference) */
     switch (bb_emit_mode) {
-    case EMIT_BINARY: {
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */ {
         uint64_t v = entry_ptr;
         bb_emit_byte(0x48); bb_emit_byte(0xBF);
         bb_emit_byte((uint8_t)(v      )); bb_emit_byte((uint8_t)(v >>  8));
@@ -559,7 +579,8 @@ void t_call_sym_param(const char *sym_or_param)
      *   TEXT:      call <sym_or_param>
      *   MACRO_DEF: call \tgt   (parameter reference) */
     switch (bb_emit_mode) {
-    case EMIT_BINARY:
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         /* BINARY path uses standard_blob; this helper is TEXT/MACRO_DEF only. */
         return;
     case EMIT_TEXT: {
@@ -581,7 +602,8 @@ void t_noop_macro(const char *macro_name)
      *   TEXT:      three-column line, col2 = macro_name, no operands.
      *   MACRO_DEF: same as TEXT. */
     switch (bb_emit_mode) {
-    case EMIT_BINARY:
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         return;
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
@@ -599,7 +621,8 @@ void t_banner_stno(int stno, int lineno, const char *src_text)
 #define STNO_RULE \
     "#=======================================================================================================================\n"
     switch (bb_emit_mode) {
-    case EMIT_BINARY:
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         return;
     case EMIT_TEXT:
     case EMIT_MACRO_DEF: {
@@ -794,7 +817,7 @@ void bb_emit_patch_rel32(bb_label_t *lbl)
 
 void bb_emit_byte(uint8_t b)
 {
-    if (bb_emit_mode != EMIT_BINARY) {
+    if (bb_emit_mode != EMIT_BINARY_WIRED) {
         /* EM-7c-bb-three-column: TEXT / MACRO_DEF mode never emits raw
          * bytes.  Every reachable instruction routes through a named
          * bb_insn_* helper (mnemonic) or a three-way emit_* free
@@ -1477,7 +1500,8 @@ void t_bb_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fallback
 void t_load_delta_cmp_imm(int n, bb_label_t *lbl_succ, bb_label_t *lbl_fail)
 {
     switch (bb_emit_mode) {
-    case EMIT_BINARY:
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         /* mov eax, [r10]   — 41 8B 02 */
         bb_emit_byte(0x41); bb_emit_byte(0x8B); bb_emit_byte(0x02);
         /* cmp eax, imm32   — 3D <4> */
@@ -1506,7 +1530,8 @@ void t_load_siglen_sub_cmp_delta(int n, uint64_t siglen_addr,
                                  bb_label_t *lbl_succ, bb_label_t *lbl_fail)
 {
     switch (bb_emit_mode) {
-    case EMIT_BINARY:
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         /* mov rcx, siglen_addr   — 48 B9 <8> */
         bb_emit_byte(0x48); bb_emit_byte(0xB9);
         bb_emit_byte((uint8_t)(siglen_addr      ));
@@ -1556,7 +1581,8 @@ void t_load_siglen_sub_cmp_delta(int n, uint64_t siglen_addr,
 void t_lea_rsi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr)
 {
     switch (bb_emit_mode) {
-    case EMIT_BINARY:
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         /* mov rsi, imm64 — 48 BE <8> */
         bb_emit_byte(0x48); bb_emit_byte(0xBE);
         bb_emit_byte((uint8_t)(in_proc_ptr      ));
@@ -1584,7 +1610,8 @@ void t_lea_rsi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr)
 void t_add_delta_imm(int v)
 {
     switch (bb_emit_mode) {
-    case EMIT_BINARY:
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         /* mov eax, [r10]  — 41 8B 02 */
         bb_emit_byte(0x41); bb_emit_byte(0x8B); bb_emit_byte(0x02);
         /* add eax, imm32  — 05 <4> */
@@ -1611,7 +1638,8 @@ void t_add_delta_imm(int v)
 void t_sub_delta_imm(int v)
 {
     switch (bb_emit_mode) {
-    case EMIT_BINARY:
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         /* mov eax, [r10]  — 41 8B 02 */
         bb_emit_byte(0x41); bb_emit_byte(0x8B); bb_emit_byte(0x02);
         /* sub eax, imm32  — 2D <4> */
@@ -1639,7 +1667,8 @@ void t_sigma_plus_delta_to_rdi(uint64_t sigma_addr, uint64_t siglen_addr)
 {
     (void)siglen_addr;
     switch (bb_emit_mode) {
-    case EMIT_BINARY:
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         /* mov rcx, &Σ  — 48 B9 <8> */
         bb_emit_byte(0x48); bb_emit_byte(0xB9);
         bb_emit_byte((uint8_t)(sigma_addr      ));
@@ -1677,7 +1706,8 @@ void t_sigma_plus_delta_to_rdi(uint64_t sigma_addr, uint64_t siglen_addr)
 void t_bounds_check_delta_plus_len(int len, uint64_t siglen_addr, bb_label_t *lbl_fail)
 {
     switch (bb_emit_mode) {
-    case EMIT_BINARY:
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         /* mov eax, [r10]  — 41 8B 02 */
         bb_emit_byte(0x41); bb_emit_byte(0x8B); bb_emit_byte(0x02);
         /* add eax, imm32  — 05 <4> */

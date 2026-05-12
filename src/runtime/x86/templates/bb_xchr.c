@@ -16,7 +16,8 @@ static void t_mov_rdx_imm32(int v)
 {
     uint64_t val = (uint64_t)(uint32_t)v;
     switch (bb_emit_mode) {
-    case EMIT_BINARY:
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* EM-BB-PURGE-1 pending */
         /* mov rdx, imm64 — 48 BA <8> (zero-extended from imm32) */
         bb_emit_byte(0x48); bb_emit_byte(0xBA);
         bb_emit_byte((uint8_t)(val      )); bb_emit_byte((uint8_t)(val >>  8));
