@@ -1349,7 +1349,8 @@ void lower_expr(const tree_t *t)
     case TT_EVERY:                            lower_every(t);         return;
     /* Prolog */
     case TT_CHOICE:                           lower_choice(t);        return;
-    case TT_CLAUSE: case TT_CUT: case TT_UNIFY:
+    case TT_UNIFY: emit_push_expr(t); sm_emit_si(g_p, SM_CALL_FN, "PL_UNIFY", 0); return; /* PB-1 */
+    case TT_CLAUSE: case TT_CUT:
     case TT_TRAIL_MARK: case TT_TRAIL_UNWIND: lower_prolog_child(t); return;
     /* not yet implemented (TT_REVASSIGN, TT_REVSWAP) */
     default:                                   lower_unhandled(t);     return;

@@ -1449,6 +1449,21 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 st->last_ok = (args[0].v != DT_FAIL);
                 break;
             }
+            /* PB-1: PL_UNIFY — honest TT_UNIFY lowering (no coro_eval).
+             * emit_push_expr(TT_UNIFY node) + SM_CALL_FN "PL_UNIFY" 0.
+             * Pops the DT_E descriptor, extracts tree_t*, calls pl_unified_term_from_expr
+             * on both children with g_pl_env, then unify().  Trail mark/unwind is
+             * the clause-level responsibility (TT_TRAIL_MARK / TT_TRAIL_UNWIND). */
+            if (name && strcmp(name, "PL_UNIFY") == 0 && nargs == 0) {
+                DESCR_t expr_d = sm_pop(st);
+                tree_t *node   = (tree_t *)expr_d.ptr;
+                if (!node || node->n < 2) { st->last_ok = 0; break; }
+                Term *t1 = pl_unified_term_from_expr(node->c[0], g_pl_env);
+                Term *t2 = pl_unified_term_from_expr(node->c[1], g_pl_env);
+                st->last_ok = unify(t1, t2, &g_pl_trail);
+                break;
+            }
+
             /* SN-6: SNOBOL4 semantics — if any argument is FAIL, the call fails
              * without invoking the function. This is what allows
              * CHARS + SIZE(INPUT) :F(DONE) to branch when INPUT hits EOF:
