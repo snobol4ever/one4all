@@ -117,6 +117,34 @@ void flat_emit_box_banner (emitter_t *e, const char *kind,
  * the full bb_flat.c static context.  Defined in bb_flat.c. */
 extern int g_flat_node_id;
 
+/* EDP-5: flat data/text section helpers promoted from static so BB
+ * templates can emit TEXT-mode static-data sections for stateful boxes.
+ * BINARY-mode callers: all these are no-ops when e->is_text is false. */
+void flat3c_label          (emitter_t *e, const char *name);
+void flat_data_section     (emitter_t *e);
+void flat_text_section     (emitter_t *e);
+void flat_intel_syntax     (emitter_t *e);
+void flat_data_string      (emitter_t *e, const char *s);
+void flat_data_quad        (emitter_t *e, const char *arg);
+void flat_data_quad_int    (emitter_t *e, long long v);
+void flat_data_long        (emitter_t *e, long long v);
+void flat_data_zero        (emitter_t *e, int n);
+void flat_globl            (emitter_t *e, const char *name);
+/* TEXT-mode port-call emitter: push r10, lea rdi,[rip+rdi_load], mov esi,mode,
+ * call fn@PLT, pop r10.  rdi_load is the full argument string e.g.
+ * "rdi, [rip + .Lfoo_z]".  No-op in BINARY mode (caller uses t_bb_port_call). */
+void flat_box_call         (emitter_t *e, const char *rdi_load,
+                            const char *fn, int mode);
+/* Slot-pointer variant: mov rdi,[rip+slot_lbl]; mov esi,mode; call fn@PLT. */
+void flat_box_call_slot    (emitter_t *e, const char *slot_lbl,
+                            const char *fn, int mode);
+/* test rax,rax; jne succ; jmp fail — fused on one line. TEXT-mode only. */
+void flat_box_dispatch_jne_jmp(emitter_t *e,
+                               bb_label_t *lbl_succ, bb_label_t *lbl_fail);
+/* cmp esi,0; je alpha_body; jmp beta — fused entry dispatch. TEXT-mode only. */
+void flat_box_entry_dispatch(emitter_t *e,
+                             bb_label_t *lbl_alpha_body, bb_label_t *lbl_beta);
+
 /* Callback type for the charset-family template (bb_xspnc.c). */
 typedef void (*bb_charset_text_fn)(emitter_t *e,
                                    bb_label_t *lbl_succ,

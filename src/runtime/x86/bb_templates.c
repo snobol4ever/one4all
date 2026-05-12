@@ -8,6 +8,32 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "bb_flat.h"
+
+/* EDP-5: TEXT-mode helper for simple stateful boxes (single .long 0 ζ slot).
+ * Emits: .data label + .long 0 + .text + push/lea/mov/call/pop/test/jne/jmp
+ * for both α (port=0) and β (port=1) entries.
+ * lbl_prefix examples: "fence", "rem" (used for .Lfence<id>_z). */
+static void flat_text_simple_box(emitter_t *e,
+                                  const char *lbl_prefix,
+                                  const char *fn_name,
+                                  bb_label_t *lbl_succ,
+                                  bb_label_t *lbl_fail,
+                                  bb_label_t *lbl_β)
+{
+    int id = g_flat_node_id++;
+    char zlbl[80]; snprintf(zlbl, sizeof(zlbl), ".L%s%d_z", lbl_prefix, id);
+    flat_data_section(e);
+    flat3c_label(e, zlbl);
+    flat_data_long(e, 0);
+    flat_text_section(e);
+    flat_intel_syntax(e);
+    char rdi_arg[120]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", zlbl);
+    flat_box_call(e, rdi_arg, fn_name, 0);
+    flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
+    t_label_define(lbl_β);
+    flat_box_call(e, rdi_arg, fn_name, 1);
+    flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
+}
 /*====================================================================================================================*/
 extern DESCR_t coro_bb_alternate(void *zeta, int entry);
 extern icn_alternate_state_t *icon_alt_new(void);
@@ -198,8 +224,29 @@ extern atp_t  *bb_atp_new(const char *varname);
 void emit_bb_xatp(emitter_t *e, const char *varname,
                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
-    (void)e;
     t_bb_box_banner("USERPAT", varname ? varname : "");
+    if (bb_emit_mode == EMIT_TEXT || bb_emit_mode == EMIT_TEXT_INLINE) {
+        int id = g_flat_node_id++;
+        char zlbl[80], vlbl[80];
+        snprintf(zlbl, sizeof(zlbl), ".Latp%d_z",     id);
+        snprintf(vlbl, sizeof(vlbl), ".Latp%d_vname", id);
+        const char *vn = varname ? varname : "";
+        flat_data_section(e);
+        flat3c_label(e, vlbl); flat_data_string(e, vn);
+        flat3c_label(e, zlbl);
+        flat_data_long(e, 0); flat_data_long(e, 0);
+        flat_data_quad(e, vlbl);
+        flat_text_section(e);
+        flat_intel_syntax(e);
+        char rdi_arg[120]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", zlbl);
+        flat_box_call(e, rdi_arg, "bb_atp", 0);
+        flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
+        t_label_define(lbl_β);
+        flat_box_call(e, rdi_arg, "bb_atp", 1);
+        flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
+        return;
+    }
+    (void)e;
     atp_t *z = bb_atp_new(varname ? varname : "");
     t_bb_port_call((uint64_t)(uintptr_t)z, "bb_atp", (uint64_t)(uintptr_t)bb_atp,
                    0, lbl_succ, lbl_fail);
@@ -325,9 +372,34 @@ extern void   *bb_dvar_bin_new(const char *name);
 void emit_bb_xdsar(emitter_t *e, const char *varname,
                    bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
-    (void)e;
     char banner[80]; snprintf(banner, sizeof(banner), "*%s", varname ? varname : "");
     t_bb_box_banner("DEREF", banner);
+    if (bb_emit_mode == EMIT_TEXT || bb_emit_mode == EMIT_TEXT_INLINE) {
+        int id = g_flat_node_id++;
+        char zlbl[80], slbl[80];
+        snprintf(zlbl, sizeof(zlbl), ".Ldvar%d_z",    id);
+        snprintf(slbl, sizeof(slbl), ".Ldvar%d_name", id);
+        const char *vn = varname ? varname : "";
+        flat_data_section(e);
+        flat3c_label(e, slbl); flat_data_string(e, vn);
+        flat3c_label(e, zlbl);
+        flat_data_quad(e, slbl);   /* name */
+        flat_data_quad(e, "0");    /* child_fn */
+        flat_data_quad(e, "0");    /* child_state */
+        flat_data_quad(e, "0");    /* child_size */
+        flat_data_long(e, 0);      /* in_progress */
+        flat_data_long(e, 0);      /* padding */
+        flat_text_section(e);
+        flat_intel_syntax(e);
+        char rdi_arg[120]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", zlbl);
+        flat_box_call(e, rdi_arg, "bb_deferred_var_exported", 0);
+        flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
+        t_label_define(lbl_β);
+        flat_box_call(e, rdi_arg, "bb_deferred_var_exported", 1);
+        flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
+        return;
+    }
+    (void)e;
     void *z = bb_dvar_bin_new(varname ? varname : "");
     t_bb_port_call((uint64_t)(uintptr_t)z, "bb_deferred_var_exported",
                    (uint64_t)(uintptr_t)bb_deferred_var_exported,
@@ -378,8 +450,12 @@ extern fence_t *bb_fence_new(void);
 void emit_bb_xfnce(emitter_t *e,
                    bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
-    (void)e;
     t_bb_box_banner("FENCE", "");
+    if (bb_emit_mode == EMIT_TEXT || bb_emit_mode == EMIT_TEXT_INLINE) {
+        flat_text_simple_box(e, "fence", "bb_fence", lbl_succ, lbl_fail, lbl_β);
+        return;
+    }
+    (void)e;
     fence_t *z = bb_fence_new();
     t_bb_port_call((uint64_t)(uintptr_t)z, "bb_fence", (uint64_t)(uintptr_t)bb_fence,
                    0, lbl_succ, lbl_fail);
@@ -524,8 +600,12 @@ extern rem_t  *bb_rem_new(void);
 void emit_bb_xstar(emitter_t *e,
                    bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
-    (void)e;
     t_bb_box_banner("REM", "");
+    if (bb_emit_mode == EMIT_TEXT || bb_emit_mode == EMIT_TEXT_INLINE) {
+        flat_text_simple_box(e, "rem", "bb_rem", lbl_succ, lbl_fail, lbl_β);
+        return;
+    }
+    (void)e;
     rem_t *z = bb_rem_new();
     t_bb_port_call((uint64_t)(uintptr_t)z, "bb_rem", (uint64_t)(uintptr_t)bb_rem,
                    0, lbl_succ, lbl_fail);
