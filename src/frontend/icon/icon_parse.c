@@ -849,7 +849,7 @@ static tree_t *parse_proc(IcnParser *p) {
     /* Build TT_FNC */
     tree_t *proc = ast_node_new(TT_FNC);
     proc->v.sval = intern_n(name_tok.val.sval.data, (int)name_tok.val.sval.len);
-    proc->v.ival = nparams;
+    proc->_id    = nparams;   /* SI-13 fix: v.ival aliases v.sval; nparams in _id */
     /* child[0]: name node */
     push_child(proc, e_leaf_sval(TT_VAR, proc->v.sval, -1));
     /* children[1..nparams]: param nodes */

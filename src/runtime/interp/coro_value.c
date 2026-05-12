@@ -350,7 +350,7 @@ static void bb_augop_writeback(tree_t *lhs, DESCR_t res)
 {
     if (!lhs) return;
     if (lhs->t == TT_VAR) {
-        int slot = (int)lhs->v.ival;
+        int slot = lhs->_id;   /* SI-13: slot in _id */
         if (frame_depth > 0 && slot >= 0 && slot < FRAME.env_n)
             FRAME.env[slot] = res;
         else if (slot < 0 && lhs->v.sval && lhs->v.sval[0] != '&')
@@ -386,7 +386,9 @@ DESCR_t bb_eval_value(tree_t *e)
 {
     if (!e) return NULVCL;
 
-    /* Icon-frame-aware TT_VAR: slot read when inside an Icon procedure call. */
+    /* Icon-frame-aware TT_VAR: slot read when inside an Icon procedure call.
+     * SI-13 fix: slot is stored in e->_id (not e->v.ival) by icn_scope_patch,
+     * so e->v.sval is never clobbered and keyword/NV detection is safe. */
     if (e->t == TT_VAR && frame_depth > 0) {
         if (e->v.sval && e->v.sval[0] == '&') {
             const char *kw = e->v.sval + 1;
@@ -400,9 +402,9 @@ DESCR_t bb_eval_value(tree_t *e)
             if (!strcmp(kw, "fail"))    return FAILDESCR;
             return NULVCL;
         }
-        int slot = (int)e->v.ival;
+        int slot = e->_id;   /* SI-13: slot stored in _id, v.sval preserved */
         if (slot >= 0 && slot < FRAME.env_n) return FRAME.env[slot];
-        if (slot < 0 && e->v.sval && e->v.sval[0] != '&') return NV_GET_fn(e->v.sval);
+        if (slot < 0 && e->v.sval) return NV_GET_fn(e->v.sval);
         return NULVCL;
     }
 
@@ -443,7 +445,7 @@ DESCR_t bb_eval_value(tree_t *e)
                 if (!kw_assign(lhs->v.sval + 1, val)) return FAILDESCR;
                 return val;
             }
-            int slot = (int)lhs->v.ival;
+            int slot = lhs->_id;   /* SI-13: slot in _id */
             if (slot >= 0 && slot < FRAME.env_n) { FRAME.env[slot] = val; return val; }
             if (slot < 0 && lhs->v.sval && lhs->v.sval[0] != '&') set_and_trace(lhs->v.sval, val);
         } else if (lhs && lhs->t == TT_IDX && lhs->n >= 2) {
@@ -1165,8 +1167,8 @@ DESCR_t bb_eval_value(tree_t *e)
                     if (!lhs || lhs->t != TT_VAR || !lhs->v.sval) continue;
                     IcnInitSlot *sl = &ent->s[ent->ns++];
                     strncpy(sl->nm, lhs->v.sval, 63); sl->nm[63] = '\0';
-                    if (frame_depth > 0 && lhs->v.ival >= 0 && lhs->v.ival < FRAME.env_n)
-                        sl->val = FRAME.env[lhs->v.ival];
+                    if (frame_depth > 0 && lhs->_id >= 0 && lhs->_id < FRAME.env_n)
+                        sl->val = FRAME.env[lhs->_id];
                     else
                         sl->val = NV_GET_fn(lhs->v.sval);
                 }
@@ -1182,8 +1184,8 @@ DESCR_t bb_eval_value(tree_t *e)
                         tree_t *lhs = ch->c[0];
                         if (!lhs || lhs->t != TT_VAR || !lhs->v.sval) continue;
                         if (strcasecmp(lhs->v.sval, ent->s[si].nm) == 0
-                            && lhs->v.ival >= 0 && lhs->v.ival < FRAME.env_n) {
-                            FRAME.env[lhs->v.ival] = ent->s[si].val;
+                            && lhs->_id >= 0 && lhs->_id < FRAME.env_n) {
+                            FRAME.env[lhs->_id] = ent->s[si].val;
                             restored = 1;
                         }
                     }
@@ -1206,7 +1208,7 @@ DESCR_t bb_eval_value(tree_t *e)
             if (lhs->v.sval && lhs->v.sval[0] == '&') {
                 if (!kw_assign(lhs->v.sval + 1, rv)) return FAILDESCR;
             } else {
-                int sl=(int)lhs->v.ival;
+                int sl=lhs->_id;   /* SI-13 */
                 if (sl>=0&&sl<FRAME.env_n) FRAME.env[sl]=rv;
                 else if (sl<0&&lhs->v.sval) NV_SET_fn(lhs->v.sval,rv);
             }
@@ -1215,7 +1217,7 @@ DESCR_t bb_eval_value(tree_t *e)
             if (rhs->v.sval && rhs->v.sval[0] == '&') {
                 if (!kw_assign(rhs->v.sval + 1, lv)) return FAILDESCR;
             } else {
-                int sl=(int)rhs->v.ival;
+                int sl=rhs->_id;   /* SI-13 */
                 if (sl>=0&&sl<FRAME.env_n) FRAME.env[sl]=lv;
                 else if (sl<0&&rhs->v.sval) NV_SET_fn(rhs->v.sval,lv);
             }
@@ -1287,7 +1289,7 @@ DESCR_t bb_eval_value(tree_t *e)
         if (IS_FAIL_fn(val)) return FAILDESCR;
         tree_t *lhs = e->c[0];
         if (lhs && lhs->t == TT_VAR) {
-            int slot = (int)lhs->v.ival;
+            int slot = lhs->_id;   /* SI-13: slot in _id */
             if (slot >= 0 && slot < FRAME.env_n) FRAME.env[slot] = val;
             else if (slot < 0 && lhs->v.sval && lhs->v.sval[0] != '&') set_and_trace(lhs->v.sval, val);
         } else if (lhs && lhs->t == TT_IDX && lhs->n >= 2) {

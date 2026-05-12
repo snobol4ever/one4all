@@ -447,17 +447,29 @@ void icn_scope_patch(IcnScope *sc, tree_t *e) {
         return;
     }
     if (e->t == TT_VAR && e->v.sval) {
-        /* U-23: globals bridge to SNO NV store — skip slot, preserve sval, set ival=-1 */
-        if (is_global(e->v.sval)) { e->v.ival = -1; }
-        else { int s = scope_add(sc, e->v.sval); if (s >= 0) e->v.ival = s; else e->v.ival = -1; }
+        /* SI-13 fix: store slot in _id, NOT v.ival. v.ival aliases v.sval (union);
+         * clobbering it makes keyword/NV detection in bb_eval_value crash.
+         * Use _id (emit-time only in SNO path; unused here) as the slot index.
+         * Sentinel: _id==-1 means "NV or keyword — use v.sval for name lookup". */
+        if (e->v.sval[0] == '&') {
+            e->_id = -1;   /* keyword — always NV, never a frame slot */
+        } else if (is_global(e->v.sval)) {
+            e->_id = -1;   /* global bridge to SNO NV store */
+        } else {
+            int s = scope_add(sc, e->v.sval);
+            e->_id = (s >= 0) ? s : -1;
+        }
     }
-    for (int i=0;i<e->n;i++) icn_scope_patch(sc, e->c[i]);
+    /* SI-13 fix: TT_FNC child[0] is the callee name (TT_VAR), not a local variable.
+     * Skip it during scope patching so v.sval is not clobbered by v.ival slot assignment. */
+    int child_start = (e->t == TT_FNC) ? 1 : 0;
+    for (int i=child_start;i<e->n;i++) icn_scope_patch(sc, e->c[i]);
 }
 
 /* coro_call: call an Icon procedure node (TT_FNC with body children).
  * Mirrors icn_call() in icon_interp.c exactly, but uses DESCR_t and frame_env. */
 DESCR_t coro_call(tree_t *proc, DESCR_t *args, int nargs) {
-    int nparams = (int)proc->v.ival;
+    int nparams = proc->_id;   /* SI-13 fix */
     int body_start = 1 + nparams;
     int nbody = proc->n - body_start;
 
@@ -474,7 +486,7 @@ DESCR_t coro_call(tree_t *proc, DESCR_t *args, int nargs) {
                 if (st->c[j] && st->c[j]->v.sval)
                     scope_add(&sc, st->c[j]->v.sval);
     }
-    /* Patch TT_VAR.v.ival with slot indices throughout body.
+    /* SI-13 fix: Patch TT_VAR._id with slot indices (v.sval preserved). 
      * scope_patch also adds any undeclared vars it encounters to sc,
      * so sc.n after patching is the true slot count. */
     for (int i = 0; i < nbody; i++)
@@ -617,7 +629,7 @@ DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs)
         }
         if (found_pi >= 0 && proc_table[found_pi].proc) {
             tree_t *proc = proc_table[found_pi].proc;
-            int nparams_p = (int)proc->v.ival;
+            int nparams_p = proc->_id;   /* SI-13 fix */
             int body_start = 1 + nparams_p;
             for (int bi = body_start; bi < proc->n; bi++)
                 icn_scope_patch(&proc_table[found_pi].lower_sc, proc->c[bi]);
@@ -1003,7 +1015,7 @@ static DESCR_t coro_bb_cat(void *zeta, int entry) {
 typedef struct { bb_node_t rhs_gen; tree_t *lhs; } icn_assign_gen_state_t;
 static DESCR_t icn_assign_write(tree_t *lhs, DESCR_t val) {
     if (lhs && lhs->t == TT_VAR) {
-        int slot = (int)lhs->v.ival;
+        int slot = lhs->_id;   /* SI-13: slot in _id */
         if (slot >= 0 && slot < FRAME.env_n) { FRAME.env[slot] = val; }
         else if (slot < 0 && lhs->v.sval && lhs->v.sval[0] != '&') NV_SET_fn(lhs->v.sval, val);
     } else if (lhs && lhs->t == TT_FIELD && lhs->v.sval && lhs->n >= 1) {
@@ -1073,7 +1085,7 @@ static DESCR_t coro_bb_revassign(void *zeta, int entry) {
         if (IS_FAIL_fn(rv)) return FAILDESCR;
         tree_t *lhs = z->lhs_expr;
         if (lhs && lhs->t == TT_VAR) {
-            int slot = (int)lhs->v.ival;
+            int slot = lhs->_id;   /* SI-13: slot in _id */
             if (slot >= 0 && slot < FRAME.env_n) {
                 z->saved      = FRAME.env[slot];
                 z->var_slot   = slot;
@@ -1180,7 +1192,7 @@ static int icn_revswap_write(tree_t *lv_expr, DESCR_t val) {
     if (lv_expr->v.sval && lv_expr->v.sval[0] == '&') {
         return kw_assign(lv_expr->v.sval + 1, val);
     }
-    int slot = (int)lv_expr->v.ival;
+    int slot = lv_expr->_id;   /* SI-13 */
     if (slot >= 0 && slot < FRAME.env_n) { FRAME.env[slot] = val; return 1; }
     if (slot < 0 && lv_expr->v.sval) { NV_SET_fn(lv_expr->v.sval, val); return 1; }
     return 0;
@@ -1194,7 +1206,7 @@ static DESCR_t icn_revswap_read(tree_t *lv_expr) {
         if (!strcmp(lv_expr->v.sval + 1, "subject")) return scan_subj ? STRVAL(scan_subj) : NULVCL;
         return NULVCL;
     }
-    int slot = (int)lv_expr->v.ival;
+    int slot = lv_expr->_id;   /* SI-13 */
     if (slot >= 0 && slot < FRAME.env_n) return FRAME.env[slot];
     if (slot < 0 && lv_expr->v.sval) return NV_GET_fn(lv_expr->v.sval);
     return NULVCL;
@@ -1901,7 +1913,7 @@ int coro_drive_fnc(tree_t *e) {
     if (pi >= proc_count) return 0;
 
     tree_t *proc   = proc_table[pi].proc;
-    int nparams    = (int)proc->v.ival;
+    int nparams    = proc->_id;   /* SI-13 fix */
     int body_start = 1 + nparams;
     int nbody      = proc->n - body_start;
 

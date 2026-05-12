@@ -181,7 +181,9 @@ void polyglot_init(const tree_t *prog, uint32_t lang_mask)
                     proc_table[proc_count].name     = name;
                     proc_table[proc_count].proc     = proc;
                     proc_table[proc_count].entry_pc = -1;
-                    proc_table[proc_count].nparams  = (int)proc->v.ival;
+                    proc_table[proc_count].nparams  = (s_lang == LANG_ICN)
+                        ? proc->_id              /* SI-13 fix: Icon stores nparams in _id */
+                        : (int)proc->v.ival;     /* Raku: v.ival (SUB_TAG already stripped by parser) */
                     proc_count++;
                     if (mod_idx >= 0) g_registry.mods[mod_idx].proc_count++;
                     if (strcmp(name, "main") == 0 && g_registry.main_mod < 0)

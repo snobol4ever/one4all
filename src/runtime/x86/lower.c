@@ -1115,7 +1115,7 @@ void lower_expr(const tree_t *t)
 
 static void build_proc_scope(IcnScope *sc, const tree_t *proc, int body_start)
 {
-    int nparams = (int)proc->v.ival;
+    int nparams = proc->_id;   /* SI-13 fix: stored in _id, not v.ival (union alias) */
     sc->n = 0;
     for (int i = 0; i < nparams && i < FRAME_SLOT_MAX; i++) {
         tree_t *pn = proc->c[1+i];
@@ -1162,7 +1162,7 @@ static void lower_proc_skeletons(void)
         int skip = sm_emit_i(g_p, SM_JUMP, 0);
         sm_label_named(g_p, nm);
         if (proc) {
-            int body_start = 1 + (int)proc->v.ival;
+            int body_start = 1 + proc->_id;   /* SI-13 fix: nparams in _id */
             IcnScope sc; build_proc_scope(&sc, proc, body_start);
             proc_table[pi].lower_sc = sc;
             g_proc_scope = &sc; g_in_proc_body = 1;
