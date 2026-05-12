@@ -1551,6 +1551,17 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 break;
             }
 
+            /* PB-4: PL_BUILTIN — drive a Prolog builtin directive from SM (no coro_eval).
+             * emit_push_expr(TT_FNC goal node) + SM_CALL_FN "PL_BUILTIN" 0.
+             * Covers assertz/asserta/retract/abolish and other builtins used in directives. */
+            if (name && strcmp(name, "PL_BUILTIN") == 0 && nargs == 0) {
+                DESCR_t expr_d = sm_pop(st);
+                tree_t *goal   = (tree_t *)expr_d.ptr;
+                if (!goal) { st->last_ok = 0; break; }
+                st->last_ok = interp_exec_pl_builtin(goal, g_pl_env);
+                break;
+            }
+
             /* SN-6: SNOBOL4 semantics — if any argument is FAIL, the call fails
              * without invoking the function. This is what allows
              * CHARS + SIZE(INPUT) :F(DONE) to branch when INPUT hits EOF:

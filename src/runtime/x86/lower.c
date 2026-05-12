@@ -1259,8 +1259,26 @@ void lower_stmt(const tree_t *s)
     if (lang == LANG_ICN) return;
 
     if (lang == LANG_PL) {
-        if (subject && subject->t == TT_CHOICE && subject->v.sval)
+        /* Named TT_CHOICE stmts (Pass 3 of prolog_lower): call the predicate.
+         * This mirrors IR mode where interp_eval runs every LANG_PL stmt.
+         * Predicates that fail (wrong arity etc.) do so silently. */
+        if (subject && subject->t == TT_CHOICE && subject->v.sval) {
             emit_prolog_call(subject->v.sval);
+            goto emit_gotos;
+        }
+        if (subject && subject->t == TT_FNC && subject->v.sval
+                 && strcmp(subject->v.sval, "initialization") == 0
+                 && subject->n == 1 && subject->c[0] && subject->c[0]->v.sval) {
+            /* :- initialization(Goal) directive — main/0 TT_CHOICE stmt will
+             * call it already; suppress to avoid double-call. PB-4. */
+            goto emit_gotos;
+        }
+        else if (subject && subject->t == TT_FNC && subject->v.sval) {
+            /* Other Prolog directive (assertz, asserta, etc.) —
+             * drive via PL_BUILTIN to avoid coro_eval. PB-4. */
+            emit_push_expr(subject);
+            sm_emit_si(g_p, SM_CALL_FN, "PL_BUILTIN", 0);
+        }
         else {
             if (subject) lower_expr(subject); else sm_emit(g_p, SM_PUSH_NULL);
             sm_emit(g_p, SM_BB_ONCE);
