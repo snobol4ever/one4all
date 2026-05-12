@@ -1,0 +1,993 @@
+=== EDP-1 Doppelganger Audit ===
+Truth files:
+  SM: src/runtime/x86/sm_templates.c
+  BB: src/runtime/x86/bb_templates.c
+
+--- SM Opcode doppelgangers ---
+  src/runtime/x86/sm_prog.c:291                                 SM:SM_LABEL
+                  case SM_LABEL
+  src/runtime/x86/sm_interp.c:275                               SM:SM_LABEL
+              case SM_LABEL
+  src/runtime/x86/sm_codegen_x64_emit.c:293                     SM:SM_LABEL
+              case SM_LABEL:       /* EM-7d: named labels (SNOBOL4 func entries) */
+  src/runtime/x86/sm_codegen_x64_emit.c:864                     SM:SM_LABEL
+          emit_sm_label(NULL);
+  src/runtime/x86/sm_codegen_x64_emit.c:1679                    SM:SM_LABEL
+              case SM_LABEL
+  src/runtime/x86/sm_codegen_x64_emit.c:2253                    SM:SM_LABEL
+                  case SM_LABEL:        rc = emit_sm_label_dispatch(out, ins, pc);      break;
+  src/runtime/x86/sm_codegen.c:2087                             SM:SM_LABEL
+       * literal no-op (see sm_interp.c case SM_LABEL: break;).  Mode-2 simply
+  src/runtime/x86/sm_prog.c:240                                 SM:SM_JUMP
+                  case SM_JUMP
+  src/runtime/x86/sm_interp.c:319                               SM:SM_JUMP
+              case SM_JUMP
+  src/runtime/x86/sm_codegen_x64_emit.c:874                     SM:SM_JUMP
+          emit_sm_jump(e, (int)ins->a[0].i);
+  src/runtime/x86/sm_codegen_x64_emit.c:1672                    SM:SM_JUMP
+              case SM_JUMP
+  src/runtime/x86/sm_codegen_x64_emit.c:2254                    SM:SM_JUMP
+                  case SM_JUMP:         rc = emit_sm_jump_line(out, ins, pc);   break;
+  src/runtime/x86/sm_prog.c:241                                 SM:SM_JUMP_S
+                  case SM_JUMP_S
+  src/runtime/x86/sm_interp.c:323                               SM:SM_JUMP_S
+              case SM_JUMP_S
+  src/runtime/x86/sm_codegen_x64_emit.c:889                     SM:SM_JUMP_S
+          if (take_when_ok) emit_sm_jump_s(e, target);
+  src/runtime/x86/sm_codegen_x64_emit.c:1673                    SM:SM_JUMP_S
+              case SM_JUMP_S
+  src/runtime/x86/sm_codegen_x64_emit.c:2255                    SM:SM_JUMP_S
+                  case SM_JUMP_S:       rc = emit_sm_jump_s_line(out, ins, pc); break;
+  src/runtime/x86/sm_prog.c:242                                 SM:SM_JUMP_F
+                  case SM_JUMP_F
+  src/runtime/x86/sm_interp.c:327                               SM:SM_JUMP_F
+              case SM_JUMP_F
+  src/runtime/x86/sm_codegen_x64_emit.c:890                     SM:SM_JUMP_F
+          else              emit_sm_jump_f(e, target);
+  src/runtime/x86/sm_codegen_x64_emit.c:1674                    SM:SM_JUMP_F
+              case SM_JUMP_F
+  src/runtime/x86/sm_codegen_x64_emit.c:2256                    SM:SM_JUMP_F
+                  case SM_JUMP_F:       rc = emit_sm_jump_f_line(out, ins, pc); break;
+  src/runtime/x86/test_template_byte_identity.c:4               SM:SM_HALT
+       * Calls the SM_HALT template (emit_sm_halt in templates/sm_halt.c)
+  src/runtime/x86/test_template_byte_identity.c:49              SM:SM_HALT
+          emit_sm_halt(e);
+  src/runtime/x86/test_template_byte_identity.c:55              SM:SM_HALT
+              fprintf(stderr, "FAIL: emit_sm_halt produced %d bytes, expected %d\n",
+  src/runtime/x86/test_template_byte_identity.c:79              SM:SM_HALT
+          printf("PASS: emit_sm_halt produced 5 bytes matching legacy emit_halt_blob\n");
+  src/runtime/x86/demo_template_productions.c:4                 SM:SM_HALT
+       * Drives `emit_sm_halt` through ALL three backends and prints the
+  src/runtime/x86/demo_template_productions.c:30                SM:SM_HALT
+          printf("=== emit_sm_halt — BINARY backend ===\n");
+  src/runtime/x86/demo_template_productions.c:35                SM:SM_HALT
+              emit_sm_halt(e);
+  src/runtime/x86/demo_template_productions.c:44                SM:SM_HALT
+          printf("\n=== emit_sm_halt — TEXT_INVOCATION backend ===\n");
+  src/runtime/x86/demo_template_productions.c:47                SM:SM_HALT
+              emit_sm_halt(e);
+  src/runtime/x86/demo_template_productions.c:52                SM:SM_HALT
+          printf("\n=== emit_sm_halt — TEXT_DEFINITION (== MACRO_DEF) backend ===\n");
+  src/runtime/x86/demo_template_productions.c:55                SM:SM_HALT
+              emit_sm_halt(e);
+  src/runtime/x86/sm_interp.c:282                               SM:SM_HALT
+              case SM_HALT
+  src/runtime/x86/sm_codegen_x64_emit.c:762                     SM:SM_HALT
+           * Renamed from emit_sm_halt to avoid conflict with templates/sm_halt.c's
+  src/runtime/x86/sm_codegen_x64_emit.c:763                     SM:SM_HALT
+           * emit_sm_halt(emitter_t *) (EM-MODE4-IS-MODE3-DUMP-f). */
+  src/runtime/x86/sm_codegen_x64_emit.c:2234                    SM:SM_HALT
+                  case SM_HALT:         rc = emit_halt_line(out, pc);          break;
+  src/runtime/x86/sm_codegen.c:1978                             SM:SM_HALT
+       * template `emit_sm_halt` (templates/sm_halt.c) through a binary
+  src/runtime/x86/sm_codegen.c:2038                             SM:SM_HALT
+          emit_sm_halt(e);
+  src/runtime/x86/sm_prog.c:286                                 SM:SM_STNO
+                  case SM_STNO
+  src/runtime/x86/sm_interp.c:285                               SM:SM_STNO
+              case SM_STNO: {
+  src/runtime/x86/sm_codegen_x64_emit.c:985                     SM:SM_STNO
+           * delegate banner + NOOP marker to emit_sm_stno(). */
+  src/runtime/x86/sm_codegen_x64_emit.c:1013                    SM:SM_STNO
+          emit_sm_stno(NULL, stno, banner_lineno, src);
+  src/runtime/x86/sm_codegen_x64_emit.c:2292                    SM:SM_STNO
+                  case SM_STNO:         rc = emit_sm_stno_dispatch(out, ins, pc,
+  src/runtime/x86/sm_prog.c:220                                 SM:SM_PUSH_LIT_S
+                  case SM_PUSH_LIT_S
+  src/runtime/x86/sm_interp.c:333                               SM:SM_PUSH_LIT_S
+              case SM_PUSH_LIT_S: {
+  src/runtime/x86/sm_codegen_x64_emit.c:281                     SM:SM_PUSH_LIT_S
+              case SM_PUSH_LIT_S
+  src/runtime/x86/sm_codegen_x64_emit.c:1350                    SM:SM_PUSH_LIT_S
+              case SM_PUSH_LIT_S
+  src/runtime/x86/sm_codegen_x64_emit.c:2240                    SM:SM_PUSH_LIT_S
+                  case SM_PUSH_LIT_S:   rc = emit_sm_push_lit_s_dispatch(out, ins, pc); break;
+  src/runtime/x86/sm_prog.c:227                                 SM:SM_PUSH_LIT_I
+                  case SM_PUSH_LIT_I
+  src/runtime/x86/sm_interp.c:344                               SM:SM_PUSH_LIT_I
+              case SM_PUSH_LIT_I
+  src/runtime/x86/sm_codegen_x64_emit.c:1353                    SM:SM_PUSH_LIT_I
+              case SM_PUSH_LIT_I
+  src/runtime/x86/sm_codegen_x64_emit.c:2235                    SM:SM_PUSH_LIT_I
+                  case SM_PUSH_LIT_I:   rc = emit_push_lit_i_line(out, ins, pc); break;
+  src/runtime/x86/sm_prog.c:236                                 SM:SM_PUSH_LIT_F
+                  case SM_PUSH_LIT_F
+  src/runtime/x86/sm_interp.c:348                               SM:SM_PUSH_LIT_F
+              case SM_PUSH_LIT_F
+  src/runtime/x86/sm_codegen_x64_emit.c:1079                    SM:SM_PUSH_LIT_F
+          emit_sm_push_lit_f(NULL, ins->a[0].f);
+  src/runtime/x86/sm_codegen_x64_emit.c:2236                    SM:SM_PUSH_LIT_F
+                  case SM_PUSH_LIT_F:   rc = emit_sm_push_lit_f_dispatch(out, ins, pc);  break;
+  src/runtime/x86/sm_interp.c:352                               SM:SM_PUSH_NULL
+              case SM_PUSH_NULL
+  src/runtime/x86/sm_codegen_x64_emit.c:1055                    SM:SM_PUSH_NULL
+          emit_sm_push_null(NULL);
+  src/runtime/x86/sm_codegen_x64_emit.c:2275                    SM:SM_PUSH_NULL
+                  case SM_PUSH_NULL:    rc = emit_sm_push_null_dispatch(out, pc);   break;
+  src/runtime/x86/sm_interp.c:357                               SM:SM_PUSH_NULL_NOFLIP
+              case SM_PUSH_NULL_NOFLIP
+  src/runtime/x86/sm_codegen_x64_emit.c:1071                    SM:SM_PUSH_NULL_NOFLIP
+          emit_sm_push_null_noflip(NULL);
+  src/runtime/x86/sm_codegen_x64_emit.c:2276                    SM:SM_PUSH_NULL_NOFLIP
+                  case SM_PUSH_NULL_NOFLIP: rc = emit_sm_push_null_noflip_dispatch(out, pc); break;
+  src/runtime/x86/sm_prog.c:246                                 SM:SM_PUSH_VAR
+                  case SM_PUSH_VAR: case SM_STORE_VAR:
+  src/runtime/x86/sm_interp.c:361                               SM:SM_PUSH_VAR
+              case SM_PUSH_VAR: {
+  src/runtime/x86/sm_codegen_x64_emit.c:282                     SM:SM_PUSH_VAR
+              case SM_PUSH_VAR
+  src/runtime/x86/sm_codegen_x64_emit.c:1356                    SM:SM_PUSH_VAR
+              case SM_PUSH_VAR
+  src/runtime/x86/sm_codegen_x64_emit.c:2241                    SM:SM_PUSH_VAR
+                  case SM_PUSH_VAR:     rc = emit_sm_push_var_dispatch(out, ins, pc);   break;
+  src/runtime/x86/sm_interp.c:371                               SM:SM_PUSH_EXPR
+              case SM_PUSH_EXPR: {
+  src/runtime/x86/sm_codegen_x64_emit.c:945                     SM:SM_PUSH_EXPR
+      static int emit_sm_push_expression_dispatch(FILE *out, const SM_Instr *ins, int pc)
+  src/runtime/x86/sm_codegen_x64_emit.c:1087                    SM:SM_PUSH_EXPR
+          emit_sm_push_expr(NULL, (uint64_t)(uintptr_t)ins->a[0].ptr);
+  src/runtime/x86/sm_codegen_x64_emit.c:2237                    SM:SM_PUSH_EXPR
+                  case SM_PUSH_EXPR:    rc = emit_sm_push_expr_dispatch(out, ins, pc);   break;
+  src/runtime/x86/sm_codegen_x64_emit.c:2259                    SM:SM_PUSH_EXPR
+                  case SM_PUSH_EXPRESSION:   rc = emit_sm_push_expression_dispatch(out, ins, pc); break;
+  src/runtime/x86/sm_interp.c:391                               SM:SM_PUSH_EXPRESSION
+              case SM_PUSH_EXPRESSION: {
+  src/runtime/x86/sm_codegen_x64_emit.c:1675                    SM:SM_PUSH_EXPRESSION
+              case SM_PUSH_EXPRESSION
+  src/runtime/x86/sm_codegen_x64_emit.c:2259                    SM:SM_PUSH_EXPRESSION
+                  case SM_PUSH_EXPRESSION:   rc = emit_sm_push_expression_dispatch(out, ins, pc); break;
+  src/runtime/x86/sm_interp.c:415                               SM:SM_CALL_EXPRESSION
+              case SM_CALL_EXPRESSION: {
+  src/runtime/x86/sm_codegen_x64_emit.c:1676                    SM:SM_CALL_EXPRESSION
+              case SM_CALL_EXPRESSION
+  src/runtime/x86/sm_codegen_x64_emit.c:2260                    SM:SM_CALL_EXPRESSION
+                  case SM_CALL_EXPRESSION:   rc = emit_sm_call_expression_dispatch(out, ins, pc); break;
+  src/runtime/x86/sm_prog.c:246                                 SM:SM_STORE_VAR
+                  case SM_PUSH_VAR: case SM_STORE_VAR:
+  src/runtime/x86/sm_interp.c:445                               SM:SM_STORE_VAR
+              case SM_STORE_VAR: {
+  src/runtime/x86/sm_codegen_x64_emit.c:283                     SM:SM_STORE_VAR
+              case SM_STORE_VAR
+  src/runtime/x86/sm_codegen_x64_emit.c:2242                    SM:SM_STORE_VAR
+                  case SM_STORE_VAR:    rc = emit_sm_store_var_dispatch(out, ins, pc);  break;
+  src/runtime/x86/sm_interp.c:479                               SM:SM_VOID_POP
+              case SM_VOID_POP
+  src/runtime/x86/sm_codegen_x64_emit.c:825                     SM:SM_VOID_POP
+           * emit_sm_void_pop (templates/sm_void_pop.c) emits
+  src/runtime/x86/sm_codegen_x64_emit.c:831                     SM:SM_VOID_POP
+          emit_sm_void_pop(e);
+  src/runtime/x86/sm_codegen_x64_emit.c:2243                    SM:SM_VOID_POP
+                  case SM_VOID_POP:          rc = emit_sm_pop(out, pc);             break;
+  src/runtime/x86/sm_interp.c:485                               SM:SM_ADD
+              case SM_ADD
+  src/runtime/x86/sm_codegen_x64_emit.c:2244                    SM:SM_ADD
+                  case SM_ADD
+  src/runtime/x86/sm_interp.c:486                               SM:SM_SUB
+              case SM_SUB
+  src/runtime/x86/sm_codegen_x64_emit.c:2245                    SM:SM_SUB
+                  case SM_SUB
+  src/runtime/x86/sm_interp.c:487                               SM:SM_MUL
+              case SM_MUL
+  src/runtime/x86/sm_codegen_x64_emit.c:2246                    SM:SM_MUL
+                  case SM_MUL
+  src/runtime/x86/sm_interp.c:488                               SM:SM_DIV
+              case SM_DIV
+  src/runtime/x86/sm_codegen_x64_emit.c:2247                    SM:SM_DIV
+                  case SM_DIV
+  src/runtime/x86/sm_interp.c:490                               SM:SM_EXP
+              case SM_EXP: {
+  src/runtime/x86/sm_interp.c:489                               SM:SM_MOD
+              case SM_MOD:   /* OC-1 RS-6 */
+  src/runtime/x86/sm_codegen_x64_emit.c:2248                    SM:SM_MOD
+                  case SM_MOD:          rc = emit_sm_arith(out, ins, pc);      break;
+  src/runtime/x86/sm_interp.c:520                               SM:SM_CONCAT
+              case SM_CONCAT: {
+  src/runtime/x86/sm_codegen_x64_emit.c:1047                    SM:SM_CONCAT
+          emit_sm_concat(NULL);
+  src/runtime/x86/sm_codegen_x64_emit.c:1176                    SM:SM_CONCAT
+       * Phase-3 path.  See the EM-7-revert banner above emit_sm_concat for
+  src/runtime/x86/sm_codegen_x64_emit.c:2274                    SM:SM_CONCAT
+                  case SM_CONCAT:       rc = emit_sm_concat_dispatch(out, pc);      break;
+  src/runtime/x86/sm_interp.c:529                               SM:SM_COERCE_NUM
+              case SM_COERCE_NUM: {
+  src/runtime/x86/sm_codegen_x64_emit.c:1063                    SM:SM_COERCE_NUM
+          emit_sm_coerce_num(NULL);
+  src/runtime/x86/sm_codegen_x64_emit.c:2277                    SM:SM_COERCE_NUM
+                  case SM_COERCE_NUM:   rc = emit_sm_coerce_num_dispatch(out, pc);  break;
+  src/runtime/x86/sm_interp.c:513                               SM:SM_NEG
+              case SM_NEG: {
+  src/runtime/x86/sm_prog.c:221                                 SM:SM_PAT_LIT
+                  case SM_PAT_LIT
+  src/runtime/x86/sm_interp.c:543                               SM:SM_PAT_LIT
+              case SM_PAT_LIT: {
+  src/runtime/x86/sm_codegen_x64_emit.c:284                     SM:SM_PAT_LIT
+              case SM_PAT_LIT
+  src/runtime/x86/sm_codegen_x64_emit.c:1391                    SM:SM_PAT_LIT
+              case SM_PAT_LIT: {
+  src/runtime/x86/sm_codegen_x64_emit.c:2312                    SM:SM_PAT_LIT
+                  case SM_PAT_LIT:      rc = emit_sm_pat_lit_dispatch(out, ins, pc);     break;
+  src/runtime/x86/sm_prog.c:222                                 SM:SM_PAT_ANY
+                  case SM_PAT_ANY: case SM_PAT_NOTANY:
+  src/runtime/x86/sm_interp.c:548                               SM:SM_PAT_ANY
+              case SM_PAT_ANY: {
+  src/runtime/x86/sm_codegen_x64_emit.c:1413                    SM:SM_PAT_ANY
+              case SM_PAT_ANY: {
+  src/runtime/x86/sm_codegen_x64_emit.c:2324                    SM:SM_PAT_ANY
+                  case SM_PAT_ANY:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_ANY),     NULL); break;
+  src/runtime/x86/sm_codegen.c:3357                             SM:SM_PAT_ANY
+                  case SM_PAT_ANY:    helper = (void *)&me9_pat_any;    break;
+  src/runtime/x86/sm_prog.c:222                                 SM:SM_PAT_NOTANY
+                  case SM_PAT_ANY: case SM_PAT_NOTANY:
+  src/runtime/x86/sm_interp.c:555                               SM:SM_PAT_NOTANY
+              case SM_PAT_NOTANY: {
+  src/runtime/x86/sm_codegen_x64_emit.c:1420                    SM:SM_PAT_NOTANY
+              case SM_PAT_NOTANY: {
+  src/runtime/x86/sm_codegen_x64_emit.c:2325                    SM:SM_PAT_NOTANY
+                  case SM_PAT_NOTANY:  rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_NOTANY),  NULL); break;
+  src/runtime/x86/sm_codegen.c:3358                             SM:SM_PAT_NOTANY
+                  case SM_PAT_NOTANY: helper = (void *)&me9_pat_notany; break;
+  src/runtime/x86/sm_prog.c:223                                 SM:SM_PAT_SPAN
+                  case SM_PAT_SPAN: case SM_PAT_BREAK:
+  src/runtime/x86/sm_interp.c:561                               SM:SM_PAT_SPAN
+              case SM_PAT_SPAN: {
+  src/runtime/x86/sm_codegen_x64_emit.c:1398                    SM:SM_PAT_SPAN
+              case SM_PAT_SPAN: {
+  src/runtime/x86/sm_codegen_x64_emit.c:2322                    SM:SM_PAT_SPAN
+                  case SM_PAT_SPAN:    rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_SPAN),    NULL); break;
+  src/runtime/x86/sm_codegen.c:3359                             SM:SM_PAT_SPAN
+                  case SM_PAT_SPAN:   helper = (void *)&me9_pat_span;   break;
+  src/runtime/x86/sm_prog.c:223                                 SM:SM_PAT_BREAK
+                  case SM_PAT_SPAN: case SM_PAT_BREAK:
+  src/runtime/x86/sm_interp.c:567                               SM:SM_PAT_BREAK
+              case SM_PAT_BREAK: {
+  src/runtime/x86/sm_codegen_x64_emit.c:1406                    SM:SM_PAT_BREAK
+              case SM_PAT_BREAK: {
+  src/runtime/x86/sm_codegen_x64_emit.c:2323                    SM:SM_PAT_BREAK
+                  case SM_PAT_BREAK:   rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_BREAK),   NULL); break;
+  src/runtime/x86/sm_codegen.c:3360                             SM:SM_PAT_BREAK
+                  case SM_PAT_BREAK:  helper = (void *)&me9_pat_break;  break;
+  src/runtime/x86/sm_prog.c:228                                 SM:SM_PAT_LEN
+                  case SM_PAT_LEN: case SM_PAT_POS: case SM_PAT_RPOS:
+  src/runtime/x86/sm_interp.c:573                               SM:SM_PAT_LEN
+              case SM_PAT_LEN: {
+  src/runtime/x86/sm_codegen_x64_emit.c:1427                    SM:SM_PAT_LEN
+              case SM_PAT_LEN: {
+  src/runtime/x86/sm_codegen_x64_emit.c:2326                    SM:SM_PAT_LEN
+                  case SM_PAT_LEN:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_LEN),     NULL); break;
+  src/runtime/x86/sm_codegen.c:3372                             SM:SM_PAT_LEN
+                  case SM_PAT_LEN:  helper = (void *)&me9_pat_len;  break;
+  src/runtime/x86/sm_prog.c:228                                 SM:SM_PAT_POS
+                  case SM_PAT_LEN: case SM_PAT_POS: case SM_PAT_RPOS:
+  src/runtime/x86/sm_interp.c:579                               SM:SM_PAT_POS
+              case SM_PAT_POS: {
+  src/runtime/x86/sm_codegen_x64_emit.c:1435                    SM:SM_PAT_POS
+              case SM_PAT_POS: {
+  src/runtime/x86/sm_codegen_x64_emit.c:2327                    SM:SM_PAT_POS
+                  case SM_PAT_POS:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_POS),     NULL); break;
+  src/runtime/x86/sm_codegen.c:3373                             SM:SM_PAT_POS
+                  case SM_PAT_POS:  helper = (void *)&me9_pat_pos;  break;
+  src/runtime/x86/sm_prog.c:228                                 SM:SM_PAT_RPOS
+                  case SM_PAT_LEN: case SM_PAT_POS: case SM_PAT_RPOS:
+  src/runtime/x86/sm_interp.c:585                               SM:SM_PAT_RPOS
+              case SM_PAT_RPOS: {
+  src/runtime/x86/sm_codegen_x64_emit.c:1444                    SM:SM_PAT_RPOS
+              case SM_PAT_RPOS: {
+  src/runtime/x86/sm_codegen_x64_emit.c:2328                    SM:SM_PAT_RPOS
+                  case SM_PAT_RPOS:    rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_RPOS),    NULL); break;
+  src/runtime/x86/sm_codegen.c:3374                             SM:SM_PAT_RPOS
+                  case SM_PAT_RPOS: helper = (void *)&me9_pat_rpos; break;
+  src/runtime/x86/sm_prog.c:229                                 SM:SM_PAT_TAB
+                  case SM_PAT_TAB: case SM_PAT_RTAB:
+  src/runtime/x86/sm_interp.c:591                               SM:SM_PAT_TAB
+              case SM_PAT_TAB: {
+  src/runtime/x86/sm_codegen_x64_emit.c:1452                    SM:SM_PAT_TAB
+              case SM_PAT_TAB: {
+  src/runtime/x86/sm_codegen_x64_emit.c:2329                    SM:SM_PAT_TAB
+                  case SM_PAT_TAB:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_TAB),     NULL); break;
+  src/runtime/x86/sm_codegen.c:3375                             SM:SM_PAT_TAB
+                  case SM_PAT_TAB:  helper = (void *)&me9_pat_tab;  break;
+  src/runtime/x86/sm_prog.c:229                                 SM:SM_PAT_RTAB
+                  case SM_PAT_TAB: case SM_PAT_RTAB:
+  src/runtime/x86/sm_interp.c:597                               SM:SM_PAT_RTAB
+              case SM_PAT_RTAB: {
+  src/runtime/x86/sm_codegen_x64_emit.c:1459                    SM:SM_PAT_RTAB
+              case SM_PAT_RTAB: {
+  src/runtime/x86/sm_codegen_x64_emit.c:2330                    SM:SM_PAT_RTAB
+                  case SM_PAT_RTAB:    rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_RTAB),    NULL); break;
+  src/runtime/x86/sm_codegen.c:3376                             SM:SM_PAT_RTAB
+                  case SM_PAT_RTAB: helper = (void *)&me9_pat_rtab; break;
+  src/runtime/x86/sm_interp.c:603                               SM:SM_PAT_ARB
+              case SM_PAT_ARB:     sm_push(st, pat_arb());     break;
+  src/runtime/x86/sm_codegen_x64_emit.c:1367                    SM:SM_PAT_ARB
+              case SM_PAT_ARB
+  src/runtime/x86/sm_codegen_x64_emit.c:2331                    SM:SM_PAT_ARB
+                  case SM_PAT_ARB:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_ARB),     NULL); break;
+  src/runtime/x86/sm_codegen.c:3460                             SM:SM_PAT_ARB
+                  case SM_PAT_ARB:     rt_fn = (void *)&pat_arb;     break;
+  src/runtime/x86/sm_interp.c:604                               SM:SM_PAT_ARBNO
+              case SM_PAT_ARBNO:   { DESCR_t _inner = sm_pop(st); sm_push(st, pat_arbno(_inner)); } break;
+  src/runtime/x86/sm_codegen_x64_emit.c:1468                    SM:SM_PAT_ARBNO
+              case SM_PAT_ARBNO: {
+  src/runtime/x86/sm_codegen_x64_emit.c:2332                    SM:SM_PAT_ARBNO
+                  case SM_PAT_ARBNO:   rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_ARBNO),   NULL); break;
+  src/runtime/x86/sm_codegen.c:3391                             SM:SM_PAT_ARBNO
+                  case SM_PAT_ARBNO:  fn = (void *)&pat_arbno;    break;
+  src/runtime/x86/sm_interp.c:605                               SM:SM_PAT_REM
+              case SM_PAT_REM:     sm_push(st, pat_rem());     break;
+  src/runtime/x86/sm_codegen_x64_emit.c:1370                    SM:SM_PAT_REM
+              case SM_PAT_REM
+  src/runtime/x86/sm_codegen_x64_emit.c:2333                    SM:SM_PAT_REM
+                  case SM_PAT_REM:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_REM),     NULL); break;
+  src/runtime/x86/sm_codegen.c:3461                             SM:SM_PAT_REM
+                  case SM_PAT_REM:     rt_fn = (void *)&pat_rem;     break;
+  src/runtime/x86/sm_interp.c:612                               SM:SM_PAT_BAL
+              case SM_PAT_BAL:     sm_push(st, pat_bal());     break;
+  src/runtime/x86/sm_codegen_x64_emit.c:1382                    SM:SM_PAT_BAL
+              case SM_PAT_BAL
+  src/runtime/x86/sm_codegen_x64_emit.c:2339                    SM:SM_PAT_BAL
+                  case SM_PAT_BAL:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_BAL),     NULL); break;
+  src/runtime/x86/sm_codegen.c:3467                             SM:SM_PAT_BAL
+                  case SM_PAT_BAL:     rt_fn = (void *)&pat_bal;     break;
+  src/runtime/x86/sm_interp.c:611                               SM:SM_PAT_ABORT
+              case SM_PAT_ABORT:   sm_push(st, pat_abort());   break;
+  src/runtime/x86/sm_codegen_x64_emit.c:1379                    SM:SM_PAT_ABORT
+              case SM_PAT_ABORT
+  src/runtime/x86/sm_codegen_x64_emit.c:2337                    SM:SM_PAT_ABORT
+                  case SM_PAT_ABORT:   rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_ABORT),   NULL); break;
+  src/runtime/x86/sm_codegen.c:3466                             SM:SM_PAT_ABORT
+                  case SM_PAT_ABORT:   rt_fn = (void *)&pat_abort;   break;
+  src/runtime/x86/sm_interp.c:606                               SM:SM_PAT_FAIL
+              case SM_PAT_FAIL:    sm_push(st, pat_fail());    break;
+  src/runtime/x86/sm_codegen_x64_emit.c:1373                    SM:SM_PAT_FAIL
+              case SM_PAT_FAIL
+  src/runtime/x86/sm_codegen_x64_emit.c:2336                    SM:SM_PAT_FAIL
+                  case SM_PAT_FAIL:    rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_FAIL),    NULL); break;
+  src/runtime/x86/sm_codegen.c:3462                             SM:SM_PAT_FAIL
+                  case SM_PAT_FAIL:    rt_fn = (void *)&pat_fail;    break;
+  src/runtime/x86/sm_interp.c:607                               SM:SM_PAT_SUCCEED
+              case SM_PAT_SUCCEED: sm_push(st, pat_succeed()); break;
+  src/runtime/x86/sm_codegen_x64_emit.c:1376                    SM:SM_PAT_SUCCEED
+              case SM_PAT_SUCCEED
+  src/runtime/x86/sm_codegen_x64_emit.c:2338                    SM:SM_PAT_SUCCEED
+                  case SM_PAT_SUCCEED: rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_SUCCEED), NULL); break;
+  src/runtime/x86/sm_codegen.c:3463                             SM:SM_PAT_SUCCEED
+                  case SM_PAT_SUCCEED: rt_fn = (void *)&pat_succeed; break;
+  src/runtime/x86/sm_interp.c:608                               SM:SM_PAT_EPS
+              case SM_PAT_EPS:     sm_push(st, pat_epsilon()); break;
+  src/runtime/x86/sm_codegen_x64_emit.c:1364                    SM:SM_PAT_EPS
+              case SM_PAT_EPS
+  src/runtime/x86/sm_codegen_x64_emit.c:2340                    SM:SM_PAT_EPS
+                  case SM_PAT_EPS:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_EPS),     NULL); break;
+  src/runtime/x86/sm_codegen.c:3464                             SM:SM_PAT_EPS
+                  case SM_PAT_EPS:     rt_fn = (void *)&pat_epsilon; break;
+  src/runtime/x86/sm_interp.c:621                               SM:SM_PAT_ALT
+              case SM_PAT_ALT: {
+  src/runtime/x86/sm_codegen_x64_emit.c:1493                    SM:SM_PAT_ALT
+              case SM_PAT_ALT: {
+  src/runtime/x86/sm_codegen_x64_emit.c:2342                    SM:SM_PAT_ALT
+                  case SM_PAT_ALT:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_ALT),     NULL); break;
+  src/runtime/x86/sm_codegen.c:3405                             SM:SM_PAT_ALT
+                  case SM_PAT_ALT: fn = (void *)&pat_alt; break;
+  src/runtime/x86/sm_interp.c:614                               SM:SM_PAT_CAT
+              case SM_PAT_CAT: {
+  src/runtime/x86/sm_codegen_x64_emit.c:1485                    SM:SM_PAT_CAT
+              case SM_PAT_CAT: {
+  src/runtime/x86/sm_codegen_x64_emit.c:2341                    SM:SM_PAT_CAT
+                  case SM_PAT_CAT:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_CAT),     NULL); break;
+  src/runtime/x86/sm_codegen.c:3404                             SM:SM_PAT_CAT
+                  case SM_PAT_CAT: fn = (void *)&pat_cat; break;
+  src/runtime/x86/sm_prog.c:247                                 SM:SM_PAT_DEREF
+                  case SM_PAT_CAPTURE: case SM_PAT_DEREF:
+  src/runtime/x86/sm_interp.c:628                               SM:SM_PAT_DEREF
+              case SM_PAT_DEREF: {
+  src/runtime/x86/sm_codegen_x64_emit.c:1503                    SM:SM_PAT_DEREF
+              case SM_PAT_DEREF: {
+  src/runtime/x86/sm_codegen_x64_emit.c:2343                    SM:SM_PAT_DEREF
+                  case SM_PAT_DEREF:   rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_DEREF),   NULL); break;
+  src/runtime/x86/sm_prog.c:248                                 SM:SM_PAT_REFNAME
+                  case SM_PAT_REFNAME
+  src/runtime/x86/sm_interp.c:641                               SM:SM_PAT_REFNAME
+              case SM_PAT_REFNAME: {
+  src/runtime/x86/sm_codegen_x64_emit.c:285                     SM:SM_PAT_REFNAME
+              case SM_PAT_REFNAME
+  src/runtime/x86/sm_codegen_x64_emit.c:1516                    SM:SM_PAT_REFNAME
+              case SM_PAT_REFNAME: {
+  src/runtime/x86/sm_codegen_x64_emit.c:2313                    SM:SM_PAT_REFNAME
+                  case SM_PAT_REFNAME:  rc = emit_sm_pat_refname_dispatch(out, ins, pc); break;
+  src/runtime/x86/sm_prog.c:247                                 SM:SM_PAT_CAPTURE
+                  case SM_PAT_CAPTURE: case SM_PAT_DEREF:
+  src/runtime/x86/sm_interp.c:649                               SM:SM_PAT_CAPTURE
+              case SM_PAT_CAPTURE: {
+  src/runtime/x86/sm_codegen_x64_emit.c:286                     SM:SM_PAT_CAPTURE
+              case SM_PAT_CAPTURE
+  src/runtime/x86/sm_codegen_x64_emit.c:1524                    SM:SM_PAT_CAPTURE
+              case SM_PAT_CAPTURE: {
+  src/runtime/x86/sm_codegen_x64_emit.c:2314                    SM:SM_PAT_CAPTURE
+                  case SM_PAT_CAPTURE:      rc = emit_sm_pat_capture_dispatch(out, ins, pc); break;
+  src/runtime/x86/sm_prog.c:251                                 SM:SM_PAT_CAPTURE_FN
+                  case SM_PAT_CAPTURE_FN
+  src/runtime/x86/sm_interp.c:665                               SM:SM_PAT_CAPTURE_FN
+              case SM_PAT_CAPTURE_FN: {
+  src/runtime/x86/sm_codegen_x64_emit.c:287                     SM:SM_PAT_CAPTURE_FN
+              case SM_PAT_CAPTURE_FN
+  src/runtime/x86/sm_codegen_x64_emit.c:301                     SM:SM_PAT_CAPTURE_FN
+              case SM_PAT_CAPTURE_FN
+  src/runtime/x86/sm_codegen_x64_emit.c:1538                    SM:SM_PAT_CAPTURE_FN
+              case SM_PAT_CAPTURE_FN
+  src/runtime/x86/sm_codegen_x64_emit.c:2315                    SM:SM_PAT_CAPTURE_FN
+                  case SM_PAT_CAPTURE_FN:   rc = emit_sm_pat_capture_fn_dispatch(out, ins, pc); break;
+  src/runtime/x86/sm_prog.c:258                                 SM:SM_PAT_CAPTURE_FN_ARGS
+                  case SM_PAT_CAPTURE_FN_ARGS
+  src/runtime/x86/sm_interp.c:710                               SM:SM_PAT_CAPTURE_FN_ARGS
+              case SM_PAT_CAPTURE_FN_ARGS: {
+  src/runtime/x86/sm_codegen_x64_emit.c:289                     SM:SM_PAT_CAPTURE_FN_ARGS
+              case SM_PAT_CAPTURE_FN_ARGS:  /* EM-7: a[0].s = fname */
+  src/runtime/x86/sm_codegen_x64_emit.c:1539                    SM:SM_PAT_CAPTURE_FN_ARGS
+              case SM_PAT_CAPTURE_FN_ARGS
+  src/runtime/x86/sm_codegen_x64_emit.c:2316                    SM:SM_PAT_CAPTURE_FN_ARGS
+                  case SM_PAT_CAPTURE_FN_ARGS: rc = emit_sm_pat_capture_fn_args_dispatch(out, ins, pc); break;
+  src/runtime/x86/sm_prog.c:264                                 SM:SM_PAT_USERCALL
+                  case SM_PAT_USERCALL
+  src/runtime/x86/sm_interp.c:731                               SM:SM_PAT_USERCALL
+              case SM_PAT_USERCALL: {
+  src/runtime/x86/sm_codegen_x64_emit.c:288                     SM:SM_PAT_USERCALL
+              case SM_PAT_USERCALL
+  src/runtime/x86/sm_codegen_x64_emit.c:302                     SM:SM_PAT_USERCALL
+              case SM_PAT_USERCALL
+  src/runtime/x86/sm_codegen_x64_emit.c:1540                    SM:SM_PAT_USERCALL
+              case SM_PAT_USERCALL
+  src/runtime/x86/sm_codegen_x64_emit.c:2317                    SM:SM_PAT_USERCALL
+                  case SM_PAT_USERCALL:     rc = emit_sm_pat_usercall_dispatch(out, ins, pc); break;
+  src/runtime/x86/sm_prog.c:269                                 SM:SM_PAT_USERCALL_ARGS
+                  case SM_PAT_USERCALL_ARGS
+  src/runtime/x86/sm_interp.c:747                               SM:SM_PAT_USERCALL_ARGS
+              case SM_PAT_USERCALL_ARGS: {
+  src/runtime/x86/sm_codegen_x64_emit.c:290                     SM:SM_PAT_USERCALL_ARGS
+              case SM_PAT_USERCALL_ARGS:    /* EM-7: a[0].s = fname */
+  src/runtime/x86/sm_codegen_x64_emit.c:1541                    SM:SM_PAT_USERCALL_ARGS
+              case SM_PAT_USERCALL_ARGS: {
+  src/runtime/x86/sm_codegen_x64_emit.c:2318                    SM:SM_PAT_USERCALL_ARGS
+                  case SM_PAT_USERCALL_ARGS: rc = emit_sm_pat_usercall_args_dispatch(out, ins, pc); break;
+  src/runtime/x86/sm_prog.c:282                                 SM:SM_EXEC_STMT
+                  case SM_EXEC_STMT
+  src/runtime/x86/sm_interp.c:762                               SM:SM_EXEC_STMT
+              case SM_EXEC_STMT: {
+  src/runtime/x86/sm_codegen_x64_emit.c:291                     SM:SM_EXEC_STMT
+              case SM_EXEC_STMT
+  src/runtime/x86/sm_codegen_x64_emit.c:2348                    SM:SM_EXEC_STMT
+                  case SM_EXEC_STMT:    rc = emit_sm_exec_stmt_variant(out, ins, pc); break;
+  src/runtime/x86/sm_interp.c:786                               SM:SM_BB_PUMP
+              case SM_BB_PUMP: {
+  src/runtime/x86/sm_interp.c:798                               SM:SM_BB_ONCE
+              case SM_BB_ONCE: {
+  src/runtime/x86/sm_interp.c:817                               SM:SM_BB_ONCE_PROC
+              case SM_BB_ONCE_PROC: {
+  src/runtime/x86/sm_interp.c:838                               SM:SM_BB_PUMP_PROC
+              case SM_BB_PUMP_PROC: {
+  src/runtime/x86/sm_interp.c:882                               SM:SM_BB_PUMP_CASE
+              case SM_BB_PUMP_CASE: {
+  src/runtime/x86/sm_interp.c:961                               SM:SM_BB_PUMP_SM
+              case SM_BB_PUMP_SM: {
+  src/runtime/x86/sm_interp.c:1002                              SM:SM_BB_PUMP_EVERY
+              case SM_BB_PUMP_EVERY: {
+  src/runtime/x86/sm_prog.c:297                                 SM:SM_GEN_TICK
+                  case SM_GEN_TICK
+  src/runtime/x86/sm_interp.c:1023                              SM:SM_GEN_TICK
+              case SM_GEN_TICK: {
+  src/runtime/x86/sm_interp.c:1055                              SM:SM_SUSPEND_VALUE
+              case SM_SUSPEND_VALUE: {
+  src/runtime/x86/sm_prog.c:274                                 SM:SM_CALL_FN
+                  case SM_CALL_FN
+  src/runtime/x86/sm_interp.c:1087                              SM:SM_CALL_FN
+              case SM_CALL_FN: {
+  src/runtime/x86/sm_codegen_x64_emit.c:292                     SM:SM_CALL_FN
+              case SM_CALL_FN
+  src/runtime/x86/sm_codegen_x64_emit.c:1129                    SM:SM_CALL_FN
+       * emit_sm_call_fn covers MACRO_DEF (sm_macros.s regen) only; it is the
+  src/runtime/x86/sm_codegen_x64_emit.c:2273                    SM:SM_CALL_FN
+                  case SM_CALL_FN:         rc = emit_sm_call_dispatch(out, ins, pc); break;
+  src/runtime/x86/sm_interp.c:1692                              SM:SM_RETURN
+              case SM_RETURN
+  src/runtime/x86/sm_codegen_x64_emit.c:963                     SM:SM_RETURN
+           * Template emit_sm_return (templates/sm_return.c) is MACRO_DEF source of truth. */
+  src/runtime/x86/sm_codegen_x64_emit.c:2261                    SM:SM_RETURN
+                  case SM_RETURN:       rc = emit_sm_return_dispatch(out, pc);          break;
+  src/runtime/x86/sm_interp.c:1693                              SM:SM_FRETURN
+              case SM_FRETURN
+  src/runtime/x86/sm_codegen_x64_emit.c:2282                    SM:SM_FRETURN
+                  case SM_FRETURN
+  src/runtime/x86/sm_interp.c:1694                              SM:SM_NRETURN
+              case SM_NRETURN
+  src/runtime/x86/sm_codegen_x64_emit.c:2283                    SM:SM_NRETURN
+                  case SM_NRETURN
+  src/runtime/x86/sm_interp.c:1695                              SM:SM_RETURN_S
+              case SM_RETURN_S:  case SM_RETURN_F:
+  src/runtime/x86/sm_codegen_x64_emit.c:2284                    SM:SM_RETURN_S
+                  case SM_RETURN_S
+  src/runtime/x86/sm_interp.c:1695                              SM:SM_RETURN_F
+              case SM_RETURN_S:  case SM_RETURN_F:
+  src/runtime/x86/sm_codegen_x64_emit.c:2285                    SM:SM_RETURN_F
+                  case SM_RETURN_F
+  src/runtime/x86/sm_interp.c:1696                              SM:SM_FRETURN_S
+              case SM_FRETURN_S: case SM_FRETURN_F:
+  src/runtime/x86/sm_codegen_x64_emit.c:2286                    SM:SM_FRETURN_S
+                  case SM_FRETURN_S
+  src/runtime/x86/sm_interp.c:1696                              SM:SM_FRETURN_F
+              case SM_FRETURN_S: case SM_FRETURN_F:
+  src/runtime/x86/sm_codegen_x64_emit.c:2287                    SM:SM_FRETURN_F
+                  case SM_FRETURN_F
+  src/runtime/x86/sm_interp.c:1697                              SM:SM_NRETURN_S
+              case SM_NRETURN_S: case SM_NRETURN_F: {
+  src/runtime/x86/sm_codegen_x64_emit.c:2288                    SM:SM_NRETURN_S
+                  case SM_NRETURN_S
+  src/runtime/x86/sm_interp.c:1697                              SM:SM_NRETURN_F
+              case SM_NRETURN_S: case SM_NRETURN_F: {
+  src/runtime/x86/sm_codegen_x64_emit.c:2289                    SM:SM_NRETURN_F
+                  case SM_NRETURN_F:    rc = emit_sm_return_variant_dispatch(out, ins->op, pc); break;
+  src/runtime/x86/sm_interp.c:278                               SM:SM_DEFINE_ENTRY
+              case SM_DEFINE_ENTRY
+  src/runtime/x86/sm_codegen_x64_emit.c:2268                    SM:SM_DEFINE_ENTRY
+                  case SM_DEFINE_ENTRY: rc = sm_emit_rtcall(out, sm_template_lookup(SM_DEFINE_ENTRY), NULL); break;
+  src/runtime/x86/sm_prog.c:279                                 SM:SM_DEFINE
+                  case SM_DEFINE
+  src/runtime/x86/sm_interp.c:1777                              SM:SM_DEFINE
+              case SM_DEFINE
+  src/runtime/x86/sm_codegen_x64_emit.c:2269                    SM:SM_DEFINE
+                  case SM_DEFINE:       rc = sm_emit_rtcall(out, sm_template_lookup(SM_DEFINE),       NULL); break;
+  src/runtime/x86/sm_prog.c:230                                 SM:SM_INCR
+                  case SM_INCR: case SM_DECR:
+  src/runtime/x86/sm_interp.c:1781                              SM:SM_INCR
+              case SM_INCR: {
+  src/runtime/x86/sm_codegen_x64_emit.c:1095                    SM:SM_INCR
+          emit_sm_incr(NULL, ins->a[0].i);
+  src/runtime/x86/sm_codegen_x64_emit.c:2278                    SM:SM_INCR
+                  case SM_INCR:         rc = emit_sm_incr_dispatch(out, ins, pc);   break;
+  src/runtime/x86/sm_prog.c:230                                 SM:SM_DECR
+                  case SM_INCR: case SM_DECR:
+  src/runtime/x86/sm_interp.c:1787                              SM:SM_DECR
+              case SM_DECR: {
+  src/runtime/x86/sm_codegen_x64_emit.c:1103                    SM:SM_DECR
+          emit_sm_decr(NULL, ins->a[0].i);
+  src/runtime/x86/sm_codegen_x64_emit.c:2279                    SM:SM_DECR
+                  case SM_DECR:         rc = emit_sm_decr_dispatch(out, ins, pc);   break;
+  src/runtime/x86/sm_prog.c:231                                 SM:SM_LCOMP
+                  case SM_LCOMP
+  src/runtime/x86/sm_interp.c:1843                              SM:SM_LCOMP
+              case SM_LCOMP: {
+  src/runtime/x86/sm_codegen_x64_emit.c:1119                    SM:SM_LCOMP
+          emit_sm_lcomp(NULL, (int)ins->a[0].i);
+  src/runtime/x86/sm_codegen_x64_emit.c:2281                    SM:SM_LCOMP
+                  case SM_LCOMP:        rc = emit_sm_lcomp_dispatch(out, ins, pc);  break;
+  src/runtime/x86/sm_prog.c:232                                 SM:SM_ACOMP
+                  case SM_ACOMP:  /* CH-17g-runtime-bridge-acomp: a[0].i = operator EKind */
+  src/runtime/x86/sm_interp.c:1800                              SM:SM_ACOMP
+              case SM_ACOMP: {
+  src/runtime/x86/sm_codegen_x64_emit.c:1111                    SM:SM_ACOMP
+          emit_sm_acomp(NULL, (int)ins->a[0].i);
+  src/runtime/x86/sm_codegen_x64_emit.c:2280                    SM:SM_ACOMP
+                  case SM_ACOMP:        rc = emit_sm_acomp_dispatch(out, ins, pc);  break;
+  src/runtime/x86/sm_interp.c:1883                              SM:SM_SUSPEND
+              case SM_SUSPEND: {
+  src/runtime/x86/sm_interp.c:1911                              SM:SM_RESUME
+              case SM_RESUME
+  src/runtime/x86/sm_interp.c:1918                              SM:SM_LOAD_GLOCAL
+              case SM_LOAD_GLOCAL: {
+  src/runtime/x86/sm_interp.c:1933                              SM:SM_STORE_GLOCAL
+              case SM_STORE_GLOCAL: {
+  src/runtime/x86/sm_interp.c:1950                              SM:SM_ICMP_GT
+              case SM_ICMP_GT: {
+  src/runtime/x86/sm_interp.c:1958                              SM:SM_ICMP_LT
+              case SM_ICMP_LT: {
+  src/runtime/x86/sm_interp.c:1972                              SM:SM_LOAD_FRAME
+              case SM_LOAD_FRAME: {
+  src/runtime/x86/sm_interp.c:1988                              SM:SM_STORE_FRAME
+              case SM_STORE_FRAME: {
+
+--- BB Kind doppelgangers ---
+  src/runtime/x86/bb_flat.c:21                                  BB:XCHR
+      #include "templates.h"   /* EM-MODE4-IS-MODE3-DUMP-d: emit_bb_xchr */
+  src/runtime/x86/bb_flat.c:505                                 BB:XCHR
+              case XCHR:     return "CHR";
+  src/runtime/x86/bb_flat.c:594                                 BB:XCHR
+          case XCHR: {
+  src/runtime/x86/bb_flat.c:837                                 BB:XCHR
+       * `emit_bb_xchr` in `templates/bb_xchr.c`, which has byte-for-byte
+  src/runtime/x86/bb_flat.c:1293                                BB:XCHR
+          case XCHR: {
+  src/runtime/x86/bb_flat.c:1300                                BB:XCHR
+              emit_bb_xchr(e, p, lit_label, lbl_succ, lbl_fail, lbl_β);
+  src/runtime/x86/bb_build.c:1276                               BB:XCHR
+          case XCHR: {
+  src/runtime/x86/stmt_exec.c:614                               BB:XCHR
+          case XCHR: {
+  src/runtime/x86/snobol4_pattern.c:1060                        BB:XCHR
+              case XCHR:     return "CHR";
+  src/runtime/x86/bb_flat.c:506                                 BB:XSPNC
+              case XSPNC:    return "SPAN";
+  src/runtime/x86/bb_flat.c:599                                 BB:XSPNC
+          case XSPNC: case XBRKC: case XANYC: case XNNYC: case XBRKX: {
+  src/runtime/x86/bb_flat.c:1078                                BB:XSPNC
+      static void flat_emit_xspnc(emitter_t *e, const char *chars,
+  src/runtime/x86/bb_flat.c:1310                                BB:XSPNC
+          case XSPNC: flat_emit_xspnc(e, p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
+  src/runtime/x86/bb_build.c:1286                               BB:XSPNC
+          case XSPNC
+  src/runtime/x86/stmt_exec.c:655                               BB:XSPNC
+          case XSPNC: {
+  src/runtime/x86/snobol4_pattern.c:1061                        BB:XSPNC
+              case XSPNC:    return "SPAN";
+  src/runtime/x86/bb_flat.c:507                                 BB:XBRKC
+              case XBRKC:    return "BREAK";
+  src/runtime/x86/bb_flat.c:599                                 BB:XBRKC
+          case XSPNC: case XBRKC: case XANYC: case XNNYC: case XBRKX: {
+  src/runtime/x86/bb_flat.c:1084                                BB:XBRKC
+      static void flat_emit_xbrkc(emitter_t *e, const char *chars,
+  src/runtime/x86/bb_flat.c:1312                                BB:XBRKC
+          case XBRKC: flat_emit_xbrkc(e, p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
+  src/runtime/x86/bb_build.c:1298                               BB:XBRKC
+          case XBRKC
+  src/runtime/x86/stmt_exec.c:665                               BB:XBRKC
+          case XBRKC: {
+  src/runtime/x86/snobol4_pattern.c:1062                        BB:XBRKC
+              case XBRKC:    return "BREAK";
+  src/runtime/x86/bb_flat.c:508                                 BB:XANYC
+              case XANYC:    return "ANY";
+  src/runtime/x86/bb_flat.c:599                                 BB:XANYC
+          case XSPNC: case XBRKC: case XANYC: case XNNYC: case XBRKX: {
+  src/runtime/x86/bb_flat.c:1090                                BB:XANYC
+      static void flat_emit_xanyc(emitter_t *e, const char *chars,
+  src/runtime/x86/bb_flat.c:1311                                BB:XANYC
+          case XANYC: flat_emit_xanyc(e, p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
+  src/runtime/x86/bb_build.c:1290                               BB:XANYC
+          case XANYC
+  src/runtime/x86/stmt_exec.c:685                               BB:XANYC
+          case XANYC: {
+  src/runtime/x86/snobol4_pattern.c:1063                        BB:XANYC
+              case XANYC:    return "ANY";
+  src/runtime/x86/bb_flat.c:509                                 BB:XNNYC
+              case XNNYC:    return "NOTANY";
+  src/runtime/x86/bb_flat.c:599                                 BB:XNNYC
+          case XSPNC: case XBRKC: case XANYC: case XNNYC: case XBRKX: {
+  src/runtime/x86/bb_flat.c:1096                                BB:XNNYC
+      static void flat_emit_xnnyc(emitter_t *e, const char *chars,
+  src/runtime/x86/bb_flat.c:1313                                BB:XNNYC
+          case XNNYC: flat_emit_xnnyc(e, p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
+  src/runtime/x86/bb_build.c:1294                               BB:XNNYC
+          case XNNYC
+  src/runtime/x86/stmt_exec.c:695                               BB:XNNYC
+          case XNNYC: {
+  src/runtime/x86/snobol4_pattern.c:1064                        BB:XNNYC
+              case XNNYC:    return "NOTANY";
+  src/runtime/x86/bb_flat.c:510                                 BB:XLNTH
+              case XLNTH:    return "LEN";
+  src/runtime/x86/bb_flat.c:605                                 BB:XLNTH
+          case XLNTH: case XTB: case XRTB: case XPOSI: case XRPSI:
+  src/runtime/x86/bb_flat.c:1214                                BB:XLNTH
+      static void flat_emit_xlnth(emitter_t *e, long long num,
+  src/runtime/x86/bb_flat.c:1218                                BB:XLNTH
+          emit_bb_xlnth(e, num, lbl_succ, lbl_fail, lbl_β);
+  src/runtime/x86/bb_flat.c:1315                                BB:XLNTH
+          case XLNTH: flat_emit_xlnth(e, (long long)p->num, lbl_succ, lbl_fail, lbl_β); break;
+  src/runtime/x86/bb_build.c:1318                               BB:XLNTH
+          case XLNTH
+  src/runtime/x86/stmt_exec.c:645                               BB:XLNTH
+          case XLNTH: {
+  src/runtime/x86/snobol4_pattern.c:1065                        BB:XLNTH
+              case XLNTH:    return "LEN";
+  src/runtime/x86/bb_flat.c:511                                 BB:XPOSI
+              case XPOSI:    return "POS";
+  src/runtime/x86/bb_flat.c:605                                 BB:XPOSI
+          case XLNTH: case XTB: case XRTB: case XPOSI: case XRPSI:
+  src/runtime/x86/bb_flat.c:919                                 BB:XPOSI
+          emit_bb_xposi(e, n, lbl_succ, lbl_fail, lbl_β);
+  src/runtime/x86/bb_flat.c:1305                                BB:XPOSI
+          case XPOSI: flat_emit_pos (e, (int)p->num, lbl_succ, lbl_fail, lbl_β); break;
+  src/runtime/x86/bb_build.c:1302                               BB:XPOSI
+          case XPOSI
+  src/runtime/x86/stmt_exec.c:625                               BB:XPOSI
+          case XPOSI: {
+  src/runtime/x86/snobol4_pattern.c:1066                        BB:XPOSI
+              case XPOSI:    return "POS";
+  src/runtime/x86/bb_flat.c:512                                 BB:XRPSI
+              case XRPSI:    return "RPOS";
+  src/runtime/x86/bb_flat.c:605                                 BB:XRPSI
+          case XLNTH: case XTB: case XRTB: case XPOSI: case XRPSI:
+  src/runtime/x86/bb_flat.c:925                                 BB:XRPSI
+          emit_bb_xrpsi(e, n, lbl_succ, lbl_fail, lbl_β);
+  src/runtime/x86/bb_flat.c:1306                                BB:XRPSI
+          case XRPSI: flat_emit_rpos(e, (int)p->num, lbl_succ, lbl_fail, lbl_β); break;
+  src/runtime/x86/bb_build.c:1306                               BB:XRPSI
+          case XRPSI
+  src/runtime/x86/stmt_exec.c:635                               BB:XRPSI
+          case XRPSI: {
+  src/runtime/x86/snobol4_pattern.c:1067                        BB:XRPSI
+              case XRPSI:    return "RPOS";
+  src/runtime/x86/bb_flat.c:513                                 BB:XTB
+              case XTB:      return "TAB";
+  src/runtime/x86/bb_flat.c:605                                 BB:XTB
+          case XLNTH: case XTB: case XRTB: case XPOSI: case XRPSI:
+  src/runtime/x86/bb_flat.c:1220                                BB:XTB
+      static void flat_emit_xtb(emitter_t *e, long long num,
+  src/runtime/x86/bb_flat.c:1224                                BB:XTB
+          emit_bb_xtb(e, num, lbl_succ, lbl_fail, lbl_β);
+  src/runtime/x86/bb_flat.c:1316                                BB:XTB
+          case XTB:   flat_emit_xtb  (e, (long long)p->num, lbl_succ, lbl_fail, lbl_β); break;
+  src/runtime/x86/bb_build.c:1310                               BB:XTB
+          case XTB
+  src/runtime/x86/stmt_exec.c:892                               BB:XTB
+          case XTB: {
+  src/runtime/x86/snobol4_pattern.c:1068                        BB:XTB
+              case XTB:      return "TAB";
+  src/runtime/x86/bb_flat.c:514                                 BB:XRTB
+              case XRTB:     return "RTAB";
+  src/runtime/x86/bb_flat.c:605                                 BB:XRTB
+          case XLNTH: case XTB: case XRTB: case XPOSI: case XRPSI:
+  src/runtime/x86/bb_flat.c:1226                                BB:XRTB
+      static void flat_emit_xrtb(emitter_t *e, long long num,
+  src/runtime/x86/bb_flat.c:1230                                BB:XRTB
+          emit_bb_xrtb(e, num, lbl_succ, lbl_fail, lbl_β);
+  src/runtime/x86/bb_flat.c:1317                                BB:XRTB
+          case XRTB:  flat_emit_xrtb (e, (long long)p->num, lbl_succ, lbl_fail, lbl_β); break;
+  src/runtime/x86/bb_build.c:1314                               BB:XRTB
+          case XRTB
+  src/runtime/x86/stmt_exec.c:904                               BB:XRTB
+          case XRTB: {
+  src/runtime/x86/snobol4_pattern.c:1069                        BB:XRTB
+              case XRTB:     return "RTAB";
+  src/runtime/x86/bb_flat.c:515                                 BB:XFARB
+              case XFARB:    return "ARB";
+  src/runtime/x86/bb_flat.c:609                                 BB:XFARB
+          case XFARB:    patnd_buf_append(buf, cap, o, "ARB");      break;
+  src/runtime/x86/bb_flat.c:906                                 BB:XFARB
+      static void flat_emit_xfarb(emitter_t *e, bb_label_t *lbl_succ,
+  src/runtime/x86/bb_flat.c:909                                 BB:XFARB
+          emit_bb_xfarb(e, lbl_succ, lbl_fail, lbl_β);
+  src/runtime/x86/bb_flat.c:1340                                BB:XFARB
+          case XFARB: flat_emit_xfarb(e, lbl_succ, lbl_fail, lbl_β); break;
+  src/runtime/x86/bb_build.c:1330                               BB:XFARB
+          case XFARB
+  src/runtime/x86/stmt_exec.c:258                               BB:XFARB
+          case XFARB:                                      return 0;  /* ARB: mutable count/start in arb_t */
+  src/runtime/x86/stmt_exec.c:705                               BB:XFARB
+          case XFARB: {
+  src/runtime/x86/snobol4_pattern.c:1070                        BB:XFARB
+              case XFARB:    return "ARB";
+  src/runtime/x86/bb_flat.c:516                                 BB:XARBN
+              case XARBN:    return "ARBNO";
+  src/runtime/x86/bb_flat.c:630                                 BB:XARBN
+          case XARBN
+  src/runtime/x86/bb_flat.c:1433                                BB:XARBN
+          case XARBN: { /* ARBNO: zero-or-more greedy repetition of child.
+  src/runtime/x86/bb_build.c:1470                               BB:XARBN
+          case XARBN
+  src/runtime/x86/stmt_exec.c:788                               BB:XARBN
+          case XARBN: {
+  src/runtime/x86/snobol4_pattern.c:1071                        BB:XARBN
+              case XARBN:    return "ARBNO";
+  src/runtime/x86/bb_flat.c:517                                 BB:XSTAR
+              case XSTAR:    return "REM";
+  src/runtime/x86/bb_flat.c:610                                 BB:XSTAR
+          case XSTAR:    patnd_buf_append(buf, cap, o, "REM");      break;
+  src/runtime/x86/bb_flat.c:1341                                BB:XSTAR
+          case XSTAR: {
+  src/runtime/x86/bb_build.c:1322                               BB:XSTAR
+          case XSTAR
+  src/runtime/x86/stmt_exec.c:259                               BB:XSTAR
+          case XSTAR:                                      return 0;  /* REM: mutable ζ state */
+  src/runtime/x86/stmt_exec.c:714                               BB:XSTAR
+          case XSTAR: {
+  src/runtime/x86/snobol4_pattern.c:1072                        BB:XSTAR
+              case XSTAR:    return "REM";
+  src/runtime/x86/bb_flat.c:518                                 BB:XFNCE
+              case XFNCE:    return "FENCE";
+  src/runtime/x86/bb_flat.c:635                                 BB:XFNCE
+          case XFNCE
+  src/runtime/x86/bb_flat.c:1318                                BB:XFNCE
+          case XFNCE: {
+  src/runtime/x86/bb_build.c:1417                               BB:XFNCE
+          case XFNCE: {
+  src/runtime/x86/stmt_exec.c:914                               BB:XFNCE
+          case XFNCE: {
+  src/runtime/x86/snobol4_pattern.c:1073                        BB:XFNCE
+              case XFNCE:    return "FENCE";
+  src/runtime/x86/bb_flat.c:519                                 BB:XFAIL
+              case XFAIL:    return "FAIL";
+  src/runtime/x86/bb_flat.c:615                                 BB:XFAIL
+          case XFAIL:    patnd_buf_append(buf, cap, o, "FAIL");     break;
+  src/runtime/x86/bb_flat.c:903                                 BB:XFAIL
+          emit_bb_xfail(e, lbl_succ, lbl_fail, lbl_β);
+  src/runtime/x86/bb_flat.c:1304                                BB:XFAIL
+          case XFAIL: flat_emit_fail(e, lbl_succ, lbl_fail, lbl_β); break;
+  src/runtime/x86/bb_build.c:1413                               BB:XFAIL
+          case XFAIL
+  src/runtime/x86/stmt_exec.c:732                               BB:XFAIL
+          case XFAIL: {
+  src/runtime/x86/snobol4_pattern.c:1074                        BB:XFAIL
+              case XFAIL:    return "FAIL";
+  src/runtime/x86/bb_flat.c:520                                 BB:XABRT
+              case XABRT:    return "ABORT";
+  src/runtime/x86/bb_flat.c:613                                 BB:XABRT
+          case XABRT:    patnd_buf_append(buf, cap, o, "ABORT");    break;
+  src/runtime/x86/stmt_exec.c:938                               BB:XABRT
+          case XABRT: {
+  src/runtime/x86/snobol4_pattern.c:1075                        BB:XABRT
+              case XABRT:    return "ABORT";
+  src/runtime/x86/bb_flat.c:521                                 BB:XSUCF
+              case XSUCF:    return "SUCCEED";
+  src/runtime/x86/bb_flat.c:612                                 BB:XSUCF
+          case XSUCF:    patnd_buf_append(buf, cap, o, "SUCCEED");  break;
+  src/runtime/x86/stmt_exec.c:723                               BB:XSUCF
+          case XSUCF: {
+  src/runtime/x86/snobol4_pattern.c:1076                        BB:XSUCF
+              case XSUCF:    return "SUCCEED";
+  src/runtime/x86/bb_flat.c:522                                 BB:XBAL
+              case XBAL:     return "BAL";
+  src/runtime/x86/bb_flat.c:611                                 BB:XBAL
+          case XBAL:     patnd_buf_append(buf, cap, o, "BAL");      break;
+  src/runtime/x86/stmt_exec.c:974                               BB:XBAL
+          case XBAL: {
+  src/runtime/x86/snobol4_pattern.c:1077                        BB:XBAL
+              case XBAL:     return "BAL";
+  src/runtime/x86/bb_flat.c:523                                 BB:XEPS
+              case XEPS:     return "EPS";
+  src/runtime/x86/bb_flat.c:614                                 BB:XEPS
+          case XEPS:     patnd_buf_append(buf, cap, o, "EPSILON");  break;
+  src/runtime/x86/bb_flat.c:897                                 BB:XEPS
+          emit_bb_xeps(e, lbl_succ, lbl_fail, lbl_β);
+  src/runtime/x86/bb_flat.c:1303                                BB:XEPS
+          case XEPS:  flat_emit_eps (e, lbl_succ, lbl_fail, lbl_β); break;
+  src/runtime/x86/bb_build.c:1282                               BB:XEPS
+          case XEPS
+  src/runtime/x86/stmt_exec.c:741                               BB:XEPS
+          case XEPS: {
+  src/runtime/x86/snobol4_pattern.c:1078                        BB:XEPS
+              case XEPS:     return "EPS";
+  src/runtime/x86/bb_flat.c:524                                 BB:XCAT
+              case XCAT:     return "CAT";
+  src/runtime/x86/bb_flat.c:617                                 BB:XCAT
+          case XCAT
+  src/runtime/x86/bb_flat.c:756                                 BB:XCAT
+      static void flat_emit_xcat(emitter_t *e, PATND_t *p,
+  src/runtime/x86/bb_flat.c:1307                                BB:XCAT
+          case XCAT:  flat_emit_xcat(e, p, lbl_succ, lbl_fail, lbl_β); break;
+  src/runtime/x86/bb_build.c:1358                               BB:XCAT
+          case XCAT: {
+  src/runtime/x86/stmt_exec.c:750                               BB:XCAT
+          case XCAT: {
+  src/runtime/x86/snobol4_pattern.c:1079                        BB:XCAT
+              case XCAT:     return "CAT";
+  src/runtime/x86/bb_flat.c:525                                 BB:XOR
+              case XOR:      return "ALT";
+  src/runtime/x86/bb_flat.c:624                                 BB:XOR
+          case XOR
+  src/runtime/x86/bb_flat.c:1308                                BB:XOR
+          case XOR:   flat_emit_alt (e, p, lbl_succ, lbl_fail, lbl_β); break;
+  src/runtime/x86/bb_build.c:1326                               BB:XOR
+          case XOR
+  src/runtime/x86/stmt_exec.c:770                               BB:XOR
+          case XOR: {
+  src/runtime/x86/snobol4_pattern.c:1080                        BB:XOR
+              case XOR:      return "ALT";
+  src/runtime/x86/bb_flat.c:526                                 BB:XDSAR
+              case XDSAR:    return "DEREF";
+  src/runtime/x86/bb_flat.c:656                                 BB:XDSAR
+          case XDSAR
+  src/runtime/x86/bb_flat.c:1398                                BB:XDSAR
+          case XDSAR: { /* XDSAR: *varname — re-resolves NV[varname] on every α */
+  src/runtime/x86/bb_build.c:1463                               BB:XDSAR
+          case XDSAR: {
+  src/runtime/x86/stmt_exec.c:253                               BB:XDSAR
+          case XDSAR
+  src/runtime/x86/stmt_exec.c:858                               BB:XDSAR
+          case XDSAR
+  src/runtime/x86/snobol4_pattern.c:1081                        BB:XDSAR
+              case XDSAR:    return "DEREF";
+  src/runtime/x86/bb_flat.c:527                                 BB:XFNME
+              case XFNME:    return "CAP_IMM";
+  src/runtime/x86/bb_flat.c:644                                 BB:XFNME
+          case XFNME
+  src/runtime/x86/bb_flat.c:1486                                BB:XFNME
+          case XFNME: { /* pat $ var — immediate capture */
+  src/runtime/x86/bb_build.c:1342                               BB:XFNME
+          case XFNME
+  src/runtime/x86/stmt_exec.c:256                               BB:XFNME
+          case XFNME
+  src/runtime/x86/stmt_exec.c:802                               BB:XFNME
+          case XFNME: {
+  src/runtime/x86/snobol4_pattern.c:1082                        BB:XFNME
+              case XFNME:    return "CAP_IMM";
+  src/runtime/x86/bb_flat.c:528                                 BB:XNME
+              case XNME:     return "CAP_COND";
+  src/runtime/x86/bb_flat.c:648                                 BB:XNME
+          case XNME
+  src/runtime/x86/bb_flat.c:1485                                BB:XNME
+          case XNME:   /* pat . var — conditional capture */
+  src/runtime/x86/bb_build.c:1338                               BB:XNME
+          case XNME
+  src/runtime/x86/stmt_exec.c:257                               BB:XNME
+          case XNME:                                       return 0;  /* always variant */
+  src/runtime/x86/stmt_exec.c:821                               BB:XNME
+          case XNME: {
+  src/runtime/x86/snobol4_pattern.c:1083                        BB:XNME
+              case XNME:     return "CAP_COND";
+  src/runtime/x86/bb_flat.c:529                                 BB:XCALLCAP
+              case XCALLCAP: return "CALLCAP";
+  src/runtime/x86/bb_flat.c:652                                 BB:XCALLCAP
+          case XCALLCAP
+  src/runtime/x86/bb_build.c:1474                               BB:XCALLCAP
+          case XCALLCAP
+  src/runtime/x86/stmt_exec.c:840                               BB:XCALLCAP
+          case XCALLCAP: {
+  src/runtime/x86/snobol4_pattern.c:1084                        BB:XCALLCAP
+              case XCALLCAP: return "CALLCAP";
+  src/runtime/x86/bb_flat.c:530                                 BB:XVAR
+              case XVAR:     return "VAR";
+  src/runtime/x86/bb_flat.c:616                                 BB:XVAR
+          case XVAR:     patnd_buf_append(buf, cap, o, "<var>");    break;
+  src/runtime/x86/stmt_exec.c:254                               BB:XVAR
+          case XVAR
+  src/runtime/x86/stmt_exec.c:860                               BB:XVAR
+          case XVAR: {
+  src/runtime/x86/snobol4_pattern.c:1085                        BB:XVAR
+              case XVAR:     return "VAR";
+  src/runtime/x86/bb_flat.c:531                                 BB:XATP
+              case XATP:     return "USERPAT";
+  src/runtime/x86/bb_flat.c:660                                 BB:XATP
+          case XATP: {
+  src/runtime/x86/bb_flat.c:1368                                BB:XATP
+          case XATP: {
+  src/runtime/x86/bb_build.c:1450                               BB:XATP
+          case XATP: {
+  src/runtime/x86/stmt_exec.c:255                               BB:XATP
+          case XATP
+  src/runtime/x86/stmt_exec.c:947                               BB:XATP
+          case XATP: {
+  src/runtime/x86/snobol4_pattern.c:1086                        BB:XATP
+              case XATP:     return "USERPAT";
+  src/runtime/x86/bb_flat.c:532                                 BB:XBRKX
+              case XBRKX:    return "BREAKX";
+  src/runtime/x86/bb_flat.c:599                                 BB:XBRKX
+          case XSPNC: case XBRKC: case XANYC: case XNNYC: case XBRKX: {
+  src/runtime/x86/bb_flat.c:1113                                BB:XBRKX
+      /* Text-path body for emit_bb_xbrkx.  Access to bb_flat.c static helpers.
+  src/runtime/x86/bb_flat.c:1162                                BB:XBRKX
+      static void flat_emit_xbrkx(emitter_t *e, const char *chars,
+  src/runtime/x86/bb_flat.c:1166                                BB:XBRKX
+          emit_bb_xbrkx(e, chars, lbl_succ, lbl_fail, lbl_β);
+  src/runtime/x86/bb_flat.c:1363                                BB:XBRKX
+          case XBRKX: {
+  src/runtime/x86/bb_flat.c:1365                                BB:XBRKX
+              flat_emit_xbrkx(e, chars, lbl_succ, lbl_fail, lbl_β);
+  src/runtime/x86/bb_build.c:1334                               BB:XBRKX
+          case XBRKX
+  src/runtime/x86/stmt_exec.c:675                               BB:XBRKX
+          case XBRKX: {
+  src/runtime/x86/snobol4_pattern.c:1087                        BB:XBRKX
+              case XBRKX:    return "BREAKX";
+
+=== Summary ===
+SM doppelganger hits: 299
+BB doppelganger hits: 190
+Total: 489
+
+Target: 0 (all emission via sm_templates.c / bb_templates.c only)
