@@ -322,10 +322,22 @@ DESCR_t eval_node(tree_t *e)
         if (IS_FAIL_fn(pat)) return FAILDESCR;
         /* When capture target is TT_INDIRECT (e.g. REM . $'$B'), resolve the
          * variable name without dereferencing — return NAME_fn(resolved_name)
-         * so bb_nme_emit_binary gets varname="$B", not the value of $B. */
+         * so bb_nme_emit_binary gets varname="$B", not the value of $B.
+         * Plain TT_VAR / TT_KEYWORD targets also need NAME_fn — eval_node
+         * would return the variable's *value*, but pat_assign_cond expects
+         * a NAME (DT_N) descriptor so XNME bb_build extracts varname/var_ptr.
+         * Mirrors the SM_PAT_CAPTURE handler (sm_interp.c) and the TT_NAME
+         * case above (eval_code.c:262). Fix landed sess 2026-05-12 unblocking
+         * SL-13 step 3 (Snocone --ir-run pattern captures not updating vars). */
         DESCR_t name;
         tree_t *tgt = e->c[1];
-        if (tgt && tgt->t == TT_INDIRECT && tgt->n > 0) {
+        if (tgt && tgt->t == TT_VAR && tgt->v.sval) {
+            name = NAME_fn(tgt->v.sval);
+        } else if (tgt && tgt->t == TT_KEYWORD && tgt->v.sval) {
+            char kbuf[128];
+            snprintf(kbuf, sizeof kbuf, "&%s", tgt->v.sval);
+            name = NAME_fn(kbuf);
+        } else if (tgt && tgt->t == TT_INDIRECT && tgt->n > 0) {
             tree_t *ic = tgt->c[0];
             const char *nm = NULL;
             if (ic->t == TT_QLIT && ic->v.sval)        nm = ic->v.sval;
@@ -348,10 +360,18 @@ DESCR_t eval_node(tree_t *e)
         if (IS_FAIL_fn(pat)) return FAILDESCR;
         pat = PATVAL_fn(pat);
         if (IS_FAIL_fn(pat)) return FAILDESCR;
-        /* Same TT_INDIRECT target resolution as TT_CAPT_COND_ASGN above. */
+        /* Same TT_VAR / TT_KEYWORD / TT_INDIRECT target resolution as
+         * TT_CAPT_COND_ASGN above — capture target is a variable name,
+         * never an evaluated value (SPITBOL Manual Ch. 18, p. 87). */
         DESCR_t name;
         tree_t *tgt = e->c[1];
-        if (tgt && tgt->t == TT_INDIRECT && tgt->n > 0) {
+        if (tgt && tgt->t == TT_VAR && tgt->v.sval) {
+            name = NAME_fn(tgt->v.sval);
+        } else if (tgt && tgt->t == TT_KEYWORD && tgt->v.sval) {
+            char kbuf[128];
+            snprintf(kbuf, sizeof kbuf, "&%s", tgt->v.sval);
+            name = NAME_fn(kbuf);
+        } else if (tgt && tgt->t == TT_INDIRECT && tgt->n > 0) {
             tree_t *ic = tgt->c[0];
             const char *nm = NULL;
             if (ic->t == TT_QLIT && ic->v.sval)        nm = ic->v.sval;
