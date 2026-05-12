@@ -22,7 +22,7 @@ SCRIP_DIR="$CORPUS/SCRIP"
 
 pass=0
 fail=0
-for case in smoke_interp sm_interp_test si_06_exp si_07_pat_lit si_08_prim_pats si_09_pat_fns ; do
+for case in smoke_interp sm_interp_test si_06_exp si_07_pat_lit si_08_prim_pats si_09_pat_fns si_11_compare ; do
     hosted_sc="$SCRIP_DIR/${case}.sc"
     native_sc="$SCRIP_DIR/${case}_native.sc"
     [ -f "$hosted_sc" ] || { echo "SKIP $case — hosted source missing"; continue; }
