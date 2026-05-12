@@ -44,11 +44,13 @@
 #include "../../runtime/x86/bb_pool.h"
 #include "../../runtime/x86/bb_box.h"       /* EM-7c: bb_box_fn + exec_stmt_blob */
 #include "../../runtime/x86/bb_build.h"     /* EM-7c-variant: g_bb_mode + BB_MODE_LIVE */
+#include "../../ast/ast.h"                  /* TT_EQ/TT_NE/TT_LT/TT_LE/TT_GT/TT_GE/TT_L* for rt_acomp/rt_lcomp */
 
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 /*==============================================================================
  * Forward declarations — symbols in snobol4.c / stmt_exec.c / snobol4_pattern.c
@@ -1017,7 +1019,7 @@ void rt_exp(void)
     }
     double base = (l.v == DT_R) ? l.r : (double)l.i;
     double expo = (r.v == DT_R) ? r.r : (double)r.i;
-    double res  = EXP_R_fn(REALVAL(base), REALVAL(expo)).r;
+    double res  = pow(base, expo);
     vstack_push(REALVAL(res));
     LAST_OK_SET(1);
 }
@@ -1116,7 +1118,7 @@ void rt_unhandled_sm(int op)
     abort();
 }
 
- — pseudo-calls inlined here to avoid a full INVOKE_fn round trip.
+/* pseudo-calls inlined here to avoid a full INVOKE_fn round trip.
  * The full pseudo-call vocabulary mirrors sm_interp.c's SM_CALL_FN handler. */
 extern DESCR_t subscript_get(DESCR_t arr, DESCR_t idx);
 extern DESCR_t subscript_get2(DESCR_t arr, DESCR_t i, DESCR_t j);

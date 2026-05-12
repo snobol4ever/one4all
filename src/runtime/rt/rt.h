@@ -231,7 +231,7 @@ void rt_define(void);
 void rt_unhandled_sm(int op);
 
 
- * name:  function name (INDIR_GET / NAME_PUSH / IDX / ... or user/builtin).
+/* name:  function name (INDIR_GET / NAME_PUSH / IDX / ... or user/builtin).
  * nargs: number of arguments already popped from SM vstack into the runtime's
  *        internal arg buffer by the emitter's call-setup sequence.
  * The function name is the compile-time constant from SM_Instr.a[0].s.

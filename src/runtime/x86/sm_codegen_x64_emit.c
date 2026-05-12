@@ -2257,6 +2257,14 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
             case SM_CALL_EXPRESSION:   rc = emit_sm_call_expression_dispatch(out, ins, pc); break;
             case SM_RETURN:       rc = emit_sm_return_dispatch(out, pc);          break;
 
+            /* SM_DEFINE_ENTRY / SM_DEFINE: function entry markers and definition
+             * stubs.  SM_DEFINE_ENTRY is emitted as a no-op rt_define_entry call
+             * which registers the expression chunk in the native registry.
+             * SM_DEFINE is a no-op macro (function definition already handled by
+             * the expression registry at emit time). */
+            case SM_DEFINE_ENTRY: rc = sm_emit_rtcall(out, sm_template_lookup(SM_DEFINE_ENTRY), NULL); break;
+            case SM_DEFINE:       rc = sm_emit_rtcall(out, sm_template_lookup(SM_DEFINE),       NULL); break;
+
             /* EM-7-pre keepers: SM_CALL_FN (general) + SM_CONCAT + SM_PUSH_NULL +
              * SM_COERCE_NUM + conditional return variants. */
             case SM_CALL_FN:         rc = emit_sm_call_dispatch(out, ins, pc); break;
@@ -2305,28 +2313,31 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
             case SM_PAT_CAPTURE_FN_ARGS: rc = emit_sm_pat_capture_fn_args_dispatch(out, ins, pc); break;
             case SM_PAT_USERCALL:     rc = emit_sm_pat_usercall_dispatch(out, ins, pc); break;
             case SM_PAT_USERCALL_ARGS: rc = emit_sm_pat_usercall_args_dispatch(out, ins, pc); break;
-            case SM_PAT_SPAN:
-            case SM_PAT_BREAK:
-            case SM_PAT_ANY:
-            case SM_PAT_NOTANY:
-            case SM_PAT_LEN:
-            case SM_PAT_POS:
-            case SM_PAT_RPOS:
-            case SM_PAT_TAB:
-            case SM_PAT_RTAB:
-            case SM_PAT_ARB:
-            case SM_PAT_ARBNO:
-            case SM_PAT_REM:
-            case SM_PAT_FENCE0:
-            case SM_PAT_FENCE1:
-            case SM_PAT_FAIL:
-            case SM_PAT_ABORT:
-            case SM_PAT_SUCCEED:
-            case SM_PAT_BAL:
-            case SM_PAT_EPS:
-            case SM_PAT_CAT:
-            case SM_PAT_ALT:
-            case SM_PAT_DEREF:
+            /* Variant-path PAT opcodes: each emits its rt_pat_*@PLT call via
+             * sm_emit_rtcall.  These are all registered as SM_TPL_RTCALL in
+             * g_sm_templates[].  They must NOT fall through to SM_EXEC_STMT. */
+            case SM_PAT_SPAN:    rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_SPAN),    NULL); break;
+            case SM_PAT_BREAK:   rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_BREAK),   NULL); break;
+            case SM_PAT_ANY:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_ANY),     NULL); break;
+            case SM_PAT_NOTANY:  rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_NOTANY),  NULL); break;
+            case SM_PAT_LEN:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_LEN),     NULL); break;
+            case SM_PAT_POS:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_POS),     NULL); break;
+            case SM_PAT_RPOS:    rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_RPOS),    NULL); break;
+            case SM_PAT_TAB:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_TAB),     NULL); break;
+            case SM_PAT_RTAB:    rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_RTAB),    NULL); break;
+            case SM_PAT_ARB:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_ARB),     NULL); break;
+            case SM_PAT_ARBNO:   rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_ARBNO),   NULL); break;
+            case SM_PAT_REM:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_REM),     NULL); break;
+            case SM_PAT_FENCE0:  rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_FENCE0),  NULL); break;
+            case SM_PAT_FENCE1:  rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_FENCE1),  NULL); break;
+            case SM_PAT_FAIL:    rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_FAIL),    NULL); break;
+            case SM_PAT_ABORT:   rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_ABORT),   NULL); break;
+            case SM_PAT_SUCCEED: rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_SUCCEED), NULL); break;
+            case SM_PAT_BAL:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_BAL),     NULL); break;
+            case SM_PAT_EPS:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_EPS),     NULL); break;
+            case SM_PAT_CAT:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_CAT),     NULL); break;
+            case SM_PAT_ALT:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_ALT),     NULL); break;
+            case SM_PAT_DEREF:   rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_DEREF),   NULL); break;
             /* SM_PAT_BOXVAL removed by ME-1 */
 
             /* SM_EXEC_STMT for a variant pattern (invariant patterns are

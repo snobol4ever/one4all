@@ -24,6 +24,12 @@ int             bb_emit_size = 0;
 bb_patch_t      bb_patch_list[BB_PATCH_MAX];
 int             bb_patch_count = 0;
 
+/* Set by t_macro_begin in TEXT mode; cleared by t_macro_end.
+ * When set, t_* body helpers are no-ops: TEXT mode emits only the macro
+ * invocation line (via t_macro_begin) — the body instructions are the
+ * macro definition (MACRO_DEF) or the BINARY emission path, not TEXT. */
+static int g_in_text_macro_body = 0;
+
 /* Central mode setter — called once at the top of each emit pass.
  * Every low-level emit function reads bb_emit_mode (and, when text-side,
  * bb_emit_out) to decide which of the three productions to write. */
@@ -134,6 +140,7 @@ void t_ret(void)
         return;
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
+        if (bb_emit_mode == EMIT_TEXT && g_in_text_macro_body) return;
         bb3c_format(emit_outf(), "", "ret", "");
         return;
     }
@@ -174,6 +181,7 @@ void t_mov_rdi_imm64(uint64_t val)
     }
     case EMIT_TEXT:
     case EMIT_MACRO_DEF: {
+        if (bb_emit_mode == EMIT_TEXT && g_in_text_macro_body) return;
         char args[64];
         snprintf(args, sizeof(args), "rdi, 0x%llx", (unsigned long long)val);
         bb3c_format(emit_outf(), "", "mov", args);
@@ -209,6 +217,7 @@ void t_call_sym_plt(const char *sym, uint64_t fn_fallback)
     }
     case EMIT_TEXT:
     case EMIT_MACRO_DEF: {
+        if (bb_emit_mode == EMIT_TEXT && g_in_text_macro_body) return;
         char args[80];
         snprintf(args, sizeof(args), "%s@PLT", sym ? sym : "??sym??");
         bb3c_format(emit_outf(), "", "call", args);
@@ -238,6 +247,7 @@ void t_macro_begin(const char *name, const char *const *params, int nparams)
                     params && params[i] ? params[i] : "?");
         }
         fputc('\n', f);
+        g_in_text_macro_body = 1;  /* suppress body t_* calls until t_macro_end */
         return;
     }
     case EMIT_MACRO_DEF: {
@@ -262,7 +272,9 @@ void t_macro_end(void)
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
+        return;
     case EMIT_TEXT:
+        g_in_text_macro_body = 0;  /* body suppression ends here */
         return;
     case EMIT_MACRO_DEF:
         bb3c_flush_pending_cjmp_only();
@@ -340,6 +352,7 @@ void t_lea_rdi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr)
         t_mov_rdi_imm64(in_proc_ptr);
         return;
     case EMIT_TEXT: {
+        if (g_in_text_macro_body) return;
         char args[80];
         snprintf(args, sizeof(args), "rdi, [rip + %s]",
                  sym_label ? sym_label : "??sym??");
@@ -376,6 +389,7 @@ void t_lea_rdx_strtab_sym(const char *sym_label, uint64_t in_proc_ptr)
         return;
     }
     case EMIT_TEXT: {
+        if (g_in_text_macro_body) return;
         char args[80];
         snprintf(args, sizeof(args), "rdx, [rip + %s]",
                  sym_label ? sym_label : "??sym??");
@@ -404,6 +418,7 @@ void t_mov_edx_imm32(int val)
         return;
     }
     case EMIT_TEXT: {
+        if (g_in_text_macro_body) return;
         char args[32];
         snprintf(args, sizeof(args), "edx, %d", val);
         bb3c_format(emit_outf(), "", "mov", args);
@@ -435,6 +450,7 @@ void t_mov_esi_imm32(int val)
         return;
     }
     case EMIT_TEXT: {
+        if (g_in_text_macro_body) return;
         char args[32];
         snprintf(args, sizeof(args), "esi, %d", val);
         bb3c_format(emit_outf(), "", "mov", args);
@@ -464,6 +480,7 @@ void t_mov_edi_imm32(int val)
         return;
     }
     case EMIT_TEXT: {
+        if (g_in_text_macro_body) return;
         char args[32];
         snprintf(args, sizeof(args), "edi, %d", val);
         bb3c_format(emit_outf(), "", "mov", args);
@@ -487,6 +504,7 @@ void t_test_eax_eax(void)
         return;
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
+        if (bb_emit_mode == EMIT_TEXT && g_in_text_macro_body) return;
         bb3c_format(emit_outf(), "", "test", "eax, eax");
         return;
     }
@@ -506,6 +524,7 @@ void t_jz_retskip(int pc)
         bb_emit_byte(0x90);
         return;
     case EMIT_TEXT: {
+        if (g_in_text_macro_body) return;
         char args[40];
         snprintf(args, sizeof(args), ".Lretskip_%d", pc);
         bb3c_format(emit_outf(), "", "jz", args);
@@ -529,6 +548,7 @@ void t_retskip_label(int pc)
     case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         return;
     case EMIT_TEXT: {
+        if (g_in_text_macro_body) return;
         FILE *f = emit_outf();
         fprintf(f, ".Lretskip_%d:\n", pc);
         return;
@@ -560,6 +580,7 @@ void t_movabs_rdi_entry(uint64_t entry_ptr)
         return;
     }
     case EMIT_TEXT: {
+        if (g_in_text_macro_body) return;
         char args[32];
         snprintf(args, sizeof(args), "rdi, 0x%llx", (unsigned long long)entry_ptr);
         bb3c_format(emit_outf(), "", "movabs", args);
