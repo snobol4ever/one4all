@@ -97,6 +97,7 @@ RT_PIC_SRCS := \
     $(RT)/x86/templates/bb_xfnme.c \
     $(RT)/x86/templates/bb_xcallcap.c \
     $(RT)/x86/templates/bb_xarbn.c \
+    $(RT)/x86/templates/bb_icon_to.c \
     $(RT)/x86/templates/bb_xcat.c \
     $(RT)/x86/templates/bb_xor.c \
     $(RT)/x86/templates/bb_xbrkx.c \
@@ -205,7 +206,7 @@ RT_PIC_SRCS := \
     $(SRC)/runtime/interp/scan_builtins.c \
     $(SRC)/runtime/interp/raku_builtins.c \
     $(SRC)/runtime/interp/pl_runtime.c \
-    $(SRC)/runtime/interp/icn_box_rt.c \
+    $(SRC)/runtime/interp/icon_box_rt.c \
     $(SRC)/runtime/common/coerce.c \
     $(SRC)/runtime/common/ast_clone.c \
     $(SRC)/driver/interp_globals.c \
@@ -397,7 +398,7 @@ scrip:
 	$(CC) $(CRT)   -c $(SRC)/runtime/interp/raku_builtins.c -o $(OBJ)/raku_builtins.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/interp/scan_builtins.c -o $(OBJ)/scan_builtins.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/interp/pl_runtime.c  -o $(OBJ)/pl_runtime.o
-	$(CC) $(CRT)   -c $(SRC)/runtime/interp/icn_box_rt.c  -o $(OBJ)/icn_box_rt.o
+	$(CC) $(CRT)   -c $(SRC)/runtime/interp/icon_box_rt.c  -o $(OBJ)/icon_box_rt.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/common/coerce.c      -o $(OBJ)/coerce.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/common/ast_clone.c    -o $(OBJ)/ast_clone.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_prog.c    -o $(OBJ)/sm_prog.o
@@ -512,6 +513,7 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xfnme.c -o $(OBJ)/template_bb_xfnme.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xcallcap.c -o $(OBJ)/template_bb_xcallcap.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xarbn.c -o $(OBJ)/template_bb_xarbn.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_icon_to.c -o $(OBJ)/template_bb_icon_to.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xcat.c -o $(OBJ)/template_bb_xcat.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xor.c -o $(OBJ)/template_bb_xor.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_emit_template.c -o $(OBJ)/sm_emit_template.o

@@ -93,6 +93,16 @@ int sm_emit_si(SM_Program *p, sm_opcode_t op, const char *s, int64_t i)
     return idx;
 }
 
+int sm_emit_sip(SM_Program *p, sm_opcode_t op, const char *s, int64_t i, void *ptr)
+{
+    int idx = _grow(p);
+    p->instrs[idx].op      = op;
+    p->instrs[idx].a[0].s  = s ? strdup(s) : NULL;
+    p->instrs[idx].a[1].i  = i;
+    p->instrs[idx].a[2].ptr = ptr;
+    return idx;
+}
+
 int sm_emit_ii(SM_Program *p, sm_opcode_t op, int64_t i0, int64_t i1)
 {
     int idx = _grow(p);

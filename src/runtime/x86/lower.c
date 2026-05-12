@@ -791,61 +791,17 @@ static void lower_bang_binary  (const tree_t *t)
 
 /* Emit an SM coroutine body for integer range lo..hi [by step].
  * glocal slots: 0=lo, 1=hi, 2=cur, (3=step for to_by). */
-static void emit_range_coroutine(const tree_t *lo_expr,
-                                  const tree_t *hi_expr, const tree_t *step_expr)
-{
-    int skip = sm_emit_i(g_p, SM_JUMP, 0), entry = sm_label(g_p);
-    sm_emit(g_p, SM_RESUME);
-    if (lo_expr) lower_expr(lo_expr); else sm_emit_i(g_p, SM_PUSH_LIT_I, 0);
-    sm_emit_i(g_p, SM_STORE_GLOCAL, 0); sm_emit(g_p, SM_VOID_POP);
-    if (hi_expr) lower_expr(hi_expr); else sm_emit_i(g_p, SM_PUSH_LIT_I, 0);
-    sm_emit_i(g_p, SM_STORE_GLOCAL, 1); sm_emit(g_p, SM_VOID_POP);
-    if (step_expr) {
-        lower_expr(step_expr);
-        sm_emit_i(g_p, SM_STORE_GLOCAL, 3); sm_emit(g_p, SM_VOID_POP);
-    }
-    sm_emit_i(g_p, SM_LOAD_GLOCAL, 0);
-    sm_emit_i(g_p, SM_STORE_GLOCAL, 2); sm_emit(g_p, SM_VOID_POP);
-    int loop = sm_label(g_p);
-    if (!step_expr) {
-        /* Simple: exit when cur > hi */
-        sm_emit_i(g_p, SM_LOAD_GLOCAL, 2); sm_emit_i(g_p, SM_LOAD_GLOCAL, 1);
-        sm_emit(g_p, SM_ICMP_GT);
-        int exit = sm_emit_i(g_p, SM_JUMP_S, 0);
-        sm_emit_i(g_p, SM_LOAD_GLOCAL, 2); sm_emit(g_p, SM_SUSPEND);
-        sm_emit_i(g_p, SM_LOAD_GLOCAL, 2); sm_emit_i(g_p, SM_INCR, 1);
-        sm_emit_i(g_p, SM_STORE_GLOCAL, 2); sm_emit(g_p, SM_VOID_POP);
-        sm_emit_i(g_p, SM_JUMP, loop);
-        sm_patch_jump(g_p, exit, sm_label(g_p));
-    } else {
-        /* Stepped: branch on sign of step */
-        sm_emit_i(g_p, SM_LOAD_GLOCAL, 3); sm_emit_i(g_p, SM_PUSH_LIT_I, 0);
-        sm_emit(g_p, SM_ICMP_LT);
-        int neg = sm_emit_i(g_p, SM_JUMP_S, 0);
-        sm_emit_i(g_p, SM_LOAD_GLOCAL, 2); sm_emit_i(g_p, SM_LOAD_GLOCAL, 1);
-        sm_emit(g_p, SM_ICMP_GT);
-        int exit_pos = sm_emit_i(g_p, SM_JUMP_S, 0);
-        int body = sm_emit_i(g_p, SM_JUMP, 0);
-        sm_patch_jump(g_p, neg, sm_label(g_p));
-        sm_emit_i(g_p, SM_LOAD_GLOCAL, 2); sm_emit_i(g_p, SM_LOAD_GLOCAL, 1);
-        sm_emit(g_p, SM_ICMP_LT);
-        int exit_neg = sm_emit_i(g_p, SM_JUMP_S, 0);
-        sm_patch_jump(g_p, body, sm_label(g_p));
-        sm_emit_i(g_p, SM_LOAD_GLOCAL, 2); sm_emit(g_p, SM_SUSPEND);
-        sm_emit_i(g_p, SM_LOAD_GLOCAL, 2); sm_emit_i(g_p, SM_LOAD_GLOCAL, 3);
-        sm_emit(g_p, SM_ADD); sm_emit_i(g_p, SM_STORE_GLOCAL, 2); sm_emit(g_p, SM_VOID_POP);
-        sm_emit_i(g_p, SM_JUMP, loop);
-        int exit_pc = sm_label(g_p);
-        sm_patch_jump(g_p, exit_pos, exit_pc); sm_patch_jump(g_p, exit_neg, exit_pc);
-    }
-    sm_emit(g_p, SM_PUSH_NULL); sm_emit(g_p, SM_RETURN);
-    sm_patch_jump(g_p, skip, sm_label(g_p));
-    sm_emit_ii(g_p, SM_PUSH_EXPRESSION, (int64_t)entry, 0);
-    sm_emit(g_p, SM_BB_PUMP_SM);
+/* IB-1: lower_to / lower_to_by — Icon integer range generator.
+ * Replaces SM coroutine (SM_RESUME/SM_SUSPEND/SM_BB_PUMP_SM) with SM_BB_PUMP_AST.
+ * coro_eval handles TT_TO / TT_TO_BY correctly — evaluates lo/hi/step, allocates
+ * icn_to_state_t, returns bb_node_t{ coro_bb_to, z }.  SM_BB_PUMP_AST routes there.
+ * GATE-6: SM_BB_PUMP_SM / SM_RESUME / SM_SUSPEND / SM_STORE_GLOCAL no longer emitted. */
+static void lower_to(const tree_t *t) {
+    sm_emit_i(g_p, SM_BB_PUMP_AST, (int64_t)ast_pump_table_register((tree_t *)t));
 }
-
-static void lower_to   (const tree_t *t) { emit_range_coroutine(T0(t), T1(t), NULL); }
-static void lower_to_by(const tree_t *t) { emit_range_coroutine(T0(t), T1(t), T2(t)); }
+static void lower_to_by(const tree_t *t) {
+    sm_emit_i(g_p, SM_BB_PUMP_AST, (int64_t)ast_pump_table_register((tree_t *)t));
+}
 
 /* GOAL-ICON-BB-COMPLETE rung13: find the first TT_ALTERNATE that is a direct
  * RHS of a TT_ASSIGN (or direct child of the gen expr root). Only these can be

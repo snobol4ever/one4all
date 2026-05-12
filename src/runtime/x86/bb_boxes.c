@@ -792,3 +792,13 @@ DESCR_t bb_succeed(void *zeta, int entry)
 succeed_t *bb_succeed_new(void)
 { return calloc(1,sizeof(succeed_t)); }
 
+/* ───── Icon range (to / to-by) ───── */
+/* Allocators — zeta is a pointer, allocation site doesn't matter to the box. */
+
+#include "../../frontend/icon/icon_gen.h"
+
+icn_to_state_t *icon_to_new(void)
+{ return calloc(1, sizeof(icn_to_state_t)); }
+
+icn_to_by_state_t *icon_to_by_new(void)
+{ return calloc(1, sizeof(icn_to_by_state_t)); }

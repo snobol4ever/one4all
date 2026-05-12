@@ -307,4 +307,10 @@ void emit_bb_xcallcap(emitter_t *e, bb_box_fn child_fn, const char *fnc_name,
 void emit_bb_xarbn(emitter_t *e, bb_box_fn child_fn,
                    bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
 
+/* Icon generator boxes (GOAL-ICON-BB-NATIVE). */
+void emit_bb_icon_to   (emitter_t *e,
+                        bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
+void emit_bb_icon_to_by(emitter_t *e,
+                        bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
+
 #endif /* RUNTIME_X86_TEMPLATES_TEMPLATES_H */

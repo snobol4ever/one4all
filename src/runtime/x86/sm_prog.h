@@ -396,6 +396,7 @@ int sm_emit_i(SM_Program *p, sm_opcode_t op, int64_t i);
 int sm_emit_f(SM_Program *p, sm_opcode_t op, double f);
 int sm_emit_ptr(SM_Program *p, sm_opcode_t op, void *ptr);
 int sm_emit_si(SM_Program *p, sm_opcode_t op, const char *s, int64_t i);
+int sm_emit_sip(SM_Program *p, sm_opcode_t op, const char *s, int64_t i, void *ptr);
 int sm_emit_ii(SM_Program *p, sm_opcode_t op, int64_t i0, int64_t i1);
 
 /* Label: emit SM_LABEL with index=next_instr; return the label index */

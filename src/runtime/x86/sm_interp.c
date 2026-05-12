@@ -1497,6 +1497,33 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 st->last_ok = 1;
                 break;
             }
+            /* IB-1: ICN_TO_INIT — pop hi then lo from stack, write into baked zeta ptr.
+             * a[0].s="ICN_TO_INIT", a[1].i=nargs(2), a[2].ptr=icn_to_state_t*.
+             * Stack order (top-of-stack = last pushed): lo was pushed first, hi second. */
+            if (name && strcmp(name, "ICN_TO_INIT") == 0) {
+                icn_to_state_t *z = (icn_to_state_t *)ins->a[2].ptr;
+                DESCR_t hi_d = sm_pop(st);
+                DESCR_t lo_d = sm_pop(st);
+                z->lo = IS_FAIL_fn(lo_d) ? 0 : lo_d.i;
+                z->hi = IS_FAIL_fn(hi_d) ? 0 : hi_d.i;
+                sm_push(st, NULVCL);
+                st->last_ok = 1;
+                break;
+            }
+            /* IB-1: ICN_TO_BY_INIT — pop step, hi, lo from stack, write into baked zeta ptr.
+             * a[0].s="ICN_TO_BY_INIT", a[1].i=nargs(3), a[2].ptr=icn_to_by_state_t*. */
+            if (name && strcmp(name, "ICN_TO_BY_INIT") == 0) {
+                icn_to_by_state_t *z = (icn_to_by_state_t *)ins->a[2].ptr;
+                DESCR_t step_d = sm_pop(st);
+                DESCR_t hi_d   = sm_pop(st);
+                DESCR_t lo_d   = sm_pop(st);
+                z->lo   = IS_FAIL_fn(lo_d)   ? 0 : lo_d.i;
+                z->hi   = IS_FAIL_fn(hi_d)   ? 0 : hi_d.i;
+                z->step = IS_FAIL_fn(step_d) ? 1 : step_d.i;
+                sm_push(st, NULVCL);
+                st->last_ok = 1;
+                break;
+            }
             if (name && strcmp(name, "ICN_SCAN_POP") == 0 && nargs == 1) {
                 if (scan_depth > 0) {
                     scan_depth--;
