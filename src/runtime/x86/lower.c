@@ -44,6 +44,7 @@
 #include <gc/gc.h>
 #include "snobol4.h"
 
+static void emit_pat_nary(const tree_t *t, sm_opcode_t op);
 void lower_expr    (const tree_t *t);
 void lower_pat_expr(const tree_t *t);
 void lower_stmt    (const tree_t *s);
@@ -231,8 +232,7 @@ static void lower_cat_seq(const tree_t *t)
     for (int i = 0; i < t->n && !has_defer; i++)
         if (t->c[i] && t->c[i]->t == TT_DEFER) has_defer = 1;
     if (has_defer) {
-        for (int i = 0; i < t->n; i++) lower_pat_expr(t->c[i]);
-        for (int i = 1; i < t->n; i++) sm_emit(g_p, SM_PAT_CAT);
+        emit_pat_nary(t, SM_PAT_CAT);
     } else {
         for (int i = 0; i < t->n; i++) lower_expr(t->c[i]);
         for (int i = 1; i < t->n; i++) sm_emit(g_p, SM_CONCAT);
@@ -313,6 +313,13 @@ static void emit_pat_capture(const tree_t *var_node, int mode)
     }
 }
 
+/* Lower all children in pattern context then emit (n-1) copies of op. */
+static void emit_pat_nary(const tree_t *t, sm_opcode_t op)
+{
+    for (int i = 0; i < t->n; i++) lower_pat_expr(t->c[i]);
+    for (int i = 1; i < t->n; i++) sm_emit(g_p, op);
+}
+
 void lower_pat_expr(const tree_t *t)
 {
     if (!t) return;
@@ -341,14 +348,8 @@ void lower_pat_expr(const tree_t *t)
     case TT_RTAB:   lower_expr(T0(t)); sm_emit(g_p, SM_PAT_RTAB);   return;
     case TT_ARBNO:  lower_pat_expr(T0(t)); sm_emit(g_p, SM_PAT_ARBNO); return;
     case TT_SEQ:
-    case TT_CAT:
-        for (int i = 0; i < t->n; i++) lower_pat_expr(t->c[i]);
-        for (int i = 1; i < t->n; i++) sm_emit(g_p, SM_PAT_CAT);
-        return;
-    case TT_ALT:
-        for (int i = 0; i < t->n; i++) lower_pat_expr(t->c[i]);
-        for (int i = 1; i < t->n; i++) sm_emit(g_p, SM_PAT_ALT);
-        return;
+    case TT_CAT:  emit_pat_nary(t, SM_PAT_CAT); return;
+    case TT_ALT:  emit_pat_nary(t, SM_PAT_ALT); return;
     case TT_CAPT_COND_ASGN:
         lower_pat_expr(T0(t));
         if (t->n > 1) emit_pat_capture(t->c[1], 0);
@@ -397,15 +398,11 @@ static void lower_fnc(const tree_t *t)
 {
     int nargs = t->n;
 
-    /* EVAL(*expr) — inline the thunked expression, call SM_CALL_EXPRESSION. */
+    /* EVAL(*expr) — thunk the expression, call it via SM_CALL_EXPRESSION. */
     if (nargs == 1 && t->v.sval && strcmp(t->v.sval, "EVAL") == 0
             && t->c[0] && t->c[0]->t == TT_DEFER) {
-        const tree_t *inner = T0(t->c[0]);
-        int skip = sm_emit_i(g_p, SM_JUMP, 0), entry = sm_label(g_p);
-        if (inner) lower_expr(inner); else sm_emit(g_p, SM_PUSH_NULL);
-        sm_emit(g_p, SM_RETURN);
-        sm_patch_jump(g_p, skip, sm_label(g_p));
-        sm_emit_ii(g_p, SM_CALL_EXPRESSION, (int64_t)entry, 0);
+        emit_thunk(T0(t->c[0]));
+        g_p->instrs[g_p->count - 1].op = SM_CALL_EXPRESSION;
         return;
     }
     /* Icon-style call: sval==NULL, children[0] is the callee name node. */
@@ -425,29 +422,46 @@ static void lower_idx(const tree_t *t)
     sm_emit_si(g_p, SM_CALL_FN, "IDX", (int64_t)t->n);
 }
 
-static void lower_assign(const tree_t *t)
+/* Store TOS into lhs (value already on stack). Handles all lhs shapes. */
+static void emit_lhs_store(const tree_t *lhs)
 {
-    lower_expr(T1(t));   /* rhs first */
-    const tree_t *lhs = T0(t);
     if (!lhs) return;
-    if (lhs->t == TT_VAR)     { emit_var_store( lhs->v.sval ? lhs->v.sval : ""); return; }
+    if (lhs->t == TT_VAR)     { emit_var_store(lhs->v.sval ? lhs->v.sval : ""); return; }
     if (lhs->t == TT_KEYWORD) { sm_emit_s(g_p, SM_STORE_VAR, kw_canonicalize(lhs->v.sval)); return; }
-    if (lhs->t == TT_FNC && lhs->v.sval) {
-        lower_expr( T0(lhs));
-        char set[256]; snprintf(set, sizeof set, "%s_SET", lhs->v.sval);
-        sm_emit_si(g_p, SM_CALL_FN, set, 2); return;
+    if (lhs->t == TT_INDIRECT) {
+        lower_expr(T0(lhs)); sm_emit_si(g_p, SM_CALL_FN, "ASGN_INDIR", 2); return;
     }
     if (lhs->t == TT_IDX) {
-        for (int i = 0; i < lhs->n; i++) lower_expr( lhs->c[i]);
+        for (int i = 0; i < lhs->n; i++) lower_expr(lhs->c[i]);
         sm_emit_si(g_p, SM_CALL_FN, "IDX_SET", (int64_t)(lhs->n + 1)); return;
     }
+    if (lhs->t == TT_FNC && lhs->v.sval) {
+        if (lhs->n == 0) {
+            sm_emit_si(g_p, SM_CALL_FN, "NRETURN_ASGN", 1);
+            g_p->instrs[g_p->count - 1].a[1].s = GC_strdup(lhs->v.sval);
+        } else if (strcasecmp(lhs->v.sval, "ITEM") == 0) {
+            for (int i = 0; i < lhs->n; i++) lower_expr(lhs->c[i]);
+            sm_emit_si(g_p, SM_CALL_FN, "ITEM_SET", (int64_t)(lhs->n + 1));
+        } else {
+            lower_expr(T0(lhs));
+            char set[256]; snprintf(set, sizeof set, "%s_SET", lhs->v.sval);
+            sm_emit_si(g_p, SM_CALL_FN, set, 2);
+        }
+        return;
+    }
     if (lhs->t == TT_FIELD) {
-        lower_expr( T0(lhs));
+        lower_expr(T0(lhs));
         sm_emit_s(g_p, SM_PUSH_LIT_S, lhs->v.sval ? lhs->v.sval : "");
         sm_emit_si(g_p, SM_CALL_FN, "FIELD_SET", 3); return;
     }
     lower_expr(lhs);
     sm_emit_si(g_p, SM_CALL_FN, "ASGN", 2);
+}
+
+static void lower_assign(const tree_t *t)
+{
+    lower_expr(T1(t));   /* rhs first */
+    emit_lhs_store(T0(t));
 }
 
 static void lower_scan(const tree_t *t)
@@ -481,16 +495,13 @@ static void lower_swap(const tree_t *t)
 
 /*── Relational operators ────────────────────────────────────────────────────*/
 
-static void lower_acomp(const tree_t *t)
+static void lower_comp(const tree_t *t, sm_opcode_t op)
 {
     lower_expr(T0(t)); lower_expr(T1(t));
-    sm_emit_i(g_p, SM_ACOMP, (int64_t)t->t);
+    sm_emit_i(g_p, op, (int64_t)t->t);
 }
-static void lower_lcomp(const tree_t *t)
-{
-    lower_expr(T0(t)); lower_expr(T1(t));
-    sm_emit_i(g_p, SM_LCOMP, (int64_t)t->t);
-}
+static void lower_acomp(const tree_t *t) { lower_comp(t, SM_ACOMP); }
+static void lower_lcomp(const tree_t *t) { lower_comp(t, SM_LCOMP); }
 
 /*── Cset / list ops ─────────────────────────────────────────────────────────*/
 
@@ -648,16 +659,6 @@ static void lower_proc_fail(const tree_t *t)
     (void)t; sm_emit(g_p, SM_PUSH_NULL); sm_emit(g_p, SM_FRETURN);
 }
 
-/* Wrap expr in a JUMP/body/RETURN/PUSH_EXPRESSION thunk for Raku case dispatch. */
-static void emit_case_chunk(const tree_t *expr)
-{
-    int skip = sm_emit_i(g_p, SM_JUMP, 0), entry = sm_label(g_p);
-    lower_expr(expr);
-    sm_emit(g_p, SM_RETURN);
-    sm_patch_jump(g_p, skip, sm_label(g_p));
-    sm_emit_ii(g_p, SM_PUSH_EXPRESSION, (int64_t)entry, 0);
-}
-
 static void lower_case(const tree_t *t)
 {
     if (t->n < 1) { sm_emit(g_p, SM_PUSH_NULL); return; }
@@ -696,15 +697,15 @@ static void lower_case(const tree_t *t)
         tree_t *last_cmp = t->c[1 + (ntriples-1)*3];
         if (last_cmp && last_cmp->t == TT_NUL) { has_def = 1; def_idx = ntriples - 1; }
     }
-    emit_case_chunk(t->c[0]);
+    emit_thunk(t->c[0]);
     for (int i = 0; i < ntriples; i++) {
         if (i == def_idx) continue;
         int base = 1 + i*3;
         tree_t *cmp = t->c[base];
         sm_emit_i(g_p, SM_PUSH_LIT_I, (int64_t)((cmp && cmp->t == TT_ILIT) ? cmp->v.ival : TT_EQ));
-        emit_case_chunk(t->c[base+1]); emit_case_chunk(t->c[base+2]);
+        emit_thunk(t->c[base+1]); emit_thunk(t->c[base+2]);
     }
-    if (has_def) { emit_case_chunk(t->c[1 + def_idx*3 + 2]); }
+    if (has_def) { emit_thunk(t->c[1 + def_idx*3 + 2]); }
     sm_emit_ii(g_p, SM_BB_PUMP_CASE, (int64_t)(ntriples - has_def), (int64_t)has_def);
 }
 
@@ -855,15 +856,17 @@ static void lower_limit(const tree_t *t) { emit_push_expr(t); sm_emit(g_p, SM_BB
 
 /*── Prolog ──────────────────────────────────────────────────────────────────*/
 
+/* Emit SM_BB_ONCE_PROC for a named predicate, parsing arity from "name/n". */
+static void emit_prolog_call(const char *sval)
+{
+    const char *sl = strrchr(sval, '/');
+    sm_emit_si(g_p, SM_BB_ONCE_PROC, sval, (int64_t)(sl ? atoi(sl + 1) : 0));
+}
+
 static void lower_choice(const tree_t *t)
 {
-    if (t->v.sval) {
-        const char *sl = strrchr(t->v.sval, '/');
-        int arity = sl ? atoi(sl + 1) : 0;
-        sm_emit_si(g_p, SM_BB_ONCE_PROC, t->v.sval, (int64_t)arity);
-    } else {
-        emit_push_expr(t); sm_emit(g_p, SM_BB_ONCE);
-    }
+    if (t->v.sval) emit_prolog_call(t->v.sval);
+    else           { emit_push_expr(t); sm_emit(g_p, SM_BB_ONCE); }
 }
 
 static void lower_prolog_child(const tree_t *t)
@@ -965,10 +968,9 @@ void lower_stmt(const tree_t *s)
     if (lang == LANG_ICN) return;
 
     if (lang == LANG_PL) {
-        if (subject && subject->t == TT_CHOICE && subject->v.sval) {
-            const char *sl = strrchr(subject->v.sval, '/');
-            sm_emit_si(g_p, SM_BB_ONCE_PROC, subject->v.sval, (int64_t)(sl ? atoi(sl+1) : 0));
-        } else {
+        if (subject && subject->t == TT_CHOICE && subject->v.sval)
+            emit_prolog_call(subject->v.sval);
+        else {
             if (subject) lower_expr(subject); else sm_emit(g_p, SM_PUSH_NULL);
             sm_emit(g_p, SM_BB_ONCE);
         }
@@ -990,29 +992,7 @@ void lower_stmt(const tree_t *s)
     if (subject) {
         if (has_eq) {
             if (replacement) lower_expr(replacement); else sm_emit(g_p, SM_PUSH_NULL);
-            const tree_t *lhs = subject;
-            if (lhs->t == TT_VAR || lhs->t == TT_KEYWORD) {
-                sm_emit_s(g_p, SM_STORE_VAR, lhs->v.sval ? lhs->v.sval : "");
-            } else if (lhs->t == TT_INDIRECT) {
-                lower_expr(T0(lhs)); sm_emit_si(g_p, SM_CALL_FN, "ASGN_INDIR", 2);
-            } else if (lhs->t == TT_IDX) {
-                for (int i = 0; i < lhs->n; i++) lower_expr(lhs->c[i]);
-                sm_emit_si(g_p, SM_CALL_FN, "IDX_SET", (int64_t)(lhs->n + 1));
-            } else if (lhs->t == TT_FNC && lhs->v.sval) {
-                if (lhs->n == 0) {
-                    sm_emit_si(g_p, SM_CALL_FN, "NRETURN_ASGN", 1);
-                    g_p->instrs[g_p->count - 1].a[1].s = GC_strdup(lhs->v.sval);
-                } else if (strcasecmp(lhs->v.sval, "ITEM") == 0) {
-                    for (int i = 0; i < lhs->n; i++) lower_expr(lhs->c[i]);
-                    sm_emit_si(g_p, SM_CALL_FN, "ITEM_SET", (int64_t)(lhs->n + 1));
-                } else {
-                    lower_expr(T0(lhs));
-                    char set[256]; snprintf(set, sizeof set, "%s_SET", lhs->v.sval);
-                    sm_emit_si(g_p, SM_CALL_FN, set, 2);
-                }
-            } else {
-                lower_expr(lhs); sm_emit_si(g_p, SM_CALL_FN, "ASGN", 2);
-            }
+            emit_lhs_store(subject);
         } else {
             if (subject->t == TT_VAR && subject->v.sval) {
                 if (strcasecmp(subject->v.sval, "RETURN")  == 0) { sm_emit(g_p, SM_RETURN);  goto emit_gotos; }
@@ -1163,6 +1143,15 @@ static void build_proc_scope(IcnScope *sc, const tree_t *proc, int body_start)
     }
 }
 
+/* Emit a JUMP/label/RETURN/patch stub — used for bodyless Prolog predicate skeletons. */
+static void emit_proc_stub(const char *name)
+{
+    int skip = sm_emit_i(g_p, SM_JUMP, 0);
+    sm_label_named(g_p, name);
+    sm_emit(g_p, SM_RETURN);
+    sm_patch_jump(g_p, skip, sm_label(g_p));
+}
+
 static void lower_proc_skeletons(void)
 {
 
@@ -1191,15 +1180,9 @@ static void lower_proc_skeletons(void)
         sm_patch_jump(g_p, skip, sm_label(g_p));
     }
 
-    for (int b = 0; b < PL_PRED_TABLE_SIZE_FWD; b++) {
-        for (Pl_PredEntry *e = g_pl_pred_table.buckets[b]; e; e = e->next) {
-            if (!e->key || !*e->key) continue;
-            int skip = sm_emit_i(g_p, SM_JUMP, 0);
-            sm_label_named(g_p, e->key);
-            sm_emit(g_p, SM_RETURN);
-            sm_patch_jump(g_p, skip, sm_label(g_p));
-        }
-    }
+    for (int b = 0; b < PL_PRED_TABLE_SIZE_FWD; b++)
+        for (Pl_PredEntry *e = g_pl_pred_table.buckets[b]; e; e = e->next)
+            if (e->key && *e->key) emit_proc_stub(e->key);
 }
 
 /*── Public entry point ──────────────────────────────────────────────────────
