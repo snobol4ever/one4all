@@ -784,21 +784,30 @@ static void lower_section_3(const tree_t *t, const char *fn)
         sm_emit_si(g_p, SM_CALL_FN, fn, 3);
     } else sm_emit(g_p, SM_PUSH_NULL);
 }
+/* IB-6: lower_bang_binary — Icon E1!E2 in value/sub-expr context.
+ * SM_BB_EVAL: registered by id via every_table; bb_eval_value handles TT_BANG_BINARY.
+ * Non-ICN: falls through to lower_unhandled. */
 static void lower_bang_binary  (const tree_t *t)
 {
-    fprintf(stderr, "BUG: Icon AST pump — kind %d\n", t->t); abort();
+    if (g_lang != LANG_ICN) { lower_unhandled(t); return; }
+    sm_emit_i(g_p, SM_BB_EVAL, (int64_t)every_table_register((tree_t *)t));
 }
 
 /*── Generator coroutines ────────────────────────────────────────────────────*/
 
 /* Emit an SM coroutine body for integer range lo..hi [by step].
  * glocal slots: 0=lo, 1=hi, 2=cur, (3=step for to_by). */
-/* IB-1: lower_to / lower_to_by — Icon integer range generator. Native BB template. */
+/* IB-1: lower_to / lower_to_by — Icon integer range generator in value/sub-expr context.
+ * SM_BB_EVAL: a[0].i = every_table id; handler calls bb_eval_value → push first value.
+ * Registered by id (no ast_gc_clone — avoids GC hazard mid-lowering).
+ * Statement-level every-loops handled by SM_BB_PUMP_EVERY (in lower_every). */
 static void lower_to(const tree_t *t) {
-    fprintf(stderr, "BUG: Icon AST pump — kind %d\n", t->t); abort();
+    if (g_lang != LANG_ICN) { lower_unhandled(t); return; }
+    sm_emit_i(g_p, SM_BB_EVAL, (int64_t)every_table_register((tree_t *)t));
 }
 static void lower_to_by(const tree_t *t) {
-    fprintf(stderr, "BUG: Icon AST pump — kind %d\n", t->t); abort();
+    if (g_lang != LANG_ICN) { lower_unhandled(t); return; }
+    sm_emit_i(g_p, SM_BB_EVAL, (int64_t)every_table_register((tree_t *)t));
 }
 
 /* GOAL-ICON-BB-COMPLETE rung13: find the first TT_ALTERNATE that is a direct
@@ -880,13 +889,14 @@ static void lower_suspend(const tree_t *t)
 
 static void lower_limit(const tree_t *t) { emit_push_expr(t); sm_emit(g_p, SM_BB_PUMP); }
 
-/* IB-2: lower_iterate — Icon !E generator. Native BB template.
+/* IB-2: lower_iterate — Icon !E generator in value/sub-expr context.
+ * SM_BB_EVAL: registered by id via every_table; bb_eval_value handles TT_ITERATE.
  * Non-ICN fallback (Rebus/Raku) not yet migrated — emits SM_PUSH_NULL. */
 static void lower_iterate(const tree_t *t)
 {
     if (!t || t->n < 1 || !t->c[0]) { sm_emit(g_p, SM_PUSH_NULL); return; }
     if (g_lang != LANG_ICN) { lower_unhandled(t); return; }
-    fprintf(stderr, "BUG: Icon AST pump — kind %d\n", t->t); abort();
+    sm_emit_i(g_p, SM_BB_EVAL, (int64_t)every_table_register((tree_t *)t));
 }
 
 /*── Prolog ──────────────────────────────────────────────────────────────────*/
