@@ -1177,6 +1177,49 @@ static int emit_sm_return_variant_dispatch(FILE *out, sm_opcode_t op, int pc)
     return sm_emit_ret_var(out, kind, cond, pc, sm_opcode_name(op));
 }
 
+/* EDP-4: label-consuming dispatch wrappers for opcodes that previously used
+ * sm_emit_rtcall(out, sm_template_lookup(SM_X), NULL) directly in the main
+ * switch.  That path consumed g_pending_pc_label via render_call_line.  The
+ * new path (emit_mode_set + template call) does not go through render_call_line,
+ * so pending labels would be orphaned at branch targets.  Each wrapper must:
+ *   1. sm_emit_consume_pc_label() — drain the pending .LpcN: label
+ *   2. bb3c_format(out, lbl, "", "") — emit it as a lone label line if non-empty
+ *   3. emit_mode_set(TEXT_MODE(), out) + emit_sm_X(NULL) — dispatch to template */
+
+/* Helper: consume pending label + emit it, then dispatch template (nullary). */
+static void edp4_label_then(FILE *out, void (*fn)(emitter_t *))
+{
+    const char *lbl = sm_emit_consume_pc_label();
+    if (lbl && *lbl) bb3c_format(out, lbl, "", "");
+    emit_mode_set(TEXT_MODE(), out);
+    fn(NULL);
+}
+
+static int emit_sm_define_entry_dispatch(FILE *out, int pc) { (void)pc; edp4_label_then(out, emit_sm_define_entry); return 0; }
+static int emit_sm_define_dispatch(FILE *out, int pc)       { (void)pc; edp4_label_then(out, emit_sm_define);       return 0; }
+static int emit_sm_pat_span_dispatch(FILE *out, int pc)     { (void)pc; edp4_label_then(out, emit_sm_pat_span);     return 0; }
+static int emit_sm_pat_break_dispatch(FILE *out, int pc)    { (void)pc; edp4_label_then(out, emit_sm_pat_break);    return 0; }
+static int emit_sm_pat_any_dispatch(FILE *out, int pc)      { (void)pc; edp4_label_then(out, emit_sm_pat_any);      return 0; }
+static int emit_sm_pat_notany_dispatch(FILE *out, int pc)   { (void)pc; edp4_label_then(out, emit_sm_pat_notany);   return 0; }
+static int emit_sm_pat_len_dispatch(FILE *out, int pc)      { (void)pc; edp4_label_then(out, emit_sm_pat_len);      return 0; }
+static int emit_sm_pat_pos_dispatch(FILE *out, int pc)      { (void)pc; edp4_label_then(out, emit_sm_pat_pos);      return 0; }
+static int emit_sm_pat_rpos_dispatch(FILE *out, int pc)     { (void)pc; edp4_label_then(out, emit_sm_pat_rpos);     return 0; }
+static int emit_sm_pat_tab_dispatch(FILE *out, int pc)      { (void)pc; edp4_label_then(out, emit_sm_pat_tab);      return 0; }
+static int emit_sm_pat_rtab_dispatch(FILE *out, int pc)     { (void)pc; edp4_label_then(out, emit_sm_pat_rtab);     return 0; }
+static int emit_sm_pat_arb_dispatch(FILE *out, int pc)      { (void)pc; edp4_label_then(out, emit_sm_pat_arb);      return 0; }
+static int emit_sm_pat_arbno_dispatch(FILE *out, int pc)    { (void)pc; edp4_label_then(out, emit_sm_pat_arbno);    return 0; }
+static int emit_sm_pat_rem_dispatch(FILE *out, int pc)      { (void)pc; edp4_label_then(out, emit_sm_pat_rem);      return 0; }
+static int emit_sm_pat_fence0_dispatch(FILE *out, int pc)   { (void)pc; edp4_label_then(out, emit_sm_pat_fence);    return 0; }
+static int emit_sm_pat_fence1_dispatch(FILE *out, int pc)   { (void)pc; edp4_label_then(out, emit_sm_pat_fence1);   return 0; }
+static int emit_sm_pat_fail_dispatch(FILE *out, int pc)     { (void)pc; edp4_label_then(out, emit_sm_pat_fail);     return 0; }
+static int emit_sm_pat_abort_dispatch(FILE *out, int pc)    { (void)pc; edp4_label_then(out, emit_sm_pat_abort);    return 0; }
+static int emit_sm_pat_succeed_dispatch(FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_succeed);  return 0; }
+static int emit_sm_pat_bal_dispatch(FILE *out, int pc)      { (void)pc; edp4_label_then(out, emit_sm_pat_bal);      return 0; }
+static int emit_sm_pat_eps_dispatch(FILE *out, int pc)      { (void)pc; edp4_label_then(out, emit_sm_pat_eps);      return 0; }
+static int emit_sm_pat_cat_dispatch(FILE *out, int pc)      { (void)pc; edp4_label_then(out, emit_sm_pat_cat);      return 0; }
+static int emit_sm_pat_alt_dispatch(FILE *out, int pc)      { (void)pc; edp4_label_then(out, emit_sm_pat_alt);      return 0; }
+static int emit_sm_pat_deref_dispatch(FILE *out, int pc)    { (void)pc; edp4_label_then(out, emit_sm_pat_deref);    return 0; }
+
 /* SM_PAT_CAPTURE_FN_ARGS / SM_PAT_USERCALL_ARGS emitters were removed
  * in EM-7-revert (session #72) along with the rest of the brokered
  * Phase-3 path.  See the EM-7-revert banner above emit_sm_concat for
@@ -2273,8 +2316,8 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
              * which registers the expression chunk in the native registry.
              * SM_DEFINE is a no-op macro (function definition already handled by
              * the expression registry at emit time). */
-            case SM_DEFINE_ENTRY: rc = sm_emit_rtcall(out, sm_template_lookup(SM_DEFINE_ENTRY), NULL); break;
-            case SM_DEFINE:       rc = sm_emit_rtcall(out, sm_template_lookup(SM_DEFINE), NULL); break;
+            case SM_DEFINE_ENTRY: rc = emit_sm_define_entry_dispatch(out, pc); break;
+            case SM_DEFINE:       rc = emit_sm_define_dispatch(out, pc);       break;
 
             /* EM-7-pre keepers: SM_CALL_FN (general) + SM_CONCAT + SM_PUSH_NULL +
              * SM_COERCE_NUM + conditional return variants. */
@@ -2327,28 +2370,28 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
             /* Variant-path PAT opcodes: each emits its rt_pat_*@PLT call via
              * sm_emit_rtcall.  These are all registered as SM_TPL_RTCALL in
              * g_sm_templates[].  They must NOT fall through to SM_EXEC_STMT. */
-            case SM_PAT_SPAN:    rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_SPAN), NULL); break;
-            case SM_PAT_BREAK:   rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_BREAK), NULL); break;
-            case SM_PAT_ANY:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_ANY), NULL); break;
-            case SM_PAT_NOTANY:  rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_NOTANY), NULL); break;
-            case SM_PAT_LEN:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_LEN), NULL); break;
-            case SM_PAT_POS:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_POS), NULL); break;
-            case SM_PAT_RPOS:    rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_RPOS), NULL); break;
-            case SM_PAT_TAB:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_TAB), NULL); break;
-            case SM_PAT_RTAB:    rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_RTAB), NULL); break;
-            case SM_PAT_ARB:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_ARB), NULL); break;
-            case SM_PAT_ARBNO:   rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_ARBNO), NULL); break;
-            case SM_PAT_REM:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_REM), NULL); break;
-            case SM_PAT_FENCE0:  rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_FENCE0), NULL); break;
-            case SM_PAT_FENCE1:  rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_FENCE1), NULL); break;
-            case SM_PAT_FAIL:    rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_FAIL), NULL); break;
-            case SM_PAT_ABORT:   rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_ABORT), NULL); break;
-            case SM_PAT_SUCCEED: rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_SUCCEED), NULL); break;
-            case SM_PAT_BAL:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_BAL), NULL); break;
-            case SM_PAT_EPS:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_EPS), NULL); break;
-            case SM_PAT_CAT:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_CAT), NULL); break;
-            case SM_PAT_ALT:     rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_ALT), NULL); break;
-            case SM_PAT_DEREF:   rc = sm_emit_rtcall(out, sm_template_lookup(SM_PAT_DEREF), NULL); break;
+            case SM_PAT_SPAN:    rc = emit_sm_pat_span_dispatch(out, pc);    break;
+            case SM_PAT_BREAK:   rc = emit_sm_pat_break_dispatch(out, pc);   break;
+            case SM_PAT_ANY:     rc = emit_sm_pat_any_dispatch(out, pc);     break;
+            case SM_PAT_NOTANY:  rc = emit_sm_pat_notany_dispatch(out, pc);  break;
+            case SM_PAT_LEN:     rc = emit_sm_pat_len_dispatch(out, pc);     break;
+            case SM_PAT_POS:     rc = emit_sm_pat_pos_dispatch(out, pc);     break;
+            case SM_PAT_RPOS:    rc = emit_sm_pat_rpos_dispatch(out, pc);    break;
+            case SM_PAT_TAB:     rc = emit_sm_pat_tab_dispatch(out, pc);     break;
+            case SM_PAT_RTAB:    rc = emit_sm_pat_rtab_dispatch(out, pc);    break;
+            case SM_PAT_ARB:     rc = emit_sm_pat_arb_dispatch(out, pc);     break;
+            case SM_PAT_ARBNO:   rc = emit_sm_pat_arbno_dispatch(out, pc);   break;
+            case SM_PAT_REM:     rc = emit_sm_pat_rem_dispatch(out, pc);     break;
+            case SM_PAT_FENCE0:  rc = emit_sm_pat_fence0_dispatch(out, pc);  break;
+            case SM_PAT_FENCE1:  rc = emit_sm_pat_fence1_dispatch(out, pc);  break;
+            case SM_PAT_FAIL:    rc = emit_sm_pat_fail_dispatch(out, pc);    break;
+            case SM_PAT_ABORT:   rc = emit_sm_pat_abort_dispatch(out, pc);   break;
+            case SM_PAT_SUCCEED: rc = emit_sm_pat_succeed_dispatch(out, pc); break;
+            case SM_PAT_BAL:     rc = emit_sm_pat_bal_dispatch(out, pc);     break;
+            case SM_PAT_EPS:     rc = emit_sm_pat_eps_dispatch(out, pc);     break;
+            case SM_PAT_CAT:     rc = emit_sm_pat_cat_dispatch(out, pc);     break;
+            case SM_PAT_ALT:     rc = emit_sm_pat_alt_dispatch(out, pc);     break;
+            case SM_PAT_DEREF:   rc = emit_sm_pat_deref_dispatch(out, pc);   break;
             /* SM_PAT_BOXVAL removed by ME-1 */
 
             /* SM_EXEC_STMT for a variant pattern (invariant patterns are
