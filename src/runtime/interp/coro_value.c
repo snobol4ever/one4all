@@ -829,6 +829,8 @@ DESCR_t bb_eval_value(tree_t *e)
         if (!IS_FAIL_fn(res)) {
             bb_augop_writeback(lhs, res);
             result = res;
+        } else {
+            return FAILDESCR;   /* augop failure propagates as FAILDESCR, not NULVCL */
         }
         return result;
     }

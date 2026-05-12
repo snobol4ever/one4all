@@ -599,6 +599,21 @@ static void lower_augop(const tree_t *t)
         case TK_AUGSLASH:  sm_emit(g_p, SM_DIV);    emit_augop_store(lslot, is_kw, lname); return;
         case TK_AUGMOD:    sm_emit(g_p, SM_MOD);    emit_augop_store(lslot, is_kw, lname); return;
         case TK_AUGCONCAT: sm_emit(g_p, SM_CONCAT); emit_augop_store(lslot, is_kw, lname); return;
+        case TK_AUGPOW:    sm_emit(g_p, SM_EXP);    emit_augop_store(lslot, is_kw, lname); return;
+        /* Numeric relop augops: SM_ACOMP on success stores rhs, on fail pushes FAILDESCR. */
+        case TK_AUGEQ: sm_emit_i(g_p, SM_ACOMP, TT_EQ); emit_augop_store(lslot, is_kw, lname); return;
+        case TK_AUGNE: sm_emit_i(g_p, SM_ACOMP, TT_NE); emit_augop_store(lslot, is_kw, lname); return;
+        case TK_AUGLT: sm_emit_i(g_p, SM_ACOMP, TT_LT); emit_augop_store(lslot, is_kw, lname); return;
+        case TK_AUGLE: sm_emit_i(g_p, SM_ACOMP, TT_LE); emit_augop_store(lslot, is_kw, lname); return;
+        case TK_AUGGT: sm_emit_i(g_p, SM_ACOMP, TT_GT); emit_augop_store(lslot, is_kw, lname); return;
+        case TK_AUGGE: sm_emit_i(g_p, SM_ACOMP, TT_GE); emit_augop_store(lslot, is_kw, lname); return;
+        /* String relop augops: SM_LCOMP on success stores rhs, on fail pushes FAILDESCR. */
+        case TK_AUGSEQ:  sm_emit_i(g_p, SM_LCOMP, TT_LEQ); emit_augop_store(lslot, is_kw, lname); return;
+        case TK_AUGSNE:  sm_emit_i(g_p, SM_LCOMP, TT_LNE); emit_augop_store(lslot, is_kw, lname); return;
+        case TK_AUGSLT:  sm_emit_i(g_p, SM_LCOMP, TT_LLT); emit_augop_store(lslot, is_kw, lname); return;
+        case TK_AUGSLE:  sm_emit_i(g_p, SM_LCOMP, TT_LLE); emit_augop_store(lslot, is_kw, lname); return;
+        case TK_AUGSGT:  sm_emit_i(g_p, SM_LCOMP, TT_LGT); emit_augop_store(lslot, is_kw, lname); return;
+        case TK_AUGSGE:  sm_emit_i(g_p, SM_LCOMP, TT_LGE); emit_augop_store(lslot, is_kw, lname); return;
         default:
             sm_emit_i(g_p, SM_PUSH_LIT_I, (int64_t)op);
             sm_emit_si(g_p, SM_CALL_FN, "AUGOP", 3);
