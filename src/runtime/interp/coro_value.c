@@ -291,14 +291,22 @@ static DESCR_t bb_section(tree_t *e, bb_section_t kind)
 static DESCR_t bb_augop_compute(DESCR_t lv, DESCR_t rv, IcnTkKind op)
 {
     if (IS_FAIL_fn(lv) || IS_FAIL_fn(rv)) return FAILDESCR;
-    long li = IS_INT_fn(lv) ? lv.i : (long)lv.r;
-    long ri = IS_INT_fn(rv) ? rv.i : (long)rv.r;
+    int lv_real = IS_REAL_fn(lv), rv_real = IS_REAL_fn(rv);
+    double ld = lv_real ? lv.r : IS_INT_fn(lv) ? (double)lv.i : strtod(lv.s ? lv.s : "0", NULL);
+    double rd = rv_real ? rv.r : IS_INT_fn(rv) ? (double)rv.i : strtod(rv.s ? rv.s : "0", NULL);
+    long li = (long)ld, ri = (long)rd;
+    int use_real = lv_real || rv_real;
     switch (op) {
-    case TK_AUGPLUS:   return INTVAL(li + ri);
-    case TK_AUGMINUS:  return INTVAL(li - ri);
-    case TK_AUGSTAR:   return INTVAL(li * ri);
-    case TK_AUGSLASH:  return ri ? INTVAL(li / ri) : FAILDESCR;
+    case TK_AUGPLUS:   return use_real ? REALVAL(ld+rd) : INTVAL(li+ri);
+    case TK_AUGMINUS:  return use_real ? REALVAL(ld-rd) : INTVAL(li-ri);
+    case TK_AUGSTAR:   return use_real ? REALVAL(ld*rd) : INTVAL(li*ri);
+    case TK_AUGSLASH:  return use_real ? (rd!=0.0?REALVAL(ld/rd):FAILDESCR) : (ri?INTVAL(li/ri):FAILDESCR);
     case TK_AUGMOD:    return ri ? INTVAL(li % ri) : FAILDESCR;
+    case TK_AUGPOW: {
+        double result = pow(ld, rd);
+        if (!lv_real && !rv_real && rd >= 0 && (double)(long long)result == result) return INTVAL((long long)result);
+        return REALVAL(result);
+    }
     case TK_AUGCONCAT: {
         const char *ls = VARVAL_fn(lv), *rs = VARVAL_fn(rv);
         if (!ls) ls = ""; if (!rs) rs = "";

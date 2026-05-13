@@ -756,6 +756,37 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         double v = IS_REAL_fn(av) ? av.r : (double)av.i;
         *out = REALVAL(sqrt(v)); return 1;
     }
+    /* IJ-4: trig/exp/log/bitwise — coerce arg to numeric */
+#define ICN_TONUM(av) (IS_REAL_fn(av) ? (av).r : IS_INT_fn(av) ? (double)(av).i : ((av).v==DT_S && (av).s ? strtod((av).s,NULL) : 0.0))
+#define ICN_MATH1(fname, cfn) \
+    if (!strcmp(fn, fname) && nargs == 1) { double _v = ICN_TONUM(args[0]); *out = REALVAL(cfn(_v)); return 1; }
+    ICN_MATH1("sin",  sin)
+    ICN_MATH1("cos",  cos)
+    ICN_MATH1("tan",  tan)
+    ICN_MATH1("asin", asin)
+    ICN_MATH1("acos", acos)
+    ICN_MATH1("exp",  exp)
+#undef ICN_MATH1
+    if (!strcmp(fn,"atan") && nargs >= 1) {
+        double v = ICN_TONUM(args[0]);
+        if (nargs >= 2) { double v2 = ICN_TONUM(args[1]); *out = REALVAL(atan2(v,v2)); }
+        else *out = REALVAL(atan(v));
+        return 1;
+    }
+    if (!strcmp(fn,"log") && nargs >= 1) {
+        double v = ICN_TONUM(args[0]);
+        if (nargs >= 2) { double base = ICN_TONUM(args[1]); *out = REALVAL(log(v)/log(base)); }
+        else *out = REALVAL(log(v));
+        return 1;
+    }
+    if (!strcmp(fn,"dtor") && nargs == 1) { double v=ICN_TONUM(args[0]); *out=REALVAL(v*3.14159265358979323846/180.0); return 1; }
+    if (!strcmp(fn,"rtod") && nargs == 1) { double v=ICN_TONUM(args[0]); *out=REALVAL(v*180.0/3.14159265358979323846); return 1; }
+    if (!strcmp(fn,"iand")  && nargs==2) { int64_t a=IS_INT_fn(args[0])?args[0].i:(int64_t)args[0].r, b=IS_INT_fn(args[1])?args[1].i:(int64_t)args[1].r; *out=INTVAL(a&b); return 1; }
+    if (!strcmp(fn,"ior")   && nargs==2) { int64_t a=IS_INT_fn(args[0])?args[0].i:(int64_t)args[0].r, b=IS_INT_fn(args[1])?args[1].i:(int64_t)args[1].r; *out=INTVAL(a|b); return 1; }
+    if (!strcmp(fn,"ixor")  && nargs==2) { int64_t a=IS_INT_fn(args[0])?args[0].i:(int64_t)args[0].r, b=IS_INT_fn(args[1])?args[1].i:(int64_t)args[1].r; *out=INTVAL(a^b); return 1; }
+    if (!strcmp(fn,"ishift")&& nargs==2) { int64_t a=IS_INT_fn(args[0])?args[0].i:(int64_t)args[0].r, b=IS_INT_fn(args[1])?args[1].i:(int64_t)args[1].r; *out=INTVAL(b>=0?a<<b:a>>(-b)); return 1; }
+    if (!strcmp(fn,"icom")  && nargs==1) { int64_t a=IS_INT_fn(args[0])?args[0].i:(int64_t)args[0].r; *out=INTVAL(~a); return 1; }
+#undef ICN_TONUM
     /* copy(X) — shallow container copy.  For tables, lists: fresh container,
      * same element descriptors.  For strings/ints/reals/sets: value semantics
      * already give a fresh descriptor; return as-is. */
