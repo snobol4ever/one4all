@@ -44,4 +44,27 @@ void emit_mov_esi_imm32(int val);
 void emit_add_delta_imm(int v);
 void emit_sub_delta_imm(int v);
 
+/* EM-RAW-PURGE: additional insn helpers */
+void bb_insn_mov_rsp_rbp(void);
+void bb_insn_mov_rdx_imm64(uint64_t v);
+void bb_insn_mov_edx_imm32(uint32_t v);
+void bb_insn_mov_edi_imm32(uint32_t v);
+void bb_insn_mov_rsi_imm64(uint64_t v);
+void bb_insn_push_r12(void);
+void bb_insn_pop_r12(void);
+void bb_insn_inc_r13_disp8(uint8_t disp);
+void bb_insn_mov_rcx_imm64(uint64_t v);
+void bb_insn_mov_eax_r10mem(void);
+void bb_insn_cmp_eax_imm32(uint32_t v);
+void bb_insn_mov_eax_mem_rcx(void);
+void bb_insn_sub_eax_imm32(uint32_t v);
+void bb_insn_mov_ecx_eax(void);
+void bb_insn_cmp_eax_ecx(void);
+void bb_insn_mov_rax_mem_rcx(void);
+void bb_insn_movsxd_rcx_r10mem(void);
+void bb_insn_lea_rax_rax_rcx(void);
+void bb_insn_mov_rdi_rax(void);
+void bb_insn_add_eax_imm32(uint32_t v);
+void bb_insn_cmp_eax_mem_rcx(void);
+
 #endif /* EMIT_INSN_H */

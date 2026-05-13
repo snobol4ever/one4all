@@ -2,6 +2,7 @@
  *
  * Combines L0–L2 primitives into multi-instruction sequences used by
  * BB box templates (L4).  Each function handles all four emit modes.
+ * EM-RAW-PURGE: all raw bb_emit_byte calls replaced with bb_insn_* calls.
  */
 
 #include "emit_bb_seq.h"
@@ -24,11 +25,9 @@ void emit_bb_inc_mem_r13_disp8(uint8_t disp)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:   {
-        bb_emit_byte(0x41); bb_emit_byte(0xFF);
-        bb_emit_byte(0x45); bb_emit_byte(disp);
+    case EMIT_BINARY_BROKERED:
+        bb_insn_inc_r13_disp8(disp);
         return;
-    }
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF: {
@@ -47,16 +46,15 @@ void emit_push_rbp_frame(void)
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x55);
-        bb_emit_byte(0x48); bb_emit_byte(0x89); bb_emit_byte(0xE5);
-        bb_emit_byte(0x48); bb_emit_byte(0x83); bb_emit_byte(0xEC); bb_emit_byte(0x08);
+        bb_insn_push_rbp();
+        bb_insn_mov_rbp_rsp();
+        bb_insn_sub_rsp_imm8(8);
         return;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         if (bb_emit_mode == EMIT_TEXT && g_in_text_macro_body) return;
-        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         bb3c_format(emit_outf(), "", "push", "rbp");
         bb3c_format(emit_outf(), "", "mov",  "rbp, rsp");
         bb3c_format(emit_outf(), "", "sub",  "rsp, 8");
@@ -70,16 +68,15 @@ void emit_pop_rbp_frame_ret(void)
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x48); bb_emit_byte(0x89); bb_emit_byte(0xEC);
-        bb_emit_byte(0x5D);
-        bb_emit_byte(0xC3);
+        bb_insn_mov_rsp_rbp();
+        bb_insn_pop_rbp();
+        emit_ret();
         return;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         if (bb_emit_mode == EMIT_TEXT && g_in_text_macro_body) return;
-        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         bb3c_format(emit_outf(), "", "mov", "rsp, rbp");
         bb3c_format(emit_outf(), "", "pop", "rbp");
         bb3c_format(emit_outf(), "", "ret", "");
@@ -95,8 +92,8 @@ void emit_brokered_prologue(void)
     switch (bb_emit_mode) {
     case EMIT_BINARY_BROKERED:
     case EMIT_BINARY_WIRED:
-        bb_emit_byte(0x55);
-        bb_emit_byte(0x48); bb_emit_byte(0x89); bb_emit_byte(0xE5);
+        bb_insn_push_rbp();
+        bb_insn_mov_rbp_rsp();
         return;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
@@ -113,16 +110,11 @@ void emit_brokered_epilogue_ret(int result)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_BROKERED:
-    case EMIT_BINARY_WIRED: {
-        bb_emit_byte(0xB8);
-        bb_emit_byte((uint8_t)((uint32_t)result      ));
-        bb_emit_byte((uint8_t)((uint32_t)result >>  8));
-        bb_emit_byte((uint8_t)((uint32_t)result >> 16));
-        bb_emit_byte((uint8_t)((uint32_t)result >> 24));
-        bb_emit_byte(0x5D);
-        bb_emit_byte(0xC3);
+    case EMIT_BINARY_WIRED:
+        bb_insn_mov_eax_imm32((uint32_t)result);
+        bb_insn_pop_rbp();
+        emit_ret();
         return;
-    }
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF: {
@@ -167,15 +159,9 @@ void emit_lea_rdx_strtab_sym(const char *sym_label, uint64_t in_proc_ptr)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:   {
-        uint64_t v = in_proc_ptr;
-        bb_emit_byte(0x48); bb_emit_byte(0xBA);
-        bb_emit_byte((uint8_t)(v      )); bb_emit_byte((uint8_t)(v >>  8));
-        bb_emit_byte((uint8_t)(v >> 16)); bb_emit_byte((uint8_t)(v >> 24));
-        bb_emit_byte((uint8_t)(v >> 32)); bb_emit_byte((uint8_t)(v >> 40));
-        bb_emit_byte((uint8_t)(v >> 48)); bb_emit_byte((uint8_t)(v >> 56));
+    case EMIT_BINARY_BROKERED:
+        bb_insn_mov_rdx_imm64(in_proc_ptr);
         return;
-    }
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT: {
         if (g_in_text_macro_body) return;
@@ -197,13 +183,9 @@ void emit_mov_edx_imm32(int val)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:   {
-        uint32_t u = (uint32_t)val;
-        bb_emit_byte(0xBA);
-        bb_emit_byte((uint8_t)(u      )); bb_emit_byte((uint8_t)(u >>  8));
-        bb_emit_byte((uint8_t)(u >> 16)); bb_emit_byte((uint8_t)(u >> 24));
+    case EMIT_BINARY_BROKERED:
+        bb_insn_mov_edx_imm32((uint32_t)val);
         return;
-    }
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT: {
         if (g_in_text_macro_body) return;
@@ -224,15 +206,9 @@ void emit_mov_edi_imm32(int val)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:   {
-        uint32_t u = (uint32_t)val;
-        bb_emit_byte(0xBF);
-        bb_emit_byte((uint8_t)(u      ));
-        bb_emit_byte((uint8_t)(u >>  8));
-        bb_emit_byte((uint8_t)(u >> 16));
-        bb_emit_byte((uint8_t)(u >> 24));
+    case EMIT_BINARY_BROKERED:
+        bb_insn_mov_edi_imm32((uint32_t)val);
         return;
-    }
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT: {
         if (g_in_text_macro_body) return;
@@ -254,7 +230,7 @@ void emit_jz_retskip(int pc)
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x90);
+        bb_insn_nop();
         return;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT: {
@@ -299,15 +275,9 @@ void emit_movabs_rdi_entry(uint64_t entry_ptr)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:   {
-        uint64_t v = entry_ptr;
-        bb_emit_byte(0x48); bb_emit_byte(0xBF);
-        bb_emit_byte((uint8_t)(v      )); bb_emit_byte((uint8_t)(v >>  8));
-        bb_emit_byte((uint8_t)(v >> 16)); bb_emit_byte((uint8_t)(v >> 24));
-        bb_emit_byte((uint8_t)(v >> 32)); bb_emit_byte((uint8_t)(v >> 40));
-        bb_emit_byte((uint8_t)(v >> 48)); bb_emit_byte((uint8_t)(v >> 56));
+    case EMIT_BINARY_BROKERED:
+        emit_mov_rdi_imm64(entry_ptr);
         return;
-    }
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT: {
         if (g_in_text_macro_body) return;
@@ -374,7 +344,7 @@ void emit_bb_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fallb
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x41); bb_emit_byte(0x52);
+        bb_insn_push_r12();
         break;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
@@ -389,7 +359,7 @@ void emit_bb_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fallb
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x41); bb_emit_byte(0x5A);
+        bb_insn_pop_r12();
         break;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
@@ -449,12 +419,8 @@ void emit_load_delta_cmp_imm(int n, bb_label_t *lbl_succ, bb_label_t *lbl_fail)
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x41); bb_emit_byte(0x8B); bb_emit_byte(0x02);
-        bb_emit_byte(0x3D);
-        bb_emit_byte((uint8_t)((uint32_t)n      ));
-        bb_emit_byte((uint8_t)((uint32_t)n >>  8));
-        bb_emit_byte((uint8_t)((uint32_t)n >> 16));
-        bb_emit_byte((uint8_t)((uint32_t)n >> 24));
+        bb_insn_mov_eax_r10mem();
+        bb_insn_cmp_eax_imm32((uint32_t)n);
         emit_jmp(lbl_fail, JMP_JNE);
         emit_jmp(lbl_succ, JMP_JMP);
         return;
@@ -490,24 +456,12 @@ void emit_load_siglen_sub_cmp_delta(int n, uint64_t siglen_addr,
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x48); bb_emit_byte(0xB9);
-        bb_emit_byte((uint8_t)(siglen_addr      ));
-        bb_emit_byte((uint8_t)(siglen_addr >>  8));
-        bb_emit_byte((uint8_t)(siglen_addr >> 16));
-        bb_emit_byte((uint8_t)(siglen_addr >> 24));
-        bb_emit_byte((uint8_t)(siglen_addr >> 32));
-        bb_emit_byte((uint8_t)(siglen_addr >> 40));
-        bb_emit_byte((uint8_t)(siglen_addr >> 48));
-        bb_emit_byte((uint8_t)(siglen_addr >> 56));
-        bb_emit_byte(0x8B); bb_emit_byte(0x01);
-        bb_emit_byte(0x2D);
-        bb_emit_byte((uint8_t)((uint32_t)n      ));
-        bb_emit_byte((uint8_t)((uint32_t)n >>  8));
-        bb_emit_byte((uint8_t)((uint32_t)n >> 16));
-        bb_emit_byte((uint8_t)((uint32_t)n >> 24));
-        bb_emit_byte(0x89); bb_emit_byte(0xC1);
-        bb_emit_byte(0x41); bb_emit_byte(0x8B); bb_emit_byte(0x02);
-        bb_emit_byte(0x39); bb_emit_byte(0xC8);
+        bb_insn_mov_rcx_imm64(siglen_addr);
+        bb_insn_mov_eax_mem_rcx();
+        bb_insn_sub_eax_imm32((uint32_t)n);
+        bb_insn_mov_ecx_eax();
+        bb_insn_mov_eax_r10mem();
+        bb_insn_cmp_eax_ecx();
         emit_jmp(lbl_fail, JMP_JNE);
         emit_jmp(lbl_succ, JMP_JMP);
         return;
@@ -551,15 +505,7 @@ void emit_lea_rsi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr)
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x48); bb_emit_byte(0xBE);
-        bb_emit_byte((uint8_t)(in_proc_ptr      ));
-        bb_emit_byte((uint8_t)(in_proc_ptr >>  8));
-        bb_emit_byte((uint8_t)(in_proc_ptr >> 16));
-        bb_emit_byte((uint8_t)(in_proc_ptr >> 24));
-        bb_emit_byte((uint8_t)(in_proc_ptr >> 32));
-        bb_emit_byte((uint8_t)(in_proc_ptr >> 40));
-        bb_emit_byte((uint8_t)(in_proc_ptr >> 48));
-        bb_emit_byte((uint8_t)(in_proc_ptr >> 56));
+        bb_insn_mov_rsi_imm64(in_proc_ptr);
         return;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
@@ -588,19 +534,11 @@ void emit_sigma_plus_delta_to_rdi(uint64_t sigma_addr, uint64_t siglen_addr)
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x48); bb_emit_byte(0xB9);
-        bb_emit_byte((uint8_t)(sigma_addr      ));
-        bb_emit_byte((uint8_t)(sigma_addr >>  8));
-        bb_emit_byte((uint8_t)(sigma_addr >> 16));
-        bb_emit_byte((uint8_t)(sigma_addr >> 24));
-        bb_emit_byte((uint8_t)(sigma_addr >> 32));
-        bb_emit_byte((uint8_t)(sigma_addr >> 40));
-        bb_emit_byte((uint8_t)(sigma_addr >> 48));
-        bb_emit_byte((uint8_t)(sigma_addr >> 56));
-        bb_emit_byte(0x48); bb_emit_byte(0x8B); bb_emit_byte(0x01);
-        bb_emit_byte(0x49); bb_emit_byte(0x63); bb_emit_byte(0x0A);
-        bb_emit_byte(0x48); bb_emit_byte(0x8D); bb_emit_byte(0x04); bb_emit_byte(0x08);
-        bb_emit_byte(0x48); bb_emit_byte(0x89); bb_emit_byte(0xC7);
+        bb_insn_mov_rcx_imm64(sigma_addr);
+        bb_insn_mov_rax_mem_rcx();
+        bb_insn_movsxd_rcx_r10mem();
+        bb_insn_lea_rax_rax_rcx();
+        bb_insn_mov_rdi_rax();
         return;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
@@ -631,22 +569,10 @@ void emit_bounds_check_delta_plus_len(int len, uint64_t siglen_addr, bb_label_t 
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x41); bb_emit_byte(0x8B); bb_emit_byte(0x02);
-        bb_emit_byte(0x05);
-        bb_emit_byte((uint8_t)((uint32_t)len      ));
-        bb_emit_byte((uint8_t)((uint32_t)len >>  8));
-        bb_emit_byte((uint8_t)((uint32_t)len >> 16));
-        bb_emit_byte((uint8_t)((uint32_t)len >> 24));
-        bb_emit_byte(0x48); bb_emit_byte(0xB9);
-        bb_emit_byte((uint8_t)(siglen_addr      ));
-        bb_emit_byte((uint8_t)(siglen_addr >>  8));
-        bb_emit_byte((uint8_t)(siglen_addr >> 16));
-        bb_emit_byte((uint8_t)(siglen_addr >> 24));
-        bb_emit_byte((uint8_t)(siglen_addr >> 32));
-        bb_emit_byte((uint8_t)(siglen_addr >> 40));
-        bb_emit_byte((uint8_t)(siglen_addr >> 48));
-        bb_emit_byte((uint8_t)(siglen_addr >> 56));
-        bb_emit_byte(0x3B); bb_emit_byte(0x01);
+        bb_insn_mov_eax_r10mem();
+        bb_insn_add_eax_imm32((uint32_t)len);
+        bb_insn_mov_rcx_imm64(siglen_addr);
+        bb_insn_cmp_eax_mem_rcx();
         emit_jmp(lbl_fail, JMP_JG);
         return;
     case EMIT_TEXT_INLINE:

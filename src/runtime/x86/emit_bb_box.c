@@ -146,10 +146,7 @@ static void emit_mov_rdx_imm32(int v)
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x48); bb_emit_byte(0xBA);
-        bb_emit_byte((uint8_t)(val      )); bb_emit_byte((uint8_t)(val >>  8));
-        bb_emit_byte((uint8_t)(val >> 16)); bb_emit_byte((uint8_t)(val >> 24));
-        bb_emit_byte(0); bb_emit_byte(0); bb_emit_byte(0); bb_emit_byte(0);
+        bb_insn_mov_rdx_imm64(val);
         return;
     case EMIT_TEXT:
     case EMIT_TEXT_INLINE:
