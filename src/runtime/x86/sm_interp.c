@@ -1773,10 +1773,13 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 int is_fret  = (ins->op == SM_FRETURN  || ins->op == SM_FRETURN_S || ins->op == SM_FRETURN_F);
                 int is_nret  = (ins->op == SM_NRETURN  || ins->op == SM_NRETURN_S || ins->op == SM_NRETURN_F);
                 /* Read return value: for expression thunks (retval_name==NULL) use stack top;
-                 * for user functions use the NV retval slot the body wrote. */
+                 * for user functions use the NV retval slot the body wrote.
+                 * Icon semantics: fall-off-end returns &null (not fail). */
+                extern int g_lang;
                 DESCR_t retval = (fr->retval_name)
                     ? NV_GET_fn(fr->retval_name)
-                    : ((st->sp > 0) ? st->stack[st->sp - 1] : FAILDESCR);
+                    : ((st->sp > 0) ? st->stack[st->sp - 1]
+                       : (g_lang == LANG_ICN ? NULVCL : FAILDESCR));
                 /* Restore saved NV vars (reverse order so retval slot last) */
                 for (int k = fr->nsaved - 1; k >= 0; k--)
                     NV_SET_fn(fr->saved_names[k], fr->saved_vals[k]);

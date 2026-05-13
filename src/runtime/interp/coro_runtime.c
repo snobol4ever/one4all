@@ -858,8 +858,42 @@ static DESCR_t coro_bb_fnc(void *zeta, int entry) {
     z->args[z->gen_idx] = v;
     return icn_call_builtin(z->call, z->args, z->nargs);
 }
-/* Coroutine trampoline for TT_FNC user-proc wrapper.
- * coro_bb_suspend calls this via makecontext; it reads from coro_stage. */
+/* coro_bb_indirect_callee — TT_FNC where callee (c[0]) is a generator.
+ * e.g. `(!plist)()` or `(!plist)(1,2)` — iterate the callee values,
+ * call each as a proc/builtin with the pre-evaluated fixed args each tick. */
+typedef struct {
+    bb_node_t   callee_box;           /* generator yielding DT_E/DT_S/DT_I proc values */
+    DESCR_t     args[ICN_FNC_GEN_ARGS]; /* pre-evaluated fixed args */
+    int         nargs;
+} icn_indirect_callee_state_t;
+
+static DESCR_t coro_bb_indirect_callee(void *zeta, int entry) {
+    icn_indirect_callee_state_t *z = (icn_indirect_callee_state_t *)zeta;
+    extern int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR_t *out);
+    DESCR_t callee = z->callee_box.fn(z->callee_box.ζ, entry);
+    if (IS_FAIL_fn(callee)) return FAILDESCR;
+    if (callee.v == DT_E) {
+        for (int i = 0; i < proc_count; i++) {
+            if (proc_table[i].entry_pc == (int)callee.i)
+                return proc_table_call(i, z->args, z->nargs);
+        }
+        if (callee.slen < (uint32_t)proc_count)
+            return proc_table_call((int)callee.slen, z->args, z->nargs);
+        return FAILDESCR;
+    }
+    if (callee.v == DT_S && callee.s) {
+        DESCR_t result = FAILDESCR;
+        for (int i = 0; i < proc_count; i++) {
+            if (proc_table[i].name && strcmp(proc_table[i].name, callee.s) == 0)
+                { result = proc_table_call(i, z->args, z->nargs); return result; }
+        }
+        if (icn_try_call_builtin_by_name(callee.s, z->args, z->nargs, &result)) return result;
+        return FAILDESCR;
+    }
+    if (IS_INT_fn(callee) || IS_REAL_fn(callee)) return (z->nargs == 0) ? callee : FAILDESCR;
+    if (callee.v == DT_SNUL) return NULVCL;
+    return FAILDESCR;
+}
 typedef struct {
     coro_t *ss;
     tree_t              *proc;
@@ -1677,6 +1711,21 @@ bb_node_t coro_eval(tree_t *e) {
     }
 
     /* ── TT_FNC user proc — coroutine wrapper ─────────────────────────────── */
+    if (e->t == TT_FNC && e->n >= 1 && e->c[0]) {
+        /* IJ-3: generative callee — (!plist)() or (!plist)(arg).
+         * When c[0] is not a bare TT_VAR but is itself a generator (TT_ITERATE,
+         * TT_ALTERNATE, etc.), build coro_bb_indirect_callee which pumps the
+         * callee generator per tick and dispatches each yielded proc value. */
+        if (e->c[0]->t != TT_VAR && is_suspendable(e->c[0])) {
+            int nargs = e->n - 1;
+            icn_indirect_callee_state_t *ic = calloc(1, sizeof(*ic));
+            ic->callee_box = coro_eval(e->c[0]);
+            ic->nargs = (nargs < ICN_FNC_GEN_ARGS) ? nargs : ICN_FNC_GEN_ARGS;
+            for (int j = 0; j < ic->nargs; j++)
+                ic->args[j] = bb_eval_value(e->c[1+j]);
+            return (bb_node_t){ coro_bb_indirect_callee, ic, 0 };
+        }
+    }
     if (e->t == TT_FNC && e->n >= 1 && e->c[0] && e->c[0]->v.sval) {
         const char *fn = e->c[0]->v.sval;
         int nargs = e->n - 1;

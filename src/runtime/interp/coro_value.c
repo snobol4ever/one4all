@@ -575,13 +575,23 @@ DESCR_t bb_eval_value(tree_t *e)
                 return FAILDESCR;
             }
             if (callee.v == DT_S && callee.s) {
-                /* Builtin proc value: dispatch by name via CH-17g-runtime-bridge-1 */
+                /* String callee: try as builtin name, then as user proc name */
                 DESCR_t out = FAILDESCR;
                 if (icn_try_call_builtin_by_name(callee.s, args, nargs, &out)) return out;
-                /* Not a known builtin — try icn_call_builtin with the original node
-                 * using the name stored in callee.s as the function name override. */
+                for (int i = 0; i < proc_count; i++) {
+                    if (proc_table[i].name && strcmp(proc_table[i].name, callee.s) == 0)
+                        return proc_table_call(i, args, nargs);
+                }
                 return FAILDESCR;
             }
+            /* Icon semantics: integer/real called with 0 args returns itself;
+             * called with args or as non-proc type → fail (Error 5 in strict mode,
+             * but for every-driven indirect calls we just fail silently). */
+            if (IS_INT_fn(callee) || IS_REAL_fn(callee)) {
+                if (nargs == 0) return callee;   /* 3() → 3 */
+                return FAILDESCR;
+            }
+            if (callee.v == DT_SNUL) return NULVCL;   /* &null() → &null */
             return FAILDESCR;
         }
         const char *fn = e->c[0]->v.sval;
