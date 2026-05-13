@@ -282,19 +282,24 @@ static int64_t vstack_pop_int64(void)
 
 static DESCR_t _rt_IDENT(DESCR_t *a, int n)
 {
-    /* IDENT(x[,y]): succeed if x == y (or x is null-string when n==1). */
+    /* IDENT(x[,y]): succeed if x == y (or x is null-string when n==1).
+     * Returns NULVCL (empty string) on success — matches SPITBOL SIL ident()
+     * behaviour.  Returning a[0] was wrong: IDENT(bs,CHAR(8)) would push
+     * CHAR(8) onto the stack, corrupting downstream CONCAT results. */
     const char *s1 = (n >= 1 && a[0].v == DT_S) ? (a[0].s ? a[0].s : "") : "";
     const char *s2 = (n >= 2 && a[1].v == DT_S) ? (a[1].s ? a[1].s : "") : "";
     if (n == 1) return (s1[0] == '\0') ? NULVCL : FAILDESCR;
-    return (strcmp(s1, s2) == 0) ? a[0] : FAILDESCR;
+    return (strcmp(s1, s2) == 0) ? NULVCL : FAILDESCR;
 }
 
 static DESCR_t _rt_DIFFER(DESCR_t *a, int n)
 {
+    /* DIFFER(x[,y]): succeed if x != y (or x is non-null when n==1).
+     * Returns NULVCL on success — same SPITBOL SIL convention as IDENT. */
     const char *s1 = (n >= 1 && a[0].v == DT_S) ? (a[0].s ? a[0].s : "") : "";
     const char *s2 = (n >= 2 && a[1].v == DT_S) ? (a[1].s ? a[1].s : "") : "";
-    if (n == 1) return (s1[0] != '\0') ? a[0] : FAILDESCR;
-    return (strcmp(s1, s2) != 0) ? a[0] : FAILDESCR;
+    if (n == 1) return (s1[0] != '\0') ? NULVCL : FAILDESCR;
+    return (strcmp(s1, s2) != 0) ? NULVCL : FAILDESCR;
 }
 
 /*==============================================================================
