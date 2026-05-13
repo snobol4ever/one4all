@@ -76,10 +76,8 @@ static const sm_nullary_entry_t g_sm_nullary[] = {
 void emit_sm_op(int op)
 {
     for (const sm_nullary_entry_t *e = g_sm_nullary; e->op >= 0; e++)
-        if (e->op == op)
-            emit_sm_nullary_rt(e->macro_name, e->rt_fn);
-        else
-            emit_sm_unhandled_op(op);
+        if (e->op == op) { emit_sm_nullary_rt(e->macro_name, e->rt_fn); return; }
+    emit_sm_unhandled_op(op);
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
 void  emit_sm_coerce_num   ()  { emit_sm_op(SM_COERCE_NUM); }
@@ -135,10 +133,8 @@ static const struct { int op; const char *mn; } g_sm_arith[] = {
 void emit_sm_arith_dispatch(int op)
 {
     for (int i = 0; g_sm_arith[i].op >= 0; i++)
-        if (g_sm_arith[i].op == op)
-            emit_sm_arith_op(op, g_sm_arith[i].mn);
-        else
-            emit_sm_unhandled_op(op);
+        if (g_sm_arith[i].op == op) { emit_sm_arith_op(op, g_sm_arith[i].mn); return; }
+    emit_sm_unhandled_op(op);
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_arith_op(int op_enum, const char *macro_name)
