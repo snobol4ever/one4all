@@ -82,6 +82,7 @@ extern DESCR_t (*g_user_call_hook)(const char *name, DESCR_t *args, int nargs);
 #include "sil_macros.h"   /* SIL macro translations — RT + SM axes */
 #include "bb_build.h"
 #include "bb_pool.h"              /* bb_pool_reset (EM-7d) */
+#include "emit_bb_flat.h"         /* bb_build_flat / bb_build_brokered — EM-RAW-PURGE-1 */
 /* rt_in_native_chunk lives in libscrip_rt.so (mode-4 only).  In the scrip
  * binary (mode-1/2/3) it is never set — provide a weak fallback that returns
  * 0 so the call resolves cleanly even when libscrip_rt is not linked. */
@@ -113,6 +114,7 @@ static const int β = 1;
 const char *Σ = NULL;
 int         Δ = 0;
 int         Ω = 0;
+int         g_scan_pre_delta = 0;  /* EM-RAW-PURGE-1: Δ before box call, for scan_body_fn_u9 */
 int         Σlen = 0;  /* true subject length — boxes use this for bounds; Ω clamped by kw_anchor */
 
 /* Subject globals — defined here, extern'd in snobol4_stmt_rt.c.
@@ -636,8 +638,10 @@ static DESCR_t bb_deferred_var(void *zeta, int entry)
                                     ζ->child_state = NULL;
                                     ζ->child_size  = 0;
                                 } else {
-                                    /* EM-RAW-PURGE-1: TODO Phase B — replace with patnd_make_eps + bb_build_flat */
-                                    ζ->child_fn    = NULL;
+                                    /* EM-RAW-PURGE-1: eps via brokered blob */
+                                    PATND_t *ep = patnd_make_eps();
+                                    bb_box_fn efn = bb_build_brokered(ep);
+                                    ζ->child_fn    = efn;
                                     ζ->child_state = NULL;
                                     ζ->child_size  = 0;
                                 }
@@ -645,8 +649,9 @@ static DESCR_t bb_deferred_var(void *zeta, int entry)
                             }
                         } else if (val.v == DT_S && val.s) {
                             /* String value: always treat as fresh literal.
-                             * EM-RAW-PURGE-1: TODO Phase B — replace with patnd_make_xchr + bb_build_flat */
-                            bb_box_fn lfn = NULL;
+                             * EM-RAW-PURGE-1: brokered blob (flat ABI incompatible with scan_body_fn_u9) */
+                            PATND_t *lp = patnd_make_xchr(val.s);
+                            bb_box_fn lfn = bb_build_brokered(lp);
                             if (lfn && lfn != ζ->child_fn) {
                                 ζ->child_fn    = lfn;
                                 ζ->child_state = NULL;
@@ -655,8 +660,10 @@ static DESCR_t bb_deferred_var(void *zeta, int entry)
                             }
                         } else {
                             if (!ζ->child_fn) {
-                                /* EM-RAW-PURGE-1: TODO Phase B — replace with patnd_make_eps + bb_build_flat */
-                                ζ->child_fn    = NULL;
+                                /* EM-RAW-PURGE-1: eps via brokered blob */
+                                PATND_t *ep = patnd_make_eps();
+                                bb_box_fn efn = bb_build_brokered(ep);
+                                ζ->child_fn    = efn;
                                 ζ->child_state = NULL;
                                 ζ->child_size  = 0;
                                 rebuilt = 1;
@@ -748,12 +755,15 @@ typedef struct { int start; int end; } scan_result_t;
 static void scan_body_fn_u9(DESCR_t val, void *arg) {
     scan_result_t *r = (scan_result_t *)arg;
     r->end = Δ;
-    /* EXVAL-3: dispatch on type tag rather than assuming SNOBOL4 σ/δ layout.
-     * DT_S (SNOBOL4 match span): slen = match length → start = end - slen.
-     * Other types (Prolog DT_SNUL, Icon value): box did not advance Δ, so
-     * start == end == Δ (zero-length match at current cursor). exec_stmt is
-     * currently SNOBOL4-only; this branch is defensive for future frontends. */
-    r->start = (val.v == DT_S) ? Δ - (int)val.slen : Δ;
+    /* EM-RAW-PURGE-1: g_scan_pre_delta is set by bb_broker before body_fn call.
+     * It holds the scan position (pre-match Δ) reliably regardless of val.slen. */
+    if (g_scan_pre_delta >= 0)
+        r->start = g_scan_pre_delta;
+    else if (val.v == DT_S && val.slen)
+        r->start = Δ - (int)val.slen;
+    else
+        r->start = Δ;
+    g_scan_pre_delta = -1;
 }
 
 /*
@@ -866,15 +876,18 @@ int exec_stmt(const char  *subj_name,
             }
         }
         if (!bin_done) {
-            /* EM-RAW-PURGE-1: TODO Phase B — replace with patnd_make_eps + bb_build_flat */
-            root.fn     = NULL;
+            /* EM-RAW-PURGE-1: eps fallback via brokered blob */
+            PATND_t *ep = patnd_make_eps();
+            bb_box_fn efn = bb_build_brokered(ep);
+            root.fn     = efn;
             root.ζ      = NULL;
             root.ζ_size = 0;
         }
     } else if (pat.v == DT_S && pat.s) {
         int bin_done = 0;
-        {   /* EM-RAW-PURGE-1: TODO Phase B — replace with patnd_make_xchr + bb_build_flat */
-            bb_box_fn bfn = NULL;
+        {   /* EM-RAW-PURGE-1: lit via brokered blob (flat return ABI incompatible with scan_body_fn_u9) */
+            PATND_t *lp = patnd_make_xchr(pat.s);
+            bb_box_fn bfn = bb_build_brokered(lp);
             if (bfn) {
                 root.fn  = bfn;
                 root.ζ   = NULL;
@@ -883,14 +896,18 @@ int exec_stmt(const char  *subj_name,
             }
         }
         if (!bin_done) {
-            /* EM-RAW-PURGE-1: TODO Phase B — replace with patnd_make_eps + bb_build_flat */
-            root.fn     = NULL;
+            /* eps fallback */
+            PATND_t *ep = patnd_make_eps();
+            bb_box_fn efn = bb_build_brokered(ep);
+            root.fn     = efn;
             root.ζ      = NULL;
             root.ζ_size = 0;
         }
     } else {
-        /* EM-RAW-PURGE-1: TODO Phase B — replace with patnd_make_eps + bb_build_flat */
-        root.fn = NULL; root.ζ = NULL; root.ζ_size = 0;
+        /* EM-RAW-PURGE-1: eps via brokered blob */
+        PATND_t *ep = patnd_make_eps();
+        bb_box_fn efn = bb_build_brokered(ep);
+        root.fn = efn; root.ζ = NULL; root.ζ_size = 0;
     }
 
     /* ── Phase 3: run match ─────────────────────────────────────────── */
@@ -1160,8 +1177,10 @@ int deferred_var_test(void)
     bb_box_fn bfn = bb_build_brokered(&dsar_node);
     bb_node_t dvar;
     if (bfn) { dvar.fn = bfn; dvar.ζ = NULL; dvar.ζ_size = 0; }
-    else { /* EM-RAW-PURGE-1: TODO Phase B — replace with patnd_make_eps + bb_build_flat */
-           dvar.fn = NULL; dvar.ζ = NULL; dvar.ζ_size = 0; }
+    else { /* EM-RAW-PURGE-1: eps fallback via brokered blob */
+           PATND_t *ep = patnd_make_eps();
+           bb_box_fn efn = bb_build_brokered(ep);
+           dvar.fn = efn; dvar.ζ = NULL; dvar.ζ_size = 0; }
 
     int ok = 1;
 

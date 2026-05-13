@@ -20,6 +20,8 @@
  *============================================================================================================================*/
 
 #include "bb_broker.h"
+extern int Δ;
+extern int g_scan_pre_delta;  /* EM-RAW-PURGE-1: set before body_fn call */
 
 /*============================================================================================================================
  * bb_broker — unified entry point
@@ -43,6 +45,7 @@ int bb_broker(bb_node_t root, BrokerMode mode,
             Δ = scan;
             DESCR_t val = fn(root.ζ, α);
             if (!IS_FAIL_fn(val)) {
+                g_scan_pre_delta = scan;  /* scan pos = pre-match Δ */
                 if (body_fn) body_fn(val, arg);
                 ticks++;
                 return ticks;   /* first match wins — SNOBOL4 semantics */

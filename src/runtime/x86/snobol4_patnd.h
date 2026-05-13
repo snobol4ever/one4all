@@ -74,4 +74,9 @@ struct _PATND_t {
 #include <stdio.h>
 void patnd_print(const PATND_t *p, FILE *out);  /* diagnostic: --dump-bb */
 
+/* EM-RAW-PURGE-1: single-node PATND_t constructors.
+ * Use with bb_build_flat / bb_build_brokered instead of raw-byte emitters. */
+PATND_t *patnd_make_xchr(const char *lit);  /* XCHR leaf — literal string */
+PATND_t *patnd_make_eps(void);              /* XEPS leaf — epsilon        */
+
 #endif /* PATND_H */

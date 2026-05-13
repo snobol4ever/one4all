@@ -206,6 +206,21 @@ DESCR_t pat_epsilon(void) {
     return spat_val(spat_new(XEPS));
 }
 
+/* EM-RAW-PURGE-1: public constructors returning raw PATND_t* for bb_build_flat. */
+PATND_t *patnd_make_xchr(const char *lit) {
+    PATND_t *p = (PATND_t *)GC_MALLOC(sizeof(PATND_t));
+    memset(p, 0, sizeof(PATND_t));
+    p->kind = XCHR;
+    p->STRVAL_fn = lit ? GC_strdup(lit) : "";
+    return p;
+}
+PATND_t *patnd_make_eps(void) {
+    PATND_t *p = (PATND_t *)GC_MALLOC(sizeof(PATND_t));
+    memset(p, 0, sizeof(PATND_t));
+    p->kind = XEPS;
+    return p;
+}
+
 /* Forward declaration — eval_node is defined in eval_code.c (separate TU) */
 extern DESCR_t eval_node(tree_t *e);
 
