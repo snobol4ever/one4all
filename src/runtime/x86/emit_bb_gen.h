@@ -6,6 +6,7 @@
 #include "emit_buf.h"
 #include "emit_label.h"
 #include "emit_text3c.h"
+#include "emit_insn.h"
 #include "bb_pool.h"
 #include <stdio.h>
 #include <stdint.h>
@@ -18,6 +19,11 @@ extern FILE          *bb_emit_out;
 
 /* emit_mode_set — central setter for emit pass mode. */
 void emit_mode_set(bb_emit_mode_t m, FILE *out);
+
+extern int g_in_text_macro_body;
+FILE *emit_outf(void);
+void bb3c_op (const char *mn, const char *fmt, ...);
+void bb3c_jmp(const char *mn, const char *target);
 
 void emit_jmp(bb_label_t *target, jmp_kind_t kind);
 void emit_bb_inc_mem_r13_disp8(uint8_t disp);
@@ -69,44 +75,5 @@ void emit_pop_rbp_frame_ret(void);
 
 void bb_emit_patch_rel8 (bb_label_t *lbl);
 void bb_emit_patch_rel32(bb_label_t *lbl);
-
-void bb_insn_mov_eax_imm32(uint32_t imm);
-void bb_insn_mov_rax_imm64(uint64_t imm);
-void bb_insn_ret(void);
-void bb_insn_nop(void);
-void bb_insn_call_rax(void);
-void bb_insn_jmp_rel8(bb_label_t *target);
-void bb_insn_jmp_rel32(bb_label_t *target);
-void bb_insn_jl_rel8 (bb_label_t *target);
-void bb_insn_jge_rel8(bb_label_t *target);
-void bb_insn_je_rel8 (bb_label_t *target);
-void bb_insn_jne_rel8(bb_label_t *target);
-void bb_insn_je_rel32 (bb_label_t *target);
-void bb_insn_jl_rel32 (bb_label_t *target);
-void bb_insn_jge_rel32(bb_label_t *target);
-void bb_insn_jne_rel32(bb_label_t *target);
-void bb_insn_jg_rel32 (bb_label_t *target);
-void bb_insn_cmp_esi_imm8(uint8_t imm);
-void bb_insn_cmp_esi_imm32(uint32_t imm);
-void bb_insn_movzx_eax_rdi_off8(uint8_t off);
-void bb_insn_cmp_al_imm8(uint8_t imm);
-void bb_insn_xor_eax_eax(void);
-void bb_insn_push_rbp(void);
-void bb_insn_pop_rbp(void);
-void bb_insn_mov_rbp_rsp(void);
-void bb_insn_sub_rsp_imm8(uint8_t imm);
-void bb_insn_add_rsp_imm8(uint8_t imm);
-
-/* ── instruction emitters (bb_emit_mode-aware) ─ */
-void emit_ret            (void);
-void emit_push_r10       (void);
-void emit_pop_r10        (void);
-void emit_test_rax_rax   (void);
-void emit_test_eax_eax   (void);
-void emit_mov_rdi_imm64  (uint64_t val);
-void emit_call_sym_plt   (const char *sym, uint64_t fn_fallback);
-void emit_mov_esi_imm32  (int val);
-void emit_add_delta_imm  (int v);
-void emit_sub_delta_imm  (int v);
 
 #endif
