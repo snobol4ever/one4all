@@ -595,10 +595,9 @@ DESCR_t bb_eval_value(tree_t *e)
             /* Icon semantics: integer/real called with 0 args returns itself;
              * called with args or as non-proc type → fail (Error 5 in strict mode,
              * but for every-driven indirect calls we just fail silently). */
-            if (IS_INT_fn(callee) || IS_REAL_fn(callee)) {
-                if (nargs == 0) return callee;   /* 3() → 3 */
-                return FAILDESCR;
-            }
+            /* Icon semantics: integers/reals are not callable — always fail.
+             * Verified against Icon 9.5 oracle: 3() → fail (not 3). */
+            if (IS_INT_fn(callee) || IS_REAL_fn(callee)) return FAILDESCR;
             if (callee.v == DT_SNUL) return NULVCL;   /* &null() → &null */
             return FAILDESCR;
         }

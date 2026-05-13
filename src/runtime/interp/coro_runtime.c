@@ -870,29 +870,38 @@ typedef struct {
 static DESCR_t coro_bb_indirect_callee(void *zeta, int entry) {
     icn_indirect_callee_state_t *z = (icn_indirect_callee_state_t *)zeta;
     extern int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR_t *out);
-    DESCR_t callee = z->callee_box.fn(z->callee_box.ζ, entry);
-    if (IS_FAIL_fn(callee)) return FAILDESCR;
-    if (callee.v == DT_E) {
-        for (int i = 0; i < proc_count; i++) {
-            if (proc_table[i].entry_pc == (int)callee.i)
-                return proc_table_call(i, z->args, z->nargs);
-        }
-        if (callee.slen < (uint32_t)proc_count)
-            return proc_table_call((int)callee.slen, z->args, z->nargs);
-        return FAILDESCR;
-    }
-    if (callee.v == DT_S && callee.s) {
+    /* Icon semantics for (!plist)(): iterate callee generator, skip non-callable
+     * types (integers, reals, unknown) AND skip procs that fail (fall-off-end).
+     * Return a result only when a callable succeeds.
+     * Return FAILDESCR only when the callee generator is fully exhausted. */
+    int cur_entry = entry;
+    for (;;) {
+        DESCR_t callee = z->callee_box.fn(z->callee_box.ζ, cur_entry);
+        cur_entry = β;
+        if (IS_FAIL_fn(callee)) return FAILDESCR;  /* generator exhausted */
         DESCR_t result = FAILDESCR;
-        for (int i = 0; i < proc_count; i++) {
-            if (proc_table[i].name && strcmp(proc_table[i].name, callee.s) == 0)
-                { result = proc_table_call(i, z->args, z->nargs); return result; }
+        if (callee.v == DT_E) {
+            int found = 0;
+            for (int i = 0; i < proc_count; i++) {
+                if (proc_table[i].entry_pc == (int)callee.i)
+                    { result = proc_table_call(i, z->args, z->nargs); found = 1; break; }
+            }
+            if (!found && callee.slen < (uint32_t)proc_count)
+                result = proc_table_call((int)callee.slen, z->args, z->nargs);
+        } else if (callee.v == DT_S && callee.s) {
+            for (int i = 0; i < proc_count; i++) {
+                if (proc_table[i].name && strcmp(proc_table[i].name, callee.s) == 0)
+                    { result = proc_table_call(i, z->args, z->nargs); break; }
+            }
+            if (result.v == DT_FAIL)
+                (void)icn_try_call_builtin_by_name(callee.s, z->args, z->nargs, &result);
+        } else if (callee.v == DT_SNUL) {
+            return NULVCL;
         }
-        if (icn_try_call_builtin_by_name(callee.s, z->args, z->nargs, &result)) return result;
-        return FAILDESCR;
+        /* else: integer, real, other non-callable — result stays FAILDESCR → skip */
+        if (!IS_FAIL_fn(result)) return result;
+        /* result failed (proc fell off end, or non-callable): skip to next element */
     }
-    if (IS_INT_fn(callee) || IS_REAL_fn(callee)) return (z->nargs == 0) ? callee : FAILDESCR;
-    if (callee.v == DT_SNUL) return NULVCL;
-    return FAILDESCR;
 }
 typedef struct {
     coro_t *ss;
