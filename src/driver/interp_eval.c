@@ -533,6 +533,16 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
                     { snprintf(buf,128,"procedure %s",proc_table[i].name); *out=STRVAL(buf); return 1; }
             snprintf(buf,128,"procedure"); *out=STRVAL(buf); return 1;
         }
+        /* IJ-4: DT_S builtin proc name → "function name" */
+        if (IS_STR_fn(av) && av.s) {
+            /* Check if it's a known builtin name; if so emit "function name" */
+            extern DESCR_t icn_proc_as_value(const char *);
+            DESCR_t pv = icn_proc_as_value(av.s);
+            if (pv.v == DT_S) {  /* confirmed builtin */
+                snprintf(buf, 128, "function %s", av.s);
+                *out = STRVAL(buf); return 1;
+            }
+        }
         const char *s=VARVAL_fn(av); if (!s) s = "";
         int sl = (int)strlen(s);
         char *outs = GC_malloc(sl*4 + 3);
@@ -557,6 +567,30 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         outs[o++] = '"';
         outs[o] = '\0';
         *out = STRVAL(outs); return 1;
+    }
+    /* IJ-4: image(val, width) — width arg ignored per Icon 9.5 oracle.
+     * Also handles DT_S builtin proc names: image(sqrt,15) → "function sqrt". */
+    if (!strcmp(fn,"image") && nargs == 2) {
+        DESCR_t av = args[0];
+        /* DT_S builtin proc name */
+        if (IS_STR_fn(av) && av.s) {
+            char *buf = GC_malloc(64);
+            snprintf(buf, 64, "function %s", av.s);
+            *out = STRVAL(buf); return 1;
+        }
+        /* DT_E user proc */
+        if (av.v == DT_E) {
+            char *buf = GC_malloc(128);
+            for (int i=0;i<proc_count;i++)
+                if (proc_table[i].entry_pc==(int)av.i)
+                    { snprintf(buf,128,"procedure %s",proc_table[i].name); *out=STRVAL(buf); return 1; }
+            snprintf(buf,128,"procedure"); *out=STRVAL(buf); return 1;
+        }
+        /* Delegate to image(val) for all other types */
+        DESCR_t one_out = FAILDESCR;
+        if (icn_try_call_builtin_by_name("image", args, 1, &one_out))
+            { *out = one_out; return 1; }
+        *out = FAILDESCR; return 1;
     }
     /* CH-17g-runtime-bridge-3 BATCH 2 (2026-05-09): multi-arg pure transforms.
      * Same constraints as batch 1 — verbatim port of in-eval branches with

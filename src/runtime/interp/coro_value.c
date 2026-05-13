@@ -395,7 +395,7 @@ static void bb_augop_writeback(tree_t *lhs, DESCR_t res)
  * When a TT_VAR name is used as a value and NV_GET returns null,
  * check if it names a user proc or known builtin.
  * Returns DT_E for user procs, DT_S(name) for builtins, FAILDESCR if neither. */
-static DESCR_t icn_proc_as_value(const char *name)
+DESCR_t icn_proc_as_value(const char *name)
 {
     if (!name || name[0] == '&') return FAILDESCR;
     for (int i = 0; i < proc_count; i++) {

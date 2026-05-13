@@ -143,6 +143,14 @@ static void emit_var_load(const char *vn)
                     return;
                 }
             }
+            /* IJ-4: also check known Icon builtins (sqrt, write, sin, etc.).
+             * SM_PUSH_VAR will call icn_proc_as_value which returns DT_S(name). */
+            extern DESCR_t icn_proc_as_value(const char *);
+            DESCR_t pv = icn_proc_as_value(vn);
+            if (pv.v == DT_S) {
+                sm_emit_s(g_p, SM_PUSH_VAR, vn);
+                return;
+            }
         }
         int slot = scope_get(g_proc_scope, vn);
         if (slot >= 0) { sm_emit_i(g_p, SM_LOAD_FRAME, slot); return; }

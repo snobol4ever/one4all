@@ -376,6 +376,14 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                         break;
                     }
                 }
+                /* IJ-4: if still not found as user proc, check Icon builtin names.
+                 * e.g. `f := sqrt; f(4.0)` — sqrt is a builtin, not in proc_table.
+                 * Return DT_S(name) so coro_bb_indirect_callee / SM_CALL_FN can call it. */
+                if (val.v == DT_SNUL || val.v == DT_S) {
+                    extern DESCR_t icn_proc_as_value(const char *);
+                    DESCR_t pv = icn_proc_as_value(name);
+                    if (pv.v != DT_FAIL) val = pv;
+                }
             } }
             sm_push(st, val);
             /* SN-6: keyword reads (e.g. INPUT at EOF) return FAILDESCR.
@@ -1593,6 +1601,16 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                                                         args, nargs);
                             sm_push(st, _pr);
                             st->last_ok = (_pr.v != DT_FAIL);
+                            goto sm_call_done;
+                        }
+                    }
+                    /* IJ-4: DT_S in frame slot = builtin name (e.g. f := sqrt; f(4.0)) */
+                    if (IS_STR_fn(_pv) && _pv.s) {
+                        extern int icn_try_call_builtin_by_name(const char *, DESCR_t *, int, DESCR_t *);
+                        DESCR_t _br = FAILDESCR;
+                        if (icn_try_call_builtin_by_name(_pv.s, args, nargs, &_br)) {
+                            sm_push(st, _br);
+                            st->last_ok = (_br.v != DT_FAIL);
                             goto sm_call_done;
                         }
                     }
