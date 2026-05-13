@@ -364,7 +364,7 @@ typedef struct {
 static DESCR_t bb_usercall(void *zeta, int entry)
 {
     usercall_t *ζ = zeta;
-    spec_t UC;
+    DESCR_t UC;
 
     if (entry == α) goto UC_α;
                     goto UC_β;
@@ -463,7 +463,7 @@ static DESCR_t bb_usercall(void *zeta, int entry)
                 * above as failure). */
                if (via_nreturn) {
                    ζ->consumed = 0;
-                   UC = spec(Σ + Δ, 0);                     goto UC_γ;
+                   UC = descr_match(Σ + Δ, 0);                  goto UC_γ;
                }
 
                /* SN-26c-parseerr-e: match the return value against subject @ Δ. */
@@ -473,7 +473,7 @@ static DESCR_t bb_usercall(void *zeta, int entry)
                    if (Δ + rl > Σlen)                              goto UC_ω;
                    if (rl > 0 && memcmp(Σ + Δ, rs, (size_t)rl) != 0) goto UC_ω;
                    ζ->consumed = rl;
-                   UC = spec(Σ + Δ, rl);
+                   UC = descr_match(Σ + Δ, rl);
                    Δ += rl;
                                                                   goto UC_γ;
                }
@@ -484,11 +484,11 @@ static DESCR_t bb_usercall(void *zeta, int entry)
                 * was previously epsilon and corpus relies on that). */
                ζ->consumed = 0;
            }
-           UC = spec(Σ + Δ, 0);           goto UC_γ;
+           UC = descr_match(Σ + Δ, 0);        goto UC_γ;
     UC_β:  Δ -= ζ->consumed;
            ζ->consumed = 0;                goto UC_ω;
 
-    UC_γ:                                  return descr_from_spec(UC);
+    UC_γ:                                  return UC;
     UC_ω:                                  return FAILDESCR;
 }
 
@@ -539,7 +539,7 @@ static DESCR_t bb_deferred_var(void *zeta, int entry)
     if (entry == α)                                     goto DVAR_α;
     if (entry == β)                                     goto DVAR_β;
 
-    spec_t          DVAR;
+    DESCR_t         DVAR;
 
     DVAR_α:         {
                         /* Recursion guard: global depth cap only. */
@@ -674,17 +674,17 @@ static DESCR_t bb_deferred_var(void *zeta, int entry)
                      * time.  bb_deferred_var is an ordinary combinator
                      * that forwards α to its child — no special
                      * bookkeeping required. */
-                    DVAR = spec_from_descr(ζ->child_fn(ζ->child_state, α));
+                    DVAR = ζ->child_fn(ζ->child_state, α);
                     g_dvar_depth--;
-                    if (spec_is_empty(DVAR))                  goto DVAR_ω;
+                    if (IS_FAIL_fn(DVAR))                    goto DVAR_ω;
                     goto DVAR_γ;
 
     DVAR_β:         if (!ζ->child_fn)                         goto DVAR_ω;
-                    DVAR = spec_from_descr(ζ->child_fn(ζ->child_state, β));
-                    if (spec_is_empty(DVAR))                  goto DVAR_ω;
+                    DVAR = ζ->child_fn(ζ->child_state, β);
+                    if (IS_FAIL_fn(DVAR))                    goto DVAR_ω;
                                                               goto DVAR_γ;
 
-    DVAR_γ:                                                   return descr_from_spec(DVAR);
+    DVAR_γ:                                                   return DVAR;
     DVAR_ω:                                                   return FAILDESCR;
 }
 
@@ -735,9 +735,8 @@ typedef struct { int start; int end; } scan_result_t;
 
 static void scan_body_fn_u9(DESCR_t val, void *arg) {
     scan_result_t *r = (scan_result_t *)arg;
-    spec_t sp = spec_from_descr(val);
     r->end   = Δ;
-    r->start = Δ - sp.δ;   /* scan position = end − match length */
+    r->start = Δ - (int)val.slen;   /* scan position = end − match length */
 }
 
 /*
@@ -1168,18 +1167,18 @@ int deferred_var_test(void)
     /* First α — will resolve via NV_GET_fn. Since test stub returns SNUL,
      * child becomes epsilon (always matches zero-width).  What we verify is
      * that the re-resolve branch runs without crash and returns a valid spec. */
-    spec_t r1 = spec_from_descr(dvar.fn(dvar.ζ, α));
+    DESCR_t r1 = dvar.fn(dvar.ζ, α);
     /* epsilon matches → non-empty spec at position 0 */
-    ok &= !spec_is_empty(r1) ? 1 : 0;   /* epsilon always succeeds */
+    ok &= !IS_FAIL_fn(r1) ? 1 : 0;   /* epsilon always succeeds */
 
     /* Second α on same box — re-resolve must run again (not skip) */
     /* Reset Δ */
     Δ = 0;
-    spec_t r2 = spec_from_descr(dvar.fn(dvar.ζ, α));
-    ok &= !spec_is_empty(r2) ? 1 : 0;
+    DESCR_t r2 = dvar.fn(dvar.ζ, α);
+    ok &= !IS_FAIL_fn(r2) ? 1 : 0;
 
     printf("  deferred_var: r1=%s r2=%s (both non-empty = re-resolve ran)\n",
-           spec_is_empty(r1)?"empty":"ok", spec_is_empty(r2)?"empty":"ok");
+           IS_FAIL_fn(r1)?"empty":"ok", IS_FAIL_fn(r2)?"empty":"ok");
 
     return ok;
 }
