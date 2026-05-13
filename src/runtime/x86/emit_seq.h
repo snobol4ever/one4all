@@ -1,7 +1,7 @@
-/* emit_seq.h — RW-2: compound BB helper sequences, new names.
+/* emit_seq.h — compound BB helper sequences (RW-2 new names; RW-6: emit_bb_seq.c deleted).
  *
  * Replaces emit_bb_seq.h. No if-statements in any body — only insn_* calls.
- * Old emit_bb_seq.c still compiled alongside; no callers changed in RW-2.
+ * RW-6: emit_bb_seq.c deleted.
  */
 
 #ifndef EMIT_SEQ_H

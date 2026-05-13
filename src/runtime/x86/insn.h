@@ -1,10 +1,10 @@
-/* insn.h — RW-1: leaf x86 instruction emitters.
+/* insn.h — leaf x86 instruction emitters (RW-1 + RW-6 absorbed emit_insn.c).
  *
  * Each function emits exactly one x86 instruction.
  * Pattern: if (IS_TEXT) { text; return; } / binary bytes below.
  * IS_TEXT / IS_BIN are the only mode checks allowed at this layer.
  *
- * Written alongside old emit_insn.c/h — no callers changed in RW-1.
+ * RW-6: emit_insn.c deleted; all functions now here.
  */
 
 #ifndef INSN_H

@@ -2,7 +2,7 @@
  *
  * No if-statements in any body — only insn_* / emit_jmp calls.
  * Mode dispatch lives entirely inside insn_* and emit_jmp.
- * Old emit_bb_seq.c still compiled alongside; no callers changed.
+ * RW-6: emit_bb_seq.c deleted (content was already in emit_seq.c).
  */
 
 #include "emit_seq.h"

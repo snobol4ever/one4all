@@ -1,7 +1,7 @@
-/* emit_text.h — RW-1: TEXT-mode 3-col formatter and banner helpers.
+/* emit_text.h — TEXT-mode 3-col formatter and banner helpers (RW-1 + RW-6 absorbed emit_text3c.c).
  *
  * Replaces emit_text3c.h. New names for all public symbols.
- * Old emit_text3c.h still compiled alongside — no callers changed in RW-1.
+ * RW-6: emit_text3c.c deleted; all functions now in emit_text.c.
  */
 
 #ifndef EMIT_TEXT_H

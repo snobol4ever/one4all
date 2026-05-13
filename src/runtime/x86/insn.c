@@ -1,8 +1,7 @@
-/* insn.c — RW-1: leaf x86 instruction emitters.
+/* insn.c — leaf x86 instruction emitters (RW-1 + RW-6 absorbed emit_insn.c).
  *
  * Each function: if (IS_TEXT) { text; return; } / binary bytes below.
  * IS_TEXT is the only mode check at this layer — never in callers above.
- * Written alongside old emit_insn.c — no callers changed in RW-1.
  */
 
 #include "insn.h"

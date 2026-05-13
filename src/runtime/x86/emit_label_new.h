@@ -1,7 +1,7 @@
-/* emit_label.h — RW-1: label lifecycle, new names.
+/* emit_label_new.h — label lifecycle (RW-1 new names; RW-6 standalone).
  *
  * Consolidates label symbols currently split across emit_label.c and
- * emit_form.c. New names alongside old — no callers changed in RW-1.
+ * emit_label.c deleted (RW-6); all label functions now here or in emit_mode.c.
  */
 
 #ifndef EMIT_LABEL_NEW_H
