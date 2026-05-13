@@ -1,6 +1,6 @@
 
 
-#include "emit_bb_flat.h"
+#include "emit_flat.h"
 #include "emit_bb_gen.h"
 #include "emit.h"
 #include "snobol4.h"
@@ -129,7 +129,7 @@ static void data_buf_flush_pending_label(void)
 /* EM-7c-capture: callback installed by sm_codegen_x64_emit to collect cap fixups. */
 static void (*g_cap_fixup_cb)(void *cap_ptr, const char *child_α_label) = NULL;
 
-void bb_flat_set_cap_fixup_cb(void (*cb)(void *cap_ptr, const char *child_α_label))
+void emit_flat_set_cap_fixup(void (*cb)(void *cap_ptr, const char *child_α_label))
 {
     g_cap_fixup_cb = cb;
 }
@@ -145,7 +145,7 @@ void bb_flat_set_cap_fixup_cb(void (*cb)(void *cap_ptr, const char *child_α_lab
 /* ── intern_str hook — set by sm_codegen_x64_emit before calling bb_build_flat_text */
 static const char *(*g_flat_intern_str)(const char *s) = NULL;
 
-void bb_flat_set_intern_str(const char *(*fn)(const char *))
+void emit_flat_set_intern_str(const char *(*fn)(const char *))
 {
     g_flat_intern_str = fn;
 }
@@ -168,7 +168,7 @@ static void flat3c_action(const char *act, const char *args)
 /* Forward decls for data-buffer helpers used by flat3c_label below; full */
 static void data_buf_remember_label(const char *name);
 
-void flat3c_label(const char *name)
+void emit_flat_label(const char *name)
 {
     if (!g_is_text) return;
     if (g_flat_data_active) {
@@ -194,7 +194,7 @@ static void data_buf_emit_block_comment(void)
     g_flat_data_block_nlbls = 0;
 }
 
-void flat_data_section(void)
+void emit_flat_data_section(void)
 {
     if (!g_is_text) return;
     g_flat_data_active = 1;
@@ -202,7 +202,7 @@ void flat_data_section(void)
     g_flat_data_block_nlbls = 0;
 }
 
-void flat_text_section(void)
+void emit_flat_text_section(void)
 {
     if (!g_is_text) return;
     if (g_flat_data_active) {
@@ -214,7 +214,7 @@ void flat_text_section(void)
     flat3c("", ".section", ".text");
 }
 
-void flat_intel_syntax(void)
+void emit_flat_intel_syntax(void)
 {
     if (!g_is_text) return;
     if (g_flat_data_active) return;
@@ -225,7 +225,7 @@ void flat_intel_syntax(void)
     flat3c("", ".intel_syntax", "noprefix");
 }
 
-void flat_data_string(const char *s)
+void emit_flat_data_string(const char *s)
 {
     if (!g_is_text) return;
     char esc[1024];
@@ -243,14 +243,14 @@ void flat_data_string(const char *s)
     else                    flat3c("", ".string", esc);
 }
 
-void flat_data_quad(const char *arg)
+void emit_flat_data_quad(const char *arg)
 {
     if (!g_is_text) return;
     if (g_flat_data_active) data_buf_three_col("", ".quad", arg ? arg : "0");
     else                    flat3c("", ".quad", arg ? arg : "0");
 }
 
-void flat_data_quad_int(long long v)
+void emit_flat_data_quad_i(long long v)
 {
     if (!g_is_text) return;
     char buf[32]; snprintf(buf, sizeof(buf), "%lld", v);
@@ -258,7 +258,7 @@ void flat_data_quad_int(long long v)
     else                    flat3c("", ".quad", buf);
 }
 
-void flat_data_long(long long v)
+void emit_flat_data_long(long long v)
 {
     if (!g_is_text) return;
     char buf[32]; snprintf(buf, sizeof(buf), "%lld", v);
@@ -266,7 +266,7 @@ void flat_data_long(long long v)
     else                    flat3c("", ".long", buf);
 }
 
-void flat_data_zero(int n)
+void emit_flat_data_zero(int n)
 {
     if (!g_is_text) return;
     char buf[16]; snprintf(buf, sizeof(buf), "%d", n);
@@ -274,14 +274,14 @@ void flat_data_zero(int n)
     else                    flat3c("", ".zero", buf);
 }
 
-void flat_globl(const char *name)
+void emit_flat_globl(const char *name)
 {
     if (!g_is_text) return;
     flat3c("", ".globl", name);
 }
 
 /* Emit the three-line box-call sequence: `lea rdi,[rip+ζ]` / `mov esi,mode` / */
-void flat_box_call(const char *rdi_load,
+void emit_flat_box_call(const char *rdi_load,
                           const char *fn, int mode)
 {
     if (!g_is_text) return;
@@ -295,7 +295,7 @@ void flat_box_call(const char *rdi_load,
 }
 
 /* Variant: arbno's box call uses a slot pointer dereference rather than */
-void flat_box_call_slot(const char *slot_lbl,
+void emit_flat_box_call_slot(const char *slot_lbl,
                                const char *fn, int mode)
 {
     if (!g_is_text) return;
@@ -311,7 +311,7 @@ void flat_box_call_slot(const char *slot_lbl,
 }
 
 /* EM-FORMAT-BB-LAW (TRIPLE-FUSION): emit */
-void flat_box_dispatch_jne_jmp(bb_label_t *lbl_succ,
+void emit_flat_dispatch_jne_jmp(bb_label_t *lbl_succ,
                                       bb_label_t *lbl_fail)
 {
     if (!g_is_text) return;
@@ -327,7 +327,7 @@ void flat_box_dispatch_jne_jmp(bb_label_t *lbl_succ,
 }
 
 /* EM-FORMAT-BB-LAW (TRIPLE-FUSION): emit the entry dispatch */
-void flat_box_entry_dispatch(bb_label_t *lbl_alpha_body,
+void emit_flat_entry_dispatch(bb_label_t *lbl_alpha_body,
                                     bb_label_t *lbl_beta)
 {
     if (!g_is_text) return;
@@ -869,7 +869,7 @@ static void intcur_text_body(bb_label_t *lbl_succ,
 extern int memcmp(const void *, const void *, size_t);
 
 /* Generic two-call emitter: α calls fn(ζ,0), β calls fn(ζ,1), result nonzero=success */
-void emit_flat_box_call(bb_box_fn fn, const char *fn_name,
+void emit_flat_box_call_fn(bb_box_fn fn, const char *fn_name,
                                void *z,
                                bb_label_t *lbl_succ, bb_label_t *lbl_fail,
                                bb_label_t *lbl_β)
@@ -1033,7 +1033,7 @@ bb_box_fn bb_build_brokered(PATND_t *p)
     return (bb_box_fn)buf;
 }
 
-int bb_build_flat_text(PATND_t *p, FILE *out, const char *prefix)
+int emit_flat_build(PATND_t *p, FILE *out, const char *prefix)
 {
     if (!flat_is_eligible(p)) return -1;
     emitter_init_text(out, TEXT_MODE_INVOCATION);
@@ -1043,7 +1043,7 @@ int bb_build_flat_text(PATND_t *p, FILE *out, const char *prefix)
     return rc;
 }
 
-void bb_build_flat_text_reset(void)
+void emit_flat_reset(void)
 {
     g_flat_slot_count = 0;
     g_flat_node_id    = 0;
@@ -1082,7 +1082,7 @@ static void bm_jmp(FILE *f, const char *cond, const char *tgt)
     bm_line(f, "", cond, arg);
 }
 
-int bb_macros_write_to_path(const char *path)
+int emit_flat_macros_to_path(const char *path)
 {
     FILE *f = fopen(path, "w");
     if (!f) return -1;

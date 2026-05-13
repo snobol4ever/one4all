@@ -1,6 +1,6 @@
 
 
-#include "emit_sm_text.h"
+#include "emit_walk.h"
 #include "sm_image.h"
 #include "sm_prog.h"
 #include "snobol4.h"
@@ -13,7 +13,7 @@
 #include <stdint.h>
 
 #include "emit_sm_shape.h"
-#include "emit_bb_flat.h"
+#include "emit_flat.h"
 #include <assert.h>
 
 
@@ -80,9 +80,9 @@ const sm_op_template_t *sm_template_lookup(int op);
 const char *emit_sm_consume_pc_label(void);
 void emit_sm_set_pc_label(const char *lbl);
 
-int g_jit_emit_inline = 0;
+int g_emit_inline = 0;
 
-#define TEXT_MODE() (g_jit_emit_inline ? EMIT_TEXT_INLINE : EMIT_TEXT)
+#define TEXT_MODE() (g_emit_inline ? EMIT_TEXT_INLINE : EMIT_TEXT)
 
 typedef struct {
     char       *buf;
@@ -1027,14 +1027,14 @@ static SimVal make_pat_val(DESCR_t d, int is_variant)
 }
 
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
-int flat_is_eligible_node(const PATND_t *p)
+int emit_flat_eligible(const PATND_t *p)
 {
     if (!p) return 1;
     return p->kind != XVAR;
 }
 
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
-int patnd_is_fully_invariant(const PATND_t *p)
+int emit_flat_invariant(const PATND_t *p)
 {
     if (!p) return 1;
     if (!flat_is_eligible_node(p)) return 0;
@@ -1052,7 +1052,7 @@ static PATND_t *patnd_of(DESCR_t d)
 
 /* Walk SM instructions [phase2_start, phase2_end) and simulate Phase-2 */
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t sm_phase2_to_patnd(const SM_Program *prog,
+DESCR_t emit_walk_phase2(const SM_Program *prog,
                             int phase2_start, int phase2_end,
                             int *out_variant)
 {
@@ -1590,11 +1590,11 @@ static int edp4_sm_unhandled(FILE *out, const SM_Instr *ins, int pc)
 }
 
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_codegen_text(SM_Program *prog, FILE *out, const char *src_path)
+int emit_walk_codegen(SM_Program *prog, FILE *out, const char *src_path)
 {
     assert(prog != NULL);
     assert(out  != NULL);
-    if (!g_jit_emit_inline) {
+    if (!g_emit_inline) {
         if (emit_sm_macro_library_to_path("sm_macros.s") != 0) {
             fprintf(stderr,
                     "sm_codegen_text: failed to write sm_macros.s "
