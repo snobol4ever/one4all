@@ -23,7 +23,18 @@ tree_t *ast_gc_clone(const tree_t *e)
     c->_id        = e->_id;
     c->n = e->n;
     c->_nalloc    = e->n;
-    c->v.sval      = e->v.sval ? GC_strdup(e->v.sval) : NULL;
+    /* Only node types that store a string in v.sval should GC_strdup it.
+     * Other types (TT_ILIT, TT_FLIT, TT_AUGOP, etc.) store ival/dval in
+     * the same union — calling GC_strdup on an integer cast to char* crashes. */
+    switch (e->t) {
+        case TT_QLIT: case TT_VAR: case TT_KEYWORD: case TT_FNC:
+        case TT_IDX:  case TT_CSET: case TT_ATTR:
+            c->v.sval = e->v.sval ? GC_strdup(e->v.sval) : NULL;
+            break;
+        default:
+            /* v already copied via c->v.ival = e->v.ival above */
+            break;
+    }
     if (e->n > 0) {
         c->c = GC_malloc((size_t)e->n * sizeof(tree_t *));
         for (int i = 0; i < e->n; i++)
