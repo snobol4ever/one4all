@@ -1489,6 +1489,153 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         *out = IS_FAIL_fn(v) ? FAILDESCR : v; return 1;
     }
 
+    /* IJ-7: Icon operator string invocation: o(x) or o(x,y) where o is an
+     * operator symbol string. Handles unop/binop in rung36_jcon_coerce. */
+#define _OPCOERCE(d) do { \
+        if (!IS_INT_fn(d) && !IS_REAL_fn(d)) { \
+            const char *_s = VARVAL_fn(d); \
+            if (_s && *_s) { char *_e=NULL; long long _iv=strtoll(_s,&_e,10); \
+                if (_e && !*_e){(d)=INTVAL(_iv);} \
+                else {double _rv=strtod(_s,&_e); \
+                      if(_e && !*_e){(d)=REALVAL(_rv);}else{*out=FAILDESCR;return 1;}} \
+            } else { *out=FAILDESCR; return 1; } } } while(0)
+#define _NUMREL(op) do { DESCR_t _l=args[0],_r=args[1]; _OPCOERCE(_l); _OPCOERCE(_r); \
+        double _lv2=IS_REAL_fn(_l)?_l.r:(double)_l.i, _rv2=IS_REAL_fn(_r)?_r.r:(double)_r.i; \
+        *out=(_lv2 op _rv2)?_r:FAILDESCR; return 1; } while(0)
+#define _STRREL(op) do { DESCR_t _l=args[0],_r=args[1]; \
+        const char *_ls=VARVAL_fn(_l); if(!_ls)_ls=""; \
+        const char *_rs=VARVAL_fn(_r); if(!_rs)_rs=""; \
+        int _cmp=strcmp(_ls,_rs); *out=(_cmp op 0)?_r:FAILDESCR; return 1; } while(0)
+
+    if (nargs == 1) {
+        DESCR_t a = args[0];
+        if (IS_FAIL_fn(a)) { *out = FAILDESCR; return 1; }
+        /* unary +: coerce to numeric */
+        if (fn[0]=='+' && fn[1]=='\0') {
+            if (IS_INT_fn(a)||IS_REAL_fn(a)) { *out=a; return 1; }
+            const char *s=VARVAL_fn(a); if(!s||!*s){*out=FAILDESCR;return 1;}
+            char *e=NULL; long long iv=strtoll(s,&e,10); if(e&&*e=='\0'){*out=INTVAL(iv);return 1;}
+            double dv=strtod(s,&e); if(e&&*e=='\0'){*out=REALVAL(dv);return 1;}
+            *out=FAILDESCR; return 1;
+        }
+        /* unary -: negate (coerce first) */
+        if (fn[0]=='-' && fn[1]=='\0') {
+            _OPCOERCE(a);
+            *out = IS_REAL_fn(a) ? REALVAL(-a.r) : INTVAL(-a.i); return 1;
+        }
+        /* unary *: size-of (1 for int/real, strlen for string/cset, nfields for record) */
+        if (fn[0]=='*' && fn[1]=='\0') {
+            if (IS_INT_fn(a)||IS_REAL_fn(a)) { *out=INTVAL(1); return 1; }
+            if (a.v==DT_DATA && a.u && a.u->type) { *out=INTVAL(a.u->type->nfields); return 1; }
+            const char *s=VARVAL_fn(a); *out=INTVAL(s?(long long)strlen(s):0LL); return 1;
+        }
+        /* unary !: JCON semantics — int/real return self; string/cset first char */
+        if (fn[0]=='!' && fn[1]=='\0') {
+            if (IS_INT_fn(a)||IS_REAL_fn(a)) { *out=a; return 1; }
+            const char *s=VARVAL_fn(a);
+            if (s&&*s) { char *ch=GC_malloc(2); ch[0]=s[0]; ch[1]='\0'; *out=STRVAL(ch); return 1; }
+            *out=FAILDESCR; return 1;
+        }
+        /* unary /: test x===0 (Icon: succeeds only if x is zero) */
+        if (fn[0]=='/' && fn[1]=='\0') {
+            if (IS_INT_fn(a))  { *out=(a.i==0)?a:FAILDESCR; return 1; }
+            if (IS_REAL_fn(a)) { *out=(a.r==0.0)?a:FAILDESCR; return 1; }
+            *out=FAILDESCR; return 1;
+        }
+        /* unary \: return x if x ~=== &null, else fail */
+        if (fn[0]=='\\' && fn[1]=='\0') {
+            *out=(a.v==DT_SNUL)?FAILDESCR:a; return 1;
+        }
+        /* unary ~: cset complement */
+        if (fn[0]=='~' && fn[1]=='\0') {
+            const char *s=VARVAL_fn(a); if(!s) s="";
+            unsigned char in_set[256]={0}; for(const char *p=s;*p;p++) in_set[(unsigned char)*p]=1;
+            char *buf=GC_malloc(257); int n=0;
+            for(int c=0;c<256;c++) if(!in_set[c]) buf[n++]=(char)c; buf[n]='\0';
+            *out=STRVAL(buf); return 1;
+        }
+        /* unary ?: random element */
+        if (fn[0]=='?' && fn[1]=='\0') {
+            if (IS_INT_fn(a)) { *out=(a.i>0)?INTVAL((long long)(rand()%(int)a.i)+1):FAILDESCR; return 1; }
+            if (IS_REAL_fn(a)) { *out=REALVAL((double)rand()/RAND_MAX*a.r); return 1; }
+            const char *s=VARVAL_fn(a);
+            if (s&&*s) { int n=(int)strlen(s); char *ch=GC_malloc(2); ch[0]=s[rand()%n]; ch[1]='\0'; *out=STRVAL(ch); return 1; }
+            *out=FAILDESCR; return 1;
+        }
+    }
+
+    if (nargs == 2) {
+        DESCR_t l=args[0], r=args[1];
+        if (IS_FAIL_fn(l)||IS_FAIL_fn(r)) { *out=FAILDESCR; return 1; }
+        /* binary arithmetic */
+        if (fn[0]=='+' && fn[1]=='\0') { _OPCOERCE(l); _OPCOERCE(r); *out=add(l,r); return 1; }
+        if (fn[0]=='-' && fn[1]=='\0') { _OPCOERCE(l); _OPCOERCE(r); *out=sub(l,r); return 1; }
+        if (fn[0]=='*' && fn[1]=='\0') { _OPCOERCE(l); _OPCOERCE(r); *out=mul(l,r); return 1; }
+        if (fn[0]=='/' && fn[1]=='\0') { _OPCOERCE(l); _OPCOERCE(r); *out=DIVIDE_fn(l,r); return 1; }
+        if (fn[0]=='%' && fn[1]=='\0') {
+            _OPCOERCE(l); _OPCOERCE(r);
+            long li=IS_INT_fn(l)?l.i:(long)l.r, ri=IS_INT_fn(r)?r.i:(long)r.r;
+            *out=ri?INTVAL(li%ri):FAILDESCR; return 1;
+        }
+        if (fn[0]=='^' && fn[1]=='\0') {
+            _OPCOERCE(l); _OPCOERCE(r);
+            if (IS_INT_fn(l)&&IS_INT_fn(r)&&r.i>=0) {
+                long long base=l.i, res=1; for(int k=0;k<(int)r.i;k++) res*=base;
+                *out=INTVAL(res); return 1;
+            }
+            double base=IS_REAL_fn(l)?l.r:(double)l.i, exp=IS_REAL_fn(r)?r.r:(double)r.i;
+            *out=(DESCR_t){.v=DT_R,.r=pow(base,exp)}; return 1;
+        }
+        /* numeric relational */
+        if (!strcmp(fn,"<"))  _NUMREL(<);
+        if (!strcmp(fn,"<=")) _NUMREL(<=);
+        if (!strcmp(fn,">"))  _NUMREL(>);
+        if (!strcmp(fn,">=")) _NUMREL(>=);
+        if (!strcmp(fn,"="))  _NUMREL(==);
+        if (!strcmp(fn,"~=")) _NUMREL(!=);
+        /* string relational */
+        if (!strcmp(fn,"<<"))  _STRREL(<);
+        if (!strcmp(fn,"<<=")) _STRREL(<=);
+        if (!strcmp(fn,">>"))  _STRREL(>);
+        if (!strcmp(fn,">>=")) _STRREL(>=);
+        if (!strcmp(fn,"=="))  _STRREL(==);
+        if (!strcmp(fn,"~==")) _STRREL(!=);
+        /* identity */
+        if (!strcmp(fn,"===")) {
+            extern int icn_descr_identical(DESCR_t, DESCR_t);
+            *out=icn_descr_identical(l,r)?r:FAILDESCR; return 1;
+        }
+        if (!strcmp(fn,"~===")) {
+            extern int icn_descr_identical(DESCR_t, DESCR_t);
+            *out=icn_descr_identical(l,r)?FAILDESCR:r; return 1;
+        }
+        /* subscript: s[i] — only valid when first arg is string/cset */
+        if (!strcmp(fn,"[]")) {
+            if (!IS_STR_fn(l) && l.v!=DT_C && l.v!=DT_SNUL) { *out=FAILDESCR; return 1; }
+            *out=subscript_get(l,r); return 1;
+        }
+        /* cset set operations */
+        if (!strcmp(fn,"++")) {
+            const char *la=VARVAL_fn(l); if(!la)la="";
+            const char *ra=VARVAL_fn(r); if(!ra)ra="";
+            *out=STRVAL(icn_cset_canonical(icn_cset_union(la,ra))); return 1;
+        }
+        if (!strcmp(fn,"--")) {
+            const char *la=VARVAL_fn(l); if(!la)la="";
+            const char *ra=VARVAL_fn(r); if(!ra)ra="";
+            *out=STRVAL(icn_cset_canonical(icn_cset_diff(la,ra))); return 1;
+        }
+        if (!strcmp(fn,"**")) {
+            const char *la=VARVAL_fn(l); if(!la)la="";
+            const char *ra=VARVAL_fn(r); if(!ra)ra="";
+            *out=STRVAL(icn_cset_canonical(icn_cset_inter(la,ra))); return 1;
+        }
+    }
+
+#undef _OPCOERCE
+#undef _NUMREL
+#undef _STRREL
+
     return 0;
 }
 
