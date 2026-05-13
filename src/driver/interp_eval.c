@@ -1617,9 +1617,8 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
             extern int icn_descr_identical(DESCR_t, DESCR_t);
             *out=icn_descr_identical(l,r)?FAILDESCR:r; return 1;
         }
-        /* subscript: s[i] — only valid when first arg is string/cset */
+        /* subscript: s[i] — string/cset/integer subscript (IJ-7: int coerced to string) */
         if (!strcmp(fn,"[]")) {
-            if (!IS_STR_fn(l) && l.v!=DT_C && l.v!=DT_SNUL) { *out=FAILDESCR; return 1; }
             *out=subscript_get(l,r); return 1;
         }
         /* cset set operations */

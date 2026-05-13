@@ -487,6 +487,13 @@ DESCR_t subscript_get(DESCR_t arr, DESCR_t idx) {
         }
         return table_get(arr.tbl, ks);
     }
+    /* IJ-7: DT_I integer subscript — coerce integer to string, then subscript.
+     * Icon: 2[1] -> "2"[1] -> "2".  Matches JCON rung36_jcon_coerce binop("[]"). */
+    if (arr.v == DT_I) {
+        char ibuf[32]; snprintf(ibuf, sizeof ibuf, "%lld", (long long)arr.i);
+        arr = STRVAL(GC_strdup(ibuf));
+        /* fall through to DT_S case below */
+    }
     /* IC-5: DT_S string subscript — Icon 1-based, negative wraps from end */
     if (arr.v == DT_S || arr.v == DT_SNUL) {
         const char *s = arr.s ? arr.s : "";

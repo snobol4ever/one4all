@@ -181,6 +181,20 @@ DESCR_t coro_bb_limit(void *zeta, int entry);
 DESCR_t coro_bb_cset_compl(void *zeta, int entry);
 
 /*----------------------------------------------------------------------------------------------------------------------------
+ * coro_bb_scan_gen -- TT_SCAN with generative subject  (gen ? body)  IJ-7
+ *
+ * Pumps subject generator; for each subject value runs the scan body.
+ * Yields body result per successful scan; tries next subject on body failure.
+ * State: subject gen box, body tree_t*.
+ *--------------------------------------------------------------------------------------------------------------------------*/
+typedef struct {
+    bb_node_t  subj_gen;  /* subject alternation/generator */
+    tree_t    *body;      /* scan body (c[1]) */
+    int        started;
+} icn_scan_gen_state_t;
+DESCR_t coro_bb_scan_gen(void *zeta, int entry);
+
+/*----------------------------------------------------------------------------------------------------------------------------
  * coro_bb_every — TT_EVERY Byrd box  (every gen [do body])   IC-2b
  *
  * Drives inner generator to exhaustion; evaluates body tree_t* per tick.

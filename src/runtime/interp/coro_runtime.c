@@ -814,6 +814,9 @@ int is_suspendable(tree_t *e) {
         case TT_NONNULL:
             /* \E — generative if E is generative; filters out null values */
             return is_suspendable(e->n > 0 ? e->c[0] : NULL);
+        case TT_SCAN:
+            /* IJ-7: (gen ? body) — generative when subject (c[0]) is generative */
+            return is_suspendable(e->n > 0 ? e->c[0] : NULL);
         case TT_NULL:
             return 0;   /* /E is never a sequence generator */
         default:
@@ -868,12 +871,101 @@ typedef struct {
 /* Forward declaration — defined in interp.c */
 extern DESCR_t icn_call_builtin(tree_t *call, DESCR_t *args, int nargs);
 
+/*--------------------------------------------------------------------------------------------------------------------------
+ * coro_bb_fnc_multi — IJ-7: user proc call with MULTIPLE generative args.
+ *
+ * Drives a cross-product over all generative args.  Innermost (rightmost) arg
+ * varies fastest.  On each tick: advance innermost gen; on exhaustion bubble left,
+ * resetting inner dims.  Calls the user proc with the current arg value combination.
+ *--------------------------------------------------------------------------------------------------------------------------*/
+typedef struct {
+    tree_t    *call;
+    int        nargs;
+    tree_t    *arg_trees[ICN_FNC_GEN_ARGS];  /* all arg tree nodes */
+    bb_node_t  gen_boxes[ICN_FNC_GEN_ARGS];  /* generators for generative args */
+    int        is_gen[ICN_FNC_GEN_ARGS];      /* 1 if arg is generative */
+    DESCR_t    cur_vals[ICN_FNC_GEN_ARGS];    /* current arg values */
+    int        ngen;
+    int        gen_idxs[ICN_FNC_GEN_ARGS];   /* indices of generative args */
+    int        started;
+} icn_fnc_multi_gen_state_t;
+
+
 static DESCR_t coro_bb_fnc(void *zeta, int entry) {
     icn_fnc_gen_state_t *z = (icn_fnc_gen_state_t *)zeta;
     DESCR_t v = z->arg_box.fn(z->arg_box.ζ, entry);
     if (IS_FAIL_fn(v)) return FAILDESCR;
     z->args[z->gen_idx] = v;
     return icn_call_builtin(z->call, z->args, z->nargs);
+}
+
+/* coro_bb_fnc_multi — cross-product over multiple generative proc args  IJ-7
+ * Innermost (rightmost) gen arg varies fastest; bubbles left on exhaustion.
+ * User proc is re-invoked with the fresh arg combination each tick. */
+static DESCR_t coro_bb_fnc_multi(void *zeta, int entry) {
+    icn_fnc_multi_gen_state_t *z = (icn_fnc_multi_gen_state_t *)zeta;
+    if (!z->started) {
+        /* Prime all gen boxes (already set up at coro_eval time) */
+        for (int d = 0; d < z->ngen; d++) {
+            int gi = z->gen_idxs[d];
+            DESCR_t v = z->gen_boxes[d].fn(z->gen_boxes[d].ζ, 0);
+            if (IS_FAIL_fn(v)) return FAILDESCR;
+            z->cur_vals[gi] = v;
+        }
+        z->started = 1;
+    } else {
+        /* Advance rightmost gen; bubble left on exhaustion */
+        int advanced = 0;
+        for (int d = z->ngen - 1; d >= 0; d--) {
+            int gi = z->gen_idxs[d];
+            DESCR_t v = z->gen_boxes[d].fn(z->gen_boxes[d].ζ, 1);
+            if (!IS_FAIL_fn(v)) {
+                z->cur_vals[gi] = v;
+                /* Reset all dims to the right */
+                for (int d2 = d + 1; d2 < z->ngen; d2++) {
+                    int gi2 = z->gen_idxs[d2];
+                    z->gen_boxes[d2] = coro_eval(z->arg_trees[gi2]);
+                    DESCR_t v2 = z->gen_boxes[d2].fn(z->gen_boxes[d2].ζ, 0);
+                    z->cur_vals[gi2] = IS_FAIL_fn(v2) ? NULVCL : v2;
+                }
+                advanced = 1;
+                break;
+            }
+        }
+        if (!advanced) return FAILDESCR;  /* all dimensions exhausted */
+    }
+    /* Call user proc with current arg combination; retry on proc failure.
+     * Icon: every toby(A|B,...) calls toby as side-effect per arg combo;
+     * proc failing (fall-off-end) is normal — advance to next combo. */
+    for (;;) {
+        const char *fn = z->call->c[0] ? z->call->c[0]->v.sval : NULL;
+        if (fn) {
+            for (int _i = 0; _i < proc_count; _i++) {
+                if (proc_table[_i].name && strcmp(proc_table[_i].name, fn) == 0) {
+                    DESCR_t r = proc_table_call(_i, z->cur_vals, z->nargs);
+                    if (!IS_FAIL_fn(r)) return r;  /* proc returned a value */
+                    break;
+                }
+            }
+        }
+        /* proc failed or not found: advance to next combination */
+        int advanced = 0;
+        for (int d = z->ngen - 1; d >= 0; d--) {
+            int gi = z->gen_idxs[d];
+            DESCR_t v = z->gen_boxes[d].fn(z->gen_boxes[d].ζ, 1);
+            if (!IS_FAIL_fn(v)) {
+                z->cur_vals[gi] = v;
+                for (int d2 = d + 1; d2 < z->ngen; d2++) {
+                    int gi2 = z->gen_idxs[d2];
+                    z->gen_boxes[d2] = coro_eval(z->arg_trees[gi2]);
+                    DESCR_t v2 = z->gen_boxes[d2].fn(z->gen_boxes[d2].ζ, 0);
+                    z->cur_vals[gi2] = IS_FAIL_fn(v2) ? NULVCL : v2;
+                }
+                advanced = 1; break;
+            }
+        }
+        if (!advanced) return FAILDESCR;  /* all combinations tried */
+    }
 }
 /* coro_bb_indirect_callee — TT_FNC where callee (c[0]) is a generator.
  * e.g. `(!plist)()` or `(!plist)(1,2)` — iterate the callee values,
@@ -1452,9 +1544,9 @@ bb_node_t coro_eval(tree_t *e) {
         DESCR_t lo_d   = bb_eval_value(e->c[0]);
         DESCR_t hi_d   = bb_eval_value(e->c[1]);
         DESCR_t step_d = bb_eval_value(e->c[2]);
-        /* Coerce string/cset bounds to numeric.  Track whether any bound was
-         * originally a string — if so, apply Icon truncation-to-integer rule.
-         * Pure-real case (all DT_R, no string coercion) uses coro_bb_to_by_real. */
+        /* Coerce string/cset bounds to numeric.  If ANY bound was string/cset,
+         * apply Icon truncation-to-integer (JCON rule: mixed coercion yields int).
+         * Pure-real case (all DT_R, no string coercion) uses real generator. */
         int was_str_lo = (!IS_REAL_fn(lo_d) && !IS_INT_fn(lo_d) && !IS_FAIL_fn(lo_d));
         int was_str_hi = (!IS_REAL_fn(hi_d) && !IS_INT_fn(hi_d) && !IS_FAIL_fn(hi_d));
         int was_str_st = (!IS_REAL_fn(step_d) && !IS_INT_fn(step_d) && !IS_FAIL_fn(step_d));
@@ -1469,7 +1561,7 @@ bb_node_t coro_eval(tree_t *e) {
 #undef _TO_COERCE
         int any_real = IS_REAL_fn(lo_d) || IS_REAL_fn(hi_d) || IS_REAL_fn(step_d);
         if (any_real && !any_str) {
-            /* Pure real case — no string coercion: use floating-point generator */
+            /* Pure-real bounds (no string coercion): use floating-point generator */
             icn_to_by_real_state_t *z = calloc(1, sizeof(*z));
             z->lo   = IS_REAL_fn(lo_d)   ? lo_d.r   : (double)(IS_FAIL_fn(lo_d)   ? 0 : lo_d.i);
             z->hi   = IS_REAL_fn(hi_d)   ? hi_d.r   : (double)(IS_FAIL_fn(hi_d)   ? 0 : hi_d.i);
@@ -1776,26 +1868,37 @@ bb_node_t coro_eval(tree_t *e) {
         int nargs = e->n - 1;
         for (int i = 0; i < proc_count; i++) {
             if (strcmp(proc_table[i].name, fn) != 0) continue;
-            /* IC-7 rung32: if any arg is generative, route to coro_bb_fnc.
-             * Otherwise the args would be pre-evaluated as scalars (only first
-             * value of any alternation/generator), and the proc would run once
-             * via coro_call — yielding only one value over `every`.
-             * fnc_gen pumps the gen arg per tick and re-calls coro_call
-             * with the substituted scalar arg each time. */
-            for (int j = 0; j < nargs && j < ICN_FNC_GEN_ARGS; j++) {
-                tree_t *arg = e->c[1+j];
-                if (!arg || !is_suspendable(arg)) continue;
-                icn_fnc_gen_state_t *fg = calloc(1, sizeof(*fg));
-                fg->arg_box = coro_eval(arg);
-                fg->call    = e;
-                fg->gen_idx = j;
-                fg->nargs   = nargs;
-                /* Pre-evaluate all other args (non-generative) */
-                for (int k2 = 0; k2 < nargs && k2 < ICN_FNC_GEN_ARGS; k2++) {
-                    if (k2 == j) continue;
-                    fg->args[k2] = bb_eval_value(e->c[1+k2]);
+            /* IC-7 / IJ-7: if any arg is generative, route to gen wrapper.
+             * Single gen arg: coro_bb_fnc (pumps one gen, pre-evals rest).
+             * Multiple gen args: coro_bb_fnc_multi (cross-product). */
+            {
+                int ngen_args = 0;
+                int gen_idxs[ICN_FNC_GEN_ARGS];
+                for (int j = 0; j < nargs && j < ICN_FNC_GEN_ARGS; j++)
+                    if (e->c[1+j] && is_suspendable(e->c[1+j]))
+                        gen_idxs[ngen_args++] = j;
+                if (ngen_args >= 1) {
+                    /* Route ALL user-proc gen-arg calls through fnc_multi
+                     * so proc failure retries next arg combination. */
+                    (void)0; /* fall through to ngen_args > 0 branch */
+                } if (ngen_args >= 1) {
+                    icn_fnc_multi_gen_state_t *mg = calloc(1, sizeof(*mg));
+                    mg->call = e; mg->nargs = nargs; mg->ngen = ngen_args; mg->started = 0;
+                    for (int k = 0; k < nargs && k < ICN_FNC_GEN_ARGS; k++)
+                        mg->arg_trees[k] = e->c[1+k];
+                    for (int d = 0; d < ngen_args; d++) {
+                        int gi = gen_idxs[d];
+                        mg->gen_idxs[d] = gi;
+                        mg->gen_boxes[d] = coro_eval(e->c[1+gi]);
+                    }
+                    /* Pre-eval non-gen args */
+                    for (int k = 0; k < nargs && k < ICN_FNC_GEN_ARGS; k++) {
+                        int is_g = 0;
+                        for (int d = 0; d < ngen_args; d++) if (gen_idxs[d] == k) { is_g = 1; break; }
+                        if (!is_g) mg->cur_vals[k] = bb_eval_value(e->c[1+k]);
+                    }
+                    return (bb_node_t){ coro_bb_fnc_multi, mg, 0 };
                 }
-                return (bb_node_t){ coro_bb_fnc, fg, 0 };
             }
             /* Build args array */
             DESCR_t *args = nargs > 0 ? calloc(nargs, sizeof(DESCR_t)) : NULL;
@@ -1906,6 +2009,16 @@ bb_node_t coro_eval(tree_t *e) {
         icn_limit_state_t *z = calloc(1, sizeof(*z));
         z->gen = coro_eval(e->c[0]);
         return (bb_node_t){ coro_bb_cset_compl, z, 0 };
+    }
+
+    /* ── IJ-7: TT_SCAN with generative subject (gen ? body) ──
+     * every writes("  ", ((A|B|C) ? move(5)) | "\n") pumps A|B|C, scans each. */
+    if (e->t == TT_SCAN && e->n >= 1 && is_suspendable(e->c[0])) {
+        icn_scan_gen_state_t *z = calloc(1, sizeof(*z));
+        z->subj_gen = coro_eval(e->c[0]);
+        z->body     = (e->n >= 2) ? e->c[1] : NULL;
+        z->started  = 0;
+        return (bb_node_t){ coro_bb_scan_gen, z, 0 };
     }
 
     /* ── IC-7: TT_NONNULL (\E) as generator — filter: pass values, skip null ──
@@ -2189,6 +2302,36 @@ DESCR_t coro_bb_cset_compl(void *zeta, int entry) {
     if (IS_INT_fn(v) || IS_REAL_fn(v)) v = descr_to_str_icn(v);
     const char *cs = (v.s && *v.s) ? v.s : "";
     return STRVAL(icn_cset_complement(cs));
+}
+
+/*----------------------------------------------------------------------------------------------------------------------------
+ * coro_bb_scan_gen -- TT_SCAN with generative subject  (gen ? body)  IJ-7
+ *
+ * α: pump subject gen at α; install subject; eval body; yield result.
+ * β: try next subject from gen (β tick); if gen exhausted → ω.
+ * Each subject is tried once: scan body is evaluated fresh per subject.
+ *--------------------------------------------------------------------------------------------------------------------------*/
+DESCR_t coro_bb_scan_gen(void *zeta, int entry) {
+    icn_scan_gen_state_t *z = (icn_scan_gen_state_t *)zeta;
+    /* Pump next subject value */
+    DESCR_t subj_d = z->subj_gen.fn(z->subj_gen.ζ, (entry == 0 || !z->started) ? 0 : 1);
+    z->started = 1;
+    if (IS_FAIL_fn(subj_d)) return FAILDESCR;
+    /* Install new scan subject */
+    const char *subj_s = VARVAL_fn(subj_d); if (!subj_s) subj_s = "";
+    if (scan_depth < SCAN_STACK_MAX) {
+        scan_stack[scan_depth].subj = scan_subj;
+        scan_stack[scan_depth].pos  = scan_pos;
+        scan_depth++;
+    }
+    scan_subj = subj_s; scan_pos = 1;
+    DESCR_t r = z->body ? bb_eval_value(z->body) : NULVCL;
+    if (scan_depth > 0) {
+        scan_depth--;
+        scan_subj = scan_stack[scan_depth].subj;
+        scan_pos  = scan_stack[scan_depth].pos;
+    }
+    return r;  /* FAILDESCR if body failed — caller retries with next subject */
 }
 
 DESCR_t coro_bb_limit(void *zeta, int entry) {
