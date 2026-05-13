@@ -1632,7 +1632,30 @@ DESCR_t interp_eval(tree_t *e)
         case TT_FNC: {
             /* Icon call nodes: sval=NULL, name in children[0]->v.sval */
             if (e->n < 1) return NULVCL;
-            const char *fn = e->c[0] ? e->c[0]->v.sval : NULL;
+            /* IJ-3: indirect call — callee is not a bare TT_VAR (e.g. (!plist)()).
+             * Evaluate callee to get a proc value, dispatch by type. */
+            if (!e->c[0] || e->c[0]->t != TT_VAR) {
+                DESCR_t callee = e->c[0] ? interp_eval(e->c[0]) : FAILDESCR;
+                if (IS_FAIL_fn(callee)) return FAILDESCR;
+                int _na = e->n - 1;
+                DESCR_t _args[FRAME_SLOT_MAX];
+                for (int _j = 0; _j < _na && _j < FRAME_SLOT_MAX; _j++)
+                    _args[_j] = interp_eval(e->c[1+_j]);
+                if (callee.v == DT_E) {
+                    for (int _i = 0; _i < proc_count; _i++)
+                        if (proc_table[_i].entry_pc == (int)callee.i)
+                            return proc_table_call(_i, _args, _na);
+                    if (callee.slen < (uint32_t)proc_count)
+                        return proc_table_call((int)callee.slen, _args, _na);
+                    return FAILDESCR;
+                }
+                if (callee.v == DT_S && callee.s) {
+                    DESCR_t _out = FAILDESCR;
+                    if (icn_try_call_builtin_by_name(callee.s, _args, _na, &_out)) return _out;
+                }
+                return FAILDESCR;
+            }
+            const char *fn = e->c[0]->v.sval;
             if (!fn) return NULVCL;
             int nargs = e->n - 1;
             if (!strcmp(fn,"write")) {
@@ -2751,6 +2774,30 @@ DESCR_t interp_eval(tree_t *e)
                 }
             }
 
+            /* IJ-3: proc value stored in a variable — e.g. `pv := p0; pv()`.
+             * Name "fn" not found in proc_table or builtins above; evaluate
+             * the callee node to get its stored DT_E / DT_S descriptor. */
+            {
+                DESCR_t _callee = interp_eval(e->c[0]);
+                if (_callee.v == DT_E) {
+                    DESCR_t _args[FRAME_SLOT_MAX];
+                    for (int _j = 0; _j < nargs && _j < FRAME_SLOT_MAX; _j++)
+                        _args[_j] = interp_eval(e->c[1+_j]);
+                    for (int _i = 0; _i < proc_count; _i++)
+                        if (proc_table[_i].entry_pc == (int)_callee.i)
+                            return proc_table_call(_i, _args, nargs);
+                    if (_callee.slen < (uint32_t)proc_count)
+                        return proc_table_call((int)_callee.slen, _args, nargs);
+                    return FAILDESCR;
+                }
+                if (_callee.v == DT_S && _callee.s) {
+                    DESCR_t _args[FRAME_SLOT_MAX];
+                    for (int _j = 0; _j < nargs && _j < FRAME_SLOT_MAX; _j++)
+                        _args[_j] = interp_eval(e->c[1+_j]);
+                    DESCR_t _out = FAILDESCR;
+                    if (icn_try_call_builtin_by_name(_callee.s, _args, nargs, &_out)) return _out;
+                }
+            }
             return NULVCL;
         }
         case TT_ALT:

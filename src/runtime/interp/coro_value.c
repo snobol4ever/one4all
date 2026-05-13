@@ -393,8 +393,8 @@ static DESCR_t icn_proc_as_value(const char *name)
     for (int i = 0; i < proc_count; i++) {
         if (proc_table[i].name && strcmp(proc_table[i].name, name) == 0) {
             DESCR_t pv; pv.v = DT_E;
-            pv.slen = (uint32_t)(proc_table[i].nparams > 0 ? proc_table[i].nparams : 0);
-            pv.i = proc_table[i].entry_pc;
+            pv.slen = (uint32_t)i;           /* proc_table index for --ir-run fallback */
+            pv.i    = proc_table[i].entry_pc; /* entry_pc for --sm-run / --jit-run */
             return pv;
         }
     }
@@ -547,9 +547,45 @@ DESCR_t bb_eval_value(tree_t *e)
          * which would build a fresh generator box and restart from alpha. */
         if (coro_drive_node && e == coro_drive_node) return coro_drive_val;
         if (e->n < 1) return NULVCL;
-        const char *fn = e->c[0] ? e->c[0]->v.sval : NULL;
-        if (!fn) return NULVCL;
         int nargs = e->n - 1;
+        /* IJ-3: indirect call — callee node is not a plain TT_VAR (e.g. !plist,
+         * proc("write",1), a variable holding a proc value).  Evaluate the callee
+         * to get a DESCR_t proc value and dispatch by type:
+         *   DT_E → user proc identified by entry_pc (from icn_proc_as_value)
+         *   DT_S → builtin identified by name string
+         * Only trigger when c[0] is not a bare TT_VAR, to preserve the fast
+         * name-string path for direct calls. */
+        if (!e->c[0] || e->c[0]->t != TT_VAR) {
+            DESCR_t callee = e->c[0] ? bb_eval_value(e->c[0]) : FAILDESCR;
+            if (IS_FAIL_fn(callee)) return FAILDESCR;
+            DESCR_t *args = nargs > 0 ? GC_malloc((size_t)nargs * sizeof(DESCR_t)) : NULL;
+            for (int j = 0; j < nargs; j++) {
+                args[j] = bb_eval_value(e->c[1+j]);
+                if (IS_FAIL_fn(args[j])) return FAILDESCR;
+            }
+            if (callee.v == DT_E) {
+                /* User proc value: find in proc_table by entry_pc */
+                for (int i = 0; i < proc_count; i++) {
+                    if (proc_table[i].entry_pc == (int)callee.i) return proc_table_call(i, args, nargs);
+                }
+                /* entry_pc not yet resolved (--ir-run path): icn_proc_as_value
+                 * stores proc_table index in slen as fallback */
+                if (callee.slen < (uint32_t)proc_count)
+                    return proc_table_call((int)callee.slen, args, nargs);
+                return FAILDESCR;
+            }
+            if (callee.v == DT_S && callee.s) {
+                /* Builtin proc value: dispatch by name via CH-17g-runtime-bridge-1 */
+                DESCR_t out = FAILDESCR;
+                if (icn_try_call_builtin_by_name(callee.s, args, nargs, &out)) return out;
+                /* Not a known builtin — try icn_call_builtin with the original node
+                 * using the name stored in callee.s as the function name override. */
+                return FAILDESCR;
+            }
+            return FAILDESCR;
+        }
+        const char *fn = e->c[0]->v.sval;
+        if (!fn) return NULVCL;
         /* RS-23a-raku: Raku block-receiving builtins (raku_try / raku_map /
          * raku_grep / raku_sort) need raw tree_t access and must NOT be subject
          * to FAIL-prop on the body argument — dispatch them here, before the
@@ -574,6 +610,26 @@ DESCR_t bb_eval_value(tree_t *e)
         for (int j = 0; j < nargs; j++) {
             args[j] = bb_eval_value(e->c[1+j]);
             if (IS_FAIL_fn(args[j])) return FAILDESCR;
+        }
+        /* IJ-3: before icn_call_builtin (which would treat "fn" as a builtin name),
+         * check if the callee TT_VAR holds a proc value stored in a frame slot or NV.
+         * e.g. `pv := p0; pv()` — "pv" is not in proc_table and not a builtin,
+         * but pv's slot holds DT_E pointing at proc p0. */
+        {
+            DESCR_t callee_val = bb_eval_value(e->c[0]);
+            if (callee_val.v == DT_E) {
+                for (int i = 0; i < proc_count; i++) {
+                    if (proc_table[i].entry_pc == (int)callee_val.i)
+                        return proc_table_call(i, args, nargs);
+                }
+                if (callee_val.slen < (uint32_t)proc_count)
+                    return proc_table_call((int)callee_val.slen, args, nargs);
+                return FAILDESCR;
+            }
+            if (callee_val.v == DT_S && callee_val.s) {
+                DESCR_t out2 = FAILDESCR;
+                if (icn_try_call_builtin_by_name(callee_val.s, args, nargs, &out2)) return out2;
+            }
         }
         return icn_call_builtin(e, args, nargs);
     }
