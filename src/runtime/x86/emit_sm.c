@@ -158,6 +158,14 @@ void  emit_sm_mod()  { emit_sm_arith_dispatch(SM_MOD); }
 static void emit_sm_int_arg(const char *mn, const char *rt_fn,
                               const char *param_name, int val)
 {
+    if (IS_TEXT) {
+        char vbuf[32];
+        snprintf(vbuf, sizeof(vbuf), "%d", val);
+        const char *const vparams[] = { vbuf };
+        emit_macro_begin(mn, vparams, 1);
+        emit_macro_end();
+        return;
+    }
     const char *const params[] = { param_name };
     emit_macro_begin(mn, params, 1);
     emit_seq_mov_edi_i32(val);
@@ -1031,22 +1039,6 @@ int emit_sm_pcref_cond(FILE *out, const sm_op_template_t *t,
     return emit_sm_template(out, t, &a);
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
-int edp4_emit_push_expression(FILE *out, const sm_op_template_t *t,
-                       int64_t entry_pc, int arity)
-{
-    emit_sm_args_t a = { 0 };
-    a.i64 = entry_pc;
-    a.i32_a = arity;
-    return emit_sm_template(out, t, &a);
-}
-/*--------------------------------------------------------------------------------------------------------------------*/
-int edp4_emit_call_expression(FILE *out, const sm_op_template_t *t, int target_pc)
-{
-    emit_sm_args_t a = { 0 };
-    a.i32_a = target_pc;
-    return emit_sm_template(out, t, &a);
-}
-/*--------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_ret(FILE *out, const sm_op_template_t *t, const char *anno)
 {
     return emit_sm_rtcall(out, t, anno);
@@ -1797,11 +1789,27 @@ static int emit_sm_jump_f_line(FILE *out, const SM_Instr *ins, int pc)
     return emit_sm_jump_cond(out, ins, pc, 0);
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
+int edp4_emit_push_expression(FILE *out, const sm_op_template_t *t,
+                       int64_t entry_pc, int arity)
+{
+    emit_sm_args_t a = { 0 };
+    a.i64 = entry_pc;
+    a.i32_a = arity;
+    return emit_sm_template(out, t, &a);
+}
+/*--------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_push_expression_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     return edp4_emit_push_expression(out, sm_template_lookup(SM_PUSH_EXPRESSION),
                               ins->a[0].i, (int)ins->a[1].i);
+}
+/*--------------------------------------------------------------------------------------------------------------------*/
+int edp4_emit_call_expression(FILE *out, const sm_op_template_t *t, int target_pc)
+{
+    emit_sm_args_t a = { 0 };
+    a.i32_a = target_pc;
+    return emit_sm_template(out, t, &a);
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_call_expression_dispatch(FILE *out, const SM_Instr *ins, int pc)

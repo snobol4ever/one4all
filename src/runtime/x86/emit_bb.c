@@ -1051,7 +1051,7 @@ static int emit_flat_body(PATND_t *p,
         emit_text_global(lbl_fail.name);
         emit_label_define_bb(&lbl_α);
     }
-    {   emit_sym_lea_r10("delta", ADDR_DELTA);
+    {   emit_sym_lea_r10("Δ", ADDR_DELTA);
     }
     flat_box_entry_dispatch(&lbl_α_body, &lbl_β);
     emit_label_define_bb(&lbl_α_body);
