@@ -1,6 +1,6 @@
 
-#ifndef SM_EMIT_TEMPLATE_H_
-#define SM_EMIT_TEMPLATE_H_
+#ifndef EMIT_SM_SHAPE_H_
+#define EMIT_SM_SHAPE_H_
 
 #include <stdint.h>
 #include <stdio.h>

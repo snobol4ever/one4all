@@ -83,8 +83,8 @@ RT_PIC_SRCS := \
     $(RT)/x86/emit_mode.c \
     $(RT)/x86/emit_bb_seq.c \
     $(RT)/x86/emit_bb_flat.c \
-    $(RT)/x86/emit_bb.c \
-    $(RT)/x86/emit_sm.c \
+    $(RT)/x86/emit_bb_box.c \
+    $(RT)/x86/emit_sm_op.c \
     \
     $(RT)/x86/bb_boxes.c \
     $(RT)/x86/bb_broker.c \
@@ -95,7 +95,7 @@ RT_PIC_SRCS := \
     $(RT)/x86/sm_image.c \
     $(RT)/x86/emit_sm_binary.c \
     $(RT)/x86/emit_sm_text.c \
-    $(RT)/x86/emit_sm_template.c \
+    $(RT)/x86/emit_sm_shape.c \
     $(SRC)/runtime/interp/coro_runtime.c \
     $(SRC)/runtime/interp/coro_value.c \
     $(SRC)/runtime/interp/coro_stmt.c \
@@ -161,8 +161,8 @@ out/libscrip_rt.so: $(RT_PIC_SRCS) $(RT)/rt/rt.h
 # Standalone helper: builds a 3-op SM_Program in memory and emits asm
 # via sm_codegen_x64_emit().  The shell gate then assembles/links/runs.
 out/sm_codegen_x64_emit_test: $(RT)/x86/sm_codegen_x64_emit_test.c \
-                               $(RT)/x86/emit_sm_template.c \
-                               $(RT)/x86/emit_sm_template.h \
+                               $(RT)/x86/emit_sm_shape.c \
+                               $(RT)/x86/emit_sm_shape.h \
                                $(RT)/x86/sm_prog.c \
                                $(RT)/x86/sm_prog.h \
                                out/libscrip_rt.so
@@ -171,7 +171,7 @@ out/sm_codegen_x64_emit_test: $(RT)/x86/sm_codegen_x64_emit_test.c \
 	    -I$(SRC) -I$(RT)/x86 -I$(RT) -I$(RT)/rt \
 	    -DDYN_ENGINE_LINKED \
 	    $(RT)/x86/sm_codegen_x64_emit_test.c \
-	    $(RT)/x86/emit_sm_template.c \
+	    $(RT)/x86/emit_sm_shape.c \
 	    $(RT)/x86/sm_prog.c \
 	    -Lout -lscrip_rt -lgc -lm \
 	    -Wl,-rpath,$(shell pwd)/out \
@@ -182,8 +182,8 @@ out/sm_codegen_x64_emit_test: $(RT)/x86/sm_codegen_x64_emit_test.c \
 # ── EM-7a Phase-2 simulator unit test ────────────────────────────────────────
 # Links against libscrip_rt.so for pat_* constructors + GC.
 out/sm_phase2_sim_test: $(RT)/x86/sm_phase2_sim_test.c \
-                        $(RT)/x86/emit_sm_template.c \
-                        $(RT)/x86/emit_sm_template.h \
+                        $(RT)/x86/emit_sm_shape.c \
+                        $(RT)/x86/emit_sm_shape.h \
                         $(RT)/x86/sm_prog.c \
                         $(RT)/x86/sm_prog.h \
                         out/libscrip_rt.so
@@ -192,7 +192,7 @@ out/sm_phase2_sim_test: $(RT)/x86/sm_phase2_sim_test.c \
 	    -I$(SRC) -I$(RT)/x86 -I$(RT) -I$(RT)/rt \
 	    -DDYN_ENGINE_LINKED \
 	    $(RT)/x86/sm_phase2_sim_test.c \
-	    $(RT)/x86/emit_sm_template.c \
+	    $(RT)/x86/emit_sm_shape.c \
 	    $(RT)/x86/sm_prog.c \
 	    -Lout -lscrip_rt -lgc -lm \
 	    -Wl,-rpath,$(shell pwd)/out \
@@ -204,8 +204,8 @@ out/sm_phase2_sim_test: $(RT)/x86/sm_phase2_sim_test.c \
 # Links against libscrip_rt.so (which already includes bb_flat.c +
 # bb_emit.c + pat_* constructors).
 out/bb_flat_text_test: $(RT)/x86/bb_flat_text_test.c \
-                       $(RT)/x86/emit_sm_template.c \
-                       $(RT)/x86/emit_sm_template.h \
+                       $(RT)/x86/emit_sm_shape.c \
+                       $(RT)/x86/emit_sm_shape.h \
                        $(RT)/x86/sm_prog.c \
                        $(RT)/x86/sm_prog.h \
                        out/libscrip_rt.so \
@@ -217,7 +217,7 @@ out/bb_flat_text_test: $(RT)/x86/bb_flat_text_test.c \
 	    -I$(SRC) -I$(RT)/x86 -I$(RT) -I$(RT)/rt \
 	    -DDYN_ENGINE_LINKED \
 	    $(RT)/x86/bb_flat_text_test.c \
-	    $(RT)/x86/emit_sm_template.c \
+	    $(RT)/x86/emit_sm_shape.c \
 	    $(RT)/x86/sm_prog.c \
 	    -Lout -lscrip_rt -lgc -lm \
 	    -Wl,-rpath,$(shell pwd)/out \
@@ -297,10 +297,10 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/sm_image.c   -o $(OBJ)/sm_image.o
 	$(CC) $(CRT)   -c $(RT)/x86/emit_sm_binary.c -o $(OBJ)/emit_sm_binary.o
 	$(CC) $(CRT)   -c $(RT)/x86/emit_sm_text.c -o $(OBJ)/emit_sm_text.o
-	$(CC) $(CRT)   -c $(RT)/x86/emit_sm.c -o $(OBJ)/emit_sm.o
-	$(CC) $(CRT)   -c $(RT)/x86/emit_bb.c -o $(OBJ)/emit_bb.o
+	$(CC) $(CRT)   -c $(RT)/x86/emit_sm_op.c -o $(OBJ)/emit_sm_op.o
+	$(CC) $(CRT)   -c $(RT)/x86/emit_bb_box.c -o $(OBJ)/emit_bb_box.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/rt/rt.c   -o $(OBJ)/rt.o
-	$(CC) $(CRT)   -c $(RT)/x86/emit_sm_template.c -o $(OBJ)/emit_sm_template.o
+	$(CC) $(CRT)   -c $(RT)/x86/emit_sm_shape.c -o $(OBJ)/emit_sm_shape.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_globals.c -o $(OBJ)/interp_globals.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_label.c   -o $(OBJ)/interp_label.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_call.c    -o $(OBJ)/interp_call.o

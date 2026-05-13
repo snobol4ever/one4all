@@ -1,5 +1,5 @@
 
-#include "emit_sm_template.h"
+#include "emit_sm_shape.h"
 #include "sm_prog.h"
 #include "emit_bb_gen.h"
 

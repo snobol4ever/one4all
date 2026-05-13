@@ -12,12 +12,12 @@
 #include <string.h>
 #include <stdint.h>
 
-#include "emit_sm_template.h"
+#include "emit_sm_shape.h"
 #include "emit_bb_flat.h"
 #include <assert.h>
 
 
-#include "emit_sm_template.h"
+#include "emit_sm_shape.h"
 void emit_sm_op(int op);
 void emit_sm_halt(void);
 void emit_sm_return(void);
