@@ -21,6 +21,7 @@
 #include "../../runtime/x86/bb_broker.h"
 #include "../../frontend/icon/icon_gen.h"
 #include "../../runtime/common/coerce.h"
+#include "scan_builtins.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -847,18 +848,10 @@ static DESCR_t icn_lazy_box(void *zeta, int entry) {
     return IS_FAIL_fn(v) ? FAILDESCR : v;
 }
 
-/* icn_scan_builtin_box — re-evaluates bb_eval_value(expr) on every tick (alpha and beta).
- * Used for scan position-advancing builtins like upto(), move(), tab(), find() whose
- * generativity comes from the advancing scan position, not from coro suspension.
- * Stops (returns FAILDESCR) when bb_eval_value returns FAILDESCR. */
-static DESCR_t icn_scan_builtin_box(void *zeta, int entry) {
-    icn_lazy_state_t *z = (icn_lazy_state_t *)zeta;
-    DESCR_t v = bb_eval_value(z->expr);
-    return IS_FAIL_fn(v) ? FAILDESCR : v;
-}
 
 /*----------------------------------------------------------------------------------------------------------------------------
- * coro_bb_fnc -- composite box: pump arg-generator, call builtin with substituted arg each tick.
+ * coro_bb_fnc — composite box: pump arg-generator, call builtin with substituted arg each tick.
+ *
  * Evaluates all non-generative args eagerly at setup. On each tick:
  *   1. Pump arg_box to get current gen value v.
  *   2. Substitute v into args[gen_idx].
@@ -902,10 +895,22 @@ typedef struct {
 
 static DESCR_t coro_bb_fnc(void *zeta, int entry) {
     icn_fnc_gen_state_t *z = (icn_fnc_gen_state_t *)zeta;
-    DESCR_t v = z->arg_box.fn(z->arg_box.ζ, entry);
-    if (IS_FAIL_fn(v)) return FAILDESCR;
-    z->args[z->gen_idx] = v;
-    return icn_call_builtin(z->call, z->args, z->nargs);
+    /* IJ-9: scan builtins (upto/find/tab/move/pos/any/many/match/bal) may fail for a
+     * given arg value while the arg generator still has more values.  In that case loop
+     * to the next arg value rather than returning FAILDESCR immediately.
+     * Non-scan builtins (and user procs) return failure on first fail as before. */
+    const char *fn = (z->call && z->call->n >= 1 && z->call->c[0]) ? z->call->c[0]->v.sval : NULL;
+    int is_scan_bltn = is_scan_builtin_name(fn);
+    int tick = entry;
+    for (;;) {
+        DESCR_t v = z->arg_box.fn(z->arg_box.ζ, tick);
+        if (IS_FAIL_fn(v)) return FAILDESCR;    /* arg_box exhausted */
+        z->args[z->gen_idx] = v;
+        DESCR_t r = icn_call_builtin(z->call, z->args, z->nargs);
+        if (!IS_FAIL_fn(r)) return r;           /* builtin succeeded */
+        if (!is_scan_bltn) return FAILDESCR;    /* non-scan: propagate failure immediately */
+        tick = β;   /* scan builtin failed — try next arg value */
+    }
 }
 
 /* coro_bb_fnc_multi — cross-product over multiple generative proc args  IJ-7
@@ -2011,8 +2016,9 @@ bb_node_t coro_eval(tree_t *e) {
         return (bb_node_t){ coro_bb_cset_compl, z, 0 };
     }
 
-    /* ── IJ-7: TT_SCAN with generative subject (gen ? body) ──
-     * every writes("  ", ((A|B|C) ? move(5)) | "\n") pumps A|B|C, scans each. */
+    /* ── IJ-7/IJ-9: TT_SCAN with generative subject or body (gen ? gen_body) ──
+     * every writes("  ", ((A|B|C) ? move(5)) | "\n") pumps A|B|C, scans each.
+     * IJ-9: body may itself be generative (upto/move/tab/etc. advance scan pos). */
     if (e->t == TT_SCAN && e->n >= 1 &&
         (is_suspendable(e->c[0]) || (e->n >= 2 && is_suspendable(e->c[1])))) {
         icn_scan_gen_state_t *z = calloc(1, sizeof(*z));
@@ -2158,21 +2164,6 @@ bb_node_t coro_eval(tree_t *e) {
         icn_lazy_state_t *z = calloc(1, sizeof(*z));
         z->expr = e;
         return (bb_node_t){ icn_lazy_box, z, 0 };
-    }
-
-    /* ── IJ-9: Scan position-advancing builtins — icn_scan_builtin_box ─────
-     * upto/move/tab/find/match/any/many/notany/bal advance scan_pos and return
-     * the next position on each call.  Use icn_scan_builtin_box so β ticks
-     * re-evaluate bb_eval_value instead of immediately returning FAILDESCR. */
-    if (e->t == TT_FNC && e->n >= 1 && e->c[0] && e->c[0]->v.sval) {
-        static const char *scan_bnames[] = { "upto","move","tab","find","match","any","many","notany","bal",NULL };
-        for (int _si = 0; scan_bnames[_si]; _si++) {
-            if (strcmp(e->c[0]->v.sval, scan_bnames[_si]) == 0) {
-                icn_lazy_state_t *z = calloc(1, sizeof(*z));
-                z->expr = e;
-                return (bb_node_t){ icn_scan_builtin_box, z, 0 };
-            }
-        }
     }
 
     /* ── Fallback: lazy box — re-evaluates at pump time with frame live ──── */
@@ -2321,79 +2312,65 @@ DESCR_t coro_bb_cset_compl(void *zeta, int entry) {
 }
 
 /*----------------------------------------------------------------------------------------------------------------------------
- * coro_bb_scan_gen -- TT_SCAN with generative subject  (gen ? body)  IJ-7
+ * coro_bb_scan_gen -- TT_SCAN with generative subject or body  IJ-7/IJ-9
  *
- * α: pump subject gen at α; install subject; eval body; yield result.
- * β: try next subject from gen (β tick); if gen exhausted → ω.
- * Each subject is tried once: scan body is evaluated fresh per subject.
+ * Outer scan context (scan_subj/scan_pos before entry) is saved on each call and
+ * restored before every return — callers always see clean globals.
+ *
+ * For each subject value:
+ *   - Install subject string, pos=1 as current scan context.
+ *   - Build body_gen via coro_eval(body); fire α → first result.
+ *   - On β: re-install (body_subj, body_pos), pump β, capture updated pos, restore outer.
+ *   - When body exhausted, move to next subject (β-tick subj_gen).
  *--------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t coro_bb_scan_gen(void *zeta, int entry) {
     icn_scan_gen_state_t *z = (icn_scan_gen_state_t *)zeta;
+    /* Save outer scan context — restored before every return. */
+    const char *outer_subj = scan_subj;
+    int          outer_pos  = scan_pos;
 
-    /* β path: resume current body generator (inner scan context already active). */
+    /* β path: resume current body generator. */
     if (entry != α && z->body_live) {
+        /* Re-install body's scan context (body_pos advanced by prior tick). */
+        scan_subj = z->body_subj;
+        scan_pos  = z->body_pos;
         DESCR_t r2 = z->body_gen.fn(z->body_gen.ζ, β);
-        if (!IS_FAIL_fn(r2)) return r2;   /* body still producing */
+        /* Capture whatever pos the body advanced to. */
+        z->body_pos = scan_pos;
+        scan_subj = outer_subj; scan_pos = outer_pos;
+        if (!IS_FAIL_fn(r2)) return r2;
+        /* Body exhausted for this subject — fall through to next subject. */
         z->body_live = 0;
-        /* Body exhausted — restore outer scan context. */
-        if (z->outer_saved) {
-            scan_subj = z->saved_subj;
-            scan_pos  = z->saved_pos;
-            z->outer_saved = 0;
-        }
-        /* Fall through to advance subject. */
     }
 
     /* Advance to next subject. */
     int subj_tick = (!z->started) ? α : β;
     z->started = 1;
-    DESCR_t subj_d = z->subj_gen.fn(z->subj_gen.ζ, subj_tick);
-    if (IS_FAIL_fn(subj_d)) {
-        /* Restore outer context if somehow still saved. */
-        if (z->outer_saved) { scan_subj = z->saved_subj; scan_pos = z->saved_pos; z->outer_saved = 0; }
-        return FAILDESCR;
-    }
+    for (;;) {
+        scan_subj = outer_subj; scan_pos = outer_pos;   /* keep outer clean while pumping subj */
+        DESCR_t subj_d = z->subj_gen.fn(z->subj_gen.ζ, subj_tick);
+        subj_tick = β;
+        if (IS_FAIL_fn(subj_d)) { scan_subj = outer_subj; scan_pos = outer_pos; return FAILDESCR; }
 
-    /* Save outer scan context once, install new subject. */
-    if (!z->outer_saved) {
-        z->saved_subj  = scan_subj;
-        z->saved_pos   = scan_pos;
-        z->outer_saved = 1;
-    }
-    const char *subj_s = VARVAL_fn(subj_d); if (!subj_s) subj_s = "";
-    z->cur_subj = subj_s;
-    scan_subj = subj_s; scan_pos = 1;
+        /* Install new subject. */
+        const char *subj_s = VARVAL_fn(subj_d); if (!subj_s) subj_s = "";
+        scan_subj = subj_s; scan_pos = 1;
 
-    /* Build fresh body generator and α-tick it. */
-    if (z->body) {
-        /* IJ-9: For scan position-advancing builtins (upto/move/tab/find/match/any/many/notany)
-         * that are not natively coro-suspendable, use icn_scan_builtin_box which re-evaluates
-         * bb_eval_value on every tick so scan_pos advances correctly between ticks. */
-        tree_t *bd = z->body;
-        int is_scan_builtin = 0;
-        if (bd->t == TT_FNC && bd->n >= 1 && bd->c[0] && bd->c[0]->v.sval) {
-            static const char *scan_bnames[] = { "upto","move","tab","find","match","any","many","notany","bal",NULL };
-            for (int _si=0; scan_bnames[_si]; _si++)
-                if (strcmp(bd->c[0]->v.sval, scan_bnames[_si])==0) { is_scan_builtin=1; break; }
-        }
-        if (is_scan_builtin) {
-            icn_lazy_state_t *lz = calloc(1, sizeof(*lz));
-            lz->expr = bd;
-            z->body_gen  = (bb_node_t){ icn_scan_builtin_box, lz, 0 };
-        } else {
-            z->body_gen  = coro_eval(bd);
-        }
+        if (!z->body) { scan_subj = outer_subj; scan_pos = outer_pos; return NULVCL; }
+
+        /* Build fresh body generator. */
+        z->body_subj = subj_s;
+        z->body_gen  = coro_eval(z->body);
         z->body_live = 1;
         DESCR_t r = z->body_gen.fn(z->body_gen.ζ, α);
+        /* Capture advanced pos from body's α tick. */
+        z->body_pos = scan_pos;
+        scan_subj = outer_subj; scan_pos = outer_pos;
         if (!IS_FAIL_fn(r)) return r;
-        /* Body failed on first tick — move to next subject next time. */
+
+        /* Body failed for this subject (no matching positions) — try next. */
         z->body_live = 0;
-        /* Restore outer context and try next subject on next β. */
-        scan_subj = z->saved_subj; scan_pos = z->saved_pos; z->outer_saved = 0;
-        return FAILDESCR;
     }
-    /* No body: yield &null per subject. */
-    return NULVCL;
 }
 
 DESCR_t coro_bb_limit(void *zeta, int entry) {

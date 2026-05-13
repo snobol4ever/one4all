@@ -191,13 +191,13 @@ typedef struct {
     bb_node_t  subj_gen;      /* subject alternation/generator */
     tree_t    *body;          /* scan body (c[1]) */
     int        started;
-    bb_node_t  body_gen;      /* IJ-9: current body generator (α/β resumption) */
-    int        body_live;     /* IJ-9: 1 = body_gen is active and can be β-ticked */
-    const char *cur_subj;     /* IJ-9: subject string installed for current body_gen */
-    /* saved outer scan context (pushed when subject is installed, popped on exhaustion) */
-    const char *saved_subj;
-    int         saved_pos;
-    int         outer_saved;  /* 1 = outer context is saved, body is running */
+    /* IJ-9: body generator state — valid when body_live=1 */
+    bb_node_t  body_gen;      /* generator built from body via coro_eval */
+    int        body_live;     /* 1 = body_gen has been started and may still produce */
+    /* body_subj/body_pos: the scan context for THIS subject's body run.
+     * body_pos advances as the body consumes characters; restored between β ticks. */
+    const char *body_subj;    /* subject string installed for this body run */
+    int         body_pos;     /* latest scan_pos seen from body (advances on each tick) */
 } icn_scan_gen_state_t;
 DESCR_t coro_bb_scan_gen(void *zeta, int entry);
 

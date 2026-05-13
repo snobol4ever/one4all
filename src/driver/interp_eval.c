@@ -4264,7 +4264,9 @@ DESCR_t interp_eval(tree_t *e)
         DESCR_t val = box.fn(box.ζ, α);
         while (!IS_FAIL_fn(val) && !FRAME.returning && !FRAME.loop_break) {
             frame_push(gen, val.v == DT_I ? val.i : 0, val.v == DT_I ? NULL : val.s);
-            interp_eval(do_expr);
+            /* IJ-9: When do_expr == gen (no explicit body), side effects already ran inside
+             * box.fn(α/β) — skip re-evaluating gen to avoid double-executing write()/etc. */
+            if (do_expr != gen) interp_eval(do_expr);
             frame_pop();
             if (FRAME.returning || FRAME.loop_break) break;
             val = box.fn(box.ζ, β);

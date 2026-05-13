@@ -1297,6 +1297,9 @@ DESCR_t bb_eval_value(tree_t *e)
                 frame_depth = saved_depth;
                 frame_pop();
             }
+            /* IJ-9: when body==NULL (bare `every gen`), side effects already ran inside
+             * box.fn(α/β) — no extra bb_exec_stmt needed.  body!=NULL means an explicit
+             * `every gen do body` — execute body normally. */
             if (FRAME.returning || FRAME.loop_break) break;
             val = box.fn(box.ζ, β);
         }
