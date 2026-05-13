@@ -313,6 +313,11 @@ const char *real_str(double r, char *buf, int bufsz) {
 int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR_t *out)
 {
     if (!fn || !out) return 0;
+    /* IJ-6: FAIL / SUCCEED used by lower_not and similar SM sequences in Icon context.
+     * SNOBOL4's FAIL returns a pattern descriptor (DT_P), not FAILDESCR, so
+     * last_ok stays 1 — wrong for Icon. Intercept here to return proper values. */
+    if (!strcmp(fn, "FAIL"))    { *out = FAILDESCR; return 1; }
+    if (!strcmp(fn, "SUCCEED")) { *out = NULVCL;    return 1; }
     /* write(x1,...,xN) — concatenate all args, append newline.
      * Icon semantics: any FAIL arg propagates; &null arg writes empty. */
     if (!strcmp(fn, "write")) {

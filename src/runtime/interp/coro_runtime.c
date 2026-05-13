@@ -2003,10 +2003,17 @@ bb_node_t coro_eval(tree_t *e) {
         return (bb_node_t){ icn_lazy_box, z, 0 };
     }
 
-    /* ── Fallback: one-shot box wrapping value-context evaluation ───────── */
-    icn_oneshot_state_t *z = calloc(1, sizeof(*z));
-    z->val = bb_eval_value(e);
-    return (bb_node_t){ coro_oneshot, z, 0 };
+    /* ── Fallback: lazy box — re-evaluates at pump time with frame live ──── */
+    /* Pre-computing at setup time (icn_oneshot) is wrong for expressions that
+     * read Icon frame locals (FRAME.env[]) or may fail (relational/identity ops):
+     * setup happens before the first pump, when the frame context may differ.
+     * icn_lazy_box re-evaluates bb_eval_value(e) on each α pump, so variable
+     * reads happen with the correct live frame.                              */
+    {
+        icn_lazy_state_t *lz = calloc(1, sizeof(*lz));
+        lz->expr = e;
+        return (bb_node_t){ icn_lazy_box, lz, 0 };
+    }
 }
 
 
