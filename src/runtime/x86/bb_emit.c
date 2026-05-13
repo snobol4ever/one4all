@@ -1745,6 +1745,19 @@ void emit_label_define(bb_label_t *lbl)
 void emit_bb_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fallback,
                     int port, bb_label_t *lbl_succ, bb_label_t *lbl_fail)
 {
+    /* EM-BB-FORMAT-4: FORMAT mode produces one fused 4-column line per port.
+     * Body = "call fn@PLT ; jne lbl_succ"; final jmp lbl_fail flushes.
+     * No push/pop r10 or zeta setup in the asm text — the fn handles state. */
+    if (emit_bb_is_format_mode()) {
+        char call_frag[BB_LABEL_NAME_MAX + 32];
+        snprintf(call_frag, sizeof(call_frag), "call %s@PLT", fn_name);
+        fmt_body_append(call_frag, "");
+        char jne[BB_LABEL_NAME_MAX + 8];
+        snprintf(jne, sizeof(jne), "jne %s", lbl_succ->name);
+        fmt_body_append(jne, "");
+        emit_jmp(lbl_fail, JMP_JMP);  /* flush the accumulated port line */
+        return;
+    }
     /* Save/restore r10 around the call.  r10 holds the flat-BB BLOB's LOCAL
      * (lea r10, [rip + Δ_data] from the α-preamble) and must persist across
      * the call so the γ-body can do `mov ... [r10+N]`.  r10 is caller-saved
