@@ -11,6 +11,7 @@
 #include "../rt/rt.h"
 
 /*---- all extern declarations in one block -------------------------------------------------------------------------*/
+extern DESCR_t  bb_deferred_var_exported(void *zeta, int entry);  /* stmt_exec.c — BINARY fn_fallback for XDSAR */
 extern DESCR_t  coro_bb_alternate    (void *zeta, int entry);   extern icn_alternate_state_t      *icon_alt_new(void);
 extern DESCR_t  coro_bb_bang_binary  (void *zeta, int entry);   extern icn_bang_binary_state_t     *icon_bang_new(void);
 extern DESCR_t  coro_bb_every        (void *zeta, int entry);   extern icn_every_state_t           *icon_every_new(void);
@@ -210,9 +211,9 @@ void emit_bb_xdsar(emitter_t *e, const char *varname, bb_label_t *s, bb_label_t 
     flat_data_quad(e, "0");   flat_data_long(e, 0);    flat_data_long(e, 0);
     flat_text_section(e);     flat_intel_syntax(e);
     void *z = bb_dvar_bin_new(vn);
-    emit_bb_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "bb_deferred_var_exported", 0, 0, s, f);
+    emit_bb_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "bb_deferred_var_exported", (uint64_t)(uintptr_t)bb_deferred_var_exported, 0, s, f);
     emit_label_define(b);
-    emit_bb_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "bb_deferred_var_exported", 0, 1, s, f);
+    emit_bb_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "bb_deferred_var_exported", (uint64_t)(uintptr_t)bb_deferred_var_exported, 1, s, f);
 }
 /*====================================================================================================================*/
 void emit_bb_xatp(emitter_t *e, const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t *b)
