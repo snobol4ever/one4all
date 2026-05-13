@@ -46,6 +46,7 @@ SCRIP_CC_BIN := $(ROOT)/scrip
 
 .PHONY: all scrip scrip-interp scrip setup \
         test test-ir test-all \
+        jit-emit-test \
         monitor-ipc \
         libscrip_rt \
         run run-ir run-jvm run-net \
@@ -366,6 +367,15 @@ test-ir: scrip
 	INTERP="./scrip --ir-run" CORPUS=$(CORPUS) bash test/run_interp_broad.sh
 
 test-all: test test-ir
+
+# ── EM-9: jit-emit-test — smoke + em8 gate for --jit-emit --x64 ──────────────
+# Runs: test_smoke_snobol4.sh (7/7) + test_gate_em8_snocone_jit_emit.sh (5/5).
+# Requires: libscrip_rt (built into out/libscrip_rt.so).
+jit-emit-test: scrip libscrip_rt
+	@bash scripts/test_smoke_snobol4.sh
+	@bash scripts/test_gate_em8_snocone_jit_emit.sh
+
+.PHONY: jit-emit-test
 
 # ── Runner wrappers ───────────────────────────────────────────────────────────
 
