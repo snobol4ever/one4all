@@ -4,7 +4,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
-bb_emit_mode_t  bb_emit_mode = EMIT_TEXT;
+bb_emit_mode_t  bb_emit_mode = EMIT_BINARY_WIRED;
 FILE           *bb_emit_out  = NULL;
 int g_bb_emit_format  = 0;
 int g_in_text_macro_body = 0;
