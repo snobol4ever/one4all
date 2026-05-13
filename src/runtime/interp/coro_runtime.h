@@ -165,6 +165,14 @@ const char *icn_cset_canonical(const char *cs);
 int kw_assign(const char *kw, DESCR_t val);
 int icn_kw_can_assign(const char *kw, DESCR_t val);
 
+/* IJ-11: central Icon keyword read — returns correct DESCR_t for any &kw name
+ * (without the leading '&').  Returns FAILDESCR for unknown / generative keywords. */
+DESCR_t icn_kw_read(const char *kw);
+/* IJ-11: if ptr is a registered keyword-cset pointer, return its "&name"; else NULL. */
+const char *icn_kw_cset_name(const char *ptr);
+/* IJ-11: returns stored length for keyword csets (handles NUL-inclusive like &ascii). -1 = not a kw cset. */
+int icn_kw_cset_len(const char *ptr);
+
 /* RS-23c: exported so coro_value.c / coro_stmt.c can use it in TT_EVERY handling. */
 tree_t *find_leaf_suspendable(tree_t *e);
 

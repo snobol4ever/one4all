@@ -361,11 +361,14 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
         case SM_PUSH_VAR: {
             const char *name = ins->a[0].s;
             DESCR_t val;
-            /* IJ-10: In Icon mode, &pos and &subject read from scan state, not NV table. */
+            /* IJ-11: In Icon mode, route all &keyword reads through icn_kw_read. */
             { extern int g_lang;
               if (g_lang == LANG_ICN && name && name[0] == '&') {
-                if (!strcmp(name, "&pos"))     { val = INTVAL(scan_pos); sm_push(st, val); st->last_ok = 1; break; }
-                if (!strcmp(name, "&subject")) { val = scan_subj ? STRVAL(scan_subj) : NULVCL; sm_push(st, val); st->last_ok = 1; break; }
+                extern DESCR_t icn_kw_read(const char *kw);
+                DESCR_t kv = icn_kw_read(name + 1);
+                sm_push(st, kv);
+                st->last_ok = IS_FAIL_fn(kv) ? 0 : 1;
+                break;
               }
             }
             val = NV_GET_fn(name);

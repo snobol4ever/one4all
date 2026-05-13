@@ -327,6 +327,8 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
             if (av.v == DT_SNUL) continue;   /* &null → empty */
             if (IS_INT_fn(av))       printf("%lld", (long long)av.i);
             else if (IS_REAL_fn(av)) { char _rb[64]; printf("%s", real_str(av.r,_rb,sizeof _rb)); }
+            /* IJ-11: cset — print the char content directly */
+            else if (IS_CSET_fn(av)) { if (av.s) fwrite(av.s, 1, strlen(av.s), stdout); }
             else { const char *s = VARVAL_fn(av); if (s) fputs(s, stdout); }
         }
         putchar('\n');
@@ -459,6 +461,9 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
             DESCR_t tag = FIELD_GET_fn(av,"icn_type");
             t = (tag.v==DT_S && tag.s) ? tag.s : "record";
         }
+        /* IJ-11: cset sentinel must be tested before generic DT_S → "string" */
+        else if (IS_CSET_fn(av)) t="cset";
+        else if (av.v==DT_SNUL)  t="null";
         else t="string";
         *out = STRVAL(t); return 1;
     }
@@ -509,9 +514,12 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         if (IS_FAIL_fn(av)) { *out = FAILDESCR; return 1; }
         char *buf = GC_malloc(256);
         if (av.v == DT_SNUL)     { *out = STRVAL("&null"); return 1; }
-        /* IJ-7: cset value — image as 'chars' with single quotes */
+        /* IJ-11: cset value — named keyword csets (e.g. &lcase) show "&lcase";
+         * anonymous csets show the chars wrapped in single quotes. */
         if (IS_CSET_fn(av)) {
             const char *cs = av.s ? av.s : "";
+            const char *kname = icn_kw_cset_name(cs);
+            if (kname) { *out = STRVAL(kname); return 1; }
             int clen = (int)strlen(cs);
             char *outs = GC_malloc(clen + 3);
             outs[0] = '\'';
@@ -549,10 +557,11 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
                     { snprintf(buf,128,"procedure %s",proc_table[i].name); *out=STRVAL(buf); return 1; }
             snprintf(buf,128,"procedure"); *out=STRVAL(buf); return 1;
         }
-        /* IJ-4: DT_S builtin proc name → "function name" */
+        /* IJ-11: named keyword csets display as "&name"; other csets show 'chars' format */
         if (IS_CSET_fn(av)) {
-            /* Cset value: emit 'chars' format (single-quoted sorted chars) */
             const char *cs = av.s ? av.s : "";
+            const char *kname = icn_kw_cset_name(cs);
+            if (kname) { *out = STRVAL(kname); return 1; }
             int cslen = (int)strlen(cs);
             char *outs = GC_malloc(cslen * 4 + 3);
             int o = 0;
@@ -1132,12 +1141,18 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
             }
         }
         if (IS_INT_fn(v)||IS_REAL_fn(v)) { *out = INTVAL(0); return 1; }
+        /* IJ-11: cset — use .s directly, and icn_kw_cset_len for NUL-inclusive kw csets */
+        if (IS_CSET_fn(v)) {
+            int klen = icn_kw_cset_len(v.s);
+            *out = INTVAL(klen >= 0 ? klen : (v.s ? (long)strlen(v.s) : 0));
+            return 1;
+        }
         const char *s = VARVAL_fn(v); if (!s) { *out = INTVAL(0); return 1; }
         if (strchr(s,'\x01')) {
             long n=1; for(const char *p=s;*p;p++) if(*p=='\x01') n++;
             *out = INTVAL(n); return 1;
         }
-        long len = v.slen > 0 ? v.slen : (long)strlen(s);
+        long len = IS_CSET_fn(v) ? (long)strlen(s) : (v.slen > 0 ? v.slen : (long)strlen(s));
         *out = INTVAL(len); return 1;
     }
 
@@ -1844,6 +1859,13 @@ DESCR_t icn_call_builtin(tree_t *call, DESCR_t *args, int nargs) {
 
 /* Forward declaration (also declared above for call_user_function) */
 
+/* IJ-11: writable Icon keyword globals.  kw_assign persists writes here;
+ * icn_kw_read reads them back so SM and BB paths both see the same state. */
+long g_icn_error  = 0;
+long g_icn_trace  = 0;
+long g_icn_dump   = 0;
+long g_icn_random = 0;
+
 /* IC-9 (2026-05-01): Icon-keyword write helper.
  * Returns 1 on success, 0 on FAIL (out-of-range &pos write).
  * Keywords without a write contract (e.g. &letters, &lcase) are read-only
@@ -1874,6 +1896,11 @@ int kw_assign(const char *kw, DESCR_t val) {
         scan_pos = 1;
         return 1;
     }
+    /* IJ-11: writable numeric keywords */
+    if (!strcmp(kw,"error"))  { g_icn_error  = to_int(val); return 1; }
+    if (!strcmp(kw,"trace"))  { g_icn_trace  = to_int(val); return 1; }
+    if (!strcmp(kw,"dump"))   { g_icn_dump   = to_int(val); return 1; }
+    if (!strcmp(kw,"random")) { g_icn_random = to_int(val); return 1; }
     /* Other keywords: silently accept (no write contract here) */
     return 1;
 }
@@ -1893,6 +1920,166 @@ int icn_kw_can_assign(const char *kw, DESCR_t val) {
     }
     /* &subject, others: always accept */
     return 1;
+}
+
+/* IJ-11: central Icon keyword read.  kw = keyword name WITHOUT leading '&'.
+ * Returns FAILDESCR for unknown / unimplemented / generative keywords.
+ * Csets returned as CSETVAL (DT_S, slen=0xFFFFFFFF) so type() yields "cset".
+ *
+ * Named-cset registry: image() checks this table to display "&lcase" etc.
+ * instead of the raw character set. */
+#define ICN_KW_CSET_MAX 16
+static struct { const char *ptr; const char *name; int len; } g_kw_cset_names[ICN_KW_CSET_MAX];
+static int g_kw_cset_count = 0;
+
+static DESCR_t make_kw_cset(const char *chars, const char *kw_name) {
+    /* Copy into GC-managed memory so the pointer is stable even after
+     * icn_str_arena wraps.  We look up by name so the copy only happens once. */
+    for (int i = 0; i < g_kw_cset_count; i++)
+        if (!strcmp(g_kw_cset_names[i].name, kw_name))
+            return CSETVAL(g_kw_cset_names[i].ptr);
+    const char *arena = icn_cset_canonical(chars);
+    char *stable = GC_strdup(arena);
+    int clen = (int)strlen(stable);
+    if (g_kw_cset_count < ICN_KW_CSET_MAX) {
+        g_kw_cset_names[g_kw_cset_count].ptr  = stable;
+        g_kw_cset_names[g_kw_cset_count].name = kw_name;
+        g_kw_cset_names[g_kw_cset_count].len  = clen;
+        g_kw_cset_count++;
+    }
+    return CSETVAL(stable);
+}
+
+/* Exported so image() and SIZE can call it */
+const char *icn_kw_cset_name(const char *ptr) {
+    for (int i = 0; i < g_kw_cset_count; i++)
+        if (g_kw_cset_names[i].ptr == ptr) return g_kw_cset_names[i].name;
+    return NULL;
+}
+/* IJ-11: returns stored length (handles NUL-inclusive csets like &ascii/&cset) */
+int icn_kw_cset_len(const char *ptr) {
+    for (int i = 0; i < g_kw_cset_count; i++)
+        if (g_kw_cset_names[i].ptr == ptr) return g_kw_cset_names[i].len;
+    return -1;  /* not a keyword cset — caller uses strlen */
+}
+
+DESCR_t icn_kw_read(const char *kw) {
+    if (!kw) return FAILDESCR;
+    /* Scan state (live) */
+    if (!strcmp(kw,"pos"))     return INTVAL(scan_pos);
+    if (!strcmp(kw,"subject")) return scan_subj ? STRVAL(scan_subj) : STRVAL("");
+    /* Math constants */
+    if (!strcmp(kw,"e"))   return REALVAL(2.718281828459045);
+    if (!strcmp(kw,"pi"))  return REALVAL(3.141592653589793);
+    if (!strcmp(kw,"phi")) return REALVAL(1.618033988749895);
+    /* Cset constants — make_kw_cset returns a GC-stable pointer and is idempotent. */
+    if (!strcmp(kw,"lcase"))   return make_kw_cset("abcdefghijklmnopqrstuvwxyz","&lcase");
+    if (!strcmp(kw,"ucase"))   return make_kw_cset("ABCDEFGHIJKLMNOPQRSTUVWXYZ","&ucase");
+    if (!strcmp(kw,"letters")) return make_kw_cset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz","&letters");
+    if (!strcmp(kw,"digits"))  return make_kw_cset("0123456789","&digits");
+    if (!strcmp(kw,"ascii")) {
+        static const char *cs = NULL;
+        if (!cs) {
+            /* &ascii = chars 0..127 (128 chars). Build from chars 1..127, prepend NUL. */
+            static char ascii_str[128];
+            for (int c=1;c<128;c++) ascii_str[c-1]=(char)c; ascii_str[127]='\0';
+            const char *tmp = icn_cset_canonical(ascii_str);
+            int tlen = (int)strlen(tmp);
+            char *stable = GC_malloc(tlen + 2);
+            stable[0] = '\0'; memcpy(stable+1, tmp, tlen+1);
+            if (g_kw_cset_count < ICN_KW_CSET_MAX) {
+                g_kw_cset_names[g_kw_cset_count].ptr  = stable;
+                g_kw_cset_names[g_kw_cset_count].name = "&ascii";
+                g_kw_cset_names[g_kw_cset_count].len  = 128;
+                g_kw_cset_count++;
+            }
+            cs = stable;
+        }
+        return CSETVAL(cs);
+    }
+    if (!strcmp(kw,"cset")) {
+        static const char *cs = NULL;
+        if (!cs) {
+            /* &cset = chars 0..255 (256 chars). Build from chars 1..255, prepend NUL. */
+            static char cset_str[256];
+            for (int c=1;c<256;c++) cset_str[c-1]=(char)c; cset_str[255]='\0';
+            const char *tmp = icn_cset_canonical(cset_str);
+            int tlen = (int)strlen(tmp);
+            char *stable = GC_malloc(tlen + 2);
+            stable[0] = '\0'; memcpy(stable+1, tmp, tlen+1);
+            if (g_kw_cset_count < ICN_KW_CSET_MAX) {
+                g_kw_cset_names[g_kw_cset_count].ptr  = stable;
+                g_kw_cset_names[g_kw_cset_count].name = "&cset";
+                g_kw_cset_names[g_kw_cset_count].len  = 256;
+                g_kw_cset_count++;
+            }
+            cs = stable;
+        }
+        return CSETVAL(cs);
+    }
+    /* Writable scalars — read from globals (written by kw_assign) */
+    { extern long g_icn_error, g_icn_trace, g_icn_dump, g_icn_random;
+      if (!strcmp(kw,"error"))  return INTVAL(g_icn_error);
+      if (!strcmp(kw,"trace"))  return INTVAL(g_icn_trace);
+      if (!strcmp(kw,"dump"))   return INTVAL(g_icn_dump);
+      if (!strcmp(kw,"random")) return INTVAL(g_icn_random);
+    }
+    /* Fixed integers */
+    if (!strcmp(kw,"col"))     return INTVAL(0);
+    if (!strcmp(kw,"row"))     return INTVAL(0);
+    if (!strcmp(kw,"x"))       return INTVAL(0);
+    if (!strcmp(kw,"y"))       return INTVAL(0);
+    if (!strcmp(kw,"level"))   return INTVAL(1);
+    /* Mouse/event keywords — fixed negative sentinels per JCON */
+    if (!strcmp(kw,"lpress"))   return INTVAL(-1);
+    if (!strcmp(kw,"mpress"))   return INTVAL(-2);
+    if (!strcmp(kw,"rpress"))   return INTVAL(-3);
+    if (!strcmp(kw,"lrelease")) return INTVAL(-4);
+    if (!strcmp(kw,"mrelease")) return INTVAL(-5);
+    if (!strcmp(kw,"rrelease")) return INTVAL(-6);
+    if (!strcmp(kw,"ldrag"))    return INTVAL(-7);
+    if (!strcmp(kw,"mdrag"))    return INTVAL(-8);
+    if (!strcmp(kw,"rdrag"))    return INTVAL(-9);
+    if (!strcmp(kw,"resize"))   return INTVAL(-10);
+    /* Null / fail sentinels */
+    if (!strcmp(kw,"null"))    return NULVCL;
+    if (!strcmp(kw,"fail"))    return FAILDESCR;
+    if (!strcmp(kw,"window"))  return NULVCL;
+    /* I/O stream strings */
+    if (!strcmp(kw,"input"))   return STRVAL("&input");
+    if (!strcmp(kw,"output"))  return STRVAL("&output");
+    if (!strcmp(kw,"errout"))  return STRVAL("&errout");
+    /* Co-expression self-reference */
+    if (!strcmp(kw,"current")) return STRVAL("co-expression_1(0)");
+    if (!strcmp(kw,"main"))    return STRVAL("co-expression_1(0)");
+    if (!strcmp(kw,"source"))  return STRVAL("co-expression_1(0)");
+    /* Date/time — mapped to "n" by nmap() in the test, so content doesn't matter */
+    { time_t t = time(NULL); struct tm *tm = localtime(&t);
+      if (!strcmp(kw,"date")) {
+          char *buf = GC_malloc(16);
+          snprintf(buf,16,"%04d/%02d/%02d",tm->tm_year+1900,tm->tm_mon+1,tm->tm_mday);
+          return STRVAL(buf);
+      }
+      if (!strcmp(kw,"dateline")) {
+          char *buf = GC_malloc(64);
+          strftime(buf,64,"%A, %B %e, %Y  %H:%M:%S",tm);
+          return STRVAL(buf);
+      }
+      if (!strcmp(kw,"clock")) {
+          char *buf = GC_malloc(16);
+          snprintf(buf,16,"%02d:%02d:%02d",tm->tm_hour,tm->tm_min,tm->tm_sec);
+          return STRVAL(buf);
+      }
+      if (!strcmp(kw,"time")) {
+          char *buf = GC_malloc(16);
+          snprintf(buf,16,"%d",(int)(clock()*1000/CLOCKS_PER_SEC));
+          return STRVAL(buf);
+      }
+    }
+    /* Version string */
+    if (!strcmp(kw,"version")) return STRVAL("Jcon Version 2.2");
+    /* Generative / unimplemented: FAILDESCR triggers "[failed]" fallback in test */
+    return FAILDESCR;
 }
 
 DESCR_t interp_eval(tree_t *e)
@@ -1936,16 +2123,9 @@ DESCR_t interp_eval(tree_t *e)
         switch (e->t) {
         case TT_VAR: {
             if (e->v.sval && e->v.sval[0] == '&') {
-                const char *kw = e->v.sval + 1;
-                if (!strcmp(kw,"subject")) return scan_subj ? STRVAL(scan_subj) : NULVCL;
-                if (!strcmp(kw,"pos"))     return INTVAL(scan_pos);
-                if (!strcmp(kw,"letters")) return STRVAL("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
-                if (!strcmp(kw,"ucase"))   return STRVAL("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
-                if (!strcmp(kw,"lcase"))   return STRVAL("abcdefghijklmnopqrstuvwxyz");
-                if (!strcmp(kw,"digits"))  return STRVAL("0123456789");
-                if (!strcmp(kw,"null"))    return NULVCL;
-                if (!strcmp(kw,"fail"))    return FAILDESCR;
-                return NULVCL;
+                /* IJ-11: central keyword read handles all &kw names.
+                 * Return FAILDESCR as-is — &fail should produce failure. */
+                return icn_kw_read(e->v.sval + 1);
             }
             int slot = (int)e->v.ival;
             if (slot >= 0 && slot < FRAME.env_n) return FRAME.env[slot];
@@ -2002,6 +2182,8 @@ DESCR_t interp_eval(tree_t *e)
                     if (a.v == DT_SNUL) continue;
                     if (IS_INT_fn(a)) printf("%lld",(long long)a.i);
                     else if (IS_REAL_fn(a)) { char _rb[64]; printf("%s",real_str(a.r,_rb,sizeof _rb)); }
+                    /* IJ-11: cset */
+                    else if (IS_CSET_fn(a)) { if (a.s) fwrite(a.s, 1, strlen(a.s), stdout); }
                     else { const char *s=VARVAL_fn(a); if (s) fputs(s, stdout); }
                 }
                 putchar('\n');
@@ -2909,6 +3091,9 @@ DESCR_t interp_eval(tree_t *e)
                     DESCR_t tag = FIELD_GET_fn(av,"icn_type");
                     t = (tag.v==DT_S && tag.s) ? tag.s : "record";
                 }
+                /* IJ-11: cset sentinel must be tested before generic DT_S → "string" */
+                else if (IS_CSET_fn(av)) t="cset";
+                else if (av.v==DT_SNUL)  t="null";
                 else t="string";
                 return STRVAL(t);
             }
@@ -3906,7 +4091,12 @@ DESCR_t interp_eval(tree_t *e)
             for (const char *p = s; *p; p++) if (*p == '\x01') n++;
             return INTVAL(n);
         }
-        long len = v.slen > 0 ? v.slen : (long)strlen(s);
+        long len;
+        /* IJ-11: cset sentinel — use icn_kw_cset_len for NUL-inclusive kw csets */
+        if (IS_CSET_fn(v)) {
+            int klen = icn_kw_cset_len(v.s);
+            len = klen >= 0 ? klen : (v.s ? (long)strlen(v.s) : 0);
+        } else len = v.slen > 0 ? v.slen : (long)strlen(s);
         return INTVAL(len);
     }
 

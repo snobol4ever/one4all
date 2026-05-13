@@ -439,16 +439,8 @@ DESCR_t bb_eval_value(tree_t *e)
      * so e->v.sval is never clobbered and keyword/NV detection is safe. */
     if (e->t == TT_VAR && frame_depth > 0) {
         if (e->v.sval && e->v.sval[0] == '&') {
-            const char *kw = e->v.sval + 1;
-            if (!strcmp(kw, "subject")) return scan_subj ? STRVAL(scan_subj) : NULVCL;
-            if (!strcmp(kw, "pos"))     return INTVAL(scan_pos);
-            if (!strcmp(kw, "letters")) return STRVAL("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
-            if (!strcmp(kw, "ucase"))   return STRVAL("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
-            if (!strcmp(kw, "lcase"))   return STRVAL("abcdefghijklmnopqrstuvwxyz");
-            if (!strcmp(kw, "digits"))  return STRVAL("0123456789");
-            if (!strcmp(kw, "null"))    return NULVCL;
-            if (!strcmp(kw, "fail"))    return FAILDESCR;
-            return NULVCL;
+            /* IJ-11: central keyword read — pass FAILDESCR through for &fail */
+            return icn_kw_read(e->v.sval + 1);
         }
         int slot = e->_id;   /* SI-13: slot stored in _id, v.sval preserved */
         if (slot >= 0 && slot < FRAME.env_n) {
@@ -834,7 +826,12 @@ DESCR_t bb_eval_value(tree_t *e)
             for (const char *p = s; *p; p++) if (*p == '\x01') n++;
             return INTVAL(n);
         }
-        long len = v.slen > 0 ? v.slen : (long)strlen(s);
+        long len;
+        /* IJ-11: cset — use icn_kw_cset_len for NUL-inclusive keyword csets */
+        if (IS_CSET_fn(v)) {
+            int klen = icn_kw_cset_len(v.s);
+            len = klen >= 0 ? klen : (v.s ? (long)strlen(v.s) : 0);
+        } else len = v.slen > 0 ? v.slen : (long)strlen(s);
         return INTVAL(len);
     }
 
@@ -890,7 +887,7 @@ DESCR_t bb_eval_value(tree_t *e)
         if (v.v == DT_SNUL) return FAILDESCR;
         const char *s = VARVAL_fn(v);
         if (!s || !*s) return FAILDESCR;
-        long slen = v.slen > 0 ? v.slen : (long)strlen(s);
+        long slen = IS_CSET_fn(v) ? (long)strlen(s) : (v.slen > 0 ? v.slen : (long)strlen(s));
         if (slen <= 0) return FAILDESCR;
         char *out = (char *)GC_malloc(2);
         out[0] = s[_rnd % (unsigned long)slen];
