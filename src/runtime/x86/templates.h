@@ -65,16 +65,7 @@ void emit_bb_charset(emitter_t *e,
                      bb_label_t *lbl_fail,
                      bb_label_t *lbl_β);
 
-/* Integer-cursor family (LEN/TAB/RTAB) — sub-rung -g (2026-05-11).
- * EM-TEMPLATE-PURITY-2: callback params removed; t_bb_port_call used. */
-void emit_bb_intcur(emitter_t *e,
-                    bb_box_fn c_fn,
-                    const char *c_fn_name,
-                    const char *kind_name,
-                    long long num,
-                    bb_label_t *lbl_succ,
-                    bb_label_t *lbl_fail,
-                    bb_label_t *lbl_β);
+/* Integer-cursor family (LEN/TAB/RTAB) — EC-5: intcur dispatch deleted, direct emit_bb_stateful. */
 void emit_bb_xlnth(emitter_t *e, long long num,
                    bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
 void emit_bb_xtb  (emitter_t *e, long long num,

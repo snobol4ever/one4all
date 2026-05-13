@@ -403,36 +403,12 @@ void emit_bb_xfnme(emitter_t *e, bb_box_fn child_fn, const char *varname,
                      "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, lbl_succ, lbl_fail, lbl_β);
 }
 /*====================================================================================================================*/
-void emit_bb_intcur(emitter_t *e,
-                    bb_box_fn c_fn,
-                    const char *c_fn_name,
-                    const char *kind_name,
-                    long long num,
-                    bb_label_t *lbl_succ,
-                    bb_label_t *lbl_fail,
-                    bb_label_t *lbl_β)
-{
-    (void)e; (void)c_fn;
-    void *z;
-    const char *rt_name;
-    uint64_t rt_fn;
-    if (c_fn_name && c_fn_name[3] == 'l') {
-        z = bb_len_new((int)num); rt_name = "rt_bb_len"; rt_fn = (uint64_t)(uintptr_t)rt_bb_len;
-    } else if (c_fn_name && c_fn_name[3] == 't') {
-        z = bb_tab_new((int)num); rt_name = "rt_bb_tab"; rt_fn = (uint64_t)(uintptr_t)rt_bb_tab;
-    } else if (c_fn_name && c_fn_name[3] == 'r') {
-        z = bb_rtab_new((int)num); rt_name = "rt_bb_rtab"; rt_fn = (uint64_t)(uintptr_t)rt_bb_rtab;
-    } else {
-        int *r = calloc(2, sizeof(int)); r[0] = (int)num; z = r;
-        rt_name = "rt_bb_len"; rt_fn = (uint64_t)(uintptr_t)rt_bb_len;
-    }
-    emit_bb_stateful(kind_name ? kind_name : "INTCUR", "", z, rt_name, rt_fn,
-                     lbl_succ, lbl_fail, lbl_β);
-}
 void emit_bb_xlnth(emitter_t *e, long long num,
                    bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
-    emit_bb_intcur(e, NULL, "bb_len", "LEN", num, lbl_succ, lbl_fail, lbl_β);
+    (void)e;
+    emit_bb_stateful("LEN", "", bb_len_new((int)num), "rt_bb_len",
+                     (uint64_t)(uintptr_t)rt_bb_len, lbl_succ, lbl_fail, lbl_β);
 }
 /*====================================================================================================================*/
 void emit_bb_xnme(emitter_t *e, bb_box_fn child_fn, const char *varname,
@@ -476,7 +452,9 @@ void emit_bb_xrpsi(emitter_t *e, int n,
 void emit_bb_xrtb(emitter_t *e, long long num,
                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
-    emit_bb_intcur(e, NULL, "bb_rtab", "RTAB", num, lbl_succ, lbl_fail, lbl_β);
+    (void)e;
+    emit_bb_stateful("RTAB", "", bb_rtab_new((int)num), "rt_bb_rtab",
+                     (uint64_t)(uintptr_t)rt_bb_rtab, lbl_succ, lbl_fail, lbl_β);
 }
 /*====================================================================================================================*/
 void emit_bb_charset(emitter_t *e,
@@ -525,7 +503,9 @@ void emit_bb_xsucf(emitter_t *e,
 void emit_bb_xtb(emitter_t *e, long long num,
                  bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
-    emit_bb_intcur(e, NULL, "bb_tab", "TAB", num, lbl_succ, lbl_fail, lbl_β);
+    (void)e;
+    emit_bb_stateful("TAB", "", bb_tab_new((int)num), "rt_bb_tab",
+                     (uint64_t)(uintptr_t)rt_bb_tab, lbl_succ, lbl_fail, lbl_β);
 }
 /*====================================================================================================================*/
 void emit_bb_xvar(emitter_t *e,
