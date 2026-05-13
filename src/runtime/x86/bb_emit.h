@@ -1,55 +1,9 @@
-/*
- * bb_emit.h — Dual-Mode x86-64 Emitter (M-DYN-1)
- *
- * Every NASM macro in snobol4_asm.mac has a corresponding C function
- * mac_*() in bb_macros.c.  Those functions call the primitives here.
- *
- * MODE SWITCH
- * -----------
- * bb_emit_mode controls all output:
- *
- *   EMIT_TEXT   — write GAS assembly text to bb_emit_out (FILE*).
- *                 Labels are symbolic strings.  Output is a .s file
- *                 fed to GAS → ELF → linker.
- *
- *   EMIT_BINARY_WIRED — write raw x86-64 bytes into the current bb_pool
- *                 buffer (flat/live mode).  One contiguous blob for the
- *                 entire pattern tree.  Boxes jmp directly to each other's
- *                 α/β/γ/ω labels within the blob.  Broker calls the blob
- *                 ONCE at α entry (esi=0); backtracking is internal jmp.
- *                 r10 = &Δ loaded in preamble; rdi=ζ ignored (ζ=NULL).
- *
- *   EMIT_BINARY_BROKERED — write raw x86-64 bytes into bb_pool, one
- *                 blob per box (brokered mode).  Each blob has a full
- *                 C ABI entry: rdi=ζ heap struct, esi=port discriminator
- *                 (cmp esi,0; je α; jmp β), ret to return to broker.
- *                 Broker calls fn(ζ,0) for α and fn(ζ,1) for β separately.
- *
- *   EMIT_MACRO_DEF — emit .macro NAME ... .endm body (sm_macros.s regen).
- *
- * LABEL SYSTEM
- * ------------
- * bb_label_t carries both a symbolic name (text mode) and a buffer
- * offset (binary mode).  Labels start unresolved (offset == -1).
- * bb_label_define() resolves a label at the current emit position and
- * patches all pending forward references to it.
- *
- * PATCH LIST
- * ----------
- * When binary mode emits a jump to an unresolved label, it records a
- * (patch_site, label_id) entry.  bb_label_define() walks the list and
- * fills in the correct rel8 or rel32 displacement.
- *
- * USAGE SEQUENCE (binary mode)
- * ----------------------------
- *   bb_emit_begin(buf, size);        // attach emitter to pool buffer
- *   mac_LIT_α(...);                  // emit bytes + record patches
- *   mac_LIT_β(...);
- *   bb_emit_end();                   // resolve all patches, returns bytes written
- *   bb_seal(buf, bytes_written);     // mprotect RW→RX
- *   box_fn fn = (box_fn)buf;
- *   fn(subject, len);
- */
+/* bb_emit.h — Dual-Mode x86-64 Emitter.
+ * bb_emit_mode selects output: EMIT_TEXT (GAS .s), EMIT_BINARY_WIRED (flat blob),
+ * EMIT_BINARY_BROKERED (per-box C-ABI blob), EMIT_MACRO_DEF (.macro body regen),
+ * EMIT_TEXT_INLINE (expanded GAS, no macros).
+ * bb_label_t carries a symbolic name (TEXT) and buffer offset (BINARY).
+ * Forward refs patched on bb_label_define().  Finalise with bb_emit_end(). */
 
 #ifndef BB_EMIT_H
 #define BB_EMIT_H
@@ -102,7 +56,6 @@ void emit_mode_set(bb_emit_mode_t m, FILE *out);
 void t_comment(const char *text);
 void t_bb_box_banner(const char *kind, const char *args);
 
-/* Instruction helpers — three-way, no emitter_t parameter. */
 void t_inc_mem_r13_disp8(uint8_t disp);
 void t_ret(void);
 void t_pad_to_blob_size(void);
@@ -121,17 +74,14 @@ typedef struct {
     int  offset;                    /* byte offset in current buffer; -1=unresolved */
 } bb_label_t;
 
-/* Initialise a label with a symbolic name, unresolved offset */
 void bb_label_init(bb_label_t *lbl, const char *name);
 
-/* Initialise a label with printf-style name formatting */
 void bb_label_initf(bb_label_t *lbl, const char *fmt, ...);
 
 /* Define label at the current emit position (binary: sets offset + patches).
  * In text mode: emits "name:" on its own line. */
 void bb_label_define(bb_label_t *lbl);
 
-/* True if label has been defined (offset != BB_LABEL_UNRESOLVED) */
 #define bb_label_defined(lbl)  ((lbl)->offset != BB_LABEL_UNRESOLVED)
 
 /* ── jump kind (used by t_emit_jmp and emitter_t vtable) ────────────────── */
@@ -146,16 +96,9 @@ typedef enum {
     JMP_JG,
 } jmp_kind_t;
 
-/* Three-way jmp helpers (no emitter_t *e parameter). */
 void t_test_rax_rax(void);
 void t_emit_jmp(bb_label_t *target, jmp_kind_t kind);
 
-/* t_noop_macro — emit one three-column line with macro_name in col 2,
- * no operands.  Used by SM_LABEL and SM_STNO templates: the .LpcN: label
- * is consumed by the line; the macro body is empty so it assembles to nothing.
- *   BINARY:    no-op (label placement is the caller's job via bb_label_define)
- *   TEXT:      bb3c_format("", macro_name, "")
- *   MACRO_DEF: same as TEXT */
 void t_lea_rdi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr);
 void t_lea_rdx_strtab_sym(const char *sym_label, uint64_t in_proc_ptr);
 void t_mov_esi_imm32(int val);
@@ -175,16 +118,8 @@ void t_banner_stno(int stno, int lineno, const char *src_text);
 
 /* ── BB port helpers (EM-TEMPLATE-PURITY-2) ────────────────────────────── */
 
-/* t_label_define — define a label at the current emit position.
- *   BINARY:    resolves offset + patches forward refs.
- *   TEXT:      emits "name:\n". */
 void t_label_define(bb_label_t *lbl);
 
-/* t_bb_port_call — emit one α or β port body for a stateful box.
- *   Pattern: mov rdi, zeta_ptr; mov esi, port; call fn@PLT;
- *            test rax, rax; jne lbl_succ; jmp lbl_fail.
- *   TEXT: three-column lines.  BINARY: raw bytes.
- *   `port` is 0 for α, 1 for β. */
 void t_bb_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fallback,
                     int port, bb_label_t *lbl_succ, bb_label_t *lbl_fail);
 
@@ -197,74 +132,27 @@ void t_bb_port_call_rip(uint64_t zeta_ptr, const char *zeta_label,
                         const char *fn_name, uint64_t fn_fallback,
                         int port, bb_label_t *lbl_succ, bb_label_t *lbl_fail);
 
-/* t_load_delta_cmp_imm — load cursor (Δ), compare to n, jump.
- *   Pattern: eax = Δ; cmp eax, n; jne lbl_fail; jmp lbl_succ.
- *   BINARY: mov eax,[r10]; cmp eax,imm32; jne; jmp.
- *   TEXT: three-column lines. */
 void t_load_delta_cmp_imm(int n, bb_label_t *lbl_succ, bb_label_t *lbl_fail);
 
-/* t_load_siglen_sub_cmp_delta — load Σlen, subtract n, compare to Δ, jump.
- *   Pattern: eax = Σlen; eax -= n; ecx = eax; eax = Δ; cmp eax, ecx;
- *            jne lbl_fail; jmp lbl_succ.  Used by RPOS(n).
- *   BINARY: raw bytes.  TEXT: three-column lines. */
 void t_load_siglen_sub_cmp_delta(int n, uint64_t siglen_addr,
                                  bb_label_t *lbl_succ, bb_label_t *lbl_fail);
 
-/* t_lea_rsi_strtab_sym — load strtab string address into rsi.
- *   BINARY:    mov rsi, in_proc_ptr  (48 BE <8>)
- *   TEXT:      lea rcx, [rip + sym_label]; mov rsi, rcx
- *   MACRO_DEF: same as TEXT with \lbl parameter */
 void t_lea_rsi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr);
 
-/* t_add_delta_imm — Δ += v  (load, add imm32, store back via [r10]).
- *   BINARY: mov eax,[r10]; add eax,imm32; mov [r10],eax
- *   TEXT:   three-column lines. */
 void t_add_delta_imm(int v);
 
-/* t_sub_delta_imm — Δ -= v  (load, sub imm32, store back via [r10]).
- *   BINARY: mov eax,[r10]; sub eax,imm32; mov [r10],eax
- *   TEXT:   three-column lines. */
 void t_sub_delta_imm(int v);
 
-/* t_sigma_plus_delta_to_rdi — rdi = Σ + Δ.
- *   BINARY: movabs rcx,&Σ; mov rax,[rcx]; movsxd rcx,[r10]; lea rax,[rax+rcx]; mov rdi,rax
- *   TEXT:   three-column lines. */
 void t_sigma_plus_delta_to_rdi(uint64_t sigma_addr, uint64_t siglen_addr);
 
-/* t_bounds_check_delta_plus_len — eax = Δ + len; cmp eax, Σlen; jg lbl_fail.
- *   BINARY: mov eax,[r10]; add eax,imm32; movabs rcx,&Σlen; cmp eax,[rcx]; jg fail
- *   TEXT:   three-column lines. */
 void t_bounds_check_delta_plus_len(int len, uint64_t siglen_addr, bb_label_t *lbl_fail);
 
-/* t_brokered_prologue — emit C-ABI entry for a brokered per-box blob (EDP-6).
- * Wraps the flat BB in a C function: push rbp; mov rbp, rsp
- * The broker calls fn(zeta, port) via C call; this establishes the frame.
- *   BINARY: 55 48 89 E5
- *   TEXT:   three-column lines (push rbp; mov rbp, rsp) */
 void t_brokered_prologue(void);
 
-/* t_brokered_epilogue_ret — emit C-ABI exit for a brokered per-box blob (EDP-6).
- * Closes the C frame and returns result to broker.
- *   result: 1 for γ (success), 0 for ω (failure)
- *   BINARY: mov eax, result; pop rbp; ret  (B8 <4> 5D C3)
- *   TEXT:   three-column lines */
 void t_brokered_epilogue_ret(int result);
 
-/* t_push_rbp_frame — establish a C-style stack frame at function entry.
- * Emits: push rbp; mov rbp, rsp; sub rsp, 8
- * The sub rsp,8 maintains the (rsp+8) mod 16 == 0 ABI invariant after
- * the push rbp.  Required at the entry of every mode-4 user-function body
- * (SM_DEFINE_ENTRY) because cfn() is called from call_native_chunk via a
- * C-ABI call, and the body subsequently makes C-ABI calls (rt_match_variant
- * etc.) whose callees use SSE-aligned access (movaps -0x60(%rbp)).
- *   BINARY: bytes 55 48 89 E5 48 83 EC 08
- *   TEXT:   three-column lines (push, mov, sub) */
 void t_push_rbp_frame(void);
 
-/* t_pop_rbp_frame_ret — undo t_push_rbp_frame and return.
- * Emits: mov rsp, rbp; pop rbp; ret  (the mov rsp,rbp strips the sub rsp,8).
- *   BINARY: bytes 48 89 EC 5D C3
- *   TEXT:   three-column lines (mov, pop, ret) */
 void t_pop_rbp_frame_ret(void);
 
 /* ── binary mode state ──────────────────────────────────────────────────── */
@@ -273,16 +161,12 @@ extern bb_buf_t  bb_emit_buf;   /* current pool buffer */
 extern int       bb_emit_pos;   /* current write position (bytes written so far) */
 extern int       bb_emit_size;  /* total buffer size */
 
-/* Attach emitter to a freshly-allocated pool buffer */
 void bb_emit_begin(bb_buf_t buf, int size);
 
-/* Finalise: resolve any remaining patches, return bytes written.
- * Aborts if any labels are still unresolved. */
 int  bb_emit_end(void);
 
 /* ── patch list ─────────────────────────────────────────────────────────── */
 
-/* Maximum simultaneous forward references (generous: deep ARBNO patterns) */
 #define BB_PATCH_MAX  512
 
 typedef enum {
@@ -316,93 +200,37 @@ void bb_emit_u64 (uint64_t v);
 void bb_emit_i8  (int8_t   v);
 void bb_emit_i32 (int32_t  v);
 
-/* ── x86-64 instruction helpers ─────────────────────────────────────────── */
-/*
- * One function per instruction form used by the mac_* layer.
- * Names follow: bb_insn_MNEMONIC_OPERAND_FORM
- *
- * Registers are implicit (SysV AMD64 calling convention throughout):
- *   subject ptr  = rdi
- *   subject len  = esi / rsi
- *   cursor       = a .bss slot or stack slot addressed by label
- *   scratch      = rax, rcx, rdx
- *
- * In text mode these emit the NASM instruction string.
- * In binary mode these emit raw bytes.
- */
-
-/* mov eax, imm32 */
+/* ── x86-64 instruction helpers (bb_flat.c mac_* layer) ─────────────────── */
 void bb_insn_mov_eax_imm32(uint32_t imm);
-
-/* mov rax, imm64  (for absolute C shim addresses) */
 void bb_insn_mov_rax_imm64(uint64_t imm);
-
-/* ret */
 void bb_insn_ret(void);
-
-/* nop */
 void bb_insn_nop(void);
-
-/* call rax */
 void bb_insn_call_rax(void);
-
-/* jmp rel8  — short unconditional jump, forward ref supported */
 void bb_insn_jmp_rel8(bb_label_t *target);
-
-/* jmp rel32 — near unconditional jump, forward ref supported */
 void bb_insn_jmp_rel32(bb_label_t *target);
-
-/* jl  rel8  — jump if less (SF≠OF), forward ref */
 void bb_insn_jl_rel8 (bb_label_t *target);
-
-/* jge rel8  — jump if greater-or-equal, forward ref */
 void bb_insn_jge_rel8(bb_label_t *target);
-
-/* je  rel8  — jump if equal (ZF=1), forward ref */
 void bb_insn_je_rel8 (bb_label_t *target);
-
-/* jne rel8  — jump if not equal, forward ref */
 void bb_insn_jne_rel8(bb_label_t *target);
-
-/* jne rel32 — jump if not equal, near, forward ref */
 void bb_insn_jne_rel32(bb_label_t *target);
-
-/* jg  rel32 — jump if greater (signed), near, forward ref (EM-7b) */
 void bb_insn_jg_rel32 (bb_label_t *target);
-
-/* cmp esi, imm8  — compare subject length against literal */
 void bb_insn_cmp_esi_imm8(uint8_t imm);
-
-/* cmp esi, imm32 */
 void bb_insn_cmp_esi_imm32(uint32_t imm);
-
-/* movzx eax, byte [rdi + imm8]  — load subject byte at offset */
 void bb_insn_movzx_eax_rdi_off8(uint8_t off);
-
-/* cmp al, imm8 */
 void bb_insn_cmp_al_imm8(uint8_t imm);
-
-/* xor eax, eax  — zero eax */
 void bb_insn_xor_eax_eax(void);
-
-/* push rbp / pop rbp / mov rbp,rsp */
 void bb_insn_push_rbp(void);
 void bb_insn_pop_rbp(void);
 void bb_insn_mov_rbp_rsp(void);
-
-/* sub rsp, imm8 / add rsp, imm8 */
 void bb_insn_sub_rsp_imm8(uint8_t imm);
 void bb_insn_add_rsp_imm8(uint8_t imm);
 
 /* ── text mode helpers ───────────────────────────────────────────────────── */
 
-/* Emit a raw text line (text mode only — no-op in binary mode) */
 void bb_text(const char *fmt, ...);
 
-/* Emit a label definition line "name:\n" (text) or define offset (binary) */
 void bb_text_label(bb_label_t *lbl);
 
-/* Emit a comment line (text mode only) */
 void bb_text_comment(const char *fmt, ...);
 
 /* ── BB three-column line emission (EM-7c-bb-three-column) ──────────────────
