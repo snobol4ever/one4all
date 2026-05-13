@@ -391,14 +391,6 @@ void emit_bb_xposi(emitter_t *e, int n,
 {
     (void)e;
     char args[32]; snprintf(args, sizeof(args), "%d", n);
-    if (t_bb_is_format_mode()) {
-        char a[256];
-        snprintf(a, sizeof(a), "%d, %s, %s", n, lbl_succ->name, lbl_fail->name);
-        t_bb_format_port(NULL, "POS_α", a);
-        snprintf(a, sizeof(a), "%s", lbl_fail->name);
-        t_bb_format_port(lbl_β, "POS_β", a);
-        return;
-    }
     t_bb_box_banner("POS", args);
     t_load_delta_cmp_imm(n, lbl_succ, lbl_fail);
     t_label_define(lbl_β);
@@ -411,14 +403,6 @@ void emit_bb_xrpsi(emitter_t *e, int n,
 {
     (void)e;
     char args[32]; snprintf(args, sizeof(args), "%d", n);
-    if (t_bb_is_format_mode()) {
-        char a[256];
-        snprintf(a, sizeof(a), "%d, %s, %s", n, lbl_succ->name, lbl_fail->name);
-        t_bb_format_port(NULL, "RPOS_α", a);
-        snprintf(a, sizeof(a), "%s", lbl_fail->name);
-        t_bb_format_port(lbl_β, "RPOS_β", a);
-        return;
-    }
     t_bb_box_banner("RPOS", args);
     t_load_siglen_sub_cmp_delta(n, ADDR_SIGLEN, lbl_succ, lbl_fail);
     t_label_define(lbl_β);
