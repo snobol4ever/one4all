@@ -85,7 +85,6 @@ RT_PIC_SRCS := \
     $(RT)/x86/emit_buf.c \
     $(RT)/x86/emit_form.c \
     $(RT)/x86/emit_mode.c \
-    $(RT)/x86/emit_bb_seq.c \
     $(RT)/x86/emit_flat.c \
     $(RT)/x86/emit_bb.c \
     $(RT)/x86/emit_sm.c \
@@ -240,13 +239,16 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/stmt_exec.c                  -o $(OBJ)/stmt_exec.o
 	$(CC) $(CRT)   -c $(RT)/x86/eval_code.c                  -o $(OBJ)/eval_code.o
 	$(CC) $(CRT)   -c $(RT)/x86/bb_pool.c                    -o $(OBJ)/bb_pool.o
+	$(CC) $(CRT)   -c $(RT)/x86/insn.c                    -o $(OBJ)/insn.o
+	$(CC) $(CRT)   -c $(RT)/x86/emit_label_new.c          -o $(OBJ)/emit_label_new.o
+	$(CC) $(CRT)   -c $(RT)/x86/emit_text.c               -o $(OBJ)/emit_text.o
+	$(CC) $(CRT)   -c $(RT)/x86/emit_seq.c                -o $(OBJ)/emit_seq.o
 	$(CC) $(CRT)   -c $(RT)/x86/emit_insn.c               -o $(OBJ)/emit_insn.o
 	$(CC) $(CRT)   -c $(RT)/x86/emit_text3c.c             -o $(OBJ)/emit_text3c.o
 	$(CC) $(CRT)   -c $(RT)/x86/emit_label.c              -o $(OBJ)/emit_label.o
 	$(CC) $(CRT)   -c $(RT)/x86/emit_buf.c                    -o $(OBJ)/emit_buf.o
 	$(CC) $(CRT)   -c $(RT)/x86/emit_form.c               -o $(OBJ)/emit_form.o
 	$(CC) $(CRT)   -c $(RT)/x86/emit_mode.c               -o $(OBJ)/emit_mode.o
-	$(CC) $(CRT)   -c $(RT)/x86/emit_bb_seq.c             -o $(OBJ)/emit_bb_seq.o
 	$(CC) $(CRT)   -c $(RT)/x86/emit_flat.c                       -o $(OBJ)/emit_flat.o
 	$(CC) $(CRT) -c $(RT)/x86/bb_boxes.c -o $(OBJ)/bb_boxes.o
 	$(CC) $(CRT) -c $(RT)/x86/bb_broker.c -o $(OBJ)/bb_broker.o

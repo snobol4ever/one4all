@@ -71,9 +71,9 @@ static void emit_bb_stateful(const char *banner, const char *arg,
                               bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_beta)
 {
     emit_bb_box_banner(banner, arg ? arg : "");
-    emit_bb_port_call((uint64_t)(uintptr_t)zeta, fn_name, fn_fallback, 0, lbl_succ, lbl_fail);
+    emit_seq_port_call((uint64_t)(uintptr_t)zeta, fn_name, fn_fallback, 0, lbl_succ, lbl_fail);
     emit_label_define(lbl_beta);
-    emit_bb_port_call((uint64_t)(uintptr_t)zeta, fn_name, fn_fallback, 1, lbl_succ, lbl_fail);
+    emit_seq_port_call((uint64_t)(uintptr_t)zeta, fn_name, fn_fallback, 1, lbl_succ, lbl_fail);
 }
 
 /*========================================================================*/
@@ -150,13 +150,13 @@ void emit_bb_xnme(bb_box_fn child_fn, const char *varname, bb_label_t *s, bb_lab
 void emit_bb_xposi(int n, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
     char args[32]; snprintf(args, sizeof(args), "%d", n);
     emit_bb_box_banner("POS", args);
-    emit_load_delta_cmp_imm(n, s, f);
+    emit_seq_cmp_delta_i(n, s, f);
     emit_label_define(b); emit_jmp(f, JMP_JMP);
 }
 void emit_bb_xrpsi(int n, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
     char args[32]; snprintf(args, sizeof(args), "%d", n);
     emit_bb_box_banner("RPOS", args);
-    emit_load_siglen_sub_cmp_delta(n, (uint64_t)(uintptr_t)&Σlen, s, f);
+    emit_seq_cmp_siglen_delta(n, (uint64_t)(uintptr_t)&Σlen, s, f);
     emit_label_define(b); emit_jmp(f, JMP_JMP);
 }
 
@@ -167,13 +167,13 @@ void emit_bb_xchr(PATND_t *p, const char *lit_label, bb_label_t *s, bb_label_t *
     if (len > 24) snprintf(preview, sizeof(preview), "'%.24s...'", lit);
     else          snprintf(preview, sizeof(preview), "'%s'", lit);
     emit_bb_box_banner("LIT", preview);
-    emit_bounds_check_delta_plus_len(len, TEMPLATE_ADDR_SIGLEN, f);
-    emit_sigma_plus_delta_to_rdi(TEMPLATE_ADDR_SIGMA, TEMPLATE_ADDR_SIGLEN);
-    emit_lea_rsi_strtab_sym(lit_label, (uint64_t)(uintptr_t)lit);
+    emit_seq_bounds_len(len, TEMPLATE_ADDR_SIGLEN, f);
+    emit_seq_sigma_delta_rdi(TEMPLATE_ADDR_SIGMA, TEMPLATE_ADDR_SIGLEN);
+    emit_seq_lea_rsi_sym(lit_label, (uint64_t)(uintptr_t)lit);
     /* mov rdx, len */
     { uint64_t val = (uint64_t)(uint32_t)len;
       switch (bb_emit_mode) {
-      case EMIT_BINARY_WIRED: case EMIT_BINARY_BROKERED: bb_insn_mov_rdx_imm64(val); break;
+      case EMIT_BINARY_WIRED: case EMIT_BINARY_BROKERED: insn_mov_rdx_i64(val); break;
       default: { char a[32]; snprintf(a,sizeof(a),"rdx, %d",len);
                  if (emit_bb_is_format_mode()) fmt_body_append("mov",a);
                  else bb3c_format(bb_emit_out?bb_emit_out:stdout,"","mov",a); break; }
@@ -205,9 +205,9 @@ void emit_bb_xdsar(const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t
     flat_data_quad("0");  flat_data_long(0);   flat_data_long(0);
     flat_text_section(); flat_intel_syntax();
     void *z = bb_dvar_bin_new(vn);
-    emit_bb_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "bb_deferred_var_exported", (uint64_t)(uintptr_t)bb_deferred_var_exported, 0, s, f);
+    emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "bb_deferred_var_exported", (uint64_t)(uintptr_t)bb_deferred_var_exported, 0, s, f);
     emit_label_define(b);
-    emit_bb_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "bb_deferred_var_exported", (uint64_t)(uintptr_t)bb_deferred_var_exported, 1, s, f);
+    emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "bb_deferred_var_exported", (uint64_t)(uintptr_t)bb_deferred_var_exported, 1, s, f);
 }
 
 void emit_bb_xatp(const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
@@ -222,9 +222,9 @@ void emit_bb_xatp(const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t 
     flat3c_label(zlbl); flat_data_long(0); flat_data_long(0); flat_data_quad(vlbl);
     flat_text_section(); flat_intel_syntax();
     atp_t *z = bb_atp_new(vn);
-    emit_bb_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_atp", (uint64_t)(uintptr_t)rt_bb_atp, 0, s, f);
+    emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_atp", (uint64_t)(uintptr_t)rt_bb_atp, 0, s, f);
     emit_label_define(b);
-    emit_bb_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_atp", (uint64_t)(uintptr_t)rt_bb_atp, 1, s, f);
+    emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_atp", (uint64_t)(uintptr_t)rt_bb_atp, 1, s, f);
 }
 
 void emit_bb_charset(bb_box_fn c_fn, const char *c_fn_name, const char *kind_name,

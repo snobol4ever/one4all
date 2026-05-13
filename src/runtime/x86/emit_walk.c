@@ -1343,9 +1343,9 @@ static int emit_pattern_blobs(FILE *out)
         if (g_pat_windows[i].is_invariant) n_invariant++;
     }
     if (n_invariant == 0) return 0;
-    bb_flat_set_intern_str(codegen_intern_str);
-    bb_flat_set_cap_fixup_cb(cap_fixup_add);
-    bb_build_flat_text_reset();
+    emit_flat_set_intern_str(codegen_intern_str);
+    emit_flat_set_cap_fixup(cap_fixup_add);
+    emit_flat_reset();
     if (emit_three_column_line(out, "", ".intel_syntax", "noprefix", NULL) != 0) return -1;
     if (emit_three_column_line(out, "", ".text", "", NULL) != 0) return -1;
     for (int i = 0; i < g_pat_windows_n; i++) {
@@ -1354,7 +1354,7 @@ static int emit_pattern_blobs(FILE *out)
         char prefix[64];
         snprintf(prefix, sizeof(prefix), "pat_inv_%d", w->pat_id);
         PATND_t *p = (PATND_t *)w->root.p;
-        if (bb_build_flat_text(p, out, prefix) != 0) {
+        if (emit_flat_build(p, out, prefix) != 0) {
             w->is_invariant = 0;
         }
     }
@@ -1602,7 +1602,7 @@ int emit_walk_codegen(SM_Program *prog, FILE *out, const char *src_path)
             return -1;
         }
         if (emit_three_column_line(out, "", ".include", "\"sm_macros.s\"", NULL) != 0) return -1;
-        if (bb_macros_write_to_path("bb_macros.s") != 0) {
+        if (emit_flat_macros_to_path("bb_macros.s") != 0) {
             fprintf(stderr, "sm_codegen_text: failed to write bb_macros.s\n");
             return -1;
         }

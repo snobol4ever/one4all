@@ -164,7 +164,7 @@ static void emit_sm_int_arg(const char *mn, const char *rt_fn,
 {
     const char *const params[] = { param_name };
     emit_macro_begin(mn, params, 1);
-    emit_mov_edi_imm32(val);
+    emit_seq_mov_edi_i32(val);
     emit_call_sym_plt(rt_fn, 0);
     emit_macro_end(); emit_pad_to_blob_size();
 }
@@ -195,7 +195,7 @@ void emit_sm_decr(int64_t n)
 
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_halt()
-{ emit_bb_inc_mem_r13_disp8(20); emit_ret(); emit_pad_to_blob_size(); }
+{ emit_seq_inc_r13(20); emit_ret(); emit_pad_to_blob_size(); }
 
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_return()
@@ -206,10 +206,10 @@ void emit_sm_return_variant(int kind, int cond, int pc)
 {
     static const char *const params[] = { "kind","cond","pc" };
     emit_macro_begin("RETURN_VARIANT", params, 3);
-    emit_mov_edi_imm32(kind); emit_mov_esi_imm32(cond);
+    emit_seq_mov_edi_i32(kind); emit_mov_esi_imm32(cond);
     emit_call_sym_plt("rt_do_return", 0);
-    emit_test_eax_eax(); emit_jz_retskip(pc);
-    emit_ret(); emit_retskip_label(pc);
+    emit_test_eax_eax(); emit_seq_jz_retskip(pc);
+    emit_ret(); emit_seq_retskip_label(pc);
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
@@ -222,7 +222,7 @@ void emit_sm_freturn_f(int pc) { emit_sm_return_variant(1,2,pc); }
 void emit_sm_nreturn_s(int pc) { emit_sm_return_variant(2,1,pc); }
 void emit_sm_nreturn_f(int pc) { emit_sm_return_variant(2,2,pc); }
 
-static void make_pc_label(bb_label_t *lbl, int pc) { bb_label_initf(lbl,".L%d",pc); }
+static void make_pc_label(bb_label_t *lbl, int pc) { emit_label_initf(lbl,".L%d",pc); }
 
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_jump(int pc)
@@ -238,8 +238,8 @@ void emit_sm_jump_f(int pc)
 { emit_call_sym_plt("rt_last_ok",0); emit_test_rax_rax();
   bb_label_t t; make_pc_label(&t,pc); emit_jmp(&t,JMP_JE); }
 
-void emit_sm_label()                                      { emit_noop_macro("LABEL"); }
-void emit_sm_stno(int stno, int lineno, const char *src) { emit_banner_stno(stno,lineno,src); emit_noop_macro("STNO"); }
+void emit_sm_label()                                      { emit_seq_noop_macro("LABEL"); }
+void emit_sm_stno(int stno, int lineno, const char *src) { emit_text_stno_banner(stno,lineno,src); emit_seq_noop_macro("STNO"); }
 
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_push_lit_i(int64_t val)
@@ -268,7 +268,7 @@ void emit_sm_push_lit_s(const char *str_lbl, uint64_t str_ptr, int len)
 {
     static const char *const p[] = {"lbl","n"};
     emit_macro_begin("PUSH_STR",p,2);
-    emit_lea_rdi_strtab_sym(str_lbl,str_ptr);
+    emit_seq_lea_rdi_sym(str_lbl,str_ptr);
     emit_mov_esi_imm32(len);
     emit_call_sym_plt("rt_push_str",0);
     emit_macro_end(); emit_pad_to_blob_size();
@@ -289,7 +289,7 @@ void emit_sm_push_expression(uint64_t entry_ptr, int arity)
 {
     static const char *const p[] = {"entry","arity"};
     emit_macro_begin("PUSH_EXPRESSION",p,2);
-    emit_movabs_rdi_entry(entry_ptr); emit_mov_esi_imm32(arity);
+    emit_seq_movabs_rdi(entry_ptr); emit_mov_esi_imm32(arity);
     emit_call_sym_plt("rt_push_expression_descr",0);
     emit_macro_end(); emit_pad_to_blob_size();
 }
@@ -299,7 +299,7 @@ void emit_sm_call_expression(const char *tgt_sym)
 {
     static const char *const p[] = {"tgt"};
     emit_macro_begin("CALL_EXPRESSION",p,1);
-    emit_call_sym_param(tgt_sym);
+    emit_seq_call_tgt(tgt_sym);
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
@@ -308,7 +308,7 @@ void emit_sm_exec_stmt(const char *subj_lbl, uint64_t subj_ptr, int has_repl)
 {
     static const char *const p[] = {"has_repl","subj_lbl"};
     emit_macro_begin("EXEC_STMT_VARIANT",p,2);
-    emit_lea_rdi_strtab_sym(subj_lbl,subj_ptr); emit_mov_esi_imm32(has_repl);
+    emit_seq_lea_rdi_sym(subj_lbl,subj_ptr); emit_mov_esi_imm32(has_repl);
     emit_call_sym_plt("rt_match_variant",0);
     emit_macro_end(); emit_pad_to_blob_size();
 }
@@ -319,7 +319,7 @@ void emit_sm_call_fn(const char *name_lbl, uint64_t name_ptr, int nargs)
     (void)name_lbl; (void)name_ptr; (void)nargs;
     static const char *const p[] = {"lbl","n"};
     emit_macro_begin("CALL_FN",p,2);
-    emit_lea_rdi_strtab_sym(NULL,0); emit_mov_esi_imm32(0);
+    emit_seq_lea_rdi_sym(NULL,0); emit_mov_esi_imm32(0);
     emit_call_sym_plt("rt_call",0);
     emit_macro_end(); emit_pad_to_blob_size();
 }
@@ -328,7 +328,7 @@ void emit_sm_call_fn(const char *name_lbl, uint64_t name_ptr, int nargs)
 void emit_sm_push_var(const char *lbl, uint64_t ptr)
 {
     static const char *const p[] = {"lbl"};
-    emit_macro_begin("PUSH_VAR",p,1); emit_lea_rdi_strtab_sym(lbl,ptr);
+    emit_macro_begin("PUSH_VAR",p,1); emit_seq_lea_rdi_sym(lbl,ptr);
     emit_call_sym_plt("rt_nv_get",0); emit_macro_end(); emit_pad_to_blob_size();
 }
 
@@ -336,7 +336,7 @@ void emit_sm_push_var(const char *lbl, uint64_t ptr)
 void emit_sm_store_var(const char *lbl, uint64_t ptr)
 {
     static const char *const p[] = {"lbl"};
-    emit_macro_begin("STORE_VAR",p,1); emit_lea_rdi_strtab_sym(lbl,ptr);
+    emit_macro_begin("STORE_VAR",p,1); emit_seq_lea_rdi_sym(lbl,ptr);
     emit_call_sym_plt("rt_nv_set",0); emit_macro_end(); emit_pad_to_blob_size();
 }
 
@@ -345,7 +345,7 @@ static void emit_sm_pat_str(const char *mn, const char *rt_fn,
                              const char *lbl, uint64_t ptr)
 {
     static const char *const p[] = {"lbl"};
-    emit_macro_begin(mn,p,1); emit_lea_rdi_strtab_sym(lbl,ptr);
+    emit_macro_begin(mn,p,1); emit_seq_lea_rdi_sym(lbl,ptr);
     emit_call_sym_plt(rt_fn,0); emit_macro_end(); emit_pad_to_blob_size();
 }
 
@@ -358,7 +358,7 @@ void emit_sm_pat_capture(const char *name_lbl, uint64_t name_ptr, int kind)
 {
     static const char *const p[] = {"lbl","n"};
     emit_macro_begin("PAT_CAPTURE",p,2);
-    emit_lea_rdi_strtab_sym(name_lbl,name_ptr); emit_mov_esi_imm32(kind);
+    emit_seq_lea_rdi_sym(name_lbl,name_ptr); emit_mov_esi_imm32(kind);
     emit_call_sym_plt("rt_pat_capture",0); emit_macro_end(); emit_pad_to_blob_size();
 }
 
@@ -367,7 +367,7 @@ void emit_sm_pat_usercall_args(const char *name_lbl, uint64_t name_ptr, int narg
 {
     static const char *const p[] = {"lbl","n"};
     emit_macro_begin("PAT_USERCALL_ARGS",p,2);
-    emit_lea_rdi_strtab_sym(name_lbl,name_ptr); emit_mov_esi_imm32(nargs);
+    emit_seq_lea_rdi_sym(name_lbl,name_ptr); emit_mov_esi_imm32(nargs);
     emit_call_sym_plt("rt_pat_usercall_args",0); emit_macro_end(); emit_pad_to_blob_size();
 }
 
@@ -377,8 +377,8 @@ void emit_sm_pat_capture_fn(const char *fname_lbl, uint64_t fname_ptr,
 {
     static const char *const p[] = {"is_imm","fname_lbl","namelist_lbl"};
     emit_macro_begin("PAT_CAPTURE_FN",p,3);
-    emit_lea_rdi_strtab_sym(fname_lbl,fname_ptr); emit_mov_esi_imm32(is_imm);
-    emit_lea_rdx_strtab_sym(namelist_lbl,namelist_ptr);
+    emit_seq_lea_rdi_sym(fname_lbl,fname_ptr); emit_mov_esi_imm32(is_imm);
+    emit_seq_lea_rdx_sym(namelist_lbl,namelist_ptr);
     emit_call_sym_plt("rt_pat_capture_fn",0); emit_macro_end(); emit_pad_to_blob_size();
 }
 
@@ -388,8 +388,8 @@ void emit_sm_pat_capture_fn_args(const char *fname_lbl, uint64_t fname_ptr,
 {
     static const char *const p[] = {"is_imm","nargs","fname_lbl"};
     emit_macro_begin("PAT_CAPTURE_FN_ARGS",p,3);
-    emit_lea_rdi_strtab_sym(fname_lbl,fname_ptr); emit_mov_esi_imm32(is_imm);
-    emit_mov_edx_imm32(nargs);
+    emit_seq_lea_rdi_sym(fname_lbl,fname_ptr); emit_mov_esi_imm32(is_imm);
+    emit_seq_mov_edx_i32(nargs);
     emit_call_sym_plt("rt_pat_capture_fn_args",0); emit_macro_end(); emit_pad_to_blob_size();
 }
 

@@ -7,6 +7,8 @@
 #include "emit_text.h"
 #include "emit_text3c.h"
 #include "emit_mode.h"
+#include "insn.h"
+#include "emit_mode.h"
 #include "emit_label.h"
 #include <stdio.h>
 #include <stdarg.h>
@@ -39,4 +41,9 @@ void emit_text_box_banner(const char *kind, const char *args) {
 }
 void emit_text_stno_banner(int stno, int lineno, const char *src_text) {
     emit_banner_stno(stno, lineno, src_text);
+}
+void emit_text_global(const char *name) {
+    if (!IS_TEXT) return;
+    bb3c_flush_pending_cjmp_only();
+    fprintf(emit_outf(), "    .global %s\n", name ? name : "");
 }

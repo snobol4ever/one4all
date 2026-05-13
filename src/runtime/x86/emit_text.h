@@ -26,6 +26,7 @@ void emit_text_flush      (void);   /* flush pending cjmp + pending label   */
 
 /* ---- Raw output -------------------------------------------------------- */
 void emit_text_rawf    (const char *fmt, ...);   /* vfprintf to out (TEXT only) */
+void emit_text_global  (const char *name);        /* TEXT: .global name          */
 void emit_text_label   (bb_label_t *lbl);        /* TEXT: emit label; BIN: define */
 void emit_text_comment (const char *fmt, ...);   /* TEXT: # comment line        */
 

@@ -10,6 +10,7 @@
 #include "emit_buf.h"
 #include "emit_text3c.h"
 #include "emit_label.h"
+#include "insn.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -184,12 +185,12 @@ void emit_jmp(bb_label_t *target, jmp_kind_t kind)
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
         switch (kind) {
-        case JMP_JMP: bb_insn_jmp_rel32(target);  return;
-        case JMP_JE:  bb_insn_je_rel32(target);   return;
-        case JMP_JNE: bb_insn_jne_rel32(target);  return;
-        case JMP_JL:  bb_insn_jl_rel32(target);   return;
-        case JMP_JGE: bb_insn_jge_rel32(target);  return;
-        case JMP_JG:  bb_insn_jg_rel32(target);   return;
+        case JMP_JMP: insn_jmp_r32(target);  return;
+        case JMP_JE:  insn_je_r32(target);   return;
+        case JMP_JNE: insn_jne_r32(target);  return;
+        case JMP_JL:  insn_jl_r32(target);   return;
+        case JMP_JGE: insn_jge_r32(target);  return;
+        case JMP_JG:  insn_jg_r32(target);   return;
         }
         return;
     }
