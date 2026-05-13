@@ -115,10 +115,21 @@ static void skip_ws(IcnLexer *lx) {
     for (;;) {
         while (lex_cur(lx) && isspace((unsigned char)lex_cur(lx)))
             lex_advance(lx);
-        /* Icon uses # for line comments */
+        /* Icon uses # for line comments.
+         * IJ-15: detect #SRC: JCON tag — sets g_icn_jcon for JCON semantics
+         * (e.g. int^int returns integer rather than real). */
         if (lex_cur(lx) == '#') {
+            const char *line_start = lx->src + lx->pos;
             while (lex_cur(lx) && lex_cur(lx) != '\n')
                 lex_advance(lx);
+            size_t line_len = (size_t)((lx->src + lx->pos) - line_start);
+            if (line_len >= 10) {
+                extern int g_icn_jcon;
+                char tmp[32]; size_t cpy = line_len < 31 ? line_len : 31;
+                memcpy(tmp, line_start, cpy); tmp[cpy] = '\0';
+                if (strstr(tmp, "SRC: JCON") || strstr(tmp, "SRC:JCON"))
+                    g_icn_jcon = 1;
+            }
             continue;
         }
         /* Skip $import / $export control lines (consumed by icn_prescan_imports) */

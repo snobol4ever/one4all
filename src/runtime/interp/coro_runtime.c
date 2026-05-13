@@ -2068,6 +2068,28 @@ bb_node_t coro_eval(tree_t *e) {
     if (e->t == TT_BANG_BINARY && e->n >= 2) {
         icn_bang_binary_state_t *z = calloc(1, sizeof(*z));
         z->proc_expr = e->c[0];
+        /* IJ-15: If E2 evaluates to a list (DT_DATA/icn_type="list"), the bang
+         * operator must iterate its elements — same as unary !list.
+         * coro_eval of a TT_VAR/TT_MAKELIST/TT_IDX holding a list returns an
+         * icn_lazy_box that yields the list object itself, not its elements.
+         * Detect this eagerly and build a coro_bb_list_iterate box directly,
+         * mirroring TT_ITERATE's IC-5 path. */
+        if (e->c[1] && (e->c[1]->t == TT_MAKELIST ||
+                        e->c[1]->t == TT_VAR ||
+                        e->c[1]->t == TT_IDX)) {
+            DESCR_t sv = bb_eval_value(e->c[1]);
+            if (sv.v == DT_DATA) {
+                DESCR_t tag = FIELD_GET_fn(sv, "icn_type");
+                if (tag.v == DT_S && tag.s && strcmp(tag.s, "list") == 0) {
+                    icn_list_iterate_state_t *lz = calloc(1, sizeof(*lz));
+                    lz->list_obj = sv;
+                    lz->pos      = 0;
+                    z->arg_box = (bb_node_t){ coro_bb_list_iterate, lz, 0 };
+                    return (bb_node_t){ coro_bb_bang_binary, z, 0 };
+                }
+            }
+            /* Not a list — fall through to standard coro_eval */
+        }
         z->arg_box   = coro_eval(e->c[1]);
         return (bb_node_t){ coro_bb_bang_binary, z, 0 };
     }
@@ -2601,6 +2623,7 @@ DESCR_t coro_bb_mutual(void *zeta, int entry) {
  * If E1 fails on an arg, skip to next (goal-directed).
  *--------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t coro_bb_bang_binary(void *zeta, int entry) {
+    extern int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR_t *out);
     icn_bang_binary_state_t *z = (icn_bang_binary_state_t *)zeta;
     int is_first = (entry == α);
     for (;;) {
@@ -2609,7 +2632,46 @@ DESCR_t coro_bb_bang_binary(void *zeta, int entry) {
         if (IS_FAIL_fn(arg)) return FAILDESCR;
         z->cur_arg = arg;
         if (!z->proc_expr) return FAILDESCR;
-        /* Inject arg as result of first argument child via drive passthrough */
+
+        /* IJ-15: When E1 is a bare TT_VAR (or already evaluated to a proc
+         * descriptor DT_E), the drive-node injection path fails because the
+         * identifier node has no argument children to inject into.  Instead,
+         * evaluate E1 to obtain the procedure value, then dispatch directly
+         * via proc_table_call — the same path used by coro_bb_indirect_callee.
+         * This handles JCON  g![2]  where E1 = TT_VAR("g"). */
+        /* IJ-15 extended: any non-TT_FNC E1 is evaluated to get the callee
+         * value at runtime. This handles: TT_VAR("g") for g![2], and also
+         * TT_BANG_BINARY as E1 for chained f![g]![2] where the outer bang's
+         * E1 is the inner bang expression that produces a proc value. */
+        if (z->proc_expr->t != TT_FNC) {
+            DESCR_t callee = bb_eval_value(z->proc_expr);
+            if (IS_FAIL_fn(callee)) { continue; }
+            DESCR_t result = FAILDESCR;
+            if (callee.v == DT_E) {
+                for (int i = 0; i < proc_count; i++) {
+                    if (proc_table[i].entry_pc == (int)callee.i) {
+                        result = proc_table_call(i, &arg, 1);
+                        break;
+                    }
+                }
+                if (IS_FAIL_fn(result) && callee.slen < (uint32_t)proc_count)
+                    result = proc_table_call((int)callee.slen, &arg, 1);
+            } else if (callee.v == DT_S && callee.s) {
+                for (int i = 0; i < proc_count; i++) {
+                    if (proc_table[i].name && strcmp(proc_table[i].name, callee.s) == 0) {
+                        result = proc_table_call(i, &arg, 1);
+                        break;
+                    }
+                }
+                if (IS_FAIL_fn(result))
+                    (void)icn_try_call_builtin_by_name(callee.s, &arg, 1, &result);
+            }
+            if (!IS_FAIL_fn(result)) return result;
+            continue;  /* E1 failed on this arg — try next E2 value */
+        }
+
+        /* E1 is a TT_FNC call node — inject arg as the first argument child
+         * via drive passthrough (original mechanism for  f(x)!generator). */
         if (z->proc_expr->n >= 2 && z->proc_expr->c[1]) {
             coro_drive_node = z->proc_expr->c[1];
             coro_drive_val  = arg;

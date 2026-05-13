@@ -1882,6 +1882,7 @@ long g_icn_error  = 0;
 long g_icn_trace  = 0;
 long g_icn_dump   = 0;
 long g_icn_random = 0;
+int  g_icn_jcon   = 0;  /* IJ-15: set when #SRC: JCON detected — enables JCON semantics (int^int→int) */
 
 /* IC-9 (2026-05-01): Icon-keyword write helper.
  * Returns 1 on success, 0 on FAIL (out-of-range &pos write).

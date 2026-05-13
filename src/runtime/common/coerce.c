@@ -58,9 +58,11 @@ DESCR_t shared_arith(DESCR_t l, DESCR_t r, sm_opcode_t op)
             return INTVAL(l.i % r.i);
         case SM_EXP:
             if (r.i >= 0) {
+                extern int g_icn_jcon;
                 int64_t base = l.i, exp = r.i, res = 1;
                 while (exp-- > 0) res *= base;
-                return REALVAL((double)res);  /* Icon ^ always returns real */
+                /* JCON: int^int → integer; standard Icon: int^int → real */
+                return g_icn_jcon ? INTVAL(res) : REALVAL((double)res);
             }
             /* JCON: int ^ negative-int → truncate pow result to integer (< 1 → 0) */
             return INTVAL((int64_t)pow((double)l.i, (double)r.i));
