@@ -90,6 +90,7 @@ RT_PIC_SRCS := \
     $(RT)/x86/lower_ctx.c \
     $(RT)/x86/sm_image.c \
     $(RT)/x86/sm_codegen.c \
+    $(RT)/x86/emitter_sm_gen.c \
     $(RT)/x86/emitter_sm_template.c \
     $(SRC)/runtime/interp/coro_runtime.c \
     $(SRC)/runtime/interp/coro_value.c \
@@ -287,6 +288,7 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/lower_ctx.c  -o $(OBJ)/lower_ctx.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_image.c   -o $(OBJ)/sm_image.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_codegen.c -o $(OBJ)/sm_codegen.o
+	$(CC) $(CRT)   -c $(RT)/x86/emitter_sm_gen.c -o $(OBJ)/emitter_sm_gen.o
 	$(CC) $(CRT)   -c $(RT)/x86/emitter_sm.c -o $(OBJ)/emitter_sm.o
 	$(CC) $(CRT)   -c $(RT)/x86/emitter_bb.c -o $(OBJ)/emitter_bb.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/rt/rt.c   -o $(OBJ)/rt.o
