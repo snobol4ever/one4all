@@ -1043,8 +1043,8 @@ void rt_acomp(int op)
     }
     if (l.v == DT_SNUL) l = INTVAL(0);
     if (r.v == DT_SNUL) r = INTVAL(0);
-    double lv = (l.v == DT_R) ? l.r : (double)l.i;
-    double rv = (r.v == DT_R) ? r.r : (double)r.i;
+    double lv = (l.v == DT_R) ? l.r : (double)((l.v == DT_I) ? l.i : 0);
+    double rv = (r.v == DT_R) ? r.r : (double)((r.v == DT_I) ? r.i : 0);
     int ok;
     switch (op) {
         case TT_EQ: ok = (lv == rv); break;

@@ -536,10 +536,10 @@ void emit_jmp(bb_label_t *target, jmp_kind_t kind)
     case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         switch (kind) {
         case JMP_JMP: bb_insn_jmp_rel32(target);  return;
-        case JMP_JE:  bb_insn_je_rel8(target);    return;
-        case JMP_JNE: bb_insn_jne_rel8(target);   return;
-        case JMP_JL:  bb_insn_jl_rel8(target);    return;
-        case JMP_JGE: bb_insn_jge_rel8(target);   return;
+        case JMP_JE:  bb_insn_je_rel32(target);   return;   /* rel32: no overflow on large blobs */
+        case JMP_JNE: bb_insn_jne_rel32(target);  return;   /* rel32: no overflow on large blobs */
+        case JMP_JL:  bb_insn_jl_rel32(target);   return;   /* rel32: no overflow on large blobs */
+        case JMP_JGE: bb_insn_jge_rel32(target);  return;   /* rel32: no overflow on large blobs */
         case JMP_JG:  bb_insn_jg_rel32(target);   return;
         }
         return;
@@ -1648,6 +1648,36 @@ void bb_insn_jne_rel32(bb_label_t *target)
         bb3c_jmp("jne", target->name); return;
     }
     bb_emit_byte(0x0F); bb_emit_byte(0x85);
+    bb_emit_patch_rel32(target);
+}
+
+/* je rel32 — jump if equal (ZF=1), near, forward ref */
+void bb_insn_je_rel32(bb_label_t *target)
+{
+    if (bb_emit_mode == EMIT_TEXT) {
+        bb3c_jmp("je", target->name); return;
+    }
+    bb_emit_byte(0x0F); bb_emit_byte(0x84);
+    bb_emit_patch_rel32(target);
+}
+
+/* jl rel32 — jump if less (signed), near, forward ref */
+void bb_insn_jl_rel32(bb_label_t *target)
+{
+    if (bb_emit_mode == EMIT_TEXT) {
+        bb3c_jmp("jl", target->name); return;
+    }
+    bb_emit_byte(0x0F); bb_emit_byte(0x8C);
+    bb_emit_patch_rel32(target);
+}
+
+/* jge rel32 — jump if greater or equal (signed), near, forward ref */
+void bb_insn_jge_rel32(bb_label_t *target)
+{
+    if (bb_emit_mode == EMIT_TEXT) {
+        bb3c_jmp("jge", target->name); return;
+    }
+    bb_emit_byte(0x0F); bb_emit_byte(0x8D);
     bb_emit_patch_rel32(target);
 }
 
