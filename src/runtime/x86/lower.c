@@ -530,21 +530,32 @@ static void lower_swap(const tree_t *t)
      * Uses SM_PUSH_VAR / SM_STORE_VAR (not emit_var_load/store) intentionally —
      * __icn_swap_tmp__ is a synthetic global scratch and must never land in a frame slot.
      * IJ-10: When one operand is a keyword (&pos, &subject, etc.), keyword assignment
-     * can fail (OOB) and the swap must be atomic.  Emit ICN_KW_SWAP which probes
-     * kw_can_assign before writing either side. */
+     * can fail (OOB); write order is left-to-right with halt on first OOB.
+     * Emit ICN_KW_SWAP with kw_is_lhs flag so the handler applies the probe at the
+     * correct write step (first write if kw is lhs, second if kw is rhs). */
     if (t->n >= 2 && T0(t) && T1(t)
             && T0(t)->t == TT_VAR && T1(t)->t == TT_VAR) {
         const char *ln = T0(t)->v.sval ? T0(t)->v.sval : "";
         const char *rn = T1(t)->v.sval ? T1(t)->v.sval : "";
         if (ln[0] == '&' || rn[0] == '&') {
-            /* Keyword swap: push lv, rv, kw_name, var_name → ICN_KW_SWAP 4.
-             * Normalise: keyword is always first (lhs), plain var is always second. */
+            /* Keyword swap: push lv, rv, kw_name, var_name, var_slot, kw_is_lhs
+             * → ICN_KW_SWAP 6.
+             * lv = old value of T0 (lhs), rv = old value of T1 (rhs).
+             * kw_name and var_name identify the two sides; kw_is_lhs (1/0) records
+             * whether the keyword was T0 (lhs) or T1 (rhs) so the handler writes
+             * in the original left-to-right order. */
             const char *kw  = (ln[0] == '&') ? ln : rn;
             const char *var = (ln[0] == '&') ? rn : ln;
-            emit_var_load(kw);  emit_var_load(var);
+            int kw_is_lhs = (ln[0] == '&') ? 1 : 0;
+            int var_slot = -1;
+            if (g_in_proc_body && g_proc_scope && var[0] && var[0] != '&')
+                var_slot = scope_get(g_proc_scope, var);
+            emit_var_load(ln);  emit_var_load(rn);   /* push lv=T0, rv=T1 */
             sm_emit_s(g_p, SM_PUSH_LIT_S, kw);
             sm_emit_s(g_p, SM_PUSH_LIT_S, var);
-            sm_emit_si(g_p, SM_CALL_FN, "ICN_KW_SWAP", 4);
+            sm_emit_i(g_p, SM_PUSH_LIT_I, (int64_t)var_slot);
+            sm_emit_i(g_p, SM_PUSH_LIT_I, (int64_t)kw_is_lhs);
+            sm_emit_si(g_p, SM_CALL_FN, "ICN_KW_SWAP", 6);
             return;
         }
         emit_var_load( ln); sm_emit_s(g_p, SM_STORE_VAR, "__icn_swap_tmp__"); sm_emit(g_p, SM_VOID_POP);

@@ -1521,28 +1521,56 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 st->last_ok = (args[0].v != DT_FAIL);
                 break;
             }
-            /* IJ-10: ICN_KW_SWAP — atomic &keyword :=: var swap.
-             * args[0]=lhs value, args[1]=rhs value.  The caller also pushed lhs_name
-             * and rhs_name as string literals before calling.  We pop them too.
-             * Atomicity: if kw_assign would fail (OOB), neither side is written.
+            /* IJ-10: ICN_KW_SWAP — &keyword :=: var  or  var :=: &keyword swap.
+             * args[0]=lv (old T0/lhs value), args[1]=rv (old T1/rhs value),
+             * args[2]=kw_name (DT_S), args[3]=var_name (DT_S),
+             * args[4]=var_slot (INTVAL, -1 if NV/global),
+             * args[5]=kw_is_lhs (INTVAL, 1 if keyword was T0, 0 if keyword was T1).
+             * Writes left-to-right with halt on first keyword-OOB:
+             *   kw_is_lhs=1 (&pos :=: x): write rv(=x) → &pos first; OOB → stop (nothing written).
+             *                              then write lv(=&pos) → x.
+             *   kw_is_lhs=0 (x :=: &pos): write rv(=&pos) → x first (always OK).
+             *                              then write lv(=x) → &pos; OOB → stop (x write committed).
              * Emitted by lower_swap when one operand is a keyword. */
-            if (name && strcmp(name, "ICN_KW_SWAP") == 0 && nargs == 4) {
-                /* args[0]=lv (old kw value), args[1]=rv (old var value),
-                 * args[2]=kw_name (DT_S), args[3]=var_name (DT_S) */
+            if (name && strcmp(name, "ICN_KW_SWAP") == 0 && nargs == 6) {
                 DESCR_t lv = args[0], rv = args[1];
                 const char *kw  = (args[2].v == DT_S && args[2].s) ? args[2].s : NULL;
                 const char *var = (args[3].v == DT_S && args[3].s) ? args[3].s : NULL;
+                int var_slot    = (int)args[4].i;
+                int kw_is_lhs   = (int)args[5].i;
                 if (!kw || !var || IS_FAIL_fn(lv) || IS_FAIL_fn(rv)) {
                     sm_push(st, FAILDESCR); st->last_ok = 0; break;
                 }
-                /* Probe: would kw_assign(kw+1, rv) succeed? */
-                if (!icn_kw_can_assign(kw + 1, rv)) {
-                    /* OOB — swap fails, neither side written */
-                    sm_push(st, FAILDESCR); st->last_ok = 0; break;
+                /* Helper: write val to var via frame slot or NV. */
+                #define KW_SWAP_WRITE_VAR(val) do { \
+                    if (var_slot >= 0 && icn_frame_env_active()) \
+                        icn_frame_env_store(var_slot, (val)); \
+                    else \
+                        NV_SET_fn(var, (val)); \
+                } while(0)
+                DESCR_t result;
+                if (kw_is_lhs) {
+                    /* &kw :=: var: write rv→kw first; probe before writing. */
+                    if (!icn_kw_can_assign(kw + 1, rv)) {
+                        sm_push(st, FAILDESCR); st->last_ok = 0; break;
+                    }
+                    kw_assign(kw + 1, rv);     /* write rv → keyword (lhs) */
+                    KW_SWAP_WRITE_VAR(lv);     /* write lv → var (rhs) */
+                    result = rv;               /* return value = new lhs value */
+                } else {
+                    /* var :=: &kw: write rv→var first (plain var, always OK). */
+                    KW_SWAP_WRITE_VAR(rv);     /* write rv → var (lhs) */
+                    /* Now write lv→kw; if OOB, var write is already committed. */
+                    if (!icn_kw_can_assign(kw + 1, lv)) {
+                        /* keyword write OOB: var committed, keyword unchanged.
+                         * Per JCON semantics this counts as a failed swap — push FAIL. */
+                        sm_push(st, FAILDESCR); st->last_ok = 0; break;
+                    }
+                    kw_assign(kw + 1, lv);     /* write lv → keyword (rhs) */
+                    result = rv;               /* return value = new lhs (var) value */
                 }
-                kw_assign(kw + 1, rv);   /* write rv → keyword */
-                NV_SET_fn(var, lv);       /* write lv → var */
-                sm_push(st, rv);
+                #undef KW_SWAP_WRITE_VAR
+                sm_push(st, result);
                 st->last_ok = 1;
                 break;
             }
