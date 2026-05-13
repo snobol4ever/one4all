@@ -735,8 +735,13 @@ typedef struct { int start; int end; } scan_result_t;
 
 static void scan_body_fn_u9(DESCR_t val, void *arg) {
     scan_result_t *r = (scan_result_t *)arg;
-    r->end   = Δ;
-    r->start = Δ - (int)val.slen;   /* scan position = end − match length */
+    r->end = Δ;
+    /* EXVAL-3: dispatch on type tag rather than assuming SNOBOL4 σ/δ layout.
+     * DT_S (SNOBOL4 match span): slen = match length → start = end - slen.
+     * Other types (Prolog DT_SNUL, Icon value): box did not advance Δ, so
+     * start == end == Δ (zero-length match at current cursor). exec_stmt is
+     * currently SNOBOL4-only; this branch is defensive for future frontends. */
+    r->start = (val.v == DT_S) ? Δ - (int)val.slen : Δ;
 }
 
 /*

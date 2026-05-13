@@ -1575,6 +1575,10 @@ DESCR_t rt_bb_cap(void *zeta, int port)
     cr = ζ->fn(ζ->state, 1);
     if (IS_FAIL_fn(cr)) goto cap_fail;
 cap_commit:
+    /* EXVAL-3: guard .s/.slen access — only valid when child returned DT_S span.
+     * Non-DT_S returns (Prolog DT_SNUL success) capture the zero-length current
+     * cursor position as an empty string. */
+    if (cr.v != DT_S) cr = descr_match_span(Σ + Δ, 0);
     if (ζ->immediate) {
         char *s = (char *)GC_MALLOC(cr.slen + 1);
         if (cr.s && cr.slen > 0) memcpy(s, cr.s, (size_t)cr.slen);
