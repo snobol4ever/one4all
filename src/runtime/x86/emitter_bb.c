@@ -181,15 +181,15 @@ void emit_bb_xchr(PATND_t *p, const char *lit_label,
     emit_sigma_plus_delta_to_rdi(TEMPLATE_ADDR_SIGMA, TEMPLATE_ADDR_SIGLEN);
     emit_lea_rsi_strtab_sym(lit_label, (uint64_t)(uintptr_t)lit);
     emit_mov_rdx_imm32(len);
-    bb_emit_push_r10();
-    bb_emit_call_sym_plt("memcmp", (uint64_t)(uintptr_t)memcmp);
-    bb_emit_pop_r10();
-    bb_emit_test_eax_eax();
+    emit_push_r10();
+    emit_call_sym_plt("memcmp", (uint64_t)(uintptr_t)memcmp);
+    emit_pop_r10();
+    emit_test_eax_eax();
     emit_jmp(f, JMP_JNE);
-    bb_emit_add_delta_imm(len);
+    emit_add_delta_imm(len);
     emit_jmp(s, JMP_JMP);
     emit_label_define(b);
-    bb_emit_sub_delta_imm(len);
+    emit_sub_delta_imm(len);
     emit_jmp(f, JMP_JMP);
 }
 /*====================================================================================================================*/

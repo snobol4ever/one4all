@@ -57,12 +57,7 @@ void emit_comment(const char *text);
 void emit_bb_box_banner(const char *kind, const char *args);
 
 void emit_bb_inc_mem_r13_disp8(uint8_t disp);
-void bb_emit_ret(void);
-void bb_emit_push_r10(void);   /* push r10 — save flat-BB LOCAL across any PLT call */
-void bb_emit_pop_r10(void);    /* pop  r10 — restore after PLT call */
 void emit_pad_to_blob_size(void);
-void bb_emit_mov_rdi_imm64(uint64_t val);
-void bb_emit_call_sym_plt(const char *sym, uint64_t fn_fallback);
 void emit_macro_begin(const char *name, const char *const *params, int nparams);
 void emit_macro_end(void);
 
@@ -98,17 +93,14 @@ typedef enum {
     JMP_JG,
 } jmp_kind_t;
 
-void bb_emit_test_rax_rax(void);
 void emit_jmp(bb_label_t *target, jmp_kind_t kind);
 
 void emit_lea_rdi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr);
 void emit_lea_rdx_strtab_sym(const char *sym_label, uint64_t in_proc_ptr);
-void bb_emit_mov_esi_imm32(int val);
 void emit_mov_edi_imm32(int val);
 void emit_mov_edx_imm32(int val);
 void emit_movabs_rdi_entry(uint64_t entry_ptr);
 void emit_call_sym_param(const char *sym_or_param);
-void bb_emit_test_eax_eax(void);
 void emit_jz_retskip(int pc);
 void emit_retskip_label(int pc);
 void emit_noop_macro(const char *macro_name);
@@ -151,10 +143,6 @@ void emit_load_siglen_sub_cmp_delta(int n, uint64_t siglen_addr,
                                  bb_label_t *lbl_succ, bb_label_t *lbl_fail);
 
 void emit_lea_rsi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr);
-
-void bb_emit_add_delta_imm(int v);
-
-void bb_emit_sub_delta_imm(int v);
 
 void emit_sigma_plus_delta_to_rdi(uint64_t sigma_addr, uint64_t siglen_addr);
 
@@ -294,5 +282,17 @@ void bb3c_flush_pending_cjmp_only(void);
  * `text_emit_jmp` (emitter_text.c) and `bb_insn_jmp/je/jne/jl/jge/
  * jg_*` (bb_emit.c, TEXT mode) route through this. */
 void bb3c_emit_jmp(FILE *out, const char *mn, const char *target);
+
+/* ── instruction emitters (bb_emit_mode-aware; renamed from bb_emit_* EM-DEVTABLE) ─ */
+void emit_ret            (void);
+void emit_push_r10       (void);
+void emit_pop_r10        (void);
+void emit_test_rax_rax   (void);
+void emit_test_eax_eax   (void);
+void emit_mov_rdi_imm64  (uint64_t val);
+void emit_call_sym_plt   (const char *sym, uint64_t fn_fallback);
+void emit_mov_esi_imm32  (int val);
+void emit_add_delta_imm  (int v);
+void emit_sub_delta_imm  (int v);
 
 #endif /* BB_EMIT_H */

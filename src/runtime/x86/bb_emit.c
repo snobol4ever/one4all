@@ -5,6 +5,7 @@
  */
 
 #include "bb_emit.h"
+#include "emitter.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -191,61 +192,6 @@ void emit_bb_inc_mem_r13_disp8(uint8_t disp)
     }
 }
 
-void bb_emit_ret(void)
-{
-    /* ret  — 1 byte: C3 */
-    switch (bb_emit_mode) {
-    case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
-        bb_emit_byte(0xC3);
-        return;
-    case EMIT_TEXT_INLINE:
-    case EMIT_TEXT:
-    case EMIT_MACRO_DEF:
-        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
-        if (bb_emit_mode == EMIT_TEXT && g_in_text_macro_body) return;
-        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
-        bb3c_format(emit_outf(), "", "ret", "");
-        return;
-    }
-}
-
-void bb_emit_push_r10(void)
-{
-    /* push r10  — 41 52 */
-    switch (bb_emit_mode) {
-    case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x41); bb_emit_byte(0x52);
-        return;
-    case EMIT_TEXT_INLINE:
-    case EMIT_TEXT:
-    case EMIT_MACRO_DEF:
-        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
-        if (emit_bb_is_format_mode()) { fmt_body_append("push", "r10"); return; }
-        bb3c_format(emit_outf(), "", "push", "r10");
-        return;
-    }
-}
-
-void bb_emit_pop_r10(void)
-{
-    /* pop r10  — 41 5A */
-    switch (bb_emit_mode) {
-    case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x41); bb_emit_byte(0x5A);
-        return;
-    case EMIT_TEXT_INLINE:
-    case EMIT_TEXT:
-    case EMIT_MACRO_DEF:
-        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
-        if (emit_bb_is_format_mode()) { fmt_body_append("pop", "r10"); return; }
-        bb3c_format(emit_outf(), "", "pop", "r10");
-        return;
-    }
-}
-
 
 void emit_push_rbp_frame(void)
 {
@@ -366,78 +312,6 @@ void emit_pad_to_blob_size(void)
     }
 }
 
-void bb_emit_mov_rdi_imm64(uint64_t val)
-{
-    /* mov rdi, imm64   — 10 bytes: 48 BF <8>
-     * Used to load a value or a baked pointer into the first arg reg. */
-    switch (bb_emit_mode) {
-    case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */ {
-        bb_emit_byte(0x48); bb_emit_byte(0xBF);
-        bb_emit_byte((uint8_t)(val      ));
-        bb_emit_byte((uint8_t)(val >>  8));
-        bb_emit_byte((uint8_t)(val >> 16));
-        bb_emit_byte((uint8_t)(val >> 24));
-        bb_emit_byte((uint8_t)(val >> 32));
-        bb_emit_byte((uint8_t)(val >> 40));
-        bb_emit_byte((uint8_t)(val >> 48));
-        bb_emit_byte((uint8_t)(val >> 56));
-        return;
-    }
-    case EMIT_TEXT_INLINE:
-    case EMIT_TEXT:
-    case EMIT_MACRO_DEF: {
-        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
-        if (bb_emit_mode == EMIT_TEXT && g_in_text_macro_body) return;
-        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
-        char args[64];
-        snprintf(args, sizeof(args), "rdi, 0x%llx", (unsigned long long)val);
-        bb3c_format(emit_outf(), "", "mov", args);
-        return;
-    }
-    }
-}
-
-void bb_emit_call_sym_plt(const char *sym, uint64_t fn_fallback)
-{
-    /* call sym@PLT
-     *   BINARY: in-process JIT can't reach a real PLT; instead bake the
-     *           resolved fn address and call indirect through rax.
-     *           Sequence is 12 bytes: 48 B8 <8-byte fn> FF D0
-     *           (= mov rax, fn; call rax).  This matches the existing
-     *           BB_INSN_CALL_SYM_PLT binary encoding in emitter_binary.c.
-     *   TEXT:   emit `call <sym>@PLT` — GAS resolves via PLT at link time.
-     *   MACRO_DEF: same form as TEXT (sym is a fixed name in the macro). */
-    switch (bb_emit_mode) {
-    case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */ {
-        bb_emit_byte(0x48); bb_emit_byte(0xB8);
-        bb_emit_byte((uint8_t)(fn_fallback      ));
-        bb_emit_byte((uint8_t)(fn_fallback >>  8));
-        bb_emit_byte((uint8_t)(fn_fallback >> 16));
-        bb_emit_byte((uint8_t)(fn_fallback >> 24));
-        bb_emit_byte((uint8_t)(fn_fallback >> 32));
-        bb_emit_byte((uint8_t)(fn_fallback >> 40));
-        bb_emit_byte((uint8_t)(fn_fallback >> 48));
-        bb_emit_byte((uint8_t)(fn_fallback >> 56));
-        bb_emit_byte(0xFF); bb_emit_byte(0xD0);
-        return;
-    }
-    case EMIT_TEXT_INLINE:
-    case EMIT_TEXT:
-    case EMIT_MACRO_DEF: {
-        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
-        if (bb_emit_mode == EMIT_TEXT && g_in_text_macro_body) return;
-        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
-        char args[80];
-        snprintf(args, sizeof(args), "%s@PLT", sym ? sym : "??sym??");
-        if (emit_bb_is_format_mode()) { fmt_body_append("call", args); return; }
-        bb3c_format(emit_outf(), "", "call", args);
-        return;
-    }
-    }
-}
-
 void emit_macro_begin(const char *name, const char *const *params, int nparams)
 {
     /* macro_begin — open a `.macro NAME params` block (MACRO_DEF) or
@@ -500,26 +374,6 @@ void emit_macro_end(void)
     }
 }
 
-void bb_emit_test_rax_rax(void)
-{
-    /* test rax, rax — set ZF from rax; used before conditional jumps.
-     *   BINARY:    48 85 C0  (REX.W TEST rax, rax)
-     *   TEXT:      `test rax, rax`
-     *   MACRO_DEF: same as TEXT */
-    switch (bb_emit_mode) {
-    case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
-        bb_emit_byte(0x48); bb_emit_byte(0x85); bb_emit_byte(0xC0);
-        return;
-    case EMIT_TEXT_INLINE:
-    case EMIT_TEXT:
-    case EMIT_MACRO_DEF:
-        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
-        bb3c_format(emit_outf(), "", "test", "rax, rax");
-        return;
-    }
-}
-
 void emit_jmp(bb_label_t *target, jmp_kind_t kind)
 {
     static const char *const mn_tab[] = { "jmp", "je", "jne", "jl", "jge", "jg" };
@@ -552,7 +406,7 @@ void emit_lea_rdi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr)
      *
      *   BINARY:    movabs rdi, <in_proc_ptr>    — 10 bytes: 48 BF <8>
      *              In-process JIT: the strtab string is already in memory;
-     *              bake its address directly.  Same encoding as bb_emit_mov_rdi_imm64.
+     *              bake its address directly.  Same encoding as emit_mov_rdi_imm64.
      *
      *   TEXT:      lea rdi, [rip + sym_label]   — 7 bytes at link time;
      *              GAS assembles this as a RIP-relative LEA (opcode 48 8D 3D).
@@ -562,7 +416,7 @@ void emit_lea_rdi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr)
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
-        bb_emit_mov_rdi_imm64(in_proc_ptr);
+        emit_mov_rdi_imm64(in_proc_ptr);
         return;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT: {
@@ -649,40 +503,6 @@ void emit_mov_edx_imm32(int val)
     }
 }
 
-void bb_emit_mov_esi_imm32(int val)
-{
-    /* mov esi, <imm32>   — 5 bytes: B8+reg  (BE <val32>)
-     *
-     *   BINARY:    BE <val32>   (MOV r/m32, imm32 short form for esi)
-     *   TEXT:      mov esi, <val>
-     *   MACRO_DEF: mov esi, \n   (parameter reference) */
-    switch (bb_emit_mode) {
-    case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */ {
-        /* MOV ESI, imm32: opcode B8+r where r=6 for ESI → 0xBE */
-        uint32_t u = (uint32_t)val;
-        bb_emit_byte(0xBE);
-        bb_emit_byte((uint8_t)(u      ));
-        bb_emit_byte((uint8_t)(u >>  8));
-        bb_emit_byte((uint8_t)(u >> 16));
-        bb_emit_byte((uint8_t)(u >> 24));
-        return;
-    }
-    case EMIT_TEXT_INLINE:
-    case EMIT_TEXT: {
-        if (g_in_text_macro_body) return;  /* TEXT: suppress macro body */
-        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
-        char args[32];
-        snprintf(args, sizeof(args), "esi, %d", val);
-        bb3c_format(emit_outf(), "", "mov", args);
-        return;
-    }
-    case EMIT_MACRO_DEF:
-        bb3c_format(emit_outf(), "", "mov", "esi, \\n");
-        return;
-    }
-}
-
 void emit_mov_edi_imm32(int val)
 {
     /* mov edi, <imm32>  — 5 bytes: BF <val32>  (MOV EDI, imm32)
@@ -711,28 +531,6 @@ void emit_mov_edi_imm32(int val)
     }
     case EMIT_MACRO_DEF:
         bb3c_format(emit_outf(), "", "mov", "edi, \\kind");
-        return;
-    }
-}
-
-void bb_emit_test_eax_eax(void)
-{
-    /* test eax, eax  — 2 bytes: 85 C0
-     *   BINARY:    85 C0
-     *   TEXT/MACRO_DEF: test eax, eax */
-    switch (bb_emit_mode) {
-    case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
-        bb_emit_byte(0x85); bb_emit_byte(0xC0);
-        return;
-    case EMIT_TEXT_INLINE:
-    case EMIT_TEXT:
-    case EMIT_MACRO_DEF:
-        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
-        if (bb_emit_mode == EMIT_TEXT && g_in_text_macro_body) return;
-        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
-        if (emit_bb_is_format_mode()) { fmt_body_append("test", "eax, eax"); return; }
-        bb3c_format(emit_outf(), "", "test", "eax, eax");
         return;
     }
 }
@@ -1811,9 +1609,9 @@ void emit_bb_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fallb
         bb3c_format(emit_outf(), "", "push", "r10");
         break;
     }
-    bb_emit_mov_rdi_imm64(zeta_ptr);
-    bb_emit_mov_esi_imm32(port);
-    bb_emit_call_sym_plt(fn_name, fn_fallback);
+    emit_mov_rdi_imm64(zeta_ptr);
+    emit_mov_esi_imm32(port);
+    emit_call_sym_plt(fn_name, fn_fallback);
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
@@ -1826,7 +1624,7 @@ void emit_bb_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fallb
         bb3c_format(emit_outf(), "", "pop", "r10");
         break;
     }
-    bb_emit_test_rax_rax();
+    emit_test_rax_rax();
     emit_jmp(lbl_succ, JMP_JNE);
     emit_jmp(lbl_fail, JMP_JMP);
 }
@@ -2019,78 +1817,6 @@ void emit_lea_rsi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr)
     }
 }
 
-void bb_emit_add_delta_imm(int v)
-{
-    switch (bb_emit_mode) {
-    case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
-        /* mov eax, [r10]  — 41 8B 02 */
-        bb_emit_byte(0x41); bb_emit_byte(0x8B); bb_emit_byte(0x02);
-        /* add eax, imm32  — 05 <4> */
-        bb_emit_byte(0x05);
-        bb_emit_byte((uint8_t)((uint32_t)v      ));
-        bb_emit_byte((uint8_t)((uint32_t)v >>  8));
-        bb_emit_byte((uint8_t)((uint32_t)v >> 16));
-        bb_emit_byte((uint8_t)((uint32_t)v >> 24));
-        /* mov [r10], eax  — 41 89 02 */
-        bb_emit_byte(0x41); bb_emit_byte(0x89); bb_emit_byte(0x02);
-        return;
-    case EMIT_TEXT_INLINE:
-    case EMIT_TEXT:
-    case EMIT_MACRO_DEF: {
-        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
-        char args[32]; snprintf(args, sizeof(args), "eax, %d", v);
-        if (emit_bb_is_format_mode()) {
-            fmt_body_append("mov", "eax, [r10]");
-            fmt_body_append("add", args);
-            fmt_body_append("mov", "[r10], eax");
-            return;
-        }
-        FILE *f = emit_outf();
-        bb3c_format(f, "", "mov", "eax, [r10]");
-        bb3c_format(f, "", "add", args);
-        bb3c_format(f, "", "mov", "[r10], eax");
-        return;
-    }
-    }
-}
-
-void bb_emit_sub_delta_imm(int v)
-{
-    switch (bb_emit_mode) {
-    case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
-        /* mov eax, [r10]  — 41 8B 02 */
-        bb_emit_byte(0x41); bb_emit_byte(0x8B); bb_emit_byte(0x02);
-        /* sub eax, imm32  — 2D <4> */
-        bb_emit_byte(0x2D);
-        bb_emit_byte((uint8_t)((uint32_t)v      ));
-        bb_emit_byte((uint8_t)((uint32_t)v >>  8));
-        bb_emit_byte((uint8_t)((uint32_t)v >> 16));
-        bb_emit_byte((uint8_t)((uint32_t)v >> 24));
-        /* mov [r10], eax  — 41 89 02 */
-        bb_emit_byte(0x41); bb_emit_byte(0x89); bb_emit_byte(0x02);
-        return;
-    case EMIT_TEXT_INLINE:
-    case EMIT_TEXT:
-    case EMIT_MACRO_DEF: {
-        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
-        char args[32]; snprintf(args, sizeof(args), "eax, %d", v);
-        if (emit_bb_is_format_mode()) {
-            fmt_body_append("mov", "eax, [r10]");
-            fmt_body_append("sub", args);
-            fmt_body_append("mov", "[r10], eax");
-            return;
-        }
-        FILE *f = emit_outf();
-        bb3c_format(f, "", "mov", "eax, [r10]");
-        bb3c_format(f, "", "sub", args);
-        bb3c_format(f, "", "mov", "[r10], eax");
-        return;
-    }
-    }
-}
-
 void emit_sigma_plus_delta_to_rdi(uint64_t sigma_addr, uint64_t siglen_addr)
 {
     (void)siglen_addr;
@@ -2194,6 +1920,293 @@ void emit_bounds_check_delta_plus_len(int len, uint64_t siglen_addr, bb_label_t 
         bb3c_format(f, "", "lea", "rcx, [rip + Σlen]");
         bb3c_format(f, "", "cmp", "eax, [rcx]");
         emit_jmp(lbl_fail, JMP_JG);
+        return;
+    }
+    }
+}
+
+/* ── restored emit_* instruction functions (EM-DEVTABLE rename) ─────────── */
+
+
+void emit_ret(void)
+{
+    /* ret  — 1 byte: C3 */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
+        bb_emit_byte(0xC3);
+        return;
+    case EMIT_TEXT_INLINE:
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF:
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        if (bb_emit_mode == EMIT_TEXT && g_in_text_macro_body) return;
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        bb3c_format(emit_outf(), "", "ret", "");
+        return;
+    }
+}
+
+
+void emit_push_r10(void)
+{
+    /* push r10  — 41 52 */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:
+        bb_emit_byte(0x41); bb_emit_byte(0x52);
+        return;
+    case EMIT_TEXT_INLINE:
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF:
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        if (emit_bb_is_format_mode()) { fmt_body_append("push", "r10"); return; }
+        bb3c_format(emit_outf(), "", "push", "r10");
+        return;
+    }
+}
+
+
+void emit_pop_r10(void)
+{
+    /* pop r10  — 41 5A */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:
+        bb_emit_byte(0x41); bb_emit_byte(0x5A);
+        return;
+    case EMIT_TEXT_INLINE:
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF:
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        if (emit_bb_is_format_mode()) { fmt_body_append("pop", "r10"); return; }
+        bb3c_format(emit_outf(), "", "pop", "r10");
+        return;
+    }
+}
+
+
+void emit_test_rax_rax(void)
+{
+    /* test rax, rax — set ZF from rax; used before conditional jumps.
+     *   BINARY:    48 85 C0  (REX.W TEST rax, rax)
+     *   TEXT:      `test rax, rax`
+     *   MACRO_DEF: same as TEXT */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
+        bb_emit_byte(0x48); bb_emit_byte(0x85); bb_emit_byte(0xC0);
+        return;
+    case EMIT_TEXT_INLINE:
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF:
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        bb3c_format(emit_outf(), "", "test", "rax, rax");
+        return;
+    }
+}
+
+
+void emit_test_eax_eax(void)
+{
+    /* test eax, eax  — 2 bytes: 85 C0
+     *   BINARY:    85 C0
+     *   TEXT/MACRO_DEF: test eax, eax */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
+        bb_emit_byte(0x85); bb_emit_byte(0xC0);
+        return;
+    case EMIT_TEXT_INLINE:
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF:
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        if (bb_emit_mode == EMIT_TEXT && g_in_text_macro_body) return;
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        if (emit_bb_is_format_mode()) { fmt_body_append("test", "eax, eax"); return; }
+        bb3c_format(emit_outf(), "", "test", "eax, eax");
+        return;
+    }
+}
+
+
+void emit_mov_rdi_imm64(uint64_t val)
+{
+    /* mov rdi, imm64   — 10 bytes: 48 BF <8>
+     * Used to load a value or a baked pointer into the first arg reg. */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */ {
+        bb_emit_byte(0x48); bb_emit_byte(0xBF);
+        bb_emit_byte((uint8_t)(val      ));
+        bb_emit_byte((uint8_t)(val >>  8));
+        bb_emit_byte((uint8_t)(val >> 16));
+        bb_emit_byte((uint8_t)(val >> 24));
+        bb_emit_byte((uint8_t)(val >> 32));
+        bb_emit_byte((uint8_t)(val >> 40));
+        bb_emit_byte((uint8_t)(val >> 48));
+        bb_emit_byte((uint8_t)(val >> 56));
+        return;
+    }
+    case EMIT_TEXT_INLINE:
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF: {
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        if (bb_emit_mode == EMIT_TEXT && g_in_text_macro_body) return;
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        char args[64];
+        snprintf(args, sizeof(args), "rdi, 0x%llx", (unsigned long long)val);
+        bb3c_format(emit_outf(), "", "mov", args);
+        return;
+    }
+    }
+}
+
+
+void emit_call_sym_plt(const char *sym, uint64_t fn_fallback)
+{
+    /* call sym@PLT
+     *   BINARY: in-process JIT can't reach a real PLT; instead bake the
+     *           resolved fn address and call indirect through rax.
+     *           Sequence is 12 bytes: 48 B8 <8-byte fn> FF D0
+     *           (= mov rax, fn; call rax).  This matches the existing
+     *           BB_INSN_CALL_SYM_PLT binary encoding in emitter_binary.c.
+     *   TEXT:   emit `call <sym>@PLT` — GAS resolves via PLT at link time.
+     *   MACRO_DEF: same form as TEXT (sym is a fixed name in the macro). */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */ {
+        bb_emit_byte(0x48); bb_emit_byte(0xB8);
+        bb_emit_byte((uint8_t)(fn_fallback      ));
+        bb_emit_byte((uint8_t)(fn_fallback >>  8));
+        bb_emit_byte((uint8_t)(fn_fallback >> 16));
+        bb_emit_byte((uint8_t)(fn_fallback >> 24));
+        bb_emit_byte((uint8_t)(fn_fallback >> 32));
+        bb_emit_byte((uint8_t)(fn_fallback >> 40));
+        bb_emit_byte((uint8_t)(fn_fallback >> 48));
+        bb_emit_byte((uint8_t)(fn_fallback >> 56));
+        bb_emit_byte(0xFF); bb_emit_byte(0xD0);
+        return;
+    }
+    case EMIT_TEXT_INLINE:
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF: {
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        if (bb_emit_mode == EMIT_TEXT && g_in_text_macro_body) return;
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        char args[80];
+        snprintf(args, sizeof(args), "%s@PLT", sym ? sym : "??sym??");
+        if (emit_bb_is_format_mode()) { fmt_body_append("call", args); return; }
+        bb3c_format(emit_outf(), "", "call", args);
+        return;
+    }
+    }
+}
+
+
+void emit_mov_esi_imm32(int val)
+{
+    /* mov esi, <imm32>   — 5 bytes: B8+reg  (BE <val32>)
+     *
+     *   BINARY:    BE <val32>   (MOV r/m32, imm32 short form for esi)
+     *   TEXT:      mov esi, <val>
+     *   MACRO_DEF: mov esi, \n   (parameter reference) */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */ {
+        /* MOV ESI, imm32: opcode B8+r where r=6 for ESI → 0xBE */
+        uint32_t u = (uint32_t)val;
+        bb_emit_byte(0xBE);
+        bb_emit_byte((uint8_t)(u      ));
+        bb_emit_byte((uint8_t)(u >>  8));
+        bb_emit_byte((uint8_t)(u >> 16));
+        bb_emit_byte((uint8_t)(u >> 24));
+        return;
+    }
+    case EMIT_TEXT_INLINE:
+    case EMIT_TEXT: {
+        if (g_in_text_macro_body) return;  /* TEXT: suppress macro body */
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        char args[32];
+        snprintf(args, sizeof(args), "esi, %d", val);
+        bb3c_format(emit_outf(), "", "mov", args);
+        return;
+    }
+    case EMIT_MACRO_DEF:
+        bb3c_format(emit_outf(), "", "mov", "esi, \\n");
+        return;
+    }
+}
+
+
+void emit_add_delta_imm(int v)
+{
+    switch (bb_emit_mode) {
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
+        /* mov eax, [r10]  — 41 8B 02 */
+        bb_emit_byte(0x41); bb_emit_byte(0x8B); bb_emit_byte(0x02);
+        /* add eax, imm32  — 05 <4> */
+        bb_emit_byte(0x05);
+        bb_emit_byte((uint8_t)((uint32_t)v      ));
+        bb_emit_byte((uint8_t)((uint32_t)v >>  8));
+        bb_emit_byte((uint8_t)((uint32_t)v >> 16));
+        bb_emit_byte((uint8_t)((uint32_t)v >> 24));
+        /* mov [r10], eax  — 41 89 02 */
+        bb_emit_byte(0x41); bb_emit_byte(0x89); bb_emit_byte(0x02);
+        return;
+    case EMIT_TEXT_INLINE:
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF: {
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        char args[32]; snprintf(args, sizeof(args), "eax, %d", v);
+        if (emit_bb_is_format_mode()) {
+            fmt_body_append("mov", "eax, [r10]");
+            fmt_body_append("add", args);
+            fmt_body_append("mov", "[r10], eax");
+            return;
+        }
+        FILE *f = emit_outf();
+        bb3c_format(f, "", "mov", "eax, [r10]");
+        bb3c_format(f, "", "add", args);
+        bb3c_format(f, "", "mov", "[r10], eax");
+        return;
+    }
+    }
+}
+
+
+void emit_sub_delta_imm(int v)
+{
+    switch (bb_emit_mode) {
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
+        /* mov eax, [r10]  — 41 8B 02 */
+        bb_emit_byte(0x41); bb_emit_byte(0x8B); bb_emit_byte(0x02);
+        /* sub eax, imm32  — 2D <4> */
+        bb_emit_byte(0x2D);
+        bb_emit_byte((uint8_t)((uint32_t)v      ));
+        bb_emit_byte((uint8_t)((uint32_t)v >>  8));
+        bb_emit_byte((uint8_t)((uint32_t)v >> 16));
+        bb_emit_byte((uint8_t)((uint32_t)v >> 24));
+        /* mov [r10], eax  — 41 89 02 */
+        bb_emit_byte(0x41); bb_emit_byte(0x89); bb_emit_byte(0x02);
+        return;
+    case EMIT_TEXT_INLINE:
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF: {
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        char args[32]; snprintf(args, sizeof(args), "eax, %d", v);
+        if (emit_bb_is_format_mode()) {
+            fmt_body_append("mov", "eax, [r10]");
+            fmt_body_append("sub", args);
+            fmt_body_append("mov", "[r10], eax");
+            return;
+        }
+        FILE *f = emit_outf();
+        bb3c_format(f, "", "mov", "eax, [r10]");
+        bb3c_format(f, "", "sub", args);
+        bb3c_format(f, "", "mov", "[r10], eax");
         return;
     }
     }

@@ -109,12 +109,10 @@ void emit_call_sym_plt(const char *sym, uint64_t fn_fallback);
 
 static inline void emit_mov_r10_imm64(uint64_t v) { emit_form_reg64_imm64(0x49,0xBA,v,"r10"); }
 static inline void emit_mov_rax_imm64(uint64_t v) { emit_form_reg64_imm64(0x48,0xB8,v,"rax"); }
-static inline void emit_mov_rdi_imm64(uint64_t v) { emit_form_reg64_imm64(0x48,0xBF,v,"rdi"); }
 static inline void emit_mov_rsi_imm64(uint64_t v) { emit_form_reg64_imm64(0x48,0xBE,v,"rsi"); }
 static inline void emit_mov_rdx_imm64(uint64_t v) { emit_form_reg64_imm64(0x48,0xBA,v,"rdx"); }
 static inline void emit_mov_rcx_imm64(uint64_t v) { emit_form_reg64_imm64(0x48,0xB9,v,"rcx"); }
 
-static inline void emit_mov_esi_imm32(uint32_t v) { emit_form_reg32_imm32(0xBE,v,"esi"); }
 static inline void emit_mov_eax_imm32(uint32_t v) { emit_form_reg32_imm32(0xB8,v,"eax"); }
 
 static inline void emit_add_eax_imm32(uint32_t v) { emit_form_alu_eax_imm32(0x05,v,"add"); }
@@ -126,8 +124,6 @@ static inline void emit_mov_ecx_eax    (void) { emit_form_reg_reg2(0x89,0xC1,   
 static inline void emit_mov_rdi_rax    (void) { emit_form_reg_reg3(0x48,0x89,0xC7,"mov rdi, rax"                ); }
 static inline void emit_mov_rdx_rax    (void) { emit_form_reg_reg3(0x48,0x89,0xC2,"mov rdx, rax"                ); }
 static inline void emit_cmp_eax_ecx    (void) { emit_form_reg_reg2(0x39,0xC8,     "cmp eax, ecx"                ); }
-static inline void emit_test_eax_eax   (void) { emit_form_reg_reg2(0x85,0xC0,     "test eax, eax"               ); }
-static inline void emit_test_rax_rax   (void) { emit_form_reg_reg3(0x48,0x85,0xC0,"test rax, rax"               ); }
 static inline void emit_xor_edx_edx    (void) { emit_form_reg_reg2(0x31,0xD2,     "xor edx, edx"                ); }
 
 static inline void emit_mov_eax_rcxmem   (void) { emit_form_mem2(0x8B,0x01,         "mov eax, [rcx]"            ); }
@@ -138,10 +134,7 @@ static inline void emit_mov_r10mem_eax   (void) { emit_form_mem3(0x41,0x89,0x02,
 static inline void emit_movsxd_rcx_r10mem(void) { emit_form_mem3(0x49,0x63,0x0A,    "movsxd rcx, dword ptr [r10]"); }
 static inline void emit_lea_rax_raxrcx   (void) { emit_form_mem4(0x48,0x8D,0x04,0x08,"lea rax, [rax+rcx]"      ); }
 
-static inline void emit_ret      (void) { emit_form_nullary1(0xC3,      "ret"    ); }
 static inline void emit_call_rax (void) { emit_form_nullary2(0xFF,0xD0, "call rax"); }
-static inline void emit_push_r10 (void) { emit_form_nullary2(0x41,0x52, "push r10"); }
-static inline void emit_pop_r10  (void) { emit_form_nullary2(0x41,0x5A, "pop r10" ); }
 static inline void emit_pop_rbp  (void) { emit_form_nullary1(0x5D,      "pop rbp" ); }
 
 static inline void emit_inc_mem_r13_disp8(uint8_t disp) {

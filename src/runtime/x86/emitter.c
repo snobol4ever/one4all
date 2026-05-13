@@ -182,12 +182,6 @@ void emit_sym_lea_r10(const char *sym, uint64_t addr)
     else           { b2(0x49,0xBA); u64(addr); }
 }
 
-void emit_call_sym_plt(const char *sym, uint64_t fn)
-{
-    if (g_is_text) { t3c("call", "%s@PLT", sym ? sym : "??"); g_emit_pos += 5; }
-    else           { b2(0x48,0xB8); u64(fn); b2(0xFF,0xD0); }
-}
-
 /*============================================================================
  * Composite helpers
  *==========================================================================*/
@@ -195,12 +189,6 @@ void emit_call_sym_plt(const char *sym, uint64_t fn)
 void emit_load_r10_delta_ptr(uint64_t addr)   { emit_sym_lea_r10("\xCE\x94", addr); }
 void emit_load_delta(void)                     { emit_mov_eax_r10mem(); }
 void emit_store_delta(void)                    { emit_mov_r10mem_eax(); }
-
-void emit_add_delta_imm(int32_t v)
-{ emit_load_delta(); emit_add_eax_imm32((uint32_t)v); emit_store_delta(); }
-
-void emit_sub_delta_imm(int32_t v)
-{ emit_load_delta(); emit_sub_eax_imm32((uint32_t)v); emit_store_delta(); }
 
 void emit_load_sigma(uint64_t sigma_addr)
 { emit_sym_lea_rcx("\xCE\xA3", sigma_addr); emit_mov_rax_rcxmem(); }

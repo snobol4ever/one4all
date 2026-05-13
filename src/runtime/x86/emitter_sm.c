@@ -20,7 +20,7 @@
 static void emit_sm_nullary_rt(const char *macro_name, const char *rt_fn)
 {
     emit_macro_begin(macro_name, NULL, 0);
-    bb_emit_call_sym_plt(rt_fn, 0);
+    emit_call_sym_plt(rt_fn, 0);
     emit_macro_end();
     emit_pad_to_blob_size();
 }
@@ -157,8 +157,8 @@ void emit_sm_arith_dispatch(int op)
 void emit_sm_arith_op(int op_enum, const char *macro_name)
 {
     emit_macro_begin(macro_name ? macro_name : "ARITH", NULL, 0);
-    bb_emit_mov_rdi_imm64((uint64_t)(unsigned)op_enum);
-    bb_emit_call_sym_plt("rt_arith", 0);
+    emit_mov_rdi_imm64((uint64_t)(unsigned)op_enum);
+    emit_call_sym_plt("rt_arith", 0);
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
@@ -176,7 +176,7 @@ static void emit_sm_int_arg(const char *mn, const char *rt_fn,
     const char *const params[] = { param_name };
     emit_macro_begin(mn, params, 1);
     emit_mov_edi_imm32(val);
-    bb_emit_call_sym_plt(rt_fn, 0);
+    emit_call_sym_plt(rt_fn, 0);
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
@@ -188,8 +188,8 @@ void emit_sm_incr(int64_t n)
 {
     const char *const params[] = { "n" };
     emit_macro_begin("INCR", params, 1);
-    bb_emit_mov_rdi_imm64((uint64_t)n);
-    bb_emit_call_sym_plt("rt_incr", 0);
+    emit_mov_rdi_imm64((uint64_t)n);
+    emit_call_sym_plt("rt_incr", 0);
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
@@ -197,27 +197,27 @@ void emit_sm_decr(int64_t n)
 {
     const char *const params[] = { "n" };
     emit_macro_begin("DECR", params, 1);
-    bb_emit_mov_rdi_imm64((uint64_t)n);
-    bb_emit_call_sym_plt("rt_decr", 0);
+    emit_mov_rdi_imm64((uint64_t)n);
+    emit_call_sym_plt("rt_decr", 0);
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
 /* ── halt / return / jump ────────────────────────────────────────────────── */
 
 void emit_sm_halt()
-{ emit_bb_inc_mem_r13_disp8(20); bb_emit_ret(); emit_pad_to_blob_size(); }
+{ emit_bb_inc_mem_r13_disp8(20); emit_ret(); emit_pad_to_blob_size(); }
 
 void emit_sm_return()
-{ emit_macro_begin("RETURN",NULL,0); bb_emit_ret(); emit_macro_end(); emit_pad_to_blob_size(); }
+{ emit_macro_begin("RETURN",NULL,0); emit_ret(); emit_macro_end(); emit_pad_to_blob_size(); }
 
 void emit_sm_return_variant(int kind, int cond, int pc)
 {
     static const char *const params[] = { "kind","cond","pc" };
     emit_macro_begin("RETURN_VARIANT", params, 3);
-    emit_mov_edi_imm32(kind); bb_emit_mov_esi_imm32(cond);
-    bb_emit_call_sym_plt("rt_do_return", 0);
-    bb_emit_test_eax_eax(); emit_jz_retskip(pc);
-    bb_emit_ret(); emit_retskip_label(pc);
+    emit_mov_edi_imm32(kind); emit_mov_esi_imm32(cond);
+    emit_call_sym_plt("rt_do_return", 0);
+    emit_test_eax_eax(); emit_jz_retskip(pc);
+    emit_ret(); emit_retskip_label(pc);
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
@@ -236,11 +236,11 @@ void emit_sm_jump(int pc)
 { bb_label_t t; make_pc_label(&t,pc); emit_jmp(&t,JMP_JMP); }
 
 void emit_sm_jump_s(int pc)
-{ bb_emit_call_sym_plt("rt_last_ok",0); bb_emit_test_rax_rax();
+{ emit_call_sym_plt("rt_last_ok",0); emit_test_rax_rax();
   bb_label_t t; make_pc_label(&t,pc); emit_jmp(&t,JMP_JNE); }
 
 void emit_sm_jump_f(int pc)
-{ bb_emit_call_sym_plt("rt_last_ok",0); bb_emit_test_rax_rax();
+{ emit_call_sym_plt("rt_last_ok",0); emit_test_rax_rax();
   bb_label_t t; make_pc_label(&t,pc); emit_jmp(&t,JMP_JE); }
 
 /* ── structural markers ──────────────────────────────────────────────────── */
@@ -254,8 +254,8 @@ void emit_sm_push_lit_i(int64_t val)
 {
     static const char *const p[] = {"val"};
     emit_macro_begin("PUSH_INT",p,1);
-    bb_emit_mov_rdi_imm64((uint64_t)val);
-    bb_emit_call_sym_plt("rt_push_int",0);
+    emit_mov_rdi_imm64((uint64_t)val);
+    emit_call_sym_plt("rt_push_int",0);
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
@@ -265,8 +265,8 @@ void emit_sm_push_lit_f(double val)
     char bs[32]; snprintf(bs,sizeof(bs),"0x%016llx",(unsigned long long)bits);
     const char *p[] = {bs};
     emit_macro_begin("PUSH_REAL",p,1);
-    bb_emit_mov_rdi_imm64(bits);
-    bb_emit_call_sym_plt("rt_push_real_bits",0);
+    emit_mov_rdi_imm64(bits);
+    emit_call_sym_plt("rt_push_real_bits",0);
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
@@ -275,8 +275,8 @@ void emit_sm_push_lit_s(const char *str_lbl, uint64_t str_ptr, int len)
     static const char *const p[] = {"lbl","n"};
     emit_macro_begin("PUSH_STR",p,2);
     emit_lea_rdi_strtab_sym(str_lbl,str_ptr);
-    bb_emit_mov_esi_imm32(len);
-    bb_emit_call_sym_plt("rt_push_str",0);
+    emit_mov_esi_imm32(len);
+    emit_call_sym_plt("rt_push_str",0);
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
@@ -284,8 +284,8 @@ void emit_sm_push_expr(uint64_t ptr_val)
 {
     static const char *const p[] = {"ptr"};
     emit_macro_begin("PUSH_EXPR",p,1);
-    bb_emit_mov_rdi_imm64(ptr_val);
-    bb_emit_call_sym_plt("rt_push_expr",0);
+    emit_mov_rdi_imm64(ptr_val);
+    emit_call_sym_plt("rt_push_expr",0);
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
@@ -295,8 +295,8 @@ void emit_sm_push_expression(uint64_t entry_ptr, int arity)
 {
     static const char *const p[] = {"entry","arity"};
     emit_macro_begin("PUSH_EXPRESSION",p,2);
-    emit_movabs_rdi_entry(entry_ptr); bb_emit_mov_esi_imm32(arity);
-    bb_emit_call_sym_plt("rt_push_expression_descr",0);
+    emit_movabs_rdi_entry(entry_ptr); emit_mov_esi_imm32(arity);
+    emit_call_sym_plt("rt_push_expression_descr",0);
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
@@ -312,8 +312,8 @@ void emit_sm_exec_stmt(const char *subj_lbl, uint64_t subj_ptr, int has_repl)
 {
     static const char *const p[] = {"has_repl","subj_lbl"};
     emit_macro_begin("EXEC_STMT_VARIANT",p,2);
-    emit_lea_rdi_strtab_sym(subj_lbl,subj_ptr); bb_emit_mov_esi_imm32(has_repl);
-    bb_emit_call_sym_plt("rt_match_variant",0);
+    emit_lea_rdi_strtab_sym(subj_lbl,subj_ptr); emit_mov_esi_imm32(has_repl);
+    emit_call_sym_plt("rt_match_variant",0);
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
@@ -322,8 +322,8 @@ void emit_sm_call_fn(const char *name_lbl, uint64_t name_ptr, int nargs)
     (void)name_lbl; (void)name_ptr; (void)nargs;
     static const char *const p[] = {"lbl","n"};
     emit_macro_begin("CALL_FN",p,2);
-    emit_lea_rdi_strtab_sym(NULL,0); bb_emit_mov_esi_imm32(0);
-    bb_emit_call_sym_plt("rt_call",0);
+    emit_lea_rdi_strtab_sym(NULL,0); emit_mov_esi_imm32(0);
+    emit_call_sym_plt("rt_call",0);
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
@@ -333,14 +333,14 @@ void emit_sm_push_var(const char *lbl, uint64_t ptr)
 {
     static const char *const p[] = {"lbl"};
     emit_macro_begin("PUSH_VAR",p,1); emit_lea_rdi_strtab_sym(lbl,ptr);
-    bb_emit_call_sym_plt("rt_nv_get",0); emit_macro_end(); emit_pad_to_blob_size();
+    emit_call_sym_plt("rt_nv_get",0); emit_macro_end(); emit_pad_to_blob_size();
 }
 
 void emit_sm_store_var(const char *lbl, uint64_t ptr)
 {
     static const char *const p[] = {"lbl"};
     emit_macro_begin("STORE_VAR",p,1); emit_lea_rdi_strtab_sym(lbl,ptr);
-    bb_emit_call_sym_plt("rt_nv_set",0); emit_macro_end(); emit_pad_to_blob_size();
+    emit_call_sym_plt("rt_nv_set",0); emit_macro_end(); emit_pad_to_blob_size();
 }
 
 /* ── pat string-arg — collapsed to emit_sm_pat_str ──────────────────────── */
@@ -350,7 +350,7 @@ static void emit_sm_pat_str(const char *mn, const char *rt_fn,
 {
     static const char *const p[] = {"lbl"};
     emit_macro_begin(mn,p,1); emit_lea_rdi_strtab_sym(lbl,ptr);
-    bb_emit_call_sym_plt(rt_fn,0); emit_macro_end(); emit_pad_to_blob_size();
+    emit_call_sym_plt(rt_fn,0); emit_macro_end(); emit_pad_to_blob_size();
 }
 
 void emit_sm_pat_lit     (const char *l, uint64_t p) { emit_sm_pat_str("PAT_LIT",      "rt_pat_lit",      l,p); }
@@ -363,16 +363,16 @@ void emit_sm_pat_capture(const char *name_lbl, uint64_t name_ptr, int kind)
 {
     static const char *const p[] = {"lbl","n"};
     emit_macro_begin("PAT_CAPTURE",p,2);
-    emit_lea_rdi_strtab_sym(name_lbl,name_ptr); bb_emit_mov_esi_imm32(kind);
-    bb_emit_call_sym_plt("rt_pat_capture",0); emit_macro_end(); emit_pad_to_blob_size();
+    emit_lea_rdi_strtab_sym(name_lbl,name_ptr); emit_mov_esi_imm32(kind);
+    emit_call_sym_plt("rt_pat_capture",0); emit_macro_end(); emit_pad_to_blob_size();
 }
 
 void emit_sm_pat_usercall_args(const char *name_lbl, uint64_t name_ptr, int nargs)
 {
     static const char *const p[] = {"lbl","n"};
     emit_macro_begin("PAT_USERCALL_ARGS",p,2);
-    emit_lea_rdi_strtab_sym(name_lbl,name_ptr); bb_emit_mov_esi_imm32(nargs);
-    bb_emit_call_sym_plt("rt_pat_usercall_args",0); emit_macro_end(); emit_pad_to_blob_size();
+    emit_lea_rdi_strtab_sym(name_lbl,name_ptr); emit_mov_esi_imm32(nargs);
+    emit_call_sym_plt("rt_pat_usercall_args",0); emit_macro_end(); emit_pad_to_blob_size();
 }
 
 /* ── pat three-arg ───────────────────────────────────────────────────────── */
@@ -382,9 +382,9 @@ void emit_sm_pat_capture_fn(const char *fname_lbl, uint64_t fname_ptr,
 {
     static const char *const p[] = {"is_imm","fname_lbl","namelist_lbl"};
     emit_macro_begin("PAT_CAPTURE_FN",p,3);
-    emit_lea_rdi_strtab_sym(fname_lbl,fname_ptr); bb_emit_mov_esi_imm32(is_imm);
+    emit_lea_rdi_strtab_sym(fname_lbl,fname_ptr); emit_mov_esi_imm32(is_imm);
     emit_lea_rdx_strtab_sym(namelist_lbl,namelist_ptr);
-    bb_emit_call_sym_plt("rt_pat_capture_fn",0); emit_macro_end(); emit_pad_to_blob_size();
+    emit_call_sym_plt("rt_pat_capture_fn",0); emit_macro_end(); emit_pad_to_blob_size();
 }
 
 void emit_sm_pat_capture_fn_args(const char *fname_lbl, uint64_t fname_ptr,
@@ -392,7 +392,7 @@ void emit_sm_pat_capture_fn_args(const char *fname_lbl, uint64_t fname_ptr,
 {
     static const char *const p[] = {"is_imm","nargs","fname_lbl"};
     emit_macro_begin("PAT_CAPTURE_FN_ARGS",p,3);
-    emit_lea_rdi_strtab_sym(fname_lbl,fname_ptr); bb_emit_mov_esi_imm32(is_imm);
+    emit_lea_rdi_strtab_sym(fname_lbl,fname_ptr); emit_mov_esi_imm32(is_imm);
     emit_mov_edx_imm32(nargs);
-    bb_emit_call_sym_plt("rt_pat_capture_fn_args",0); emit_macro_end(); emit_pad_to_blob_size();
+    emit_call_sym_plt("rt_pat_capture_fn_args",0); emit_macro_end(); emit_pad_to_blob_size();
 }
