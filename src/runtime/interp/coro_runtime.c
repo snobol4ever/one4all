@@ -637,6 +637,9 @@ DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs)
             /* Expand env_n to cover all slots (params + locals) */
             int total_slots = proc_table[found_pi].lower_sc.n;
             if (total_slots > f->env_n) f->env_n = total_slots;
+            /* IJ-3: copy lower_sc into FRAME.sc so SM_CALL_FN can find
+             * variable slots by name (e.g. for proc-value-in-variable dispatch). */
+            f->sc = proc_table[found_pi].lower_sc;
 
             /* IC-9: restore static variables into frame slots on proc entry.
              * Mirrors coro_call's static-restore loop at coro_runtime.c:508-526. */

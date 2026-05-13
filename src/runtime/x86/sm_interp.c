@@ -361,6 +361,22 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
         case SM_PUSH_VAR: {
             const char *name = ins->a[0].s;
             DESCR_t val = NV_GET_fn(name);
+            /* IJ-3: if NV returned a string/null for a name that is an Icon proc,
+             * promote to DT_E proc-value descriptor so `pv := p0; pv()` works.
+             * Only fires when g_lang is Icon and the name is in proc_table. */
+            { extern int g_lang;
+            if (g_lang == LANG_ICN && (val.v == DT_S || val.v == DT_SNUL)) {
+                extern int proc_count;
+                extern IcnProcEntry proc_table[];
+                for (int _pi = 0; _pi < proc_count; _pi++) {
+                    if (proc_table[_pi].name && strcmp(proc_table[_pi].name, name) == 0) {
+                        val.v    = DT_E;
+                        val.slen = (uint32_t)_pi;           /* proc_table index as fallback */
+                        val.i    = proc_table[_pi].entry_pc; /* entry_pc for sm_call_proc   */
+                        break;
+                    }
+                }
+            } }
             sm_push(st, val);
             /* SN-6: keyword reads (e.g. INPUT at EOF) return FAILDESCR.
              * Update last_ok so the statement's :F branch fires correctly. */
@@ -1548,6 +1564,41 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
              * bodies lowered by CH-17b'' which emit SM_LOAD_FRAME / SM_STORE_FRAME.
              * Without this, SM_CALL_FN binds params into NV but the body reads
              * frame slots → params always read as uninitialised FAILDESCR. */
+
+            /* IJ-3: proc-value-in-variable — `pv := p0; pv()`.
+             * SM emits SM_CALL_FN "pv" nargs=0 when pv is called without parens
+             * after being assigned a proc value.  "pv" is not in proc_table, but
+             * FRAME.env[slot_of_pv] holds a DT_E descriptor from SM_PUSH_VAR "p0".
+             * Look up the slot via FRAME.sc; if it holds DT_E, dispatch that proc. */
+            if (name && icn_frame_env_active()) {
+                int _pv_slot = scope_get(&FRAME.sc, name);
+                if (_pv_slot >= 0) {
+                    DESCR_t _pv = icn_frame_env_load(_pv_slot);
+                    if (_pv.v == DT_E) {
+                        /* Find proc by entry_pc first, then by slen-as-index fallback */
+                        for (int _pi = 0; _pi < proc_count; _pi++) {
+                            if (proc_table[_pi].entry_pc == (int)_pv.i) {
+                                DESCR_t _pr = sm_call_proc(proc_table[_pi].entry_pc,
+                                                            proc_table[_pi].nparams,
+                                                            args, nargs);
+                                sm_push(st, _pr);
+                                st->last_ok = (_pr.v != DT_FAIL);
+                                goto sm_call_done;
+                            }
+                        }
+                        if (_pv.slen < (uint32_t)proc_count) {
+                            int _pi = (int)_pv.slen;
+                            DESCR_t _pr = sm_call_proc(proc_table[_pi].entry_pc,
+                                                        proc_table[_pi].nparams,
+                                                        args, nargs);
+                            sm_push(st, _pr);
+                            st->last_ok = (_pr.v != DT_FAIL);
+                            goto sm_call_done;
+                        }
+                    }
+                }
+            }
+
             if (name && g_current_sm_prog) {
                 extern int proc_count;
                 extern IcnProcEntry proc_table[];

@@ -130,6 +130,20 @@ static int emit_goto(sm_opcode_t op, const char *target)
 static void emit_var_load(const char *vn)
 {
     if (g_in_proc_body && g_proc_scope && vn[0] && vn[0] != '&') {
+        /* IJ-3: if this name is a known Icon proc (not a local variable),
+         * skip the slot path so SM_PUSH_VAR fires instead.  SM_PUSH_VAR
+         * promotes Icon proc names to DT_E proc-value descriptors, letting
+         * `pv := p0; pv()` work.  Without this, scope_get finds a slot (any
+         * referenced name gets one during scope building) and SM_LOAD_FRAME
+         * pushes the zero-initialised slot value, never a DT_E. */
+        if (g_lang == LANG_ICN) {
+            for (int _pi = 0; _pi < proc_count; _pi++) {
+                if (proc_table[_pi].name && strcmp(proc_table[_pi].name, vn) == 0) {
+                    sm_emit_s(g_p, SM_PUSH_VAR, vn);   /* SM_PUSH_VAR → DT_E promotion */
+                    return;
+                }
+            }
+        }
         int slot = scope_get(g_proc_scope, vn);
         if (slot >= 0) { sm_emit_i(g_p, SM_LOAD_FRAME, slot); return; }
     }
