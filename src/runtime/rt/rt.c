@@ -1219,6 +1219,14 @@ void rt_call(const char *name, int nargs)
      * would also hit the registry, but short-circuiting here avoids the
      * extra indirection and the risk of interpreter call-stack corruption. */
     void *cfn = chunk_reg_lookup(name ? name : "");
+    if (!cfn && name) {
+        /* Two-arg DEFINE: DEFINE('nPush()', 'nPush_') — call-site name is
+         * "nPush" but the registry key is body label "nPush_".  Look up via
+         * FUNC_ENTRY_fn (mirrors sm_interp.c's FUNC_ENTRY_fn call at ~L1690). */
+        const char *entry = FUNC_ENTRY_fn(name);
+        if (entry && strcmp(entry, name) != 0)
+            cfn = chunk_reg_lookup(entry);
+    }
     if (cfn) {
         strncpy(kw_rtntype, "RETURN", sizeof(kw_rtntype)-1); /* default; rt_do_return overwrites */
         DESCR_t result = call_native_chunk(name, cfn, args, nargs);
