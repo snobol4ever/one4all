@@ -88,31 +88,8 @@ static void emit_bb_stateful(const char *banner, const char *arg,
     t_bb_port_call((uint64_t)(uintptr_t)zeta, fn_name, fn_fallback, 1, lbl_succ, lbl_fail);
 }
 
-/* EDP-5: TEXT-mode helper for simple stateful boxes (single .long 0 ζ slot).
- * Emits: .data label + .long 0 + .text + push/lea/mov/call/pop/test/jne/jmp
- * for both α (port=0) and β (port=1) entries.
- * lbl_prefix examples: "fence", "rem" (used for .Lfence<id>_z). */
-static void flat_text_simple_box(emitter_t *e,
-                                  const char *lbl_prefix,
-                                  const char *fn_name,
-                                  bb_label_t *lbl_succ,
-                                  bb_label_t *lbl_fail,
-                                  bb_label_t *lbl_β)
-{
-    int id = g_flat_node_id++;
-    char zlbl[80]; snprintf(zlbl, sizeof(zlbl), ".L%s%d_z", lbl_prefix, id);
-    flat_data_section(e);
-    flat3c_label(e, zlbl);
-    flat_data_long(e, 0);
-    flat_text_section(e);
-    flat_intel_syntax(e);
-    char rdi_arg[120]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", zlbl);
-    flat_box_call(e, rdi_arg, fn_name, 0);
-    flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
-    t_label_define(lbl_β);
-    flat_box_call(e, rdi_arg, fn_name, 1);
-    flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
-}
+/* EDP-5 flat_text_simple_box removed (EC-8): was TEXT-mode helper for
+ * xstar/xfnce; those now use emit_bb_stateful directly. */
 /*====================================================================================================================*/
 void emit_bb_icon_alt(emitter_t *e,
                       bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
