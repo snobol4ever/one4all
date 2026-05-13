@@ -913,8 +913,24 @@ void rt_match_variant(const char *subj_name, int has_repl)
     DESCR_t subj_d = vstack_pop();
     DESCR_t pat_d  = vstack_pop();
 
+    /* EM-7d: arm error recovery so sno_runtime_error longjmps safely.
+     * On error, treat the statement as failed (last_ok=0) and return.
+     * Mirrors sm_run_with_recovery's per-statement setjmp pattern. */
+    int err = setjmp(g_sno_err_jmp);
+    g_sno_err_active = 1;
+    if (err != 0) {
+        /* Runtime error fired inside exec_stmt: reset bb_pool and mark failure.
+         * exec_stmt_pool_reset() frees any partial pattern blobs that were
+         * allocated before the error, so subsequent statements get fresh pool
+         * space (fixes pool-exhaustion silent-skip after heavy matching). */
+        exec_stmt_pool_reset();
+        LAST_OK_SET(0);
+        return;
+    }
+
     int ok = exec_stmt(subj_name, &subj_d, pat_d,
                        has_repl ? &repl : NULL, has_repl);
+    g_sno_err_active = 0;   /* disarm before return */
     LAST_OK_SET(ok ? 1 : 0);
 }
 
