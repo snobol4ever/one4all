@@ -723,6 +723,56 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         buf[n]='\0';
         *out = STRVAL(buf); return 1;
     }
+    /* IJ-5: detab(s,t...) — expand tabs; entab(s,t...) — compress spaces to tabs */
+    if (!strcmp(fn,"detab") && nargs >= 1) {
+        const char *s = VARVAL_fn(args[0]); if (!s) s = "";
+        int stops[32], nstops = 0;
+        for (int j = 1; j < nargs && nstops < 32; j++)
+            if (!IS_FAIL_fn(args[j]) && args[j].v != DT_SNUL) stops[nstops++] = (int)to_int(args[j]);
+        if (nstops == 0) { stops[0] = 9; nstops = 1; }
+        int cap = 4096; char *buf = GC_malloc(cap); int bi = 0, col = 0;
+        for (int i = 0; s[i]; i++) {
+            if (s[i] == '\t') {
+                int next = -1;
+                for (int k = 0; k < nstops; k++) if (stops[k] > col+1) { next=stops[k]; break; }
+                if (next < 0) { int base = (nstops>0?stops[nstops-1]:9); int gap=8; next=col+1+gap-((col+1-base)%gap+gap)%gap; if(next<=col+1)next=col+2; }
+                int sp = next - (col+1);
+                while (sp-- > 0) { if (bi>=cap-1){cap*=2;buf=GC_realloc(buf,cap);} buf[bi++]=' '; col++; }
+            } else { if (bi>=cap-1){cap*=2;buf=GC_realloc(buf,cap);} buf[bi++]=s[i]; col++; }
+        }
+        buf[bi]='\0'; *out=STRVAL(buf); return 1;
+    }
+    if (!strcmp(fn,"entab") && nargs >= 1) {
+        const char *s = VARVAL_fn(args[0]); if (!s) s = "";
+        int stops[32], nstops = 0;
+        for (int j = 1; j < nargs && nstops < 32; j++)
+            if (!IS_FAIL_fn(args[j]) && args[j].v != DT_SNUL) stops[nstops++] = (int)to_int(args[j]);
+        if (nstops == 0) { stops[0] = 9; nstops = 1; }
+        int cap = 4096; char *buf = GC_malloc(cap); int bi = 0, col = 0;
+        int slen = (int)strlen(s);
+        /* simple: for each run of spaces ending at a tab stop, emit tab */
+        for (int i = 0; i <= slen; ) {
+            if (i < slen && s[i] == ' ') {
+                int run_start = col, j = i;
+                while (j < slen && s[j]==' ') { j++; col++; }
+                /* col is now end col; emit tabs/spaces */
+                int sc = run_start;
+                while (sc < col) {
+                    int next = -1;
+                    for (int k = 0; k < nstops; k++) if (stops[k] > sc+1) { next=stops[k]; break; }
+                    if (next<0) { int base=(nstops>0?stops[nstops-1]:9); int gap=8; next=base+((sc+1-base)/gap+1)*gap; }
+                    /* next is 1-based stop; next-1 is 0-based col it lands on */
+                    if (next-1 <= col) { if(bi>=cap-1){cap*=2;buf=GC_realloc(buf,cap);} buf[bi++]='\t'; sc=next-1; }
+                    else { if(bi>=cap-1){cap*=2;buf=GC_realloc(buf,cap);} buf[bi++]=' '; sc++; }
+                }
+                i = j;
+            } else {
+                if (i < slen) { if(bi>=cap-1){cap*=2;buf=GC_realloc(buf,cap);} buf[bi++]=s[i]; col++; }
+                i++;
+            }
+        }
+        buf[bi]='\0'; *out=STRVAL(buf); return 1;
+    }
     /* abs(x), max(a,b,...), min(a,b,...), sqrt(x) — math */
     if (!strcmp(fn,"abs") && nargs == 1) {
         DESCR_t av = args[0];
