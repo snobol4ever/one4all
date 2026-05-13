@@ -128,6 +128,15 @@ void t_bb_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fallback
  *   Use for boxes whose ζ is emitted as static .data (xatp, xdsar).
  *   BINARY: ignores zeta_label; uses zeta_ptr directly (same as t_bb_port_call).
  *   TEXT/INLINE: emits `lea rdi, [rip + zeta_label]`. */
+/* t_bb_format_port — emit one three-column macro-invocation line for a BB port.
+ *   Only active when g_bb_emit_format=1 and mode is TEXT or TEXT_INLINE.
+ *   Emits: bb3c_format(out, label_str, macro_name, args)
+ *   lbl_entry may be NULL (no label on this line). */
+void t_bb_format_port(bb_label_t *lbl_entry, const char *macro_name, const char *args);
+
+/* t_bb_is_format_mode — returns 1 if g_bb_emit_format and TEXT/TEXT_INLINE mode. */
+int  t_bb_is_format_mode(void);
+
 void t_bb_port_call_rip(uint64_t zeta_ptr, const char *zeta_label,
                         const char *fn_name, uint64_t fn_fallback,
                         int port, bb_label_t *lbl_succ, bb_label_t *lbl_fail);

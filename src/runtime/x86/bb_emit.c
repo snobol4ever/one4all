@@ -21,6 +21,24 @@ FILE           *bb_emit_out  = NULL;   /* set by caller; defaults to stdout */
  * in TEXT mode instead of raw GAS.  0 = legacy raw-GAS (default). */
 int g_bb_emit_format = 0;
 
+int t_bb_is_format_mode(void) {
+    return g_bb_emit_format &&
+           (bb_emit_mode == EMIT_TEXT || bb_emit_mode == EMIT_TEXT_INLINE);
+}
+
+void t_bb_format_port(bb_label_t *lbl_entry, const char *macro_name, const char *args)
+{
+    if (!t_bb_is_format_mode()) return;
+    char lbl_str[BB_LABEL_NAME_MAX + 2] = "";
+    if (lbl_entry && lbl_entry->name[0]) {
+        snprintf(lbl_str, sizeof(lbl_str), "%s:", lbl_entry->name);
+    }
+    bb3c_format(bb_emit_out ? bb_emit_out : stdout,
+                lbl_str,
+                macro_name ? macro_name : "",
+                args ? args : "");
+}
+
 bb_buf_t        bb_emit_buf  = NULL;
 int             bb_emit_pos  = 0;
 int             bb_emit_size = 0;
