@@ -40,16 +40,16 @@ int main(void)
                                        * accidental short writes */
 
     bb_buf_t capture = buf;
-    emitter_t *e = emitter_binary_new(capture, (int)sizeof(buf));
-    if (!e) {
+    emitter_init_binary(capture, (int)sizeof(buf));
+    if (0) {  /* emitter_init_binary cannot fail */
         fprintf(stderr, "FAIL: emitter_binary_new returned NULL\n");
         return 1;
     }
 
     emit_sm_halt();
 
-    int n = emitter_end(e);
-    emitter_free(e);
+    int n = emitter_end();
+    
 
     if (n != EXPECTED_LEN) {
         fprintf(stderr, "FAIL: emit_sm_halt produced %d bytes, expected %d\n",

@@ -31,10 +31,10 @@ int main(void)
     {
         unsigned char buf[16];
         bb_buf_t cap = buf;
-        emitter_t *e = emitter_binary_new(cap, sizeof(buf));
+        emitter_init_binary(cap, sizeof(buf));
         emit_sm_halt();
-        int n = emitter_end(e);
-        emitter_free(e);
+        int n = emitter_end();
+        
         printf("  bytes (%d total):", n);
         for (int i = 0; i < n; i++) printf(" %02x", buf[i]);
         printf("\n  meaning: inc dword [r13+20] ; ret\n");
@@ -43,17 +43,17 @@ int main(void)
     /* (2) Text-INVOCATION backend — emit into stdout */
     printf("\n=== emit_sm_halt — TEXT_INVOCATION backend ===\n");
     {
-        emitter_t *e = emitter_text_new_mode(stdout, TEXT_MODE_INVOCATION);
+        emitter_init_text(stdout, TEXT_MODE_INVOCATION);
         emit_sm_halt();
-        emitter_free(e);
+        
     }
 
     /* (3) Text-DEFINITION backend — emit into stdout */
     printf("\n=== emit_sm_halt — TEXT_DEFINITION (== MACRO_DEF) backend ===\n");
     {
-        emitter_t *e = emitter_macro_def_new(stdout);
+        emitter_init_macro_def(stdout);
         emit_sm_halt();
-        emitter_free(e);
+        
     }
 
     printf("\n");

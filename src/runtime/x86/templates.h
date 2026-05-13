@@ -269,9 +269,9 @@ void emit_bb_xcat (bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_�
 void emit_bb_xor  (bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
 
 /* String-arg stateful boxes. */
-void emit_bb_xatp (emitter_t *e, const char *varname,
+void emit_bb_xatp (const char *varname,
                    bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
-void emit_bb_xdsar(emitter_t *e, const char *varname,
+void emit_bb_xdsar(const char *varname,
                    bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
 
 /* Child-fn + string boxes (capture family). */

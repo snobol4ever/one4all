@@ -2024,14 +2024,7 @@ static void emit_halt_blob_via_template(void)
     /* Construct a binary emitter that targets the capture buffer.
      * emitter_binary_new() also sets bb_emit_mode = EMIT_BINARY_WIRED and
      * calls bb_emit_begin(buf, size) which resets bb_emit_pos = 0. */
-    emitter_t *e = emitter_binary_new(capture, (int)sizeof(buf));
-    if (!e) {
-        fprintf(stderr,
-                "emit_halt_blob_via_template: emitter_binary_new failed; "
-                "falling back to legacy emit_halt_blob\n");
-        emit_halt_blob();
-        return;
-    }
+    emitter_init_binary(capture, (int)sizeof(buf));
 
     /* Run the template.  This populates buf[0..bb_emit_pos) with the
      * x86 byte sequence the binary backend renders for SM_HALT.
@@ -2041,8 +2034,8 @@ static void emit_halt_blob_via_template(void)
     /* Capture the byte count before freeing the emitter (which leaves
      * bb_emit_pos at its last-write value but is in any case a global
      * we must not depend on across the free). */
-    int n = emitter_end(e);
-    emitter_free(e);
+    int n = emitter_end();
+    
 
     /* Sanity check: SM_HALT must produce exactly 5 bytes
      * (41 ff 45 14 c3).  Any deviation is a template bug; trip a

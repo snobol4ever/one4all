@@ -243,9 +243,8 @@ static void strtab_label(char *buf, size_t bufsz, const char *s)
  * Uses a static buffer — safe because callers only need the label momentarily
  * to build a bb_insn_desc_t.sym before emit_insn consumes it. */
 static char g_intern_str_buf[64];
-static const char *codegen_intern_str(emitter_t *unused, const char *s)
+static const char *codegen_intern_str(const char *s)
 {
-    (void)unused;
     if (s) strtab_intern(s);          /* ensure entry exists */
     strtab_label(g_intern_str_buf, sizeof(g_intern_str_buf), s ? s : "");
     return g_intern_str_buf;
@@ -704,7 +703,7 @@ static int emit_major_break(FILE *out, int stno, int lineno,
     return 0;
 }
 
-static int emit_minor_break(FILE *out, const char *caption)
+static int sm_emit_minor_break(FILE *out, const char *caption)
 {
     /* EM-FORMAT-BB lone-label fusion (2026-05-09): flush any pending label
      * before banner so it doesn't appear after the banner it should precede. */
@@ -754,7 +753,7 @@ static void render_str_preview(char *dst, size_t cap,
  * Each writes one or more three-column lines using sm_macros.s macros.
  * ----------------------------------------------------------------------- */
 
-static int emit_pc_label(FILE *out, int pc)
+static int sm_emit_pc_label(FILE *out, int pc)
 {
     /* EM-7c-no-trailing-ws: bare label, no padding (no trailing spaces). */
     return fprintf(out, ".L%d:\n", pc) < 0 ? -1 : 0;
@@ -832,10 +831,9 @@ static int emit_sm_pop(FILE *out, int pc)
      *   call rt_pop_void@PLT
      * directly to `out`.  Legacy sm_emit_rtcall path retained below
      * as __attribute__((unused)) for rollback reference. */
-    emitter_t *e = emitter_text_new(out);
-    if (!e) return -1;
+    emitter_init_text(out, TEXT_MODE_INVOCATION);
     emit_sm_void_pop();
-    emitter_free(e);
+    
     return 0;
 }
 
@@ -853,10 +851,9 @@ static int emit_sm_arith(FILE *out, const SM_Instr *ins, int pc)
      * macro_name from sm_template_lookup carries ADD_NUM/SUB_NUM/etc. */
     const sm_op_template_t *t = sm_template_lookup(ins->op);
     if (!t) return -1;
-    emitter_t *e = emitter_text_new(out);
-    if (!e) return -1;
+    emitter_init_text(out, TEXT_MODE_INVOCATION);
     emit_sm_arith_op((int)ins->op, t->macro_name);
-    emitter_free(e);
+    
     return 0;
 }
 
@@ -875,10 +872,9 @@ static int emit_sm_jump_line(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     /* EM-MODE4-IS-MODE3-DUMP-j: routed through per-opcode template. */
-    emitter_t *e = emitter_text_new(out);
-    if (!e) return -1;
+    emitter_init_text(out, TEXT_MODE_INVOCATION);
     emit_sm_jump((int)ins->a[0].i);
-    emitter_free(e);
+    
     return 0;
 }
 
@@ -890,11 +886,10 @@ static int emit_sm_jump_cond(FILE *out, const SM_Instr *ins, int pc,
      * we pick the right one and emit the per-call line. */
     (void)pc;
     int  target = (int)ins->a[0].i;
-    emitter_t *e = emitter_text_new(out);
-    if (!e) return -1;
+    emitter_init_text(out, TEXT_MODE_INVOCATION);
     if (take_when_ok) emit_sm_jump_s(target);
     else              emit_sm_jump_f(target);
-    emitter_free(e);
+    
     return 0;
 }
 

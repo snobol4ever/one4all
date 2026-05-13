@@ -32,7 +32,7 @@
 #include "bb_pool.h"
 #include "snobol4.h"
 #include "bb_box.h"
-#include "emitter.h"  /* emitter_t — for bb_flat_set_intern_str signature */
+#include "emitter.h"
 
 /*
  * Build a flat-globbed blob for an entire invariant PATND_t tree.
@@ -80,7 +80,7 @@ int bb_build_flat_text(PATND_t *p, FILE *out, const char *prefix);
 /* EM-7c-symbolic: set the intern_str callback used by bb_build_flat_text.
  * Call before each emit run so bb_flat.c can route literal strings through
  * the SM-side strtab instead of baking raw process pointers. */
-void bb_flat_set_intern_str(const char *(*fn)(emitter_t *, const char *));
+void bb_flat_set_intern_str(const char *(*fn)(const char *));
 
 /*
  * EM-7c: reset internal label/slot counters between unrelated emit runs.
@@ -112,8 +112,8 @@ void bb_flat_set_cap_fixup_cb(void (*cb)(void *cap_ptr, const char *child_α_lab
  * so per-box templates (which live under the `templates` directory)
  * can produce the same banner shape without having to duplicate the
  * implementation. */
-void flat_emit_banner_rule(emitter_t *e, char ch);
-void flat_emit_box_banner (emitter_t *e, const char *kind,
+void flat_emit_banner_rule(char ch);
+void flat_emit_box_banner (const char *kind,
                            const char *args, const char *label_prefix);
 
 /* Per-node ID counter used by templates to generate unique static-data
@@ -125,61 +125,61 @@ extern int g_flat_node_id;
 /* EDP-5: flat data/text section helpers promoted from static so BB
  * templates can emit TEXT-mode static-data sections for stateful boxes.
  * BINARY-mode callers: all these are no-ops when e->is_text is false. */
-void flat3c_label          (emitter_t *e, const char *name);
-void flat_data_section     (emitter_t *e);
-void flat_text_section     (emitter_t *e);
-void flat_intel_syntax     (emitter_t *e);
-void flat_data_string      (emitter_t *e, const char *s);
-void flat_data_quad        (emitter_t *e, const char *arg);
-void flat_data_quad_int    (emitter_t *e, long long v);
-void flat_data_long        (emitter_t *e, long long v);
-void flat_data_zero        (emitter_t *e, int n);
-void flat_globl            (emitter_t *e, const char *name);
+void flat3c_label          (const char *name);
+void flat_data_section     (void);
+void flat_text_section     (void);
+void flat_intel_syntax     (void);
+void flat_data_string      (const char *s);
+void flat_data_quad        (const char *arg);
+void flat_data_quad_int    (long long v);
+void flat_data_long        (long long v);
+void flat_data_zero        (int n);
+void flat_globl            (const char *name);
 /* TEXT-mode port-call emitter: push r10, lea rdi,[rip+rdi_load], mov esi,mode,
  * call fn@PLT, pop r10.  rdi_load is the full argument string e.g.
  * "rdi, [rip + .Lfoo_z]".  No-op in BINARY mode (caller uses t_bb_port_call). */
-void flat_box_call         (emitter_t *e, const char *rdi_load,
+void flat_box_call         (const char *rdi_load,
                             const char *fn, int mode);
 /* Slot-pointer variant: mov rdi,[rip+slot_lbl]; mov esi,mode; call fn@PLT. */
-void flat_box_call_slot    (emitter_t *e, const char *slot_lbl,
+void flat_box_call_slot    (const char *slot_lbl,
                             const char *fn, int mode);
 /* test rax,rax; jne succ; jmp fail — fused on one line. TEXT-mode only. */
-void flat_box_dispatch_jne_jmp(emitter_t *e,
+void flat_box_dispatch_jne_jmp(
                                bb_label_t *lbl_succ, bb_label_t *lbl_fail);
 /* cmp esi,0; je alpha_body; jmp beta — fused entry dispatch. TEXT-mode only. */
-void flat_box_entry_dispatch(emitter_t *e,
+void flat_box_entry_dispatch(
                              bb_label_t *lbl_alpha_body, bb_label_t *lbl_beta);
 
 /* Callback type for the charset-family template (bb_xspnc.c). */
-typedef void (*bb_charset_text_fn)(emitter_t *e,
+typedef void (*bb_charset_text_fn)(
                                    bb_label_t *lbl_succ,
                                    bb_label_t *lbl_fail,
                                    bb_label_t *lbl_β,
                                    void *arg);
 
 /* Callback type for the integer-cursor family template (bb_xlnth.c). */
-typedef void (*bb_intcur_text_fn)(emitter_t *e,
+typedef void (*bb_intcur_text_fn)(
                                   bb_label_t *lbl_succ,
                                   bb_label_t *lbl_fail,
                                   bb_label_t *lbl_β,
                                   void *arg);
 
 /* Callback type for the XBRKX template (bb_xbrkx.c). */
-typedef void (*bb_brkx_text_fn)(emitter_t *e,
+typedef void (*bb_brkx_text_fn)(
                                 bb_label_t *lbl_succ,
                                 bb_label_t *lbl_fail,
                                 bb_label_t *lbl_β,
                                 void *arg);
 
 /* Callback type for the XPOSI/XRPSI templates (bb_xposi.c). */
-typedef void (*bb_pos_text_fn)(emitter_t *e, int n,
+typedef void (*bb_pos_text_fn)(int n,
                                bb_label_t *lbl_succ,
                                bb_label_t *lbl_fail,
                                bb_label_t *lbl_β,
                                void *arg);
 
 /* Callback type for no-operand boxes (XEPS/XFAIL/XFARB) (bb_xfarb.c). */
-typedef void (*bb_nullary_text_fn)(emitter_t *e,
+typedef void (*bb_nullary_text_fn)(
                                    bb_label_t *lbl_succ,
                                    bb_label_t *lbl_fail,
                                    bb_label_t *lbl_β,
@@ -187,7 +187,7 @@ typedef void (*bb_nullary_text_fn)(emitter_t *e,
 
 /* flat_emit_box_call — alpha/beta dispatch for a pre-allocated zeta struct.
  * Exposed for use by integer-cursor template (bb_xlnth.c). */
-void flat_emit_box_call(emitter_t *e, bb_box_fn fn, const char *fn_name,
+void flat_emit_box_call(bb_box_fn fn, const char *fn_name,
                         void *z,
                         bb_label_t *lbl_succ, bb_label_t *lbl_fail,
                         bb_label_t *lbl_β);

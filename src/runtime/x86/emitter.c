@@ -1,15 +1,13 @@
 /*
- * emitter.c — unified binary+text emitter implementation
+ * emitter.c — x86-64 emitter implementation (EM-DEVTABLE)
  *
- * Each leaf primitive reads bb_emit_mode (or e->is_text) and produces
- * either raw x86-64 bytes (BINARY_WIRED) or GAS mnemonics (TEXT).
- * The two output paths are side-by-side in every function so they can
- * be checked against each other at a glance.  No parallel files.
- *
- * Replaces: emitter_binary.c + emitter_text.c  (EM-UNIFY-b)
+ * No vtable, no emitter_t struct, no malloc.  Global state replaces the
+ * old emitter_t instance.  Form functions (emit_form_*) are the leaf
+ * layer: each encodes one x86-64 encoding class and handles both the
+ * binary-byte path and the GAS-mnemonic path side-by-side.
  *
  * Authors: Lon Jones Cherryholmes · Claude Sonnet 4.6
- * Sprint:  EM-UNIFY / GOAL-MODE4-EMIT
+ * Sprint:  EM-DEVTABLE / GOAL-MODE4-EMIT
  */
 
 #include "emitter.h"
@@ -18,13 +16,47 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-/* ── context ──────────────────────────────────────────────────────────────── */
+/*============================================================================
+ * Global state
+ *==========================================================================*/
 
-typedef struct { FILE *out; int pos; } text_ctx_t;
-#define CTX(e)  ((text_ctx_t *)((e)->ctx))
-static FILE *outf(emitter_t *e) { FILE *f = CTX(e)->out; return f ? f : stdout; }
+int  g_is_text        = 0;
+int  g_emit_text_mode = TEXT_MODE_INVOCATION;
+int  g_emit_pos       = 0;
 
-/* ── binary byte helpers (private) ───────────────────────────────────────── */
+/*============================================================================
+ * Lifecycle
+ *==========================================================================*/
+
+void emitter_init_binary(bb_buf_t buf, int size)
+{
+    g_is_text        = 0;
+    g_emit_text_mode = TEXT_MODE_INVOCATION;
+    g_emit_pos       = 0;
+    bb_emit_mode     = EMIT_BINARY_WIRED;
+    bb_emit_begin(buf, size);
+}
+
+void emitter_init_text(FILE *out, int mode)
+{
+    g_is_text        = 1;
+    g_emit_text_mode = mode;
+    g_emit_pos       = 0;
+    bb_emit_mode     = EMIT_TEXT;
+    bb_emit_out      = out ? out : stdout;
+}
+
+int emitter_end(void)
+{
+    return g_is_text ? g_emit_pos : bb_emit_end();
+}
+
+FILE *emitter_text_out(void) { return g_is_text ? bb_emit_out : NULL; }
+int   emitter_pos     (void) { return g_is_text ? g_emit_pos  : bb_emit_pos; }
+
+/*============================================================================
+ * Private byte helpers
+ *==========================================================================*/
 
 static void b1(uint8_t a)
 { bb_emit_byte(a); }
@@ -34,188 +66,163 @@ static void b3(uint8_t a, uint8_t b, uint8_t c)
 { bb_emit_byte(a); bb_emit_byte(b); bb_emit_byte(c); }
 static void b4(uint8_t a, uint8_t b, uint8_t c, uint8_t d)
 { bb_emit_byte(a); bb_emit_byte(b); bb_emit_byte(c); bb_emit_byte(d); }
-static void imm32(uint32_t v) { bb_emit_u32(v); }
-static void imm64(uint64_t v) { bb_emit_u64(v); }
+static void u32(uint32_t v) { bb_emit_u32(v); }
+static void u64(uint64_t v) { bb_emit_u64(v); }
 
-/* ── text three-column helpers (private) ──────────────────────────────────── */
+/*============================================================================
+ * Private text helpers
+ *==========================================================================*/
 
-static void emit3c_op(emitter_t *e, const char *mn, const char *fmt, ...)
+static void t3c(const char *mnem, const char *fmt, ...)
 {
     char buf[256]; buf[0] = '\0';
-    if (fmt) { va_list ap; va_start(ap, fmt); vsnprintf(buf, sizeof(buf), fmt, ap); va_end(ap); }
-    bb3c_format(outf(e), "", mn ? mn : "", buf);
-}
-static void emit3c_jmp(emitter_t *e, const char *mn, const char *target)
-{ bb3c_emit_jmp(outf(e), mn ? mn : "", target ? target : ""); }
-
-/* ── emit_insn — binary bytes AND text mnemonic, side by side ────────────── */
-
-static void emit_insn(emitter_t *e, const bb_insn_desc_t *d)
-{
-    int txt = e->is_text;
-    uint64_t a0 = d->a0;
-    uint32_t a1 = d->a1;
-    uint8_t  a2 = d->a2;
-
-    switch (d->kind) {
-    /* 64-bit reg ← imm64 */
-    case BB_INSN_MOV_R10_IMM64:
-        if (txt) { emit3c_op(e,"mov","r10, 0x%llx",(unsigned long long)a0); CTX(e)->pos+=10; }
-        else     { b2(0x49,0xBA); imm64(a0); }
-        break;
-    case BB_INSN_MOV_RAX_IMM64:
-        if (txt) { emit3c_op(e,"mov","rax, 0x%llx",(unsigned long long)a0); CTX(e)->pos+=10; }
-        else     { b2(0x48,0xB8); imm64(a0); }
-        break;
-    case BB_INSN_MOV_RDI_IMM64:
-        if (txt) { emit3c_op(e,"mov","rdi, 0x%llx",(unsigned long long)a0); CTX(e)->pos+=10; }
-        else     { b2(0x48,0xBF); imm64(a0); }
-        break;
-    case BB_INSN_MOV_RSI_IMM64:
-        if (txt) { emit3c_op(e,"mov","rsi, 0x%llx",(unsigned long long)a0); CTX(e)->pos+=10; }
-        else     { b2(0x48,0xBE); imm64(a0); }
-        break;
-    case BB_INSN_MOV_RDX_IMM64:
-        if (txt) { emit3c_op(e,"mov","rdx, 0x%llx",(unsigned long long)a0); CTX(e)->pos+=10; }
-        else     { b2(0x48,0xBA); imm64(a0); }
-        break;
-    case BB_INSN_MOV_RCX_IMM64:
-        if (txt) { emit3c_op(e,"mov","rcx, 0x%llx",(unsigned long long)a0); CTX(e)->pos+=10; }
-        else     { b2(0x48,0xB9); imm64(a0); }
-        break;
-    /* 32-bit reg ← imm32 */
-    case BB_INSN_MOV_ESI_IMM32:
-        if (txt) { emit3c_op(e,"mov","esi, %u",a1); CTX(e)->pos+=5; }
-        else     { b1(0xBE); imm32(a1); }
-        break;
-    case BB_INSN_MOV_EAX_IMM32:
-        if (txt) { emit3c_op(e,"mov","eax, %u",a1); CTX(e)->pos+=5; }
-        else     { b1(0xB8); imm32(a1); }
-        break;
-    case BB_INSN_ADD_EAX_IMM32:
-        if (txt) { emit3c_op(e,"add","eax, %u",a1); CTX(e)->pos+=5; }
-        else     { b1(0x05); imm32(a1); }
-        break;
-    case BB_INSN_SUB_EAX_IMM32:
-        if (txt) { emit3c_op(e,"sub","eax, %u",a1); CTX(e)->pos+=5; }
-        else     { b1(0x2D); imm32(a1); }
-        break;
-    case BB_INSN_CMP_EAX_IMM32:
-        if (txt) { emit3c_op(e,"cmp","eax, %u",a1); CTX(e)->pos+=5; }
-        else     { b1(0x3D); imm32(a1); }
-        break;
-    case BB_INSN_CMP_ESI_IMM8:
-        if (txt) { emit3c_op(e,"cmp","esi, %u",(unsigned)a2); CTX(e)->pos+=3; }
-        else     { b2(0x83,0xFE); b1(a2); }
-        break;
-    /* memory loads/stores */
-    case BB_INSN_MOV_EAX_RCXMEM:
-        if (txt) { emit3c_op(e,"mov","eax, [rcx]",NULL); CTX(e)->pos+=2; }
-        else     { b2(0x8B,0x01); }
-        break;
-    case BB_INSN_MOV_RAX_RCXMEM:
-        if (txt) { emit3c_op(e,"mov","rax, [rcx]",NULL); CTX(e)->pos+=3; }
-        else     { b3(0x48,0x8B,0x01); }
-        break;
-    case BB_INSN_CMP_EAX_RCXMEM:
-        if (txt) { emit3c_op(e,"cmp","eax, [rcx]",NULL); CTX(e)->pos+=2; }
-        else     { b2(0x3B,0x01); }
-        break;
-    case BB_INSN_MOV_EAX_R10MEM:
-        if (txt) { emit3c_op(e,"mov","eax, [r10]",NULL); CTX(e)->pos+=3; }
-        else     { b3(0x41,0x8B,0x02); }
-        break;
-    case BB_INSN_MOV_R10MEM_EAX:
-        if (txt) { emit3c_op(e,"mov","[r10], eax",NULL); CTX(e)->pos+=3; }
-        else     { b3(0x41,0x89,0x02); }
-        break;
-    /* reg-reg */
-    case BB_INSN_MOV_ECX_EAX:
-        if (txt) { emit3c_op(e,"mov","ecx, eax",NULL); CTX(e)->pos+=2; }
-        else     { b2(0x89,0xC1); }
-        break;
-    case BB_INSN_MOV_RDI_RAX:
-        if (txt) { emit3c_op(e,"mov","rdi, rax",NULL); CTX(e)->pos+=3; }
-        else     { b3(0x48,0x89,0xC7); }
-        break;
-    case BB_INSN_MOV_RDX_RAX:
-        if (txt) { emit3c_op(e,"mov","rdx, rax",NULL); CTX(e)->pos+=3; }
-        else     { b3(0x48,0x89,0xC2); }
-        break;
-    case BB_INSN_CMP_EAX_ECX:
-        if (txt) { emit3c_op(e,"cmp","eax, ecx",NULL); CTX(e)->pos+=2; }
-        else     { b2(0x39,0xC8); }
-        break;
-    case BB_INSN_TEST_EAX_EAX:
-        if (txt) { emit3c_op(e,"test","eax, eax",NULL); CTX(e)->pos+=2; }
-        else     { b2(0x85,0xC0); }
-        break;
-    case BB_INSN_TEST_RAX_RAX:
-        if (txt) { emit3c_op(e,"test","rax, rax",NULL); CTX(e)->pos+=3; }
-        else     { b3(0x48,0x85,0xC0); }
-        break;
-    case BB_INSN_XOR_EDX_EDX:
-        if (txt) { emit3c_op(e,"xor","edx, edx",NULL); CTX(e)->pos+=2; }
-        else     { b2(0x31,0xD2); }
-        break;
-    case BB_INSN_MOVSXD_RCX_R10MEM:
-        if (txt) { emit3c_op(e,"movsxd","rcx, dword ptr [r10]",NULL); CTX(e)->pos+=3; }
-        else     { b3(0x49,0x63,0x0A); }
-        break;
-    case BB_INSN_LEA_RAX_RAXRCX:
-        if (txt) { emit3c_op(e,"lea","rax, [rax+rcx]",NULL); CTX(e)->pos+=4; }
-        else     { b4(0x48,0x8D,0x04,0x08); }
-        break;
-    /* control */
-    case BB_INSN_RET:
-        if (txt) { emit3c_op(e,"ret",NULL); CTX(e)->pos+=1; }
-        else     { b1(0xC3); }
-        break;
-    case BB_INSN_CALL_RAX:
-        if (txt) { emit3c_op(e,"call","rax",NULL); CTX(e)->pos+=2; }
-        else     { b2(0xFF,0xD0); }
-        break;
-    /* SM-State field: inc dword [r13 + disp8] */
-    case BB_INSN_INC_MEM_R13_DISP8:
-        if (txt) { emit3c_op(e,"inc","dword ptr [r13 + %u]",(unsigned)a2); CTX(e)->pos+=4; }
-        else     { b3(0x41,0xFF,0x45); b1(a2); }
-        break;
-    /* symbolic — TEXT: RIP-relative; BINARY: movabs imm64 (in-process JIT) */
-    case BB_INSN_LEA_RCX_SYM:
-        if (txt) { emit3c_op(e,"lea","rcx, [rip + %s]",d->sym?d->sym:"??"); CTX(e)->pos+=7; }
-        else     { b2(0x48,0xB9); imm64(a0); }
-        break;
-    case BB_INSN_CALL_SYM_PLT:
-        if (txt) { emit3c_op(e,"call","%s@PLT",d->sym?d->sym:"??"); CTX(e)->pos+=5; }
-        else     { b2(0x48,0xB8); imm64(a0); b2(0xFF,0xD0); }
-        break;
-    case BB_INSN_LEA_R10_SYM:
-        if (txt) { emit3c_op(e,"lea","r10, [rip + %s]",d->sym?d->sym:"??"); CTX(e)->pos+=7; }
-        else     { b2(0x49,0xBA); imm64(a0); }
-        break;
-    /* push/pop r10 — preserve flat-BB LOCAL across PLT call */
-    case BB_INSN_PUSH_R10:
-        if (txt) { emit3c_op(e,"push","r10",NULL); CTX(e)->pos+=2; }
-        else     { b2(0x41,0x52); }
-        break;
-    case BB_INSN_POP_R10:
-        if (txt) { emit3c_op(e,"pop","r10",NULL); CTX(e)->pos+=2; }
-        else     { b2(0x41,0x5A); }
-        break;
-    case BB_INSN_POP_RBP:
-        if (txt) { emit3c_op(e,"pop","rbp",NULL); CTX(e)->pos+=1; }
-        else     { b1(0x5D); }
-        break;
-    }
+    if (fmt) { va_list ap; va_start(ap,fmt); vsnprintf(buf,sizeof(buf),fmt,ap); va_end(ap); }
+    bb3c_format(bb_emit_out, "", mnem ? mnem : "", buf);
 }
 
-/* ── label_define ─────────────────────────────────────────────────────────── */
+static void t3c_jmp(const char *mnem, const char *target)
+{ bb3c_emit_jmp(bb_emit_out, mnem ? mnem : "", target ? target : ""); }
 
-static void label_define(emitter_t *e, bb_label_t *lbl)
+/*============================================================================
+ * Instruction-form functions
+ *==========================================================================*/
+
+void emit_form_reg64_imm64(uint8_t prefix, uint8_t reg, uint64_t val, const char *mnem)
 {
-    if (e->is_text) {
-        char lbuf[256]; snprintf(lbuf, sizeof(lbuf), "%s:", lbl->name);
-        bb3c_format(outf(e), lbuf, "", "");
+    if (g_is_text) { t3c("mov", "%s, 0x%llx", mnem, (unsigned long long)val); g_emit_pos += 10; }
+    else           { b2(prefix, reg); u64(val); }
+}
+
+void emit_form_reg32_imm32(uint8_t op, uint32_t val, const char *mnem)
+{
+    if (g_is_text) { t3c("mov", "%s, %u", mnem, val); g_emit_pos += 5; }
+    else           { b1(op); u32(val); }
+}
+
+void emit_form_alu_eax_imm32(uint8_t op, uint32_t val, const char *mnem)
+{
+    if (g_is_text) { t3c(mnem, "eax, %u", val); g_emit_pos += 5; }
+    else           { b1(op); u32(val); }
+}
+
+void emit_form_alu_esi_imm8(uint8_t modrm, uint8_t val, const char *mnem)
+{
+    if (g_is_text) { t3c(mnem, "esi, %u", (unsigned)val); g_emit_pos += 3; }
+    else           { b3(0x83, modrm, val); }
+}
+
+void emit_form_reg_reg2(uint8_t b0, uint8_t b1_, const char *text)
+{
+    if (g_is_text) { t3c(NULL, "%s", text); g_emit_pos += 2; }
+    else           { b2(b0, b1_); }
+}
+
+void emit_form_reg_reg3(uint8_t b0, uint8_t b1_, uint8_t b2_, const char *text)
+{
+    if (g_is_text) { t3c(NULL, "%s", text); g_emit_pos += 3; }
+    else           { b3(b0, b1_, b2_); }
+}
+
+void emit_form_mem2(uint8_t b0, uint8_t b1_, const char *text)
+{
+    if (g_is_text) { t3c(NULL, "%s", text); g_emit_pos += 2; }
+    else           { b2(b0, b1_); }
+}
+
+void emit_form_mem3(uint8_t b0, uint8_t b1_, uint8_t b2_, const char *text)
+{
+    if (g_is_text) { t3c(NULL, "%s", text); g_emit_pos += 3; }
+    else           { b3(b0, b1_, b2_); }
+}
+
+void emit_form_mem4(uint8_t b0, uint8_t b1_, uint8_t b2_, uint8_t b3_, const char *text)
+{
+    if (g_is_text) { t3c(NULL, "%s", text); g_emit_pos += 4; }
+    else           { b4(b0, b1_, b2_, b3_); }
+}
+
+void emit_form_r13_disp8(uint8_t b0, uint8_t b1_, uint8_t b2_, uint8_t disp,
+                          const char *text_fmt)
+{
+    if (g_is_text) { t3c(NULL, text_fmt, (unsigned)disp); g_emit_pos += 4; }
+    else           { b3(b0, b1_, b2_); b1(disp); }
+}
+
+void emit_form_nullary1(uint8_t b0, const char *text)
+{
+    if (g_is_text) { t3c(text, NULL); g_emit_pos += 1; }
+    else           { b1(b0); }
+}
+
+void emit_form_nullary2(uint8_t b0, uint8_t b1_, const char *text)
+{
+    if (g_is_text) { t3c(text, NULL); g_emit_pos += 2; }
+    else           { b2(b0, b1_); }
+}
+
+void emit_form_nullary3(uint8_t b0, uint8_t b1_, uint8_t b2_, const char *text)
+{
+    if (g_is_text) { t3c(text, NULL); g_emit_pos += 3; }
+    else           { b3(b0, b1_, b2_); }
+}
+
+/*============================================================================
+ * Symbolic forms (RIP-relative TEXT; imm64 BINARY)
+ *==========================================================================*/
+
+void emit_sym_lea_rcx(const char *sym, uint64_t addr)
+{
+    if (g_is_text) { t3c("lea", "rcx, [rip + %s]", sym ? sym : "??"); g_emit_pos += 7; }
+    else           { b2(0x48,0xB9); u64(addr); }
+}
+
+void emit_sym_lea_r10(const char *sym, uint64_t addr)
+{
+    if (g_is_text) { t3c("lea", "r10, [rip + %s]", sym ? sym : "??"); g_emit_pos += 7; }
+    else           { b2(0x49,0xBA); u64(addr); }
+}
+
+void emit_call_sym_plt(const char *sym, uint64_t fn)
+{
+    if (g_is_text) { t3c("call", "%s@PLT", sym ? sym : "??"); g_emit_pos += 5; }
+    else           { b2(0x48,0xB8); u64(fn); b2(0xFF,0xD0); }
+}
+
+/*============================================================================
+ * Composite helpers
+ *==========================================================================*/
+
+void emit_load_r10_delta_ptr(uint64_t addr)   { emit_sym_lea_r10("\xCE\x94", addr); }
+void emit_load_delta(void)                     { emit_mov_eax_r10mem(); }
+void emit_store_delta(void)                    { emit_mov_r10mem_eax(); }
+
+void emit_add_delta_imm(int32_t v)
+{ emit_load_delta(); emit_add_eax_imm32((uint32_t)v); emit_store_delta(); }
+
+void emit_sub_delta_imm(int32_t v)
+{ emit_load_delta(); emit_sub_eax_imm32((uint32_t)v); emit_store_delta(); }
+
+void emit_load_sigma(uint64_t sigma_addr)
+{ emit_sym_lea_rcx("\xCE\xA3", sigma_addr); emit_mov_rax_rcxmem(); }
+
+void emit_load_siglen(uint64_t siglen_addr)
+{ emit_sym_lea_rcx("\xCE\xA3""len", siglen_addr); emit_mov_eax_rcxmem(); }
+
+void emit_sigma_plus_delta(uint64_t sigma_addr)
+{ emit_load_sigma(sigma_addr); emit_movsxd_rcx_r10mem(); emit_lea_rax_raxrcx(); }
+
+void emit_cmp_eax_siglen(uint64_t siglen_addr)
+{ emit_sym_lea_rcx("\xCE\xA3""len", siglen_addr); emit_cmp_eax_rcxmem(); }
+
+/*============================================================================
+ * Label + jump
+ *==========================================================================*/
+
+void emit_label_define_bb(bb_label_t *lbl)
+{
+    if (g_is_text) {
+        char buf[256]; snprintf(buf, sizeof(buf), "%s:", lbl->name);
+        bb3c_format(bb_emit_out, buf, "", "");
     } else {
         bb_emit_mode_t s = bb_emit_mode; bb_emit_mode = EMIT_BINARY_WIRED;
         bb_label_define(lbl);
@@ -223,325 +230,207 @@ static void label_define(emitter_t *e, bb_label_t *lbl)
     }
 }
 
-/* ── emit_jmp ─────────────────────────────────────────────────────────────── */
-
-static void do_emit_jmp(emitter_t *e, bb_label_t *target, jmp_kind_t kind)
+void emit_label_name(const char *name)
 {
-    static const char *mn[] = {"jmp","je","jne","jl","jge","jg"};
+    if (!g_is_text) return;
+    char buf[256]; snprintf(buf, sizeof(buf), "%s:", name ? name : "");
+    bb3c_format(bb_emit_out, buf, "", "");
+}
+
+void emit_pc_label(int pc)
+{
+    if (!g_is_text) return;
+    char buf[64]; snprintf(buf, sizeof(buf), ".L%d:", pc);
+    bb3c_format(bb_emit_out, buf, "", "");
+}
+
+void emit_jmp_label(bb_label_t *target, jmp_kind_t kind)
+{
+    static const char *mn[]            = {"jmp","je","jne","jl","jge","jg"};
+    static const uint8_t ops[6][2]     = {
+        {0xE9,0x00},{0x0F,0x84},{0x0F,0x85},{0x0F,0x8C},{0x0F,0x8D},{0x0F,0x8F}
+    };
     int k = (int)kind < 6 ? (int)kind : 0;
-    if (e->is_text) {
-        emit3c_jmp(e, mn[k], target->name);
-        CTX(e)->pos += 6;
+    if (g_is_text) {
+        t3c_jmp(mn[k], target->name); g_emit_pos += 6;
     } else {
-        static const uint8_t ops[6][2] = {
-            {0xE9,0x00},{0x0F,0x84},{0x0F,0x85},{0x0F,0x8C},{0x0F,0x8D},{0x0F,0x8F}
-        };
-        if (k == 0) { b1(0xE9); }
-        else        { b2(ops[k][0], ops[k][1]); }
+        if (k == 0) b1(0xE9); else b2(ops[k][0], ops[k][1]);
         bb_emit_patch_rel32(target);
     }
 }
 
-/* ── global_sym ───────────────────────────────────────────────────────────── */
+/*============================================================================
+ * Text-only structural output
+ *==========================================================================*/
 
-static void global_sym(emitter_t *e, const char *name)
+void emit_section(const char *name)
 {
-    if (e->is_text) bb3c_format(outf(e), "", ".global", name ? name : "");
-    /* binary: no-op */
-}
-
-/* ── fprintf_raw ──────────────────────────────────────────────────────────── */
-
-static void fprintf_raw(emitter_t *e, const char *fmt, ...)
-{
-    if (!e->is_text) return;
-    bb3c_flush_pending_cjmp_only();
-    va_list ap; va_start(ap, fmt); vfprintf(outf(e), fmt, ap); va_end(ap);
-}
-
-/* ── pos ──────────────────────────────────────────────────────────────────── */
-
-static int pos(emitter_t *e)
-{ return e->is_text ? CTX(e)->pos : bb_emit_pos; }
-
-/* ── structural markers ───────────────────────────────────────────────────── */
-
-static void label_name(emitter_t *e, const char *name)
-{
-    if (!e->is_text) return;
-    char lbuf[256]; snprintf(lbuf, sizeof(lbuf), "%s:", name ? name : "");
-    bb3c_format(outf(e), lbuf, "", "");
-}
-
-static void pc_label(emitter_t *e, int pc)
-{
-    if (!e->is_text) return;
-    char lbuf[64]; snprintf(lbuf, sizeof(lbuf), ".L%d:", pc);
-    bb3c_format(outf(e), lbuf, "", "");
-}
-
-static void section(emitter_t *e, const char *name)
-{
-    if (!e->is_text || !name) return;
+    if (!g_is_text || !name) return;
     bb3c_flush_pending_cjmp_only();
     if (name[0]=='.' && (strcmp(name,".text")==0 || strcmp(name,".data")==0 ||
                           strcmp(name,".rodata")==0 || strcmp(name,".bss")==0))
-        fprintf(outf(e), "%s\n", name);
+        fprintf(bb_emit_out, "%s\n", name);
     else
-        fprintf(outf(e), ".section %s\n", name);
+        fprintf(bb_emit_out, ".section %s\n", name);
 }
 
-static void directive(emitter_t *e, const char *line)
+void emit_directive(const char *line)
 {
-    if (!e->is_text || !line) return;
+    if (!g_is_text || !line) return;
     bb3c_flush_pending_cjmp_only();
-    fprintf(outf(e), "    %s\n", line);
+    fprintf(bb_emit_out, "    %s\n", line);
 }
 
-/* ── data emission ────────────────────────────────────────────────────────── */
-
-static void data_quad(emitter_t *e, uint64_t val)
+void emit_global_sym(const char *name)
 {
-    if (e->is_text) {
+    if (g_is_text) bb3c_format(bb_emit_out, "", ".global", name ? name : "");
+}
+
+void emit_banner(const char *text)
+{
+    if (!g_is_text) return;
+    bb3c_flush_pending_cjmp_only();
+    fputc('#', bb_emit_out); for (int i=1;i<120;i++) fputc('=',bb_emit_out); fputc('\n',bb_emit_out);
+    fprintf(bb_emit_out, "    # %s\n", text ? text : "");
+    fputc('#', bb_emit_out); for (int i=1;i<120;i++) fputc('=',bb_emit_out); fputc('\n',bb_emit_out);
+}
+
+void emit_minor_break(const char *text)
+{
+    if (!g_is_text) return;
+    bb3c_flush_pending_cjmp_only();
+    fputc('#', bb_emit_out); for (int i=1;i<120;i++) fputc('-',bb_emit_out); fputc('\n',bb_emit_out);
+    if (text && *text) fprintf(bb_emit_out, "    # %s\n", text);
+}
+
+void emit_blank_line(void)
+{
+    if (!g_is_text) return;
+    bb3c_flush_pending_cjmp_only();
+    fputc('\n', bb_emit_out);
+}
+
+void emit_fprintf_raw(const char *fmt, ...)
+{
+    if (!g_is_text) return;
+    bb3c_flush_pending_cjmp_only();
+    va_list ap; va_start(ap, fmt); vfprintf(bb_emit_out, fmt, ap); va_end(ap);
+}
+
+/*============================================================================
+ * Data emission
+ *==========================================================================*/
+
+void emit_data_quad(uint64_t val)
+{
+    if (g_is_text) {
         char buf[40]; snprintf(buf, sizeof(buf), "0x%llx", (unsigned long long)val);
-        bb3c_format(outf(e), "", ".quad", buf);
+        bb3c_format(bb_emit_out, "", ".quad", buf);
     } else {
         bb_emit_u64(val);
     }
 }
 
-static void data_quad_sym(emitter_t *e, const char *sym)
+void emit_data_quad_sym(const char *sym)
 {
-    if (e->is_text) bb3c_format(outf(e), "", ".quad", sym ? sym : "0");
-    /* binary: in-process JIT has no linker; no-op until mode-4 needs it */
+    if (g_is_text) bb3c_format(bb_emit_out, "", ".quad", sym ? sym : "0");
+    /* binary: no-op — in-process JIT has no linker */
 }
 
-static void data_string(emitter_t *e, const char *bytes, size_t len)
+void emit_data_string(const char *bytes, size_t len)
 {
     if (!bytes) return;
-    if (e->is_text) {
+    if (g_is_text) {
         bb3c_flush_pending_cjmp_only();
-        FILE *f = outf(e);
-        fputs("    .ascii \"", f);
+        fputs("    .ascii \"", bb_emit_out);
         for (size_t i = 0; i < len; i++) {
             unsigned char c = (unsigned char)bytes[i];
             switch (c) {
-            case '\\': fputs("\\\\", f); break;
-            case '"' : fputs("\\\"", f); break;
-            case '\n': fputs("\\n",  f); break;
-            case '\t': fputs("\\t",  f); break;
-            default: if (c>=0x20 && c<0x7f) fputc(c,f); else fprintf(f,"\\x%02x",c); break;
+            case '\\': fputs("\\\\", bb_emit_out); break;
+            case '"' : fputs("\\\"", bb_emit_out); break;
+            case '\n': fputs("\\n",  bb_emit_out); break;
+            case '\t': fputs("\\t",  bb_emit_out); break;
+            default: if (c>=0x20 && c<0x7f) fputc(c,bb_emit_out);
+                     else fprintf(bb_emit_out,"\\x%02x",c); break;
             }
         }
-        fputs("\"\n", f);
+        fputs("\"\n", bb_emit_out);
     } else {
         for (size_t i = 0; i < len; i++) bb_emit_byte((uint8_t)bytes[i]);
     }
 }
 
-static void data_long(emitter_t *e, int32_t val)
+void emit_data_long(int32_t val)
 {
-    if (e->is_text) {
+    if (g_is_text) {
         char buf[24]; snprintf(buf, sizeof(buf), "%d", (int)val);
-        bb3c_format(outf(e), "", ".long", buf);
+        bb3c_format(bb_emit_out, "", ".long", buf);
     } else {
         uint32_t u = (uint32_t)val;
-        bb_emit_byte((uint8_t)(u));      bb_emit_byte((uint8_t)(u>>8));
-        bb_emit_byte((uint8_t)(u>>16));  bb_emit_byte((uint8_t)(u>>24));
+        bb_emit_byte((uint8_t)u);      bb_emit_byte((uint8_t)(u>>8));
+        bb_emit_byte((uint8_t)(u>>16)); bb_emit_byte((uint8_t)(u>>24));
     }
 }
 
-/* ── BB-specific compound emissions ──────────────────────────────────────── */
+/*============================================================================
+ * BB compound emissions
+ *==========================================================================*/
 
-static void bb_zeta_rdi(emitter_t *e, uint64_t ptr, const char *sym)
+void emit_bb_zeta_rdi(uint64_t ptr, const char *sym)
 {
-    if (e->is_text) {
+    if (g_is_text) {
         char arg[128]; snprintf(arg, sizeof(arg), "rdi, [rip + %s]", sym ? sym : "0");
-        bb3c_format(outf(e), "", "lea", arg);
+        bb3c_format(bb_emit_out, "", "lea", arg);
     } else {
-        emit_mov_rdi_imm64(e, ptr);
+        emit_mov_rdi_imm64(ptr);
     }
 }
 
-static void bb_dispatch_jne_jmp(emitter_t *e,
-                                        bb_label_t *lbl_succ, bb_label_t *lbl_fail)
+void emit_bb_dispatch_jne_jmp(bb_label_t *lbl_succ, bb_label_t *lbl_fail)
 {
-    if (e->is_text) {
+    if (g_is_text) {
         char buf[256]; int o = 0;
         o += snprintf(buf+o, sizeof(buf)-o, "rax, rax;");
         while (o < 27 && o < (int)sizeof(buf)-1) buf[o++] = ' '; buf[o] = '\0';
         snprintf(buf+o, sizeof(buf)-o, "jne %s; jmp %s",
                  lbl_succ ? lbl_succ->name : "?", lbl_fail ? lbl_fail->name : "?");
-        bb3c_format(outf(e), "", "test", buf);
+        bb3c_format(bb_emit_out, "", "test", buf);
     } else {
-        emit_test_rax_rax(e);
-        EV_JMP(e, lbl_succ, JMP_JNE);
-        EV_JMP(e, lbl_fail, JMP_JMP);
+        emit_test_rax_rax();
+        emit_jmp_label(lbl_succ, JMP_JNE);
+        emit_jmp_label(lbl_fail, JMP_JMP);
     }
 }
 
-/* ── BB port labels / box banner ──────────────────────────────────────────── */
-
-static const char *greek_for_port(char port)
+static const char *greek_port(char port)
 {
-    switch (port) { case 'a': return "α"; case 'b': return "β";
-                    case 'g': return "γ"; case 'o': return "ω"; default: return "?"; }
+    switch (port) { case 'a': return "\xCE\xB1"; case 'b': return "\xCE\xB2";
+                    case 'g': return "\xCE\xB3"; case 'o': return "\xCF\x89"; default: return "?"; }
 }
 
-static void bb_port_label(emitter_t *e, const char *pfx, char port)
+void emit_bb_port_label(const char *pfx, char port)
 {
-    if (!e->is_text) return;
-    char lbuf[256]; snprintf(lbuf, sizeof(lbuf), "%s_%s:", pfx?pfx:"", greek_for_port(port));
-    bb3c_format(outf(e), lbuf, "", "");
+    if (!g_is_text) return;
+    char buf[256]; snprintf(buf, sizeof(buf), "%s_%s:", pfx ? pfx : "", greek_port(port));
+    bb3c_format(bb_emit_out, buf, "", "");
 }
 
-static void bb_port_jmp(emitter_t *e, const char *pfx, char port)
+void emit_bb_port_jmp(const char *pfx, char port)
 {
-    if (!e->is_text) return;
-    char tbuf[256]; snprintf(tbuf, sizeof(tbuf), "%s_%s", pfx?pfx:"", greek_for_port(port));
-    bb3c_emit_jmp(outf(e), "jmp", tbuf);
-    CTX(e)->pos += 5;
+    if (!g_is_text) return;
+    char tbuf[256]; snprintf(tbuf, sizeof(tbuf), "%s_%s", pfx ? pfx : "", greek_port(port));
+    bb3c_emit_jmp(bb_emit_out, "jmp", tbuf);
+    g_emit_pos += 5;
 }
 
-static void bb_box_banner(emitter_t *e, const char *kind, const char *args)
+/*============================================================================
+ * Macro hooks
+ *==========================================================================*/
+
+static int g_macro_suppress = 0;
+
+void emit_macro_param_ref(const char *name)
 {
-    if (!e->is_text) return;
-    bb3c_flush_pending_cjmp_only();
-    FILE *f = outf(e);
-    fputs("#", f); for (int i=1;i<120;i++) fputc('-',f); fputc('\n',f);
-    fprintf(f, "    # BOX %s(%s)\n", kind?kind:"?", args?args:"");
-}
-
-/* ── formatting / readability (text-only) ─────────────────────────────────── */
-
-static void comment(emitter_t *e, const char *text)
-{ if (!e->is_text) return; bb3c_flush_pending_cjmp_only(); fprintf(outf(e),"    # %s\n",text?text:""); }
-
-static void banner(emitter_t *e, const char *text)
-{
-    if (!e->is_text) return;
-    bb3c_flush_pending_cjmp_only(); FILE *f = outf(e);
-    fputs("#",f); for(int i=1;i<120;i++) fputc('=',f); fputc('\n',f);
-    fprintf(f,"    # %s\n", text?text:"");
-    fputs("#",f); for(int i=1;i<120;i++) fputc('=',f); fputc('\n',f);
-}
-
-static void minor_break(emitter_t *e, const char *text)
-{
-    if (!e->is_text) return;
-    bb3c_flush_pending_cjmp_only(); FILE *f = outf(e);
-    fputs("#",f); for(int i=1;i<120;i++) fputc('-',f); fputc('\n',f);
-    if (text && *text) fprintf(f,"    # %s\n",text);
-}
-
-static void blank_line(emitter_t *e)
-{ if (!e->is_text) return; bb3c_flush_pending_cjmp_only(); fputc('\n',outf(e)); }
-
-/* ── macro hooks ──────────────────────────────────────────────────────────── */
-
-static int g_text_macro_suppress = 0;
-
-static void macro_begin(emitter_t *e, const char *name,
-                                const char *const *params, int nparams)
-{
-    if (!e->is_text) return;
-    bb3c_flush_pending_cjmp_only(); FILE *f = outf(e);
-    if (e->text_mode == TEXT_MODE_DEFINITION) {
-        fprintf(f, ".macro %s", name?name:"?");
-        for (int i=0; i<nparams; i++) fprintf(f," %s", params[i]?params[i]:"?");
-        fputc('\n',f);
-    } else {
-        fprintf(f,"    %s", name?name:"?");
-        for (int i=0; i<nparams; i++) fprintf(f,"%s%s",(i==0?" ":", "),params[i]?params[i]:"?");
-        fputc('\n',f);
-        g_text_macro_suppress = 1;
-    }
-}
-
-static void macro_param_ref(emitter_t *e, const char *name)
-{ if (e->is_text && e->text_mode==TEXT_MODE_DEFINITION) fprintf(outf(e),"\\%s",name?name:"?"); }
-
-static void macro_end(emitter_t *e)
-{
-    if (!e->is_text) return;
-    if (e->text_mode==TEXT_MODE_DEFINITION) { bb3c_flush_pending_cjmp_only(); fputs(".endm\n",outf(e)); }
-    else g_text_macro_suppress = 0;
-}
-
-static void pad_to_blob_size(emitter_t *e) { (void)e; }
-
-/* ── vtable template ──────────────────────────────────────────────────────── */
-
-static const emitter_t emitter_tmpl = {
-    .emit_insn           = emit_insn,
-    .label_define        = label_define,
-    .emit_jmp = do_emit_jmp,
-    .global_sym          = global_sym,
-    .fprintf_raw         = fprintf_raw,
-    .pos                 = pos,
-    .intern_str          = NULL,
-    .label_name          = label_name,
-    .pc_label            = pc_label,
-    .section             = section,
-    .directive           = directive,
-    .data_quad           = data_quad,
-    .data_quad_sym       = data_quad_sym,
-    .data_string         = data_string,
-    .data_long           = data_long,
-    .bb_zeta_rdi         = bb_zeta_rdi,
-    .bb_dispatch_jne_jmp = bb_dispatch_jne_jmp,
-    .pad_to_blob_size    = pad_to_blob_size,
-    .bb_port_label       = bb_port_label,
-    .bb_port_jmp         = bb_port_jmp,
-    .bb_box_banner       = bb_box_banner,
-    .comment             = comment,
-    .banner              = banner,
-    .minor_break         = minor_break,
-    .blank_line          = blank_line,
-    .macro_begin         = macro_begin,
-    .macro_param_ref     = macro_param_ref,
-    .macro_end           = macro_end,
-    .text_mode           = TEXT_MODE_INVOCATION,
-    .is_text             = 0,
-    .ctx                 = NULL,
-};
-
-/* ── constructors ─────────────────────────────────────────────────────────── */
-
-emitter_t *emitter_binary_new(bb_buf_t buf, int size)
-{
-    emitter_t *e = malloc(sizeof(emitter_t));
-    if (!e) return NULL;
-    *e = emitter_tmpl;
-    e->is_text = 0; e->ctx = NULL;
-    bb_emit_mode = EMIT_BINARY_WIRED;
-    bb_emit_begin(buf, size);
-    return e;
-}
-
-emitter_t *emitter_text_new(FILE *out)
-{ return emitter_text_new_mode(out, TEXT_MODE_INVOCATION); }
-
-emitter_t *emitter_text_new_mode(FILE *out, emitter_text_mode_t mode)
-{
-    emitter_t *e = malloc(sizeof(emitter_t));
-    if (!e) return NULL;
-    *e = emitter_tmpl;
-    e->is_text = 1; e->text_mode = mode;
-    text_ctx_t *ctx = calloc(1, sizeof(text_ctx_t));
-    if (!ctx) { free(e); return NULL; }
-    ctx->out = out; ctx->pos = 0;
-    e->ctx = ctx;
-    return e;
-}
-
-void emitter_free(emitter_t *e) { if (!e) return; free(e->ctx); free(e); }
-
-FILE *emitter_text_file(emitter_t *e)
-{ return (e && e->is_text) ? outf(e) : NULL; }
-
-int emitter_end(emitter_t *e)
-{
-    if (!e) return 0;
-    return e->is_text ? CTX(e)->pos : bb_emit_end();
+    if (g_is_text && g_emit_text_mode == TEXT_MODE_DEFINITION)
+        fprintf(bb_emit_out, "\\%s", name ? name : "?");
 }

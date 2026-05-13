@@ -193,7 +193,7 @@ void emit_bb_xchr(PATND_t *p, const char *lit_label,
     emit_jmp(f, JMP_JMP);
 }
 /*====================================================================================================================*/
-void emit_bb_xdsar(emitter_t *e, const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t *b)
+void emit_bb_xdsar(const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
     /* TEXT: emit .data block (name ptr, child quads, in_progress long).
      * BINARY: flat_data_* are no-ops; bb_dvar_bin_new allocates real zeta below. */
@@ -204,19 +204,19 @@ void emit_bb_xdsar(emitter_t *e, const char *varname, bb_label_t *s, bb_label_t 
     snprintf(zlbl, sizeof(zlbl), ".Ldvar%d_z",    id);
     snprintf(slbl, sizeof(slbl), ".Ldvar%d_name", id);
     const char *vn = varname ? varname : "";
-    flat_data_section(e);
-    flat3c_label(e, slbl);  flat_data_string(e, vn);
-    flat3c_label(e, zlbl);
-    flat_data_quad(e, slbl);  flat_data_quad(e, "0");  flat_data_quad(e, "0");
-    flat_data_quad(e, "0");   flat_data_long(e, 0);    flat_data_long(e, 0);
-    flat_text_section(e);     flat_intel_syntax(e);
+    flat_data_section();
+    flat3c_label(slbl);  flat_data_string(vn);
+    flat3c_label(zlbl);
+    flat_data_quad(slbl);  flat_data_quad("0");  flat_data_quad("0");
+    flat_data_quad("0");   flat_data_long(0);    flat_data_long(0);
+    flat_text_section();     flat_intel_syntax();
     void *z = bb_dvar_bin_new(vn);
     emit_bb_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "bb_deferred_var_exported", (uint64_t)(uintptr_t)bb_deferred_var_exported, 0, s, f);
     emit_label_define(b);
     emit_bb_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "bb_deferred_var_exported", (uint64_t)(uintptr_t)bb_deferred_var_exported, 1, s, f);
 }
 /*====================================================================================================================*/
-void emit_bb_xatp(emitter_t *e, const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t *b)
+void emit_bb_xatp(const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
     /* TEXT: emit .data block with zeta struct (string + two longs + quad ptr).
      * BINARY: flat_data_* are no-ops; atp_t *z allocated below. */
@@ -226,10 +226,10 @@ void emit_bb_xatp(emitter_t *e, const char *varname, bb_label_t *s, bb_label_t *
     snprintf(zlbl, sizeof(zlbl), ".Latp%d_z",     id);
     snprintf(vlbl, sizeof(vlbl), ".Latp%d_vname", id);
     const char *vn = varname ? varname : "";
-    flat_data_section(e);
-    flat3c_label(e, vlbl);  flat_data_string(e, vn);
-    flat3c_label(e, zlbl);  flat_data_long(e, 0);  flat_data_long(e, 0);  flat_data_quad(e, vlbl);
-    flat_text_section(e);   flat_intel_syntax(e);
+    flat_data_section();
+    flat3c_label(vlbl);  flat_data_string(vn);
+    flat3c_label(zlbl);  flat_data_long(0);  flat_data_long(0);  flat_data_quad(vlbl);
+    flat_text_section();   flat_intel_syntax();
     atp_t *z = bb_atp_new(vn);
     emit_bb_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_atp", (uint64_t)(uintptr_t)rt_bb_atp, 0, s, f);
     emit_label_define(b);
