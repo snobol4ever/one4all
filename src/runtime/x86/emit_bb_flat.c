@@ -1024,8 +1024,7 @@ bb_box_fn bb_build_brokered(PATND_t *p)
     g_flat_slot_count = 0; g_flat_node_id = 0;
     emit_mode_set(EMIT_BINARY_BROKERED, NULL);
     emitter_init_binary(buf, FLAT_BUF_MAX);
-    bb_emit_byte(0x55);
-    bb_emit_byte(0x48); bb_emit_byte(0x89); bb_emit_byte(0xE5);
+    emit_brokered_prologue();
     emit_flat_body(p, "pat_brok", 0, 1);
     int nbytes = emitter_end();
     emit_mode_set(EMIT_BINARY_WIRED, NULL);
