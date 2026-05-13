@@ -17,9 +17,9 @@
 bb_emit_mode_t  bb_emit_mode = EMIT_TEXT;
 FILE           *bb_emit_out  = NULL;   /* set by caller; defaults to stdout */
 
-/* EM-BB-MACROS: set by --bb-macros; BB templates emit 3-col macro invocations
+/* EM-BB-FORMAT: set by --bb-format; BB templates emit 3-col macro invocations
  * in TEXT mode instead of raw GAS.  0 = legacy raw-GAS (default). */
-int g_bb_emit_macros = 0;
+int g_bb_emit_format = 0;
 
 bb_buf_t        bb_emit_buf  = NULL;
 int             bb_emit_pos  = 0;

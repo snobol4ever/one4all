@@ -71,7 +71,7 @@ extern void ir_print_node_nl(const tree_t *e, FILE *f);
 #include "../runtime/x86/bb_build.h"    /* M-BB-LIVE-WIRE: bb_mode_t, g_bb_mode */
 #include "../runtime/x86/sm_codegen.h"  /* M-JIT-RUN: sm_codegen, sm_jit_run */
 #include "../runtime/x86/sm_codegen_x64_emit.h" /* M-JITEM-X64 / EM-1: standalone asm emitter */
-#include "../runtime/x86/bb_emit.h"              /* EM-BB-MACROS: g_bb_emit_macros */
+#include "../runtime/x86/bb_emit.h"              /* EM-BB-FORMAT: g_bb_emit_format */
 #include "scrip_sm.h"                   /* RS-14: sm_preamble, sm_run_with_recovery */
 #include "sync_monitor.h"               /* IM-7: --monitor in-process comparator */
 #include "../runtime/x86/sm_image.h"    /* M-JIT-RUN: sm_image_init */
@@ -121,7 +121,7 @@ int main(int argc, char **argv)
     int opt_jit_emit       = 0;  /* --jit-emit : enables standalone backend emission */
     int opt_emit_x64       = 0;  /* --x64      : x86-64 backend selector */
     int opt_jit_emit_inline = 0; /* --jit-emit-inline : inline GAS (no macros) */
-    int opt_bb_macros       = 0; /* --bb-macros : BB boxes emit 3-col macro invocations */
+    int opt_bb_format       = 0; /* --bb-format : BB boxes emit 3-col macro invocations */
 
     /* Byrd Box pattern mode — independent switch (default: --bb-driver) */
     int bb_driver          = 0;  /* --bb-driver : pattern matching via driver/broker */
@@ -159,7 +159,7 @@ int main(int argc, char **argv)
         else if (strcmp(argv[argi], "--jit-emit")      == 0) { opt_jit_emit       = 1; argi++; }
         else if (strcmp(argv[argi], "--x64")           == 0) { opt_emit_x64       = 1; argi++; }
         else if (strcmp(argv[argi], "--jit-emit-inline") == 0) { opt_jit_emit_inline = 1; opt_jit_emit = 1; argi++; }
-        else if (strcmp(argv[argi], "--bb-macros")       == 0) { opt_bb_macros       = 1; argi++; }
+        else if (strcmp(argv[argi], "--bb-format")       == 0) { opt_bb_format       = 1; argi++; }
         /* BB pattern mode */
         else if (strcmp(argv[argi], "--bb-driver")     == 0) { bb_driver          = 1; argi++; }
         else if (strcmp(argv[argi], "--bb-live")       == 0) { bb_live            = 1; argi++; }
@@ -488,7 +488,7 @@ int main(int argc, char **argv)
          * source to stdout. The emitted asm is then assembled+linked
          * outside scrip (see scripts/test_smoke_jit_emit_x64.sh). */
         g_jit_emit_inline = opt_jit_emit_inline;  /* EDP-2 */
-        g_bb_emit_macros  = opt_bb_macros;         /* EM-BB-MACROS */
+        g_bb_emit_format  = opt_bb_format;         /* EM-BB-FORMAT */
         SM_Program *sm = sm_preamble(ast_prog);
         if (!sm) return 1;
         if (sm_codegen_x64_emit(sm, stdout, input_path) != 0) {

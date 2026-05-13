@@ -25,10 +25,10 @@ typedef enum {
 
 extern bb_emit_mode_t bb_emit_mode;
 
-/* EM-BB-MACROS: when 1, BB template functions emit three-column macro
+/* EM-BB-FORMAT: when 1, BB template functions emit three-column macro
  * invocations (e.g. "LIT_CHECK lit, len, γ, ω") in TEXT mode instead of
- * raw GAS instruction sequences.  Controlled by --bb-macros CLI flag. */
-extern int g_bb_emit_macros;
+ * raw GAS instruction sequences.  Controlled by --bb-format CLI flag. */
+extern int g_bb_emit_format;
 extern FILE          *bb_emit_out;   /* text mode: output FILE* (default stdout) */
 
 /* emit_mode_set — central setter for emit pass mode.
