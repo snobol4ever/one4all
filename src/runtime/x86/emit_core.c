@@ -12,12 +12,14 @@ FILE           *bb_emit_out  = NULL;
 int g_bb_emit_format  = 0;
 int g_in_text_macro_body = 0;
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_mode_set(bb_emit_mode_t m, FILE *out)
 {
     bb_emit_mode = m;
     bb_emit_out  = out;
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 FILE *emit_outf(void) { return bb_emit_out ? bb_emit_out : stdout; }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
@@ -57,6 +59,7 @@ static void fmt_flush_jmp(const char *mn, bb_label_t *target) {
     g_fmt_body[0]  = '\0';
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_format_port(bb_label_t *lbl_entry, const char *macro_name, const char *args)
 {
     if (!emit_bb_is_format_mode()) return;
@@ -70,6 +73,7 @@ void emit_bb_format_port(bb_label_t *lbl_entry, const char *macro_name, const ch
                 args ? args : "");
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_pad_to_blob_size(void)
 {
     switch (bb_emit_mode) {
@@ -82,6 +86,7 @@ void emit_pad_to_blob_size(void)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_macro_begin(const char *name, const char *const *params, int nparams)
 {
     switch (bb_emit_mode) {
@@ -116,6 +121,7 @@ void emit_macro_begin(const char *name, const char *const *params, int nparams)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_macro_end(void)
 {
     switch (bb_emit_mode) {
@@ -134,6 +140,7 @@ void emit_macro_end(void)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_jmp(bb_label_t *target, jmp_kind_t kind)
 {
     static const char *const mn_tab[] = { "jmp", "je", "jne", "jl", "jge", "jg" };
@@ -163,6 +170,7 @@ void emit_jmp(bb_label_t *target, jmp_kind_t kind)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_label_define(bb_label_t *lbl)
 {
     if (emit_bb_is_format_mode())
@@ -172,6 +180,7 @@ void emit_label_define(bb_label_t *lbl)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb3c_op(const char *mn, const char *fmt, ...)
 {
     if (bb_emit_mode != EMIT_TEXT) return;
@@ -188,6 +197,7 @@ void bb3c_op(const char *mn, const char *fmt, ...)
     bb3c_format(f, "", mn ? mn : "", argbuf);
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb3c_jmp(const char *mn, const char *target)
 {
     if (bb_emit_mode != EMIT_TEXT) return;
@@ -204,6 +214,7 @@ int        bb_emit_size  = 0;
 bb_patch_t bb_patch_list[BB_PATCH_MAX];
 int        bb_patch_count = 0;
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_emit_begin(bb_buf_t buf, int size)
 {
     bb_emit_buf    = buf;
@@ -212,6 +223,7 @@ void bb_emit_begin(bb_buf_t buf, int size)
     bb_patch_count = 0;
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 int bb_emit_end(void)
 {
     if (bb_patch_count > 0) {
@@ -226,6 +238,7 @@ int bb_emit_end(void)
     return bb_emit_pos;
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_emit_patch_rel8(bb_label_t *lbl)
 {
     if (bb_emit_mode == EMIT_TEXT) {
@@ -257,6 +270,7 @@ void bb_emit_patch_rel8(bb_label_t *lbl)
     bb_emit_byte(0x00);
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_emit_patch_rel32(bb_label_t *lbl)
 {
     if (bb_emit_mode == EMIT_TEXT) {
@@ -282,6 +296,7 @@ void bb_emit_patch_rel32(bb_label_t *lbl)
     bb_emit_u32(0x00000000);
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_emit_byte(uint8_t b)
 {
     if (bb_emit_mode != EMIT_BINARY_WIRED) {
@@ -309,6 +324,7 @@ int  g_is_text        = 0;
 int  g_emit_text_mode = TEXT_MODE_INVOCATION;
 int  g_emit_pos       = 0;
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emitter_init_binary(bb_buf_t buf, int size)
 {
     g_is_text = 0; g_emit_text_mode = TEXT_MODE_INVOCATION; g_emit_pos = 0;
@@ -316,6 +332,7 @@ void emitter_init_binary(bb_buf_t buf, int size)
     bb_emit_begin(buf, size);
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emitter_init_text(FILE *out, int mode)
 {
     g_is_text = 1; g_emit_text_mode = mode; g_emit_pos = 0;
@@ -323,6 +340,7 @@ void emitter_init_text(FILE *out, int mode)
     bb_emit_out  = out ? out : stdout;
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 int  emitter_end(void)        { return g_is_text ? g_emit_pos : bb_emit_end(); }
 FILE *emitter_text_out(void)  { return g_is_text ? bb_emit_out : NULL; }
 int   emitter_pos(void)       { return g_is_text ? g_emit_pos  : bb_emit_pos; }
@@ -341,6 +359,7 @@ static void ef_t3c(const char *mnem, const char *fmt, ...)
     if (fmt) { va_list ap; va_start(ap,fmt); vsnprintf(buf,sizeof(buf),fmt,ap); va_end(ap); }
     bb3c_format(bb_emit_out, "", mnem ? mnem : "", buf);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static void ef_t3c_jmp(const char *mnem, const char *target)
 { bb3c_emit_jmp(bb_emit_out, mnem ? mnem : "", target ? target : ""); }
 
@@ -349,77 +368,92 @@ void emit_form_reg64_imm64(uint8_t prefix, uint8_t reg, uint64_t val, const char
     if (g_is_text) { ef_t3c("mov", "%s, 0x%llx", mnem, (unsigned long long)val); g_emit_pos += 10; }
     else           { ef_b2(prefix, reg); ef_u64(val); }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_form_reg32_imm32(uint8_t op, uint32_t val, const char *mnem)
 {
     if (g_is_text) { ef_t3c("mov", "%s, %u", mnem, val); g_emit_pos += 5; }
     else           { ef_b1(op); ef_u32(val); }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_form_alu_eax_imm32(uint8_t op, uint32_t val, const char *mnem)
 {
     if (g_is_text) { ef_t3c(mnem, "eax, %u", val); g_emit_pos += 5; }
     else           { ef_b1(op); ef_u32(val); }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_form_alu_esi_imm8(uint8_t modrm, uint8_t val, const char *mnem)
 {
     if (g_is_text) { ef_t3c(mnem, "esi, %u", (unsigned)val); g_emit_pos += 3; }
     else           { ef_b3(0x83, modrm, val); }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_form_reg_reg2(uint8_t b0, uint8_t b1_, const char *text)
 {
     if (g_is_text) { ef_t3c(NULL, "%s", text); g_emit_pos += 2; }
     else           { ef_b2(b0, b1_); }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_form_reg_reg3(uint8_t b0, uint8_t b1_, uint8_t b2_, const char *text)
 {
     if (g_is_text) { ef_t3c(NULL, "%s", text); g_emit_pos += 3; }
     else           { ef_b3(b0, b1_, b2_); }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_form_mem2(uint8_t b0, uint8_t b1_, const char *text)
 {
     if (g_is_text) { ef_t3c(NULL, "%s", text); g_emit_pos += 2; }
     else           { ef_b2(b0, b1_); }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_form_mem3(uint8_t b0, uint8_t b1_, uint8_t b2_, const char *text)
 {
     if (g_is_text) { ef_t3c(NULL, "%s", text); g_emit_pos += 3; }
     else           { ef_b3(b0, b1_, b2_); }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_form_mem4(uint8_t b0, uint8_t b1_, uint8_t b2_, uint8_t b3_, const char *text)
 {
     if (g_is_text) { ef_t3c(NULL, "%s", text); g_emit_pos += 4; }
     else           { ef_b4(b0, b1_, b2_, b3_); }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_form_r13_disp8(uint8_t b0, uint8_t b1_, uint8_t b2_, uint8_t disp, const char *text_fmt)
 {
     if (g_is_text) { ef_t3c(NULL, text_fmt, (unsigned)disp); g_emit_pos += 4; }
     else           { ef_b3(b0, b1_, b2_); ef_b1(disp); }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_form_nullary1(uint8_t b0, const char *text)
 {
     if (g_is_text) { ef_t3c(text, NULL); g_emit_pos += 1; }
     else           { ef_b1(b0); }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_form_nullary2(uint8_t b0, uint8_t b1_, const char *text)
 {
     if (g_is_text) { ef_t3c(text, NULL); g_emit_pos += 2; }
     else           { ef_b2(b0, b1_); }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_form_nullary3(uint8_t b0, uint8_t b1_, uint8_t b2_, const char *text)
 {
     if (g_is_text) { ef_t3c(text, NULL); g_emit_pos += 3; }
     else           { ef_b3(b0, b1_, b2_); }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_sym_lea_rcx(const char *sym, uint64_t addr)
 {
     if (g_is_text) { ef_t3c("lea", "rcx, [rip + %s]", sym ? sym : "??"); g_emit_pos += 7; }
     else           { ef_b2(0x48,0xB9); ef_u64(addr); }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_sym_lea_r10(const char *sym, uint64_t addr)
 {
     if (g_is_text) { ef_t3c("lea", "r10, [rip + %s]", sym ? sym : "??"); g_emit_pos += 7; }
     else           { ef_b2(0x49,0xBA); ef_u64(addr); }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_load_r10_delta_ptr(uint64_t addr)  { emit_sym_lea_r10("\xCE\x94", addr); }
 void emit_load_delta(void)                    { emit_mov_eax_r10mem(); }
 void emit_store_delta(void)                   { emit_mov_r10mem_eax(); }
@@ -439,12 +473,14 @@ void emit_label_define_bb(bb_label_t *lbl)
         bb_emit_mode = s;
     }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_label_name(const char *name)
 {
     if (!g_is_text) return;
     char buf[256]; snprintf(buf, sizeof(buf), "%s:", name ? name : "");
     bb3c_format(bb_emit_out, buf, "", "");
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_pc_label(int pc)
 {
     if (!g_is_text) return;
@@ -452,6 +488,7 @@ void emit_pc_label(int pc)
     bb3c_format(bb_emit_out, buf, "", "");
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_jmp_label(bb_label_t *target, jmp_kind_t kind)
 {
     static const char    *mn[]    = {"jmp","je","jne","jl","jge","jg"};
@@ -460,6 +497,7 @@ void emit_jmp_label(bb_label_t *target, jmp_kind_t kind)
     if (g_is_text) { ef_t3c_jmp(mn[k], target->name); g_emit_pos += 6; }
     else { if (k==0) ef_b1(0xE9); else ef_b2(ops[k][0], ops[k][1]); bb_emit_patch_rel32(target); }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_section(const char *name)
 {
     if (!g_is_text || !name) return;
@@ -470,12 +508,14 @@ void emit_section(const char *name)
     else
         fprintf(bb_emit_out, ".section %s\n", name);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_directive(const char *line)
 {
     if (!g_is_text || !line) return;
     bb3c_flush_pending_cjmp_only();
     fprintf(bb_emit_out, "    %s\n", line);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_global_sym(const char *name) { if (g_is_text) bb3c_format(bb_emit_out, "", ".global", name ? name : ""); }
 void emit_banner(const char *text)
 {
@@ -485,6 +525,7 @@ void emit_banner(const char *text)
     fprintf(bb_emit_out, "    # %s\n", text ? text : "");
     fputc('#', bb_emit_out); for (int i=1;i<120;i++) fputc('=',bb_emit_out); fputc('\n',bb_emit_out);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_minor_break(const char *text)
 {
     if (!g_is_text) return;
@@ -492,18 +533,21 @@ void emit_minor_break(const char *text)
     fputc('#', bb_emit_out); for (int i=1;i<120;i++) fputc('-',bb_emit_out); fputc('\n',bb_emit_out);
     if (text && *text) fprintf(bb_emit_out, "    # %s\n", text);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_blank_line(void)
 {
     if (!g_is_text) return;
     bb3c_flush_pending_cjmp_only();
     fputc('\n', bb_emit_out);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_fprintf_raw(const char *fmt, ...)
 {
     if (!g_is_text) return;
     bb3c_flush_pending_cjmp_only();
     va_list ap; va_start(ap, fmt); vfprintf(bb_emit_out, fmt, ap); va_end(ap);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_data_quad(uint64_t val)
 {
     if (g_is_text) {
@@ -511,10 +555,12 @@ void emit_data_quad(uint64_t val)
         bb3c_format(bb_emit_out, "", ".quad", buf);
     } else { bb_emit_u64(val); }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_data_quad_sym(const char *sym)
 {
     if (g_is_text) bb3c_format(bb_emit_out, "", ".quad", sym ? sym : "0");
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_data_string(const char *bytes, size_t len)
 {
     if (!bytes) return;
@@ -534,6 +580,7 @@ void emit_data_string(const char *bytes, size_t len)
         fputs("\"\n", bb_emit_out);
     } else { for (size_t i=0;i<len;i++) bb_emit_byte((uint8_t)bytes[i]); }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_data_long(int32_t val)
 {
     if (g_is_text) {
@@ -545,6 +592,7 @@ void emit_data_long(int32_t val)
         bb_emit_byte((uint8_t)(u>>16)); bb_emit_byte((uint8_t)(u>>24));
     }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_zeta_rdi(uint64_t ptr, const char *sym)
 {
     if (g_is_text) {
@@ -552,6 +600,7 @@ void emit_bb_zeta_rdi(uint64_t ptr, const char *sym)
         bb3c_format(bb_emit_out, "", "lea", arg);
     } else { emit_mov_rdi_imm64(ptr); }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_dispatch_jne_jmp(bb_label_t *lbl_succ, bb_label_t *lbl_fail)
 {
     if (g_is_text) {
@@ -567,17 +616,20 @@ void emit_bb_dispatch_jne_jmp(bb_label_t *lbl_succ, bb_label_t *lbl_fail)
         emit_jmp_label(lbl_fail, JMP_JMP);
     }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static const char *ef_greek_port(char port)
 {
     switch (port) { case 'a': return "\xCE\xB1"; case 'b': return "\xCE\xB2";
                     case 'g': return "\xCE\xB3"; case 'o': return "\xCF\x89"; default: return "?"; }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_port_label(const char *pfx, char port)
 {
     if (!g_is_text) return;
     char buf[256]; snprintf(buf, sizeof(buf), "%s_%s:", pfx ? pfx : "", ef_greek_port(port));
     bb3c_format(bb_emit_out, buf, "", "");
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_port_jmp(const char *pfx, char port)
 {
     if (!g_is_text) return;
@@ -585,12 +637,14 @@ void emit_bb_port_jmp(const char *pfx, char port)
     bb3c_emit_jmp(bb_emit_out, "jmp", tbuf);
     g_emit_pos += 5;
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_macro_param_ref(const char *name)
 {
     if (g_is_text && g_emit_text_mode == TEXT_MODE_DEFINITION)
         fprintf(bb_emit_out, "\\%s", name ? name : "?");
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_label_init(bb_label_t *lbl, const char *name)
 {
     strncpy(lbl->name, name, BB_LABEL_NAME_MAX - 1);
@@ -598,6 +652,7 @@ void bb_label_init(bb_label_t *lbl, const char *name)
     lbl->offset = BB_LABEL_UNRESOLVED;
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_label_initf(bb_label_t *lbl, const char *fmt, ...)
 {
     va_list ap;
@@ -607,6 +662,7 @@ void bb_label_initf(bb_label_t *lbl, const char *fmt, ...)
     lbl->offset = BB_LABEL_UNRESOLVED;
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_label_define(bb_label_t *lbl)
 {
     if (bb_emit_mode == EMIT_TEXT) {
@@ -642,6 +698,7 @@ void bb_label_define(bb_label_t *lbl)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_label_init(bb_label_t *lbl, const char *name)  { bb_label_init(lbl, name); }
 void emit_label_initf(bb_label_t *lbl, const char *fmt, ...)
 {
@@ -660,6 +717,7 @@ static FILE *g_bb3c_pending_cjmp_out         = NULL;
 
 #define BB_COL3_WIDTH 27
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 static int bb3c_visual_width(const char *s)
 {
     int w = 0;
@@ -670,6 +728,7 @@ static int bb3c_visual_width(const char *s)
     return w;
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 static int bb3c_pad_to_width(char *buf, size_t bufsz, const char *s, int target)
 {
     int sw = bb3c_visual_width(s);
@@ -684,6 +743,7 @@ static int bb3c_pad_to_width(char *buf, size_t bufsz, const char *s, int target)
     return o;
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 static void bb3c_write_line(FILE *out, const char *L, const char *A, const char *G)
 {
     char buf[768];
@@ -703,6 +763,7 @@ static void bb3c_write_line(FILE *out, const char *L, const char *A, const char 
     fputc('\n', out);
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 static void bb3c_flush_pending_cond_jmp(void)
 {
     if (g_bb3c_pending_cjmp_mn[0] && g_bb3c_pending_cjmp_out) {
@@ -715,6 +776,7 @@ static void bb3c_flush_pending_cond_jmp(void)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 static void bb3c_flush_pending_to(FILE *target)
 {
     bb3c_flush_pending_cond_jmp();
@@ -726,6 +788,7 @@ static void bb3c_flush_pending_to(FILE *target)
     (void)target;
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb3c_flush_pending_cjmp_only(void) { bb3c_flush_pending_cond_jmp(); }
 void bb3c_flush_pending(void)           { bb3c_flush_pending_to(NULL); }
 
@@ -738,6 +801,7 @@ static int bb3c_is_cond_jmp(const char *mn)
            (strcmp(mn, "jbe") == 0);
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb3c_emit_jmp(FILE *out, const char *mn, const char *target)
 {
     const char *m = mn ? mn : "";
@@ -773,6 +837,7 @@ void bb3c_emit_jmp(FILE *out, const char *mn, const char *target)
     bb3c_format(out, "", "", rest);
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb3c_format(FILE *out, const char *label, const char *action, const char *goto_)
 {
     if (g_bb3c_pending_cjmp_mn[0]) bb3c_flush_pending_cond_jmp();
@@ -810,6 +875,7 @@ void bb3c_format(FILE *out, const char *label, const char *action, const char *g
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb3c_text(const char *label, const char *action, const char *goto_)
 {
     if (bb_emit_mode != EMIT_TEXT) return;
@@ -817,6 +883,7 @@ void bb3c_text(const char *label, const char *action, const char *goto_)
     bb3c_format(f, label, action, goto_);
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_text(const char *fmt, ...)
 {
     if (bb_emit_mode != EMIT_TEXT) return;
@@ -824,6 +891,7 @@ void bb_text(const char *fmt, ...)
     va_list ap; va_start(ap, fmt); vfprintf(f, fmt, ap); va_end(ap);
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_text_label(bb_label_t *lbl)
 {
     if (bb_emit_mode == EMIT_TEXT) {
@@ -835,6 +903,7 @@ void bb_text_label(bb_label_t *lbl)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_text_comment(const char *fmt, ...)
 {
     if (bb_emit_mode != EMIT_TEXT) return;
@@ -844,6 +913,7 @@ void bb_text_comment(const char *fmt, ...)
     fprintf(f, "\n");
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_comment(const char *text)
 {
     FILE *f;
@@ -861,6 +931,7 @@ void emit_comment(const char *text)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_box_banner(const char *kind, const char *args)
 {
     FILE *f;
@@ -881,6 +952,7 @@ void emit_bb_box_banner(const char *kind, const char *args)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_banner_stno(int stno, int lineno, const char *src_text)
 {
 #define STNO_RULE \
@@ -922,6 +994,7 @@ void emit_text_jmp(FILE *out, const char *mn, const char *target) {
 void emit_text_op(const char *label, const char *action, const char *goto_) {
     bb3c_text(label, action, goto_);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_text_flush_cjmp(void) { bb3c_flush_pending_cjmp_only(); }
 void emit_text_flush(void)      { bb3c_flush_pending(); }
 
@@ -930,6 +1003,7 @@ void emit_text_rawf(const char *fmt, ...) {
     if (bb_emit_mode != EMIT_TEXT) return;
     va_list ap; va_start(ap, fmt); vfprintf(emit_outf(), fmt, ap); va_end(ap);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_text_label(bb_label_t *lbl)      { bb_text_label(lbl); }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
@@ -939,6 +1013,7 @@ void emit_text_comment(const char *fmt, ...) {
     va_list ap; va_start(ap, fmt); vfprintf(emit_outf(), fmt, ap); va_end(ap);
     fputc('\n', emit_outf());
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_text_box_banner(const char *kind, const char *args) { emit_bb_box_banner(kind, args); }
 void emit_text_stno_banner(int stno, int lineno, const char *src_text) { emit_banner_stno(stno, lineno, src_text); }
 
@@ -1814,6 +1889,7 @@ void insn_jg_r32(bb_label_t *t) {
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_mov_eax_imm32(uint32_t imm)
 {
     if (bb_emit_mode == EMIT_TEXT)
@@ -1823,6 +1899,7 @@ void bb_insn_mov_eax_imm32(uint32_t imm)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_mov_rax_imm64(uint64_t imm)
 {
     if (bb_emit_mode == EMIT_TEXT)
@@ -1832,6 +1909,7 @@ void bb_insn_mov_rax_imm64(uint64_t imm)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_ret(void)
 {
     if (bb_emit_mode == EMIT_TEXT)
@@ -1840,6 +1918,7 @@ void bb_insn_ret(void)
         bb_emit_byte(RET);
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_nop(void)
 {
     if (bb_emit_mode == EMIT_TEXT)
@@ -1848,6 +1927,7 @@ void bb_insn_nop(void)
         bb_emit_byte(NOP);
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_call_rax(void)
 {
     if (bb_emit_mode == EMIT_TEXT)
@@ -1857,6 +1937,7 @@ void bb_insn_call_rax(void)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_jmp_rel8(bb_label_t *target)
 {
     if (bb_emit_mode == EMIT_TEXT)
@@ -1866,6 +1947,7 @@ void bb_insn_jmp_rel8(bb_label_t *target)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_jmp_rel32(bb_label_t *target)
 {
     if (bb_emit_mode == EMIT_TEXT)
@@ -1875,6 +1957,7 @@ void bb_insn_jmp_rel32(bb_label_t *target)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_jl_rel8(bb_label_t *target)
 {
     if (bb_emit_mode == EMIT_TEXT)
@@ -1884,6 +1967,7 @@ void bb_insn_jl_rel8(bb_label_t *target)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_jge_rel8(bb_label_t *target)
 {
     if (bb_emit_mode == EMIT_TEXT)
@@ -1893,6 +1977,7 @@ void bb_insn_jge_rel8(bb_label_t *target)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_je_rel8(bb_label_t *target)
 {
     if (bb_emit_mode == EMIT_TEXT)
@@ -1902,6 +1987,7 @@ void bb_insn_je_rel8(bb_label_t *target)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_jne_rel8(bb_label_t *target)
 {
     if (bb_emit_mode == EMIT_TEXT)
@@ -1911,6 +1997,7 @@ void bb_insn_jne_rel8(bb_label_t *target)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_jne_rel32(bb_label_t *target)
 {
     if (bb_emit_mode == EMIT_TEXT)
@@ -1920,6 +2007,7 @@ void bb_insn_jne_rel32(bb_label_t *target)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_je_rel32(bb_label_t *target)
 {
     if (bb_emit_mode == EMIT_TEXT)
@@ -1929,6 +2017,7 @@ void bb_insn_je_rel32(bb_label_t *target)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_jl_rel32(bb_label_t *target)
 {
     if (bb_emit_mode == EMIT_TEXT)
@@ -1938,6 +2027,7 @@ void bb_insn_jl_rel32(bb_label_t *target)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_jge_rel32(bb_label_t *target)
 {
     if (bb_emit_mode == EMIT_TEXT)
@@ -1947,6 +2037,7 @@ void bb_insn_jge_rel32(bb_label_t *target)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_jg_rel32(bb_label_t *target)
 {
     if (bb_emit_mode == EMIT_TEXT)
@@ -1956,6 +2047,7 @@ void bb_insn_jg_rel32(bb_label_t *target)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_cmp_esi_imm8(uint8_t imm)
 {
     if (bb_emit_mode == EMIT_TEXT)
@@ -1965,6 +2057,7 @@ void bb_insn_cmp_esi_imm8(uint8_t imm)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_cmp_esi_imm32(uint32_t imm)
 {
     if (bb_emit_mode == EMIT_TEXT)
@@ -1974,6 +2067,7 @@ void bb_insn_cmp_esi_imm32(uint32_t imm)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_movzx_eax_rdi_off8(uint8_t off)
 {
     if (bb_emit_mode == EMIT_TEXT)
@@ -1983,6 +2077,7 @@ void bb_insn_movzx_eax_rdi_off8(uint8_t off)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_cmp_al_imm8(uint8_t imm)
 {
     if (bb_emit_mode == EMIT_TEXT)
@@ -1992,6 +2087,7 @@ void bb_insn_cmp_al_imm8(uint8_t imm)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_xor_eax_eax(void)
 {
     if (bb_emit_mode == EMIT_TEXT)
@@ -2001,6 +2097,7 @@ void bb_insn_xor_eax_eax(void)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_push_rbp(void)
 {
     if (bb_emit_mode == EMIT_TEXT)
@@ -2009,6 +2106,7 @@ void bb_insn_push_rbp(void)
         bb_emit_byte(PUSH_RBP);
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_pop_rbp(void)
 {
     if (bb_emit_mode == EMIT_TEXT)
@@ -2017,6 +2115,7 @@ void bb_insn_pop_rbp(void)
         bb_emit_byte(POP_RBP);
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_mov_rbp_rsp(void)
 {
     if (bb_emit_mode == EMIT_TEXT)
@@ -2026,6 +2125,7 @@ void bb_insn_mov_rbp_rsp(void)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_sub_rsp_imm8(uint8_t imm)
 {
     if (bb_emit_mode == EMIT_TEXT)
@@ -2035,6 +2135,7 @@ void bb_insn_sub_rsp_imm8(uint8_t imm)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_add_rsp_imm8(uint8_t imm)
 {
     if (bb_emit_mode == EMIT_TEXT)
@@ -2044,6 +2145,7 @@ void bb_insn_add_rsp_imm8(uint8_t imm)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_ret(void)
 {
     switch (bb_emit_mode) {
@@ -2058,6 +2160,7 @@ void emit_ret(void)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_push_r10(void)
 {
     switch (bb_emit_mode) {
@@ -2076,6 +2179,7 @@ void emit_push_r10(void)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_pop_r10(void)
 {
     switch (bb_emit_mode) {
@@ -2094,6 +2198,7 @@ void emit_pop_r10(void)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_test_rax_rax(void)
 {
     switch (bb_emit_mode) {
@@ -2108,6 +2213,7 @@ void emit_test_rax_rax(void)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_test_eax_eax(void)
 {
     switch (bb_emit_mode) {
@@ -2126,6 +2232,7 @@ void emit_test_eax_eax(void)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_mov_rdi_imm64(uint64_t val)
 {
     switch (bb_emit_mode) {
@@ -2150,6 +2257,7 @@ void emit_mov_rdi_imm64(uint64_t val)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_call_sym_plt(const char *sym, uint64_t fn_fallback)
 {
     switch (bb_emit_mode) {
@@ -2179,6 +2287,7 @@ void emit_call_sym_plt(const char *sym, uint64_t fn_fallback)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_mov_esi_imm32(int val)
 {
     switch (bb_emit_mode) {
@@ -2201,6 +2310,7 @@ void emit_mov_esi_imm32(int val)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_add_delta_imm(int v)
 {
     switch (bb_emit_mode) {
@@ -2232,6 +2342,7 @@ void emit_add_delta_imm(int v)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_sub_delta_imm(int v)
 {
     switch (bb_emit_mode) {
@@ -2263,6 +2374,7 @@ void emit_sub_delta_imm(int v)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_mov_rsp_rbp(void)          
 {
     switch (bb_emit_mode) {
@@ -2272,6 +2384,7 @@ void bb_insn_mov_rsp_rbp(void)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_mov_rdx_imm64(uint64_t v)  
 {
     switch (bb_emit_mode) {
@@ -2287,6 +2400,7 @@ void bb_insn_mov_rdx_imm64(uint64_t v)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_mov_edx_imm32(uint32_t v)  
 {
     switch (bb_emit_mode) {
@@ -2300,6 +2414,7 @@ void bb_insn_mov_edx_imm32(uint32_t v)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_mov_edi_imm32(uint32_t v)  
 {
     switch (bb_emit_mode) {
@@ -2313,6 +2428,7 @@ void bb_insn_mov_edi_imm32(uint32_t v)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_mov_rsi_imm64(uint64_t v)  
 {
     switch (bb_emit_mode) {
@@ -2328,6 +2444,7 @@ void bb_insn_mov_rsi_imm64(uint64_t v)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_push_r12(void)             
 {
     switch (bb_emit_mode) {
@@ -2337,6 +2454,7 @@ void bb_insn_push_r12(void)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_pop_r12(void)              
 {
     switch (bb_emit_mode) {
@@ -2346,6 +2464,7 @@ void bb_insn_pop_r12(void)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_inc_r13_disp8(uint8_t disp) 
 {
     switch (bb_emit_mode) {
@@ -2358,6 +2477,7 @@ void bb_insn_inc_r13_disp8(uint8_t disp)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_mov_rcx_imm64(uint64_t v)  
 {
     switch (bb_emit_mode) {
@@ -2373,6 +2493,7 @@ void bb_insn_mov_rcx_imm64(uint64_t v)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_mov_eax_r10mem(void)        
 {
     switch (bb_emit_mode) {
@@ -2382,6 +2503,7 @@ void bb_insn_mov_eax_r10mem(void)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_cmp_eax_imm32(uint32_t v)  
 {
     switch (bb_emit_mode) {
@@ -2395,6 +2517,7 @@ void bb_insn_cmp_eax_imm32(uint32_t v)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_mov_eax_mem_rcx(void)       
 {
     switch (bb_emit_mode) {
@@ -2404,6 +2527,7 @@ void bb_insn_mov_eax_mem_rcx(void)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_sub_eax_imm32(uint32_t v)  
 {
     switch (bb_emit_mode) {
@@ -2417,6 +2541,7 @@ void bb_insn_sub_eax_imm32(uint32_t v)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_mov_ecx_eax(void)           
 {
     switch (bb_emit_mode) {
@@ -2426,6 +2551,7 @@ void bb_insn_mov_ecx_eax(void)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_cmp_eax_ecx(void)           
 {
     switch (bb_emit_mode) {
@@ -2435,6 +2561,7 @@ void bb_insn_cmp_eax_ecx(void)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_mov_rax_mem_rcx(void)       
 {
     switch (bb_emit_mode) {
@@ -2444,6 +2571,7 @@ void bb_insn_mov_rax_mem_rcx(void)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_movsxd_rcx_r10mem(void)     
 {
     switch (bb_emit_mode) {
@@ -2453,6 +2581,7 @@ void bb_insn_movsxd_rcx_r10mem(void)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_lea_rax_rax_rcx(void)       
 {
     switch (bb_emit_mode) {
@@ -2463,6 +2592,7 @@ void bb_insn_lea_rax_rax_rcx(void)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_mov_rdi_rax(void)           
 {
     switch (bb_emit_mode) {
@@ -2472,6 +2602,7 @@ void bb_insn_mov_rdi_rax(void)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_add_eax_imm32(uint32_t v)  
 {
     switch (bb_emit_mode) {
@@ -2485,6 +2616,7 @@ void bb_insn_add_eax_imm32(uint32_t v)
     }
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_cmp_eax_mem_rcx(void)       
 {
     switch (bb_emit_mode) {
