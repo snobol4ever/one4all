@@ -275,7 +275,9 @@ void emit_bb_xchr(emitter_t *e, PATND_t *p,
     t_sigma_plus_delta_to_rdi(TEMPLATE_ADDR_SIGMA, TEMPLATE_ADDR_SIGLEN);
     t_lea_rsi_strtab_sym(lit_label, (uint64_t)(uintptr_t)lit);
     t_mov_rdx_imm32(len);
+    t_push_r10();
     t_call_sym_plt("memcmp", (uint64_t)(uintptr_t)memcmp);
+    t_pop_r10();
     t_test_eax_eax();
     t_emit_jmp(lbl_fail, JMP_JNE);
     t_add_delta_imm(len);

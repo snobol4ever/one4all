@@ -58,6 +58,8 @@ void t_bb_box_banner(const char *kind, const char *args);
 
 void t_inc_mem_r13_disp8(uint8_t disp);
 void t_ret(void);
+void t_push_r10(void);   /* push r10 — save flat-BB LOCAL across any PLT call */
+void t_pop_r10(void);    /* pop  r10 — restore after PLT call */
 void t_pad_to_blob_size(void);
 void t_mov_rdi_imm64(uint64_t val);
 void t_call_sym_plt(const char *sym, uint64_t fn_fallback);
