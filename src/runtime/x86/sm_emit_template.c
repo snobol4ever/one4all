@@ -777,6 +777,19 @@ int sm_emit_macro_library(FILE *out)
 
     #undef EMIT_IF_NEW
 
+    /* PUSH_REAL: hand-written, not in g_sm_templates[].  SM_PUSH_LIT_F is
+     * special-cased in sm_codegen_x64_emit.c because the template bakes the
+     * literal float bits per call-site; a parameterised macro body would need
+     * to receive the bits as an integer immediate.  emit_sm_push_lit_f passes
+     * the bit-pattern as a hex string so `movabs rdi, \val` assembles correctly. */
+    if (fputs(
+        "# PUSH_REAL: hand-written (SM_PUSH_LIT_F special-case; param = 64-bit bits as hex)\n"
+        "                        .macro           PUSH_REAL val\n"
+        "                        movabs           rdi, \\val\n"
+        "                        call             rt_push_real_bits@PLT\n"
+        "                        .endm\n",
+        out) == EOF) return -1;
+
     /* EM-7c-sm-three-column-verify (2026-05-09): trailing '\\n\\n'
      * produced one blank line at end-of-file -- flagged by the audit.
      * Drop the second '\\n'. */

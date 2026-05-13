@@ -199,9 +199,6 @@ const void *rt_get_default_vstack_backend(void)
  * emit-time partition, so invariant subtrees of partly-variant patterns
  * resolve via linker-baked _pat_inv_<pid>_<sid>_α labels rather than being
  * rebuilt into bb_pool at runtime. */
-#define PATSTACK_CAP 256
-static DESCR_t g_pat_stack[PATSTACK_CAP];
-static int     g_pat_sp = 0;
 
 static int     g_halt_rc  = 0;
 static int     g_halt_set = 0;
@@ -259,27 +256,6 @@ static DESCR_t vstack_peek(void)   { DESCR_t out; g_ops->peek(&out); return out;
 #define LAST_OK_GET()   (g_ops->get_last_ok())
 #define LAST_OK_SET(x)  (g_ops->set_last_ok(x))
 
-/* EM-7c-variant: pat-stack helpers — used by rt_pat_*() to assemble
- * patterns at runtime from the SM_PAT_* opcode sequence emitted into the
- * mode-4 binary.  See block comment on g_pat_stack[] for the architectural
- * note. */
-static void pat_push(DESCR_t d)
-{
-    if (g_pat_sp >= PATSTACK_CAP) {
-        fprintf(stderr, "libscrip_rt: pat-stack overflow (cap=%d).\n", PATSTACK_CAP);
-        abort();
-    }
-    g_pat_stack[g_pat_sp++] = d;
-}
-
-static DESCR_t pat_pop_internal(void)
-{
-    if (g_pat_sp <= 0) {
-        fprintf(stderr, "libscrip_rt: pat-stack underflow.\n");
-        abort();
-    }
-    return g_pat_stack[--g_pat_sp];
-}
 
 /* EM-7c-variant: vstack coerce helpers — pop TOS as string or int with
  * the coercions the SM_PAT_*-takes-charset-or-int contract expects.
@@ -726,77 +702,77 @@ void rt_match_blob(void *blob_α,
 
 void rt_pat_lit(const char *s)
 {
-    pat_push(pat_lit(s ? s : ""));
+    vstack_push(pat_lit(s ? s : ""));
 }
 
 void rt_pat_refname(const char *name)
 {
-    pat_push(pat_ref(name ? name : ""));
+    vstack_push(pat_ref(name ? name : ""));
 }
 
 void rt_pat_span(void)
 {
     const char *cs = vstack_pop_str();
-    pat_push(pat_span(cs));
+    vstack_push(pat_span(cs));
 }
 
 void rt_pat_break(void)
 {
     const char *cs = vstack_pop_str();
-    pat_push(pat_break_(cs));
+    vstack_push(pat_break_(cs));
 }
 
 void rt_pat_any(void)
 {
     const char *cs = vstack_pop_str();
-    pat_push(pat_any_cs(cs));
+    vstack_push(pat_any_cs(cs));
 }
 
 void rt_pat_notany(void)
 {
     const char *cs = vstack_pop_str();
-    pat_push(pat_notany(cs));
+    vstack_push(pat_notany(cs));
 }
 
-void rt_pat_len(void)   { pat_push(pat_len (vstack_pop_int64())); }
-void rt_pat_pos(void)   { pat_push(pat_pos (vstack_pop_int64())); }
-void rt_pat_rpos(void)  { pat_push(pat_rpos(vstack_pop_int64())); }
-void rt_pat_tab(void)   { pat_push(pat_tab (vstack_pop_int64())); }
-void rt_pat_rtab(void)  { pat_push(pat_rtab(vstack_pop_int64())); }
+void rt_pat_len(void)   { vstack_push(pat_len (vstack_pop_int64())); }
+void rt_pat_pos(void)   { vstack_push(pat_pos (vstack_pop_int64())); }
+void rt_pat_rpos(void)  { vstack_push(pat_rpos(vstack_pop_int64())); }
+void rt_pat_tab(void)   { vstack_push(pat_tab (vstack_pop_int64())); }
+void rt_pat_rtab(void)  { vstack_push(pat_rtab(vstack_pop_int64())); }
 
-void rt_pat_arb(void)     { pat_push(pat_arb());     }
-void rt_pat_rem(void)     { pat_push(pat_rem());     }
-void rt_pat_fence(void)   { pat_push(pat_fence());   }
-void rt_pat_fail(void)    { pat_push(pat_fail());    }
-void rt_pat_abort(void)   { pat_push(pat_abort());   }
-void rt_pat_succeed(void) { pat_push(pat_succeed()); }
-void rt_pat_bal(void)     { pat_push(pat_bal());     }
-void rt_pat_eps(void)     { pat_push(pat_epsilon()); }
+void rt_pat_arb(void)     { vstack_push(pat_arb());     }
+void rt_pat_rem(void)     { vstack_push(pat_rem());     }
+void rt_pat_fence(void)   { vstack_push(pat_fence());   }
+void rt_pat_fail(void)    { vstack_push(pat_fail());    }
+void rt_pat_abort(void)   { vstack_push(pat_abort());   }
+void rt_pat_succeed(void) { vstack_push(pat_succeed()); }
+void rt_pat_bal(void)     { vstack_push(pat_bal());     }
+void rt_pat_eps(void)     { vstack_push(pat_epsilon()); }
 
 void rt_pat_arbno(void)
 {
-    DESCR_t inner = pat_pop_internal();
-    pat_push(pat_arbno(inner));
+    DESCR_t inner = vstack_pop();
+    vstack_push(pat_arbno(inner));
 }
 
 void rt_pat_fence1(void)
 {
-    DESCR_t child = pat_pop_internal();
-    pat_push(pat_fence_p(child));
+    DESCR_t child = vstack_pop();
+    vstack_push(pat_fence_p(child));
 }
 
 void rt_pat_cat(void)
 {
-    DESCR_t right = pat_pop_internal();
-    DESCR_t left  = pat_pop_internal();
-    pat_push(pat_cat(left, right));
+    DESCR_t right = vstack_pop();
+    DESCR_t left  = vstack_pop();
+    vstack_push(pat_cat(left, right));
 }
 
 void rt_pat_alt(void)
 {
-    DESCR_t right = pat_pop_internal();
-    DESCR_t left  = pat_pop_internal();
-    pat_push(pat_alt(left, right));
+    DESCR_t right = vstack_pop();
+    DESCR_t left  = vstack_pop();
+    vstack_push(pat_alt(left, right));
 }
 
 void rt_pat_deref(void)
@@ -806,40 +782,35 @@ void rt_pat_deref(void)
      * else look up by name (deferred ref). */
     DESCR_t v = vstack_pop();
     if (v.v == DT_P) {
-        pat_push(v);
+        vstack_push(v);
     } else if (v.v == DT_S && v.s) {
-        pat_push(pat_lit(v.s));
+        vstack_push(pat_lit(v.s));
     } else {
         char *name = VARVAL_fn(v);
-        pat_push(pat_ref(name ? name : ""));
+        vstack_push(pat_ref(name ? name : ""));
     }
 }
 
 void rt_pat_capture(const char *varname, int kind)
 {
     /* a[0].s = varname, a[1].i = kind (0=cond, 1=imm, 2=cursor) */
-    DESCR_t child = pat_pop_internal();
+    DESCR_t child = vstack_pop();
     DESCR_t var   = NAME_fn(varname ? varname : "");
     if (kind == 1)
-        pat_push(pat_assign_imm(child, var));
+        vstack_push(pat_assign_imm(child, var));
     else if (kind == 2)
-        pat_push(pat_cat(child, pat_at_cursor(varname ? varname : "")));
+        vstack_push(pat_cat(child, pat_at_cursor(varname ? varname : "")));
     else
-        pat_push(pat_assign_cond(child, var));
+        vstack_push(pat_assign_cond(child, var));
 }
 
-void rt_pat_boxval(void)
-{
-    /* Move pat-stack TOS to value-stack as DT_P. */
-    vstack_push(pat_pop_internal());
-}
 
 /* SM_PAT_CAPTURE_FN: . *func() / $ *func() — no-args form.
  * a[0].s=fname, a[1].i=is_imm(0=cond/1=imm), a[2].s=namelist (tab-sep, or NULL).
  * Pops child from pat-stack; pushes XCALLCAP node. */
 void rt_pat_capture_fn(const char *fname, int is_imm, const char *namelist)
 {
-    DESCR_t child = pat_pop_internal();
+    DESCR_t child = vstack_pop();
     if (!fname) fname = "";
     if (namelist && namelist[0]) {
         int nnames = 1;
@@ -857,11 +828,11 @@ void rt_pat_capture_fn(const char *fname, int is_imm, const char *namelist)
                 start = q + 1;
             }
         }
-        pat_push(is_imm
+        vstack_push(is_imm
             ? pat_assign_callcap_named_imm(child, fname, NULL, 0, names, nnames)
             : pat_assign_callcap_named    (child, fname, NULL, 0, names, nnames));
     } else {
-        pat_push(is_imm
+        vstack_push(is_imm
             ? pat_assign_callcap_named_imm(child, fname, NULL, 0, NULL, 0)
             : pat_assign_callcap          (child, fname, NULL, 0));
     }
@@ -877,8 +848,8 @@ void rt_pat_capture_fn_args(const char *fname, int is_imm, int nargs)
         ? (DESCR_t *)GC_MALLOC((size_t)nargs * sizeof(DESCR_t))
         : NULL;
     for (int i = nargs - 1; i >= 0; i--) argv[i] = vstack_pop();
-    DESCR_t child = pat_pop_internal();
-    pat_push(is_imm
+    DESCR_t child = vstack_pop();
+    vstack_push(is_imm
         ? pat_assign_callcap_named_imm(child, fname, argv, nargs, NULL, 0)
         : pat_assign_callcap          (child, fname, argv, nargs));
 }
@@ -888,7 +859,7 @@ void rt_pat_capture_fn_args(const char *fname, int is_imm, int nargs)
 void rt_pat_usercall(const char *fname)
 {
     if (!fname) fname = "";
-    pat_push(pat_user_call(fname, NULL, 0));
+    vstack_push(pat_user_call(fname, NULL, 0));
 }
 
 /* SM_PAT_USERCALL_ARGS: bare *func(args) — args-on-stack form.
@@ -900,20 +871,20 @@ void rt_pat_usercall_args(const char *fname, int nargs)
         ? (DESCR_t *)GC_MALLOC((size_t)nargs * sizeof(DESCR_t))
         : NULL;
     for (int i = nargs - 1; i >= 0; i--) argv[i] = vstack_pop();
-    pat_push(pat_user_call(fname, argv, nargs));
+    vstack_push(pat_user_call(fname, argv, nargs));
 }
 
 /*==============================================================================
  * rt_match_variant — SM_EXEC_STMT for variant patterns
  *
  * Stack contract (top-of-stack last popped):
- *   pat-stack:  [pattern_descr]  ← pat-stack TOS
- *   vstack:     [subj_descr]
+ *   vstack:     [pattern_descr]  ← pushed first by rt_pat_* sequence
+ *               [subj_descr]
  *               [repl_or_zero]   ← vstack TOS
  *
  * The replacement slot is ALWAYS pushed (as INTVAL(0) when has_repl=0,
- * matching sm_lower's emission convention) so we always pop two from
- * the vstack regardless of has_repl.
+ * matching sm_lower's emission convention) so we always pop three from
+ * the vstack (pat + subj + repl).
  *
  * Arguments:
  *   subj_name — subject NV name for write-back, or NULL/"" for none
@@ -924,20 +895,18 @@ void rt_pat_usercall_args(const char *fname, int nargs)
  *     In BB_MODE_LIVE (set by rt_init), Phases 3-5 route through
  *     bb_build_flat/binary -> direct bb_box_fn call.
  *   - Sets g_last_ok from exec_stmt's return (so SM_JUMP_S/F observe it).
- *   - Resets g_pat_sp = 0 after each statement (defensive — patterns
- *     do not leak across statements).
+ *   - Pops pattern from vstack (pushed by rt_pat_* before subj/repl).
  *============================================================================*/
 
 void rt_match_variant(const char *subj_name, int has_repl)
 {
     DESCR_t repl   = vstack_pop();   /* always pop: real repl or INTVAL(0) */
     DESCR_t subj_d = vstack_pop();
-    DESCR_t pat_d  = (g_pat_sp > 0) ? pat_pop_internal() : pat_epsilon();
+    DESCR_t pat_d  = vstack_pop();
 
     int ok = exec_stmt(subj_name, &subj_d, pat_d,
                        has_repl ? &repl : NULL, has_repl);
     LAST_OK_SET(ok ? 1 : 0);
-    g_pat_sp  = 0;
 }
 
 /*==============================================================================

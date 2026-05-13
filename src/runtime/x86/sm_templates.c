@@ -140,8 +140,11 @@ void emit_sm_push_lit_i(int64_t val)
 void emit_sm_push_lit_f(double val)
 {
     uint64_t bits; __builtin_memcpy(&bits, &val, 8);
-    char val_str[32]; snprintf(val_str, sizeof(val_str), "%g", val);
-    const char *params[] = { val_str };
+    /* TEXT/MACRO_DEF mode: pass bit-pattern as hex so `movabs rdi, \val`
+     * assembles correctly.  The decimal form ("%g") cannot serve as a
+     * 64-bit integer immediate in GAS. */
+    char bits_str[32]; snprintf(bits_str, sizeof(bits_str), "0x%016llx", (unsigned long long)bits);
+    const char *params[] = { bits_str };
     emit_macro_begin("PUSH_REAL", params, 1);
     bb_emit_mov_rdi_imm64(bits);
     bb_emit_call_sym_plt("rt_push_real_bits", 0);
