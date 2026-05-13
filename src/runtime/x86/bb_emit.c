@@ -961,7 +961,7 @@ void bb_text_comment(const char *fmt, ...)
  * EM-7c-s-file-beautify (2026-05-09): removed the literal `;` separators
  * that the prior PARTIAL rung introduced.  The shape now matches SM-side
  * (`emit_three_column_line` in sm_codegen_x64_emit.c, sm_line, and
- * sm_emit_template's `render_call_line`) — one printf format
+ * emit_sm_template's `render_call_line`) — one printf format
  * `%-24s%-16s %s\n` shared across the entire `.s` file.
  *
  * NULL or empty args render as whitespace of the right column width.

@@ -41,7 +41,6 @@ void emit_sm_push_lit_i(int64_t val);
 /* SM_VOID_POP — call rt_pop_void@PLT; discard TOS.
  * No mode-3/mode-4 divergence; template used by mode-4; mode-3 still
  * uses Standard blob (sub-rung -h, sess 2026-05-11). */
-void emit_sm_void_pop();
 
 /* ── BB box templates ─────────────────────────────────────────────────── */
 
@@ -107,8 +106,6 @@ void emit_bb_xfarb(bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_�
  * SM_CONCAT:     pop right+left, push concat result → rt_concat()
  * SM_PUSH_NULL:  push null descriptor               → rt_push_null()
  * SM_COERCE_NUM: coerce TOS string to number        → rt_coerce_num() */
-void emit_sm_concat    ();
-void emit_sm_push_null ();
 void emit_sm_coerce_num();
 
 /* SM_LABEL / SM_STNO structural markers — sub-rung -o (2026-05-11).
@@ -130,7 +127,7 @@ void emit_sm_call_fn(const char *name_lbl,
  * emit_sm_return: MACRO_DEF source of truth for RETURN macro (ret).
  * emit_sm_return_variant: MACRO_DEF source of truth for RETURN_VARIANT macro
  *   (mov edi,kind; mov esi,cond; call rt_do_return@PLT; test/jz/ret/label).
- * TEXT dispatch uses sm_emit_ret / sm_emit_ret_var (proven path). */
+ * TEXT dispatch uses emit_sm_ret / emit_sm_ret_var (proven path). */
 void emit_sm_return();
 void emit_sm_return_variant(int kind, int cond, int pc);
 
@@ -202,7 +199,6 @@ void emit_sm_push_lit_f(double val);
 void emit_sm_push_expr(uint64_t ptr_val);
 
 /* SM_PUSH_NULL_NOFLIP — push null, preserve last_ok. */
-void emit_sm_push_null_noflip();
 
 /* SM_EXP / SM_NEG — arithmetic. */
 void emit_sm_exp();
@@ -264,7 +260,7 @@ void emit_bb_xfnce(bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_�
 /* Variant — β→fail stub (never flat-eligible). */
 void emit_bb_xvar (bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
 
-/* Composite — structural stubs (handled inline by flat_emit_node). */
+/* Composite — structural stubs (handled inline by emit_flat_node). */
 void emit_bb_xcat (bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
 void emit_bb_xor  (bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
 

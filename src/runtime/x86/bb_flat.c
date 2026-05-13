@@ -70,7 +70,7 @@ static int g_flat_slot_count = 0;
  *                           switched the main stream out of `.text`)
  *   flat_intel_syntax()  -> if was deferred just now, no-op (stayed in text)
  *
- * At end of `flat_emit_body`: `flat_data_consolidate_flush(e)` emits ONE
+ * At end of `emit_flat_body`: `flat_data_consolidate_flush(e)` emits ONE
  * `.section .data` directive, dumps the buffer, restores `.section .text`
  * and `.intel_syntax noprefix`, then resets state.
  *
@@ -190,7 +190,7 @@ static void data_buf_flush_pending_label(void)
 }
 
 /* EM-7c-capture: callback installed by sm_codegen_x64_emit to collect cap fixups.
- * Called from flat_emit_node when XNME/XFNME emits a child sub-blob. */
+ * Called from emit_flat_node when XNME/XFNME emits a child sub-blob. */
 static void (*g_cap_fixup_cb)(void *cap_ptr, const char *child_α_label) = NULL;
 
 void bb_flat_set_cap_fixup_cb(void (*cb)(void *cap_ptr, const char *child_α_label))
@@ -339,7 +339,7 @@ void flat_data_string(const char *s)
     if (!g_is_text) return;
     /* Build the escaped quoted form once.  We escape only " and \, and
      * non-printables as \NNN — matches the assembler's expectation and
-     * mirrors flat_emit_charset_call's per-byte loop. */
+     * mirrors emit_flat_charset_call's per-byte loop. */
     char esc[1024];
     size_t o = 0;
     if (o < sizeof(esc)) esc[o++] = '"';
@@ -695,7 +695,7 @@ static void patnd_to_sno_string(const PATND_t *p, char *buf, size_t cap)
  */
 /* EM-MODE4-IS-MODE3-DUMP-d: external linkage (was static).
  * Used from the per-box template files for the BB-box banner shape. */
-void flat_emit_banner_rule(char ch)
+void emit_flat_banner_rule(char ch)
 {
     if (!g_is_text) return;
     char buf[BB_BANNER_RULE_LEN + 4];
@@ -711,11 +711,11 @@ void flat_emit_banner_rule(char ch)
  *   # pattern <prefix>: <reconstructed source>
  *   #=====================================================================
  */
-static void flat_emit_pat_banner(const char *prefix, PATND_t *p)
+static void emit_flat_pat_banner(const char *prefix, PATND_t *p)
 {
     if (!g_is_text) return;
     (void)prefix; (void)p;
-    flat_emit_banner_rule('=');
+    emit_flat_banner_rule('=');
 }
 
 /* Per-box banner: emit before the α-arm of a box.
@@ -730,11 +730,11 @@ static void flat_emit_pat_banner(const char *prefix, PATND_t *p)
  */
 /* EM-MODE4-IS-MODE3-DUMP-d: external linkage (was static).
  * Used from the per-box template files for the BB-box banner shape. */
-void flat_emit_box_banner(const char *kind,
+void emit_flat_box_banner(const char *kind,
                           const char *args, const char *label_prefix)
 {
     if (!g_is_text) return;
-    flat_emit_banner_rule('-');
+    emit_flat_banner_rule('-');
     if (args && *args) {
         emit_fprintf_raw("#                       BOX %s(%s)  [%s]\n", kind, args,
                 label_prefix ? label_prefix : "");
@@ -745,12 +745,12 @@ void flat_emit_box_banner(const char *kind,
 }
 
 /* ── forward declarations ────────────────────────────────────────────────── */
-static void flat_emit_node(PATND_t *p,
+static void emit_flat_node(PATND_t *p,
                            bb_label_t *lbl_succ, bb_label_t *lbl_fail,
                            bb_label_t *lbl_β);
 
 /* ── XCAT ───────────────────────────────────────────────────────────────── */
-static void flat_emit_xcat(PATND_t *p,
+static void emit_flat_xcat(PATND_t *p,
                            bb_label_t *lbl_succ, bb_label_t *lbl_fail,
                            bb_label_t *lbl_β)
 {
@@ -771,18 +771,18 @@ static void flat_emit_xcat(PATND_t *p,
         return;
     }
     if (p->nchildren == 1) {
-        flat_emit_node(p->children[0], lbl_succ, lbl_fail, &left_β);
+        emit_flat_node(p->children[0], lbl_succ, lbl_fail, &left_β);
         emit_label_define_bb(lbl_β); emit_jmp_label(&left_β, JMP_JMP);
         emit_label_define_bb(&xcat_ω); emit_jmp_label(lbl_fail, JMP_JMP);
         emit_label_define_bb(&mid_γ); emit_label_define_bb(&right_ω); emit_label_define_bb(&right_β);
         return;
     }
 
-    flat_emit_node(p->children[0], &mid_γ, &xcat_ω, &left_β);
+    emit_flat_node(p->children[0], &mid_γ, &xcat_ω, &left_β);
     emit_label_define_bb(&mid_γ);
 
     if (p->nchildren == 2) {
-        flat_emit_node(p->children[1], lbl_succ, &right_ω, &right_β);
+        emit_flat_node(p->children[1], lbl_succ, &right_ω, &right_β);
     } else {
         int nc = p->nchildren;
         bb_label_t *mids  = alloca(sizeof(bb_label_t) * (nc - 1));
@@ -793,7 +793,7 @@ static void flat_emit_xcat(PATND_t *p,
         }
         for (int i = 1; i < nc; i++) {
             bb_label_t *s = (i < nc-1) ? &mids[i-1] : lbl_succ;
-            flat_emit_node(p->children[i], s, &right_ω, &betas[i-1]);
+            emit_flat_node(p->children[i], s, &right_ω, &betas[i-1]);
             if (i < nc-1) emit_label_define_bb(&mids[i-1]);
         }
     }
@@ -803,14 +803,14 @@ static void flat_emit_xcat(PATND_t *p,
 }
 
 /* ── XOR (alternation) ──────────────────────────────────────────────────── */
-static void flat_emit_alt(PATND_t *p,
+static void emit_flat_alt(PATND_t *p,
                           bb_label_t *lbl_succ, bb_label_t *lbl_fail,
                           bb_label_t *lbl_β)
 {
     int id = g_flat_node_id++;
     int nc = p->nchildren;
     if (nc == 0) { emit_label_define_bb(lbl_β); emit_jmp_label(lbl_fail, JMP_JMP); return; }
-    if (nc == 1) { flat_emit_node(p->children[0], lbl_succ, lbl_fail, lbl_β); return; }
+    if (nc == 1) { emit_flat_node(p->children[0], lbl_succ, lbl_fail, lbl_β); return; }
 
     bb_label_t *ci_βs = alloca((size_t)nc * sizeof(bb_label_t));
     bb_label_t *ci_ωs = alloca((size_t)nc * sizeof(bb_label_t));
@@ -820,7 +820,7 @@ static void flat_emit_alt(PATND_t *p,
     }
     for (int i = 0; i < nc; i++) {
         bb_label_t *f = (i < nc-1) ? &ci_ωs[i] : &ci_ωs[nc-1];
-        flat_emit_node(p->children[i], lbl_succ, f, &ci_βs[i]);
+        emit_flat_node(p->children[i], lbl_succ, f, &ci_βs[i]);
         if (i < nc-1) emit_label_define_bb(&ci_ωs[i]);
         else          emit_label_define_bb(&ci_ωs[nc-1]);
     }
@@ -833,12 +833,12 @@ static void flat_emit_alt(PATND_t *p,
  * reference but no longer called.  XCHR emission now goes through
  * `emit_bb_xchr` in `templates/bb_xchr.c`, which has byte-for-byte
  * the same body.  See sub-rung -d watermark.  Single-line revert:
- * change the call in flat_emit_node's case XCHR back to
- * flat_emit_lit(lit, (int)strlen(lit), lbl_succ, lbl_fail, lbl_β). */
-static void flat_emit_lit(const char *lit, int len,
+ * change the call in emit_flat_node's case XCHR back to
+ * emit_flat_lit(lit, (int)strlen(lit), lbl_succ, lbl_fail, lbl_β). */
+static void emit_flat_lit(const char *lit, int len,
                           bb_label_t *lbl_succ, bb_label_t *lbl_fail,
                           bb_label_t *lbl_β) __attribute__((unused));
-static void flat_emit_lit(const char *lit, int len,
+static void emit_flat_lit(const char *lit, int len,
                           bb_label_t *lbl_succ, bb_label_t *lbl_fail,
                           bb_label_t *lbl_β)
 {
@@ -893,9 +893,9 @@ static void flat_emit_lit(const char *lit, int len,
 /* ── leaf: charset (ANY/NOTANY/SPAN/BRK) ───────────────────────────────── */
 /* EM-MODE4-IS-MODE3-DUMP-e: charset family now routed through
  * emit_bb_charset() in templates/bb_xspnc.c.  Kept as a rollback
- * reference and byte-identity oracle.  Do not call from flat_emit_node. */
+ * reference and byte-identity oracle.  Do not call from emit_flat_node. */
 __attribute__((unused))
-static void flat_emit_charset_call(bb_box_fn c_fn,
+static void emit_flat_charset_call(bb_box_fn c_fn,
                                    const char *c_fn_name,
                                    const char *chars,
                                    bb_label_t *lbl_succ, bb_label_t *lbl_fail,
@@ -919,7 +919,7 @@ static void flat_emit_charset_call(bb_box_fn c_fn,
         } else {
             preview[0] = '\0';
         }
-        flat_emit_box_banner(kind, preview, lbl_succ->name);
+        emit_flat_box_banner(kind, preview, lbl_succ->name);
         /* Static .data: chars string + cs_t {chars*, delta=0} */
         int id = g_flat_node_id++;
         char zlbl[64], slbl[64];
@@ -998,7 +998,7 @@ static void charset_text_body(bb_label_t *lbl_succ,
     } else {
         preview[0] = '\0';
     }
-    flat_emit_box_banner(kind, preview, lbl_succ->name);
+    emit_flat_box_banner(kind, preview, lbl_succ->name);
 
     /* Static .data: charset string + cs_t {chars*, delta=0}. */
     int id = g_flat_node_id++;
@@ -1031,7 +1031,7 @@ static void charset_text_body(bb_label_t *lbl_succ,
     flat_box_dispatch_jne_jmp(lbl_succ, lbl_fail);
 }
 
-/* Per-kind wrappers called from flat_emit_node.  Each builds a
+/* Per-kind wrappers called from emit_flat_node.  Each builds a
  * charset_text_arg_t and delegates to emit_bb_charset (template), which
  * owns the binary path and dispatches the text path back here. */
 
@@ -1063,7 +1063,7 @@ static void brkx_text_body(bb_label_t *lbl_succ,
     } else {
         preview[0] = '\0';
     }
-    flat_emit_box_banner("BREAKX", preview, lbl_succ->name);
+    emit_flat_box_banner("BREAKX", preview, lbl_succ->name);
 
     int id = g_flat_node_id++;
     char zlbl[64], slbl[64];
@@ -1114,7 +1114,7 @@ static void intcur_text_body(bb_label_t *lbl_succ,
     const intcur_text_arg_t *a = (const intcur_text_arg_t *)arg_;
     char banner_args[32];
     snprintf(banner_args, sizeof(banner_args), "%lld", a->num);
-    flat_emit_box_banner(a->kind_name, banner_args, lbl_succ->name);
+    emit_flat_box_banner(a->kind_name, banner_args, lbl_succ->name);
 
     int id = g_flat_node_id++;
     char lbl[64];
@@ -1135,13 +1135,13 @@ static void intcur_text_body(bb_label_t *lbl_succ,
 }
 
 
-/* ── flat_emit_node dispatch ─────────────────────────────────────────────── */
+/* ── emit_flat_node dispatch ─────────────────────────────────────────────── */
 extern int memcmp(const void *, const void *, size_t);
 
 /* Generic two-call emitter: α calls fn(ζ,0), β calls fn(ζ,1), result nonzero=success */
 /* EM-MODE4-IS-MODE3-DUMP-g: promoted from static to extern so
  * templates/bb_xlnth.c can reuse the alpha/beta dispatch logic. */
-void flat_emit_box_call(bb_box_fn fn, const char *fn_name,
+void emit_flat_box_call(bb_box_fn fn, const char *fn_name,
                                void *z,
                                bb_label_t *lbl_succ, bb_label_t *lbl_fail,
                                bb_label_t *lbl_β)
@@ -1181,7 +1181,7 @@ void flat_emit_box_call(bb_box_fn fn, const char *fn_name,
     }
 }
 
-static void flat_emit_node(PATND_t *p,
+static void emit_flat_node(PATND_t *p,
                            bb_label_t *lbl_succ, bb_label_t *lbl_fail,
                            bb_label_t *lbl_β)
 {
@@ -1199,8 +1199,8 @@ static void flat_emit_node(PATND_t *p,
     case XFAIL: emit_bb_xfail(lbl_succ, lbl_fail, lbl_β); break;
     case XPOSI: emit_bb_xposi((int)p->num, lbl_succ, lbl_fail, lbl_β); break;
     case XRPSI: emit_bb_xrpsi((int)p->num, lbl_succ, lbl_fail, lbl_β); break;
-    case XCAT:  flat_emit_xcat(p, lbl_succ, lbl_fail, lbl_β); break;
-    case XOR:   flat_emit_alt (p, lbl_succ, lbl_fail, lbl_β); break;
+    case XCAT:  emit_flat_xcat(p, lbl_succ, lbl_fail, lbl_β); break;
+    case XOR:   emit_flat_alt (p, lbl_succ, lbl_fail, lbl_β); break;
     case XSPNC: emit_bb_charset(NULL,   "bb_span",   "SPAN",   p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
     case XANYC: emit_bb_charset(NULL,    "bb_any",    "ANY",    p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
     case XBRKC: emit_bb_charset(NULL,    "bb_brk",    "BREAK",  p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
@@ -1235,13 +1235,13 @@ static int flat_is_eligible(PATND_t *p)
     if (!p) return 1;
     if (p->kind == XVAR) return 0;  /* runtime DESCR_t as pattern — graph unknown */
     if (p->kind == XCAT && p->nchildren > 2) return 0;
-    /* SN-33b: XNME/XFNME/XARBN binary path in flat_emit_node passes child_fn=NULL
+    /* SN-33b: XNME/XFNME/XARBN binary path in emit_flat_node passes child_fn=NULL
      * to bb_cap_new (or emits a fail-stub for ARBNO).  bb_cap then dereferences
      * NULL at bb_boxes.c:541.  Until recursive child-blob emission lands in the
      * binary path, fall back to bb_build_binary (which builds the child correctly
      * via bb_build_binary_node — see bb_build.c:bb_nme_emit_binary). */
     /* SL-13c (sess 2026-05-12, Claude Opus 4.7): XCALLCAP also has no
-     * flat_emit_node case — falls to `default` which emits a β→fail stub,
+     * emit_flat_node case — falls to `default` which emits a β→fail stub,
      * silently dropping pat . *Fn() deferred calls.  bb_build_binary has a
      * proper bb_callcap_emit_binary handler (bb_build.c:1219) that wires the
      * trampoline to bb_cap with NM_CALL.  Excluding XCALLCAP from flat
@@ -1253,7 +1253,7 @@ static int flat_is_eligible(PATND_t *p)
 }
 
 /* ── shared emission body ─────────────────────────────────────────────────── */
-static int flat_emit_body(PATND_t *p,
+static int emit_flat_body(PATND_t *p,
                             const char *prefix, int text_externalise, int brokered)
 {
     bb_label_t lbl_α, lbl_α_body, lbl_succ, lbl_fail, lbl_β;
@@ -1276,7 +1276,7 @@ static int flat_emit_body(PATND_t *p,
     if (text_externalise) {
         /* EM-FORMAT-BB-BOX-BANNERS: pattern-level banner above the
          * blob's exported symbols.  Reconstructed PATND_t source. */
-        flat_emit_pat_banner(prefix, p);
+        emit_flat_pat_banner(prefix, p);
         emit_global_sym(lbl_α.name);
         emit_global_sym(lbl_β.name);
         emit_global_sym(lbl_succ.name);
@@ -1297,7 +1297,7 @@ static int flat_emit_body(PATND_t *p,
      * start + preamble size; fine since binary blobs are called at offset 0). */
     emit_label_define_bb(&lbl_α_body);
     if (!text_externalise) emit_label_define_bb(&lbl_α);   /* binary: α = α_body */
-    flat_emit_node(p, &lbl_succ, &lbl_fail, &lbl_β);
+    emit_flat_node(p, &lbl_succ, &lbl_fail, &lbl_β);
 
     /* PAT_γ: success → return DESCR_t{v=DT_S=1, rdx=Σ+Δ} */
     emit_label_define_bb(&lbl_succ);
@@ -1345,7 +1345,7 @@ bb_box_fn bb_build_flat(PATND_t *p)
     if (!buf) return NULL;
     g_flat_slot_count = 0; g_flat_node_id = 0;
     emitter_init_binary(buf, FLAT_BUF_MAX);
-    flat_emit_body(p, "pat_flat", 0, 0);
+    emit_flat_body(p, "pat_flat", 0, 0);
     int nbytes = emitter_end();
     
     if (nbytes <= 0 || nbytes > FLAT_BUF_MAX) { bb_free(buf, FLAT_BUF_MAX); return NULL; }
@@ -1371,7 +1371,7 @@ bb_box_fn bb_build_brokered(PATND_t *p)
     /* C-ABI prologue: push rbp; mov rbp, rsp — emitted before flat BB body */
     bb_emit_byte(0x55);                                          /* push rbp */
     bb_emit_byte(0x48); bb_emit_byte(0x89); bb_emit_byte(0xE5); /* mov rbp, rsp */
-    flat_emit_body(p, "pat_brok", 0, 1);
+    emit_flat_body(p, "pat_brok", 0, 1);
     int nbytes = emitter_end();
     
     emit_mode_set(EMIT_BINARY_WIRED, NULL);
@@ -1389,7 +1389,7 @@ int bb_build_flat_text(PATND_t *p, FILE *out, const char *prefix)
      * Use bb_build_flat_text_reset() between unrelated emit runs. */
     emitter_init_text(out, TEXT_MODE_INVOCATION);
     /* intern_str now wired via bb_flat_set_intern_str global */
-    int rc = flat_emit_body(p, prefix, 1, 0);
+    int rc = emit_flat_body(p, prefix, 1, 0);
     emitter_end();
     
     /* EM-FORMAT-BB lone-label fusion: flush any pending label before returning,

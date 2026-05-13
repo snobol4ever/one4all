@@ -1,4 +1,4 @@
-/* sm_emit_template.c -- single source of truth for SM opcode emission.
+/* emit_sm_template.c -- single source of truth for SM opcode emission.
  *
  * EM-7c-sm-macros (sess #87, 2026-05-09).
  *
@@ -40,9 +40,9 @@
  * NULL) and clears it so continuation lines within the same instruction
  * (multi-line blobs) don't inherit it.
  * ----------------------------------------------------------------------- */
-static char g_pending_pc_label[32] = "";  /* ".Lpc%d:"  set by sm_emit_set_pc_label */
+static char g_pending_pc_label[32] = "";  /* ".Lpc%d:"  set by emit_sm_set_pc_label */
 
-void sm_emit_set_pc_label(const char *lbl)
+void emit_sm_set_pc_label(const char *lbl)
 {
     if (lbl && *lbl) {
         size_t n = strlen(lbl);
@@ -57,7 +57,7 @@ void sm_emit_set_pc_label(const char *lbl)
 /* Read + clear.  Used by callers that bypass render_call_line (e.g.
  * sm_line in the codegen driver) but still want the column-1 label
  * pickup behavior.  Returns "" when there's nothing pending. */
-const char *sm_emit_consume_pc_label(void)
+const char *emit_sm_consume_pc_label(void)
 {
     static char buf[32];
     if (!g_pending_pc_label[0]) return "";
@@ -519,7 +519,7 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
     case SM_TPL__COUNT:
         break;
     }
-    fprintf(stderr, "sm_emit_template: render_macro_body: unknown kind %d\n",
+    fprintf(stderr, "emit_sm_template: render_macro_body: unknown kind %d\n",
             (int)t->kind);
     return -1;
 }
@@ -564,7 +564,7 @@ static int write_anno(FILE *out, const char *anno)
  * The macro name itself goes into column 2 (t->macro_name directly).
  * These two together replace the old fused build_op_col. */
 static int build_args_col(char *buf, int cap, const sm_op_template_t *t,
-                          const sm_emit_args_t *args)
+                          const emit_sm_args_t *args)
 {
     int n = 0;
     switch (t->kind) {
@@ -578,7 +578,7 @@ static int build_args_col(char *buf, int cap, const sm_op_template_t *t,
         break;
     case SM_TPL_LBL:
         if (!args->lbl) {
-            fprintf(stderr, "sm_emit_template: SM_TPL_LBL got NULL lbl for %s\n",
+            fprintf(stderr, "emit_sm_template: SM_TPL_LBL got NULL lbl for %s\n",
                     t->macro_name);
             return -1;
         }
@@ -592,7 +592,7 @@ static int build_args_col(char *buf, int cap, const sm_op_template_t *t,
         break;
     case SM_TPL_LBL_INT32:
         if (!args->lbl) {
-            fprintf(stderr, "sm_emit_template: SM_TPL_LBL_INT32 got NULL lbl for %s\n",
+            fprintf(stderr, "emit_sm_template: SM_TPL_LBL_INT32 got NULL lbl for %s\n",
                     t->macro_name);
             return -1;
         }
@@ -650,7 +650,7 @@ static int build_args_col(char *buf, int cap, const sm_op_template_t *t,
     case SM_TPL__COUNT:
         break;
     default:
-        fprintf(stderr, "sm_emit_template: build_args_col: unknown kind %d\n",
+        fprintf(stderr, "emit_sm_template: build_args_col: unknown kind %d\n",
                 (int)t->kind);
         return -1;
     }
@@ -658,7 +658,7 @@ static int build_args_col(char *buf, int cap, const sm_op_template_t *t,
 }
 
 static int render_call_line(FILE *out, const sm_op_template_t *t,
-                            const sm_emit_args_t *args)
+                            const emit_sm_args_t *args)
 {
     /* Corrected three-column layout:
      *   Col 1 (label):  24 chars, left-aligned  -- from args->label or g_pending_pc_label
@@ -723,7 +723,7 @@ static int render_call_line(FILE *out, const sm_op_template_t *t,
  * Public API
  * --------------------------------------------------------------------- */
 
-/* sm_emit_macro_library:
+/* emit_sm_macro_library:
  *
  * Walks g_sm_templates[] (plus the standalone unhandled and ret_var
  * templates) and emits one .macro definition per UNIQUE macro_name.
@@ -735,7 +735,7 @@ static int render_call_line(FILE *out, const sm_op_template_t *t,
  * which are common to AT&T and Intel syntax); placement before any
  * `.intel_syntax noprefix` directive in the .s is fine.
  */
-int sm_emit_macro_library(FILE *out)
+int emit_sm_macro_library(FILE *out)
 {
     /* De-duplication: track which macro_names have already been emitted. */
     const char *seen[256] = { 0 };
@@ -744,7 +744,7 @@ int sm_emit_macro_library(FILE *out)
     if (fputs(
         "# === BEGIN sm macro library (generated from g_sm_templates[]) ===\n"
         "# EM-7c-sm-macros: one macro per opcode group; bodies and per-call\n"
-        "#   emissions share one renderer in sm_emit_template.c, so the\n"
+        "#   emissions share one renderer in emit_sm_template.c, so the\n"
         "#   .s and the C dispatcher cannot drift -- they are paired by\n"
         "#   shape kind in render_macro_body() / render_call_line().\n"
         "                        .intel_syntax    noprefix\n",
@@ -759,7 +759,7 @@ int sm_emit_macro_library(FILE *out)
         }                                                                   \
         if (!already) {                                                     \
             if (n_seen >= (int)(sizeof(seen)/sizeof(seen[0]))) {            \
-                fprintf(stderr, "sm_emit_macro_library: seen[] overflow\n");\
+                fprintf(stderr, "emit_sm_macro_library: seen[] overflow\n");\
                 return -1;                                                  \
             }                                                               \
             seen[n_seen++] = _t->macro_name;                                \
@@ -797,24 +797,24 @@ int sm_emit_macro_library(FILE *out)
     return 0;
 }
 
-int sm_emit_macro_library_to_path(const char *path)
+int emit_sm_macro_library_to_path(const char *path)
 {
     if (!path || !*path) return -1;
     FILE *fp = fopen(path, "w");
     if (!fp) {
-        fprintf(stderr, "sm_emit_macro_library_to_path: cannot open %s for writing\n",
+        fprintf(stderr, "emit_sm_macro_library_to_path: cannot open %s for writing\n",
                 path);
         return -1;
     }
-    int rc = sm_emit_macro_library(fp);
+    int rc = emit_sm_macro_library(fp);
     if (fclose(fp) != 0) return -1;
     return rc;
 }
 
 /* Per-instruction generic dispatch (rarely called directly; convenience
  * wrappers below are usually clearer at call sites). */
-int sm_emit_template(FILE *out, const sm_op_template_t *t,
-                     const sm_emit_args_t *args)
+int emit_sm_template(FILE *out, const sm_op_template_t *t,
+                     const emit_sm_args_t *args)
 {
     if (!t || !args) return -1;
     return render_call_line(out, t, args);
@@ -822,173 +822,173 @@ int sm_emit_template(FILE *out, const sm_op_template_t *t,
 
 /* ---- Convenience wrappers ----------------------------------------- */
 
-int sm_emit_rtcall(FILE *out, const sm_op_template_t *t, const char *anno)
+int emit_sm_rtcall(FILE *out, const sm_op_template_t *t, const char *anno)
 {
-    sm_emit_args_t a = { 0 };
+    emit_sm_args_t a = { 0 };
     a.anno = anno;
-    return sm_emit_template(out, t, &a);
+    return emit_sm_template(out, t, &a);
 }
 
-int sm_emit_noop(FILE *out, const sm_op_template_t *t, const char *anno)
+int emit_sm_noop(FILE *out, const sm_op_template_t *t, const char *anno)
 {
     /* SM_TPL_NOOP: render exactly one three-column line carrying the
      * macro name in col 2.  The pending .LpcN: pc-label is consumed
      * (via render_call_line's normal label-pickup path) so the label
      * is never naked.  Macro body is empty; the .s assembles cleanly
      * because the macro expands to nothing. */
-    sm_emit_args_t a = { 0 };
+    emit_sm_args_t a = { 0 };
     a.anno = anno;
-    return sm_emit_template(out, t, &a);
+    return emit_sm_template(out, t, &a);
 }
 
-int sm_emit_int64(FILE *out, const sm_op_template_t *t,
+int emit_sm_int64(FILE *out, const sm_op_template_t *t,
                   int64_t v, const char *anno)
 {
-    sm_emit_args_t a = { 0 };
+    emit_sm_args_t a = { 0 };
     a.i64 = v;
     a.anno = anno;
-    return sm_emit_template(out, t, &a);
+    return emit_sm_template(out, t, &a);
 }
 
-int sm_emit_lbl(FILE *out, const sm_op_template_t *t,
+int emit_sm_lbl(FILE *out, const sm_op_template_t *t,
                 const char *lbl, const char *anno)
 {
-    sm_emit_args_t a = { 0 };
+    emit_sm_args_t a = { 0 };
     a.lbl = lbl;
     a.anno = anno;
-    return sm_emit_template(out, t, &a);
+    return emit_sm_template(out, t, &a);
 }
 
-int sm_emit_lblopt(FILE *out, const sm_op_template_t *t,
+int emit_sm_lblopt(FILE *out, const sm_op_template_t *t,
                    const char *lbl_or_null, const char *anno)
 {
-    sm_emit_args_t a = { 0 };
+    emit_sm_args_t a = { 0 };
     a.lbl = (lbl_or_null && *lbl_or_null) ? lbl_or_null : NULL;
     a.anno = anno;
-    return sm_emit_template(out, t, &a);
+    return emit_sm_template(out, t, &a);
 }
 
-int sm_emit_lbl_int32(FILE *out, const sm_op_template_t *t,
+int emit_sm_lbl_int32(FILE *out, const sm_op_template_t *t,
                       const char *lbl, int n, const char *anno)
 {
-    sm_emit_args_t a = { 0 };
+    emit_sm_args_t a = { 0 };
     a.lbl = lbl;
     a.i32_a = n;
     a.anno = anno;
-    return sm_emit_template(out, t, &a);
+    return emit_sm_template(out, t, &a);
 }
 
-int sm_emit_lblopt_int32(FILE *out, const sm_op_template_t *t,
+int emit_sm_lblopt_int32(FILE *out, const sm_op_template_t *t,
                          const char *lbl_or_null, int n, const char *anno)
 {
-    sm_emit_args_t a = { 0 };
+    emit_sm_args_t a = { 0 };
     a.lbl = (lbl_or_null && *lbl_or_null) ? lbl_or_null : NULL;
     a.i32_a = n;
     a.anno = anno;
-    return sm_emit_template(out, t, &a);
+    return emit_sm_template(out, t, &a);
 }
 
-int sm_emit_arith(FILE *out, const sm_op_template_t *t)
+int emit_sm_arith(FILE *out, const sm_op_template_t *t)
 {
-    sm_emit_args_t a = { 0 };
+    emit_sm_args_t a = { 0 };
     /* annotation set by caller's choice -- we put the opcode name */
-    return sm_emit_template(out, t, &a);
+    return emit_sm_template(out, t, &a);
 }
 
-int sm_emit_pcref_jmp(FILE *out, const sm_op_template_t *t,
+int emit_sm_pcref_jmp(FILE *out, const sm_op_template_t *t,
                       int target_pc, const char *anno)
 {
-    sm_emit_args_t a = { 0 };
+    emit_sm_args_t a = { 0 };
     a.i32_a = target_pc;
     a.anno = anno;
-    return sm_emit_template(out, t, &a);
+    return emit_sm_template(out, t, &a);
 }
 
-int sm_emit_pcref_cond(FILE *out, const sm_op_template_t *t,
+int emit_sm_pcref_cond(FILE *out, const sm_op_template_t *t,
                        int target_pc, int taken_when_ok,
                        const char *anno)
 {
     /* taken_when_ok is encoded in t->const_a (S=1, F=0); the per-call
      * site only needs the target pc. */
     (void)taken_when_ok;
-    sm_emit_args_t a = { 0 };
+    emit_sm_args_t a = { 0 };
     a.i32_a = target_pc;
     a.anno = anno;
-    return sm_emit_template(out, t, &a);
+    return emit_sm_template(out, t, &a);
 }
 
-int sm_emit_push_expression(FILE *out, const sm_op_template_t *t,
+int edp4_emit_push_expression(FILE *out, const sm_op_template_t *t,
                        int64_t entry_pc, int arity)
 {
-    sm_emit_args_t a = { 0 };
+    emit_sm_args_t a = { 0 };
     a.i64 = entry_pc;
     a.i32_a = arity;
-    return sm_emit_template(out, t, &a);
+    return emit_sm_template(out, t, &a);
 }
 
-int sm_emit_call_expression(FILE *out, const sm_op_template_t *t, int target_pc)
+int edp4_emit_call_expression(FILE *out, const sm_op_template_t *t, int target_pc)
 {
-    sm_emit_args_t a = { 0 };
+    emit_sm_args_t a = { 0 };
     a.i32_a = target_pc;
-    return sm_emit_template(out, t, &a);
+    return emit_sm_template(out, t, &a);
 }
 
-int sm_emit_ret(FILE *out, const sm_op_template_t *t, const char *anno)
+int emit_sm_ret(FILE *out, const sm_op_template_t *t, const char *anno)
 {
-    return sm_emit_rtcall(out, t, anno);
+    return emit_sm_rtcall(out, t, anno);
 }
 
-int sm_emit_ret_var(FILE *out, int kind, int cond, int pc, const char *anno)
+int emit_sm_ret_var(FILE *out, int kind, int cond, int pc, const char *anno)
 {
-    sm_emit_args_t a = { 0 };
+    emit_sm_args_t a = { 0 };
     a.i32_a = kind;
     a.i32_b = cond;
     a.pc    = pc;
     a.anno  = anno;
-    return sm_emit_template(out, sm_template_ret_var(), &a);
+    return emit_sm_template(out, sm_template_ret_var(), &a);
 }
 
-int sm_emit_unhandled(FILE *out, int op)
+int emit_sm_unhandled(FILE *out, int op)
 {
-    sm_emit_args_t a = { 0 };
+    emit_sm_args_t a = { 0 };
     a.i32_a = op;
-    return sm_emit_template(out, sm_template_unhandled(), &a);
+    return emit_sm_template(out, sm_template_unhandled(), &a);
 }
 
-int sm_emit_exec_var(FILE *out, const sm_op_template_t *t,
+int emit_sm_exec_var(FILE *out, const sm_op_template_t *t,
                      const char *subj_lbl_or_null, int has_repl)
 {
-    sm_emit_args_t a = { 0 };
+    emit_sm_args_t a = { 0 };
     a.lbl   = (subj_lbl_or_null && *subj_lbl_or_null) ? subj_lbl_or_null : NULL;
     a.i32_a = has_repl;
-    return sm_emit_template(out, t, &a);
+    return emit_sm_template(out, t, &a);
 }
 
-int sm_emit_capture_fn(FILE *out, const sm_op_template_t *t,
+int emit_sm_capture_fn(FILE *out, const sm_op_template_t *t,
                        const char *fname_lbl_or_null,
                        int is_imm,
                        const char *namelist_lbl_or_null,
                        const char *anno)
 {
-    sm_emit_args_t a = { 0 };
+    emit_sm_args_t a = { 0 };
     a.lbl   = (fname_lbl_or_null && *fname_lbl_or_null) ? fname_lbl_or_null : NULL;
     a.lbl_b = (namelist_lbl_or_null && *namelist_lbl_or_null) ? namelist_lbl_or_null : NULL;
     a.i32_a = is_imm;
     a.anno  = anno;
-    return sm_emit_template(out, t, &a);
+    return emit_sm_template(out, t, &a);
 }
 
-int sm_emit_capture_fn_args(FILE *out, const sm_op_template_t *t,
+int emit_sm_capture_fn_args(FILE *out, const sm_op_template_t *t,
                             const char *fname_lbl_or_null,
                             int is_imm, int nargs,
                             const char *anno)
 {
-    sm_emit_args_t a = { 0 };
+    emit_sm_args_t a = { 0 };
     a.lbl   = (fname_lbl_or_null && *fname_lbl_or_null) ? fname_lbl_or_null : NULL;
     a.i32_a = is_imm;
     a.i32_b = nargs;
     a.anno  = anno;
-    return sm_emit_template(out, t, &a);
+    return emit_sm_template(out, t, &a);
 }
 
 /* ---------------------------------------------------------------------
@@ -996,18 +996,18 @@ int sm_emit_capture_fn_args(FILE *out, const sm_op_template_t *t,
  * stream, asserts no failure.  Used by the gate to verify all kinds
  * have both arms implemented (no SM_TPL__COUNT slipping through).
  * --------------------------------------------------------------------- */
-int sm_emit_template_selftest(FILE *out)
+int emit_sm_template_selftest(FILE *out)
 {
     int failures = 0;
-    if (fprintf(out, "sm_emit_template self-test: %d templates\n",
+    if (fprintf(out, "emit_sm_template self-test: %d templates\n",
                 G_SM_TEMPLATES_N + 2) < 0) return -1;
     /* Macro library round-trip. */
-    if (sm_emit_macro_library(out) != 0) {
-        fprintf(out, "FAIL: sm_emit_macro_library returned -1\n");
+    if (emit_sm_macro_library(out) != 0) {
+        fprintf(out, "FAIL: emit_sm_macro_library returned -1\n");
         failures++;
     }
     /* Per-call line round-trip with sentinel args, one per kind. */
-    sm_emit_args_t sentinel = {
+    emit_sm_args_t sentinel = {
         .i64   = 0x12345678,
         .i32_a = 7,
         .i32_b = 3,

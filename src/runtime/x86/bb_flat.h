@@ -98,7 +98,7 @@ void bb_build_flat_text_reset(void);
  * Returns 0 on success, -1 on I/O error. */
 int bb_macros_write_to_path(const char *path);
 
-/* EM-7c-capture: install a callback that is invoked each time flat_emit_node
+/* EM-7c-capture: install a callback that is invoked each time emit_flat_node
  * emits an XNME/XFNME child sub-blob.  sm_codegen_x64_emit installs this
  * to collect cap fixups for the startup preamble. */
 void bb_flat_set_cap_fixup_cb(void (*cb)(void *cap_ptr, const char *child_α_label));
@@ -112,8 +112,8 @@ void bb_flat_set_cap_fixup_cb(void (*cb)(void *cap_ptr, const char *child_α_lab
  * so per-box templates (which live under the `templates` directory)
  * can produce the same banner shape without having to duplicate the
  * implementation. */
-void flat_emit_banner_rule(char ch);
-void flat_emit_box_banner (const char *kind,
+void emit_flat_banner_rule(char ch);
+void emit_flat_box_banner (const char *kind,
                            const char *args, const char *label_prefix);
 
 /* Per-node ID counter used by templates to generate unique static-data
@@ -185,9 +185,9 @@ typedef void (*bb_nullary_text_fn)(
                                    bb_label_t *lbl_β,
                                    void *arg);
 
-/* flat_emit_box_call — alpha/beta dispatch for a pre-allocated zeta struct.
+/* emit_flat_box_call — alpha/beta dispatch for a pre-allocated zeta struct.
  * Exposed for use by integer-cursor template (bb_xlnth.c). */
-void flat_emit_box_call(bb_box_fn fn, const char *fn_name,
+void emit_flat_box_call(bb_box_fn fn, const char *fn_name,
                         void *z,
                         bb_label_t *lbl_succ, bb_label_t *lbl_fail,
                         bb_label_t *lbl_β);

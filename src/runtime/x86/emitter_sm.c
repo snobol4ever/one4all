@@ -90,10 +90,6 @@ void emit_sm_op(int op)
 }
 
 /* Named wrappers — public API unchanged */
-void emit_sm_void_pop()       { emit_sm_op(SM_VOID_POP); }
-void emit_sm_concat()         { emit_sm_op(SM_CONCAT); }
-void emit_sm_push_null()      { emit_sm_op(SM_PUSH_NULL); }
-void emit_sm_push_null_noflip(){ emit_sm_op(SM_PUSH_NULL_NOFLIP); }
 void emit_sm_coerce_num()     { emit_sm_op(SM_COERCE_NUM); }
 void emit_sm_exp()            { emit_sm_op(SM_EXP); }
 void emit_sm_neg()            { emit_sm_op(SM_NEG); }
