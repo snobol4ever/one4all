@@ -1559,16 +1559,7 @@ bb_node_t coro_eval(tree_t *e) {
         } } while(0)
         _TO_COERCE(lo_d); _TO_COERCE(hi_d); _TO_COERCE(step_d);
 #undef _TO_COERCE
-        int any_real = IS_REAL_fn(lo_d) || IS_REAL_fn(hi_d) || IS_REAL_fn(step_d);
-        if (any_real && !any_str) {
-            /* Pure-real bounds (no string coercion): use floating-point generator */
-            icn_to_by_real_state_t *z = calloc(1, sizeof(*z));
-            z->lo   = IS_REAL_fn(lo_d)   ? lo_d.r   : (double)(IS_FAIL_fn(lo_d)   ? 0 : lo_d.i);
-            z->hi   = IS_REAL_fn(hi_d)   ? hi_d.r   : (double)(IS_FAIL_fn(hi_d)   ? 0 : hi_d.i);
-            z->step = IS_REAL_fn(step_d) ? step_d.r : (double)(IS_FAIL_fn(step_d) ? 1 : step_d.i);
-            return (bb_node_t){ coro_bb_to_by_real, z, 0 };
-        }
-        /* Mixed or string/cset coercion: truncate to integer */
+        /* JCON: all to-by bounds truncate to integer regardless of type (no pure-real path) */
 #define _TO_INT(d, def) (IS_REAL_fn(d) ? (long)(d).r : (IS_FAIL_fn(d) ? (def) : (d).i))
         icn_to_by_state_t *z = calloc(1, sizeof(*z));
         z->lo   = _TO_INT(lo_d,   0);

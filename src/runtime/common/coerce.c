@@ -62,7 +62,8 @@ DESCR_t shared_arith(DESCR_t l, DESCR_t r, sm_opcode_t op)
                 while (exp-- > 0) res *= base;
                 return REALVAL((double)res);  /* Icon ^ always returns real */
             }
-            return REALVAL(pow((double)l.i, (double)r.i));
+            /* JCON: int ^ negative-int → truncate pow result to integer (< 1 → 0) */
+            return INTVAL((int64_t)pow((double)l.i, (double)r.i));
         default: break;
         }
     }

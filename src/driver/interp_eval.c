@@ -509,6 +509,17 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         if (IS_FAIL_fn(av)) { *out = FAILDESCR; return 1; }
         char *buf = GC_malloc(256);
         if (av.v == DT_SNUL)     { *out = STRVAL("&null"); return 1; }
+        /* IJ-7: cset value — image as 'chars' with single quotes */
+        if (IS_CSET_fn(av)) {
+            const char *cs = av.s ? av.s : "";
+            int clen = (int)strlen(cs);
+            char *outs = GC_malloc(clen + 3);
+            outs[0] = '\'';
+            memcpy(outs+1, cs, clen);
+            outs[1+clen] = '\'';
+            outs[2+clen] = '\0';
+            *out = STRVAL(outs); return 1;
+        }
         /* IJ-3: file values — integer FH index with name in raku_fh_name */
         if (IS_INT_fn(av)) {
             int idx = (int)av.i;
@@ -539,6 +550,23 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
             snprintf(buf,128,"procedure"); *out=STRVAL(buf); return 1;
         }
         /* IJ-4: DT_S builtin proc name → "function name" */
+        if (IS_CSET_fn(av)) {
+            /* Cset value: emit 'chars' format (single-quoted sorted chars) */
+            const char *cs = av.s ? av.s : "";
+            int cslen = (int)strlen(cs);
+            char *outs = GC_malloc(cslen * 4 + 3);
+            int o = 0;
+            outs[o++] = '\'';
+            for (int i = 0; i < cslen; i++) {
+                unsigned char c = (unsigned char)cs[i];
+                if (c == '\'') { outs[o++] = '\\'; outs[o++] = '\''; }
+                else if (c < 0x20 || c == 0x7f) { o += snprintf(outs+o, 5, "\\x%02x", c); }
+                else outs[o++] = (char)c;
+            }
+            outs[o++] = '\'';
+            outs[o] = '\0';
+            *out = STRVAL(outs); return 1;
+        }
         if (IS_STR_fn(av) && av.s) {
             /* Check if it's a known builtin name; if so emit "function name" */
             extern DESCR_t icn_proc_as_value(const char *);
@@ -1591,6 +1619,11 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
                 long long base=l.i, res=1; for(int k=0;k<(int)r.i;k++) res*=base;
                 *out=INTVAL(res); return 1;
             }
+            /* JCON: int ^ negative-int truncates to integer (pow result < 1 → 0) */
+            if (IS_INT_fn(l)&&IS_INT_fn(r)&&r.i<0) {
+                double rv=pow((double)l.i,(double)r.i);
+                *out=INTVAL((long long)rv); return 1;
+            }
             double base=IS_REAL_fn(l)?l.r:(double)l.i, exp=IS_REAL_fn(r)?r.r:(double)r.i;
             *out=(DESCR_t){.v=DT_R,.r=pow(base,exp)}; return 1;
         }
@@ -1621,21 +1654,21 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         if (!strcmp(fn,"[]")) {
             *out=subscript_get(l,r); return 1;
         }
-        /* cset set operations */
-        if (!strcmp(fn,"++")) {
-            const char *la=VARVAL_fn(l); if(!la)la="";
-            const char *ra=VARVAL_fn(r); if(!ra)ra="";
-            *out=STRVAL(icn_cset_canonical(icn_cset_union(la,ra))); return 1;
-        }
-        if (!strcmp(fn,"--")) {
-            const char *la=VARVAL_fn(l); if(!la)la="";
-            const char *ra=VARVAL_fn(r); if(!ra)ra="";
-            *out=STRVAL(icn_cset_canonical(icn_cset_diff(la,ra))); return 1;
-        }
-        if (!strcmp(fn,"**")) {
-            const char *la=VARVAL_fn(l); if(!la)la="";
-            const char *ra=VARVAL_fn(r); if(!ra)ra="";
-            *out=STRVAL(icn_cset_canonical(icn_cset_inter(la,ra))); return 1;
+        /* cset set operations: int/real args coerce to decimal image string as cset */
+        if (!strcmp(fn,"++") || !strcmp(fn,"--") || !strcmp(fn,"**")) {
+            /* coerce each operand to its char-string representation */
+            char _lbuf[64], _rbuf[64];
+            const char *la, *ra;
+            if (IS_INT_fn(l))       { snprintf(_lbuf,sizeof _lbuf,"%lld",(long long)l.i); la=_lbuf; }
+            else if (IS_REAL_fn(l)) { real_str(l.r,_lbuf,sizeof _lbuf); la=_lbuf; }
+            else                    { la=VARVAL_fn(l); if(!la) la=""; }
+            if (IS_INT_fn(r))       { snprintf(_rbuf,sizeof _rbuf,"%lld",(long long)r.i); ra=_rbuf; }
+            else if (IS_REAL_fn(r)) { real_str(r.r,_rbuf,sizeof _rbuf); ra=_rbuf; }
+            else                    { ra=VARVAL_fn(r); if(!ra) ra=""; }
+            if (fn[0]=='+') *out=CSETVAL(icn_cset_canonical(icn_cset_union(la,ra)));
+            else if (fn[1]=='-') *out=CSETVAL(icn_cset_canonical(icn_cset_diff(la,ra)));
+            else *out=CSETVAL(icn_cset_canonical(icn_cset_inter(la,ra)));
+            return 1;
         }
     }
 
@@ -4183,7 +4216,7 @@ DESCR_t interp_eval(tree_t *e)
 
     /* ── Icon EKinds — OE-3 ─── */
 
-    case TT_CSET: return e->v.sval ? STRVAL(icn_cset_canonical(e->v.sval)) : NULVCL;
+    case TT_CSET: return e->v.sval ? CSETVAL(icn_cset_canonical(e->v.sval)) : NULVCL;
 
     case TT_TO: case TT_TO_BY: {
         long cur;
@@ -4435,10 +4468,11 @@ DESCR_t interp_eval(tree_t *e)
         }
         /* &null — fail */
         if (v.v == DT_SNUL) return FAILDESCR;
-        /* String — random character, fail if empty */
+        /* Cset or String — random character, fail if empty */
         const char *s = VARVAL_fn(v);
         if (!s || !*s) return FAILDESCR;
-        long slen = v.slen > 0 ? v.slen : (long)strlen(s);
+        /* For csets (slen=0xFFFFFFFF sentinel), always use strlen */
+        long slen = IS_CSET_fn(v) ? (long)strlen(s) : (v.slen > 0 ? v.slen : (long)strlen(s));
         if (slen <= 0) return FAILDESCR;
         char *out = (char *)GC_malloc(2);
         out[0] = s[_rnd % (unsigned long)slen];

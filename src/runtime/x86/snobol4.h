@@ -46,6 +46,8 @@ static inline size_t descr_slen(DESCR_t d) {
 #define BSTRVAL(s_, len_) ((DESCR_t){ .v = DT_S, .slen = (uint32_t)(len_), .s = (s_) })
 #define INTVAL(i_) ((DESCR_t){ .v = DT_I,  .i = (i_) })
 #define REALVAL(r_)((DESCR_t){ .v = DT_R, .r = (r_) })
+/* CSETVAL: DT_S with slen=0xFFFFFFFF flags a cset value so image() can distinguish it from string */
+#define CSETVAL(s_) ((DESCR_t){ .v = DT_S, .slen = 0xFFFFFFFFu, .s = (s_) })
 #define NAMEPTR(dp_) ((DESCR_t){ .v = DT_N, .slen = 1, .ptr = (void*)(dp_) })
 #define NAMEVAL(s_)  ((DESCR_t){ .v = DT_N, .slen = 0, .s = (char *)(s_) })
 #define STYPE(v_)    ((v_).v)
@@ -57,10 +59,11 @@ static inline size_t descr_slen(DESCR_t d) {
 /* All strings are GC-managed, null-terminated char*.
  * "" is the canonical NULL/empty value.  */
 
-static inline int IS_NULL_fn(DESCR_t v)  { return v.v == DT_SNUL || (v.v == DT_S && (!v.s || !*v.s)); }
+static inline int IS_NULL_fn(DESCR_t v)  { return v.v == DT_SNUL || (v.v == DT_S && v.slen != 0xFFFFFFFFu && (!v.s || !*v.s)); }
 static inline int IS_STR_fn(DESCR_t v)   { return v.v == DT_S || v.v == DT_SNUL; }
 static inline int IS_INT_fn(DESCR_t v)   { return v.v == DT_I; }
 static inline int IS_REAL_fn(DESCR_t v)  { return v.v == DT_R; }
+static inline int IS_CSET_fn(DESCR_t v)  { return v.v == DT_S && v.slen == 0xFFFFFFFFu; }
 static inline int IS_DATA_fn(DESCR_t v)  { return v.v == DT_DATA; }
 
 /* Convert any value to string (GC-managed) */

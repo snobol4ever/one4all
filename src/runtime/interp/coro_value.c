@@ -1149,7 +1149,7 @@ DESCR_t bb_eval_value(tree_t *e)
      * The four binary ops delegate to the icn_cset_* helpers in icon_runtime.c
      * (now declared in coro_runtime.h).  TT_CSET literal mirrors interp_eval.c:3466. */
     case TT_CSET:
-        return e->v.sval ? STRVAL(icn_cset_canonical(e->v.sval)) : NULVCL;
+        return e->v.sval ? CSETVAL(icn_cset_canonical(e->v.sval)) : NULVCL;
 
     case TT_CSET_COMPL: {
         DESCR_t operand = bb_eval_value(e->c[0]);
@@ -1158,7 +1158,7 @@ DESCR_t bb_eval_value(tree_t *e)
          * Icon rule: ~integer treats the decimal image as a cset. */
         if (IS_INT_fn(operand) || IS_REAL_fn(operand)) operand = descr_to_str_icn(operand);
         const char *cs = IS_NULL_fn(operand) ? "" : VARVAL_fn(operand);
-        return STRVAL(icn_cset_complement(cs));
+        return CSETVAL(icn_cset_complement(cs));
     }
 
     case TT_CSET_UNION: {
@@ -1166,9 +1166,13 @@ DESCR_t bb_eval_value(tree_t *e)
         if (IS_FAIL_fn(lv)) return FAILDESCR;
         DESCR_t rv = bb_eval_value(e->c[1]);
         if (IS_FAIL_fn(rv)) return FAILDESCR;
-        const char *a = IS_NULL_fn(lv) ? "" : VARVAL_fn(lv);
-        const char *b = IS_NULL_fn(rv) ? "" : VARVAL_fn(rv);
-        return STRVAL(icn_cset_union(a, b));
+        char _lb[64], _rb[64];
+        const char *a = IS_INT_fn(lv) ? (snprintf(_lb,sizeof _lb,"%lld",(long long)lv.i),_lb)
+                      : IS_REAL_fn(lv) ? (real_str(lv.r,_lb,sizeof _lb),_lb) : VARVAL_fn(lv);
+        const char *b = IS_INT_fn(rv) ? (snprintf(_rb,sizeof _rb,"%lld",(long long)rv.i),_rb)
+                      : IS_REAL_fn(rv) ? (real_str(rv.r,_rb,sizeof _rb),_rb) : VARVAL_fn(rv);
+        if (!a) a=""; if (!b) b="";
+        return CSETVAL(icn_cset_canonical(icn_cset_union(a, b)));
     }
 
     case TT_CSET_DIFF: {
@@ -1176,9 +1180,13 @@ DESCR_t bb_eval_value(tree_t *e)
         if (IS_FAIL_fn(lv)) return FAILDESCR;
         DESCR_t rv = bb_eval_value(e->c[1]);
         if (IS_FAIL_fn(rv)) return FAILDESCR;
-        const char *a = IS_NULL_fn(lv) ? "" : VARVAL_fn(lv);
-        const char *b = IS_NULL_fn(rv) ? "" : VARVAL_fn(rv);
-        return STRVAL(icn_cset_diff(a, b));
+        char _lb[64], _rb[64];
+        const char *a = IS_INT_fn(lv) ? (snprintf(_lb,sizeof _lb,"%lld",(long long)lv.i),_lb)
+                      : IS_REAL_fn(lv) ? (real_str(lv.r,_lb,sizeof _lb),_lb) : VARVAL_fn(lv);
+        const char *b = IS_INT_fn(rv) ? (snprintf(_rb,sizeof _rb,"%lld",(long long)rv.i),_rb)
+                      : IS_REAL_fn(rv) ? (real_str(rv.r,_rb,sizeof _rb),_rb) : VARVAL_fn(rv);
+        if (!a) a=""; if (!b) b="";
+        return CSETVAL(icn_cset_canonical(icn_cset_diff(a, b)));
     }
 
     case TT_CSET_INTER: {
@@ -1186,9 +1194,13 @@ DESCR_t bb_eval_value(tree_t *e)
         if (IS_FAIL_fn(lv)) return FAILDESCR;
         DESCR_t rv = bb_eval_value(e->c[1]);
         if (IS_FAIL_fn(rv)) return FAILDESCR;
-        const char *a = IS_NULL_fn(lv) ? "" : VARVAL_fn(lv);
-        const char *b = IS_NULL_fn(rv) ? "" : VARVAL_fn(rv);
-        return STRVAL(icn_cset_inter(a, b));
+        char _lb[64], _rb[64];
+        const char *a = IS_INT_fn(lv) ? (snprintf(_lb,sizeof _lb,"%lld",(long long)lv.i),_lb)
+                      : IS_REAL_fn(lv) ? (real_str(lv.r,_lb,sizeof _lb),_lb) : VARVAL_fn(lv);
+        const char *b = IS_INT_fn(rv) ? (snprintf(_rb,sizeof _rb,"%lld",(long long)rv.i),_rb)
+                      : IS_REAL_fn(rv) ? (real_str(rv.r,_rb,sizeof _rb),_rb) : VARVAL_fn(rv);
+        if (!a) a=""; if (!b) b="";
+        return CSETVAL(icn_cset_canonical(icn_cset_inter(a, b)));
     }
 
     /* RS-23d: TT_WHILE — Icon while loop in value context.
