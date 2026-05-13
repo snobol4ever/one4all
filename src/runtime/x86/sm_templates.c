@@ -139,9 +139,10 @@ void emit_sm_push_lit_i(int64_t val)
 /*====================================================================================================================*/
 void emit_sm_push_lit_f(double val)
 {
-    static const char *const params[] = { "val" };
-    emit_macro_begin("PUSH_REAL", params, 1);
     uint64_t bits; __builtin_memcpy(&bits, &val, 8);
+    char val_str[32]; snprintf(val_str, sizeof(val_str), "%g", val);
+    const char *params[] = { val_str };
+    emit_macro_begin("PUSH_REAL", params, 1);
     bb_emit_mov_rdi_imm64(bits);
     bb_emit_call_sym_plt("rt_push_real_bits", 0);
     emit_macro_end();

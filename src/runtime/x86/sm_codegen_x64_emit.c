@@ -1195,8 +1195,18 @@ static void edp4_label_then(FILE *out, void (*fn)(emitter_t *))
     fn(NULL);
 }
 
-static int emit_sm_define_entry_dispatch(FILE *out, int pc) { (void)pc; edp4_label_then(out, emit_sm_define_entry); return 0; }
-static int emit_sm_define_dispatch(FILE *out, int pc)       { (void)pc; edp4_label_then(out, emit_sm_define);       return 0; }
+static int emit_sm_define_entry_dispatch(FILE *out, const SM_Instr *ins, int pc, const SM_Program *prog) {
+    (void)ins;
+    const char *name = (pc > 0 && prog->instrs[pc-1].a[0].s) ? prog->instrs[pc-1].a[0].s : "";
+    char anno[80]; snprintf(anno, sizeof(anno), "# %s", name);
+    return sm_emit_noop(out, sm_template_lookup(SM_DEFINE_ENTRY), anno);
+}
+static int emit_sm_define_dispatch(FILE *out, const SM_Instr *ins, int pc) {
+    (void)pc;
+    const char *name = ins->a[0].s ? ins->a[0].s : "";
+    char anno[80]; snprintf(anno, sizeof(anno), "# %s", name);
+    return sm_emit_noop(out, sm_template_lookup(SM_DEFINE), anno);
+}
 static int emit_sm_pat_span_dispatch(FILE *out, int pc)     { (void)pc; edp4_label_then(out, emit_sm_pat_span);     return 0; }
 static int emit_sm_pat_break_dispatch(FILE *out, int pc)    { (void)pc; edp4_label_then(out, emit_sm_pat_break);    return 0; }
 static int emit_sm_pat_any_dispatch(FILE *out, int pc)      { (void)pc; edp4_label_then(out, emit_sm_pat_any);      return 0; }
@@ -2316,8 +2326,8 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
              * which registers the expression chunk in the native registry.
              * SM_DEFINE is a no-op macro (function definition already handled by
              * the expression registry at emit time). */
-            case SM_DEFINE_ENTRY: rc = emit_sm_define_entry_dispatch(out, pc); break;
-            case SM_DEFINE:       rc = emit_sm_define_dispatch(out, pc);       break;
+            case SM_DEFINE_ENTRY: rc = emit_sm_define_entry_dispatch(out, ins, pc, prog); break;
+            case SM_DEFINE:       rc = emit_sm_define_dispatch(out, ins, pc);              break;
 
             /* EM-7-pre keepers: SM_CALL_FN (general) + SM_CONCAT + SM_PUSH_NULL +
              * SM_COERCE_NUM + conditional return variants. */
