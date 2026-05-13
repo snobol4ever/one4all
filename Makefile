@@ -76,6 +76,9 @@ RT_PIC_SRCS := \
     $(RT)/x86/eval_pat.c \
     $(RT)/x86/bb_pool.c \
     $(RT)/x86/emit_insn.c \
+    $(RT)/x86/insn.c \
+    $(RT)/x86/emit_text.c \
+    $(RT)/x86/emit_label_new.c \
     $(RT)/x86/emit_text3c.c \
     $(RT)/x86/emit_label.c \
     $(RT)/x86/emit_buf.c \
