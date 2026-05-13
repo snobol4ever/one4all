@@ -89,27 +89,9 @@ const sm_op_template_t *sm_template_lookup(int op);
 const char *emit_sm_consume_pc_label(void);
 void emit_sm_set_pc_label(const char *lbl);
 
-/*======================================================================================================================
- * sm_codegen_text — TEXT mode pipeline (ESP-13: moved from sm_codegen_x64_emit.c)
- *======================================================================================================================*/
-
-/* EDP-2: inline GAS mode flag — set by --jit-emit-inline via scrip.c. */
 int g_jit_emit_inline = 0;
 
-/* TEXT_MODE: pick EMIT_TEXT_INLINE or EMIT_TEXT depending on the flag. */
 #define TEXT_MODE() (g_jit_emit_inline ? EMIT_TEXT_INLINE : EMIT_TEXT)
-
-/* -----------------------------------------------------------------------
- * Source-line cache (EM-4-readability)
- *
- * When the caller passes a non-NULL src_path, we slurp the file once,
- * split it into lines (1-based index), and use it to print a verbatim
- * source banner above each statement's asm block.
- *
- * Goal: the emitted .s file reads top-to-bottom like an annotated
- * disassembly -- each statement's source text is right above the
- * x86 it produces.  Nobody else's compiler does this.  Ours does.
- * ----------------------------------------------------------------------- */
 
 typedef struct {
     char       *buf;       /* whole-file backing buffer (NUL-terminated)  */
@@ -122,6 +104,7 @@ typedef struct {
 /* Slurp src_path into sl.  Returns 0 on success, -1 on error.
  * On error sl is left zeroed; the emitter falls back to "no source"
  * mode and emits structural banners only. */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int srclines_load(SrcLines *sl, const char *src_path)
 {
     memset(sl, 0, sizeof(*sl));
@@ -138,7 +121,6 @@ static int srclines_load(SrcLines *sl, const char *src_path)
     fclose(f);
     buf[got] = '\0';
 
-    /* First pass: count lines.  Last line w/o trailing \n still counts. */
     int count = 0;
     for (size_t i = 0; i < got; i++) if (buf[i] == '\n') count++;
     if (got > 0 && buf[got-1] != '\n') count++;
@@ -146,8 +128,6 @@ static int srclines_load(SrcLines *sl, const char *src_path)
     char **lines = calloc((size_t)count + 2, sizeof(char *));
     if (!lines) { free(buf); return -1; }
 
-    /* Second pass: split.  NUL-terminate each line (overwrite '\n').
-     * lines[0] left NULL so 1-based lookups are direct. */
     int    li = 1;
     char  *p  = buf;
     char  *line_start = buf;
@@ -168,6 +148,7 @@ static int srclines_load(SrcLines *sl, const char *src_path)
     return 0;
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void srclines_free(SrcLines *sl)
 {
     free(sl->lines);
@@ -175,35 +156,19 @@ static void srclines_free(SrcLines *sl)
     memset(sl, 0, sizeof(*sl));
 }
 
-/* Lookup line text by 1-based index.  Returns NULL if out of range. */
 static const char *srclines_get(const SrcLines *sl, int lineno)
 {
     if (!sl || !sl->lines || lineno < 1 || lineno > sl->count) return NULL;
     return sl->lines[lineno];
 }
 
-/* Strip a trailing '\r' (CRLF source files) for clean banner output. */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void srcline_strip_cr(char *s)
 {
     if (!s) return;
     size_t n = strlen(s);
     if (n > 0 && s[n-1] == '\r') s[n-1] = '\0';
 }
-
-/* -----------------------------------------------------------------------
- * String table — EM-6
- *
- * The emitter cannot use raw in-process pointers for string literals —
- * the emitted binary runs in a different process.  Instead, we collect
- * all unique C strings referenced by the SM_Program into a string table,
- * emit them in .section .rodata as .Lstr_N labels, and reference those
- * labels by name in the instruction emitters.
- *
- * Two-pass protocol:
- *   1. strtab_collect(prog) — walk the SM_Program, intern all a[].s strings.
- *   2. strtab_emit(out)     — write .section .rodata with all .string data.
- *   3. Instruction emitters call strtab_label(s) to get the label name.
- * ----------------------------------------------------------------------- */
 
 #define STRTAB_CAP 8192  /* EM-7: beauty.sno has ~2500 unique strings; 8192 gives headroom */
 
@@ -215,13 +180,14 @@ typedef struct {
 static StrEntry g_strtab[STRTAB_CAP];
 static int      g_strtab_n = 0;
 
-
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void strtab_reset(void)
 {
     g_strtab_n = 0;
 }
 
 /* Intern a string; return its label index (0-based). */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int strtab_intern(const char *s)
 {
     if (!s) s = "";
@@ -241,6 +207,7 @@ static int strtab_intern(const char *s)
 }
 
 /* Look up a string; return its label index or -1 if not interned. */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int strtab_lookup(const char *s)
 {
     if (!s) s = "";
@@ -250,7 +217,7 @@ static int strtab_lookup(const char *s)
     return -1;
 }
 
-/* Return the .Lstr_N label name for string s (must be interned first). */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void strtab_label(char *buf, size_t bufsz, const char *s)
 {
     if (!s) s = "";
@@ -259,14 +226,9 @@ static void strtab_label(char *buf, size_t bufsz, const char *s)
             snprintf(buf, bufsz, ".S%d", g_strtab[i].idx);
             return;
         }
-    /* Should not happen if caller always interns first. */
     snprintf(buf, bufsz, ".S_ERR");
 }
 
-/* EM-7c-symbolic: intern_str callback installed on text emitters so that
- * emitter_bb_flat.c can route literal strings through the SM-side .Lstr_N strtab.
- * Uses a static buffer — safe because callers only need the label momentarily
- * to build a bb_insn_desc_t.sym before emit_insn consumes it. */
 static char g_intern_str_buf[64];
 static const char *codegen_intern_str(const char *s)
 {
@@ -275,8 +237,7 @@ static const char *codegen_intern_str(const char *s)
     return g_intern_str_buf;
 }
 
-/* Escape a C string for GNU-as .string directive.
- * Only escapes \, ", and control chars that matter. */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void strtab_escape(char *out, size_t outsz, const char *s)
 {
     size_t j = 0;
@@ -297,17 +258,13 @@ static void strtab_escape(char *out, size_t outsz, const char *s)
     if (j < outsz) out[j] = '\0';
 }
 
-/* Collect all strings from the SM_Program into the table.
- * Only opcodes that actually carry string payloads in a[0].s / a[2].s
- * are interned — never blindly walk all instructions (other opcodes
- * carry integer / pointer payloads in the same union fields). */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void strtab_collect(const SM_Program *prog)
 {
     strtab_reset();
     for (int i = 0; i < prog->count; i++) {
         const SM_Instr *ins = &prog->instrs[i];
         switch (ins->op) {
-        /* Opcodes that carry string data in a[0].s */
         case SM_PUSH_LIT_S:
         case SM_PUSH_VAR:
         case SM_STORE_VAR:
@@ -326,7 +283,6 @@ static void strtab_collect(const SM_Program *prog)
         default:
             break;
         }
-        /* a[2].s: only SM_PAT_CAPTURE_FN / SM_PAT_USERCALL carry name lists */
         switch (ins->op) {
         case SM_PAT_CAPTURE_FN:
         case SM_PAT_USERCALL:
@@ -365,6 +321,7 @@ static void strtab_collect(const SM_Program *prog)
 static uint8_t *g_pc_used_as_target = NULL;   /* len = prog->count; 1 = referenced */
 static int      g_pc_used_count     = 0;
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int pc_used_alloc(const SM_Program *prog)
 {
     if (g_pc_used_as_target) {
@@ -376,7 +333,6 @@ static int pc_used_alloc(const SM_Program *prog)
     g_pc_used_as_target = (uint8_t *)calloc((size_t)prog->count, 1);
     if (!g_pc_used_as_target) return -1;
     g_pc_used_count = prog->count;
-    /* Source 4: program entry pc=0 always referenced. */
     g_pc_used_as_target[0] = 1;
     return 0;
 }
@@ -387,6 +343,7 @@ static inline void pc_used_mark(int pc)
         g_pc_used_as_target[pc] = 1;
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int pc_is_used_as_target(int pc)
 {
     if (!g_pc_used_as_target) return 1;   /* fallback: keep all labels */
@@ -394,6 +351,7 @@ static int pc_is_used_as_target(int pc)
     return g_pc_used_as_target[pc] ? 1 : 0;
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void release_pc_used_as_target(void)
 {
     if (g_pc_used_as_target) {
@@ -403,28 +361,12 @@ static void release_pc_used_as_target(void)
     }
 }
 
-/* -----------------------------------------------------------------------
- * emit_three_column_line -- central renderer for all non-BB, non-banner lines.
- *
- * Corrected three-column shape (per EM-7c-three-column-non-bb):
- *   Col 1 (label,  24-wide): label with trailing ':' if present, else empty.
- *   Col 2 (opcode, 16-wide): directive/mnemonic name ONLY (no args).
- *   Col 3 (free):            args + optional "# comment".
- *
- * When label is NULL/"", 24 spaces precede column 2.
- * When opcode is NULL/"", column 2 is empty (useful for bare-label lines).
- * When col3 is NULL/"" and no anno, nothing follows the opcode (padded).
- * Banner lines (#====..., # stmt N) are NOT routed here -- they print
- * full-width and don't obey column rules.
- * ----------------------------------------------------------------------- */
 static int emit_three_column_line(FILE *out,
                                   const char *label,   /* e.g. ".Lstr_0:" or NULL */
                                   const char *opcode,  /* e.g. ".string" or NULL */
                                   const char *col3,    /* args+comment or NULL */
                                   const char *anno)    /* optional annotation or NULL */
 {
-    /* Build column 3: col3 content (if any) + annotation (if any).
-     * One-space gap between args and `#` -- no fourth-column padding. */
     char c3[512];
     if (col3 && *col3 && anno && *anno) {
         if (anno[0] == '#')
@@ -442,15 +384,11 @@ static int emit_three_column_line(FILE *out,
         c3[0] = '\0';
     }
 
-    /* EM-FORMAT-BB lone-label fusion (2026-05-09): route through
-     * bb3c_format so the pending-label buffer covers SM-side data
-     * directives (e.g. .Lexpression_registry:) that previously emitted
-     * standalone label-only lines. */
     bb3c_format(out, label ? label : "", opcode ? opcode : "", c3);
     return 0;
 }
 
-/* Emit .section .rodata with all interned strings as .Lstr_N: .string "..." */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int strtab_emit_rodata(FILE *out)
 {
     if (g_strtab_n == 0) return 0;
@@ -466,8 +404,6 @@ static int strtab_emit_rodata(FILE *out)
     return 0;
 }
 
-
-
 /* EM-7d-usercall-reentrant: emit .datan expression registry table.
  *
  * Walk prog for SM_LABEL instructions with a[0].s set (SNOBOL4 named function
@@ -478,11 +414,9 @@ static int strtab_emit_rodata(FILE *out)
  *
  * Returns the number of entries emitted, or -1 on I/O error.
  * If no named labels exist, emits nothing (returns 0). */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_expression_registry(FILE *out, const SM_Program *prog)
 {
-    /* Count function-entry labels only (a[2].i == 1, set by lower.c when
-     * FUNC_IS_ENTRY_LABEL is true).  Plain goto labels (a[2].i == 0) must
-     * not appear in the expression registry — they are not callable chunks. */
     int n = 0;
     for (int i = 0; i < prog->count; i++) {
         const SM_Instr *ins = &prog->instrs[i];
@@ -525,11 +459,6 @@ static int emit_expression_registry(FILE *out, const SM_Program *prog)
     return n;
 }
 
-/* EM-7c-capture: cap fixup table.  Each entry pairs a heap cap_t pointer
- * (baked as imm64 — valid in emitter process AND in the emitted binary
- * since the binary calls into libscrip_rt which allocates the same heap
- * objects) with the child's α label name.  Emitted as a sequence of
- * rt_patch_cap_fn(cap_ptr, child_fn) calls in main's preamble. */
 #define MAX_CAP_FIXUPS 1024
 typedef struct {
     void       *cap_ptr;      /* heap cap_t * from bb_cap_new — baked as imm64 */
@@ -541,6 +470,7 @@ static int         g_cap_fixups_n = 0;
 
 static void cap_fixups_reset(void) { g_cap_fixups_n = 0; }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void cap_fixup_add(void *cap_ptr, const char *child_label)
 {
     if (g_cap_fixups_n >= MAX_CAP_FIXUPS) return;
@@ -550,14 +480,9 @@ static void cap_fixup_add(void *cap_ptr, const char *child_label)
     g_cap_fixups_n++;
 }
 
-
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_file_header(FILE *out, int count, int has_expression_registry)
 {
-    /* The .rodata section (string literals) and expression registry (if any)
-     * were already emitted before this call.  We resume with .text + main
-     * prologue.  If has_expression_registry is non-zero, main calls
-     * rt_register_expressions before rt_init so that user-defined
-     * SNOBOL4 functions are dispatchable from the start. */
     if (emit_three_column_line(out, "", ".intel_syntax", "noprefix", NULL) != 0) return -1;
     if (emit_three_column_line(out, "", ".globl",  "main",          NULL) != 0) return -1;
     if (emit_three_column_line(out, "", ".type",   "main, @function", NULL) != 0) return -1;
@@ -572,7 +497,6 @@ static int emit_file_header(FILE *out, int count, int has_expression_registry)
         if (emit_three_column_line(out, "", "call", "rt_register_expressions@PLT", NULL) != 0) return -1;
     }
 
-    /* EM-7c-capture: patch cap_t fn pointers to baked child blobs. */
     for (int i = 0; i < g_cap_fixups_n; i++) {
         const char *α = g_cap_fixups[i].child_label;
         if ((uintptr_t)g_cap_fixups[i].cap_ptr == 1) {
@@ -617,9 +541,9 @@ static int emit_file_header(FILE *out, int count, int has_expression_registry)
     return 0;
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_file_footer(FILE *out)
 {
-    /* EM-FORMAT-BB lone-label fusion: flush any pending label before footer. */
     bb3c_flush_pending();
     if (emit_three_column_line(out, "", "call", "rt_finalize@PLT", NULL) != 0) return -1;
     if (emit_three_column_line(out, "", "pop",  "rbp", NULL) != 0) return -1;
@@ -629,33 +553,10 @@ static int emit_file_footer(FILE *out)
     return 0;
 }
 
-/* -----------------------------------------------------------------------
- * Three-column helpers
- *
- * Three-column SNOBOL4 layout (from BB-GEN-X86-TEXT.md law):
- *   Col 1 (label):  col 0, width 24
- *   Col 2 (action): col 24, macro name + args
- *   Col 3 (goto):   semicolon comment or live jmp
- *
- * SM_LINE(label, action, goto_comment) -- full three-column line
- * SM_ACT(action, goto_comment)         -- action + goto, no label
- * SM_LABEL_DEF(label)                  -- label only line
- * ----------------------------------------------------------------------- */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int sm_line(FILE *out, const char *label, const char *action,
                    const char *goto_col)
 {
-    /* Three-column layout:  LABEL:  ACTION  GOTO/#comment
-     * Col 1 (label):  24 chars, left-aligned
-     * Col 2 (action): 36 chars, left-aligned
-     * Col 3 (goto/#comment): free width
-     *
-     * If label is NULL/empty, consume g_cur_pc_label (set once per
-     * instruction by set_cur_pc_label()) so the first sm_line call on
-     * an instruction automatically gets the .LpcN: column.  Subsequent
-     * calls within the same instruction have g_cur_pc_label already
-     * cleared and emit with no label column.
-     */
     const char *gc = "";
     char gc_buf[128] = "";
     if (goto_col && *goto_col) {
@@ -687,30 +588,15 @@ static int sm_line(FILE *out, const char *label, const char *action,
         lbl = emit_sm_consume_pc_label();   /* "" if no pending label */
     }
     const char *act = (action && *action) ? action : "";
-    /* EM-FORMAT-BB lone-label fusion (2026-05-09): route through bb3c_format
-     * so SM-side dispatch lines participate in the same pending-label buffer
-     * as BB-side and data-section emissions.  bb3c_format applies the same
-     * %-24s%-16s %s shape + right-trim. */
     bb3c_format(out, (lbl && *lbl) ? lbl : "", act, gc);
     return 0;
 }
 
-/* -----------------------------------------------------------------------
- * Page breaks (EM-4-readability)
- *
- * Major (==): printed at every statement boundary -- carries the verbatim
- *             source text of the statement (when available) plus stno/lineno.
- * Minor (--): printed between conceptual blocks within a statement, used
- *             sparingly to avoid clutter.
- * ----------------------------------------------------------------------- */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_major_break(FILE *out, int stno, int lineno,
                             const char *src_text)
 {
-    /* EM-FORMAT-BB lone-label fusion (2026-05-09): flush any pending label
-     * before banner so it doesn't appear after the banner it should precede. */
     bb3c_flush_pending();
-    /* EM-FORMAT-SM: 120-char `#=` banner per spec.  No blank lines. */
     if (fputs(
         "#=======================================================================================================================\n",
         out) == EOF) return -1;
@@ -728,12 +614,10 @@ static int emit_major_break(FILE *out, int stno, int lineno,
     return 0;
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_minor_break(FILE *out, const char *caption)
 {
-    /* EM-FORMAT-BB lone-label fusion (2026-05-09): flush any pending label
-     * before banner so it doesn't appear after the banner it should precede. */
     bb3c_flush_pending();
-    /* EM-FORMAT-SM: 120-char `#-` banner. */
     if (fputs("#-----------------------------------------------------------------------------------------------------------------------\n",
               out) == EOF) return -1;
     if (caption && *caption) {
@@ -744,10 +628,8 @@ static int emit_sm_minor_break(FILE *out, const char *caption)
     return 0;
 }
 
-/* Render a printable, single-line preview of a string literal for use in
- * inline annotations (e.g. movabs rdi,<ptr>  # str="hi").  Truncates at
- * MAX_PREVIEW chars and replaces non-printable bytes with '.'. */
 #define STR_PREVIEW_MAX  40
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void render_str_preview(char *dst, size_t cap,
                                const char *s, int slen)
 {
@@ -773,47 +655,37 @@ static void render_str_preview(char *dst, size_t cap,
     dst[o] = '\0';
 }
 
-/* -----------------------------------------------------------------------
- * SM straight-line opcode emitters
- * Each writes one or more three-column lines using sm_macros.s macros.
- * ----------------------------------------------------------------------- */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_pc_label(FILE *out, int pc)
 {
-    /* EM-7c-no-trailing-ws: bare label, no padding (no trailing spaces). */
     return fprintf(out, ".L%d:\n", pc) < 0 ? -1 : 0;
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_halt_line(FILE *out, int pc)
 {
     (void)pc;
-    /* SM_HALT: call rt_halt_tos() via sm_macros.s HALT macro.
-     * Mode-4 form: call rt_halt_tos@PLT (Option C sanctioned exception).
-     * Renamed from emit_sm_halt to avoid conflict with templates/sm_halt.c's
-     * emit_sm_halt(emitter_t *) (EM-MODE4-IS-MODE3-DUMP-f). */
     return emit_sm_rtcall(out, sm_template_lookup(SM_HALT), NULL);
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_push_lit_i_line(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    /* TEXT mode: emit macro invocation line via render_call_line.
-     * Template path (emitter_text_new) expands body inline — wrong for TEXT. */
     return emit_sm_int64(out, sm_template_lookup(SM_PUSH_LIT_I),
                          ins->a[0].i, NULL);
 }
 
 __attribute__((unused))
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_push_lit_i_legacy(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    /* Legacy: SM_PUSH_INT macro via emit_sm_template. Kept as rollback. */
     return emit_sm_int64(out, sm_template_lookup(SM_PUSH_LIT_I),
                          ins->a[0].i, NULL);
 }
 
-/* EM-3 opcodes */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_push_lit_s_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -827,6 +699,7 @@ static int emit_sm_push_lit_s_dispatch(FILE *out, const SM_Instr *ins, int pc)
                              lbl, (int)slen, anno);
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_push_var_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -837,6 +710,7 @@ static int emit_sm_push_var_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return emit_sm_lbl(out, sm_template_lookup(SM_PUSH_VAR), lbl, anno);
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_store_var_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -847,6 +721,7 @@ static int emit_sm_store_var_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return emit_sm_lbl(out, sm_template_lookup(SM_STORE_VAR), lbl, anno);
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_pop(FILE *out, int pc)
 {
     (void)pc;
@@ -863,17 +738,17 @@ static int emit_sm_pop(FILE *out, int pc)
 }
 
 __attribute__((unused))
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_pop_legacy(FILE *out, int pc)
 {
     (void)pc;
     return emit_sm_rtcall(out, sm_template_lookup(SM_VOID_POP), NULL);
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int edp4_sm_arith(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    /* EM-MODE4-IS-MODE3-DUMP-l: routed through per-opcode template.
-     * macro_name from sm_template_lookup carries ADD_NUM/SUB_NUM/etc. */
     const sm_op_template_t *t = sm_template_lookup(ins->op);
     if (!t) return -1;
     emitter_init_text(out, TEXT_MODE_INVOCATION);
@@ -882,27 +757,26 @@ static int edp4_sm_arith(FILE *out, const SM_Instr *ins, int pc)
     return 0;
 }
 
-/* EM-4 opcodes: SM_LABEL + SM_JUMP / SM_JUMP_S / SM_JUMP_F */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_label_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
-    /* SM_LABEL: routed through template (EM-MODE4-IS-MODE3-DUMP-o). */
     (void)ins; (void)pc;
     emit_mode_set(TEXT_MODE(), out);
     emit_sm_label();
     return 0;
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_jump_line(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    /* EM-MODE4-IS-MODE3-DUMP-j: routed through per-opcode template. */
     emitter_init_text(out, TEXT_MODE_INVOCATION);
     emit_sm_jump((int)ins->a[0].i);
     
     return 0;
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_jump_cond(FILE *out, const SM_Instr *ins, int pc,
                              int take_when_ok)
 {
@@ -918,11 +792,13 @@ static int emit_sm_jump_cond(FILE *out, const SM_Instr *ins, int pc,
     return 0;
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_jump_s_line(FILE *out, const SM_Instr *ins, int pc)
 {
     return emit_sm_jump_cond(out, ins, pc, /*take_when_ok=*/1);
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_jump_f_line(FILE *out, const SM_Instr *ins, int pc)
 {
     return emit_sm_jump_cond(out, ins, pc, /*take_when_ok=*/0);
@@ -968,6 +844,7 @@ static int emit_sm_jump_f_line(FILE *out, const SM_Instr *ins, int pc)
  * shapes.  EM-5's gate doesn't exercise them.
  * ----------------------------------------------------------------------- */
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_push_expression_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -975,6 +852,7 @@ static int emit_sm_push_expression_dispatch(FILE *out, const SM_Instr *ins, int 
                               ins->a[0].i, (int)ins->a[1].i);
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_call_expression_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -982,11 +860,10 @@ static int emit_sm_call_expression_dispatch(FILE *out, const SM_Instr *ins, int 
                               (int)ins->a[0].i);
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_return_dispatch(FILE *out, int pc)
 {
     (void)pc;
-    /* SM_RETURN: native return.  TEXT dispatch uses emit_sm_ret (proven path).
-     * Template emit_sm_return (templates/sm_return.c) is MACRO_DEF source of truth. */
     return emit_sm_ret(out, sm_template_lookup(SM_RETURN), NULL);
 }
 
@@ -1003,12 +880,10 @@ static int emit_sm_return_dispatch(FILE *out, int pc)
  *             interp because sm_interp.c reads only a[0].i)
  * ----------------------------------------------------------------------- */
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_stno_dispatch(FILE *out, const SM_Instr *ins, int pc,
                         const SrcLines *sl)
 {
-    /* SM_STNO: routed through template (EM-MODE4-IS-MODE3-DUMP-o).
-     * Compute stno/lineno/src_text here (caller context needed), then
-     * delegate banner + NOOP marker to emit_sm_stno(). */
     (void)pc;
     int stno   = (int)ins->a[0].i;
     int lineno = (int)ins->a[1].i;
@@ -1057,15 +932,7 @@ static int emit_sm_stno_dispatch(FILE *out, const SM_Instr *ins, int pc,
  * edp4_sm_unhandled in the dispatch switch.
  * ----------------------------------------------------------------------- */
 
-/* -----------------------------------------------------------------------
- * EM-7-pre keepers: SM_CALL_FN, SM_CONCAT, SM_PUSH_NULL, SM_COERCE_NUM,
- *                   SM_RETURN_S/F, SM_FRETURN[_S/_F], SM_NRETURN[_S/_F].
- * These are Phase 1/4/5 concerns, orthogonal to BB / pattern-matching.
- * ----------------------------------------------------------------------- */
-
-/* SM_CONCAT / SM_PUSH_NULL / SM_COERCE_NUM: now routed through templates
- * (sm_nullary_rt.c, EM-MODE4-IS-MODE3-DUMP-n).  The static wrappers below
- * bridge the old FILE*-based dispatcher into emit_mode_set + template call. */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_concat_dispatch(FILE *out, int pc)
 {
     (void)pc;
@@ -1074,6 +941,7 @@ static int emit_sm_concat_dispatch(FILE *out, int pc)
     return 0;
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_push_null_dispatch(FILE *out, int pc)
 {
     (void)pc;
@@ -1082,6 +950,7 @@ static int emit_sm_push_null_dispatch(FILE *out, int pc)
     return 0;
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_coerce_num_dispatch(FILE *out, int pc)
 {
     (void)pc;
@@ -1090,6 +959,7 @@ static int emit_sm_coerce_num_dispatch(FILE *out, int pc)
     return 0;
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_push_null_noflip_dispatch(FILE *out, int pc)
 {
     (void)pc;
@@ -1098,6 +968,7 @@ static int emit_sm_push_null_noflip_dispatch(FILE *out, int pc)
     return 0;
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_push_lit_f_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -1106,6 +977,7 @@ static int emit_sm_push_lit_f_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return 0;
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_push_expr_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -1114,6 +986,7 @@ static int emit_sm_push_expr_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return 0;
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_incr_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -1122,6 +995,7 @@ static int emit_sm_incr_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return 0;
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_decr_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -1130,6 +1004,7 @@ static int emit_sm_decr_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return 0;
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_acomp_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -1138,6 +1013,7 @@ static int emit_sm_acomp_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return 0;
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_lcomp_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -1155,6 +1031,7 @@ static int emit_sm_lcomp_dispatch(FILE *out, const SM_Instr *ins, int pc)
  * emit_sm_call_fn covers MACRO_DEF (sm_macros.s regen) only; it is the
  * source of truth for the CALL_FN macro body.  The legacy static path is
  * preserved as _legacy for rollback reference. */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_call_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -1168,6 +1045,7 @@ static int emit_sm_call_dispatch(FILE *out, const SM_Instr *ins, int pc)
 }
 
 __attribute__((unused))
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_call_legacy(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -1180,10 +1058,7 @@ static int emit_sm_call_legacy(FILE *out, const SM_Instr *ins, int pc)
                              lbl, nargs, anno);
 }
 
-/* SM_RETURN_S / SM_RETURN_F / SM_FRETURN[_S/_F] / SM_NRETURN[_S/_F].
- *
- * TEXT dispatch uses emit_sm_ret_var (proven path).
- * Template emit_sm_return_variant (templates/sm_return.c) is MACRO_DEF source of truth. */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_return_variant_dispatch(FILE *out, sm_opcode_t op, int pc)
 {
     int kind = 0;  /* RETURN */
@@ -1197,16 +1072,7 @@ static int emit_sm_return_variant_dispatch(FILE *out, sm_opcode_t op, int pc)
     return emit_sm_ret_var(out, kind, cond, pc, sm_opcode_name(op));
 }
 
-/* EDP-4: label-consuming dispatch wrappers for opcodes that previously used
- * emit_sm_rtcall(out, sm_template_lookup(SM_X), NULL) directly in the main
- * switch.  That path consumed g_pending_pc_label via render_call_line.  The
- * new path (emit_mode_set + template call) does not go through render_call_line,
- * so pending labels would be orphaned at branch targets.  Each wrapper must:
- *   1. emit_sm_consume_pc_label() — drain the pending .LpcN: label
- *   2. bb3c_format(out, lbl, "", "") — emit it as a lone label line if non-empty
- *   3. emit_mode_set(TEXT_MODE(), out) + emit_sm_X(NULL) — dispatch to template */
-
-/* Helper: consume pending label + emit it, then dispatch template (nullary). */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void edp4_label_then(FILE *out, void (*fn)(emitter_t *))
 {
     const char *lbl = emit_sm_consume_pc_label();
@@ -1250,13 +1116,6 @@ static int emit_sm_pat_cat_dispatch(FILE *out, int pc)      { (void)pc; edp4_lab
 static int emit_sm_pat_alt_dispatch(FILE *out, int pc)      { (void)pc; edp4_label_then(out, emit_sm_pat_alt);      return 0; }
 static int emit_sm_pat_deref_dispatch(FILE *out, int pc)    { (void)pc; edp4_label_then(out, emit_sm_pat_deref);    return 0; }
 
-/* SM_PAT_CAPTURE_FN_ARGS / SM_PAT_USERCALL_ARGS emitters were removed
- * in EM-7-revert (session #72) along with the rest of the brokered
- * Phase-3 path.  See the EM-7-revert banner above emit_sm_concat for
- * rationale.  These opcodes fall through to edp4_sm_unhandled until
- * EM-7c reintroduces pattern-side emit using the corrected
- * bb_flat / bb_emit infrastructure. */
-
 /* =======================================================================
  * EM-7a — Phase-2 SM simulator: reconstruct PATND_t tree at emit time
  *
@@ -1295,7 +1154,6 @@ static int emit_sm_pat_deref_dispatch(FILE *out, int pc)    { (void)pc; edp4_lab
  *   Returns an XEPS node if the window is empty (pure-string match).
  * ======================================================================= */
 
-/* Maximum sim-stack depth.  Patterns rarely exceed 64 levels. */
 #define PHASE2_SIM_DEPTH  128
 
 typedef struct {
@@ -1311,6 +1169,7 @@ typedef struct {
 
 static void simstack_init(SimStack *ss) { ss->top = 0; }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void simstack_push(SimStack *ss, SimVal v)
 {
     if (ss->top < PHASE2_SIM_DEPTH) ss->slots[ss->top++] = v;
@@ -1319,12 +1178,11 @@ static void simstack_push(SimStack *ss, SimVal v)
 static SimVal simstack_pop(SimStack *ss)
 {
     if (ss->top > 0) return ss->slots[--ss->top];
-    /* Underflow: return a variant epsilon so downstream builds still run */
     SimVal v; v.val = pat_epsilon(); v.is_pat = 1; v.is_variant = 1;
     return v;
 }
 
-/* Push a compile-time-constant (invariant) string/int onto the VALUE side */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void simstack_push_const_s(SimStack *ss, const char *s)
 {
     SimVal v;
@@ -1336,6 +1194,7 @@ static void simstack_push_const_s(SimStack *ss, const char *s)
     simstack_push(ss, v);
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void simstack_push_const_i(SimStack *ss, int64_t n)
 {
     SimVal v;
@@ -1347,7 +1206,7 @@ static void simstack_push_const_i(SimStack *ss, int64_t n)
     simstack_push(ss, v);
 }
 
-/* Push a runtime (variant) placeholder onto the VALUE side */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void simstack_push_variant_val(SimStack *ss)
 {
     SimVal v;
@@ -1357,7 +1216,6 @@ static void simstack_push_variant_val(SimStack *ss)
     simstack_push(ss, v);
 }
 
-/* Wrap a PATND_t (as DESCR_t) into a SimVal with given variant flag */
 static SimVal make_pat_val(DESCR_t d, int is_variant)
 {
     SimVal v;
@@ -1367,19 +1225,14 @@ static SimVal make_pat_val(DESCR_t d, int is_variant)
     return v;
 }
 
-/* ── flat_is_eligible_node: single-node check (no child recursion) ───── */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int flat_is_eligible_node(const PATND_t *p)
 {
     if (!p) return 1;
-    /* XVAR: runtime DESCR_t as pattern node — graph unknown at emit time.
-     * All other kinds (XARBN, XNME, XFNME, XDSAR, XSPNC, etc.) are invariant:
-     * the BB graph structure is fixed at build time. */
     return p->kind != XVAR;
 }
 
-/* ── patnd_is_fully_invariant: whole-tree check ──────────────────────── */
-/* Returns 0 only if the tree contains an XVAR node — the only kind
- * whose BB graph cannot be baked at emit time (runtime DESCR_t as pattern). */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int patnd_is_fully_invariant(const PATND_t *p)
 {
     if (!p) return 1;
@@ -1390,14 +1243,12 @@ int patnd_is_fully_invariant(const PATND_t *p)
     return 1;
 }
 
-/* ── PATND_t accessor: extract PATND_t * from a DT_P DESCR_t ─────────── */
 static PATND_t *patnd_of(DESCR_t d)
 {
     if (d.v != DT_P || !d.s) return NULL;
     return (PATND_t *)d.s;
 }
 
-/* ── sm_phase2_to_patnd ──────────────────────────────────────────────── */
 /*
  * Walk SM instructions [phase2_start, phase2_end) and simulate Phase-2
  * semantics to reconstruct the pattern tree.
@@ -1412,6 +1263,7 @@ static PATND_t *patnd_of(DESCR_t d)
  * The returned PATND_t is GC-allocated (pat_* constructors use GC_MALLOC).
  * It is valid for the duration of the emit call.
  */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t sm_phase2_to_patnd(const SM_Program *prog,
                             int phase2_start, int phase2_end,
                             int *out_variant)
@@ -1424,7 +1276,6 @@ DESCR_t sm_phase2_to_patnd(const SM_Program *prog,
         const SM_Instr *ins = &prog->instrs[pc];
         switch (ins->op) {
 
-        /* ── value-stack pushes (Phase-2 argument sources) ───────── */
         case SM_PUSH_LIT_S:
             simstack_push_const_s(&ss, ins->a[0].s ? ins->a[0].s : "");
             break;
@@ -1432,12 +1283,10 @@ DESCR_t sm_phase2_to_patnd(const SM_Program *prog,
             simstack_push_const_i(&ss, ins->a[0].i);
             break;
         case SM_PUSH_VAR:
-            /* Runtime variable load — variant */
             simstack_push_variant_val(&ss);
             has_variant = 1;
             break;
 
-        /* ── leaf pat constructors that need no value-stack arg ──── */
         case SM_PAT_EPS:
             simstack_push(&ss, make_pat_val(pat_epsilon(), 0));
             break;
@@ -1460,22 +1309,18 @@ DESCR_t sm_phase2_to_patnd(const SM_Program *prog,
             simstack_push(&ss, make_pat_val(pat_bal(), 0));
             break;
         case SM_PAT_FENCE0:
-            /* FENCE graph is fixed — not variant */
             simstack_push(&ss, make_pat_val(pat_fence(), 0));
             break;
 
-        /* ── leaf constructors: invariant literal ────────────────── */
         case SM_PAT_LIT: {
             const char *s = ins->a[0].s ? ins->a[0].s : "";
             simstack_push(&ss, make_pat_val(pat_lit(s), 0));
             break;
         }
 
-        /* ── constructors that pop one value-stack arg ───────────── */
         case SM_PAT_SPAN: {
             SimVal arg = simstack_pop(&ss);
             const char *cs = (arg.val.v == DT_S && arg.val.s) ? arg.val.s : "";
-            /* invariant iff charset arg was a literal (not a variable) */
             simstack_push(&ss, make_pat_val(pat_span(cs), arg.is_variant));
             if (arg.is_variant) has_variant = 1;
             break;
@@ -1504,7 +1349,6 @@ DESCR_t sm_phase2_to_patnd(const SM_Program *prog,
         case SM_PAT_LEN: {
             SimVal arg = simstack_pop(&ss);
             int64_t n = (arg.val.v == DT_I) ? arg.val.i : 0;
-            /* invariant iff n was a literal */
             simstack_push(&ss, make_pat_val(pat_len(n), arg.is_variant));
             if (arg.is_variant) has_variant = 1;
             break;
@@ -1513,7 +1357,6 @@ DESCR_t sm_phase2_to_patnd(const SM_Program *prog,
             SimVal arg = simstack_pop(&ss);
             int64_t n = (arg.val.v == DT_I) ? arg.val.i : 0;
             int v = arg.is_variant;
-            /* XPOSI is invariant per flat_is_eligible_node */
             simstack_push(&ss, make_pat_val(pat_pos(n), v));
             if (v) has_variant = 1;
             break;
@@ -1541,24 +1384,20 @@ DESCR_t sm_phase2_to_patnd(const SM_Program *prog,
             break;
         }
 
-        /* ── one-child pat constructors ──────────────────────────── */
         case SM_PAT_ARBNO: {
             SimVal inner = simstack_pop(&ss);
             int v = inner.is_variant;
-            /* XARBN is variant if child is variant (mutable ζ on inner) */
             simstack_push(&ss, make_pat_val(pat_arbno(inner.val), v));
             if (v) has_variant = 1;
             break;
         }
         case SM_PAT_FENCE1: {
             SimVal inner = simstack_pop(&ss);
-            /* FENCE graph is fixed — invariant iff child is invariant */
             simstack_push(&ss, make_pat_val(pat_fence_p(inner.val), inner.is_variant));
             if (inner.is_variant) has_variant = 1;
             break;
         }
 
-        /* ── two-child combinators ───────────────────────────────── */
         case SM_PAT_CAT: {
             SimVal right = simstack_pop(&ss);
             SimVal left  = simstack_pop(&ss);
@@ -1576,7 +1415,6 @@ DESCR_t sm_phase2_to_patnd(const SM_Program *prog,
             break;
         }
 
-        /* ── deref: runtime pattern variable lookup → always variant */
         case SM_PAT_DEREF: {
             SimVal arg = simstack_pop(&ss);
             /* XDSAR: *varname — graph is invariant; name baked into node.
@@ -1597,7 +1435,6 @@ DESCR_t sm_phase2_to_patnd(const SM_Program *prog,
             break;
         }
 
-        /* ── capture wrappers ────────────────────────────────────── */
         case SM_PAT_CAPTURE: {
             SimVal child = simstack_pop(&ss);
             const char *vname = ins->a[0].s ? ins->a[0].s : "";
@@ -1616,8 +1453,6 @@ DESCR_t sm_phase2_to_patnd(const SM_Program *prog,
         case SM_PAT_CAPTURE_FN_ARGS:
         case SM_PAT_USERCALL:
         case SM_PAT_USERCALL_ARGS: {
-            /* XCALLCAP / XATP — always variant (runtime function call) */
-            /* Pop child if CAPTURE_FN* (it has a child pat), else no child */
             SimVal child = simstack_pop(&ss);
             const char *fname = ins->a[0].s ? ins->a[0].s : "";
             DESCR_t d = pat_assign_callcap(child.val, fname, NULL, 0);
@@ -1626,11 +1461,8 @@ DESCR_t sm_phase2_to_patnd(const SM_Program *prog,
             break;
         }
 
-        /* ── opcodes that are NOT Phase-2 — skip silently ────────── */
         /* SM_PUSH_VAR handled above; SM_STORE_VAR, SM_STNO, etc.     */
-        /* are straight-line and never appear inside a Phase-2 window */
         default:
-            /* Unknown opcode in Phase-2 window: treat as variant     */
             simstack_push_variant_val(&ss);
             has_variant = 1;
             break;
@@ -1692,8 +1524,7 @@ static pattern_window_t g_pat_windows[MAX_PATTERN_WINDOWS];
 static int              g_pat_windows_n   = 0;
 static int              g_pat_windows_id  = 0;
 
-
-
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void pattern_windows_reset(void)
 {
     g_pat_windows_n  = 0;
@@ -1701,9 +1532,7 @@ static void pattern_windows_reset(void)
     cap_fixups_reset();
 }
 
-/* Find the index of the pattern window covering pc, or -1 if pc is not
- * inside any registered Phase-2 window.  Linear scan — fine because
- * patterns/program is small (worst case beauty.sno ~hundreds). */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int pattern_window_at_pc(int pc)
 {
     for (int i = 0; i < g_pat_windows_n; i++) {
@@ -1714,7 +1543,7 @@ static int pattern_window_at_pc(int pc)
     return -1;
 }
 
-/* Find the pattern window whose SM_EXEC_STMT is at this pc, or -1. */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int pattern_window_for_exec_stmt(int pc)
 {
     for (int i = 0; i < g_pat_windows_n; i++) {
@@ -1724,17 +1553,11 @@ static int pattern_window_for_exec_stmt(int pc)
     return -1;
 }
 
-/* Pre-pass: locate every SM_EXEC_STMT, compute its Phase-2 window,
- * run the simulator, and register fully-invariant ones.  Variant
- * windows are NOT registered — their SM_EXEC_STMT will fall through
- * to edp4_sm_unhandled in the main dispatch (variant rung is next). */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void pattern_windows_collect(const SM_Program *prog)
 {
     pattern_windows_reset();
 
-    /* EM-FORMAT-SM (sess 2026-05-09): allocate the target bitset for the
-     * "labels-only-when-referenced" rule.  We populate it as a side effect
-     * of this same walk over prog->instrs -- one pass, two outputs. */
     pc_used_alloc(prog);
 
     int stmt_start = 0;   /* PC of the first instruction in the current statement */
@@ -1742,9 +1565,6 @@ static void pattern_windows_collect(const SM_Program *prog)
     for (int pc = 0; pc < prog->count; pc++) {
         const SM_Instr *ins = &prog->instrs[pc];
 
-        /* EM-FORMAT-SM: target-collection side pass.  Mark PCs that are
-         * jump / call / chunk-registry / data-quad targets so the dispatch
-         * loop later can skip emitting unreferenced .LpcN: labels. */
         switch (ins->op) {
         case SM_JUMP:
         case SM_JUMP_S:
@@ -1768,9 +1588,6 @@ static void pattern_windows_collect(const SM_Program *prog)
 
         if (ins->op != SM_EXEC_STMT) continue;
 
-        /* Phase-2 window:
-         *   [stmt_start, pc - 2)  — the two instructions at pc-1 and pc-2
-         *                           are the replacement and subject pushes. */
         int phase2_end = pc - 2;
         if (phase2_end < stmt_start) phase2_end = stmt_start;  /* defensive */
 
@@ -1799,10 +1616,7 @@ static void pattern_windows_collect(const SM_Program *prog)
     }
 }
 
-/* Emit the .text-resident invariant pattern blobs.  Called after the
- * .rodata section and before the main `.text` instruction stream.
- * Each invariant pattern gets one labeled expression with externally-visible
- * α/β/γ/ω labels (`pat_inv_<id>_α` etc.). */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_pattern_blobs(FILE *out)
 {
     int n_invariant = 0;
@@ -1811,8 +1625,6 @@ static int emit_pattern_blobs(FILE *out)
     }
     if (n_invariant == 0) return 0;
 
-    /* Reset internal label counters at the start of this emit run.
-     * Within the run, IDs accumulate across patterns (no collisions). */
     bb_flat_set_intern_str(codegen_intern_str);  /* EM-7c-symbolic: route lits through strtab */
     bb_flat_set_cap_fixup_cb(cap_fixup_add);     /* EM-7c-capture: collect XNME/XFNME fixups */
     bb_build_flat_text_reset();
@@ -1829,14 +1641,9 @@ static int emit_pattern_blobs(FILE *out)
 
         PATND_t *p = (PATND_t *)w->root.p;
         if (bb_build_flat_text(p, out, prefix) != 0) {
-            /* If the bake fails despite the pre-pass marking it invariant,
-             * downgrade — at SM_EXEC_STMT we'll fall back to UNHANDLED. */
             w->is_invariant = 0;
         }
     }
-    /* EM-FORMAT-BB lone-label fusion (2026-05-09): flush any pending label
-     * before the SM-side dispatch begins, so an unfused trailing blob
-     * label doesn't cross the section boundary into `main:` content. */
     bb3c_flush_pending();
     return 0;
 }
@@ -1849,22 +1656,17 @@ static int emit_pattern_blobs(FILE *out)
  * emit_three_column_line so they render with 24-space col-1 padding
  * (matching SM-side dispatch shape) rather than the tab-indented no-label
  * fallback in sm_line. */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_exec_stmt_blob(FILE *out, const SM_Instr *ins, int pc, int win_idx)
 {
     pattern_window_t *w = &g_pat_windows[win_idx];
     const char *sname = ins->a[0].s;     /* subject NV name (or NULL) */
     int has_repl      = (int)ins->a[1].i;
 
-    /* Arg 0 (rdi) = blob_α = address of `pat_inv_<id>_α`.
-     * GAS Intel syntax: `lea rdi, [rip + symbol]`.  This first line
-     * consumes the pending .LpcN: pc-label (sm_line routes through it). */
     char act[160];
     snprintf(act, sizeof(act),
              "rdi, [rip + pat_inv_%d_α]", w->pat_id);
     const char *anno = NULL;
-    /* Use emit_three_column_line to keep col 1 = pending .LpcN, col 2 = lea,
-     * col 3 = args + comment.  The pending label is consumed via the
-     * emit_sm_consume_pc_label path below. */
     char lbl[32];
     const char *pending = emit_sm_consume_pc_label();
     if (pending && *pending) {
@@ -1877,7 +1679,6 @@ static int emit_sm_exec_stmt_blob(FILE *out, const SM_Instr *ins, int pc, int wi
     }
     if (emit_three_column_line(out, lbl, "lea", act, anno) != 0) return -1;
 
-    /* Arg 1 (rsi) = subj_name — same .Lstr_N convention as SM_PUSH_VAR. */
     if (sname && *sname) {
         char lbl_str[64];
         strtab_label(lbl_str, sizeof(lbl_str), sname);
@@ -1888,7 +1689,6 @@ static int emit_sm_exec_stmt_blob(FILE *out, const SM_Instr *ins, int pc, int wi
         if (emit_three_column_line(out, "", "xor", "esi, esi", NULL) != 0) return -1;
     }
 
-    /* Arg 2 (edx) = has_repl flag */
     char act3[80];
     snprintf(act3, sizeof(act3), "edx, %d", has_repl);
     if (emit_three_column_line(out, "", "mov", act3, NULL) != 0) return -1;
@@ -1922,21 +1722,16 @@ static int emit_sm_exec_stmt_blob(FILE *out, const SM_Instr *ins, int pc, int wi
  * Col 2 starts with `#` so GAS treats the rest of the line as a
  * comment; the .LpcN: still defines the label so jumps targeting
  * this PC continue to work. */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_pat_baked(FILE *out, const SM_Instr *ins, int pc, int win_idx)
 {
     pattern_window_t *w = &g_pat_windows[win_idx];
 
-    /* Resolve op name to its MACRO spelling (PUSH_INT, PAT_RPOS, ...)
-     * for visual consistency with col-2 tokens elsewhere in the file.
-     * Fall back to the SM enum name if the op has no template entry
-     * (defensive — shouldn't happen on real corpora). */
     const sm_op_template_t *t = sm_template_lookup(ins->op);
     const char *opname = (t && t->macro_name) ? t->macro_name
                                               : sm_opcode_name(ins->op);
     if (!opname) opname = "?";
 
-    /* Snapshot the pending pc-label (consume it so the next line
-     * doesn't inherit it). */
     char lbl[32];
     const char *pending = emit_sm_consume_pc_label();
     if (pending && *pending) {
@@ -1948,10 +1743,6 @@ static int emit_sm_pat_baked(FILE *out, const SM_Instr *ins, int pc, int win_idx
         lbl[0] = '\0';
     }
 
-    /* Render via the three-column primitive with a leading-`#` op so
-     * the macro is NOT expanded by the assembler — col 2 still reads
-     * as the op name to the human eye, col 3 carries `baked` plus a
-     * back-reference to the blob. */
     char op_col[24];
     snprintf(op_col, sizeof(op_col), "# %s", opname);
 
@@ -1984,10 +1775,6 @@ static int emit_sm_pat_baked(FILE *out, const SM_Instr *ins, int pc, int win_idx
  * EM-7c-variant-bb-pool-emit.
  * ----------------------------------------------------------------------- */
 
-/* Helper: emit a no-arg PLT call that pushes a constant pattern node. */
-/* Helper: look up the strtab label for a string arg, or return NULL.
- * Mirrors the EM-7-pre helpers' contract for empty/NULL strings:
- * caller-side .Lstr_<n> if arg is non-empty, NULL otherwise. */
 static const char *pat_arg_label(char *lbl_buf, size_t lbl_buf_n,
                                  const char *arg)
 {
@@ -1996,8 +1783,7 @@ static const char *pat_arg_label(char *lbl_buf, size_t lbl_buf_n,
     return lbl_buf;
 }
 
-/* SM_PAT_LIT: a[0].s = literal string.  Driven by SM_PAT_LIT template
- * (LBLOPT shape — single source of truth with sm_macros). */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_pat_lit_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -2011,7 +1797,7 @@ static int emit_sm_pat_lit_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return emit_sm_lblopt(out, sm_template_lookup(SM_PAT_LIT), l, NULL);
 }
 
-/* SM_PAT_REFNAME: a[0].s = var name. */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_pat_refname_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -2025,7 +1811,7 @@ static int emit_sm_pat_refname_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return emit_sm_lblopt(out, sm_template_lookup(SM_PAT_REFNAME), l, NULL);
 }
 
-/* SM_PAT_CAPTURE: a[0].s = varname, a[1].i = kind (0/1/2). */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_pat_capture_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -2041,8 +1827,7 @@ static int emit_sm_pat_capture_dispatch(FILE *out, const SM_Instr *ins, int pc)
                                 l, kind, anno);
 }
 
-/* SM_PAT_CAPTURE_FN: . *func() / $ *func() — a[0].s=fname, a[1].i=is_imm,
- *                    a[2].s=namelist.  LBLOPT3 shape. */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_pat_capture_fn_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -2058,7 +1843,7 @@ static int emit_sm_pat_capture_fn_dispatch(FILE *out, const SM_Instr *ins, int p
                               fl, is_imm, nl, anno);
 }
 
-/* SM_PAT_CAPTURE_FN_ARGS: a[0].s=fname, a[1].i=is_imm, a[2].i=nargs. */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_pat_capture_fn_args_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -2073,7 +1858,7 @@ static int emit_sm_pat_capture_fn_args_dispatch(FILE *out, const SM_Instr *ins, 
                                    fl, is_imm, nargs, anno);
 }
 
-/* SM_PAT_USERCALL: bare *func() — a[0].s=fname. */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_pat_usercall_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -2087,7 +1872,7 @@ static int emit_sm_pat_usercall_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return emit_sm_lblopt(out, sm_template_lookup(SM_PAT_USERCALL), l, NULL);
 }
 
-/* SM_PAT_USERCALL_ARGS: a[0].s=fname, a[1].i=nargs. */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_pat_usercall_args_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -2109,6 +1894,7 @@ static int emit_sm_pat_usercall_args_dispatch(FILE *out, const SM_Instr *ins, in
  * BOXVAL) has its own template entry; sm_template_lookup picks the
  * right one and emit_sm_rtcall writes the macro call.  No annotation
  * needed — the macro name in col 2 is self-describing. */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_pat_noarg(FILE *out, sm_opcode_t op, int pc)
 {
     (void)pc;
@@ -2117,9 +1903,7 @@ static int emit_sm_pat_noarg(FILE *out, sm_opcode_t op, int pc)
     return emit_sm_rtcall(out, t, NULL);
 }
 
-/* SM_EXEC_STMT for a variant pattern: emit a rt_match_variant call.
- * Mirrors emit_sm_exec_stmt_blob's parameter shape (subj_name in rdi,
- * has_repl in esi). */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_exec_stmt_variant(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -2127,9 +1911,6 @@ static int emit_sm_exec_stmt_variant(FILE *out, const SM_Instr *ins, int pc)
     int has_repl      = (int)ins->a[1].i;
     char lbl[64];
     const char *l = pat_arg_label(lbl, sizeof(lbl), sname);
-    /* Annotation captures both the (optional) subject name and the
-     * has_repl flag for human readers.  The macro itself encodes the
-     * shape (LBLOPT for subj + int for has_repl). */
     char anno[128];
     if (l) {
         snprintf(anno, sizeof(anno), "subj=%s", sname);
@@ -2146,16 +1927,10 @@ static int emit_sm_exec_stmt_variant(FILE *out, const SM_Instr *ins, int pc)
     return emit_sm_template(out, sm_template_lookup(SM_EXEC_STMT), &a);
 }
 
-
-/* -----------------------------------------------------------------------
- * Unhandled opcode trap
- * ----------------------------------------------------------------------- */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int edp4_sm_unhandled(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    /* SM_UNHANDLED template: trap with the opcode int as edi.  Annotation
-     * names the actual opcode -- the integer in args is opaque otherwise. */
     char anno[64];
     snprintf(anno, sizeof(anno), "%s", sm_opcode_name(ins->op));
     emit_sm_args_t a = { 0 };
@@ -2164,10 +1939,7 @@ static int edp4_sm_unhandled(FILE *out, const SM_Instr *ins, int pc)
     return emit_sm_template(out, sm_template_unhandled(), &a);
 }
 
-/* -----------------------------------------------------------------------
- * Top-level entry
- * ----------------------------------------------------------------------- */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int sm_codegen_text(SM_Program *prog, FILE *out, const char *src_path)
 {
     assert(prog != NULL);
@@ -2197,7 +1969,6 @@ int sm_codegen_text(SM_Program *prog, FILE *out, const char *src_path)
             return -1;
         }
         if (emit_three_column_line(out, "", ".include", "\"sm_macros.s\"", NULL) != 0) return -1;
-        /* EM-7c-bb-macros: write BB macro library alongside sm_macros.s. */
         if (bb_macros_write_to_path("bb_macros.s") != 0) {
             fprintf(stderr, "sm_codegen_text: failed to write bb_macros.s\n");
             return -1;
@@ -2205,17 +1976,9 @@ int sm_codegen_text(SM_Program *prog, FILE *out, const char *src_path)
         if (emit_three_column_line(out, "", ".include", "\"bb_macros.s\"", NULL) != 0) return -1;
     }
 
-    /* EM-6: collect all string literals and variable names into the string
-     * table, then emit them in .section .rodata before .text.  This makes
-     * every string pointer in the emitted binary a RIP-relative reference
-     * to a .Lstr_N label rather than an in-process pointer from the emitter. */
     strtab_collect(prog);
     if (strtab_emit_rodata(out) != 0) return -1;
 
-    /* EM-7d-usercall-reentrant: emit .data expression registry table for
-     * user-defined SNOBOL4 functions (SM_LABEL instructions with a[0].s set).
-     * This must come after strtab_emit_rodata (so .S* labels are defined)
-     * and before .text (so .L* forward references resolve in the same TU). */
     int expression_reg_count = emit_expression_registry(out, prog);
     if (expression_reg_count < 0) return -1;
 
@@ -2231,7 +1994,6 @@ int sm_codegen_text(SM_Program *prog, FILE *out, const char *src_path)
     pattern_windows_collect(prog);
     if (emit_pattern_blobs(out) != 0) return -1;
 
-    /* EM-4-readability: load the source file once if a path was given. */
     SrcLines sl;
     int sl_loaded = (srclines_load(&sl, src_path) == 0);
 
@@ -2308,13 +2070,11 @@ int sm_codegen_text(SM_Program *prog, FILE *out, const char *src_path)
 
         int rc;
         switch (ins->op) {
-            /* EM-2: halt + integer push */
             case SM_HALT:         rc = emit_halt_line(out, pc);          break;
             case SM_PUSH_LIT_I:   rc = emit_push_lit_i_line(out, ins, pc); break;
             case SM_PUSH_LIT_F:   rc = emit_sm_push_lit_f_dispatch(out, ins, pc);  break;
             case SM_PUSH_EXPR:    rc = emit_sm_push_expr_dispatch(out, ins, pc);   break;
 
-            /* EM-3: string push, var load/store, pop, arithmetic */
             case SM_PUSH_LIT_S:   rc = emit_sm_push_lit_s_dispatch(out, ins, pc); break;
             case SM_PUSH_VAR:     rc = emit_sm_push_var_dispatch(out, ins, pc);   break;
             case SM_STORE_VAR:    rc = emit_sm_store_var_dispatch(out, ins, pc);  break;
@@ -2333,21 +2093,13 @@ int sm_codegen_text(SM_Program *prog, FILE *out, const char *src_path)
             case SM_JUMP_S:       rc = emit_sm_jump_s_line(out, ins, pc); break;
             case SM_JUMP_F:       rc = emit_sm_jump_f_line(out, ins, pc); break;
 
-            /* EM-5: expression descriptor push expression call, return. */
             case SM_PUSH_EXPRESSION:   rc = emit_sm_push_expression_dispatch(out, ins, pc); break;
             case SM_CALL_EXPRESSION:   rc = emit_sm_call_expression_dispatch(out, ins, pc); break;
             case SM_RETURN:       rc = emit_sm_return_dispatch(out, pc);          break;
 
-            /* SM_DEFINE_ENTRY / SM_DEFINE: function entry markers and definition
-             * stubs.  SM_DEFINE_ENTRY is emitted as a no-op rt_define_entry call
-             * which registers the expression chunk in the native registry.
-             * SM_DEFINE is a no-op macro (function definition already handled by
-             * the expression registry at emit time). */
             case SM_DEFINE_ENTRY: rc = emit_sm_define_entry_dispatch(out, ins, pc, prog); break;
             case SM_DEFINE:       rc = emit_sm_define_dispatch(out, ins, pc);              break;
 
-            /* EM-7-pre keepers: SM_CALL_FN (general) + SM_CONCAT + SM_PUSH_NULL +
-             * SM_COERCE_NUM + conditional return variants. */
             case SM_CALL_FN:         rc = emit_sm_call_dispatch(out, ins, pc); break;
             case SM_CONCAT:       rc = emit_sm_concat_dispatch(out, pc);      break;
             case SM_PUSH_NULL:    rc = emit_sm_push_null_dispatch(out, pc);   break;
@@ -2394,9 +2146,6 @@ int sm_codegen_text(SM_Program *prog, FILE *out, const char *src_path)
             case SM_PAT_CAPTURE_FN_ARGS: rc = emit_sm_pat_capture_fn_args_dispatch(out, ins, pc); break;
             case SM_PAT_USERCALL:     rc = emit_sm_pat_usercall_dispatch(out, ins, pc); break;
             case SM_PAT_USERCALL_ARGS: rc = emit_sm_pat_usercall_args_dispatch(out, ins, pc); break;
-            /* Variant-path PAT opcodes: each emits its rt_pat_*@PLT call via
-             * emit_sm_rtcall.  These are all registered as SM_TPL_RTCALL in
-             * g_sm_templates[].  They must NOT fall through to SM_EXEC_STMT. */
             case SM_PAT_SPAN:    rc = emit_sm_pat_span_dispatch(out, pc);    break;
             case SM_PAT_BREAK:   rc = emit_sm_pat_break_dispatch(out, pc);   break;
             case SM_PAT_ANY:     rc = emit_sm_pat_any_dispatch(out, pc);     break;
@@ -2420,8 +2169,6 @@ int sm_codegen_text(SM_Program *prog, FILE *out, const char *src_path)
             case SM_PAT_ALT:     rc = emit_sm_pat_alt_dispatch(out, pc);     break;
             case SM_PAT_DEREF:   rc = emit_sm_pat_deref_dispatch(out, pc);   break;
 
-            /* SM_EXEC_STMT for a variant pattern (invariant patterns are
-             * already handled above by the pattern-window hook → blob call). */
             case SM_EXEC_STMT:    rc = emit_sm_exec_stmt_variant(out, ins, pc); break;
 
             default:              rc = edp4_sm_unhandled(out, ins, pc);  break;
@@ -2432,18 +2179,14 @@ int sm_codegen_text(SM_Program *prog, FILE *out, const char *src_path)
         }
     }
 
-    /* Flush any final unused pending label (e.g. SM_LABEL at the very end). */
     {
         const char *leftover = emit_sm_consume_pc_label();
         if (leftover && *leftover) {
-            /* EM-FORMAT-BB lone-label fusion: route through bb3c_format. */
             bb3c_format(out, leftover, "", "");
         }
     }
 
     int frc = emit_file_footer(out);
-    /* EM-FORMAT-BB lone-label fusion (2026-05-09): flush any pending label
-     * held by bb3c_format's fusion buffer before closing.  No-op if empty. */
     bb3c_flush_pending();
     if (sl_loaded) srclines_free(&sl);
     release_pc_used_as_target();

@@ -32,16 +32,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* -----------------------------------------------------------------------
- * Three-column label support.
- *
- * g_pending_pc_label is set by the dispatcher once per instruction.
- * render_call_line consumes it (copies to args->label if args->label is
- * NULL) and clears it so continuation lines within the same instruction
- * (multi-line blobs) don't inherit it.
- * ----------------------------------------------------------------------- */
 static char g_pending_pc_label[32] = "";  /* ".Lpc%d:"  set by emit_sm_set_pc_label */
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_set_pc_label(const char *lbl)
 {
     if (lbl && *lbl) {
@@ -54,15 +47,10 @@ void emit_sm_set_pc_label(const char *lbl)
     }
 }
 
-/* Read + clear.  Used by callers that bypass render_call_line (e.g.
- * sm_line in the codegen driver) but still want the column-1 label
- * pickup behavior.  Returns "" when there's nothing pending. */
 const char *emit_sm_consume_pc_label(void)
 {
     static char buf[32];
     if (!g_pending_pc_label[0]) return "";
-    /* Copy out into a static buffer (so the caller can use it across
-     * subsequent sm_emit_* calls without aliasing into g_pending_pc_label). */
     size_t n = strlen(g_pending_pc_label);
     if (n >= sizeof(buf)) n = sizeof(buf) - 1;
     memcpy(buf, g_pending_pc_label, n);
@@ -70,7 +58,6 @@ const char *emit_sm_consume_pc_label(void)
     g_pending_pc_label[0] = '\0';
     return buf;
 }
-
 
 /* ---------------------------------------------------------------------
  * Template table
@@ -82,7 +69,6 @@ const char *emit_sm_consume_pc_label(void)
  * --------------------------------------------------------------------- */
 
 static const sm_op_template_t g_sm_templates[] = {
-    /* Value push/pop/store */
     { SM_HALT,         "HALT",         "rt_halt_tos",     SM_TPL_RTCALL,    0, 0 },
     { SM_PUSH_LIT_I,   "PUSH_INT",     "rt_push_int",     SM_TPL_INT64,      0, 0 },
     { SM_PUSH_LIT_S,   "PUSH_STR",     "rt_push_str",     SM_TPL_LBL_INT32,  0, 0 },
@@ -93,36 +79,22 @@ static const sm_op_template_t g_sm_templates[] = {
     { SM_CONCAT,       "CONCAT",       "rt_concat",       SM_TPL_RTCALL,    0, 0 },
     { SM_COERCE_NUM,   "COERCE_NUM",   "rt_coerce_num",   SM_TPL_RTCALL,    0, 0 },
 
-    /* Arithmetic.  EM-7c follow-up: each op gets its own named no-arg
-     * macro.  Op-enum is baked into the macro body via t->const_a, not
-     * passed at the call site, so col 2 carries the human-readable name
-     * directly — no opaque integer + # annotation.  All six map to one
-     * runtime helper (rt_arith).
-     *
-     * Suffix `_NUM` disambiguates from x86 mnemonics `add`, `sub`, `mul`,
-     * `div` (GAS macro-name match is case-insensitive against mnemonics).
-     * Same disambiguator pattern as VOID_POP (SM POP vs x86 pop) and
-     * CALL_FN (SM CALL vs x86 call) from the prior rung. */
     { SM_ADD,          "ADD_NUM",      "rt_arith",        SM_TPL_ARITH,     SM_ADD, 0 },
     { SM_SUB,          "SUB_NUM",      "rt_arith",        SM_TPL_ARITH,     SM_SUB, 0 },
     { SM_MUL,          "MUL_NUM",      "rt_arith",        SM_TPL_ARITH,     SM_MUL, 0 },
     { SM_DIV,          "DIV_NUM",      "rt_arith",        SM_TPL_ARITH,     SM_DIV, 0 },
     { SM_MOD,          "MOD_NUM",      "rt_arith",        SM_TPL_ARITH,     SM_MOD, 0 },
 
-    /* Control flow */
     { SM_JUMP,         "JUMP",         NULL,                    SM_TPL_PCREF_JMP,  0, 0 },
     { SM_JUMP_S,       "JUMP_S",       "rt_last_ok",      SM_TPL_PCREF_COND, 1, 0 },
     { SM_JUMP_F,       "JUMP_F",       "rt_last_ok",      SM_TPL_PCREF_COND, 0, 0 },
 
-    /* Expression discipline */
     { SM_PUSH_EXPRESSION,   "PUSH_EXPRESSION",   "rt_push_expression_descr", SM_TPL_PUSH_EXPRESSION, 0, 0 },
     { SM_CALL_EXPRESSION,   "CALL_EXPRESSION",   NULL,                    SM_TPL_CALL_EXPRESSION, 0, 0 },
     { SM_RETURN,       "RETURN",       NULL,                    SM_TPL_RET,        0, 0 },
 
-    /* General call */
     { SM_CALL_FN,         "CALL_FN",         "rt_call",         SM_TPL_LBL_INT32,  0, 0 },
 
-    /* Pattern construction (no-arg shape) */
     { SM_PAT_SPAN,     "PAT_SPAN",     "rt_pat_span",     SM_TPL_RTCALL,    0, 0 },
     { SM_PAT_BREAK,    "PAT_BREAK",    "rt_pat_break",    SM_TPL_RTCALL,    0, 0 },
     { SM_PAT_ANY,      "PAT_ANY",      "rt_pat_any",      SM_TPL_RTCALL,    0, 0 },
@@ -146,41 +118,29 @@ static const sm_op_template_t g_sm_templates[] = {
     { SM_PAT_ALT,      "PAT_ALT",      "rt_pat_alt",      SM_TPL_RTCALL,    0, 0 },
     { SM_PAT_DEREF,    "PAT_DEREF",    "rt_pat_deref",    SM_TPL_RTCALL,    0, 0 },
 
-    /* Pattern construction (one-string-or-NULL shape) */
     { SM_PAT_LIT,      "PAT_LIT",      "rt_pat_lit",      SM_TPL_LBLOPT,     0, 0 },
     { SM_PAT_REFNAME,  "PAT_REFNAME",  "rt_pat_refname",  SM_TPL_LBLOPT,     0, 0 },
     { SM_PAT_USERCALL, "PAT_USERCALL", "rt_pat_usercall", SM_TPL_LBLOPT,     0, 0 },
 
-    /* Pattern construction (string-or-NULL + int) */
     { SM_PAT_CAPTURE,       "PAT_CAPTURE",       "rt_pat_capture",       SM_TPL_LBLOPT_INT32, 0, 0 },
     { SM_PAT_USERCALL_ARGS, "PAT_USERCALL_ARGS", "rt_pat_usercall_args", SM_TPL_LBLOPT_INT32, 0, 0 },
 
-    /* Pattern construction with three args */
     { SM_PAT_CAPTURE_FN,      "PAT_CAPTURE_FN",      "rt_pat_capture_fn",
       SM_TPL_LBLOPT3,         0, 0 },
     { SM_PAT_CAPTURE_FN_ARGS, "PAT_CAPTURE_FN_ARGS", "rt_pat_capture_fn_args",
       SM_TPL_LBLOPT_I_I,      0, 0 },
 
-    /* Statement execution (variant pattern) */
     { SM_EXEC_STMT,    "EXEC_STMT_VARIANT",  "rt_match_variant",
       SM_TPL_EXEC_VAR, 0, 0 },
 
-    /* Statement-boundary / no-op markers (EM-7c-stmt-banner-fidelity).
-     * These opcodes carry no executable code but mark a position in
-     * the pc tape.  Rendering them as a real three-column line keeps
-     * the .LpcN: label out of the "naked" failure mode — col 2
-     * declares which marker executes here, even though the macro
-     * body is empty. */
     { SM_LABEL,        "LABEL",        NULL,                    SM_TPL_NOOP,       0, 0 },
     { SM_STNO,         "STNO",         NULL,                    SM_TPL_NOOP,       0, 0 },
 
-    /* Opcodes added sess 2026-05-12 (EM-TEMPLATE-COMPLETE). */
     { SM_PUSH_NULL_NOFLIP, "PUSH_NULL_NOFLIP", "rt_push_null_noflip", SM_TPL_RTCALL, 0, 0 },
     { SM_EXP,          "EXP_NUM",      "rt_exp",          SM_TPL_RTCALL,    0, 0 },
     { SM_NEG,          "NEGATE",       "rt_neg",          SM_TPL_RTCALL,    0, 0 },
     { SM_DEFINE_ENTRY, "DEFINE_ENTRY", "rt_define_entry", SM_TPL_RTCALL,    0, 0 },
     { SM_DEFINE,       "DEFINE",       "rt_define",       SM_TPL_RTCALL,    0, 0 },
-    /* Generator / M5 opcodes — trap via rt_unhandled_sm at runtime. */
     { SM_SUSPEND,        "SUSPEND",        "rt_unhandled_sm", SM_TPL_ARITH, SM_SUSPEND,        0 },
     { SM_RESUME,         "RESUME",         "rt_unhandled_sm", SM_TPL_ARITH, SM_RESUME,         0 },
     { SM_SUSPEND_VALUE,  "SUSPEND_VALUE",  "rt_unhandled_sm", SM_TPL_ARITH, SM_SUSPEND_VALUE,  0 },
@@ -204,14 +164,10 @@ static const sm_op_template_t g_sm_templates[] = {
     { SM_DECR,    "DECR",    "rt_decr",  SM_TPL_ARITH, 0, 0 },
     { SM_ACOMP,   "ACOMP",   "rt_acomp", SM_TPL_ARITH, 0 /* op from a[0].i */, 0 },
     { SM_LCOMP,   "LCOMP",   "rt_lcomp", SM_TPL_ARITH, 0, 0 },
-    /* FRETURN/NRETURN/RETURN_S/F family: handled as special cases in
-     * sm_codegen_x64_emit.c (same path as RETURN_VARIANT). */
-    /* SM_PUSH_LIT_F / SM_PUSH_EXPR: special-cased in sm_codegen_x64_emit.c. */
 };
 
 #define G_SM_TEMPLATES_N (int)(sizeof(g_sm_templates) / sizeof(g_sm_templates[0]))
 
-/* Standalone non-table templates (for shapes that aren't keyed by opcode). */
 static const sm_op_template_t g_tpl_unhandled = {
     -1, "UNHANDLED", "rt_unhandled_op", SM_TPL_UNHANDLED, 0, 0
 };
@@ -247,9 +203,6 @@ const sm_op_template_t *sm_template_ret_var(void)    { return &g_tpl_ret_var; }
  *   - A `default: abort()` covers any unhandled kind.
  * --------------------------------------------------------------------- */
 
-/* ---- macro body renderer -------------------------------------------- */
-
-/* forward decl — emit_optional_lbl below uses macro_line, defined further down */
 static int macro_line(FILE *out, const char *label, const char *opcode, const char *col3);
 
 /* Helper: format the .ifnb/.else/.endif block for an optional label arg.
@@ -261,6 +214,7 @@ static int macro_line(FILE *out, const char *label, const char *opcode, const ch
  * Now: each line is a macro_line call: directive token in col 2, args in
  * col 3.  Result assembles identically (GAS conditional assembly is
  * indentation-insensitive); audit test passes. */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_optional_lbl(FILE *out, const char *macro_arg,
                              const char *register_load_dst)
 {
@@ -280,20 +234,12 @@ static int emit_optional_lbl(FILE *out, const char *macro_arg,
     return 0;
 }
 
-/* Helper: emit one three-column line for sm_macros.s content.
- * Col 1 (label, 24-wide): label or empty.
- * Col 2 (opcode, 16-wide): directive/mnemonic.
- * Col 3 (free): operands + optional annotation.
- *
- * If opcode starts with '.' it is a directive (.macro, .endm, .ifnb, etc.).
- * Banner lines (starting with '#') are printed full-width -- NOT three-column.
- */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int macro_line(FILE *out, const char *label, const char *opcode, const char *col3)
 {
     const char *lbl = (label  && *label)  ? label  : "";
     const char *op  = (opcode && *opcode) ? opcode : "";
     const char *c3  = (col3   && *col3)   ? col3   : "";
-    /* EM-7c-no-trailing-ws (2026-05-09): build + right-trim. */
     char line[768];
     int n = snprintf(line, sizeof(line), "%-24s%-16s %s", lbl, op, c3);
     if (n < 0) return -1;
@@ -303,13 +249,9 @@ static int macro_line(FILE *out, const char *label, const char *opcode, const ch
     return (fputs(line, out) < 0 || fputc('\n', out) == EOF) ? -1 : 0;
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int render_macro_body(FILE *out, const sm_op_template_t *t)
 {
-    /* Each arm emits one .macro NAME args / body / .endm block.
-     * All lines use the corrected three-column format:
-     *   Col 1 (24-wide): label or empty
-     *   Col 2 (16-wide): opcode/directive/mnemonic
-     *   Col 3 (free):    args/operands */
     char macro_def[64];
     switch (t->kind) {
     case SM_TPL_RTCALL:
@@ -317,12 +259,6 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
         macro_line(out, "", ".macro", macro_def);
         { char ct[64]; snprintf(ct, sizeof(ct), "%s@PLT", t->runtime);
           macro_line(out, "", "call", ct); }
-        /* SM_DEFINE_ENTRY: establish a C-style stack frame so the user-function
-         * body maintains the SysV AMD64 ABI invariant (rsp+8) mod 16 == 0 at
-         * every nested `call`.  Without this, calls to rt_match_variant etc.
-         * arrive with rsp misaligned, and downstream movaps -0x60(%rbp) in
-         * libc/snobol4 internals SIGSEGVs.  Mirrors mode-3's ME-6a/ME-13
-         * prologue in sm_codegen.c. */
         /* SM_DEFINE_ENTRY: enter the C-ABI prologue (push rbp; mov rbp,rsp).
          * cfn() is entered via a C-ABI `call` from call_native_chunk, so rsp%16==8
          * at entry to the body.  The bare `push rbp` brings rsp to %16==0; the
@@ -341,8 +277,6 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
     case SM_TPL_RET:
         snprintf(macro_def, sizeof(macro_def), "%s", t->macro_name);
         macro_line(out, "", ".macro", macro_def);
-        /* Undo the C frame established by SM_DEFINE_ENTRY: strip the
-         * sub rsp,8 via mov rsp,rbp, restore caller's rbp, then ret. */
         macro_line(out, "", "mov",  "rsp, rbp");
         macro_line(out, "", "pop",  "rbp");
         macro_line(out, "", "ret", "");
@@ -489,7 +423,6 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
           macro_line(out, "", "call", ct); }
         macro_line(out, "", "test", "eax, eax");
         macro_line(out, "", "jz", ".Lretskip_\\pc");
-        /* Undo the C frame established by SM_DEFINE_ENTRY before returning. */
         macro_line(out, "", "mov", "rsp, rbp");
         macro_line(out, "", "pop", "rbp");
         macro_line(out, "", "ret", "");
@@ -524,30 +457,12 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
     return -1;
 }
 
-/* ---- per-call line renderer ---------------------------------------- */
-/*
- * Emits exactly one source line of the form:
- *   "\tMACRO_NAME formatted_args  # annotation"
- * The body of the macro is *not* re-emitted -- the assembler expands
- * it on its own.  The renderer's only job is to format the args
- * matching the macro's expected signature.
- *
- * The annotation, if non-NULL and non-empty, is appended after the
- * macro call as a `#` comment.  GAS treats `#` as the line-comment
- * introducer (verified at session start).
- */
-
-/* Helper: format the third-column annotation, "" if NULL/empty. */
 static const char *anno_or_empty(const char *anno)
 {
     return (anno && *anno) ? anno : NULL;
 }
 
-/* Helper: write trailing annotation if any.
- *
- * Mirrors sm_line's convention: an annotation that doesn't start with
- * '#' gets one prepended (so "SM_ADD" becomes "# SM_ADD").  GAS treats
- * '#' as the line-comment introducer in Intel syntax. */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int write_anno(FILE *out, const char *anno)
 {
     const char *a = anno_or_empty(anno);
@@ -556,13 +471,7 @@ static int write_anno(FILE *out, const char *anno)
     return fprintf(out, "  # %s\n", a) < 0 ? -1 : 0;
 }
 
-/* Build the args-only string for column 3 into buf[cap].
- * This is everything after the macro name in the call line.
- * Returns 0 on success, -1 if buf is too small (truncation).
- *
- * Convention: if there are no args, buf[0] = '\0' (empty string).
- * The macro name itself goes into column 2 (t->macro_name directly).
- * These two together replace the old fused build_op_col. */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int build_args_col(char *buf, int cap, const sm_op_template_t *t,
                           const emit_sm_args_t *args)
 {
@@ -657,18 +566,10 @@ static int build_args_col(char *buf, int cap, const sm_op_template_t *t,
     return (n < 0 || n >= cap) ? -1 : 0;
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int render_call_line(FILE *out, const sm_op_template_t *t,
                             const emit_sm_args_t *args)
 {
-    /* Corrected three-column layout:
-     *   Col 1 (label):  24 chars, left-aligned  -- from args->label or g_pending_pc_label
-     *   Col 2 (opcode): 16 chars, left-aligned  -- macro name ONLY (no args)
-     *   Col 3 (args + anno): free width         -- args then # comment
-     *
-     * g_pending_pc_label is consumed (cleared) on the first call per
-     * instruction so that continuation lines (multi-line blob handlers)
-     * don't inherit the label.
-     */
     char argsb[128];
     if (build_args_col(argsb, sizeof(argsb), t, args) != 0) return -1;
 
@@ -688,11 +589,8 @@ static int render_call_line(FILE *out, const sm_op_template_t *t,
     } else {
         lbl_col = "";
     }
-    /* Consume pending label so next call on this instruction gets no label. */
     g_pending_pc_label[0] = '\0';
 
-    /* Build args+anno for column 3: args (if any) then annotation.
-     * One-space gap between args and `#` -- no fourth-column padding. */
     char col3[256];
     const char *anno = args ? args->anno : NULL;
     if (argsb[0] && anno && *anno) {
@@ -711,17 +609,10 @@ static int render_call_line(FILE *out, const sm_op_template_t *t,
         col3[0] = '\0';
     }
 
-    /* EM-FORMAT-BB lone-label fusion (2026-05-09): route through bb3c_format
-     * so SM-side macro-driven dispatch lines participate in the same
-     * pending-label buffer as BB-side and data-section emissions. */
     bb3c_format(out, (lbl_col && *lbl_col) ? lbl_col : "",
                 t->macro_name, col3);
     return 0;
 }
-
-/* ---------------------------------------------------------------------
- * Public API
- * --------------------------------------------------------------------- */
 
 /* emit_sm_macro_library:
  *
@@ -735,9 +626,9 @@ static int render_call_line(FILE *out, const sm_op_template_t *t,
  * which are common to AT&T and Intel syntax); placement before any
  * `.intel_syntax noprefix` directive in the .s is fine.
  */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_macro_library(FILE *out)
 {
-    /* De-duplication: track which macro_names have already been emitted. */
     const char *seen[256] = { 0 };
     int n_seen = 0;
 
@@ -750,7 +641,6 @@ int emit_sm_macro_library(FILE *out)
         "                        .intel_syntax    noprefix\n",
         out) == EOF) return -1;
 
-    /* Helper: emit a template's macro IF it hasn't been emitted yet. */
     #define EMIT_IF_NEW(tpl) do {                                           \
         const sm_op_template_t *_t = (tpl);                                 \
         int already = 0;                                                    \
@@ -767,8 +657,6 @@ int emit_sm_macro_library(FILE *out)
         }                                                                   \
     } while (0)
 
-    /* Walk the table in declaration order so the library reads
-     * top-to-bottom in a logical grouping. */
     for (int i = 0; i < G_SM_TEMPLATES_N; i++) {
         EMIT_IF_NEW(&g_sm_templates[i]);
     }
@@ -790,13 +678,11 @@ int emit_sm_macro_library(FILE *out)
         "                        .endm\n",
         out) == EOF) return -1;
 
-    /* EM-7c-sm-three-column-verify (2026-05-09): trailing '\\n\\n'
-     * produced one blank line at end-of-file -- flagged by the audit.
-     * Drop the second '\\n'. */
     if (fputs("# === END sm macro library ===\n", out) == EOF) return -1;
     return 0;
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_macro_library_to_path(const char *path)
 {
     if (!path || !*path) return -1;
@@ -813,6 +699,7 @@ int emit_sm_macro_library_to_path(const char *path)
 
 /* Per-instruction generic dispatch (rarely called directly; convenience
  * wrappers below are usually clearer at call sites). */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_template(FILE *out, const sm_op_template_t *t,
                      const emit_sm_args_t *args)
 {
@@ -820,8 +707,7 @@ int emit_sm_template(FILE *out, const sm_op_template_t *t,
     return render_call_line(out, t, args);
 }
 
-/* ---- Convenience wrappers ----------------------------------------- */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_rtcall(FILE *out, const sm_op_template_t *t, const char *anno)
 {
     emit_sm_args_t a = { 0 };
@@ -829,6 +715,7 @@ int emit_sm_rtcall(FILE *out, const sm_op_template_t *t, const char *anno)
     return emit_sm_template(out, t, &a);
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_noop(FILE *out, const sm_op_template_t *t, const char *anno)
 {
     /* SM_TPL_NOOP: render exactly one three-column line carrying the
@@ -841,6 +728,7 @@ int emit_sm_noop(FILE *out, const sm_op_template_t *t, const char *anno)
     return emit_sm_template(out, t, &a);
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_int64(FILE *out, const sm_op_template_t *t,
                   int64_t v, const char *anno)
 {
@@ -850,6 +738,7 @@ int emit_sm_int64(FILE *out, const sm_op_template_t *t,
     return emit_sm_template(out, t, &a);
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_lbl(FILE *out, const sm_op_template_t *t,
                 const char *lbl, const char *anno)
 {
@@ -859,6 +748,7 @@ int emit_sm_lbl(FILE *out, const sm_op_template_t *t,
     return emit_sm_template(out, t, &a);
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_lblopt(FILE *out, const sm_op_template_t *t,
                    const char *lbl_or_null, const char *anno)
 {
@@ -868,6 +758,7 @@ int emit_sm_lblopt(FILE *out, const sm_op_template_t *t,
     return emit_sm_template(out, t, &a);
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_lbl_int32(FILE *out, const sm_op_template_t *t,
                       const char *lbl, int n, const char *anno)
 {
@@ -878,6 +769,7 @@ int emit_sm_lbl_int32(FILE *out, const sm_op_template_t *t,
     return emit_sm_template(out, t, &a);
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_lblopt_int32(FILE *out, const sm_op_template_t *t,
                          const char *lbl_or_null, int n, const char *anno)
 {
@@ -888,13 +780,14 @@ int emit_sm_lblopt_int32(FILE *out, const sm_op_template_t *t,
     return emit_sm_template(out, t, &a);
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_arith(FILE *out, const sm_op_template_t *t)
 {
     emit_sm_args_t a = { 0 };
-    /* annotation set by caller's choice -- we put the opcode name */
     return emit_sm_template(out, t, &a);
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_pcref_jmp(FILE *out, const sm_op_template_t *t,
                       int target_pc, const char *anno)
 {
@@ -904,6 +797,7 @@ int emit_sm_pcref_jmp(FILE *out, const sm_op_template_t *t,
     return emit_sm_template(out, t, &a);
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_pcref_cond(FILE *out, const sm_op_template_t *t,
                        int target_pc, int taken_when_ok,
                        const char *anno)
@@ -917,6 +811,7 @@ int emit_sm_pcref_cond(FILE *out, const sm_op_template_t *t,
     return emit_sm_template(out, t, &a);
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int edp4_emit_push_expression(FILE *out, const sm_op_template_t *t,
                        int64_t entry_pc, int arity)
 {
@@ -926,6 +821,7 @@ int edp4_emit_push_expression(FILE *out, const sm_op_template_t *t,
     return emit_sm_template(out, t, &a);
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int edp4_emit_call_expression(FILE *out, const sm_op_template_t *t, int target_pc)
 {
     emit_sm_args_t a = { 0 };
@@ -933,11 +829,13 @@ int edp4_emit_call_expression(FILE *out, const sm_op_template_t *t, int target_p
     return emit_sm_template(out, t, &a);
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_ret(FILE *out, const sm_op_template_t *t, const char *anno)
 {
     return emit_sm_rtcall(out, t, anno);
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_ret_var(FILE *out, int kind, int cond, int pc, const char *anno)
 {
     emit_sm_args_t a = { 0 };
@@ -948,6 +846,7 @@ int emit_sm_ret_var(FILE *out, int kind, int cond, int pc, const char *anno)
     return emit_sm_template(out, sm_template_ret_var(), &a);
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_unhandled(FILE *out, int op)
 {
     emit_sm_args_t a = { 0 };
@@ -955,6 +854,7 @@ int emit_sm_unhandled(FILE *out, int op)
     return emit_sm_template(out, sm_template_unhandled(), &a);
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_exec_var(FILE *out, const sm_op_template_t *t,
                      const char *subj_lbl_or_null, int has_repl)
 {
@@ -964,6 +864,7 @@ int emit_sm_exec_var(FILE *out, const sm_op_template_t *t,
     return emit_sm_template(out, t, &a);
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_capture_fn(FILE *out, const sm_op_template_t *t,
                        const char *fname_lbl_or_null,
                        int is_imm,
@@ -978,6 +879,7 @@ int emit_sm_capture_fn(FILE *out, const sm_op_template_t *t,
     return emit_sm_template(out, t, &a);
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_capture_fn_args(FILE *out, const sm_op_template_t *t,
                             const char *fname_lbl_or_null,
                             int is_imm, int nargs,
@@ -991,22 +893,16 @@ int emit_sm_capture_fn_args(FILE *out, const sm_op_template_t *t,
     return emit_sm_template(out, t, &a);
 }
 
-/* ---------------------------------------------------------------------
- * Self-test: walks every template, emits its macro body to a stub
- * stream, asserts no failure.  Used by the gate to verify all kinds
- * have both arms implemented (no SM_TPL__COUNT slipping through).
- * --------------------------------------------------------------------- */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_template_selftest(FILE *out)
 {
     int failures = 0;
     if (fprintf(out, "emit_sm_template self-test: %d templates\n",
                 G_SM_TEMPLATES_N + 2) < 0) return -1;
-    /* Macro library round-trip. */
     if (emit_sm_macro_library(out) != 0) {
         fprintf(out, "FAIL: emit_sm_macro_library returned -1\n");
         failures++;
     }
-    /* Per-call line round-trip with sentinel args, one per kind. */
     emit_sm_args_t sentinel = {
         .i64   = 0x12345678,
         .i32_a = 7,

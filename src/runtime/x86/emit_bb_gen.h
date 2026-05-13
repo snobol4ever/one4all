@@ -1,9 +1,3 @@
-/* bb_emit.h — Dual-Mode x86-64 Emitter.
- * bb_emit_mode selects output: EMIT_TEXT (GAS .s), EMIT_BINARY_WIRED (flat blob),
- * EMIT_BINARY_BROKERED (per-box C-ABI blob), EMIT_MACRO_DEF (.macro body regen),
- * EMIT_TEXT_INLINE (expanded GAS, no macros).
- * bb_label_t carries a symbolic name (TEXT) and buffer offset (BINARY).
- * Forward refs patched on bb_label_define().  Finalise with bb_emit_end(). */
 
 #ifndef EMITTER_BB_GEN_H
 #define EMITTER_BB_GEN_H
@@ -12,8 +6,6 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stddef.h>
-
-/* ── mode ───────────────────────────────────────────────────────────────── */
 
 typedef enum {
     EMIT_TEXT             = 0,
@@ -25,9 +17,6 @@ typedef enum {
 
 extern bb_emit_mode_t bb_emit_mode;
 
-/* EM-BB-FORMAT: when 1, BB template functions emit three-column macro
- * invocations (e.g. "LIT_CHECK lit, len, γ, ω") in TEXT mode instead of
- * raw GAS instruction sequences.  Controlled by --bb-format CLI flag. */
 extern int g_bb_emit_format;
 extern FILE          *bb_emit_out;   /* text mode: output FILE* (default stdout) */
 
@@ -38,7 +27,6 @@ extern FILE          *bb_emit_out;   /* text mode: output FILE* (default stdout)
  * Templates and the helpers they call do not carry the mode in their args. */
 void emit_mode_set(bb_emit_mode_t m, FILE *out);
 
-/* ── three-way low-level helpers (no emitter_t *e parameter) ────────────── */
 /*
  * Templates and template-helpers call these directly.  Each helper consults
  * bb_emit_mode and produces one of {binary bytes, text line, macro_def line}
@@ -61,8 +49,6 @@ void emit_pad_to_blob_size(void);
 void emit_macro_begin(const char *name, const char *const *params, int nparams);
 void emit_macro_end(void);
 
-/* ── label ──────────────────────────────────────────────────────────────── */
-
 #define BB_LABEL_NAME_MAX  80
 #define BB_LABEL_UNRESOLVED (-1)
 
@@ -75,14 +61,9 @@ void bb_label_init(bb_label_t *lbl, const char *name);
 
 void bb_label_initf(bb_label_t *lbl, const char *fmt, ...);
 
-/* Define label at the current emit position (binary: sets offset + patches).
- * In text mode: emits "name:" on its own line. */
 void bb_label_define(bb_label_t *lbl);
 
 #define bb_label_defined(lbl)  ((lbl)->offset != BB_LABEL_UNRESOLVED)
-
-/* ── jump kind (used by emit_jmp and emitter_t vtable) ────────────────── */
-/* Defined here so both bb_emit.h and emitter.h consumers share one enum.   */
 
 typedef enum {
     JMP_JMP = 0,
@@ -105,12 +86,7 @@ void emit_jz_retskip(int pc);
 void emit_retskip_label(int pc);
 void emit_noop_macro(const char *macro_name);
 
-/* emit_banner_stno — emit the SM_STNO major banner.
- *   BINARY:    no-op
- *   TEXT/MACRO_DEF: 120-char #= rule, "# stmt N  (line L):  <src>", #= rule */
 void emit_banner_stno(int stno, int lineno, const char *src_text);
-
-/* ── BB port helpers (EM-TEMPLATE-PURITY-2) ────────────────────────────── */
 
 void emit_label_define(bb_label_t *lbl);
 
@@ -122,15 +98,9 @@ void emit_bb_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fallb
  *   Use for boxes whose ζ is emitted as static .data (xatp, xdsar).
  *   BINARY: ignores zeta_label; uses zeta_ptr directly (same as emit_bb_port_call).
  *   TEXT/INLINE: emits `lea rdi, [rip + zeta_label]`. */
-/* emit_bb_format_port — emit one three-column macro-invocation line for a BB port.
- *   Only active when g_bb_emit_format=1 and mode is TEXT or TEXT_INLINE.
- *   Emits: bb3c_format(out, label_str, macro_name, args)
- *   lbl_entry may be NULL (no label on this line). */
 void emit_bb_format_port(bb_label_t *lbl_entry, const char *macro_name, const char *args);
 
-/* emit_bb_is_format_mode — returns 1 if g_bb_emit_format and TEXT/TEXT_INLINE mode. */
 int  emit_bb_is_format_mode(void);
-/* fmt_body_append — accumulate one instruction fragment into the FORMAT port body buffer. */
 void fmt_body_append(const char *instr, const char *operands);
 
 void emit_bb_port_call_rip(uint64_t zeta_ptr, const char *zeta_label,
@@ -156,8 +126,6 @@ void emit_push_rbp_frame(void);
 
 void emit_pop_rbp_frame_ret(void);
 
-/* ── binary mode state ──────────────────────────────────────────────────── */
-
 extern bb_buf_t  bb_emit_buf;   /* current pool buffer */
 extern int       bb_emit_pos;   /* current write position (bytes written so far) */
 extern int       bb_emit_size;  /* total buffer size */
@@ -165,8 +133,6 @@ extern int       bb_emit_size;  /* total buffer size */
 void bb_emit_begin(bb_buf_t buf, int size);
 
 int  bb_emit_end(void);
-
-/* ── patch list ─────────────────────────────────────────────────────────── */
 
 #define BB_PATCH_MAX  512
 
@@ -184,15 +150,8 @@ typedef struct {
 extern bb_patch_t bb_patch_list[BB_PATCH_MAX];
 extern int        bb_patch_count;
 
-/* Record a forward reference at the current position.
- * Emits a 0-placeholder of the appropriate width. */
 void bb_emit_patch_rel8 (bb_label_t *lbl);
 void bb_emit_patch_rel32(bb_label_t *lbl);
-
-/* ── byte primitives ────────────────────────────────────────────────────── */
-
-/* These are the only functions that write bytes.  All higher-level
- * helpers (instruction emitters, mac_* functions) call these. */
 
 void bb_emit_byte(uint8_t b);
 void bb_emit_u16 (uint16_t v);
@@ -201,7 +160,6 @@ void bb_emit_u64 (uint64_t v);
 void bb_emit_i8  (int8_t   v);
 void bb_emit_i32 (int32_t  v);
 
-/* ── x86-64 instruction helpers (bb_flat.c mac_* layer) ─────────────────── */
 void bb_insn_mov_eax_imm32(uint32_t imm);
 void bb_insn_mov_rax_imm64(uint64_t imm);
 void bb_insn_ret(void);
@@ -229,8 +187,6 @@ void bb_insn_mov_rbp_rsp(void);
 void bb_insn_sub_rsp_imm8(uint8_t imm);
 void bb_insn_add_rsp_imm8(uint8_t imm);
 
-/* ── text mode helpers ───────────────────────────────────────────────────── */
-
 void bb_text(const char *fmt, ...);
 
 void bb_text_label(bb_label_t *lbl);
@@ -256,20 +212,8 @@ void bb_text_comment(const char *fmt, ...);
 void bb3c_text(const char *label, const char *action, const char *goto_);
 void bb3c_format(FILE *out, const char *label, const char *action, const char *goto_);
 
-/* EM-FORMAT-BB lone-label fusion (2026-05-09):
- * Flush any pending label held by `bb3c_format`'s fusion buffer.  Call
- * once at end-of-file before closing the output stream so a trailing
- * label-only emission doesn't get silently dropped.  No-op if buffer
- * is empty. */
 void bb3c_flush_pending(void);
 
-/* EM-FORMAT-BB-FUSED-GOTOS (2026-05-09):
- * Flush only the deferred conditional-jmp buffer (NOT the pending label).
- * Used by raw-write paths (banners, EV_TEXT) that physically write to
- * the FILE* without going through bb3c_format — they must land AFTER
- * any cond-jmp emission, but the pending label is a separate concern
- * (handled by bb3c_format's own logic when the next bb3c content
- * arrives).  Symmetric with bb3c_flush_pending which flushes the label. */
 void bb3c_flush_pending_cjmp_only(void);
 
 /* EM-FORMAT-BB-FUSED-GOTOS (2026-05-09):

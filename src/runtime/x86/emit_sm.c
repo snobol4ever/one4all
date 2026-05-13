@@ -1,11 +1,3 @@
-/*
- * emitter_sm.c — SM opcode emitters (renamed from sm_templates.c, EM-UNIFY-a)
- *
- * EM-UNIFY-c: nullary and single-arg rt-call families collapsed to tables.
- *
- * Authors: Lon Jones Cherryholmes · Claude Sonnet 4.6
- * Sprint:  EM-UNIFY / GOAL-MODE4-EMIT
- */
 
 #include "emit.h"
 #include "emit_bb_gen.h"
@@ -15,8 +7,7 @@
 #include <string.h>
 #include <stdio.h>
 
-/* ── nullary rt-call body ─────────────────────────────────────────────────── */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_sm_nullary_rt(const char *macro_name, const char *rt_fn)
 {
     emit_macro_begin(macro_name, NULL, 0);
@@ -24,8 +15,6 @@ static void emit_sm_nullary_rt(const char *macro_name, const char *rt_fn)
     emit_macro_end();
     emit_pad_to_blob_size();
 }
-
-/* ── nullary opcode table ────────────────────────────────────────────────── */
 
 typedef struct { int op; const char *macro_name; const char *rt_fn; } sm_nullary_entry_t;
 
@@ -61,7 +50,6 @@ static const sm_nullary_entry_t g_sm_nullary[] = {
     { SM_PAT_CAT,         "PAT_CAT",           "rt_pat_cat"           },
     { SM_PAT_ALT,         "PAT_ALT",           "rt_pat_alt"           },
     { SM_PAT_DEREF,       "PAT_DEREF",         "rt_pat_deref"         },
-    /* M5 stubs */
     { SM_RESUME,          "RESUME",            "rt_unhandled_sm"      },
     { SM_SUSPEND,         "SUSPEND",           "rt_unhandled_sm"      },
     { SM_SUSPEND_VALUE,   "SUSPEND_VALUE",     "rt_unhandled_sm"      },
@@ -82,6 +70,7 @@ static const sm_nullary_entry_t g_sm_nullary[] = {
     { -1, NULL, NULL }
 };
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_op(int op)
 {
     for (const sm_nullary_entry_t *e = g_sm_nullary; e->op >= 0; e++)
@@ -89,7 +78,6 @@ void emit_sm_op(int op)
     emit_sm_unhandled_op(op);
 }
 
-/* Named wrappers — public API unchanged */
 void emit_sm_coerce_num()     { emit_sm_op(SM_COERCE_NUM); }
 void emit_sm_exp()            { emit_sm_op(SM_EXP); }
 void emit_sm_neg()            { emit_sm_op(SM_NEG); }
@@ -136,13 +124,12 @@ void emit_sm_bb_pump_proc()   { emit_sm_op(SM_BB_PUMP_PROC); }
 void emit_sm_bb_pump_sm()     { emit_sm_op(SM_BB_PUMP_SM); }
 void emit_sm_bb_pump_ast() { emit_sm_nullary_rt("BB_PUMP_AST", "rt_bb_pump_ast"); }
 
-/* ── arith family — collapsed to emit_sm_arith(op) ──────────────────────── */
-
 static const struct { int op; const char *mn; } g_sm_arith[] = {
     { SM_ADD,"ADD_NUM" },{ SM_SUB,"SUB_NUM" },{ SM_MUL,"MUL_NUM" },
     { SM_DIV,"DIV_NUM" },{ SM_MOD,"MOD_NUM" },{ -1,NULL }
 };
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_arith_dispatch(int op)
 {
     for (int i = 0; g_sm_arith[i].op >= 0; i++)
@@ -150,6 +137,7 @@ void emit_sm_arith_dispatch(int op)
     emit_sm_unhandled_op(op);
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_arith_op(int op_enum, const char *macro_name)
 {
     emit_macro_begin(macro_name ? macro_name : "ARITH", NULL, 0);
@@ -164,8 +152,7 @@ void emit_sm_mul() { emit_sm_arith_dispatch(SM_MUL); }
 void emit_sm_div() { emit_sm_arith_dispatch(SM_DIV); }
 void emit_sm_mod() { emit_sm_arith_dispatch(SM_MOD); }
 
-/* ── single int-arg — collapsed to emit_sm_int_arg ──────────────────────── */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_sm_int_arg(const char *mn, const char *rt_fn,
                               const char *param_name, int val)
 {
@@ -180,6 +167,7 @@ void emit_sm_acomp(int op)       { emit_sm_int_arg("ACOMP",    "rt_acomp",      
 void emit_sm_lcomp(int op)       { emit_sm_int_arg("LCOMP",    "rt_lcomp",       "op", op); }
 void emit_sm_unhandled_op(int op){ emit_sm_int_arg("UNHANDLED","rt_unhandled_op","op", op); }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_incr(int64_t n)
 {
     const char *const params[] = { "n" };
@@ -189,6 +177,7 @@ void emit_sm_incr(int64_t n)
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_decr(int64_t n)
 {
     const char *const params[] = { "n" };
@@ -198,14 +187,15 @@ void emit_sm_decr(int64_t n)
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
-/* ── halt / return / jump ────────────────────────────────────────────────── */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_halt()
 { emit_bb_inc_mem_r13_disp8(20); emit_ret(); emit_pad_to_blob_size(); }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_return()
 { emit_macro_begin("RETURN",NULL,0); emit_ret(); emit_macro_end(); emit_pad_to_blob_size(); }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_return_variant(int kind, int cond, int pc)
 {
     static const char *const params[] = { "kind","cond","pc" };
@@ -228,24 +218,24 @@ void emit_sm_nreturn_f(int pc) { emit_sm_return_variant(2,2,pc); }
 
 static void make_pc_label(bb_label_t *lbl, int pc) { bb_label_initf(lbl,".L%d",pc); }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_jump(int pc)
 { bb_label_t t; make_pc_label(&t,pc); emit_jmp(&t,JMP_JMP); }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_jump_s(int pc)
 { emit_call_sym_plt("rt_last_ok",0); emit_test_rax_rax();
   bb_label_t t; make_pc_label(&t,pc); emit_jmp(&t,JMP_JNE); }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_jump_f(int pc)
 { emit_call_sym_plt("rt_last_ok",0); emit_test_rax_rax();
   bb_label_t t; make_pc_label(&t,pc); emit_jmp(&t,JMP_JE); }
 
-/* ── structural markers ──────────────────────────────────────────────────── */
-
 void emit_sm_label()                                      { emit_noop_macro("LABEL"); }
 void emit_sm_stno(int stno, int lineno, const char *src) { emit_banner_stno(stno,lineno,src); emit_noop_macro("STNO"); }
 
-/* ── push literals ───────────────────────────────────────────────────────── */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_push_lit_i(int64_t val)
 {
     static const char *const p[] = {"val"};
@@ -255,6 +245,7 @@ void emit_sm_push_lit_i(int64_t val)
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_push_lit_f(double val)
 {
     uint64_t bits; __builtin_memcpy(&bits,&val,8);
@@ -266,6 +257,7 @@ void emit_sm_push_lit_f(double val)
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_push_lit_s(const char *str_lbl, uint64_t str_ptr, int len)
 {
     static const char *const p[] = {"lbl","n"};
@@ -276,6 +268,7 @@ void emit_sm_push_lit_s(const char *str_lbl, uint64_t str_ptr, int len)
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_push_expr(uint64_t ptr_val)
 {
     static const char *const p[] = {"ptr"};
@@ -285,8 +278,7 @@ void emit_sm_push_expr(uint64_t ptr_val)
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
-/* ── expression / statement ──────────────────────────────────────────────── */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_push_expression(uint64_t entry_ptr, int arity)
 {
     static const char *const p[] = {"entry","arity"};
@@ -296,6 +288,7 @@ void emit_sm_push_expression(uint64_t entry_ptr, int arity)
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_call_expression(const char *tgt_sym)
 {
     static const char *const p[] = {"tgt"};
@@ -304,6 +297,7 @@ void emit_sm_call_expression(const char *tgt_sym)
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_exec_stmt(const char *subj_lbl, uint64_t subj_ptr, int has_repl)
 {
     static const char *const p[] = {"has_repl","subj_lbl"};
@@ -313,6 +307,7 @@ void emit_sm_exec_stmt(const char *subj_lbl, uint64_t subj_ptr, int has_repl)
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_call_fn(const char *name_lbl, uint64_t name_ptr, int nargs)
 {
     (void)name_lbl; (void)name_ptr; (void)nargs;
@@ -323,8 +318,7 @@ void emit_sm_call_fn(const char *name_lbl, uint64_t name_ptr, int nargs)
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
-/* ── var / store ─────────────────────────────────────────────────────────── */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_push_var(const char *lbl, uint64_t ptr)
 {
     static const char *const p[] = {"lbl"};
@@ -332,6 +326,7 @@ void emit_sm_push_var(const char *lbl, uint64_t ptr)
     emit_call_sym_plt("rt_nv_get",0); emit_macro_end(); emit_pad_to_blob_size();
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_store_var(const char *lbl, uint64_t ptr)
 {
     static const char *const p[] = {"lbl"};
@@ -339,8 +334,7 @@ void emit_sm_store_var(const char *lbl, uint64_t ptr)
     emit_call_sym_plt("rt_nv_set",0); emit_macro_end(); emit_pad_to_blob_size();
 }
 
-/* ── pat string-arg — collapsed to emit_sm_pat_str ──────────────────────── */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_sm_pat_str(const char *mn, const char *rt_fn,
                              const char *lbl, uint64_t ptr)
 {
@@ -353,8 +347,7 @@ void emit_sm_pat_lit     (const char *l, uint64_t p) { emit_sm_pat_str("PAT_LIT"
 void emit_sm_pat_refname (const char *l, uint64_t p) { emit_sm_pat_str("PAT_REFNAME",  "rt_pat_refname",  l,p); }
 void emit_sm_pat_usercall(const char *l, uint64_t p) { emit_sm_pat_str("PAT_USERCALL", "rt_pat_usercall", l,p); }
 
-/* ── pat str+int ─────────────────────────────────────────────────────────── */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_pat_capture(const char *name_lbl, uint64_t name_ptr, int kind)
 {
     static const char *const p[] = {"lbl","n"};
@@ -363,6 +356,7 @@ void emit_sm_pat_capture(const char *name_lbl, uint64_t name_ptr, int kind)
     emit_call_sym_plt("rt_pat_capture",0); emit_macro_end(); emit_pad_to_blob_size();
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_pat_usercall_args(const char *name_lbl, uint64_t name_ptr, int nargs)
 {
     static const char *const p[] = {"lbl","n"};
@@ -371,8 +365,7 @@ void emit_sm_pat_usercall_args(const char *name_lbl, uint64_t name_ptr, int narg
     emit_call_sym_plt("rt_pat_usercall_args",0); emit_macro_end(); emit_pad_to_blob_size();
 }
 
-/* ── pat three-arg ───────────────────────────────────────────────────────── */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_pat_capture_fn(const char *fname_lbl, uint64_t fname_ptr,
                              int is_imm, const char *namelist_lbl, uint64_t namelist_ptr)
 {
@@ -383,6 +376,7 @@ void emit_sm_pat_capture_fn(const char *fname_lbl, uint64_t fname_ptr,
     emit_call_sym_plt("rt_pat_capture_fn",0); emit_macro_end(); emit_pad_to_blob_size();
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_pat_capture_fn_args(const char *fname_lbl, uint64_t fname_ptr,
                                   int is_imm, int nargs)
 {

@@ -10,7 +10,6 @@
 #include "emit_bb_flat.h"
 #include "../rt/rt.h"
 
-/*---- all extern declarations in one block -------------------------------------------------------------------------*/
 extern DESCR_t  bb_deferred_var_exported(void *zeta, int entry);  /* stmt_exec.c — BINARY fn_fallback for XDSAR */
 extern DESCR_t  coro_bb_alternate    (void *zeta, int entry);   extern icn_alternate_state_t      *icon_alt_new(void);
 extern DESCR_t  coro_bb_bang_binary  (void *zeta, int entry);   extern icn_bang_binary_state_t     *icon_bang_new(void);
@@ -38,11 +37,8 @@ extern len_t      *bb_len_new(int n);
 extern tab_t      *bb_tab_new(int n);
 extern rtab_t     *bb_rtab_new(int n);
 extern rem_t      *bb_rem_new(void);
-/*------------------------------------------------------------------------------------------------------------------*/
 
-/* EC-4: Both α and β jump to lbl_fail with no state.
- * beta_first=1 (CAT/OR/VAR): β label precedes the α jmp.
- * beta_first=0 (FAIL/ABORT):  α jmp precedes the β label. */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_bb_jmp_pair(const char *banner, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_beta,
                               int beta_first)
 {
@@ -52,7 +48,7 @@ static void emit_bb_jmp_pair(const char *banner, bb_label_t *lbl_succ, bb_label_
     else            { emit_jmp(lbl_fail, JMP_JMP); emit_label_define(lbl_beta); emit_jmp(lbl_fail, JMP_JMP); }
 }
 
-/* EC-3: banner + pre-allocated zeta + alpha port_call + beta label + beta port_call. */
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_bb_stateful(const char *banner, const char *arg, void *zeta, const char *fn_name, uint64_t fn_fallback,
                               bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_beta)
 {
@@ -62,7 +58,6 @@ static void emit_bb_stateful(const char *banner, const char *arg, void *zeta, co
     emit_bb_port_call((uint64_t)(uintptr_t)zeta, fn_name, fn_fallback, 1, lbl_succ, lbl_fail);
 }
 
-/*====================================================================================================================*/
 void emit_bb_icon_alt    (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_ALT",     "", icon_alt_new(),     "coro_bb_alternate",   (uint64_t)(uintptr_t)coro_bb_alternate,   s, f, b); }
 void emit_bb_icon_bang   (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_BANG",    "", icon_bang_new(),    "coro_bb_bang_binary", (uint64_t)(uintptr_t)coro_bb_bang_binary, s, f, b); }
 void emit_bb_icon_every  (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_EVERY",   "", icon_every_new(),   "coro_bb_every",       (uint64_t)(uintptr_t)coro_bb_every,       s, f, b); }
@@ -72,30 +67,28 @@ void emit_bb_icon_limit  (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb
 void emit_bb_icon_seq    (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_SEQ",     "", icon_seq_new(),     "coro_bb_seq_expr",    (uint64_t)(uintptr_t)coro_bb_seq_expr,    s, f, b); }
 void emit_bb_icon_to     (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_TO",      "", icon_to_new(),      "coro_bb_to",          (uint64_t)(uintptr_t)coro_bb_to,          s, f, b); }
 void emit_bb_icon_to_by  (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_TO_BY",   "", icon_to_by_new(),   "coro_bb_to_by",       (uint64_t)(uintptr_t)coro_bb_to_by,       s, f, b); }
-/*====================================================================================================================*/
 void emit_bb_xabrt  (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_jmp_pair("ABORT",  s, f, b, 0); }
 void emit_bb_xcat   (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_jmp_pair("CAT",    s, f, b, 1); }
 void emit_bb_xfail  (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_jmp_pair("FAIL",   s, f, b, 0); }
 void emit_bb_xor    (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_jmp_pair("ALT",    s, f, b, 1); }
 void emit_bb_xvar   (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_jmp_pair("VAR",    s, f, b, 1); }
-/*====================================================================================================================*/
 void emit_bb_xbal   (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("BAL",    "", bb_bal_new(),          "rt_bb_bal",   (uint64_t)(uintptr_t)rt_bb_bal,   s, f, b); }
 void emit_bb_xfarb  (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ARB",    "", bb_arb_new(),          "rt_bb_arb",   (uint64_t)(uintptr_t)rt_bb_arb,   s, f, b); }
 void emit_bb_xlnth  (long long n,   bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("LEN",  "", bb_len_new((int)n),  "rt_bb_len",  (uint64_t)(uintptr_t)rt_bb_len,  s, f, b); }
 void emit_bb_xrtb   (long long n,   bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("RTAB", "", bb_rtab_new((int)n), "rt_bb_rtab", (uint64_t)(uintptr_t)rt_bb_rtab, s, f, b); }
 void emit_bb_xstar  (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("REM",    "", bb_rem_new(),          "rt_bb_rem",   (uint64_t)(uintptr_t)rt_bb_rem,   s, f, b); }
 void emit_bb_xtb    (long long n,   bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("TAB",  "", bb_tab_new((int)n),  "rt_bb_tab",  (uint64_t)(uintptr_t)rt_bb_tab,  s, f, b); }
-/*====================================================================================================================*/
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xarbn(bb_box_fn child_fn, bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
     emit_bb_stateful("ARBNO", "", rt_bb_arbno_new(child_fn, NULL), "rt_bb_arbno", (uint64_t)(uintptr_t)rt_bb_arbno, s, f, b);
 }
-/*====================================================================================================================*/
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xbrkx(const char *chars, bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
     emit_bb_stateful("BREAKX", chars ? chars : "", bb_breakx_new(chars), "rt_bb_breakx", (uint64_t)(uintptr_t)rt_bb_breakx, s, f, b);
 }
-/*====================================================================================================================*/
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xcallcap(bb_box_fn child_fn, const char *fnc_name,
                       bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
@@ -103,7 +96,7 @@ void emit_bb_xcallcap(bb_box_fn child_fn, const char *fnc_name,
                      bb_cap_new_call(child_fn, NULL, fnc_name, NULL, 0, NULL, 0, 0),
                      "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, s, f, b);
 }
-/*====================================================================================================================*/
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xfnce(bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
     emit_bb_box_banner("FENCE", "");
@@ -111,7 +104,7 @@ void emit_bb_xfnce(bb_label_t *s, bb_label_t *f, bb_label_t *b)
     emit_label_define(b);
     emit_jmp(f, JMP_JMP);               /* beta: always fail (FENCE cuts backtracking) */
 }
-/*====================================================================================================================*/
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xfnme(bb_box_fn child_fn, const char *varname,
                    bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
@@ -119,7 +112,7 @@ void emit_bb_xfnme(bb_box_fn child_fn, const char *varname,
                      bb_cap_new(child_fn, NULL, varname, NULL, 1),
                      "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, s, f, b);
 }
-/*====================================================================================================================*/
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xnme(bb_box_fn child_fn, const char *varname,
                   bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
@@ -127,7 +120,7 @@ void emit_bb_xnme(bb_box_fn child_fn, const char *varname,
                      bb_cap_new(child_fn, NULL, varname, NULL, 0),
                      "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, s, f, b);
 }
-/*====================================================================================================================*/
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xeps(bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
     emit_bb_box_banner("EPS", "");
@@ -135,7 +128,7 @@ void emit_bb_xeps(bb_label_t *s, bb_label_t *f, bb_label_t *b)
     emit_label_define(b);
     emit_jmp(f, JMP_JMP);               /* beta: fail */
 }
-/*====================================================================================================================*/
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xsucf(bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
     (void)f;
@@ -144,9 +137,9 @@ void emit_bb_xsucf(bb_label_t *s, bb_label_t *f, bb_label_t *b)
     emit_label_define(b);
     emit_jmp(s, JMP_JMP);               /* beta: also succeed (generates another zero-width match) */
 }
-/*====================================================================================================================*/
 #define TEMPLATE_ADDR_SIGMA   ((uint64_t)(uintptr_t)&Σ)
 #define TEMPLATE_ADDR_SIGLEN  ((uint64_t)(uintptr_t)&Σlen)
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_mov_rdx_imm32(int v)
 {
     uint64_t val = (uint64_t)(uint32_t)v;
@@ -168,6 +161,7 @@ static void emit_mov_rdx_imm32(int v)
     }
     }
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xchr(PATND_t *p, const char *lit_label,
                   bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
@@ -192,7 +186,7 @@ void emit_bb_xchr(PATND_t *p, const char *lit_label,
     emit_sub_delta_imm(len);
     emit_jmp(f, JMP_JMP);
 }
-/*====================================================================================================================*/
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xdsar(const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
     /* TEXT: emit .data block (name ptr, child quads, in_progress long).
@@ -215,7 +209,7 @@ void emit_bb_xdsar(const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t
     emit_label_define(b);
     emit_bb_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "bb_deferred_var_exported", (uint64_t)(uintptr_t)bb_deferred_var_exported, 1, s, f);
 }
-/*====================================================================================================================*/
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xatp(const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
     /* TEXT: emit .data block with zeta struct (string + two longs + quad ptr).
@@ -235,7 +229,7 @@ void emit_bb_xatp(const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t 
     emit_label_define(b);
     emit_bb_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_atp", (uint64_t)(uintptr_t)rt_bb_atp, 1, s, f);
 }
-/*====================================================================================================================*/
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xposi(int n, bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
     char args[32]; snprintf(args, sizeof(args), "%d", n);
@@ -244,8 +238,8 @@ void emit_bb_xposi(int n, bb_label_t *s, bb_label_t *f, bb_label_t *b)
     emit_label_define(b);
     emit_jmp(f, JMP_JMP);
 }
-/*====================================================================================================================*/
 #define ADDR_SIGLEN  ((uint64_t)(uintptr_t)&Σlen)
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xrpsi(int n, bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
     char args[32]; snprintf(args, sizeof(args), "%d", n);
@@ -254,7 +248,7 @@ void emit_bb_xrpsi(int n, bb_label_t *s, bb_label_t *f, bb_label_t *b)
     emit_label_define(b);
     emit_jmp(f, JMP_JMP);
 }
-/*====================================================================================================================*/
+/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_charset(bb_box_fn c_fn, const char *c_fn_name, const char *kind_name,
                      const char *chars, bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
@@ -270,4 +264,3 @@ void emit_bb_charset(bb_box_fn c_fn, const char *c_fn_name, const char *kind_nam
     else                                                        { rt_name = "rt_bb_span";   rt_fn = (uint64_t)(uintptr_t)rt_bb_span;   }
     emit_bb_stateful(kind_name ? kind_name : "CHARSET", chars ? chars : "", z, rt_name, rt_fn, s, f, b);
 }
-/*====================================================================================================================*/

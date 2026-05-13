@@ -1,8 +1,3 @@
-/*
- * emit_sm_text.h — SM_Program → GNU-as .s text (mode 4, --jit-emit --x64)
- *
- * Authors: Lon Jones Cherryholmes · Claude Sonnet 4.6
- */
 
 #ifndef EMIT_SM_TEXT_H
 #define EMIT_SM_TEXT_H

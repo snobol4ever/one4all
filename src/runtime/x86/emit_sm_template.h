@@ -89,8 +89,6 @@ typedef struct {
     const char     *macro_name;    /* "SM_PUSH_INT" etc. */
     const char     *runtime;       /* "rt_push_int" or NULL */
     sm_tpl_kind_t   kind;
-    /* Optional per-opcode integer constant baked into the call (e.g.
-     * SM_ARITH op-enum, SM_RETURN_VARIANT kind/cond, UNHANDLED op). */
     int             const_a;
     int             const_b;
 } sm_op_template_t;
@@ -99,39 +97,14 @@ typedef struct {
  * or NULL if unknown.  Constant time (linear scan; small N). */
 const sm_op_template_t *sm_template_lookup(int op);
 
-/* The trap template (used for opcodes without their own entry). */
 const sm_op_template_t *sm_template_unhandled(void);
 
-/* The RET_VAR template (used for SM_RETURN_S/F, SM_FRETURN[_S/_F],
- * SM_NRETURN[_S/_F] -- their kind/cond is computed from the opcode
- * by the caller and passed as args, not via const_a/const_b on the
- * template itself). */
 const sm_op_template_t *sm_template_ret_var(void);
 
-/* ---------------------------------------------------------------------
- * Renderers.
- *
- * Each shape has ONE renderer that produces both the macro body and
- * the per-call emission line.  They share one printf-style format
- * string per shape (defined in emit_sm_template.c).
- * --------------------------------------------------------------------- */
-
-/* Emit the entire macro library (one .macro/.endm block per
- * template) at the top of an emitted .s file.  Generated from
- * g_sm_templates[].  Called once by sm_codegen_x64_emit at the
- * very start of emission, before .rodata / .data / .text. */
 int emit_sm_macro_library(FILE *out);
 
-/* Emit the SM macro library to a standalone file at `path`.
- * The emitted .s files use `.include "sm_macros.s"` to pick up the
- * macros from this header file at assembly time, rather than each
- * .s carrying its own ~200-line copy.  Returns 0 on success, -1 on
- * I/O error.  Overwrites any existing file. */
 int emit_sm_macro_library_to_path(const char *path);
 
-/* Emit one macro-call line for a given template at the dispatch site.
- * The `args` carry the per-instruction values.  Returns 0 on
- * success, -1 on I/O error. */
 typedef struct {
     int64_t     i64;          /* INT64 / PUSH_EXPRESSION entry */
     int         i32_a;        /* arity / slen / nargs / target_pc / taken / kind */
@@ -146,8 +119,6 @@ typedef struct {
 int emit_sm_template(FILE *out, const sm_op_template_t *t,
                      const emit_sm_args_t *args);
 
-/* Convenience: fill-and-emit for the hottest shapes, so the dispatcher
- * site doesn't have to construct emit_sm_args_t every time. */
 int emit_sm_rtcall    (FILE *out, const sm_op_template_t *t,
                         const char *anno);
 int emit_sm_int64      (FILE *out, const sm_op_template_t *t,
@@ -176,9 +147,6 @@ int emit_sm_ret_var    (FILE *out, int kind, int cond, int pc,
                         const char *anno);
 int emit_sm_unhandled  (FILE *out, int op);
 
-/* SM_TPL_NOOP — emit a labelled three-column line carrying the macro
- * name in col 2 with empty col 3.  Used by SM_LABEL and SM_STNO so
- * the pending .LpcN: pc-label is consumed and never appears naked. */
 int emit_sm_noop       (FILE *out, const sm_op_template_t *t,
                         const char *anno);
 
@@ -205,19 +173,6 @@ int emit_sm_capture_fn_args(FILE *out, const sm_op_template_t *t,
  * --------------------------------------------------------------------- */
 int emit_sm_template_selftest(FILE *out);
 
-/* ---------------------------------------------------------------------
- * Three-column label support.
- *
- * The dispatcher calls emit_sm_set_pc_label(".Lpc13:") once per
- * instruction before calling any sm_emit_* function.  The label is
- * consumed as column 1 by the first sm_emit_* call, then cleared.
- * Subsequent calls (multi-line blobs, raw sm_line calls) get no label.
- *
- * emit_sm_consume_pc_label() returns the pending label (or "") and
- * clears it — used by external emitters (e.g. sm_line in the codegen
- * driver) that bypass emit_sm_template but still want the column-1
- * label pickup for the first line they emit per instruction.
- * --------------------------------------------------------------------- */
 void        emit_sm_set_pc_label(const char *lbl);   /* lbl copied; pass NULL to clear */
 const char *emit_sm_consume_pc_label(void);          /* read+clear; returns "" if none */
 
