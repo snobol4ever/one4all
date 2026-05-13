@@ -68,7 +68,6 @@
  *   rt_pat_deref      — SM_PAT_DEREF  (pops DESCR_t from vstack)
  *   rt_pat_refname    — SM_PAT_REFNAME (a[0].s = var name)
  *   rt_pat_capture    — SM_PAT_CAPTURE (a[0].s=var, a[1].i=kind)
- *   rt_pat_boxval     — SM_PAT_BOXVAL (pat-stack top -> vstack)
  *   rt_exec_stmt      — SM_EXEC_STMT  (a[0].s=subj, a[1].i=has_repl)
  *
  * Stability: every symbol exported here is part of the mode-4 ABI.
@@ -147,14 +146,12 @@ void rt_match_blob(void *blob_α,
  * patterns (those with at least one runtime-dependent leaf — *VAR,
  * BREAK(VAR), LEN(VAR), etc.).  Each call mirrors the corresponding
  * sm_interp.c case: builds a PATND_t fragment, pushes it on the
- * libscrip_rt pat-stack.  SM_PAT_BOXVAL bridges pat-stack → vstack.
  * SM_EXEC_STMT for variant patterns calls rt_match_variant,
  * which dispatches to exec_stmt (which in BB_MODE_LIVE — set by
  * rt_init — routes Phase-3 through bb_build_flat/binary +
  * direct bb_box_fn call, NOT through bb_broker).
  *
  * Distinction from the EM-7-pre ABI that was reverted in session #72:
- * the runtime mechanics are similar (a pat-stack of DESCR_t fragments)
  * but the Phase-3 route is correct.  Future rung
  * EM-7c-variant-bb-pool-emit will replace this entire ABI with
  * per-variant-node bb_pool emit driven by an emit-time partition,
@@ -186,7 +183,6 @@ void rt_pat_cat     (void);
 void rt_pat_alt     (void);
 void rt_pat_deref   (void);
 void rt_pat_capture (const char *varname, int kind);
-void rt_pat_boxval  (void);
 void rt_pat_capture_fn     (const char *fname, int is_imm, const char *namelist);
 void rt_pat_capture_fn_args(const char *fname, int is_imm, int nargs);
 void rt_pat_usercall       (const char *fname);

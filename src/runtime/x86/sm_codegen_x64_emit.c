@@ -1383,7 +1383,6 @@ static PATND_t *patnd_of(DESCR_t d)
  * semantics to reconstruct the pattern tree.
  *
  * Instructions in this window are SM_PAT_* ops plus supporting value-stack
- * pushes (SM_PUSH_LIT_S, SM_PUSH_LIT_I, SM_PUSH_VAR, SM_PAT_BOXVAL, etc.).
  * SM_PUSH_VAR produces a variant value; everything else may be invariant.
  *
  * Returns: root DESCR_t (DT_P) wrapping the reconstructed PATND_t.
@@ -1417,7 +1416,6 @@ DESCR_t sm_phase2_to_patnd(const SM_Program *prog,
             simstack_push_variant_val(&ss);
             has_variant = 1;
             break;
-        /* SM_PAT_BOXVAL removed by ME-1 */
 
         /* ── leaf pat constructors that need no value-stack arg ──── */
         case SM_PAT_EPS:
@@ -1954,7 +1952,6 @@ static int emit_sm_pat_baked(FILE *out, const SM_Instr *ins, int pc, int win_idx
  * the pattern is variant, or there's no SM_EXEC_STMT in this region —
  * pattern-as-rvalue case like `WPAT = BREAK(WORD) SPAN(WORD)`) is emitted
  * as a thin call to the matching rt_pat_*() function.  The runtime
- * builds a PATND_t fragment on its pat-stack; SM_PAT_BOXVAL bridges to
  * the value stack as DT_P; SM_EXEC_STMT for variant patterns calls
  * rt_match_variant which delegates to exec_stmt.
  *
@@ -2402,7 +2399,6 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
             case SM_PAT_CAT:     rc = emit_sm_pat_cat_dispatch(out, pc);     break;
             case SM_PAT_ALT:     rc = emit_sm_pat_alt_dispatch(out, pc);     break;
             case SM_PAT_DEREF:   rc = emit_sm_pat_deref_dispatch(out, pc);   break;
-            /* SM_PAT_BOXVAL removed by ME-1 */
 
             /* SM_EXEC_STMT for a variant pattern (invariant patterns are
              * already handled above by the pattern-window hook → blob call). */

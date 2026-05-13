@@ -648,7 +648,6 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             sm_push(st, pat_alt(left, right));
             break;
         }
-        /* SM_PAT_BOXVAL deleted by ME-1 — pat-stack and value-stack are now one */
         case SM_PAT_DEREF: {
             DESCR_t v = sm_pop(st);
             if (v.v == DT_P) {

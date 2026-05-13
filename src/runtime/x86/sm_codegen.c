@@ -963,7 +963,6 @@ static void h_pat_alt(void)
     DESCR_t right = POP(), left = POP();
     PUSH(pat_alt(left, right));
 }
-/* h_pat_boxval deleted by ME-1 — SM_PAT_BOXVAL opcode removed */
 
 static void h_pat_deref(void)
 {
@@ -1540,7 +1539,6 @@ static void init_handler_table(void)
     g_handlers[SM_PAT_CAPTURE_FN_ARGS] = h_pat_capture_fn_args;
     g_handlers[SM_PAT_USERCALL]   = h_pat_usercall;
     g_handlers[SM_PAT_USERCALL_ARGS] = h_pat_usercall_args;
-    /* SM_PAT_BOXVAL handler removed by ME-1 */
 
     g_handlers[SM_EXEC_STMT]   = h_exec_stmt;
     g_handlers[SM_CALL_FN]        = h_call;

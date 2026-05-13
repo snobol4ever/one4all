@@ -192,7 +192,6 @@ static const char *opnames[SM_OPCODE_COUNT] = {
     "SM_DEFINE_ENTRY",
     "SM_DEFINE",
     "SM_INCR","SM_DECR","SM_LCOMP","SM_ACOMP",
-    /* SM_PAT_BOXVAL removed by ME-1 */
     "SM_SUSPEND","SM_RESUME","SM_LOAD_GLOCAL","SM_STORE_GLOCAL","SM_ICMP_GT","SM_ICMP_LT",
     "SM_LOAD_FRAME","SM_STORE_FRAME",
 };

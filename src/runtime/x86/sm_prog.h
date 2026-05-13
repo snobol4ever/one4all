@@ -257,7 +257,6 @@ typedef enum {
     SM_LCOMP,
     SM_ACOMP,
 
-    /* SM_PAT_BOXVAL deleted by ME-1 — pat-stack unified with value stack */
 
     /* CHUNKS-step14: generator opcodes — SM_SUSPEND / SM_RESUME.
      * SM_SUSPEND: pop TOS as the yielded value; save pc+stack to the current
