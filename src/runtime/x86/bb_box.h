@@ -57,6 +57,16 @@ static inline spec_t spec_cat(spec_t x, spec_t y)   { return (spec_t){ x.σ, x.�
 /* Test for failure sentinel */
 static inline bool spec_is_empty(spec_t x)           { return x.σ == (const char *)0; }
 
+/* descr_match — construct a DT_S match DESCR_t from (σ, δ) without going through spec_t.
+ * EST-2: direct replacement for spec(σ,δ)+descr_from_spec() in rt.c / bb_boxes.c. */
+static inline DESCR_t descr_match(const char *σ, int δ) {
+    DESCR_t d; d.v = DT_S; d.slen = (uint32_t)δ; d.s = (char *)σ; return d;
+}
+/* descr_match_cat — concatenate two contiguous match descriptors (EST-2 replaces spec_cat). */
+static inline DESCR_t descr_match_cat(DESCR_t x, DESCR_t y) {
+    DESCR_t d; d.v = DT_S; d.slen = x.slen + y.slen; d.s = x.s; return d;
+}
+
 /* ── entry ports ────────────────────────────────────────────────────────── */
 static const int α = 0;   /* fresh entry */
 static const int β = 1;   /* backtrack re-entry */
@@ -153,7 +163,7 @@ typedef struct cap_s {
     void        *state;
     int          immediate;
     NAME_t       name;
-    spec_t       pending;
+    DESCR_t      pending;   /* EST-2: was spec_t — DESCR_t (dead field, never read) */
     int          has_pending;
     int          registered;
 } cap_t;

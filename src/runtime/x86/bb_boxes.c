@@ -27,7 +27,7 @@ arb_t *bb_arb_new(void)
 
 #pragma GCC diagnostic ignored "-Wmisleading-indentation"
 #define ARBNO_INIT 8
-typedef struct { spec_t matched; int start; } arbno_frame_t;
+typedef struct { DESCR_t matched; int start; } arbno_frame_t;
 typedef struct { bb_box_fn fn; void *state; int depth; int cap; arbno_frame_t *stack; } arbno_t;
 
 arbno_t *bb_arbno_new(bb_box_fn fn, void *state)

@@ -1365,23 +1365,21 @@ __attribute__((weak)) int _expr_is_pat(tree_t *e)          { (void)e; return 0; 
 DESCR_t rt_bb_arb(void *zeta, int port)
 {
     arb_t *ζ = zeta;
-    spec_t ARB;
-    if (port == 0) { ζ->count = 0; ζ->start = Δ; ARB = spec(Σ+Δ, 0); return descr_from_spec(ARB); }
+    if (port == 0) { ζ->count = 0; ζ->start = Δ; return descr_match(Σ+Δ, 0); }
     ζ->count++;
     if (ζ->start + ζ->count > Σlen) return FAILDESCR;
-    Δ = ζ->start; ARB = spec(Σ+Δ, ζ->count); Δ += ζ->count;
-    return descr_from_spec(ARB);
+    Δ = ζ->start; DESCR_t ARB = descr_match(Σ+Δ, ζ->count); Δ += ζ->count;
+    return ARB;
 }
 
 /* ── len ──────────────────────────────────────────────────────────────── */
 DESCR_t rt_bb_len(void *zeta, int port)
 {
     len_t *ζ = zeta;
-    spec_t LEN;
     if (port == 0) {
         if (Δ + ζ->n > Σlen) return FAILDESCR;
-        LEN = spec(Σ+Δ, ζ->n); Δ += ζ->n;
-        return descr_from_spec(LEN);
+        DESCR_t LEN = descr_match(Σ+Δ, ζ->n); Δ += ζ->n;
+        return LEN;
     }
     Δ -= ζ->n; return FAILDESCR;
 }
@@ -1390,11 +1388,10 @@ DESCR_t rt_bb_len(void *zeta, int port)
 DESCR_t rt_bb_tab(void *zeta, int port)
 {
     tab_t *ζ = zeta;
-    spec_t TAB;
     if (port == 0) {
         if (Δ > ζ->n) return FAILDESCR;
-        ζ->advance = ζ->n - Δ; TAB = spec(Σ+Δ, ζ->advance); Δ = ζ->n;
-        return descr_from_spec(TAB);
+        ζ->advance = ζ->n - Δ; DESCR_t TAB = descr_match(Σ+Δ, ζ->advance); Δ = ζ->n;
+        return TAB;
     }
     Δ -= ζ->advance; return FAILDESCR;
 }
@@ -1403,11 +1400,10 @@ DESCR_t rt_bb_tab(void *zeta, int port)
 DESCR_t rt_bb_rtab(void *zeta, int port)
 {
     rtab_t *ζ = zeta;
-    spec_t RTAB;
     if (port == 0) {
         if (Δ > Σlen - ζ->n) return FAILDESCR;
-        ζ->advance = (Σlen - ζ->n) - Δ; RTAB = spec(Σ+Δ, ζ->advance); Δ = Σlen - ζ->n;
-        return descr_from_spec(RTAB);
+        ζ->advance = (Σlen - ζ->n) - Δ; DESCR_t RTAB = descr_match(Σ+Δ, ζ->advance); Δ = Σlen - ζ->n;
+        return RTAB;
     }
     Δ -= ζ->advance; return FAILDESCR;
 }
@@ -1416,7 +1412,6 @@ DESCR_t rt_bb_rtab(void *zeta, int port)
 DESCR_t rt_bb_bal(void *zeta, int port)
 {
     bal_t *ζ = zeta;
-    spec_t BAL;
     if (port == 0) {
         int pos = Δ, depth = 0;
         while (pos < Σlen) {
@@ -1426,8 +1421,8 @@ DESCR_t rt_bb_bal(void *zeta, int port)
             else { pos++; }
         }
         ζ->δ = pos - Δ;
-        BAL = spec(Σ+Δ, ζ->δ); Δ += ζ->δ;
-        return descr_from_spec(BAL);
+        DESCR_t BAL = descr_match(Σ+Δ, ζ->δ); Δ += ζ->δ;
+        return BAL;
     }
     Δ -= ζ->δ; return FAILDESCR;
 }
@@ -1436,13 +1431,12 @@ DESCR_t rt_bb_bal(void *zeta, int port)
 DESCR_t rt_bb_breakx(void *zeta, int port)
 {
     brkx_t *ζ = zeta;
-    spec_t BREAKX;
     if (port == 0) {
         ζ->δ = 0;
         while (Δ+ζ->δ < Σlen && !strchr(ζ->chars, Σ[Δ+ζ->δ])) ζ->δ++;
         if (ζ->δ == 0 || Δ+ζ->δ >= Σlen) return FAILDESCR;
-        BREAKX = spec(Σ+Δ, ζ->δ); Δ += ζ->δ;
-        return descr_from_spec(BREAKX);
+        DESCR_t BREAKX = descr_match(Σ+Δ, ζ->δ); Δ += ζ->δ;
+        return BREAKX;
     }
     Δ -= ζ->δ; return FAILDESCR;
 }
@@ -1454,13 +1448,12 @@ typedef struct { const char *chars; int delta; } rt_cs_t;
 DESCR_t rt_bb_span(void *zeta, int port)
 {
     rt_cs_t *ζ = zeta;
-    spec_t SPAN;
     if (port == 0) {
         int i = 0;
         while (Δ+i < Σlen && strchr(ζ->chars, Σ[Δ+i])) i++;
         if (i == 0) return FAILDESCR;
-        ζ->delta = i; SPAN = spec(Σ+Δ, i); Δ += i;
-        return descr_from_spec(SPAN);
+        ζ->delta = i; DESCR_t SPAN = descr_match(Σ+Δ, i); Δ += i;
+        return SPAN;
     }
     Δ -= ζ->delta; return FAILDESCR;
 }
@@ -1468,12 +1461,11 @@ DESCR_t rt_bb_span(void *zeta, int port)
 DESCR_t rt_bb_brk(void *zeta, int port)
 {
     rt_cs_t *ζ = zeta;
-    spec_t BRK;
     if (port == 0) {
         int i = 0;
         while (Δ+i < Σlen && !strchr(ζ->chars, Σ[Δ+i])) i++;
-        ζ->delta = i; BRK = spec(Σ+Δ, i); Δ += i;
-        return descr_from_spec(BRK);
+        ζ->delta = i; DESCR_t BRK = descr_match(Σ+Δ, i); Δ += i;
+        return BRK;
     }
     Δ -= ζ->delta; return FAILDESCR;
 }
@@ -1481,11 +1473,10 @@ DESCR_t rt_bb_brk(void *zeta, int port)
 DESCR_t rt_bb_any(void *zeta, int port)
 {
     rt_cs_t *ζ = zeta;
-    spec_t ANY;
     if (port == 0) {
         if (Δ >= Σlen || !strchr(ζ->chars, Σ[Δ])) return FAILDESCR;
-        ANY = spec(Σ+Δ, 1); Δ++;
-        return descr_from_spec(ANY);
+        DESCR_t ANY = descr_match(Σ+Δ, 1); Δ++;
+        return ANY;
     }
     Δ--; return FAILDESCR;
 }
@@ -1493,34 +1484,33 @@ DESCR_t rt_bb_any(void *zeta, int port)
 DESCR_t rt_bb_notany(void *zeta, int port)
 {
     rt_cs_t *ζ = zeta;
-    spec_t NOTANY;
     if (port == 0) {
         if (Δ >= Σlen || strchr(ζ->chars, Σ[Δ])) return FAILDESCR;
-        NOTANY = spec(Σ+Δ, 1); Δ++;
-        return descr_from_spec(NOTANY);
+        DESCR_t NOTANY = descr_match(Σ+Δ, 1); Δ++;
+        return NOTANY;
     }
     Δ--; return FAILDESCR;
 }
 
 /* ── arbno ────────────────────────────────────────────────────────────── */
 /* Forward decl for arbno_t — defined locally in bb_boxes.c still via typedef */
-typedef struct { spec_t matched; int start; } rt_arbno_frame_t;
+typedef struct { DESCR_t matched; int start; } rt_arbno_frame_t;
 typedef struct { bb_box_fn fn; void *state; int depth; int cap; rt_arbno_frame_t *stack; } rt_arbno_t;
 #define RT_ARBNO_INIT 8
 
 DESCR_t rt_bb_arbno(void *zeta, int port)
 {
     rt_arbno_t *ζ = zeta;
-    spec_t ARBNO; spec_t br; rt_arbno_frame_t *fr;
+    DESCR_t ARBNO; DESCR_t br; rt_arbno_frame_t *fr;
     if (port == 0) {
         ζ->depth = 0; fr = &ζ->stack[0];
-        fr->matched = spec(Σ+Δ, 0); fr->start = Δ;
+        fr->matched = descr_match(Σ+Δ, 0); fr->start = Δ;
     try_next:
-        br = spec_from_descr(ζ->fn(ζ->state, 0));
-        if (spec_is_empty(br)) { ARBNO = ζ->stack[ζ->depth].matched; return descr_from_spec(ARBNO); }
+        br = ζ->fn(ζ->state, 0);
+        if (IS_FAIL_fn(br)) { ARBNO = ζ->stack[ζ->depth].matched; return ARBNO; }
         fr = &ζ->stack[ζ->depth];
-        if (Δ == fr->start) { ARBNO = ζ->stack[ζ->depth].matched; return descr_from_spec(ARBNO); }
-        ARBNO = spec_cat(fr->matched, br);
+        if (Δ == fr->start) { ARBNO = ζ->stack[ζ->depth].matched; return ARBNO; }
+        ARBNO = descr_match_cat(fr->matched, br);
         ζ->depth++;
         if (ζ->depth >= ζ->cap) {
             ζ->cap *= 2;
@@ -1534,7 +1524,7 @@ DESCR_t rt_bb_arbno(void *zeta, int port)
     if (ζ->depth <= 0) return FAILDESCR;
     ζ->depth--; fr = &ζ->stack[ζ->depth]; Δ = fr->start;
     ARBNO = ζ->stack[ζ->depth].matched;
-    return descr_from_spec(ARBNO);
+    return ARBNO;
 }
 
 void *rt_bb_arbno_new(bb_box_fn fn, void *state)
@@ -1551,15 +1541,13 @@ void *rt_bb_arbno_new(bb_box_fn fn, void *state)
 DESCR_t rt_bb_atp(void *zeta, int port)
 {
     atp_t *ζ = zeta;
-    spec_t ATP;
     if (port == 0) {
         ζ->done = 1;
         if (ζ->varname && ζ->varname[0]) {
             DESCR_t v = { .v = DT_I, .i = (int64_t)Δ };
             NV_SET_fn(ζ->varname, v);
         }
-        ATP = spec(Σ+Δ, 0);
-        return descr_from_spec(ATP);
+        return descr_match(Σ+Δ, 0);
     }
     return FAILDESCR;
 }
@@ -1574,31 +1562,31 @@ static void rt_register_cap(cap_t *c);
 DESCR_t rt_bb_cap(void *zeta, int port)
 {
     cap_t *ζ = zeta;
-    spec_t cr;
+    DESCR_t cr;
     if (port == 0) {
         ζ->has_pending = 0;
         if (!ζ->immediate) rt_register_cap(ζ);
-        cr = spec_from_descr(ζ->fn(ζ->state, 0));
-        if (spec_is_empty(cr)) goto cap_fail;
+        cr = ζ->fn(ζ->state, 0);
+        if (IS_FAIL_fn(cr)) goto cap_fail;
         goto cap_commit;
     }
     /* port == 1: β */
     if (!ζ->immediate && ζ->has_pending) { NAME_pop(); ζ->has_pending = 0; }
-    cr = spec_from_descr(ζ->fn(ζ->state, 1));
-    if (spec_is_empty(cr)) goto cap_fail;
+    cr = ζ->fn(ζ->state, 1);
+    if (IS_FAIL_fn(cr)) goto cap_fail;
 cap_commit:
     if (ζ->immediate) {
-        char *s = (char *)GC_MALLOC(cr.δ + 1);
-        if (cr.σ && cr.δ > 0) memcpy(s, cr.σ, (size_t)cr.δ);
-        s[cr.δ] = '\0';
-        DESCR_t val = { .v = DT_S, .slen = (uint32_t)cr.δ, .s = s };
+        char *s = (char *)GC_MALLOC(cr.slen + 1);
+        if (cr.s && cr.slen > 0) memcpy(s, cr.s, (size_t)cr.slen);
+        s[cr.slen] = '\0';
+        DESCR_t val = { .v = DT_S, .slen = cr.slen, .s = s };
         if (name_commit_value(&ζ->name, val) < 0) goto cap_fail;
     } else {
-        (void) NAME_push(&ζ->name, cr.σ, (int)cr.δ);
+        (void) NAME_push(&ζ->name, cr.s, (int)cr.slen);
         ζ->pending     = cr;
         ζ->has_pending = 1;
     }
-    return descr_from_spec(cr);
+    return cr;
 cap_fail:
     if (!ζ->immediate && ζ->has_pending) { NAME_pop(); ζ->has_pending = 0; }
     return FAILDESCR;
@@ -1629,7 +1617,6 @@ void rt_flush_pending_captures(void)
 DESCR_t rt_bb_rem(void *zeta, int port)
 {
     (void)zeta;
-    spec_t REM;
-    if (port == 0) { REM = spec(Σ+Δ, Σlen-Δ); Δ = Σlen; return descr_from_spec(REM); }
+    if (port == 0) { DESCR_t REM = descr_match(Σ+Δ, Σlen-Δ); Δ = Σlen; return REM; }
     return FAILDESCR;
 }
