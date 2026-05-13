@@ -76,12 +76,11 @@ RT_PIC_SRCS := \
     $(RT)/x86/eval_pat.c \
     $(RT)/x86/bb_pool.c \
     $(RT)/x86/bb_emit.c \
-    $(RT)/x86/emitter_text.c \
-    $(RT)/x86/emitter_binary.c \
+    $(RT)/x86/emitter.c \
     $(RT)/x86/emitter_macro_def.c \
     $(RT)/x86/bb_flat.c \
-    $(RT)/x86/bb_templates.c \
-    $(RT)/x86/sm_templates.c \
+    $(RT)/x86/emitter_bb.c \
+    $(RT)/x86/emitter_sm.c \
     \
     $(RT)/x86/bb_boxes.c \
     $(RT)/x86/bb_broker.c \
@@ -250,8 +249,7 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/eval_code.c                  -o $(OBJ)/eval_code.o
 	$(CC) $(CRT)   -c $(RT)/x86/bb_pool.c                    -o $(OBJ)/bb_pool.o
 	$(CC) $(CRT)   -c $(RT)/x86/bb_emit.c                    -o $(OBJ)/bb_emit.o
-	$(CC) $(CRT)   -c $(RT)/x86/emitter_text.c               -o $(OBJ)/emitter_text.o
-	$(CC) $(CRT)   -c $(RT)/x86/emitter_binary.c             -o $(OBJ)/emitter_binary.o
+	$(CC) $(CRT)   -c $(RT)/x86/emitter.c                    -o $(OBJ)/emitter.o
 	$(CC) $(CRT)   -c $(RT)/x86/emitter_macro_def.c          -o $(OBJ)/emitter_macro_def.o
 	$(CC) $(CRT)   -c $(RT)/x86/bb_flat.c                    -o $(OBJ)/bb_flat.o
 	$(CC) $(CRT) -c $(RT)/x86/bb_boxes.c -o $(OBJ)/bb_boxes.o
@@ -299,8 +297,8 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/lower_ctx.c  -o $(OBJ)/lower_ctx.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_image.c   -o $(OBJ)/sm_image.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_codegen.c -o $(OBJ)/sm_codegen.o
-	$(CC) $(CRT)   -c $(RT)/x86/sm_templates.c -o $(OBJ)/sm_templates.o
-	$(CC) $(CRT)   -c $(RT)/x86/bb_templates.c -o $(OBJ)/bb_templates.o
+	$(CC) $(CRT)   -c $(RT)/x86/emitter_sm.c -o $(OBJ)/emitter_sm.o
+	$(CC) $(CRT)   -c $(RT)/x86/emitter_bb.c -o $(OBJ)/emitter_bb.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/rt/rt.c   -o $(OBJ)/rt.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_emit_template.c -o $(OBJ)/sm_emit_template.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_codegen_x64_emit.c -o $(OBJ)/sm_codegen_x64_emit.o

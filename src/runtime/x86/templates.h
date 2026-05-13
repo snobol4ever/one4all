@@ -94,6 +94,10 @@ void emit_bb_xrpsi(int n,
  * op_enum: SM opcode integer; macro_name: GAS macro name (ADD_NUM etc.). */
 void emit_sm_arith_op(int op_enum, const char *macro_name);
 
+/* EM-UNIFY-c: opcode-as-argument dispatch (collapse nullary/arith families) */
+void emit_sm_op   (int op);        /* dispatch any nullary SM opcode by enum */
+void emit_sm_arith_dispatch(int op);        /* dispatch ADD/SUB/MUL/DIV/MOD by enum  */
+
 /* XEPS/XFAIL/XFARB (EPS/FAIL/ARB) — sub-rung -m (2026-05-11). */
 void emit_bb_xeps (bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
 void emit_bb_xfail(bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
