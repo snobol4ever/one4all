@@ -1649,157 +1649,157 @@ void insn_jg_r32(bb_label_t *t) {
 void bb_insn_mov_eax_imm32(uint32_t imm)
 {
     if (bb_emit_mode == EMIT_TEXT) { bb3c_op("mov", "eax, %u", imm); return; }
-    bb_emit_byte(0xB8); bb_emit_u32(imm);
+    bb_emit_byte(MOV_EAX_IMM32); bb_emit_u32(imm);
 }
 
 void bb_insn_mov_rax_imm64(uint64_t imm)
 {
     if (bb_emit_mode == EMIT_TEXT) { bb3c_op("mov", "rax, 0x%llx", (unsigned long long)imm); return; }
-    bb_emit_byte(0x48); bb_emit_byte(0xB8); bb_emit_u64(imm);
+    bb_emit_byte(REX_W); bb_emit_byte(MOV_EAX_IMM32); bb_emit_u64(imm);
 }
 
 void bb_insn_ret(void)
 {
     if (bb_emit_mode == EMIT_TEXT) { bb3c_op("ret", NULL); return; }
-    bb_emit_byte(0xC3);
+    bb_emit_byte(RET);
 }
 
 void bb_insn_nop(void)
 {
     if (bb_emit_mode == EMIT_TEXT) { bb3c_op("nop", NULL); return; }
-    bb_emit_byte(0x90);
+    bb_emit_byte(NOP);
 }
 
 void bb_insn_call_rax(void)
 {
     if (bb_emit_mode == EMIT_TEXT) { bb3c_op("call", "rax"); return; }
-    bb_emit_byte(0xFF); bb_emit_byte(0xD0);
+    bb_emit_byte(INC_CALL_FF); bb_emit_byte(MODRM_CALL_RAX);
 }
 
 void bb_insn_jmp_rel8(bb_label_t *target)
 {
     if (bb_emit_mode == EMIT_TEXT) { bb3c_jmp("jmp", target->name); return; }
-    bb_emit_byte(0xEB); bb_emit_patch_rel8(target);
+    bb_emit_byte(JMP_REL8); bb_emit_patch_rel8(target);
 }
 
 void bb_insn_jmp_rel32(bb_label_t *target)
 {
     if (bb_emit_mode == EMIT_TEXT) { bb3c_jmp("jmp", target->name); return; }
-    bb_emit_byte(0xE9); bb_emit_patch_rel32(target);
+    bb_emit_byte(JMP_REL32); bb_emit_patch_rel32(target);
 }
 
 void bb_insn_jl_rel8(bb_label_t *target)
 {
     if (bb_emit_mode == EMIT_TEXT) { bb3c_jmp("jl", target->name); return; }
-    bb_emit_byte(0x7C); bb_emit_patch_rel8(target);
+    bb_emit_byte(JL_REL8); bb_emit_patch_rel8(target);
 }
 
 void bb_insn_jge_rel8(bb_label_t *target)
 {
     if (bb_emit_mode == EMIT_TEXT) { bb3c_jmp("jge", target->name); return; }
-    bb_emit_byte(0x7D); bb_emit_patch_rel8(target);
+    bb_emit_byte(JGE_REL8); bb_emit_patch_rel8(target);
 }
 
 void bb_insn_je_rel8(bb_label_t *target)
 {
     if (bb_emit_mode == EMIT_TEXT) { bb3c_jmp("je", target->name); return; }
-    bb_emit_byte(0x74); bb_emit_patch_rel8(target);
+    bb_emit_byte(JE_REL8); bb_emit_patch_rel8(target);
 }
 
 void bb_insn_jne_rel8(bb_label_t *target)
 {
     if (bb_emit_mode == EMIT_TEXT) { bb3c_jmp("jne", target->name); return; }
-    bb_emit_byte(0x75); bb_emit_patch_rel8(target);
+    bb_emit_byte(JNE_REL8); bb_emit_patch_rel8(target);
 }
 
 void bb_insn_jne_rel32(bb_label_t *target)
 {
     if (bb_emit_mode == EMIT_TEXT) { bb3c_jmp("jne", target->name); return; }
-    bb_emit_byte(0x0F); bb_emit_byte(0x85); bb_emit_patch_rel32(target);
+    bb_emit_byte(ESC); bb_emit_byte(TEST_RM_R); bb_emit_patch_rel32(target);
 }
 
 void bb_insn_je_rel32(bb_label_t *target)
 {
     if (bb_emit_mode == EMIT_TEXT) { bb3c_jmp("je", target->name); return; }
-    bb_emit_byte(0x0F); bb_emit_byte(0x84); bb_emit_patch_rel32(target);
+    bb_emit_byte(ESC); bb_emit_byte(JE_REL32_X); bb_emit_patch_rel32(target);
 }
 
 void bb_insn_jl_rel32(bb_label_t *target)
 {
     if (bb_emit_mode == EMIT_TEXT) { bb3c_jmp("jl", target->name); return; }
-    bb_emit_byte(0x0F); bb_emit_byte(0x8C); bb_emit_patch_rel32(target);
+    bb_emit_byte(ESC); bb_emit_byte(JL_REL32_X); bb_emit_patch_rel32(target);
 }
 
 void bb_insn_jge_rel32(bb_label_t *target)
 {
     if (bb_emit_mode == EMIT_TEXT) { bb3c_jmp("jge", target->name); return; }
-    bb_emit_byte(0x0F); bb_emit_byte(0x8D); bb_emit_patch_rel32(target);
+    bb_emit_byte(ESC); bb_emit_byte(LEA); bb_emit_patch_rel32(target);
 }
 
 void bb_insn_jg_rel32(bb_label_t *target)
 {
     if (bb_emit_mode == EMIT_TEXT) { bb3c_jmp("jg", target->name); return; }
-    bb_emit_byte(0x0F); bb_emit_byte(0x8F); bb_emit_patch_rel32(target);
+    bb_emit_byte(ESC); bb_emit_byte(JG_REL32_X); bb_emit_patch_rel32(target);
 }
 
 void bb_insn_cmp_esi_imm8(uint8_t imm)
 {
     if (bb_emit_mode == EMIT_TEXT) { bb3c_op("cmp", "esi, %u", (unsigned)imm); return; }
-    bb_emit_byte(0x83); bb_emit_byte(0xFE); bb_emit_byte(imm);
+    bb_emit_byte(CMP_RM_IMM8); bb_emit_byte(MODRM_CMP_ESI); bb_emit_byte(imm);
 }
 
 void bb_insn_cmp_esi_imm32(uint32_t imm)
 {
     if (bb_emit_mode == EMIT_TEXT) { bb3c_op("cmp", "esi, %u", imm); return; }
-    bb_emit_byte(0x81); bb_emit_byte(0xFE); bb_emit_u32(imm);
+    bb_emit_byte(CMP_RM_IMM32); bb_emit_byte(MODRM_CMP_ESI); bb_emit_u32(imm);
 }
 
 void bb_insn_movzx_eax_rdi_off8(uint8_t off)
 {
     if (bb_emit_mode == EMIT_TEXT) { bb3c_op("movzx", "eax, byte [rdi + %u]", (unsigned)off); return; }
-    bb_emit_byte(0x0F); bb_emit_byte(0xB6); bb_emit_byte(0x47); bb_emit_byte(off);
+    bb_emit_byte(ESC); bb_emit_byte(MOVZX_R_RM8); bb_emit_byte(MODRM_EAX_EDI7); bb_emit_byte(off);
 }
 
 void bb_insn_cmp_al_imm8(uint8_t imm)
 {
     if (bb_emit_mode == EMIT_TEXT) { bb3c_op("cmp", "al, %u", (unsigned)imm); return; }
-    bb_emit_byte(0x3C); bb_emit_byte(imm);
+    bb_emit_byte(CMP_AL_IMM8); bb_emit_byte(imm);
 }
 
 void bb_insn_xor_eax_eax(void)
 {
     if (bb_emit_mode == EMIT_TEXT) { bb3c_op("xor", "eax, eax"); return; }
-    bb_emit_byte(0x31); bb_emit_byte(0xC0);
+    bb_emit_byte(XOR_RM_R); bb_emit_byte(MODRM_EAX_EAX);
 }
 
 void bb_insn_push_rbp(void)
 {
     if (bb_emit_mode == EMIT_TEXT) { bb3c_op("push", "rbp"); return; }
-    bb_emit_byte(0x55);
+    bb_emit_byte(PUSH_RBP);
 }
 
 void bb_insn_pop_rbp(void)
 {
     if (bb_emit_mode == EMIT_TEXT) { bb3c_op("pop", "rbp"); return; }
-    bb_emit_byte(0x5D);
+    bb_emit_byte(POP_RBP);
 }
 
 void bb_insn_mov_rbp_rsp(void)
 {
     if (bb_emit_mode == EMIT_TEXT) { bb3c_op("mov", "rbp, rsp"); return; }
-    bb_emit_byte(0x48); bb_emit_byte(0x89); bb_emit_byte(0xE5);
+    bb_emit_byte(REX_W); bb_emit_byte(MOV_RM_R); bb_emit_byte(MODRM_RBP_RSP);
 }
 
 void bb_insn_sub_rsp_imm8(uint8_t imm)
 {
     if (bb_emit_mode == EMIT_TEXT) { bb3c_op("sub", "rsp, %u", (unsigned)imm); return; }
-    bb_emit_byte(0x48); bb_emit_byte(0x83); bb_emit_byte(0xEC); bb_emit_byte(imm);
+    bb_emit_byte(REX_W); bb_emit_byte(CMP_RM_IMM8); bb_emit_byte(MODRM_RSP_RBP); bb_emit_byte(imm);
 }
 
 void bb_insn_add_rsp_imm8(uint8_t imm)
 {
     if (bb_emit_mode == EMIT_TEXT) { bb3c_op("add", "rsp, %u", (unsigned)imm); return; }
-    bb_emit_byte(0x48); bb_emit_byte(0x83); bb_emit_byte(0xC4); bb_emit_byte(imm);
+    bb_emit_byte(REX_W); bb_emit_byte(CMP_RM_IMM8); bb_emit_byte(MODRM_CMP_RSP); bb_emit_byte(imm);
 }
 
 void emit_ret(void)
@@ -1807,7 +1807,7 @@ void emit_ret(void)
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0xC3); return;
+        bb_emit_byte(RET); return;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
@@ -1821,7 +1821,7 @@ void emit_push_r10(void)
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x41); bb_emit_byte(0x52); return;
+        bb_emit_byte(REX_B); bb_emit_byte(REX_B_PUSH_R10); return;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
@@ -1836,7 +1836,7 @@ void emit_pop_r10(void)
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x41); bb_emit_byte(0x5A); return;
+        bb_emit_byte(REX_B); bb_emit_byte(REX_B_POP_R10); return;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
@@ -1851,7 +1851,7 @@ void emit_test_rax_rax(void)
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x48); bb_emit_byte(0x85); bb_emit_byte(0xC0); return;
+        bb_emit_byte(REX_W); bb_emit_byte(TEST_RM_R); bb_emit_byte(MODRM_EAX_EAX); return;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
@@ -1865,7 +1865,7 @@ void emit_test_eax_eax(void)
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x85); bb_emit_byte(0xC0); return;
+        bb_emit_byte(TEST_RM_R); bb_emit_byte(MODRM_EAX_EAX); return;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
@@ -1880,7 +1880,7 @@ void emit_mov_rdi_imm64(uint64_t val)
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED: {
-        bb_emit_byte(0x48); bb_emit_byte(0xBF);
+        bb_emit_byte(REX_W); bb_emit_byte(MOV_EDI_IMM32);
         bb_emit_byte((uint8_t)(val      )); bb_emit_byte((uint8_t)(val >>  8));
         bb_emit_byte((uint8_t)(val >> 16)); bb_emit_byte((uint8_t)(val >> 24));
         bb_emit_byte((uint8_t)(val >> 32)); bb_emit_byte((uint8_t)(val >> 40));
@@ -1904,12 +1904,12 @@ void emit_call_sym_plt(const char *sym, uint64_t fn_fallback)
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED: {
-        bb_emit_byte(0x48); bb_emit_byte(0xB8);
+        bb_emit_byte(REX_W); bb_emit_byte(MOV_EAX_IMM32);
         bb_emit_byte((uint8_t)(fn_fallback      )); bb_emit_byte((uint8_t)(fn_fallback >>  8));
         bb_emit_byte((uint8_t)(fn_fallback >> 16)); bb_emit_byte((uint8_t)(fn_fallback >> 24));
         bb_emit_byte((uint8_t)(fn_fallback >> 32)); bb_emit_byte((uint8_t)(fn_fallback >> 40));
         bb_emit_byte((uint8_t)(fn_fallback >> 48)); bb_emit_byte((uint8_t)(fn_fallback >> 56));
-        bb_emit_byte(0xFF); bb_emit_byte(0xD0);
+        bb_emit_byte(INC_CALL_FF); bb_emit_byte(MODRM_CALL_RAX);
         return;
     }
     case EMIT_TEXT_INLINE:
@@ -1931,7 +1931,7 @@ void emit_mov_esi_imm32(int val)
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED: {
         uint32_t u = (uint32_t)val;
-        bb_emit_byte(0xBE);
+        bb_emit_byte(MOV_ESI_IMM32);
         bb_emit_byte((uint8_t)(u      )); bb_emit_byte((uint8_t)(u >>  8));
         bb_emit_byte((uint8_t)(u >> 16)); bb_emit_byte((uint8_t)(u >> 24));
         return;
@@ -1952,11 +1952,11 @@ void emit_add_delta_imm(int v)
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x41); bb_emit_byte(0x8B); bb_emit_byte(0x02);
-        bb_emit_byte(0x05);
+        bb_emit_byte(REX_B); bb_emit_byte(MOV_R_RM); bb_emit_byte(MODRM_R10_INDIR);
+        bb_emit_byte(ADD_EAX_IMM32);
         bb_emit_byte((uint8_t)((uint32_t)v      )); bb_emit_byte((uint8_t)((uint32_t)v >>  8));
         bb_emit_byte((uint8_t)((uint32_t)v >> 16)); bb_emit_byte((uint8_t)((uint32_t)v >> 24));
-        bb_emit_byte(0x41); bb_emit_byte(0x89); bb_emit_byte(0x02);
+        bb_emit_byte(REX_B); bb_emit_byte(MOV_RM_R); bb_emit_byte(MODRM_R10_INDIR);
         return;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
@@ -1983,11 +1983,11 @@ void emit_sub_delta_imm(int v)
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x41); bb_emit_byte(0x8B); bb_emit_byte(0x02);
-        bb_emit_byte(0x2D);
+        bb_emit_byte(REX_B); bb_emit_byte(MOV_R_RM); bb_emit_byte(MODRM_R10_INDIR);
+        bb_emit_byte(SUB_EAX_IMM32);
         bb_emit_byte((uint8_t)((uint32_t)v      )); bb_emit_byte((uint8_t)((uint32_t)v >>  8));
         bb_emit_byte((uint8_t)((uint32_t)v >> 16)); bb_emit_byte((uint8_t)((uint32_t)v >> 24));
-        bb_emit_byte(0x41); bb_emit_byte(0x89); bb_emit_byte(0x02);
+        bb_emit_byte(REX_B); bb_emit_byte(MOV_RM_R); bb_emit_byte(MODRM_R10_INDIR);
         return;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
@@ -2013,7 +2013,7 @@ void bb_insn_mov_rsp_rbp(void)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED: case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x48); bb_emit_byte(0x89); bb_emit_byte(0xEC); return;
+        bb_emit_byte(REX_W); bb_emit_byte(MOV_RM_R); bb_emit_byte(MODRM_RSP_RBP); return;
     default: bb3c_format(emit_outf(), "", "mov", "rsp, rbp"); return;
     }
 }
@@ -2022,7 +2022,7 @@ void bb_insn_mov_rdx_imm64(uint64_t v)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED: case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x48); bb_emit_byte(0xBA);
+        bb_emit_byte(REX_W); bb_emit_byte(MOV_EDX_IMM32);
         bb_emit_byte((uint8_t)(v      )); bb_emit_byte((uint8_t)(v >>  8));
         bb_emit_byte((uint8_t)(v >> 16)); bb_emit_byte((uint8_t)(v >> 24));
         bb_emit_byte((uint8_t)(v >> 32)); bb_emit_byte((uint8_t)(v >> 40));
@@ -2037,7 +2037,7 @@ void bb_insn_mov_edx_imm32(uint32_t v)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED: case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0xBA);
+        bb_emit_byte(MOV_EDX_IMM32);
         bb_emit_byte((uint8_t)(v      )); bb_emit_byte((uint8_t)(v >>  8));
         bb_emit_byte((uint8_t)(v >> 16)); bb_emit_byte((uint8_t)(v >> 24));
         return;
@@ -2050,7 +2050,7 @@ void bb_insn_mov_edi_imm32(uint32_t v)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED: case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0xBF);
+        bb_emit_byte(MOV_EDI_IMM32);
         bb_emit_byte((uint8_t)(v      )); bb_emit_byte((uint8_t)(v >>  8));
         bb_emit_byte((uint8_t)(v >> 16)); bb_emit_byte((uint8_t)(v >> 24));
         return;
@@ -2063,7 +2063,7 @@ void bb_insn_mov_rsi_imm64(uint64_t v)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED: case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x48); bb_emit_byte(0xBE);
+        bb_emit_byte(REX_W); bb_emit_byte(MOV_ESI_IMM32);
         bb_emit_byte((uint8_t)(v      )); bb_emit_byte((uint8_t)(v >>  8));
         bb_emit_byte((uint8_t)(v >> 16)); bb_emit_byte((uint8_t)(v >> 24));
         bb_emit_byte((uint8_t)(v >> 32)); bb_emit_byte((uint8_t)(v >> 40));
@@ -2078,7 +2078,7 @@ void bb_insn_push_r12(void)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED: case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x41); bb_emit_byte(0x54); return;
+        bb_emit_byte(REX_B); bb_emit_byte(REX_B_PUSH_R12); return;
     default: bb3c_format(emit_outf(), "", "push", "r12"); return;
     }
 }
@@ -2087,7 +2087,7 @@ void bb_insn_pop_r12(void)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED: case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x41); bb_emit_byte(0x5C); return;
+        bb_emit_byte(REX_B); bb_emit_byte(REX_B_POP_R12); return;
     default: bb3c_format(emit_outf(), "", "pop", "r12"); return;
     }
 }
@@ -2096,8 +2096,8 @@ void bb_insn_inc_r13_disp8(uint8_t disp)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED: case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x41); bb_emit_byte(0xFF);
-        bb_emit_byte(0x45); bb_emit_byte(disp);
+        bb_emit_byte(REX_B); bb_emit_byte(INC_CALL_FF);
+        bb_emit_byte(MODRM_INC_R13D); bb_emit_byte(disp);
         return;
     default: { char a[40]; snprintf(a,sizeof(a),"dword ptr [r13 + %u]",(unsigned)disp);
                bb3c_format(emit_outf(),"","inc",a); return; }
@@ -2108,7 +2108,7 @@ void bb_insn_mov_rcx_imm64(uint64_t v)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED: case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x48); bb_emit_byte(0xB9);
+        bb_emit_byte(REX_W); bb_emit_byte(MOV_ECX_IMM32);
         bb_emit_byte((uint8_t)(v      )); bb_emit_byte((uint8_t)(v >>  8));
         bb_emit_byte((uint8_t)(v >> 16)); bb_emit_byte((uint8_t)(v >> 24));
         bb_emit_byte((uint8_t)(v >> 32)); bb_emit_byte((uint8_t)(v >> 40));
@@ -2123,7 +2123,7 @@ void bb_insn_mov_eax_r10mem(void)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED: case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x41); bb_emit_byte(0x8B); bb_emit_byte(0x02); return;
+        bb_emit_byte(REX_B); bb_emit_byte(MOV_R_RM); bb_emit_byte(MODRM_R10_INDIR); return;
     default: bb3c_format(emit_outf(), "", "mov", "eax, [r10]"); return;
     }
 }
@@ -2132,7 +2132,7 @@ void bb_insn_cmp_eax_imm32(uint32_t v)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED: case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x3D);
+        bb_emit_byte(CMP_EAX_IMM32);
         bb_emit_byte((uint8_t)(v      )); bb_emit_byte((uint8_t)(v >>  8));
         bb_emit_byte((uint8_t)(v >> 16)); bb_emit_byte((uint8_t)(v >> 24));
         return;
@@ -2145,7 +2145,7 @@ void bb_insn_mov_eax_mem_rcx(void)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED: case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x8B); bb_emit_byte(0x01); return;
+        bb_emit_byte(MOV_R_RM); bb_emit_byte(MODRM_RCX_INDIR); return;
     default: bb3c_format(emit_outf(), "", "mov", "eax, [rcx]"); return;
     }
 }
@@ -2154,7 +2154,7 @@ void bb_insn_sub_eax_imm32(uint32_t v)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED: case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x2D);
+        bb_emit_byte(SUB_EAX_IMM32);
         bb_emit_byte((uint8_t)(v      )); bb_emit_byte((uint8_t)(v >>  8));
         bb_emit_byte((uint8_t)(v >> 16)); bb_emit_byte((uint8_t)(v >> 24));
         return;
@@ -2167,7 +2167,7 @@ void bb_insn_mov_ecx_eax(void)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED: case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x89); bb_emit_byte(0xC1); return;
+        bb_emit_byte(MOV_RM_R); bb_emit_byte(MODRM_ECX_EAX); return;
     default: bb3c_format(emit_outf(), "", "mov", "ecx, eax"); return;
     }
 }
@@ -2176,7 +2176,7 @@ void bb_insn_cmp_eax_ecx(void)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED: case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x39); bb_emit_byte(0xC8); return;
+        bb_emit_byte(CMP_RM_R); bb_emit_byte(MODRM_EAX_ECX); return;
     default: bb3c_format(emit_outf(), "", "cmp", "eax, ecx"); return;
     }
 }
@@ -2185,7 +2185,7 @@ void bb_insn_mov_rax_mem_rcx(void)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED: case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x48); bb_emit_byte(0x8B); bb_emit_byte(0x01); return;
+        bb_emit_byte(REX_W); bb_emit_byte(MOV_R_RM); bb_emit_byte(MODRM_RCX_INDIR); return;
     default: bb3c_format(emit_outf(), "", "mov", "rax, [rcx]"); return;
     }
 }
@@ -2194,7 +2194,7 @@ void bb_insn_movsxd_rcx_r10mem(void)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED: case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x49); bb_emit_byte(0x63); bb_emit_byte(0x0A); return;
+        bb_emit_byte(REX_WB); bb_emit_byte(MOVSXD_R_RM); bb_emit_byte(MODRM_RCX_R10); return;
     default: bb3c_format(emit_outf(), "", "movsxd", "rcx, dword [r10]"); return;
     }
 }
@@ -2203,8 +2203,8 @@ void bb_insn_lea_rax_rax_rcx(void)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED: case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x48); bb_emit_byte(0x8D);
-        bb_emit_byte(0x04); bb_emit_byte(0x08); return;
+        bb_emit_byte(REX_W); bb_emit_byte(LEA);
+        bb_emit_byte(MODRM_RAX_RAXRCX); bb_emit_byte(SIB_RAX_RCX); return;
     default: bb3c_format(emit_outf(), "", "lea", "rax, [rax+rcx]"); return;
     }
 }
@@ -2213,7 +2213,7 @@ void bb_insn_mov_rdi_rax(void)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED: case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x48); bb_emit_byte(0x89); bb_emit_byte(0xC7); return;
+        bb_emit_byte(REX_W); bb_emit_byte(MOV_RM_R); bb_emit_byte(MODRM_RDI_RAX); return;
     default: bb3c_format(emit_outf(), "", "mov", "rdi, rax"); return;
     }
 }
@@ -2222,7 +2222,7 @@ void bb_insn_add_eax_imm32(uint32_t v)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED: case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x05);
+        bb_emit_byte(ADD_EAX_IMM32);
         bb_emit_byte((uint8_t)(v      )); bb_emit_byte((uint8_t)(v >>  8));
         bb_emit_byte((uint8_t)(v >> 16)); bb_emit_byte((uint8_t)(v >> 24));
         return;
@@ -2235,7 +2235,7 @@ void bb_insn_cmp_eax_mem_rcx(void)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED: case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x3B); bb_emit_byte(0x01); return;
+        bb_emit_byte(CMP_R_RM); bb_emit_byte(MODRM_RCX_INDIR); return;
     default: bb3c_format(emit_outf(), "", "cmp", "eax, [rcx]"); return;
     }
 }
