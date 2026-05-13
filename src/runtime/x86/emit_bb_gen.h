@@ -4,6 +4,7 @@
 
 #include "emit_defs.h"
 #include "emit_buf.h"
+#include "emit_label.h"
 #include "bb_pool.h"
 #include <stdio.h>
 #include <stdint.h>
@@ -25,12 +26,6 @@ void emit_bb_inc_mem_r13_disp8(uint8_t disp);
 void emit_pad_to_blob_size(void);
 void emit_macro_begin(const char *name, const char *const *params, int nparams);
 void emit_macro_end(void);
-
-void bb_label_init(bb_label_t *lbl, const char *name);
-
-void bb_label_initf(bb_label_t *lbl, const char *fmt, ...);
-
-void bb_label_define(bb_label_t *lbl);
 
 void emit_jmp(bb_label_t *target, jmp_kind_t kind);
 
