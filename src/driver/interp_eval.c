@@ -343,6 +343,7 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
             if (av.v == DT_SNUL) continue;
             if (IS_INT_fn(av))       printf("%lld", (long long)av.i);
             else if (IS_REAL_fn(av)) { char _rb[64]; printf("%s", real_str(av.r,_rb,sizeof _rb)); }
+            else if (IS_CSET_fn(av)) { if (av.s) fwrite(av.s, 1, strlen(av.s), stdout); }
             else { const char *s = VARVAL_fn(av); if (s) fputs(s, stdout); }
         }
         *out = nargs > 0 ? args[nargs-1] : NULVCL;
@@ -2045,10 +2046,10 @@ DESCR_t icn_kw_read(const char *kw) {
     if (!strcmp(kw,"null"))    return NULVCL;
     if (!strcmp(kw,"fail"))    return FAILDESCR;
     if (!strcmp(kw,"window"))  return NULVCL;
-    /* I/O stream strings */
-    if (!strcmp(kw,"input"))   return STRVAL("&input");
-    if (!strcmp(kw,"output"))  return STRVAL("&output");
-    if (!strcmp(kw,"errout"))  return STRVAL("&errout");
+    /* I/O stream file handles — raku_fh_table[0]=stdin,[1]=stdout,[2]=stderr */
+    if (!strcmp(kw,"input"))   { raku_fh_ensure_init(); return INTVAL(0); }
+    if (!strcmp(kw,"output"))  { raku_fh_ensure_init(); return INTVAL(1); }
+    if (!strcmp(kw,"errout"))  { raku_fh_ensure_init(); return INTVAL(2); }
     /* Co-expression self-reference */
     if (!strcmp(kw,"current")) return STRVAL("co-expression_1(0)");
     if (!strcmp(kw,"main"))    return STRVAL("co-expression_1(0)");
@@ -2187,24 +2188,6 @@ DESCR_t interp_eval(tree_t *e)
                     else { const char *s=VARVAL_fn(a); if (s) fputs(s, stdout); }
                 }
                 putchar('\n');
-                return last;
-            }
-            if (!strcmp(fn,"writes")) {
-                if (nargs == 0) return NULVCL;
-                DESCR_t *vals = (DESCR_t *)GC_malloc((size_t)nargs * sizeof(DESCR_t));
-                for (int _wi = 0; _wi < nargs; _wi++) {
-                    vals[_wi] = interp_eval(e->c[1+_wi]);
-                    if (IS_FAIL_fn(vals[_wi])) return FAILDESCR;
-                }
-                DESCR_t last = NULVCL;
-                for (int _wi = 0; _wi < nargs; _wi++) {
-                    DESCR_t a = vals[_wi];
-                    last = a;
-                    if (a.v == DT_SNUL) continue;
-                    if (IS_INT_fn(a)) printf("%lld",(long long)a.i);
-                    else if (IS_REAL_fn(a)) { char _rb[64]; printf("%s",real_str(a.r,_rb,sizeof _rb)); }
-                    else { const char *s=VARVAL_fn(a); if (s) fputs(s, stdout); }
-                }
                 return last;
             }
             if (!strcmp(fn,"read") && nargs == 0) {
