@@ -218,6 +218,24 @@ typedef struct {
 DESCR_t coro_bb_every(void *zeta, int entry);
 
 /*----------------------------------------------------------------------------------------------------------------------------
+ * coro_bb_mutual — TT_SEQ (Icon A & B) when B is also generative   IJ-12
+ *
+ * Implements JCON ir_a_Mutual semantics: A is the outer generator, B is the
+ * inner generator.  A produces one value; B is driven to exhaustion; then A
+ * advances.  On β: resume B first; if B exhausted, advance A and restart B.
+ *
+ * State: gen_a / gen_b (boxes), ast_a / ast_b (for fresh B construction).
+ *--------------------------------------------------------------------------------------------------------------------------*/
+typedef struct {
+    bb_node_t  gen_a;       /* outer generator (A) */
+    bb_node_t  gen_b;       /* inner generator (B) — rebuilt from ast_b each A tick */
+    tree_t    *ast_b;       /* B AST — used to build a fresh gen_b when A advances */
+    int        b_started;   /* has gen_b been started on the current A tick? */
+    int        a_started;   /* has gen_a been started? */
+} icn_mutual_state_t;
+DESCR_t coro_bb_mutual(void *zeta, int entry);
+
+/*----------------------------------------------------------------------------------------------------------------------------
  * coro_bb_bang_binary — TT_BANG_BINARY Byrd box  (E1 ! E2)   IC-2b
  *
  * Invoke E1 (a procedure tree_t*) with successive values from E2 (a generator).

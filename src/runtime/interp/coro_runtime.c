@@ -1284,12 +1284,82 @@ typedef struct {
     char    *var_name;   /* NV name (TT_VAR fallback) */
     DESCR_t  saved;
     int      have_saved;
+    /* IJ-12: chained <- support — when RHS is itself a TT_REVASSIGN, pump it
+     * as a generator so inner assignments are tracked and reverted on β. */
+    bb_node_t rhs_gen;   /* non-NULL fn iff RHS is a chained revassign */
+    int       use_rhs_gen;
 } icn_revassign_state_t;
+
+/*----------------------------------------------------------------------------------------------------------------------------
+ * IJ-12: coro_bb_revassign_lhs_gen — TT_REVASSIGN where LHS subscript index is generative.
+ *   e.g. `every line[4*(!sol-1)+3] <- "Q" do { write(line) }`
+ *
+ * Drives the index generator: for each index value, snapshot lhs cell, write rhs,
+ * yield, then on β revert and advance to next index value.
+ *
+ * State: gen_idx (box for the index generator), lhs_base_expr, rhs_expr,
+ *        saved cell value, cell pointer.
+ *--------------------------------------------------------------------------------------------------------------------------*/
+typedef struct {
+    bb_node_t  gen_idx;       /* generator for the subscript index */
+    tree_t    *lhs_base_expr; /* base of the lhs subscript (e.g. `line`) */
+    tree_t    *rhs_expr;      /* rhs value */
+    /* Revert state (same fields as icn_revassign_state_t) */
+    DESCR_t   *cell;
+    DESCR_t    base_d;
+    DESCR_t    idx_d;
+    int        have_subscript;
+    DESCR_t    saved;
+    int        have_saved;
+} icn_revassign_lhs_gen_state_t;
+
+static DESCR_t coro_bb_revassign_lhs_gen(void *zeta, int entry) {
+    icn_revassign_lhs_gen_state_t *z = (icn_revassign_lhs_gen_state_t *)zeta;
+    /* Revert previous position if any */
+    if (entry != α && z->have_saved) {
+        if (z->cell) *z->cell = z->saved;
+        else if (z->have_subscript) subscript_set(z->base_d, z->idx_d, z->saved);
+        z->have_saved = 0; z->cell = NULL; z->have_subscript = 0;
+    }
+    /* Advance index */
+    DESCR_t idx = (entry == α)
+        ? z->gen_idx.fn(z->gen_idx.ζ, α)
+        : z->gen_idx.fn(z->gen_idx.ζ, β);
+    if (IS_FAIL_fn(idx)) return FAILDESCR;    /* Evaluate base and rhs */
+    DESCR_t base = bb_eval_value(z->lhs_base_expr);
+    if (IS_FAIL_fn(base)) return FAILDESCR;
+    DESCR_t rv = bb_eval_value(z->rhs_expr);
+    if (IS_FAIL_fn(rv)) return FAILDESCR;
+    /* Snapshot current value */
+    z->base_d = base; z->idx_d = idx;
+    z->saved = subscript_get(base, idx);
+    z->have_saved = 1;
+    /* Write new value */
+    if (base.v == DT_A) {
+        DESCR_t *cell = array_ptr(base.arr, (int)to_int(idx));
+        if (cell) { z->cell = cell; *cell = rv; }
+        else { z->have_subscript = 1; subscript_set(base, idx, rv); }
+    } else if (base.v == DT_T) {
+        z->have_subscript = 1; subscript_set(base, idx, rv);
+    } else if (base.v == DT_DATA) {
+        z->have_subscript = 1; subscript_set(base, idx, rv);
+    } else {
+        /* String or other — use subscript_set directly */
+        z->have_subscript = 1; subscript_set(base, idx, rv);
+    }
+    return rv;
+}
 
 static DESCR_t coro_bb_revassign(void *zeta, int entry) {
     icn_revassign_state_t *z = (icn_revassign_state_t *)zeta;
     if (entry == α) {
-        DESCR_t rv = bb_eval_value(z->rhs_expr);
+        /* Evaluate RHS: use sub-generator if RHS is itself a chained <- */
+        DESCR_t rv;
+        if (z->use_rhs_gen) {
+            rv = z->rhs_gen.fn(z->rhs_gen.ζ, α);
+        } else {
+            rv = bb_eval_value(z->rhs_expr);
+        }
         if (IS_FAIL_fn(rv)) return FAILDESCR;
         tree_t *lhs = z->lhs_expr;
         if (lhs && lhs->t == TT_VAR) {
@@ -1334,7 +1404,10 @@ static DESCR_t coro_bb_revassign(void *zeta, int entry) {
         }
         return rv;
     }
-    /* β / ω — revert and exhaust */
+    /* β / ω — revert inner chain first (if any), then revert lhs */
+    if (z->use_rhs_gen) {
+        z->rhs_gen.fn(z->rhs_gen.ζ, β);  /* revert inner <- assignments */
+    }
     if (z->have_saved) {
         if (z->cell) {
             *z->cell = z->saved;
@@ -2006,6 +2079,16 @@ bb_node_t coro_eval(tree_t *e) {
      * drive c[0] as the generator; exec c[1] as the body per tick.
      * Reuse icn_every_state_t / coro_bb_every (same alpha/beta semantics). */
     if (e->t == TT_SEQ && e->n >= 2 && is_suspendable(e->c[0])) {
+        /* IJ-12: if B (c[1]) is also suspendable, use the mutual conjunction box
+         * (cross-product: A outer, B inner, B rebuilt on each A advance).
+         * If B is one-shot, fall through to coro_bb_every (filter conjunction). */
+        if (is_suspendable(e->c[1])) {
+            icn_mutual_state_t *z = calloc(1, sizeof(*z));
+            z->gen_a    = coro_eval(e->c[0]);
+            z->ast_b    = e->c[1];
+            z->b_started = 0;
+            return (bb_node_t){ coro_bb_mutual, z, 0 };
+        }
         icn_every_state_t *z = calloc(1, sizeof(*z));
         z->gen     = coro_eval(e->c[0]);
         z->gen_ast = e->c[0];
@@ -2128,10 +2211,26 @@ bb_node_t coro_eval(tree_t *e) {
      * Net effect: under `every`, the post-loop state of lhs equals its
      * pre-loop state; rhs was visible for the body of one tick only.       */
     if (e->t == TT_REVASSIGN && e->n >= 2) {
+        /* IJ-12: if LHS is TT_IDX with generative index, use lhs-gen box.
+         * e.g. `line[4*(!sol-1)+3] <- "Q"` — iterates over !sol positions. */
+        tree_t *lhs = e->c[0];
+        if (lhs && lhs->t == TT_IDX && lhs->n >= 2 && is_suspendable(lhs->c[1])) {
+            icn_revassign_lhs_gen_state_t *z = calloc(1, sizeof(*z));
+            z->gen_idx      = coro_eval(lhs->c[1]);
+            z->lhs_base_expr = lhs->c[0];
+            z->rhs_expr      = e->c[1];
+            return (bb_node_t){ coro_bb_revassign_lhs_gen, z, 0 };
+        }
         icn_revassign_state_t *z = calloc(1, sizeof(*z));
         z->lhs_expr = e->c[0];
         z->rhs_expr = e->c[1];
         z->var_slot = -2;        /* sentinel for "unset" */
+        /* IJ-12: if RHS is also a TT_REVASSIGN chain, build a sub-generator
+         * so inner assignments are tracked and reverted on β. */
+        if (e->c[1] && is_suspendable(e->c[1])) {
+            z->rhs_gen     = coro_eval(e->c[1]);
+            z->use_rhs_gen = 1;
+        }
         return (bb_node_t){ coro_bb_revassign, z, 0 };
     }
 
@@ -2428,6 +2527,60 @@ DESCR_t coro_bb_every(void *zeta, int entry) {
         coro_drive_val  = saved_drive_val;
     }
     return v;
+}
+
+/*----------------------------------------------------------------------------------------------------------------------------
+ * coro_bb_mutual — TT_SEQ (Icon A & B) mutual conjunction, both sides generative  IJ-12
+ *
+ * JCON ir_a_Mutual semantics (from jcon_irgen.icn ir_a_Mutual):
+ *   α: pump A α → if A succeeds, pump B α → if B succeeds, yield B value.
+ *      if B fails, pump A β (next A value) and restart B from α.
+ *      if A exhausts, FAIL the whole conjunction.
+ *   β: pump B β → if B succeeds, yield B value.
+ *      if B fails (B exhausted for this A-value), pump A β → restart B α.
+ *      if A exhausts, FAIL.
+ *
+ * A is the "outer" generator; B is the "inner" generator.  For each A-tick
+ * B is driven to exhaustion before A advances.  B is reconstructed fresh
+ * (coro_eval(ast_b)) whenever A advances, so B's coro state reflects the
+ * new A-value (e.g. reversible assignments that depend on A's side effects).
+ *--------------------------------------------------------------------------------------------------------------------------*/
+DESCR_t coro_bb_mutual(void *zeta, int entry) {
+    icn_mutual_state_t *z = (icn_mutual_state_t *)zeta;
+
+    if (entry == α) {
+        /* First call: start A. */
+        DESCR_t av = z->gen_a.fn(z->gen_a.ζ, α);
+        if (IS_FAIL_fn(av)) return FAILDESCR;
+        /* A succeeded — build a fresh B generator and start it. */
+        z->gen_b    = coro_eval(z->ast_b);
+        z->b_started = 1;
+        DESCR_t bv = z->gen_b.fn(z->gen_b.ζ, α);
+        while (IS_FAIL_fn(bv)) {
+            /* B failed immediately — advance A, rebuild B. */
+            av = z->gen_a.fn(z->gen_a.ζ, β);
+            if (IS_FAIL_fn(av)) return FAILDESCR;
+            z->gen_b = coro_eval(z->ast_b);
+            bv = z->gen_b.fn(z->gen_b.ζ, α);
+        }
+        return bv;
+    } else {
+        /* β entry: try to resume B first. */
+        if (z->b_started) {
+            DESCR_t bv = z->gen_b.fn(z->gen_b.ζ, β);
+            if (!IS_FAIL_fn(bv)) return bv;
+        }
+        /* B exhausted — advance A, rebuild and restart B. */
+        for (;;) {
+            DESCR_t av = z->gen_a.fn(z->gen_a.ζ, β);
+            if (IS_FAIL_fn(av)) return FAILDESCR;
+            z->gen_b = coro_eval(z->ast_b);
+            z->b_started = 1;
+            DESCR_t bv = z->gen_b.fn(z->gen_b.ζ, α);
+            if (!IS_FAIL_fn(bv)) return bv;
+            /* This A-value also exhausted B immediately — keep trying A. */
+        }
+    }
 }
 
 /*----------------------------------------------------------------------------------------------------------------------------
