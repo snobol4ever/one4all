@@ -1,5 +1,5 @@
 #include "emitter.h"
-#include "bb_emit.h"
+#include "emitter_bb_gen.h"
 #include "bb_box.h"
 #include "templates.h"
 #include "../frontend/icon/icon_gen.h"

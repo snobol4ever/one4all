@@ -64,7 +64,7 @@
 #include "sm_prog.h"
 #include "snobol4.h"         /* DESCR_t, PATND_t, pat_* constructors (EM-7a) */
 #include "bb_flat.h"         /* bb_build_flat_text, bb_build_flat_text_reset (EM-7c) */
-#include "sm_emit_template.h" /* SM op template table (EM-7c-sm-macros, sess #87) */
+#include "emitter_sm_template.h" /* SM op template table (EM-7c-sm-macros, sess #87) */
 #include "templates.h" /* per-opcode templates (EM-MODE4-IS-MODE3-DUMP-f+) */
 #include <string.h>
 

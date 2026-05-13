@@ -24,7 +24,7 @@
  * this one header. */
 #include "snobol4.h"          /* DESCR_t, SPEC_t (transitive deps of patnd) */
 #include "emitter.h"          /* emitter_t */
-#include "bb_emit.h"          /* bb_label_t */
+#include "emitter_bb_gen.h"          /* bb_label_t */
 #include "snobol4_patnd.h"    /* PATND_t */
 
 /* ── SM opcode templates ──────────────────────────────────────────────── */

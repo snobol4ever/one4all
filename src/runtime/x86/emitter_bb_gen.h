@@ -5,8 +5,8 @@
  * bb_label_t carries a symbolic name (TEXT) and buffer offset (BINARY).
  * Forward refs patched on bb_label_define().  Finalise with bb_emit_end(). */
 
-#ifndef BB_EMIT_H
-#define BB_EMIT_H
+#ifndef EMITTER_BB_GEN_H
+#define EMITTER_BB_GEN_H
 
 #include "bb_pool.h"
 #include <stdio.h>
@@ -295,4 +295,4 @@ void emit_mov_esi_imm32  (int val);
 void emit_add_delta_imm  (int v);
 void emit_sub_delta_imm  (int v);
 
-#endif /* BB_EMIT_H */
+#endif /* EMITTER_BB_GEN_H */

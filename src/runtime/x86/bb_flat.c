@@ -14,7 +14,7 @@
  */
 
 #include "bb_flat.h"
-#include "bb_emit.h"
+#include "emitter_bb_gen.h"
 #include "emitter.h"
 #include "snobol4.h"
 #include "bb_box.h"

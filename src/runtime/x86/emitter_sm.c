@@ -8,7 +8,7 @@
  */
 
 #include "emitter.h"
-#include "bb_emit.h"
+#include "emitter_bb_gen.h"
 #include "templates.h"
 #include "sm_prog.h"
 #include <stdint.h>
