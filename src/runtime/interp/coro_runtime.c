@@ -325,6 +325,18 @@ int coro_drive(tree_t *e) {
         DESCR_t lo_d=bb_eval_value(e->c[0]);
         DESCR_t hi_d=bb_eval_value(e->c[1]);
         DESCR_t st_d=bb_eval_value(e->c[2]);
+        /* Coerce string/cset bounds to numeric; preserve pure-real for float iteration */
+        int _was_str = (!IS_REAL_fn(lo_d)&&!IS_INT_fn(lo_d)&&!IS_FAIL_fn(lo_d)) ||
+                       (!IS_REAL_fn(hi_d)&&!IS_INT_fn(hi_d)&&!IS_FAIL_fn(hi_d)) ||
+                       (!IS_REAL_fn(st_d)&&!IS_INT_fn(st_d)&&!IS_FAIL_fn(st_d));
+#define _TOBY_COERCE_EAGER(d) do { \
+        if (!IS_INT_fn(d) && !IS_FAIL_fn(d)) { \
+            double _rv = IS_REAL_fn(d) ? (d).r : strtod((d).s?(d).s:"",NULL); \
+            (d) = INTVAL((long)_rv); } } while(0)
+        if (_was_str || !(IS_REAL_fn(lo_d)||IS_REAL_fn(hi_d)||IS_REAL_fn(st_d))) {
+            _TOBY_COERCE_EAGER(lo_d); _TOBY_COERCE_EAGER(hi_d); _TOBY_COERCE_EAGER(st_d);
+        }
+#undef _TOBY_COERCE_EAGER
         if(IS_FAIL_fn(lo_d)||IS_FAIL_fn(hi_d)||IS_FAIL_fn(st_d)) return 0;
         long lo=lo_d.i,hi=hi_d.i,st=st_d.i?st_d.i:1; int ticks=0;
         if(st>0){for(long i=lo;i<=hi&&!FRAME.returning;i+=st){frame_push(e,i,NULL);int inner=coro_drive(root);if(!inner)bb_exec_stmt(FRAME.body_root);frame_pop();ticks++;if(FRAME.returning)break;}}
@@ -792,6 +804,11 @@ int is_suspendable(tree_t *e) {
         case TT_IDENTICAL:                                /* IC-8: x === gen — drive gen */
         case TT_LCONCAT: case TT_CAT:
                            for (int i = 0; i < e->n; i++)
+                if (is_suspendable(e->c[i])) return 1;
+            return 0;
+        /* Cset ops are generative if any child is generative — e.g. ~~(A|B|C) */
+        case TT_CSET_COMPL: case TT_CSET_UNION: case TT_CSET_DIFF: case TT_CSET_INTER:
+            for (int i = 0; i < e->n; i++)
                 if (is_suspendable(e->c[i])) return 1;
             return 0;
         case TT_NONNULL:
@@ -1435,18 +1452,37 @@ bb_node_t coro_eval(tree_t *e) {
         DESCR_t lo_d   = bb_eval_value(e->c[0]);
         DESCR_t hi_d   = bb_eval_value(e->c[1]);
         DESCR_t step_d = bb_eval_value(e->c[2]);
+        /* Coerce string/cset bounds to numeric.  Track whether any bound was
+         * originally a string — if so, apply Icon truncation-to-integer rule.
+         * Pure-real case (all DT_R, no string coercion) uses coro_bb_to_by_real. */
+        int was_str_lo = (!IS_REAL_fn(lo_d) && !IS_INT_fn(lo_d) && !IS_FAIL_fn(lo_d));
+        int was_str_hi = (!IS_REAL_fn(hi_d) && !IS_INT_fn(hi_d) && !IS_FAIL_fn(hi_d));
+        int was_str_st = (!IS_REAL_fn(step_d) && !IS_INT_fn(step_d) && !IS_FAIL_fn(step_d));
+        int any_str = was_str_lo || was_str_hi || was_str_st;
+#define _TO_COERCE(d) do { \
+        if (!IS_REAL_fn(d) && !IS_INT_fn(d) && !IS_FAIL_fn(d)) { \
+            const char *_s = (d).s ? (d).s : ""; \
+            char *_e = NULL; double _rv = strtod(_s, &_e); \
+            if (_e && !*_e) { (d) = REALVAL(_rv); } else { (d) = FAILDESCR; } \
+        } } while(0)
+        _TO_COERCE(lo_d); _TO_COERCE(hi_d); _TO_COERCE(step_d);
+#undef _TO_COERCE
         int any_real = IS_REAL_fn(lo_d) || IS_REAL_fn(hi_d) || IS_REAL_fn(step_d);
-        if (any_real) {
+        if (any_real && !any_str) {
+            /* Pure real case — no string coercion: use floating-point generator */
             icn_to_by_real_state_t *z = calloc(1, sizeof(*z));
             z->lo   = IS_REAL_fn(lo_d)   ? lo_d.r   : (double)(IS_FAIL_fn(lo_d)   ? 0 : lo_d.i);
             z->hi   = IS_REAL_fn(hi_d)   ? hi_d.r   : (double)(IS_FAIL_fn(hi_d)   ? 0 : hi_d.i);
             z->step = IS_REAL_fn(step_d) ? step_d.r : (double)(IS_FAIL_fn(step_d) ? 1 : step_d.i);
             return (bb_node_t){ coro_bb_to_by_real, z, 0 };
         }
+        /* Mixed or string/cset coercion: truncate to integer */
+#define _TO_INT(d, def) (IS_REAL_fn(d) ? (long)(d).r : (IS_FAIL_fn(d) ? (def) : (d).i))
         icn_to_by_state_t *z = calloc(1, sizeof(*z));
-        z->lo   = IS_FAIL_fn(lo_d)   ? 0 : lo_d.i;
-        z->hi   = IS_FAIL_fn(hi_d)   ? 0 : hi_d.i;
-        z->step = IS_FAIL_fn(step_d) ? 1 : step_d.i;
+        z->lo   = _TO_INT(lo_d,   0);
+        z->hi   = _TO_INT(hi_d,   0);
+        z->step = _TO_INT(step_d, 1); if (!z->step) z->step = 1;
+#undef _TO_INT
         return (bb_node_t){ coro_bb_to_by, z, 0 };
     }
 
@@ -1865,6 +1901,13 @@ bb_node_t coro_eval(tree_t *e) {
         return (bb_node_t){ coro_bb_every, z, 0 };
     }
 
+    /* ── TT_CSET_COMPL with generative child — ~~(A|B|C) maps complement over gen ── */
+    if (e->t == TT_CSET_COMPL && e->n >= 1 && is_suspendable(e->c[0])) {
+        icn_limit_state_t *z = calloc(1, sizeof(*z));
+        z->gen = coro_eval(e->c[0]);
+        return (bb_node_t){ coro_bb_cset_compl, z, 0 };
+    }
+
     /* ── IC-7: TT_NONNULL (\E) as generator — filter: pass values, skip null ──
      * every write(\(1 to 3)) — drive inner gen, yield each non-null value.   */
     if (e->t == TT_NONNULL && e->n >= 1 && is_suspendable(e->c[0])) {
@@ -2133,6 +2176,21 @@ int coro_drive_fnc(tree_t *e) {
  * α: pump inner gen α; count=1; return value if count<=max.
  * β: if count>=max → ω; pump inner gen β; if ω → ω; count++; return value.
  *--------------------------------------------------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------------------------------------------------------------
+ * coro_bb_cset_compl — TT_CSET_COMPL with generative child  (~~gen)
+ * Pumps inner generator; applies icn_cset_complement + int/real coercion to each value.
+ * State: inner bb_node_t gen only — reuses icn_limit_state_t (gen field used, max/count ignored).
+ *---------------------------------------------------------------------------------------------------------------------------*/
+DESCR_t coro_bb_cset_compl(void *zeta, int entry) {
+    icn_limit_state_t *z = (icn_limit_state_t *)zeta;
+    DESCR_t v = z->gen.fn(z->gen.ζ, entry == α ? α : β);
+    if (IS_FAIL_fn(v)) return FAILDESCR;
+    /* Coerce integer/real to image string before complement */
+    if (IS_INT_fn(v) || IS_REAL_fn(v)) v = descr_to_str_icn(v);
+    const char *cs = (v.s && *v.s) ? v.s : "";
+    return STRVAL(icn_cset_complement(cs));
+}
+
 DESCR_t coro_bb_limit(void *zeta, int entry) {
     icn_limit_state_t *z = (icn_limit_state_t *)zeta;
     if (z->max <= 0) return FAILDESCR;

@@ -1154,6 +1154,9 @@ DESCR_t bb_eval_value(tree_t *e)
     case TT_CSET_COMPL: {
         DESCR_t operand = bb_eval_value(e->c[0]);
         if (IS_FAIL_fn(operand)) return FAILDESCR;
+        /* Coerce integer/real to image string before complementing.
+         * Icon rule: ~integer treats the decimal image as a cset. */
+        if (IS_INT_fn(operand) || IS_REAL_fn(operand)) operand = descr_to_str_icn(operand);
         const char *cs = IS_NULL_fn(operand) ? "" : VARVAL_fn(operand);
         return STRVAL(icn_cset_complement(cs));
     }

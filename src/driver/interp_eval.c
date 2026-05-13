@@ -1546,12 +1546,20 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         if (fn[0]=='\\' && fn[1]=='\0') {
             *out=(a.v==DT_SNUL)?FAILDESCR:a; return 1;
         }
-        /* unary ~: cset complement */
+        /* unary ~: cset complement — skip NUL (c=0) so the result is a valid
+         * C string; otherwise ~~x breaks: strlen sees NUL in the complement
+         * and the second ~ treats the rest as not-in-set, producing garbage.
+         * Coerce integer/real to their image string first (Icon rule: ~integer
+         * treats the decimal image as a cset, e.g. ~~1257787 → "12578"). */
         if (fn[0]=='~' && fn[1]=='\0') {
-            const char *s=VARVAL_fn(a); if(!s) s="";
+            const char *s=NULL;
+            if (IS_INT_fn(a)) { char *nb=GC_malloc(32); snprintf(nb,32,"%lld",(long long)a.i); s=nb; }
+            else if (IS_REAL_fn(a)) { char *nb=GC_malloc(64); real_str(a.r,nb,64); s=nb; }
+            else { s=VARVAL_fn(a); }
+            if(!s) s="";
             unsigned char in_set[256]={0}; for(const char *p=s;*p;p++) in_set[(unsigned char)*p]=1;
-            char *buf=GC_malloc(257); int n=0;
-            for(int c=0;c<256;c++) if(!in_set[c]) buf[n++]=(char)c; buf[n]='\0';
+            char *buf=GC_malloc(256); int n=0;
+            for(int c=1;c<256;c++) if(!in_set[c]) buf[n++]=(char)c; buf[n]='\0';
             *out=STRVAL(buf); return 1;
         }
         /* unary ?: random element */

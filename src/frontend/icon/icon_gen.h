@@ -178,6 +178,7 @@ typedef struct {
     long      count;
 } icn_limit_state_t;
 DESCR_t coro_bb_limit(void *zeta, int entry);
+DESCR_t coro_bb_cset_compl(void *zeta, int entry);
 
 /*----------------------------------------------------------------------------------------------------------------------------
  * coro_bb_every — TT_EVERY Byrd box  (every gen [do body])   IC-2b
