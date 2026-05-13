@@ -55,6 +55,18 @@ extern rtab_t *bb_rtab_new(int n);
 extern rem_t  *bb_rem_new(void);
 /* ------------------------------------------------ */
 
+/* EC-3: Pattern-B helper — banner + alloc-already-done + two port_calls.
+ * zeta must be allocated by the caller before invoking this helper. */
+static void emit_bb_stateful(const char *banner, const char *arg,
+                              void *zeta, const char *fn_name, uint64_t fn_fallback,
+                              bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
+{
+    t_bb_box_banner(banner, arg ? arg : "");
+    t_bb_port_call((uint64_t)(uintptr_t)zeta, fn_name, fn_fallback, 0, lbl_succ, lbl_fail);
+    t_label_define(lbl_β);
+    t_bb_port_call((uint64_t)(uintptr_t)zeta, fn_name, fn_fallback, 1, lbl_succ, lbl_fail);
+}
+
 /* EDP-5: TEXT-mode helper for simple stateful boxes (single .long 0 ζ slot).
  * Emits: .data label + .long 0 + .text + push/lea/mov/call/pop/test/jne/jmp
  * for both α (port=0) and β (port=1) entries.
@@ -85,130 +97,71 @@ void emit_bb_icon_alt(emitter_t *e,
                       bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     (void)e;
-    t_bb_box_banner("ICN_ALT", "");
-    icn_alternate_state_t *z = icon_alt_new();
-    t_bb_port_call((uint64_t)(uintptr_t)z, "coro_bb_alternate",
-                   (uint64_t)(uintptr_t)coro_bb_alternate,
-                   0, lbl_succ, lbl_fail);
-    t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "coro_bb_alternate",
-                   (uint64_t)(uintptr_t)coro_bb_alternate,
-                   1, lbl_succ, lbl_fail);
+    emit_bb_stateful("ICN_ALT", "", icon_alt_new(), "coro_bb_alternate",
+                     (uint64_t)(uintptr_t)coro_bb_alternate, lbl_succ, lbl_fail, lbl_β);
 }
 /*====================================================================================================================*/
 void emit_bb_icon_bang(emitter_t *e,
                        bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     (void)e;
-    t_bb_box_banner("ICN_BANG", "");
-    icn_bang_binary_state_t *z = icon_bang_new();
-    t_bb_port_call((uint64_t)(uintptr_t)z, "coro_bb_bang_binary",
-                   (uint64_t)(uintptr_t)coro_bb_bang_binary,
-                   0, lbl_succ, lbl_fail);
-    t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "coro_bb_bang_binary",
-                   (uint64_t)(uintptr_t)coro_bb_bang_binary,
-                   1, lbl_succ, lbl_fail);
+    emit_bb_stateful("ICN_BANG", "", icon_bang_new(), "coro_bb_bang_binary",
+                     (uint64_t)(uintptr_t)coro_bb_bang_binary, lbl_succ, lbl_fail, lbl_β);
 }
 /*====================================================================================================================*/
 void emit_bb_icon_every(emitter_t *e,
                         bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     (void)e;
-    t_bb_box_banner("ICN_EVERY", "");
-    icn_every_state_t *z = icon_every_new();
-    t_bb_port_call((uint64_t)(uintptr_t)z, "coro_bb_every",
-                   (uint64_t)(uintptr_t)coro_bb_every,
-                   0, lbl_succ, lbl_fail);
-    t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "coro_bb_every",
-                   (uint64_t)(uintptr_t)coro_bb_every,
-                   1, lbl_succ, lbl_fail);
+    emit_bb_stateful("ICN_EVERY", "", icon_every_new(), "coro_bb_every",
+                     (uint64_t)(uintptr_t)coro_bb_every, lbl_succ, lbl_fail, lbl_β);
 }
 /*====================================================================================================================*/
 void emit_bb_icon_iterate(emitter_t *e,
                           bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     (void)e;
-    t_bb_box_banner("ICN_ITERATE", "");
-    icn_iterate_state_t *z = icon_iterate_new();
-    t_bb_port_call((uint64_t)(uintptr_t)z, "coro_bb_iterate",
-                   (uint64_t)(uintptr_t)coro_bb_iterate,
-                   0, lbl_succ, lbl_fail);
-    t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "coro_bb_iterate",
-                   (uint64_t)(uintptr_t)coro_bb_iterate,
-                   1, lbl_succ, lbl_fail);
+    emit_bb_stateful("ICN_ITERATE", "", icon_iterate_new(), "coro_bb_iterate",
+                     (uint64_t)(uintptr_t)coro_bb_iterate, lbl_succ, lbl_fail, lbl_β);
 }
 /*====================================================================================================================*/
 void emit_bb_icon_lconcat(emitter_t *e,
                           bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     (void)e;
-    t_bb_box_banner("ICN_LCONCAT", "");
-    icn_cat_gen_state_t *z = icon_lconcat_new();
-    t_bb_port_call((uint64_t)(uintptr_t)z, "coro_bb_cat",
-                   (uint64_t)(uintptr_t)coro_bb_cat,
-                   0, lbl_succ, lbl_fail);
-    t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "coro_bb_cat",
-                   (uint64_t)(uintptr_t)coro_bb_cat,
-                   1, lbl_succ, lbl_fail);
+    emit_bb_stateful("ICN_LCONCAT", "", icon_lconcat_new(), "coro_bb_cat",
+                     (uint64_t)(uintptr_t)coro_bb_cat, lbl_succ, lbl_fail, lbl_β);
 }
 /*====================================================================================================================*/
 void emit_bb_icon_limit(emitter_t *e,
                         bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     (void)e;
-    t_bb_box_banner("ICN_LIMIT", "");
-    icn_limit_state_t *z = icon_limit_new();
-    t_bb_port_call((uint64_t)(uintptr_t)z, "coro_bb_limit",
-                   (uint64_t)(uintptr_t)coro_bb_limit,
-                   0, lbl_succ, lbl_fail);
-    t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "coro_bb_limit",
-                   (uint64_t)(uintptr_t)coro_bb_limit,
-                   1, lbl_succ, lbl_fail);
+    emit_bb_stateful("ICN_LIMIT", "", icon_limit_new(), "coro_bb_limit",
+                     (uint64_t)(uintptr_t)coro_bb_limit, lbl_succ, lbl_fail, lbl_β);
 }
 /*====================================================================================================================*/
 void emit_bb_icon_seq(emitter_t *e,
                       bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     (void)e;
-    t_bb_box_banner("ICN_SEQ", "");
-    icn_seq_state_t *z = icon_seq_new();
-    t_bb_port_call((uint64_t)(uintptr_t)z, "coro_bb_seq_expr",
-                   (uint64_t)(uintptr_t)coro_bb_seq_expr,
-                   0, lbl_succ, lbl_fail);
-    t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "coro_bb_seq_expr",
-                   (uint64_t)(uintptr_t)coro_bb_seq_expr,
-                   1, lbl_succ, lbl_fail);
+    emit_bb_stateful("ICN_SEQ", "", icon_seq_new(), "coro_bb_seq_expr",
+                     (uint64_t)(uintptr_t)coro_bb_seq_expr, lbl_succ, lbl_fail, lbl_β);
 }
 /*====================================================================================================================*/
 void emit_bb_icon_to(emitter_t *e,
                      bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     (void)e;
-    t_bb_box_banner("ICN_TO", "");
-    icn_to_state_t *z = icon_to_new();
-    t_bb_port_call((uint64_t)(uintptr_t)z, "coro_bb_to", (uint64_t)(uintptr_t)coro_bb_to,
-                   0, lbl_succ, lbl_fail);
-    t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "coro_bb_to", (uint64_t)(uintptr_t)coro_bb_to,
-                   1, lbl_succ, lbl_fail);
+    emit_bb_stateful("ICN_TO", "", icon_to_new(), "coro_bb_to",
+                     (uint64_t)(uintptr_t)coro_bb_to, lbl_succ, lbl_fail, lbl_β);
 }
 void emit_bb_icon_to_by(emitter_t *e,
                         bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     (void)e;
-    t_bb_box_banner("ICN_TO_BY", "");
-    icn_to_by_state_t *z = icon_to_by_new();
-    t_bb_port_call((uint64_t)(uintptr_t)z, "coro_bb_to_by", (uint64_t)(uintptr_t)coro_bb_to_by,
-                   0, lbl_succ, lbl_fail);
-    t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "coro_bb_to_by", (uint64_t)(uintptr_t)coro_bb_to_by,
-                   1, lbl_succ, lbl_fail);
+    emit_bb_stateful("ICN_TO_BY", "", icon_to_by_new(), "coro_bb_to_by",
+                     (uint64_t)(uintptr_t)coro_bb_to_by, lbl_succ, lbl_fail, lbl_β);
 }
 /*====================================================================================================================*/
 void emit_bb_xabrt(emitter_t *e,
@@ -227,15 +180,8 @@ void emit_bb_xarbn(emitter_t *e, bb_box_fn child_fn,
                    bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     (void)e;
-    t_bb_box_banner("ARBNO", "");
-    void *z = rt_bb_arbno_new(child_fn, NULL);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "rt_bb_arbno",
-                   (uint64_t)(uintptr_t)rt_bb_arbno,
-                   0, lbl_succ, lbl_fail);
-    t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "rt_bb_arbno",
-                   (uint64_t)(uintptr_t)rt_bb_arbno,
-                   1, lbl_succ, lbl_fail);
+    emit_bb_stateful("ARBNO", "", rt_bb_arbno_new(child_fn, NULL), "rt_bb_arbno",
+                     (uint64_t)(uintptr_t)rt_bb_arbno, lbl_succ, lbl_fail, lbl_β);
 }
 /*====================================================================================================================*/
 void emit_bb_xatp(emitter_t *e, const char *varname,
@@ -278,15 +224,8 @@ void emit_bb_xbal(emitter_t *e,
                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     (void)e;
-    t_bb_box_banner("BAL", "");
-    bal_t *z = bb_bal_new();
-    t_bb_port_call((uint64_t)(uintptr_t)z, "rt_bb_bal",
-                   (uint64_t)(uintptr_t)rt_bb_bal,
-                   0, lbl_succ, lbl_fail);
-    t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "rt_bb_bal",
-                   (uint64_t)(uintptr_t)rt_bb_bal,
-                   1, lbl_succ, lbl_fail);
+    emit_bb_stateful("BAL", "", bb_bal_new(), "rt_bb_bal",
+                     (uint64_t)(uintptr_t)rt_bb_bal, lbl_succ, lbl_fail, lbl_β);
 }
 /*====================================================================================================================*/
 void emit_bb_xbrkx(emitter_t *e,
@@ -296,14 +235,8 @@ void emit_bb_xbrkx(emitter_t *e,
                    bb_label_t *lbl_β)
 {
     (void)e;
-    brkx_t *z = bb_breakx_new(chars);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "rt_bb_breakx",
-                   (uint64_t)(uintptr_t)rt_bb_breakx,
-                   0, lbl_succ, lbl_fail);
-    t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "rt_bb_breakx",
-                   (uint64_t)(uintptr_t)rt_bb_breakx,
-                   1, lbl_succ, lbl_fail);
+    emit_bb_stateful("BREAKX", chars ? chars : "", bb_breakx_new(chars), "rt_bb_breakx",
+                     (uint64_t)(uintptr_t)rt_bb_breakx, lbl_succ, lbl_fail, lbl_β);
 }
 /*====================================================================================================================*/
 void emit_bb_xcallcap(emitter_t *e, bb_box_fn child_fn,
@@ -311,16 +244,9 @@ void emit_bb_xcallcap(emitter_t *e, bb_box_fn child_fn,
                       bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     (void)e;
-    t_bb_box_banner("CALLCAP", fnc_name ? fnc_name : "");
-    cap_t *z = bb_cap_new_call(child_fn, NULL, fnc_name,
-                                NULL, 0, NULL, 0, 0);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "rt_bb_cap",
-                   (uint64_t)(uintptr_t)rt_bb_cap,
-                   0, lbl_succ, lbl_fail);
-    t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "rt_bb_cap",
-                   (uint64_t)(uintptr_t)rt_bb_cap,
-                   1, lbl_succ, lbl_fail);
+    emit_bb_stateful("CALLCAP", fnc_name ? fnc_name : "",
+                     bb_cap_new_call(child_fn, NULL, fnc_name, NULL, 0, NULL, 0, 0),
+                     "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, lbl_succ, lbl_fail, lbl_β);
 }
 /*====================================================================================================================*/
 void emit_bb_xcat(emitter_t *e,
@@ -445,15 +371,8 @@ void emit_bb_xfarb(emitter_t *e,
                    bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     (void)e;
-    t_bb_box_banner("ARB", "");
-    arb_t *z = bb_arb_new();
-    t_bb_port_call((uint64_t)(uintptr_t)z, "rt_bb_arb",
-                   (uint64_t)(uintptr_t)rt_bb_arb,
-                   0, lbl_succ, lbl_fail);
-    t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "rt_bb_arb",
-                   (uint64_t)(uintptr_t)rt_bb_arb,
-                   1, lbl_succ, lbl_fail);
+    emit_bb_stateful("ARB", "", bb_arb_new(), "rt_bb_arb",
+                     (uint64_t)(uintptr_t)rt_bb_arb, lbl_succ, lbl_fail, lbl_β);
 }
 /*====================================================================================================================*/
 void emit_bb_xfnce(emitter_t *e,
@@ -472,15 +391,9 @@ void emit_bb_xfnme(emitter_t *e, bb_box_fn child_fn, const char *varname,
                    bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     (void)e;
-    t_bb_box_banner("CAP_IMM", varname ? varname : "");
-    cap_t *z = bb_cap_new(child_fn, NULL, varname, NULL, 1);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "rt_bb_cap",
-                   (uint64_t)(uintptr_t)rt_bb_cap,
-                   0, lbl_succ, lbl_fail);
-    t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "rt_bb_cap",
-                   (uint64_t)(uintptr_t)rt_bb_cap,
-                   1, lbl_succ, lbl_fail);
+    emit_bb_stateful("CAP_IMM", varname ? varname : "",
+                     bb_cap_new(child_fn, NULL, varname, NULL, 1),
+                     "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, lbl_succ, lbl_fail, lbl_β);
 }
 /*====================================================================================================================*/
 void emit_bb_intcur(emitter_t *e,
@@ -492,7 +405,7 @@ void emit_bb_intcur(emitter_t *e,
                     bb_label_t *lbl_fail,
                     bb_label_t *lbl_β)
 {
-    (void)kind_name; (void)e; (void)c_fn;
+    (void)e; (void)c_fn;
     void *z;
     const char *rt_name;
     uint64_t rt_fn;
@@ -506,9 +419,8 @@ void emit_bb_intcur(emitter_t *e,
         int *r = calloc(2, sizeof(int)); r[0] = (int)num; z = r;
         rt_name = "rt_bb_len"; rt_fn = (uint64_t)(uintptr_t)rt_bb_len;
     }
-    t_bb_port_call((uint64_t)(uintptr_t)z, rt_name, rt_fn, 0, lbl_succ, lbl_fail);
-    t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, rt_name, rt_fn, 1, lbl_succ, lbl_fail);
+    emit_bb_stateful(kind_name ? kind_name : "INTCUR", "", z, rt_name, rt_fn,
+                     lbl_succ, lbl_fail, lbl_β);
 }
 void emit_bb_xlnth(emitter_t *e, long long num,
                    bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
@@ -520,15 +432,9 @@ void emit_bb_xnme(emitter_t *e, bb_box_fn child_fn, const char *varname,
                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     (void)e;
-    t_bb_box_banner("CAP_COND", varname ? varname : "");
-    cap_t *z = bb_cap_new(child_fn, NULL, varname, NULL, 0);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "rt_bb_cap",
-                   (uint64_t)(uintptr_t)rt_bb_cap,
-                   0, lbl_succ, lbl_fail);
-    t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "rt_bb_cap",
-                   (uint64_t)(uintptr_t)rt_bb_cap,
-                   1, lbl_succ, lbl_fail);
+    emit_bb_stateful("CAP_COND", varname ? varname : "",
+                     bb_cap_new(child_fn, NULL, varname, NULL, 0),
+                     "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, lbl_succ, lbl_fail, lbl_β);
 }
 /*====================================================================================================================*/
 void emit_bb_xor(emitter_t *e,
@@ -579,41 +485,26 @@ void emit_bb_charset(emitter_t *e,
                      bb_label_t *lbl_fail,
                      bb_label_t *lbl_β)
 {
-    (void)kind_name; (void)e; (void)c_fn;
+    (void)e; (void)c_fn;
     typedef struct { const char *chars; int delta; } cs_t;
     cs_t *z = calloc(1, sizeof(cs_t));
     z->chars = chars;
-    /* Map old bb_* name to rt_bb_* name+ptr */
     const char *rt_name; uint64_t rt_fn;
     if      (c_fn_name && strcmp(c_fn_name, "bb_span")   == 0) { rt_name = "rt_bb_span";   rt_fn = (uint64_t)(uintptr_t)rt_bb_span;   }
     else if (c_fn_name && strcmp(c_fn_name, "bb_brk")    == 0) { rt_name = "rt_bb_brk";    rt_fn = (uint64_t)(uintptr_t)rt_bb_brk;    }
     else if (c_fn_name && strcmp(c_fn_name, "bb_any")    == 0) { rt_name = "rt_bb_any";    rt_fn = (uint64_t)(uintptr_t)rt_bb_any;    }
     else if (c_fn_name && strcmp(c_fn_name, "bb_notany") == 0) { rt_name = "rt_bb_notany"; rt_fn = (uint64_t)(uintptr_t)rt_bb_notany; }
     else                                                        { rt_name = "rt_bb_span";   rt_fn = (uint64_t)(uintptr_t)rt_bb_span;   }
-    t_bb_port_call((uint64_t)(uintptr_t)z, rt_name, rt_fn, 0, lbl_succ, lbl_fail);
-    t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, rt_name, rt_fn, 1, lbl_succ, lbl_fail);
+    emit_bb_stateful(kind_name ? kind_name : "CHARSET", chars ? chars : "", z,
+                     rt_name, rt_fn, lbl_succ, lbl_fail, lbl_β);
 }
 /*====================================================================================================================*/
 void emit_bb_xstar(emitter_t *e,
                    bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     (void)e;
-    t_bb_box_banner("REM", "");
-    /* α: match rest of subject — Δ=Σlen, always succeed (zero or more chars) */
-    /* In BINARY: call rt_bb_rem_alpha (sets Δ=Σlen, returns non-fail).
-     * Simplest: call a trivial rt helper or just jmp lbl_succ (Δ advance handled by caller).
-     * SNOBOL4 REM is: match everything from Δ to end, no backtrack.
-     * In brokered mode t_bb_port_call handles Δ, so we need a call.
-     * Use rt_bb_rem stub (stateless): α succeeds with full remainder, β fails. */
-    rem_t *z = bb_rem_new();
-    t_bb_port_call((uint64_t)(uintptr_t)z, "rt_bb_rem",
-                   (uint64_t)(uintptr_t)rt_bb_rem,
-                   0, lbl_succ, lbl_fail);
-    t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "rt_bb_rem",
-                   (uint64_t)(uintptr_t)rt_bb_rem,
-                   1, lbl_succ, lbl_fail);
+    emit_bb_stateful("REM", "", bb_rem_new(), "rt_bb_rem",
+                     (uint64_t)(uintptr_t)rt_bb_rem, lbl_succ, lbl_fail, lbl_β);
 }
 /*====================================================================================================================*/
 void emit_bb_xsucf(emitter_t *e,
