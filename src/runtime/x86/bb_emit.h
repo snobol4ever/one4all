@@ -20,7 +20,7 @@ typedef enum {
     EMIT_BINARY_WIRED     = 1,
     EMIT_BINARY_BROKERED  = 2,   /* per-box blobs, C ABI entry, rdi=ζ, ret */
     EMIT_MACRO_DEF        = 3,   /* emit .macro NAME ... .endm body (sm_macros.s regen) */
-    EMIT_TEXT_INLINE      = 4    /* inline GAS; t_macro_begin/end are no-ops */
+    EMIT_TEXT_INLINE      = 4    /* inline GAS; emit_macro_begin/end are no-ops */
 } bb_emit_mode_t;
 
 extern bb_emit_mode_t bb_emit_mode;
@@ -53,18 +53,18 @@ void emit_mode_set(bb_emit_mode_t m, FILE *out);
  * names.  Once the vtable is gone, the inlines disappear and the `t_`
  * prefix may be dropped in a rename pass.
  */
-void t_comment(const char *text);
-void t_bb_box_banner(const char *kind, const char *args);
+void emit_comment(const char *text);
+void emit_bb_box_banner(const char *kind, const char *args);
 
-void t_inc_mem_r13_disp8(uint8_t disp);
-void t_ret(void);
-void t_push_r10(void);   /* push r10 — save flat-BB LOCAL across any PLT call */
-void t_pop_r10(void);    /* pop  r10 — restore after PLT call */
-void t_pad_to_blob_size(void);
-void t_mov_rdi_imm64(uint64_t val);
-void t_call_sym_plt(const char *sym, uint64_t fn_fallback);
-void t_macro_begin(const char *name, const char *const *params, int nparams);
-void t_macro_end(void);
+void emit_bb_inc_mem_r13_disp8(uint8_t disp);
+void bb_emit_ret(void);
+void bb_emit_push_r10(void);   /* push r10 — save flat-BB LOCAL across any PLT call */
+void bb_emit_pop_r10(void);    /* pop  r10 — restore after PLT call */
+void emit_pad_to_blob_size(void);
+void bb_emit_mov_rdi_imm64(uint64_t val);
+void bb_emit_call_sym_plt(const char *sym, uint64_t fn_fallback);
+void emit_macro_begin(const char *name, const char *const *params, int nparams);
+void emit_macro_end(void);
 
 /* ── label ──────────────────────────────────────────────────────────────── */
 
@@ -86,7 +86,7 @@ void bb_label_define(bb_label_t *lbl);
 
 #define bb_label_defined(lbl)  ((lbl)->offset != BB_LABEL_UNRESOLVED)
 
-/* ── jump kind (used by t_emit_jmp and emitter_t vtable) ────────────────── */
+/* ── jump kind (used by emit_jmp and emitter_t vtable) ────────────────── */
 /* Defined here so both bb_emit.h and emitter.h consumers share one enum.   */
 
 typedef enum {
@@ -98,73 +98,73 @@ typedef enum {
     JMP_JG,
 } jmp_kind_t;
 
-void t_test_rax_rax(void);
-void t_emit_jmp(bb_label_t *target, jmp_kind_t kind);
+void bb_emit_test_rax_rax(void);
+void emit_jmp(bb_label_t *target, jmp_kind_t kind);
 
-void t_lea_rdi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr);
-void t_lea_rdx_strtab_sym(const char *sym_label, uint64_t in_proc_ptr);
-void t_mov_esi_imm32(int val);
-void t_mov_edi_imm32(int val);
-void t_mov_edx_imm32(int val);
-void t_movabs_rdi_entry(uint64_t entry_ptr);
-void t_call_sym_param(const char *sym_or_param);
-void t_test_eax_eax(void);
-void t_jz_retskip(int pc);
-void t_retskip_label(int pc);
-void t_noop_macro(const char *macro_name);
+void emit_lea_rdi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr);
+void emit_lea_rdx_strtab_sym(const char *sym_label, uint64_t in_proc_ptr);
+void bb_emit_mov_esi_imm32(int val);
+void emit_mov_edi_imm32(int val);
+void emit_mov_edx_imm32(int val);
+void emit_movabs_rdi_entry(uint64_t entry_ptr);
+void emit_call_sym_param(const char *sym_or_param);
+void bb_emit_test_eax_eax(void);
+void emit_jz_retskip(int pc);
+void emit_retskip_label(int pc);
+void emit_noop_macro(const char *macro_name);
 
-/* t_banner_stno — emit the SM_STNO major banner.
+/* emit_banner_stno — emit the SM_STNO major banner.
  *   BINARY:    no-op
  *   TEXT/MACRO_DEF: 120-char #= rule, "# stmt N  (line L):  <src>", #= rule */
-void t_banner_stno(int stno, int lineno, const char *src_text);
+void emit_banner_stno(int stno, int lineno, const char *src_text);
 
 /* ── BB port helpers (EM-TEMPLATE-PURITY-2) ────────────────────────────── */
 
-void t_label_define(bb_label_t *lbl);
+void emit_label_define(bb_label_t *lbl);
 
-void t_bb_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fallback,
+void emit_bb_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fallback,
                     int port, bb_label_t *lbl_succ, bb_label_t *lbl_fail);
 
-/* t_bb_port_call_rip — like t_bb_port_call but TEXT/INLINE mode uses
+/* emit_bb_port_call_rip — like emit_bb_port_call but TEXT/INLINE mode uses
  *   `lea rdi, [rip + zeta_label]` instead of `mov rdi, literal`.
  *   Use for boxes whose ζ is emitted as static .data (xatp, xdsar).
- *   BINARY: ignores zeta_label; uses zeta_ptr directly (same as t_bb_port_call).
+ *   BINARY: ignores zeta_label; uses zeta_ptr directly (same as emit_bb_port_call).
  *   TEXT/INLINE: emits `lea rdi, [rip + zeta_label]`. */
-/* t_bb_format_port — emit one three-column macro-invocation line for a BB port.
+/* emit_bb_format_port — emit one three-column macro-invocation line for a BB port.
  *   Only active when g_bb_emit_format=1 and mode is TEXT or TEXT_INLINE.
  *   Emits: bb3c_format(out, label_str, macro_name, args)
  *   lbl_entry may be NULL (no label on this line). */
-void t_bb_format_port(bb_label_t *lbl_entry, const char *macro_name, const char *args);
+void emit_bb_format_port(bb_label_t *lbl_entry, const char *macro_name, const char *args);
 
-/* t_bb_is_format_mode — returns 1 if g_bb_emit_format and TEXT/TEXT_INLINE mode. */
-int  t_bb_is_format_mode(void);
+/* emit_bb_is_format_mode — returns 1 if g_bb_emit_format and TEXT/TEXT_INLINE mode. */
+int  emit_bb_is_format_mode(void);
 
-void t_bb_port_call_rip(uint64_t zeta_ptr, const char *zeta_label,
+void emit_bb_port_call_rip(uint64_t zeta_ptr, const char *zeta_label,
                         const char *fn_name, uint64_t fn_fallback,
                         int port, bb_label_t *lbl_succ, bb_label_t *lbl_fail);
 
-void t_load_delta_cmp_imm(int n, bb_label_t *lbl_succ, bb_label_t *lbl_fail);
+void emit_load_delta_cmp_imm(int n, bb_label_t *lbl_succ, bb_label_t *lbl_fail);
 
-void t_load_siglen_sub_cmp_delta(int n, uint64_t siglen_addr,
+void emit_load_siglen_sub_cmp_delta(int n, uint64_t siglen_addr,
                                  bb_label_t *lbl_succ, bb_label_t *lbl_fail);
 
-void t_lea_rsi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr);
+void emit_lea_rsi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr);
 
-void t_add_delta_imm(int v);
+void bb_emit_add_delta_imm(int v);
 
-void t_sub_delta_imm(int v);
+void bb_emit_sub_delta_imm(int v);
 
-void t_sigma_plus_delta_to_rdi(uint64_t sigma_addr, uint64_t siglen_addr);
+void emit_sigma_plus_delta_to_rdi(uint64_t sigma_addr, uint64_t siglen_addr);
 
-void t_bounds_check_delta_plus_len(int len, uint64_t siglen_addr, bb_label_t *lbl_fail);
+void emit_bounds_check_delta_plus_len(int len, uint64_t siglen_addr, bb_label_t *lbl_fail);
 
-void t_brokered_prologue(void);
+void emit_brokered_prologue(void);
 
-void t_brokered_epilogue_ret(int result);
+void emit_brokered_epilogue_ret(int result);
 
-void t_push_rbp_frame(void);
+void emit_push_rbp_frame(void);
 
-void t_pop_rbp_frame_ret(void);
+void emit_pop_rbp_frame_ret(void);
 
 /* ── binary mode state ──────────────────────────────────────────────────── */
 

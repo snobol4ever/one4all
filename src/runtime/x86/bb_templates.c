@@ -46,19 +46,19 @@ static void emit_bb_jmp_pair(const char *banner, bb_label_t *lbl_succ, bb_label_
                               int beta_first)
 {
     (void)lbl_succ;
-    t_bb_box_banner(banner, "");
-    if (beta_first) { t_label_define(lbl_beta); t_emit_jmp(lbl_fail, JMP_JMP); t_emit_jmp(lbl_fail, JMP_JMP); }
-    else            { t_emit_jmp(lbl_fail, JMP_JMP); t_label_define(lbl_beta); t_emit_jmp(lbl_fail, JMP_JMP); }
+    emit_bb_box_banner(banner, "");
+    if (beta_first) { emit_label_define(lbl_beta); emit_jmp(lbl_fail, JMP_JMP); emit_jmp(lbl_fail, JMP_JMP); }
+    else            { emit_jmp(lbl_fail, JMP_JMP); emit_label_define(lbl_beta); emit_jmp(lbl_fail, JMP_JMP); }
 }
 
 /* EC-3: banner + pre-allocated zeta + alpha port_call + beta label + beta port_call. */
 static void emit_bb_stateful(const char *banner, const char *arg, void *zeta, const char *fn_name, uint64_t fn_fallback,
                               bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_beta)
 {
-    t_bb_box_banner(banner, arg ? arg : "");
-    t_bb_port_call((uint64_t)(uintptr_t)zeta, fn_name, fn_fallback, 0, lbl_succ, lbl_fail);
-    t_label_define(lbl_beta);
-    t_bb_port_call((uint64_t)(uintptr_t)zeta, fn_name, fn_fallback, 1, lbl_succ, lbl_fail);
+    emit_bb_box_banner(banner, arg ? arg : "");
+    emit_bb_port_call((uint64_t)(uintptr_t)zeta, fn_name, fn_fallback, 0, lbl_succ, lbl_fail);
+    emit_label_define(lbl_beta);
+    emit_bb_port_call((uint64_t)(uintptr_t)zeta, fn_name, fn_fallback, 1, lbl_succ, lbl_fail);
 }
 
 /*====================================================================================================================*/
@@ -109,10 +109,10 @@ void emit_bb_xcallcap(emitter_t *e, bb_box_fn child_fn, const char *fnc_name,
 void emit_bb_xfnce(emitter_t *e, bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
     (void)e;
-    t_bb_box_banner("FENCE", "");
-    t_emit_jmp(s, JMP_JMP);               /* alpha: succeed zero-width — once succeeded, beta cuts */
-    t_label_define(b);
-    t_emit_jmp(f, JMP_JMP);               /* beta: always fail (FENCE cuts backtracking) */
+    emit_bb_box_banner("FENCE", "");
+    emit_jmp(s, JMP_JMP);               /* alpha: succeed zero-width — once succeeded, beta cuts */
+    emit_label_define(b);
+    emit_jmp(f, JMP_JMP);               /* beta: always fail (FENCE cuts backtracking) */
 }
 /*====================================================================================================================*/
 void emit_bb_xfnme(emitter_t *e, bb_box_fn child_fn, const char *varname,
@@ -136,24 +136,24 @@ void emit_bb_xnme(emitter_t *e, bb_box_fn child_fn, const char *varname,
 void emit_bb_xeps(emitter_t *e, bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
     (void)e;
-    t_bb_box_banner("EPS", "");
-    t_emit_jmp(s, JMP_JMP);               /* alpha: always succeed zero-width */
-    t_label_define(b);
-    t_emit_jmp(f, JMP_JMP);               /* beta: fail */
+    emit_bb_box_banner("EPS", "");
+    emit_jmp(s, JMP_JMP);               /* alpha: always succeed zero-width */
+    emit_label_define(b);
+    emit_jmp(f, JMP_JMP);               /* beta: fail */
 }
 /*====================================================================================================================*/
 void emit_bb_xsucf(emitter_t *e, bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
     (void)e; (void)f;
-    t_bb_box_banner("SUCCEED", "");
-    t_emit_jmp(s, JMP_JMP);               /* alpha: always succeed zero-width */
-    t_label_define(b);
-    t_emit_jmp(s, JMP_JMP);               /* beta: also succeed (generates another zero-width match) */
+    emit_bb_box_banner("SUCCEED", "");
+    emit_jmp(s, JMP_JMP);               /* alpha: always succeed zero-width */
+    emit_label_define(b);
+    emit_jmp(s, JMP_JMP);               /* beta: also succeed (generates another zero-width match) */
 }
 /*====================================================================================================================*/
 #define TEMPLATE_ADDR_SIGMA   ((uint64_t)(uintptr_t)&Σ)
 #define TEMPLATE_ADDR_SIGLEN  ((uint64_t)(uintptr_t)&Σlen)
-static void t_mov_rdx_imm32(int v)
+static void emit_mov_rdx_imm32(int v)
 {
     uint64_t val = (uint64_t)(uint32_t)v;
     switch (bb_emit_mode) {
@@ -182,21 +182,21 @@ void emit_bb_xchr(emitter_t *e, PATND_t *p, const char *lit_label,
     char preview[40];
     if (len > 24) snprintf(preview, sizeof(preview), "'%.24s...'", lit);
     else          snprintf(preview, sizeof(preview), "'%s'",       lit);
-    t_bb_box_banner("LIT", preview);
-    t_bounds_check_delta_plus_len(len, TEMPLATE_ADDR_SIGLEN, f);
-    t_sigma_plus_delta_to_rdi(TEMPLATE_ADDR_SIGMA, TEMPLATE_ADDR_SIGLEN);
-    t_lea_rsi_strtab_sym(lit_label, (uint64_t)(uintptr_t)lit);
-    t_mov_rdx_imm32(len);
-    t_push_r10();
-    t_call_sym_plt("memcmp", (uint64_t)(uintptr_t)memcmp);
-    t_pop_r10();
-    t_test_eax_eax();
-    t_emit_jmp(f, JMP_JNE);
-    t_add_delta_imm(len);
-    t_emit_jmp(s, JMP_JMP);
-    t_label_define(b);
-    t_sub_delta_imm(len);
-    t_emit_jmp(f, JMP_JMP);
+    emit_bb_box_banner("LIT", preview);
+    emit_bounds_check_delta_plus_len(len, TEMPLATE_ADDR_SIGLEN, f);
+    emit_sigma_plus_delta_to_rdi(TEMPLATE_ADDR_SIGMA, TEMPLATE_ADDR_SIGLEN);
+    emit_lea_rsi_strtab_sym(lit_label, (uint64_t)(uintptr_t)lit);
+    emit_mov_rdx_imm32(len);
+    bb_emit_push_r10();
+    bb_emit_call_sym_plt("memcmp", (uint64_t)(uintptr_t)memcmp);
+    bb_emit_pop_r10();
+    bb_emit_test_eax_eax();
+    emit_jmp(f, JMP_JNE);
+    bb_emit_add_delta_imm(len);
+    emit_jmp(s, JMP_JMP);
+    emit_label_define(b);
+    bb_emit_sub_delta_imm(len);
+    emit_jmp(f, JMP_JMP);
 }
 /*====================================================================================================================*/
 void emit_bb_xdsar(emitter_t *e, const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t *b)
@@ -204,7 +204,7 @@ void emit_bb_xdsar(emitter_t *e, const char *varname, bb_label_t *s, bb_label_t 
     /* TEXT: emit .data block (name ptr, child quads, in_progress long).
      * BINARY: flat_data_* are no-ops; bb_dvar_bin_new allocates real zeta below. */
     char banner[80]; snprintf(banner, sizeof(banner), "*%s", varname ? varname : "");
-    t_bb_box_banner("DEREF", banner);
+    emit_bb_box_banner("DEREF", banner);
     int id = g_flat_node_id++;
     char zlbl[80], slbl[80];
     snprintf(zlbl, sizeof(zlbl), ".Ldvar%d_z",    id);
@@ -217,16 +217,16 @@ void emit_bb_xdsar(emitter_t *e, const char *varname, bb_label_t *s, bb_label_t 
     flat_data_quad(e, "0");   flat_data_long(e, 0);    flat_data_long(e, 0);
     flat_text_section(e);     flat_intel_syntax(e);
     void *z = bb_dvar_bin_new(vn);
-    t_bb_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "bb_deferred_var_exported", 0, 0, s, f);
-    t_label_define(b);
-    t_bb_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "bb_deferred_var_exported", 0, 1, s, f);
+    emit_bb_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "bb_deferred_var_exported", 0, 0, s, f);
+    emit_label_define(b);
+    emit_bb_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "bb_deferred_var_exported", 0, 1, s, f);
 }
 /*====================================================================================================================*/
 void emit_bb_xatp(emitter_t *e, const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
     /* TEXT: emit .data block with zeta struct (string + two longs + quad ptr).
      * BINARY: flat_data_* are no-ops; atp_t *z allocated below. */
-    t_bb_box_banner("USERPAT", varname ? varname : "");
+    emit_bb_box_banner("USERPAT", varname ? varname : "");
     int id = g_flat_node_id++;
     char zlbl[80], vlbl[80];
     snprintf(zlbl, sizeof(zlbl), ".Latp%d_z",     id);
@@ -237,19 +237,19 @@ void emit_bb_xatp(emitter_t *e, const char *varname, bb_label_t *s, bb_label_t *
     flat3c_label(e, zlbl);  flat_data_long(e, 0);  flat_data_long(e, 0);  flat_data_quad(e, vlbl);
     flat_text_section(e);   flat_intel_syntax(e);
     atp_t *z = bb_atp_new(vn);
-    t_bb_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_atp", (uint64_t)(uintptr_t)rt_bb_atp, 0, s, f);
-    t_label_define(b);
-    t_bb_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_atp", (uint64_t)(uintptr_t)rt_bb_atp, 1, s, f);
+    emit_bb_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_atp", (uint64_t)(uintptr_t)rt_bb_atp, 0, s, f);
+    emit_label_define(b);
+    emit_bb_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_atp", (uint64_t)(uintptr_t)rt_bb_atp, 1, s, f);
 }
 /*====================================================================================================================*/
 void emit_bb_xposi(emitter_t *e, int n, bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
     (void)e;
     char args[32]; snprintf(args, sizeof(args), "%d", n);
-    t_bb_box_banner("POS", args);
-    t_load_delta_cmp_imm(n, s, f);
-    t_label_define(b);
-    t_emit_jmp(f, JMP_JMP);
+    emit_bb_box_banner("POS", args);
+    emit_load_delta_cmp_imm(n, s, f);
+    emit_label_define(b);
+    emit_jmp(f, JMP_JMP);
 }
 /*====================================================================================================================*/
 #define ADDR_SIGLEN  ((uint64_t)(uintptr_t)&Σlen)
@@ -257,10 +257,10 @@ void emit_bb_xrpsi(emitter_t *e, int n, bb_label_t *s, bb_label_t *f, bb_label_t
 {
     (void)e;
     char args[32]; snprintf(args, sizeof(args), "%d", n);
-    t_bb_box_banner("RPOS", args);
-    t_load_siglen_sub_cmp_delta(n, ADDR_SIGLEN, s, f);
-    t_label_define(b);
-    t_emit_jmp(f, JMP_JMP);
+    emit_bb_box_banner("RPOS", args);
+    emit_load_siglen_sub_cmp_delta(n, ADDR_SIGLEN, s, f);
+    emit_label_define(b);
+    emit_jmp(f, JMP_JMP);
 }
 /*====================================================================================================================*/
 void emit_bb_charset(emitter_t *e, bb_box_fn c_fn, const char *c_fn_name, const char *kind_name,

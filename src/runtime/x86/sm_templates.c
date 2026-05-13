@@ -12,12 +12,12 @@ static void make_pc_label(bb_label_t *lbl, int target_pc);
 void emit_sm_arith_op(emitter_t *e, int op_enum, const char *macro_name)
 {
     (void)e;
-    t_comment(macro_name ? macro_name : "SM_ARITH");
-    t_macro_begin(macro_name ? macro_name : "ARITH", NULL, 0);
-    t_mov_rdi_imm64((uint64_t)(unsigned)op_enum);
-    t_call_sym_plt("rt_arith", 0);
-    t_macro_end();
-    t_pad_to_blob_size();
+    emit_comment(macro_name ? macro_name : "SM_ARITH");
+    emit_macro_begin(macro_name ? macro_name : "ARITH", NULL, 0);
+    bb_emit_mov_rdi_imm64((uint64_t)(unsigned)op_enum);
+    bb_emit_call_sym_plt("rt_arith", 0);
+    emit_macro_end();
+    emit_pad_to_blob_size();
 }
 void emit_sm_add(emitter_t *e) { emit_sm_arith_op(e, SM_ADD, "ADD_NUM"); }
 void emit_sm_sub(emitter_t *e) { emit_sm_arith_op(e, SM_SUB, "SUB_NUM"); }
@@ -28,95 +28,95 @@ void emit_sm_mod(emitter_t *e) { emit_sm_arith_op(e, SM_MOD, "MOD_NUM"); }
 void emit_sm_acomp(emitter_t *e, int op)
 {
     (void)e;
-    t_comment("SM_ACOMP — numeric compare, op=EKind");
+    emit_comment("SM_ACOMP — numeric compare, op=EKind");
     static const char *const params[] = { "op" };
-    t_macro_begin("ACOMP", params, 1);
-    t_mov_edi_imm32(op);
-    t_call_sym_plt("rt_acomp", 0);
-    t_macro_end();
-    t_pad_to_blob_size();
+    emit_macro_begin("ACOMP", params, 1);
+    emit_mov_edi_imm32(op);
+    bb_emit_call_sym_plt("rt_acomp", 0);
+    emit_macro_end();
+    emit_pad_to_blob_size();
 }
 /*====================================================================================================================*/
 void emit_sm_lcomp(emitter_t *e, int op)
 {
     (void)e;
-    t_comment("SM_LCOMP — lexicographic string compare, op=EKind");
+    emit_comment("SM_LCOMP — lexicographic string compare, op=EKind");
     static const char *const params[] = { "op" };
-    t_macro_begin("LCOMP", params, 1);
-    t_mov_edi_imm32(op);
-    t_call_sym_plt("rt_lcomp", 0);
-    t_macro_end();
-    t_pad_to_blob_size();
+    emit_macro_begin("LCOMP", params, 1);
+    emit_mov_edi_imm32(op);
+    bb_emit_call_sym_plt("rt_lcomp", 0);
+    emit_macro_end();
+    emit_pad_to_blob_size();
 }
 /*====================================================================================================================*/
 void emit_sm_incr(emitter_t *e, int64_t n)
 {
     (void)e;
-    t_comment("SM_INCR — increment TOS by immediate n");
+    emit_comment("SM_INCR — increment TOS by immediate n");
     static const char *const params[] = { "n" };
-    t_macro_begin("INCR", params, 1);
-    t_mov_rdi_imm64((uint64_t)n);
-    t_call_sym_plt("rt_incr", 0);
-    t_macro_end();
-    t_pad_to_blob_size();
+    emit_macro_begin("INCR", params, 1);
+    bb_emit_mov_rdi_imm64((uint64_t)n);
+    bb_emit_call_sym_plt("rt_incr", 0);
+    emit_macro_end();
+    emit_pad_to_blob_size();
 }
 /*====================================================================================================================*/
 void emit_sm_decr(emitter_t *e, int64_t n)
 {
     (void)e;
-    t_comment("SM_DECR — decrement TOS by immediate n");
+    emit_comment("SM_DECR — decrement TOS by immediate n");
     static const char *const params[] = { "n" };
-    t_macro_begin("DECR", params, 1);
-    t_mov_rdi_imm64((uint64_t)n);
-    t_call_sym_plt("rt_decr", 0);
-    t_macro_end();
-    t_pad_to_blob_size();
+    emit_macro_begin("DECR", params, 1);
+    bb_emit_mov_rdi_imm64((uint64_t)n);
+    bb_emit_call_sym_plt("rt_decr", 0);
+    emit_macro_end();
+    emit_pad_to_blob_size();
 }
 /*====================================================================================================================*/
 void emit_sm_halt(emitter_t *e)
 {
     (void)e;
-    t_comment("SM_HALT — exit sm_jit_run via ret");
-    t_inc_mem_r13_disp8(20);
-    t_ret();
-    t_pad_to_blob_size();
+    emit_comment("SM_HALT — exit sm_jit_run via ret");
+    emit_bb_inc_mem_r13_disp8(20);
+    bb_emit_ret();
+    emit_pad_to_blob_size();
 }
 /*====================================================================================================================*/
 void emit_sm_void_pop(emitter_t *e)
 {
     (void)e;
-    t_comment("SM_VOID_POP — pop and discard TOS");
-    t_macro_begin("VOID_POP", NULL, 0);
-    t_call_sym_plt("rt_pop_void", 0);
-    t_macro_end();
-    t_pad_to_blob_size();
+    emit_comment("SM_VOID_POP — pop and discard TOS");
+    emit_macro_begin("VOID_POP", NULL, 0);
+    bb_emit_call_sym_plt("rt_pop_void", 0);
+    emit_macro_end();
+    emit_pad_to_blob_size();
 }
 /*====================================================================================================================*/
 void emit_sm_return(emitter_t *e)
 {
     (void)e;
-    t_comment("SM_RETURN — native return");
-    t_macro_begin("RETURN", NULL, 0);
-    t_ret();
-    t_macro_end();
-    t_pad_to_blob_size();
+    emit_comment("SM_RETURN — native return");
+    emit_macro_begin("RETURN", NULL, 0);
+    bb_emit_ret();
+    emit_macro_end();
+    emit_pad_to_blob_size();
 }
 /*====================================================================================================================*/
 void emit_sm_return_variant(emitter_t *e, int kind, int cond, int pc)
 {
     (void)e;
-    t_comment("SM_RETURN_VARIANT — conditional/typed return via rt_do_return");
+    emit_comment("SM_RETURN_VARIANT — conditional/typed return via rt_do_return");
     static const char *const params[] = { "kind", "cond", "pc" };
-    t_macro_begin("RETURN_VARIANT", params, 3);
-    t_mov_edi_imm32(kind);
-    t_mov_esi_imm32(cond);
-    t_call_sym_plt("rt_do_return", 0);
-    t_test_eax_eax();
-    t_jz_retskip(pc);
-    t_ret();
-    t_retskip_label(pc);
-    t_macro_end();
-    t_pad_to_blob_size();
+    emit_macro_begin("RETURN_VARIANT", params, 3);
+    emit_mov_edi_imm32(kind);
+    bb_emit_mov_esi_imm32(cond);
+    bb_emit_call_sym_plt("rt_do_return", 0);
+    bb_emit_test_eax_eax();
+    emit_jz_retskip(pc);
+    bb_emit_ret();
+    emit_retskip_label(pc);
+    emit_macro_end();
+    emit_pad_to_blob_size();
 }
 void emit_sm_freturn  (emitter_t *e, int pc) { emit_sm_return_variant(e, 1, 0, pc); }
 void emit_sm_nreturn  (emitter_t *e, int pc) { emit_sm_return_variant(e, 2, 0, pc); }
@@ -131,182 +131,182 @@ static void make_pc_label(bb_label_t *lbl, int target_pc) { bb_label_initf(lbl, 
 void emit_sm_jump  (emitter_t *e, int target_pc)
 {
     (void)e;
-    t_comment("SM_JUMP — unconditional jump");
+    emit_comment("SM_JUMP — unconditional jump");
     bb_label_t tgt; make_pc_label(&tgt, target_pc);
-    t_emit_jmp(&tgt, JMP_JMP);
+    emit_jmp(&tgt, JMP_JMP);
 }
 void emit_sm_jump_s(emitter_t *e, int target_pc)
 {
     (void)e;
-    t_comment("SM_JUMP_S — jump if last_ok");
-    t_call_sym_plt("rt_last_ok", 0);
-    t_test_rax_rax();
+    emit_comment("SM_JUMP_S — jump if last_ok");
+    bb_emit_call_sym_plt("rt_last_ok", 0);
+    bb_emit_test_rax_rax();
     bb_label_t tgt; make_pc_label(&tgt, target_pc);
-    t_emit_jmp(&tgt, JMP_JNE);
+    emit_jmp(&tgt, JMP_JNE);
 }
 void emit_sm_jump_f(emitter_t *e, int target_pc)
 {
     (void)e;
-    t_comment("SM_JUMP_F — jump if not last_ok");
-    t_call_sym_plt("rt_last_ok", 0);
-    t_test_rax_rax();
+    emit_comment("SM_JUMP_F — jump if not last_ok");
+    bb_emit_call_sym_plt("rt_last_ok", 0);
+    bb_emit_test_rax_rax();
     bb_label_t tgt; make_pc_label(&tgt, target_pc);
-    t_emit_jmp(&tgt, JMP_JE);
+    emit_jmp(&tgt, JMP_JE);
 }
 /*====================================================================================================================*/
-void emit_sm_label(emitter_t *e)                                          { (void)e; t_noop_macro("LABEL"); }
-void emit_sm_stno (emitter_t *e, int stno, int lineno, const char *src)   { (void)e; t_banner_stno(stno, lineno, src); t_noop_macro("STNO"); }
+void emit_sm_label(emitter_t *e)                                          { (void)e; emit_noop_macro("LABEL"); }
+void emit_sm_stno (emitter_t *e, int stno, int lineno, const char *src)   { (void)e; emit_banner_stno(stno, lineno, src); emit_noop_macro("STNO"); }
 /*====================================================================================================================*/
 void emit_sm_push_lit_i(emitter_t *e, int64_t val)
 {
     (void)e;
-    t_comment("SM_PUSH_LIT_I — push integer literal");
+    emit_comment("SM_PUSH_LIT_I — push integer literal");
     static const char *const params[] = { "val" };
-    t_macro_begin("PUSH_INT", params, 1);
-    t_mov_rdi_imm64((uint64_t)val);
-    t_call_sym_plt("rt_push_int", 0);
-    t_macro_end();
-    t_pad_to_blob_size();
+    emit_macro_begin("PUSH_INT", params, 1);
+    bb_emit_mov_rdi_imm64((uint64_t)val);
+    bb_emit_call_sym_plt("rt_push_int", 0);
+    emit_macro_end();
+    emit_pad_to_blob_size();
 }
 /*====================================================================================================================*/
 void emit_sm_push_lit_f(emitter_t *e, double val)
 {
     (void)e;
-    t_comment("SM_PUSH_LIT_F — push real literal");
+    emit_comment("SM_PUSH_LIT_F — push real literal");
     static const char *const params[] = { "val" };
-    t_macro_begin("PUSH_REAL", params, 1);
+    emit_macro_begin("PUSH_REAL", params, 1);
     uint64_t bits; __builtin_memcpy(&bits, &val, 8);
-    t_mov_rdi_imm64(bits);
-    t_call_sym_plt("rt_push_real_bits", 0);
-    t_macro_end();
-    t_pad_to_blob_size();
+    bb_emit_mov_rdi_imm64(bits);
+    bb_emit_call_sym_plt("rt_push_real_bits", 0);
+    emit_macro_end();
+    emit_pad_to_blob_size();
 }
 /*====================================================================================================================*/
 void emit_sm_push_lit_s(emitter_t *e, const char *str_lbl, uint64_t str_ptr, int len)
 {
     (void)e;
-    t_comment("SM_PUSH_LIT_S — push string literal via rt_push_str(s, len)");
+    emit_comment("SM_PUSH_LIT_S — push string literal via rt_push_str(s, len)");
     static const char *const params[] = { "lbl", "n" };
-    t_macro_begin("PUSH_STR", params, 2);
-    t_lea_rdi_strtab_sym(str_lbl, str_ptr);
-    t_mov_esi_imm32(len);
-    t_call_sym_plt("rt_push_str", 0);
-    t_macro_end();
-    t_pad_to_blob_size();
+    emit_macro_begin("PUSH_STR", params, 2);
+    emit_lea_rdi_strtab_sym(str_lbl, str_ptr);
+    bb_emit_mov_esi_imm32(len);
+    bb_emit_call_sym_plt("rt_push_str", 0);
+    emit_macro_end();
+    emit_pad_to_blob_size();
 }
 /*====================================================================================================================*/
 void emit_sm_push_expr(emitter_t *e, uint64_t ptr_val)
 {
     (void)e;
-    t_comment("SM_PUSH_EXPR — push frozen DT_E expression descriptor");
+    emit_comment("SM_PUSH_EXPR — push frozen DT_E expression descriptor");
     static const char *const params[] = { "ptr" };
-    t_macro_begin("PUSH_EXPR", params, 1);
-    t_mov_rdi_imm64(ptr_val);
-    t_call_sym_plt("rt_push_expr", 0);
-    t_macro_end();
-    t_pad_to_blob_size();
+    emit_macro_begin("PUSH_EXPR", params, 1);
+    bb_emit_mov_rdi_imm64(ptr_val);
+    bb_emit_call_sym_plt("rt_push_expr", 0);
+    emit_macro_end();
+    emit_pad_to_blob_size();
 }
 /*====================================================================================================================*/
 void emit_sm_push_expression(emitter_t *e, uint64_t entry_ptr, int arity)
 {
     (void)e;
-    t_comment("SM_PUSH_EXPRESSION — push expression descriptor (entry, arity)");
+    emit_comment("SM_PUSH_EXPRESSION — push expression descriptor (entry, arity)");
     static const char *const params[] = { "entry", "arity" };
-    t_macro_begin("PUSH_EXPRESSION", params, 2);
-    t_movabs_rdi_entry(entry_ptr);
-    t_mov_esi_imm32(arity);
-    t_call_sym_plt("rt_push_expression_descr", 0);
-    t_macro_end();
-    t_pad_to_blob_size();
+    emit_macro_begin("PUSH_EXPRESSION", params, 2);
+    emit_movabs_rdi_entry(entry_ptr);
+    bb_emit_mov_esi_imm32(arity);
+    bb_emit_call_sym_plt("rt_push_expression_descr", 0);
+    emit_macro_end();
+    emit_pad_to_blob_size();
 }
 void emit_sm_call_expression(emitter_t *e, const char *tgt_sym)
 {
     (void)e;
-    t_comment("SM_CALL_EXPRESSION — call expression chunk directly");
+    emit_comment("SM_CALL_EXPRESSION — call expression chunk directly");
     static const char *const params[] = { "tgt" };
-    t_macro_begin("CALL_EXPRESSION", params, 1);
-    t_call_sym_param(tgt_sym);
-    t_macro_end();
-    t_pad_to_blob_size();
+    emit_macro_begin("CALL_EXPRESSION", params, 1);
+    emit_call_sym_param(tgt_sym);
+    emit_macro_end();
+    emit_pad_to_blob_size();
 }
 void emit_sm_exec_stmt(emitter_t *e, const char *subj_lbl, uint64_t subj_ptr, int has_repl)
 {
     (void)e;
-    t_comment("SM_EXEC_STMT — execute pattern statement via rt_match_variant");
+    emit_comment("SM_EXEC_STMT — execute pattern statement via rt_match_variant");
     static const char *const params[] = { "has_repl", "subj_lbl" };
-    t_macro_begin("EXEC_STMT_VARIANT", params, 2);
-    t_lea_rdi_strtab_sym(subj_lbl, subj_ptr);
-    t_mov_esi_imm32(has_repl);
-    t_call_sym_plt("rt_match_variant", 0);
-    t_macro_end();
-    t_pad_to_blob_size();
+    emit_macro_begin("EXEC_STMT_VARIANT", params, 2);
+    emit_lea_rdi_strtab_sym(subj_lbl, subj_ptr);
+    bb_emit_mov_esi_imm32(has_repl);
+    bb_emit_call_sym_plt("rt_match_variant", 0);
+    emit_macro_end();
+    emit_pad_to_blob_size();
 }
 /*====================================================================================================================*/
 void emit_sm_call_fn(emitter_t *e, const char *name_lbl, uint64_t name_ptr, int nargs)
 {
     (void)e; (void)name_lbl; (void)name_ptr; (void)nargs;
-    t_comment("SM_CALL_FN — call named function via rt_call(name, nargs)");
+    emit_comment("SM_CALL_FN — call named function via rt_call(name, nargs)");
     static const char *const params[] = { "lbl", "n" };
-    t_macro_begin("CALL_FN", params, 2);
-    t_lea_rdi_strtab_sym(NULL, 0);
-    t_mov_esi_imm32(0);
-    t_call_sym_plt("rt_call", 0);
-    t_macro_end();
-    t_pad_to_blob_size();
+    emit_macro_begin("CALL_FN", params, 2);
+    emit_lea_rdi_strtab_sym(NULL, 0);
+    bb_emit_mov_esi_imm32(0);
+    bb_emit_call_sym_plt("rt_call", 0);
+    emit_macro_end();
+    emit_pad_to_blob_size();
 }
 /*====================================================================================================================*/
 void emit_sm_pat_capture(emitter_t *e, const char *name_lbl, uint64_t name_ptr, int kind)
 {
     (void)e;
-    t_comment("SM_PAT_CAPTURE — pop child, push capture(varname, kind)");
+    emit_comment("SM_PAT_CAPTURE — pop child, push capture(varname, kind)");
     static const char *const params[] = { "lbl", "n" };
-    t_macro_begin("PAT_CAPTURE", params, 2);
-    t_lea_rdi_strtab_sym(name_lbl, name_ptr);
-    t_mov_esi_imm32(kind);
-    t_call_sym_plt("rt_pat_capture", 0);
-    t_macro_end();
-    t_pad_to_blob_size();
+    emit_macro_begin("PAT_CAPTURE", params, 2);
+    emit_lea_rdi_strtab_sym(name_lbl, name_ptr);
+    bb_emit_mov_esi_imm32(kind);
+    bb_emit_call_sym_plt("rt_pat_capture", 0);
+    emit_macro_end();
+    emit_pad_to_blob_size();
 }
 void emit_sm_pat_usercall_args(emitter_t *e, const char *name_lbl, uint64_t name_ptr, int nargs)
 {
     (void)e;
-    t_comment("SM_PAT_USERCALL_ARGS — push *func(args) user-call pattern");
+    emit_comment("SM_PAT_USERCALL_ARGS — push *func(args) user-call pattern");
     static const char *const params[] = { "lbl", "n" };
-    t_macro_begin("PAT_USERCALL_ARGS", params, 2);
-    t_lea_rdi_strtab_sym(name_lbl, name_ptr);
-    t_mov_esi_imm32(nargs);
-    t_call_sym_plt("rt_pat_usercall_args", 0);
-    t_macro_end();
-    t_pad_to_blob_size();
+    emit_macro_begin("PAT_USERCALL_ARGS", params, 2);
+    emit_lea_rdi_strtab_sym(name_lbl, name_ptr);
+    bb_emit_mov_esi_imm32(nargs);
+    bb_emit_call_sym_plt("rt_pat_usercall_args", 0);
+    emit_macro_end();
+    emit_pad_to_blob_size();
 }
 /*====================================================================================================================*/
 void emit_sm_pat_capture_fn(emitter_t *e, const char *fname_lbl, uint64_t fname_ptr,
                              int is_imm, const char *namelist_lbl, uint64_t namelist_ptr)
 {
     (void)e;
-    t_comment("SM_PAT_CAPTURE_FN — pop child, push . *func() / $ *func() capture");
+    emit_comment("SM_PAT_CAPTURE_FN — pop child, push . *func() / $ *func() capture");
     static const char *const params[] = { "is_imm", "fname_lbl", "namelist_lbl" };
-    t_macro_begin("PAT_CAPTURE_FN", params, 3);
-    t_lea_rdi_strtab_sym(fname_lbl, fname_ptr);
-    t_mov_esi_imm32(is_imm);
-    t_lea_rdx_strtab_sym(namelist_lbl, namelist_ptr);
-    t_call_sym_plt("rt_pat_capture_fn", 0);
-    t_macro_end();
-    t_pad_to_blob_size();
+    emit_macro_begin("PAT_CAPTURE_FN", params, 3);
+    emit_lea_rdi_strtab_sym(fname_lbl, fname_ptr);
+    bb_emit_mov_esi_imm32(is_imm);
+    emit_lea_rdx_strtab_sym(namelist_lbl, namelist_ptr);
+    bb_emit_call_sym_plt("rt_pat_capture_fn", 0);
+    emit_macro_end();
+    emit_pad_to_blob_size();
 }
 void emit_sm_pat_capture_fn_args(emitter_t *e, const char *fname_lbl, uint64_t fname_ptr,
                                   int is_imm, int nargs)
 {
     (void)e;
-    t_comment("SM_PAT_CAPTURE_FN_ARGS — pop child, push *func(args) capture");
+    emit_comment("SM_PAT_CAPTURE_FN_ARGS — pop child, push *func(args) capture");
     static const char *const params[] = { "is_imm", "nargs", "fname_lbl" };
-    t_macro_begin("PAT_CAPTURE_FN_ARGS", params, 3);
-    t_lea_rdi_strtab_sym(fname_lbl, fname_ptr);
-    t_mov_esi_imm32(is_imm);
-    t_mov_edx_imm32(nargs);
-    t_call_sym_plt("rt_pat_capture_fn_args", 0);
-    t_macro_end();
-    t_pad_to_blob_size();
+    emit_macro_begin("PAT_CAPTURE_FN_ARGS", params, 3);
+    emit_lea_rdi_strtab_sym(fname_lbl, fname_ptr);
+    bb_emit_mov_esi_imm32(is_imm);
+    emit_mov_edx_imm32(nargs);
+    bb_emit_call_sym_plt("rt_pat_capture_fn_args", 0);
+    emit_macro_end();
+    emit_pad_to_blob_size();
 }
 /*====================================================================================================================*/
 void emit_sm_pat_lit      (emitter_t *e, const char *lbl, uint64_t ptr) { emit_sm_pat_lbl_rt(e, "SM_PAT_LIT — push literal-string match pattern",        "PAT_LIT",      "rt_pat_lit",      lbl, ptr); }
@@ -370,46 +370,46 @@ void emit_sm_bb_pump_ast    (emitter_t *e) { emit_sm_rtcall(e, "SM_BB_PUMP_AST �
 void emit_sm_unhandled_op(emitter_t *e, int op)
 {
     (void)e;
-    t_comment("SM_UNHANDLED — trap for unimplemented opcode");
+    emit_comment("SM_UNHANDLED — trap for unimplemented opcode");
     static const char *const params[] = { "op" };
-    t_macro_begin("UNHANDLED", params, 1);
-    t_mov_edi_imm32(op);
-    t_call_sym_plt("rt_unhandled_op", 0);
-    t_macro_end();
-    t_pad_to_blob_size();
+    emit_macro_begin("UNHANDLED", params, 1);
+    emit_mov_edi_imm32(op);
+    bb_emit_call_sym_plt("rt_unhandled_op", 0);
+    emit_macro_end();
+    emit_pad_to_blob_size();
 }
 /*====================================================================================================================*/
 static void emit_sm_rtcall(emitter_t *e, const char *comment, const char *macro, const char *rt_sym)
 {
     (void)e;
-    t_comment(comment);
-    t_macro_begin(macro, NULL, 0);
-    t_call_sym_plt(rt_sym, 0);
-    t_macro_end();
-    t_pad_to_blob_size();
+    emit_comment(comment);
+    emit_macro_begin(macro, NULL, 0);
+    bb_emit_call_sym_plt(rt_sym, 0);
+    emit_macro_end();
+    emit_pad_to_blob_size();
 }
 static void emit_sm_lbl_rt(emitter_t *e, const char *comment, const char *macro, const char *rt_sym,
                              const char *name_lbl, uint64_t name_ptr)
 {
     (void)e;
-    t_comment(comment);
+    emit_comment(comment);
     static const char *const params[] = { "lbl" };
-    t_macro_begin(macro, params, 1);
-    t_lea_rdi_strtab_sym(name_lbl, name_ptr);
-    t_call_sym_plt(rt_sym, 0);
-    t_macro_end();
-    t_pad_to_blob_size();
+    emit_macro_begin(macro, params, 1);
+    emit_lea_rdi_strtab_sym(name_lbl, name_ptr);
+    bb_emit_call_sym_plt(rt_sym, 0);
+    emit_macro_end();
+    emit_pad_to_blob_size();
 }
 static void emit_sm_pat_lbl_rt(emitter_t *e, const char *comment, const char *macro, const char *rt_sym,
                                  const char *name_lbl, uint64_t name_ptr)
 {
     (void)e;
-    t_comment(comment);
+    emit_comment(comment);
     static const char *const params[] = { "lbl" };
-    t_macro_begin(macro, params, 1);
-    t_lea_rdi_strtab_sym(name_lbl, name_ptr);
-    t_call_sym_plt(rt_sym, 0);
-    t_macro_end();
-    t_pad_to_blob_size();
+    emit_macro_begin(macro, params, 1);
+    emit_lea_rdi_strtab_sym(name_lbl, name_ptr);
+    bb_emit_call_sym_plt(rt_sym, 0);
+    emit_macro_end();
+    emit_pad_to_blob_size();
 }
 /*====================================================================================================================*/
