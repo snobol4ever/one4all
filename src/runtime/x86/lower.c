@@ -1142,7 +1142,14 @@ void lower_expr(const tree_t *t)
     if (!t) { sm_emit(g_p, SM_PUSH_NULL); return; }
     switch (t->t) {
     /* literals */
-    case TT_QLIT: case TT_CSET:              lower_strlit(t);        return;
+    case TT_QLIT:                             lower_strlit(t);        return;
+    case TT_CSET: {
+        /* IJ-5: cset literals are sets — emit canonical sorted+dedup form */
+        const char *raw = t->v.sval ? t->v.sval : "";
+        const char *canon = icn_cset_canonical(raw);
+        sm_emit_s(g_p, SM_PUSH_LIT_S, canon);
+        return;
+    }
     case TT_ILIT:                             lower_ilit(t);          return;
     case TT_FLIT:                             lower_flit(t);          return;
     case TT_NUL:                              lower_nul(t);           return;

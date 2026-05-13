@@ -1149,7 +1149,7 @@ DESCR_t bb_eval_value(tree_t *e)
      * The four binary ops delegate to the icn_cset_* helpers in icon_runtime.c
      * (now declared in coro_runtime.h).  TT_CSET literal mirrors interp_eval.c:3466. */
     case TT_CSET:
-        return e->v.sval ? STRVAL(e->v.sval) : NULVCL;
+        return e->v.sval ? STRVAL(icn_cset_canonical(e->v.sval)) : NULVCL;
 
     case TT_CSET_COMPL: {
         DESCR_t operand = bb_eval_value(e->c[0]);

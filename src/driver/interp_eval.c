@@ -759,17 +759,30 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
     }
     /* IJ-5: detab(s,t...) — expand tabs; entab(s,t...) — compress spaces to tabs */
     if (!strcmp(fn,"detab") && nargs >= 1) {
+        /* arg0 must be string/cset (coercible); tab stops must be integer/real */
+        if (args[0].v == DT_I || args[0].v == DT_R) { *out = FAILDESCR; return 1; }
         const char *s = VARVAL_fn(args[0]); if (!s) s = "";
         int stops[32], nstops = 0;
-        for (int j = 1; j < nargs && nstops < 32; j++)
-            if (!IS_FAIL_fn(args[j]) && args[j].v != DT_SNUL) stops[nstops++] = (int)to_int(args[j]);
+        for (int j = 1; j < nargs && nstops < 32; j++) {
+            if (IS_FAIL_fn(args[j]) || args[j].v == DT_SNUL) continue;
+            if (!IS_INT_fn(args[j]) && !IS_REAL_fn(args[j])) { *out = FAILDESCR; return 1; }
+            stops[nstops++] = (int)to_int(args[j]);
+        }
         if (nstops == 0) { stops[0] = 9; nstops = 1; }
+        /* gap beyond last explicit stop: if one stop, period = stop value;
+         * if two+, period = last - second-to-last */
+        int gap = (nstops >= 2) ? stops[nstops-1] - stops[nstops-2] : stops[0];
+        if (gap < 1) gap = 1;
         int cap = 4096; char *buf = GC_malloc(cap); int bi = 0, col = 0;
         for (int i = 0; s[i]; i++) {
             if (s[i] == '\t') {
                 int next = -1;
                 for (int k = 0; k < nstops; k++) if (stops[k] > col+1) { next=stops[k]; break; }
-                if (next < 0) { int base = (nstops>0?stops[nstops-1]:9); int gap=8; next=col+1+gap-((col+1-base)%gap+gap)%gap; if(next<=col+1)next=col+2; }
+                if (next < 0) {
+                    int base = stops[nstops-1];
+                    int beyond = col + 1 - base; /* how far past last stop (0-based) */
+                    next = base + ((beyond / gap) + 1) * gap;
+                }
                 int sp = next - (col+1);
                 while (sp-- > 0) { if (bi>=cap-1){cap*=2;buf=GC_realloc(buf,cap);} buf[bi++]=' '; col++; }
             } else { if (bi>=cap-1){cap*=2;buf=GC_realloc(buf,cap);} buf[bi++]=s[i]; col++; }
@@ -777,25 +790,32 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         buf[bi]='\0'; *out=STRVAL(buf); return 1;
     }
     if (!strcmp(fn,"entab") && nargs >= 1) {
+        if (args[0].v == DT_I || args[0].v == DT_R) { *out = FAILDESCR; return 1; }
         const char *s = VARVAL_fn(args[0]); if (!s) s = "";
         int stops[32], nstops = 0;
-        for (int j = 1; j < nargs && nstops < 32; j++)
-            if (!IS_FAIL_fn(args[j]) && args[j].v != DT_SNUL) stops[nstops++] = (int)to_int(args[j]);
+        for (int j = 1; j < nargs && nstops < 32; j++) {
+            if (IS_FAIL_fn(args[j]) || args[j].v == DT_SNUL) continue;
+            if (!IS_INT_fn(args[j]) && !IS_REAL_fn(args[j])) { *out = FAILDESCR; return 1; }
+            stops[nstops++] = (int)to_int(args[j]);
+        }
         if (nstops == 0) { stops[0] = 9; nstops = 1; }
+        int gap = (nstops >= 2) ? stops[nstops-1] - stops[nstops-2] : stops[0];
+        if (gap < 1) gap = 1;
         int cap = 4096; char *buf = GC_malloc(cap); int bi = 0, col = 0;
         int slen = (int)strlen(s);
-        /* simple: for each run of spaces ending at a tab stop, emit tab */
         for (int i = 0; i <= slen; ) {
             if (i < slen && s[i] == ' ') {
                 int run_start = col, j = i;
                 while (j < slen && s[j]==' ') { j++; col++; }
-                /* col is now end col; emit tabs/spaces */
                 int sc = run_start;
                 while (sc < col) {
                     int next = -1;
                     for (int k = 0; k < nstops; k++) if (stops[k] > sc+1) { next=stops[k]; break; }
-                    if (next<0) { int base=(nstops>0?stops[nstops-1]:9); int gap=8; next=base+((sc+1-base)/gap+1)*gap; }
-                    /* next is 1-based stop; next-1 is 0-based col it lands on */
+                    if (next < 0) {
+                        int base = stops[nstops-1];
+                        int beyond = sc + 1 - base;
+                        next = base + ((beyond / gap) + 1) * gap;
+                    }
                     if (next-1 <= col) { if(bi>=cap-1){cap*=2;buf=GC_realloc(buf,cap);} buf[bi++]='\t'; sc=next-1; }
                     else { if(bi>=cap-1){cap*=2;buf=GC_realloc(buf,cap);} buf[bi++]=' '; sc++; }
                 }
@@ -4004,7 +4024,7 @@ DESCR_t interp_eval(tree_t *e)
 
     /* ── Icon EKinds — OE-3 ─── */
 
-    case TT_CSET: return e->v.sval ? STRVAL(e->v.sval) : NULVCL;
+    case TT_CSET: return e->v.sval ? STRVAL(icn_cset_canonical(e->v.sval)) : NULVCL;
 
     case TT_TO: case TT_TO_BY: {
         long cur;

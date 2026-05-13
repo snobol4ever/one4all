@@ -354,3 +354,21 @@ const char *icn_cset_inter(const char *a, const char *b) {
     str_arena_pos += n + 1;
     return out;
 }
+
+/* icn_cset_canonical(cs): sort + deduplicate cset chars (ascending byte order).
+ * Icon cset literals 'abc' are sets of chars; their canonical string form is
+ * sorted with duplicates removed so '1987' -> "1789". */
+const char *icn_cset_canonical(const char *cs) {
+    if (!cs || !*cs) return "";
+    unsigned char present[256] = {0};
+    for (const unsigned char *p = (const unsigned char *)cs; *p; p++) present[*p] = 1;
+    int n = 0;
+    for (int c = 0; c < 256; c++) if (present[c]) n++;
+    if (str_arena_pos + n + 1 > 65536) str_arena_pos = 0;
+    char *out = icn_str_arena + str_arena_pos;
+    int bi = 0;
+    for (int c = 0; c < 256; c++) if (present[c]) out[bi++] = (char)c;
+    out[bi] = '\0';
+    str_arena_pos += bi + 1;
+    return out;
+}

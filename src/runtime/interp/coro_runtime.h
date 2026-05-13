@@ -156,6 +156,7 @@ const char *icn_cset_complement(const char *cs);
 const char *icn_cset_union(const char *a, const char *b);
 const char *icn_cset_diff(const char *a, const char *b);
 const char *icn_cset_inter(const char *a, const char *b);
+const char *icn_cset_canonical(const char *cs);
 
 /* IC-9 (session #26): Icon-keyword assign / probe (defined in driver/interp.c).
  * Used by coro_bb_revswap to perform atomic swap-with-revert on &pos / &subject.
