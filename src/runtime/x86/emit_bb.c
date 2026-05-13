@@ -43,6 +43,7 @@ static void emit_bb_jmp_pair(const char *banner, bb_label_t *lbl_succ, bb_label_
     if (beta_first) { emit_label_define(lbl_beta); emit_jmp(lbl_fail, JMP_JMP); emit_jmp(lbl_fail, JMP_JMP); }
     else            { emit_jmp(lbl_fail, JMP_JMP); emit_label_define(lbl_beta); emit_jmp(lbl_fail, JMP_JMP); }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static void emit_bb_stateful(const char *banner, const char *arg, void *zeta, const char *fn_name, uint64_t fn_fallback, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_beta)
 {
     emit_bb_box_banner(banner, arg ? arg : "");
@@ -50,6 +51,7 @@ static void emit_bb_stateful(const char *banner, const char *arg, void *zeta, co
     emit_label_define(lbl_beta);
     emit_seq_port_call((uint64_t)(uintptr_t)zeta, fn_name, fn_fallback, 1, lbl_succ, lbl_fail);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xabrt          (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_jmp_pair("ABORT",  s, f, b, 0); }
 void emit_bb_xcat           (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_jmp_pair("CAT",    s, f, b, 1); }
 void emit_bb_xfail          (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_jmp_pair("FAIL",   s, f, b, 0); }
@@ -74,30 +76,37 @@ void emit_bb_icon_to        (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit
 void emit_bb_icon_to_by     (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_TO_BY",   "", icon_to_by_new(),   "coro_bb_to_by",       (uint64_t)(uintptr_t)coro_bb_to_by,       s,f,b); }
 void emit_bb_xarbn          (bb_box_fn child_fn, bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ARBNO", "", rt_bb_arbno_new(child_fn, NULL), "rt_bb_arbno", (uint64_t)(uintptr_t)rt_bb_arbno, s,f,b); }
 void emit_bb_xbrkx(const char *chars, bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("BREAKX", chars ? chars : "", bb_breakx_new(chars), "rt_bb_breakx", (uint64_t)(uintptr_t)rt_bb_breakx, s,f,b); }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xcallcap(bb_box_fn child_fn, const char *fnc_name, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
     emit_bb_stateful("CALLCAP", fnc_name ? fnc_name : "", bb_cap_new_call(child_fn, NULL, fnc_name, NULL, 0, NULL, 0, 0), "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, s,f,b);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xfnce(bb_label_t *s, bb_label_t *f, bb_label_t *b) {
     emit_bb_box_banner("FENCE",""); emit_jmp(s, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xfnme(bb_box_fn child_fn, const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
     emit_bb_stateful("CAP_IMM", varname ? varname : "", bb_cap_new(child_fn, NULL, varname, NULL, 1), "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, s,f,b);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xnme(bb_box_fn child_fn, const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
     emit_bb_stateful("CAP_COND", varname ? varname : "", bb_cap_new(child_fn, NULL, varname, NULL, 0), "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, s,f,b);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xposi(int n, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
     char args[32]; snprintf(args, sizeof(args), "%d", n);
     emit_bb_box_banner("POS", args);
     emit_seq_cmp_delta_i(n, s, f);
     emit_label_define(b); emit_jmp(f, JMP_JMP);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xrpsi(int n, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
     char args[32]; snprintf(args, sizeof(args), "%d", n);
     emit_bb_box_banner("RPOS", args);
     emit_seq_cmp_siglen_delta(n, (uint64_t)(uintptr_t)&Σlen, s, f);
     emit_label_define(b); emit_jmp(f, JMP_JMP);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xchr(PATND_t *p, const char *lit_label, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
     const char *lit = (p && p->STRVAL_fn) ? p->STRVAL_fn : "";
     int len = (int)strlen(lit);
@@ -126,6 +135,7 @@ void emit_bb_xchr(PATND_t *p, const char *lit_label, bb_label_t *s, bb_label_t *
     emit_sub_delta_imm(len);
     emit_jmp(f, JMP_JMP);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xdsar(const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
     char banner[80]; snprintf(banner, sizeof(banner), "*%s", varname ? varname : "");
     emit_bb_box_banner("DEREF", banner);
@@ -145,6 +155,7 @@ void emit_bb_xdsar(const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t
     emit_label_define(b);
     emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "bb_deferred_var_exported", (uint64_t)(uintptr_t)bb_deferred_var_exported, 1, s, f);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xatp(const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
     emit_bb_box_banner("USERPAT", varname ? varname : "");
     int id = g_flat_node_id++;
@@ -161,6 +172,7 @@ void emit_bb_xatp(const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t 
     emit_label_define(b);
     emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_atp", (uint64_t)(uintptr_t)rt_bb_atp, 1, s, f);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_charset(bb_box_fn c_fn, const char *c_fn_name, const char *kind_name, const char *chars, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
     (void)c_fn;
     typedef struct { const char *chars; int delta; } cs_t;
@@ -173,6 +185,7 @@ void emit_bb_charset(bb_box_fn c_fn, const char *c_fn_name, const char *kind_nam
     else                                                       { rt_name="rt_bb_span";   rt_fn=(uint64_t)(uintptr_t)rt_bb_span;   }
     emit_bb_stateful(kind_name ? kind_name : "CHARSET", chars ? chars : "", z, rt_name, rt_fn, s,f,b);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 #include "emit_templates.h"
 #include <string.h>
 #include <stdio.h>
@@ -213,6 +226,7 @@ static void data_buf_reset(void)
     g_flat_data_block_nlbls = 0;
     g_flat_data_pending_lbl[0] = '\0';
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static void data_buf_appendf(const char *fmt, ...)
 {
     if (g_flat_data_len >= FLAT_DATA_BUF_MAX) return;
@@ -226,6 +240,7 @@ static void data_buf_appendf(const char *fmt, ...)
         g_flat_data_len += ((size_t)n < left) ? (size_t)n : left;
     }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static void data_buf_three_col(const char *lbl, const char *act, const char *got)
 {
     char fused_lbl[160];
@@ -251,6 +266,7 @@ static void data_buf_three_col(const char *lbl, const char *act, const char *got
     while (n > 0 && (line[n-1] == ' ' || line[n-1] == '\t')) line[--n] = '\0';
     data_buf_appendf("%s\n", line);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static void data_buf_pend_label(const char *name)
 {
     if (g_flat_data_pending_lbl[0]) {
@@ -264,6 +280,7 @@ static void data_buf_pend_label(const char *name)
     snprintf(g_flat_data_pending_lbl, sizeof(g_flat_data_pending_lbl),
              "%s:", name ? name : "");
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static void data_buf_flush_pending_label(void)
 {
     if (!g_flat_data_pending_lbl[0]) return;
@@ -275,11 +292,13 @@ static void data_buf_flush_pending_label(void)
     }
     g_flat_data_pending_lbl[0] = '\0';
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static void (*g_cap_fixup_cb)(void *cap_ptr, const char *child_α_label) = NULL;
 void emit_flat_set_cap_fixup(void (*cb)(void *cap_ptr, const char *child_α_label))
 {
     g_cap_fixup_cb = cb;
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 #define SYM_SIGMA   "\xCE\xA3"
 #define SYM_SIGLEN  "\xCE\xA3""len"
 #define SYM_DELTA   "\xCE\x94"
@@ -291,6 +310,7 @@ void emit_flat_set_intern_str(const char *(*fn)(const char *))
 {
     g_flat_intern_str = fn;
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static void flat3c(const char *lbl, const char *act, const char *got)
 {
     if (!g_is_text) return;
@@ -298,10 +318,12 @@ static void flat3c(const char *lbl, const char *act, const char *got)
     if (!f) return;
     bb3c_format(f, lbl ? lbl : "", act ? act : "", got ? got : "");
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static void flat3c_action(const char *act, const char *args)
 {
     flat3c("", act, args ? args : "");
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static void data_buf_remember_label(const char *name);
 void emit_flat_label(const char *name)
 {
@@ -314,6 +336,7 @@ void emit_flat_label(const char *name)
     char buf[160]; snprintf(buf, sizeof(buf), "%s:", name);
     flat3c(buf, "", "");
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static void data_buf_remember_label(const char *name)
 {
     if (g_flat_data_block_nlbls >= FLAT_DATA_LBL_MAX) return;
@@ -321,10 +344,12 @@ static void data_buf_remember_label(const char *name)
              sizeof(g_flat_data_block_lbls[0]), "%s", name ? name : "");
     g_flat_data_block_nlbls++;
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static void data_buf_emit_block_comment(void)
 {
     g_flat_data_block_nlbls = 0;
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_flat_data_section(void)
 {
     if (!g_is_text) return;
@@ -332,6 +357,7 @@ void emit_flat_data_section(void)
     g_flat_data_any    = 1;
     g_flat_data_block_nlbls = 0;
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_flat_text_section(void)
 {
     if (!g_is_text) return;
@@ -343,6 +369,7 @@ void emit_flat_text_section(void)
     }
     flat3c("", ".section", ".text");
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_flat_intel_syntax(void)
 {
     if (!g_is_text) return;
@@ -353,6 +380,7 @@ void emit_flat_intel_syntax(void)
     }
     flat3c("", ".intel_syntax", "noprefix");
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_flat_data_string(const char *s)
 {
     if (!g_is_text) return;
@@ -370,12 +398,14 @@ void emit_flat_data_string(const char *s)
     if (g_flat_data_active) data_buf_three_col("", ".string", esc);
     else                    flat3c("", ".string", esc);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_flat_data_quad(const char *arg)
 {
     if (!g_is_text) return;
     if (g_flat_data_active) data_buf_three_col("", ".quad", arg ? arg : "0");
     else                    flat3c("", ".quad", arg ? arg : "0");
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_flat_data_quad_i(long long v)
 {
     if (!g_is_text) return;
@@ -383,6 +413,7 @@ void emit_flat_data_quad_i(long long v)
     if (g_flat_data_active) data_buf_three_col("", ".quad", buf);
     else                    flat3c("", ".quad", buf);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_flat_data_long(long long v)
 {
     if (!g_is_text) return;
@@ -390,6 +421,7 @@ void emit_flat_data_long(long long v)
     if (g_flat_data_active) data_buf_three_col("", ".long", buf);
     else                    flat3c("", ".long", buf);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_flat_data_zero(int n)
 {
     if (!g_is_text) return;
@@ -397,11 +429,13 @@ void emit_flat_data_zero(int n)
     if (g_flat_data_active) data_buf_three_col("", ".zero", buf);
     else                    flat3c("", ".zero", buf);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_flat_globl(const char *name)
 {
     if (!g_is_text) return;
     flat3c("", ".globl", name);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_flat_box_call(const char *rdi_load,
                           const char *fn, int mode)
 {
@@ -414,6 +448,7 @@ void emit_flat_box_call(const char *rdi_load,
     flat3c_action("call", call_arg);
     flat3c_action("pop", "r10");
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_flat_box_call_slot(const char *slot_lbl, const char *fn, int mode)
 {
     if (!g_is_text) return;
@@ -427,6 +462,7 @@ void emit_flat_box_call_slot(const char *slot_lbl, const char *fn, int mode)
     flat3c_action("call", call_arg);
     flat3c_action("pop", "r10");
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_flat_dispatch_jne_jmp(bb_label_t *lbl_succ, bb_label_t *lbl_fail)
 {
     if (!g_is_text) return;
@@ -440,6 +476,7 @@ void emit_flat_dispatch_jne_jmp(bb_label_t *lbl_succ, bb_label_t *lbl_fail)
              lbl_fail ? lbl_fail->name : "?");
     flat3c_action("test", buf);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_flat_entry_dispatch(bb_label_t *lbl_alpha_body, bb_label_t *lbl_beta)
 {
     if (!g_is_text) return;
@@ -453,6 +490,7 @@ void emit_flat_entry_dispatch(bb_label_t *lbl_alpha_body, bb_label_t *lbl_beta)
              lbl_beta       ? lbl_beta->name       : "?");
     flat3c_action("cmp", buf);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static const char *flat_xkind_name(XKIND_t k) {
     switch (k) {
         case XCHR:     return "CHR";
@@ -486,6 +524,7 @@ static const char *flat_xkind_name(XKIND_t k) {
         default:       return "?";
     }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static int patnd_buf_append(char *buf, size_t cap, size_t *o, const char *s)
 {
     if (!s) return 0;
@@ -497,6 +536,7 @@ static int patnd_buf_append(char *buf, size_t cap, size_t *o, const char *s)
     buf[*o] = '\0';
     return (*o + 1 >= cap) ? 1 : 0;
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static int patnd_buf_appendf(char *buf, size_t cap, size_t *o, const char *fmt, ...)
 {
     if (*o + 1 >= cap) return 1;
@@ -508,6 +548,7 @@ static int patnd_buf_appendf(char *buf, size_t cap, size_t *o, const char *fmt, 
     *o += (size_t)n;
     return 0;
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static void patnd_to_sno_r(const PATND_t *p, char *buf, size_t cap, size_t *o, int depth)
 {
     if (*o + 4 >= cap) return;
@@ -595,6 +636,7 @@ static void patnd_to_sno_r(const PATND_t *p, char *buf, size_t cap, size_t *o, i
         break;
     }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static void patnd_to_sno_string(const PATND_t *p, char *buf, size_t cap)
 {
     if (!buf || cap == 0) return;
@@ -602,6 +644,7 @@ static void patnd_to_sno_string(const PATND_t *p, char *buf, size_t cap)
     size_t o = 0;
     patnd_to_sno_r(p, buf, cap, &o, 0);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 #define BB_BANNER_RULE_LEN 119
 void emit_flat_banner_rule(char ch)
 {
@@ -612,12 +655,14 @@ void emit_flat_banner_rule(char ch)
     buf[1 + BB_BANNER_RULE_LEN] = '\0';
     emit_text_rawf("%s\n", buf);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static void emit_flat_pat_banner(const char *prefix, PATND_t *p)
 {
     if (!g_is_text) return;
     (void)prefix; (void)p;
     emit_flat_banner_rule('=');
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_flat_box_banner(const char *kind,
                           const char *args, const char *label_prefix)
 {
@@ -629,6 +674,7 @@ void emit_flat_box_banner(const char *kind,
         emit_text_rawf("#                       BOX %s  [%s]\n", kind, label_prefix ? label_prefix : "");
     }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static void emit_flat_node(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
 static void emit_flat_xcat(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
@@ -676,6 +722,7 @@ static void emit_flat_xcat(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fai
     emit_label_define_bb(lbl_β); emit_jmp_label(&right_β, JMP_JMP);
     emit_label_define_bb(&xcat_ω);  emit_jmp_label(lbl_fail, JMP_JMP);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static void emit_flat_alt(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     int id = g_flat_node_id++;
@@ -697,6 +744,7 @@ static void emit_flat_alt(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fail
     emit_jmp_label(lbl_fail, JMP_JMP);
     emit_label_define_bb(lbl_β); emit_jmp_label(&ci_βs[0], JMP_JMP);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static void emit_flat_lit(const char *lit, int len, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 __attribute__((unused));
 static void emit_flat_lit(const char *lit, int len, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
@@ -724,6 +772,7 @@ static void emit_flat_lit(const char *lit, int len, bb_label_t *lbl_succ, bb_lab
     emit_sub_delta_imm(len);
     emit_jmp_label(lbl_fail, JMP_JMP);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 __attribute__((unused))
 static void emit_flat_charset_call(bb_box_fn c_fn, const char *c_fn_name, const char *chars, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
@@ -784,6 +833,7 @@ static void emit_flat_charset_call(bb_box_fn c_fn, const char *c_fn_name, const 
         emit_jmp_label(lbl_fail, JMP_JMP);
     }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 typedef struct {
     bb_box_fn   c_fn;
     const char *c_fn_name;
@@ -830,6 +880,7 @@ static void charset_text_body(bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_lab
     emit_call_sym_plt(c_fn_name, (uint64_t)(uintptr_t)a->c_fn);
     flat_box_dispatch_jne_jmp(lbl_succ, lbl_fail);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 extern brkx_t  *bb_breakx_new(const char *chars);
 typedef struct {
     const char *chars;
@@ -871,6 +922,7 @@ static void brkx_text_body(bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_
     emit_call_sym_plt("bb_breakx", 0);
     flat_box_dispatch_jne_jmp(lbl_succ, lbl_fail);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 typedef struct {
     bb_box_fn   c_fn;
     const char *c_fn_name;
@@ -902,6 +954,7 @@ static void intcur_text_body(bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_labe
     flat_box_call(rdi_arg, a->c_fn_name, 1);
     flat_box_dispatch_jne_jmp(lbl_succ, lbl_fail);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 extern int memcmp(const void *, const void *, size_t);
 void emit_flat_box_call_fn(bb_box_fn fn, const char *fn_name, void *z, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
@@ -931,6 +984,7 @@ void emit_flat_box_call_fn(bb_box_fn fn, const char *fn_name, void *z, bb_label_
         emit_jmp_label(lbl_fail, JMP_JMP);
     }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static void emit_flat_node(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     if (!p) { emit_bb_xeps(lbl_succ, lbl_fail, lbl_β); return; }
@@ -967,6 +1021,7 @@ static void emit_flat_node(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fai
         break;
     }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static int flat_is_eligible(PATND_t *p)
 {
     if (!p) return 1;
@@ -977,6 +1032,7 @@ static int flat_is_eligible(PATND_t *p)
         if (!flat_is_eligible(p->children[i])) return 0;
     return 1;
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static int emit_flat_body(PATND_t *p,
                             const char *prefix, int text_externalise, int brokered)
 {
@@ -1022,6 +1078,7 @@ static int emit_flat_body(PATND_t *p,
     }
     return 0;
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 bb_box_fn bb_build_flat(PATND_t *p)
 {
     if (!flat_is_eligible(p)) return NULL;
@@ -1035,6 +1092,7 @@ bb_box_fn bb_build_flat(PATND_t *p)
     bb_seal(buf, (size_t)nbytes);
     return (bb_box_fn)buf;
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 bb_box_fn bb_build_brokered(PATND_t *p)
 {
     if (!flat_is_eligible(p)) return NULL;
@@ -1051,6 +1109,7 @@ bb_box_fn bb_build_brokered(PATND_t *p)
     bb_seal(buf, (size_t)nbytes);
     return (bb_box_fn)buf;
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 int emit_flat_build(PATND_t *p, FILE *out, const char *prefix)
 {
     if (!flat_is_eligible(p)) return -1;
@@ -1060,11 +1119,13 @@ int emit_flat_build(PATND_t *p, FILE *out, const char *prefix)
     bb3c_flush_pending();
     return rc;
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_flat_reset(void)
 {
     g_flat_slot_count = 0;
     g_flat_node_id    = 0;
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static void bm_line(FILE *f, const char *lbl, const char *act, const char *got)
 {
     char line[512];
@@ -1076,6 +1137,7 @@ static void bm_line(FILE *f, const char *lbl, const char *act, const char *got)
     line[n] = '\0';
     fprintf(f, "%s\n", line);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static void bm_macro(FILE *f, const char *name, const char *args)
 {
     char decl[160];
@@ -1085,16 +1147,20 @@ static void bm_macro(FILE *f, const char *name, const char *args)
         snprintf(decl, sizeof(decl), "%s", name);
     bm_line(f, "", ".macro", decl);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static void bm_endm(FILE *f)  { bm_line(f, "", ".endm", ""); }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static void bm_op(FILE *f, const char *mn, const char *args)
 {
     bm_line(f, "", mn, args ? args : "");
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static void bm_jmp(FILE *f, const char *cond, const char *tgt)
 {
     char arg[128]; snprintf(arg, sizeof(arg), "\\%s", tgt);
     bm_line(f, "", cond, arg);
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 int emit_bb_macro_library_to_path(const char *path)
 {
     FILE *f = fopen(path, "w");

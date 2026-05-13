@@ -30,6 +30,7 @@ void emit_form_nullary3(uint8_t b0, uint8_t b1, uint8_t b2, const char *text);
 void emit_sym_lea_rcx (const char *sym, uint64_t addr_fallback);
 void emit_sym_lea_r10 (const char *sym, uint64_t addr_fallback);
 void emit_call_sym_plt(const char *sym, uint64_t fn_fallback);
+/*--------------------------------------------------------------------------------------------------------------------*/
 static inline void emit_mov_r10_imm64(uint64_t v) { emit_form_reg64_imm64(0x49,0xBA,v,"r10"); }
 static inline void emit_mov_rax_imm64(uint64_t v) { emit_form_reg64_imm64(0x48,0xB8,v,"rax"); }
 static inline void emit_mov_rsi_imm64(uint64_t v) { emit_form_reg64_imm64(0x48,0xBE,v,"rsi"); }
@@ -54,9 +55,11 @@ static inline void emit_movsxd_rcx_r10mem(void) { emit_form_mem3(0x49,0x63,0x0A,
 static inline void emit_lea_rax_raxrcx   (void) { emit_form_mem4(0x48,0x8D,0x04,0x08,"lea rax, [rax+rcx]"      ); }
 static inline void emit_call_rax (void) { emit_form_nullary2(0xFF,0xD0, "call rax"); }
 static inline void emit_pop_rbp  (void) { emit_form_nullary1(0x5D,      "pop rbp" ); }
+/*--------------------------------------------------------------------------------------------------------------------*/
 static inline void emit_inc_mem_r13_disp8(uint8_t disp) {
     emit_form_r13_disp8(0x41,0xFF,0x45, disp, "inc dword ptr [r13 + %u]");
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
 void emit_load_r10_delta_ptr (uint64_t addr);
 void emit_load_delta         (void);
 void emit_store_delta        (void);
