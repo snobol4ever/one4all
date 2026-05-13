@@ -1,7 +1,7 @@
 #include "emit.h"
 #include "emit_bb_gen.h"
 #include "bb_box.h"
-#include "templates.h"
+#include "emit_templates.h"
 #include "../frontend/icon/icon_gen.h"
 #include "snobol4_patnd.h"
 #include <string.h>

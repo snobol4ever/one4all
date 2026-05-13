@@ -9,7 +9,7 @@
 
 #include "emit.h"
 #include "emit_bb_gen.h"
-#include "templates.h"
+#include "emit_templates.h"
 #include "sm_prog.h"
 #include <stdint.h>
 #include <string.h>

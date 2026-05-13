@@ -53,7 +53,7 @@
 #include "../../frontend/snobol4/scrip_cc.h"  /* tree_t, TT_FNC for SM_PAT_CAPTURE_FN */
 #include "bb_broker.h"   /* SN-9b: SM_BB_PUMP / SM_BB_ONCE handlers */
 #include "../../runtime/interp/coro_runtime.h"  /* GOAL-ICON-BB-COMPLETE rung13: FRAME, EVERY_GEN_SLOT_MAX, IcnFrame */
-#include "templates.h"  /* binary template dispatch */
+#include "emit_templates.h"  /* binary template dispatch */
 #include "emit_bb_gen.h"              /* BB emitter */
 #include "emit.h"              /* emitter_t stub */
 

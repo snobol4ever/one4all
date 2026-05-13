@@ -15,8 +15,8 @@
  * Sprint:  EM-MODE4-IS-MODE3-DUMP-c / GOAL-MODE4-EMIT
  */
 
-#ifndef RUNTIME_X86_TEMPLATES_TEMPLATES_H
-#define RUNTIME_X86_TEMPLATES_TEMPLATES_H
+#ifndef RUNTIME_X86_TEMPLATES_EMIT_TEMPLATES_H
+#define RUNTIME_X86_TEMPLATES_EMIT_TEMPLATES_H
 
 /* Dependency pull-ins for everything this header declares.  Putting
  * them at the top of the header (rather than scattered between
@@ -293,4 +293,4 @@ void emit_bb_icon_bang(bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *l
 void emit_bb_icon_lconcat(bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
 void emit_bb_icon_seq(bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
 
-#endif /* RUNTIME_X86_TEMPLATES_TEMPLATES_H */
+#endif /* RUNTIME_X86_TEMPLATES_EMIT_TEMPLATES_H */

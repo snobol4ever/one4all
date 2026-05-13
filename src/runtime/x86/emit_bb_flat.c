@@ -18,7 +18,7 @@
 #include "emit.h"
 #include "snobol4.h"
 #include "bb_box.h"
-#include "templates.h"   /* EM-MODE4-IS-MODE3-DUMP-d: emit_bb_xchr */
+#include "emit_templates.h"   /* EM-MODE4-IS-MODE3-DUMP-d: emit_bb_xchr */
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
