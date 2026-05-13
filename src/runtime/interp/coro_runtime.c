@@ -655,8 +655,13 @@ DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs)
             f->sc = proc_table[found_pi].lower_sc;
 
             /* IC-9: restore static variables into frame slots on proc entry.
-             * Mirrors coro_call's static-restore loop at coro_runtime.c:508-526. */
+             * Mirrors coro_call's static-restore loop at coro_runtime.c:508-526.
+             * IJ-12 fix: for recursive calls, static_tab may not yet have the
+             * value (the calling frame hasn't exited, so it hasn't saved yet).
+             * Fall back to reading the parent frame's slot for the same variable,
+             * which holds the live value from the initial{} or prior assignment. */
             IcnScope *sc = &proc_table[found_pi].lower_sc;
+            IcnFrame *parent_f = (frame_depth >= 2) ? &frame_stack[frame_depth - 2] : NULL;
             for (int bi = body_start; bi < found_proc->n; bi++) {
                 tree_t *st = found_proc->c[bi];
                 if (!st || st->t != TT_GLOBAL || st->v.ival != 1) continue;
@@ -666,8 +671,14 @@ DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs)
                     int slot = scope_get(sc, vn->v.sval);
                     if (slot < 0 || slot >= f->env_n) continue;
                     DESCR_t saved;
-                    if (static_get(found_proc, vn->v.sval, &saved))
+                    if (static_get(found_proc, vn->v.sval, &saved)) {
                         f->env[slot] = saved;
+                    } else if (parent_f && slot < parent_f->env_n
+                               && parent_f->env[slot].v != 0) {
+                        /* Parent frame has a live value for this static var
+                         * (recursive call before parent's proc-exit saves it). */
+                        f->env[slot] = parent_f->env[slot];
+                    }
                 }
             }
         }
