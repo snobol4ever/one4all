@@ -82,7 +82,6 @@ extern DESCR_t (*g_user_call_hook)(const char *name, DESCR_t *args, int nargs);
 #include "sil_macros.h"   /* SIL macro translations — RT + SM axes */
 #include "bb_build.h"
 #include "bb_pool.h"              /* bb_pool_reset (EM-7d) */
-#include "../x86/emit_bb_flat.h"     /* bb_lit_emit_binary — M-DYN-B1 */
 /* rt_in_native_chunk lives in libscrip_rt.so (mode-4 only).  In the scrip
  * binary (mode-1/2/3) it is never set — provide a weak fallback that returns
  * 0 so the call resolves cleanly even when libscrip_rt is not linked. */
@@ -637,8 +636,8 @@ static DESCR_t bb_deferred_var(void *zeta, int entry)
                                     ζ->child_state = NULL;
                                     ζ->child_size  = 0;
                                 } else {
-                                    /* EDP-9: bb_eps C box deleted; use binary blob */
-                                    ζ->child_fn    = bb_eps_emit_binary();
+                                    /* EM-RAW-PURGE-1: TODO Phase B — replace with patnd_make_eps + bb_build_flat */
+                                    ζ->child_fn    = NULL;
                                     ζ->child_state = NULL;
                                     ζ->child_size  = 0;
                                 }
@@ -646,8 +645,8 @@ static DESCR_t bb_deferred_var(void *zeta, int entry)
                             }
                         } else if (val.v == DT_S && val.s) {
                             /* String value: always treat as fresh literal.
-                             * EDP-9: bb_lit C box deleted; use bb_lit_emit_binary. */
-                            bb_box_fn lfn = bb_lit_emit_binary(val.s, (int)strlen(val.s));
+                             * EM-RAW-PURGE-1: TODO Phase B — replace with patnd_make_xchr + bb_build_flat */
+                            bb_box_fn lfn = NULL;
                             if (lfn && lfn != ζ->child_fn) {
                                 ζ->child_fn    = lfn;
                                 ζ->child_state = NULL;
@@ -656,8 +655,8 @@ static DESCR_t bb_deferred_var(void *zeta, int entry)
                             }
                         } else {
                             if (!ζ->child_fn) {
-                                /* EDP-9: bb_eps C box deleted; use binary blob */
-                                ζ->child_fn    = bb_eps_emit_binary();
+                                /* EM-RAW-PURGE-1: TODO Phase B — replace with patnd_make_eps + bb_build_flat */
+                                ζ->child_fn    = NULL;
                                 ζ->child_state = NULL;
                                 ζ->child_size  = 0;
                                 rebuilt = 1;
@@ -867,15 +866,15 @@ int exec_stmt(const char  *subj_name,
             }
         }
         if (!bin_done) {
-            /* EDP-9: Non-flat-eligible patterns fall back to epsilon binary blob. */
-            root.fn     = bb_eps_emit_binary();
+            /* EM-RAW-PURGE-1: TODO Phase B — replace with patnd_make_eps + bb_build_flat */
+            root.fn     = NULL;
             root.ζ      = NULL;
             root.ζ_size = 0;
         }
     } else if (pat.v == DT_S && pat.s) {
         int bin_done = 0;
-        {   /* EDP-9: use bb_lit_emit_binary for all modes (no C bb_lit box) */
-            bb_box_fn bfn = bb_lit_emit_binary(pat.s, (int)strlen(pat.s));
+        {   /* EM-RAW-PURGE-1: TODO Phase B — replace with patnd_make_xchr + bb_build_flat */
+            bb_box_fn bfn = NULL;
             if (bfn) {
                 root.fn  = bfn;
                 root.ζ   = NULL;
@@ -884,16 +883,14 @@ int exec_stmt(const char  *subj_name,
             }
         }
         if (!bin_done) {
-            /* bb_lit_emit_binary failed (pool exhausted) — epsilon binary fallback */
-            root.fn     = bb_eps_emit_binary();
+            /* EM-RAW-PURGE-1: TODO Phase B — replace with patnd_make_eps + bb_build_flat */
+            root.fn     = NULL;
             root.ζ      = NULL;
             root.ζ_size = 0;
         }
     } else {
-        /* EDP-9: bb_eps C box deleted; use bb_eps_emit_binary */
-        bb_box_fn efn = bb_eps_emit_binary();
-        if (efn) { root.fn = efn; root.ζ = NULL; root.ζ_size = 0; }
-        else { root.fn = NULL; root.ζ = NULL; root.ζ_size = 0; }
+        /* EM-RAW-PURGE-1: TODO Phase B — replace with patnd_make_eps + bb_build_flat */
+        root.fn = NULL; root.ζ = NULL; root.ζ_size = 0;
     }
 
     /* ── Phase 3: run match ─────────────────────────────────────────── */
@@ -1163,7 +1160,8 @@ int deferred_var_test(void)
     bb_box_fn bfn = bb_build_brokered(&dsar_node);
     bb_node_t dvar;
     if (bfn) { dvar.fn = bfn; dvar.ζ = NULL; dvar.ζ_size = 0; }
-    else { dvar.fn = bb_eps_emit_binary(); dvar.ζ = NULL; dvar.ζ_size = 0; }
+    else { /* EM-RAW-PURGE-1: TODO Phase B — replace with patnd_make_eps + bb_build_flat */
+           dvar.fn = NULL; dvar.ζ = NULL; dvar.ζ_size = 0; }
 
     int ok = 1;
 
