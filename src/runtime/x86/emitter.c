@@ -50,7 +50,7 @@ static void emit3c_jmp(emitter_t *e, const char *mn, const char *target)
 
 /* ── emit_insn — binary bytes AND text mnemonic, side by side ────────────── */
 
-static void unified_emit_insn(emitter_t *e, const bb_insn_desc_t *d)
+static void emit_insn(emitter_t *e, const bb_insn_desc_t *d)
 {
     int txt = e->is_text;
     uint64_t a0 = d->a0;
@@ -211,7 +211,7 @@ static void unified_emit_insn(emitter_t *e, const bb_insn_desc_t *d)
 
 /* ── label_define ─────────────────────────────────────────────────────────── */
 
-static void unified_label_define(emitter_t *e, bb_label_t *lbl)
+static void label_define(emitter_t *e, bb_label_t *lbl)
 {
     if (e->is_text) {
         char lbuf[256]; snprintf(lbuf, sizeof(lbuf), "%s:", lbl->name);
@@ -225,7 +225,7 @@ static void unified_label_define(emitter_t *e, bb_label_t *lbl)
 
 /* ── emit_jmp ─────────────────────────────────────────────────────────────── */
 
-static void unified_emit_jmp(emitter_t *e, bb_label_t *target, jmp_kind_t kind)
+static void do_emit_jmp(emitter_t *e, bb_label_t *target, jmp_kind_t kind)
 {
     static const char *mn[] = {"jmp","je","jne","jl","jge","jg"};
     int k = (int)kind < 6 ? (int)kind : 0;
@@ -244,7 +244,7 @@ static void unified_emit_jmp(emitter_t *e, bb_label_t *target, jmp_kind_t kind)
 
 /* ── global_sym ───────────────────────────────────────────────────────────── */
 
-static void unified_global_sym(emitter_t *e, const char *name)
+static void global_sym(emitter_t *e, const char *name)
 {
     if (e->is_text) bb3c_format(outf(e), "", ".global", name ? name : "");
     /* binary: no-op */
@@ -252,7 +252,7 @@ static void unified_global_sym(emitter_t *e, const char *name)
 
 /* ── fprintf_raw ──────────────────────────────────────────────────────────── */
 
-static void unified_fprintf_raw(emitter_t *e, const char *fmt, ...)
+static void fprintf_raw(emitter_t *e, const char *fmt, ...)
 {
     if (!e->is_text) return;
     bb3c_flush_pending_cjmp_only();
@@ -261,26 +261,26 @@ static void unified_fprintf_raw(emitter_t *e, const char *fmt, ...)
 
 /* ── pos ──────────────────────────────────────────────────────────────────── */
 
-static int unified_pos(emitter_t *e)
+static int pos(emitter_t *e)
 { return e->is_text ? CTX(e)->pos : bb_emit_pos; }
 
 /* ── structural markers ───────────────────────────────────────────────────── */
 
-static void unified_label_name(emitter_t *e, const char *name)
+static void label_name(emitter_t *e, const char *name)
 {
     if (!e->is_text) return;
     char lbuf[256]; snprintf(lbuf, sizeof(lbuf), "%s:", name ? name : "");
     bb3c_format(outf(e), lbuf, "", "");
 }
 
-static void unified_pc_label(emitter_t *e, int pc)
+static void pc_label(emitter_t *e, int pc)
 {
     if (!e->is_text) return;
     char lbuf[64]; snprintf(lbuf, sizeof(lbuf), ".L%d:", pc);
     bb3c_format(outf(e), lbuf, "", "");
 }
 
-static void unified_section(emitter_t *e, const char *name)
+static void section(emitter_t *e, const char *name)
 {
     if (!e->is_text || !name) return;
     bb3c_flush_pending_cjmp_only();
@@ -291,7 +291,7 @@ static void unified_section(emitter_t *e, const char *name)
         fprintf(outf(e), ".section %s\n", name);
 }
 
-static void unified_directive(emitter_t *e, const char *line)
+static void directive(emitter_t *e, const char *line)
 {
     if (!e->is_text || !line) return;
     bb3c_flush_pending_cjmp_only();
@@ -300,7 +300,7 @@ static void unified_directive(emitter_t *e, const char *line)
 
 /* ── data emission ────────────────────────────────────────────────────────── */
 
-static void unified_data_quad(emitter_t *e, uint64_t val)
+static void data_quad(emitter_t *e, uint64_t val)
 {
     if (e->is_text) {
         char buf[40]; snprintf(buf, sizeof(buf), "0x%llx", (unsigned long long)val);
@@ -310,13 +310,13 @@ static void unified_data_quad(emitter_t *e, uint64_t val)
     }
 }
 
-static void unified_data_quad_sym(emitter_t *e, const char *sym)
+static void data_quad_sym(emitter_t *e, const char *sym)
 {
     if (e->is_text) bb3c_format(outf(e), "", ".quad", sym ? sym : "0");
     /* binary: in-process JIT has no linker; no-op until mode-4 needs it */
 }
 
-static void unified_data_string(emitter_t *e, const char *bytes, size_t len)
+static void data_string(emitter_t *e, const char *bytes, size_t len)
 {
     if (!bytes) return;
     if (e->is_text) {
@@ -339,7 +339,7 @@ static void unified_data_string(emitter_t *e, const char *bytes, size_t len)
     }
 }
 
-static void unified_data_long(emitter_t *e, int32_t val)
+static void data_long(emitter_t *e, int32_t val)
 {
     if (e->is_text) {
         char buf[24]; snprintf(buf, sizeof(buf), "%d", (int)val);
@@ -353,7 +353,7 @@ static void unified_data_long(emitter_t *e, int32_t val)
 
 /* ── BB-specific compound emissions ──────────────────────────────────────── */
 
-static void unified_bb_zeta_rdi(emitter_t *e, uint64_t ptr, const char *sym)
+static void bb_zeta_rdi(emitter_t *e, uint64_t ptr, const char *sym)
 {
     if (e->is_text) {
         char arg[128]; snprintf(arg, sizeof(arg), "rdi, [rip + %s]", sym ? sym : "0");
@@ -363,7 +363,7 @@ static void unified_bb_zeta_rdi(emitter_t *e, uint64_t ptr, const char *sym)
     }
 }
 
-static void unified_bb_dispatch_jne_jmp(emitter_t *e,
+static void bb_dispatch_jne_jmp(emitter_t *e,
                                         bb_label_t *lbl_succ, bb_label_t *lbl_fail)
 {
     if (e->is_text) {
@@ -388,14 +388,14 @@ static const char *greek_for_port(char port)
                     case 'g': return "γ"; case 'o': return "ω"; default: return "?"; }
 }
 
-static void unified_bb_port_label(emitter_t *e, const char *pfx, char port)
+static void bb_port_label(emitter_t *e, const char *pfx, char port)
 {
     if (!e->is_text) return;
     char lbuf[256]; snprintf(lbuf, sizeof(lbuf), "%s_%s:", pfx?pfx:"", greek_for_port(port));
     bb3c_format(outf(e), lbuf, "", "");
 }
 
-static void unified_bb_port_jmp(emitter_t *e, const char *pfx, char port)
+static void bb_port_jmp(emitter_t *e, const char *pfx, char port)
 {
     if (!e->is_text) return;
     char tbuf[256]; snprintf(tbuf, sizeof(tbuf), "%s_%s", pfx?pfx:"", greek_for_port(port));
@@ -403,7 +403,7 @@ static void unified_bb_port_jmp(emitter_t *e, const char *pfx, char port)
     CTX(e)->pos += 5;
 }
 
-static void unified_bb_box_banner(emitter_t *e, const char *kind, const char *args)
+static void bb_box_banner(emitter_t *e, const char *kind, const char *args)
 {
     if (!e->is_text) return;
     bb3c_flush_pending_cjmp_only();
@@ -414,10 +414,10 @@ static void unified_bb_box_banner(emitter_t *e, const char *kind, const char *ar
 
 /* ── formatting / readability (text-only) ─────────────────────────────────── */
 
-static void unified_comment(emitter_t *e, const char *text)
+static void comment(emitter_t *e, const char *text)
 { if (!e->is_text) return; bb3c_flush_pending_cjmp_only(); fprintf(outf(e),"    # %s\n",text?text:""); }
 
-static void unified_banner(emitter_t *e, const char *text)
+static void banner(emitter_t *e, const char *text)
 {
     if (!e->is_text) return;
     bb3c_flush_pending_cjmp_only(); FILE *f = outf(e);
@@ -426,7 +426,7 @@ static void unified_banner(emitter_t *e, const char *text)
     fputs("#",f); for(int i=1;i<120;i++) fputc('=',f); fputc('\n',f);
 }
 
-static void unified_minor_break(emitter_t *e, const char *text)
+static void minor_break(emitter_t *e, const char *text)
 {
     if (!e->is_text) return;
     bb3c_flush_pending_cjmp_only(); FILE *f = outf(e);
@@ -434,14 +434,14 @@ static void unified_minor_break(emitter_t *e, const char *text)
     if (text && *text) fprintf(f,"    # %s\n",text);
 }
 
-static void unified_blank_line(emitter_t *e)
+static void blank_line(emitter_t *e)
 { if (!e->is_text) return; bb3c_flush_pending_cjmp_only(); fputc('\n',outf(e)); }
 
 /* ── macro hooks ──────────────────────────────────────────────────────────── */
 
 static int g_text_macro_suppress = 0;
 
-static void unified_macro_begin(emitter_t *e, const char *name,
+static void macro_begin(emitter_t *e, const char *name,
                                 const char *const *params, int nparams)
 {
     if (!e->is_text) return;
@@ -458,49 +458,49 @@ static void unified_macro_begin(emitter_t *e, const char *name,
     }
 }
 
-static void unified_macro_param_ref(emitter_t *e, const char *name)
+static void macro_param_ref(emitter_t *e, const char *name)
 { if (e->is_text && e->text_mode==TEXT_MODE_DEFINITION) fprintf(outf(e),"\\%s",name?name:"?"); }
 
-static void unified_macro_end(emitter_t *e)
+static void macro_end(emitter_t *e)
 {
     if (!e->is_text) return;
     if (e->text_mode==TEXT_MODE_DEFINITION) { bb3c_flush_pending_cjmp_only(); fputs(".endm\n",outf(e)); }
     else g_text_macro_suppress = 0;
 }
 
-static void unified_pad_to_blob_size(emitter_t *e) { (void)e; }
+static void pad_to_blob_size(emitter_t *e) { (void)e; }
 
 /* ── vtable template ──────────────────────────────────────────────────────── */
 
 static const emitter_t emitter_tmpl = {
-    .emit_insn           = unified_emit_insn,
-    .label_define        = unified_label_define,
-    .emit_jmp            = unified_emit_jmp,
-    .global_sym          = unified_global_sym,
-    .fprintf_raw         = unified_fprintf_raw,
-    .pos                 = unified_pos,
+    .emit_insn           = emit_insn,
+    .label_define        = label_define,
+    .emit_jmp = do_emit_jmp,
+    .global_sym          = global_sym,
+    .fprintf_raw         = fprintf_raw,
+    .pos                 = pos,
     .intern_str          = NULL,
-    .label_name          = unified_label_name,
-    .pc_label            = unified_pc_label,
-    .section             = unified_section,
-    .directive           = unified_directive,
-    .data_quad           = unified_data_quad,
-    .data_quad_sym       = unified_data_quad_sym,
-    .data_string         = unified_data_string,
-    .data_long           = unified_data_long,
-    .bb_zeta_rdi         = unified_bb_zeta_rdi,
-    .bb_dispatch_jne_jmp = unified_bb_dispatch_jne_jmp,
-    .pad_to_blob_size    = unified_pad_to_blob_size,
-    .bb_port_label       = unified_bb_port_label,
-    .bb_port_jmp         = unified_bb_port_jmp,
-    .bb_box_banner       = unified_bb_box_banner,
-    .comment             = unified_comment,
-    .banner              = unified_banner,
-    .minor_break         = unified_minor_break,
-    .blank_line          = unified_blank_line,
-    .macro_begin         = unified_macro_begin,
-    .macro_param_ref     = unified_macro_param_ref,
-    .macro_end           = unified_macro_end,
+    .label_name          = label_name,
+    .pc_label            = pc_label,
+    .section             = section,
+    .directive           = directive,
+    .data_quad           = data_quad,
+    .data_quad_sym       = data_quad_sym,
+    .data_string         = data_string,
+    .data_long           = data_long,
+    .bb_zeta_rdi         = bb_zeta_rdi,
+    .bb_dispatch_jne_jmp = bb_dispatch_jne_jmp,
+    .pad_to_blob_size    = pad_to_blob_size,
+    .bb_port_label       = bb_port_label,
+    .bb_port_jmp         = bb_port_jmp,
+    .bb_box_banner       = bb_box_banner,
+    .comment             = comment,
+    .banner              = banner,
+    .minor_break         = minor_break,
+    .blank_line          = blank_line,
+    .macro_begin         = macro_begin,
+    .macro_param_ref     = macro_param_ref,
+    .macro_end           = macro_end,
     .text_mode           = TEXT_MODE_INVOCATION,
     .is_text             = 0,
     .ctx                 = NULL,
