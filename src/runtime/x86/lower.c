@@ -59,6 +59,11 @@ static LabelTable   g_labtab;
 static int          g_in_proc_body;
 static IcnScope    *g_proc_scope;
 static unsigned long long g_unhandled_kinds[LOWER_UNHANDLED_WORDS];
+/* IJ-9: tracks whether lower_expr is being called in a value/arg context
+ * (inside a function arg list, binop, etc.) rather than as a bare statement.
+ * When > 0, TT_EVERY emits SM_BB_EVAL (value-context: fails as expression)
+ * rather than SM_BB_PUMP_EVERY (statement: runs for side effects). */
+static int          g_in_value_ctx;
 /* GOAL-ICON-BB-COMPLETE rung13: per-compile slot counter for SM_GEN_TICK.
  * Each lower_every call claims a unique slot in FRAME.every_gen[]. Reset in sm_lower(). */
 static int          g_every_gen_slot_next = 0;
@@ -895,6 +900,19 @@ static void lower_every(const tree_t *t)
     const tree_t *gen_expr = t->c[0];
     const tree_t *body     = (t->n > 1) ? t->c[1] : NULL;
 
+    /* IJ-9: TT_EVERY in expression/value context (arg to a function, operand of
+     * a binop, etc.) — in JCON semantics `every` always fails as an expression.
+     * Route through SM_BB_EVAL → bb_eval_value(TT_EVERY) which runs the generator
+     * to exhaustion for side effects and returns FAILDESCR to the caller.
+     * Statement-context `every` (bare statement, g_in_value_ctx <= 1) keeps the
+     * SM_BB_PUMP_EVERY path which drives for side effects and pushes NULVCL.
+     * g_in_value_ctx == 1: lower_stmt called lower_expr(this_stmt) — still top-level.
+     * g_in_value_ctx >= 2: lower_expr_inner called lower_expr(sub_expr) — value context. */
+    if (g_lang == LANG_ICN && g_in_value_ctx >= 2) {
+        sm_emit_i(g_p, SM_BB_EVAL, (int64_t)every_table_register((tree_t *)t));
+        return;
+    }
+
     /* GOAL-ICON-BB-COMPLETE rung14: TT_LIMIT in generator — pure SM limit coroutine */
     if (g_lang == LANG_ICN && gen_expr->t == TT_LIMIT) {
         lower_limit_every(gen_expr, body);
@@ -1137,9 +1155,18 @@ emit_gotos:
  * Pattern primitives all delegate to lower_pat_expr (they carry no extra state).
  * TT_REVASSIGN / TT_REVSWAP fall to default until implemented.
  *────────────────────────────────────────────────────────────────────────────*/
+/* IJ-9: lower_expr_inner is the dispatch body; lower_expr wraps it with
+ * g_in_value_ctx tracking so lower_every can detect expression context. */
+static void lower_expr_inner(const tree_t *t);
 void lower_expr(const tree_t *t)
 {
     if (!t) { sm_emit(g_p, SM_PUSH_NULL); return; }
+    g_in_value_ctx++;
+    lower_expr_inner(t);
+    g_in_value_ctx--;
+}
+static void lower_expr_inner(const tree_t *t)
+{
     switch (t->t) {
     /* literals */
     case TT_QLIT:                             lower_strlit(t);        return;

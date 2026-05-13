@@ -1261,7 +1261,7 @@ DESCR_t bb_eval_value(tree_t *e)
             }
             FRAME.loop_break = 0;
             FRAME.loop_next  = 0;
-            return NULVCL;
+            return FAILDESCR;  /* IJ-9: every always fails as expression */
         }
         if (gen->t == TT_SEQ && gen->n >= 2 && is_suspendable(gen->c[0])) {
             tree_t *filter = gen->c[0];
@@ -1276,7 +1276,7 @@ DESCR_t bb_eval_value(tree_t *e)
             }
             FRAME.loop_break = 0;
             FRAME.loop_next  = 0;
-            return NULVCL;
+            return FAILDESCR;  /* IJ-9: every always fails as expression */
         }
         bb_node_t box = coro_eval(gen);
         int caller_depth = frame_depth;
@@ -1305,7 +1305,10 @@ DESCR_t bb_eval_value(tree_t *e)
         }
         FRAME.loop_break = 0;
         FRAME.loop_next  = 0;
-        return NULVCL;
+        /* IJ-9: JCON semantics — `every` in expression context always fails.
+         * The generator ran for side effects; return FAILDESCR so the caller
+         * (e.g. image(every...) | "none") sees failure and takes the alt branch. */
+        return FAILDESCR;
     }
 
     /* TT_INITIAL — once-only block; side-effects only, returns NULVCL.

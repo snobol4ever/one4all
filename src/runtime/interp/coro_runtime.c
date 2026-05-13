@@ -774,7 +774,11 @@ int is_suspendable(tree_t *e) {
     if (!e) return 0;
     switch (e->t) {
         case TT_TO: case TT_TO_BY: case TT_ITERATE: case TT_ALTERNATE:
-        case TT_SUSPEND: case TT_LIMIT: case TT_EVERY:
+        case TT_SUSPEND: case TT_LIMIT:
+        /* IJ-9: TT_EVERY removed — `every` in expression context always fails
+         * (JCON semantics). Marking it suspendable caused coro_eval to build
+         * coro_bb_every boxes that yielded the gen value to the outer caller,
+         * making image(every...) return a value instead of failing. */
         case TT_BANG_BINARY: case TT_SEQ_EXPR:
             return 1;
         case TT_FNC:
