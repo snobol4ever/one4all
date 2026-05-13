@@ -55,6 +55,27 @@ extern rtab_t *bb_rtab_new(int n);
 extern rem_t  *bb_rem_new(void);
 /* ------------------------------------------------ */
 
+/* EC-4: Pattern-C helper — both α and β fail (or succeed) with no state.
+ * xcat/xor: α falls through to β label then fails; β also fails.
+ * xfail/xvar/xabrt: α fails; β label; β fails. */
+static void emit_bb_jmp_pair(const char *banner,
+                              bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β,
+                              int beta_first)
+{
+    (void)lbl_succ;
+    t_bb_box_banner(banner, "");
+    if (beta_first) {
+        t_label_define(lbl_β);
+        t_emit_jmp(lbl_fail, JMP_JMP);
+        t_emit_jmp(lbl_fail, JMP_JMP);
+    } else {
+        t_emit_jmp(lbl_fail, JMP_JMP);
+        t_label_define(lbl_β);
+        t_emit_jmp(lbl_fail, JMP_JMP);
+    }
+}
+
+
 /* EC-3: Pattern-B helper — banner + alloc-already-done + two port_calls.
  * zeta must be allocated by the caller before invoking this helper. */
 static void emit_bb_stateful(const char *banner, const char *arg,
@@ -167,13 +188,7 @@ void emit_bb_icon_to_by(emitter_t *e,
 void emit_bb_xabrt(emitter_t *e,
                    bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
-    (void)e; (void)lbl_succ;
-    t_bb_box_banner("ABORT", "");
-    /* α: always fail */
-    t_emit_jmp(lbl_fail, JMP_JMP);
-    t_label_define(lbl_β);
-    /* β: always fail */
-    t_emit_jmp(lbl_fail, JMP_JMP);
+    (void)e; emit_bb_jmp_pair("ABORT", lbl_succ, lbl_fail, lbl_β, 0);
 }
 /*====================================================================================================================*/
 void emit_bb_xarbn(emitter_t *e, bb_box_fn child_fn,
@@ -252,11 +267,7 @@ void emit_bb_xcallcap(emitter_t *e, bb_box_fn child_fn,
 void emit_bb_xcat(emitter_t *e,
                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
-    (void)e;
-    t_bb_box_banner("CAT", "");
-    t_label_define(lbl_β);
-    t_emit_jmp(lbl_fail, JMP_JMP);
-    t_emit_jmp(lbl_fail, JMP_JMP);
+    (void)e; emit_bb_jmp_pair("CAT", lbl_succ, lbl_fail, lbl_β, 1);
 }
 /*====================================================================================================================*/
 #define TEMPLATE_ADDR_SIGMA   ((uint64_t)(uintptr_t)&Σ)
@@ -360,11 +371,7 @@ void emit_bb_xeps(emitter_t *e,
 void emit_bb_xfail(emitter_t *e,
                    bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
-    (void)e; (void)lbl_succ;
-    t_bb_box_banner("FAIL", "");
-    t_emit_jmp(lbl_fail, JMP_JMP);
-    t_label_define(lbl_β);
-    t_emit_jmp(lbl_fail, JMP_JMP);
+    (void)e; emit_bb_jmp_pair("FAIL", lbl_succ, lbl_fail, lbl_β, 0);
 }
 /*====================================================================================================================*/
 void emit_bb_xfarb(emitter_t *e,
@@ -440,11 +447,7 @@ void emit_bb_xnme(emitter_t *e, bb_box_fn child_fn, const char *varname,
 void emit_bb_xor(emitter_t *e,
                  bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
-    (void)e;
-    t_bb_box_banner("ALT", "");
-    t_label_define(lbl_β);
-    t_emit_jmp(lbl_fail, JMP_JMP);
-    t_emit_jmp(lbl_fail, JMP_JMP);
+    (void)e; emit_bb_jmp_pair("ALT", lbl_succ, lbl_fail, lbl_β, 1);
 }
 /*====================================================================================================================*/
 void emit_bb_xposi(emitter_t *e, int n,
@@ -528,10 +531,6 @@ void emit_bb_xtb(emitter_t *e, long long num,
 void emit_bb_xvar(emitter_t *e,
                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
-    (void)e; (void)lbl_succ;
-    t_bb_box_banner("VAR", "");
-    t_label_define(lbl_β);
-    t_emit_jmp(lbl_fail, JMP_JMP);
-    t_emit_jmp(lbl_fail, JMP_JMP);
+    (void)e; emit_bb_jmp_pair("VAR", lbl_succ, lbl_fail, lbl_β, 1);
 }
 /*====================================================================================================================*/
