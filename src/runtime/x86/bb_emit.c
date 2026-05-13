@@ -1824,8 +1824,8 @@ void t_load_siglen_sub_cmp_delta(int n, uint64_t siglen_addr,
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         FILE *f = emit_outf();
         char args[64];
-        snprintf(args, sizeof(args), "rcx, 0x%llx", (unsigned long long)siglen_addr);
-        bb3c_format(f, "", "mov", args);
+        /* EM-BB-TEXT-ADDR: RIP-relative lea, not literal address */
+        bb3c_format(f, "", "lea", "rcx, [rip + Î£len]");
         bb3c_format(f, "", "mov", "eax, [rcx]");
         snprintf(args, sizeof(args), "eax, %d", n);
         bb3c_format(f, "", "sub", args);
@@ -1961,8 +1961,8 @@ void t_sigma_plus_delta_to_rdi(uint64_t sigma_addr, uint64_t siglen_addr)
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         FILE *f = emit_outf();
         char args[80];
-        snprintf(args, sizeof(args), "rcx, 0x%llx", (unsigned long long)sigma_addr);
-        bb3c_format(f, "", "mov", args);
+        /* EM-BB-TEXT-ADDR: RIP-relative lea, not literal address */
+        bb3c_format(f, "", "lea", "rcx, [rip + Î£]");
         bb3c_format(f, "", "mov", "rax, [rcx]");
         bb3c_format(f, "", "movsxd", "rcx, [r10]");
         bb3c_format(f, "", "lea", "rax, [rax+rcx]");
@@ -2007,9 +2007,8 @@ void t_bounds_check_delta_plus_len(int len, uint64_t siglen_addr, bb_label_t *lb
         bb3c_format(f, "", "mov", "eax, [r10]");
         char args[32]; snprintf(args, sizeof(args), "eax, %d", len);
         bb3c_format(f, "", "add", args);
-        snprintf(args, sizeof(args), "0x%llx", (unsigned long long)siglen_addr);
-        char full[80]; snprintf(full, sizeof(full), "rcx, %s", args);
-        bb3c_format(f, "", "mov", full);
+        /* EM-BB-TEXT-ADDR: RIP-relative lea, not literal address */
+        bb3c_format(f, "", "lea", "rcx, [rip + Î£len]");
         bb3c_format(f, "", "cmp", "eax, [rcx]");
         t_emit_jmp(lbl_fail, JMP_JG);
         return;
