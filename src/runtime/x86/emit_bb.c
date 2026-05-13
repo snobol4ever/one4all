@@ -1,5 +1,5 @@
 #include "emitter.h"
-#include "emitter_bb_gen.h"
+#include "emit_bb_gen.h"
 #include "bb_box.h"
 #include "templates.h"
 #include "../frontend/icon/icon_gen.h"
@@ -7,7 +7,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
-#include "bb_flat.h"
+#include "emit_bb_flat.h"
 #include "../rt/rt.h"
 
 /*---- all extern declarations in one block -------------------------------------------------------------------------*/

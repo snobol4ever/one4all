@@ -22,9 +22,9 @@
  * (mismatched arg count, undefined macro, etc.) -- we cannot ship a
  * silently-wrong byte stream.
  */
-#include "emitter_sm_template.h"
+#include "emit_sm_template.h"
 #include "sm_prog.h"
-#include "emitter_bb_gen.h"     /* EM-FORMAT-BB: bb3c_format for unified label fusion */
+#include "emit_bb_gen.h"     /* EM-FORMAT-BB: bb3c_format for unified label fusion */
 
 #include <assert.h>
 #include <inttypes.h>

@@ -344,7 +344,7 @@ void rt_patch_cap_fn(void *cap_ptr, void *child_fn)
 }
 
 /* EM-7c-arbno: allocate a fresh arbno_t for a baked ARBNO blob.
- * bb_arbno_new is declared in bb_box.h via the opaque extern in bb_flat.c.
+ * bb_arbno_new is declared in bb_box.h via the opaque extern in emitter_bb_flat.c.
  * Here we call it directly since libscrip_rt.so links bb_boxes.c. */
 extern void *bb_arbno_new(void *fn, void *state);  /* arbno_t* opaque */
 void rt_init_arbno(void **slot_ptr, void *child_fn)

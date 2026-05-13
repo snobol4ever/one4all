@@ -24,7 +24,7 @@
  * this one header. */
 #include "snobol4.h"          /* DESCR_t, SPEC_t (transitive deps of patnd) */
 #include "emitter.h"          /* emitter_t */
-#include "emitter_bb_gen.h"          /* bb_label_t */
+#include "emit_bb_gen.h"          /* bb_label_t */
 #include "snobol4_patnd.h"    /* PATND_t */
 
 /* ── SM opcode templates ──────────────────────────────────────────────── */
@@ -53,7 +53,7 @@ void emit_bb_xchr(PATND_t *p,
 
 /* Charset-family (SPAN/BREAK/ANY/NOTANY) — sub-rung -e (2026-05-11).
  * EM-TEMPLATE-PURITY-2: callback params removed; t_bb_port_call used. */
-#include "bb_flat.h"   /* bb_box_fn */
+#include "emit_bb_flat.h"   /* bb_box_fn */
 
 void emit_bb_charset(bb_box_fn c_fn,
                      const char *c_fn_name,

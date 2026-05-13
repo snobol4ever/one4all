@@ -9,24 +9,24 @@
  * Authors: Lon Jones Cherryholmes · Claude Sonnet 4.6
  */
 
-#include "sm_codegen.h"
+#include "emit_sm_text.h"
 #include "sm_image.h"
 #include "sm_prog.h"
 #include "snobol4.h"
 #include "bb_broker.h"
-#include "emitter_bb_gen.h"
+#include "emit_bb_gen.h"
 #include "emitter.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 
-#include "emitter_sm_template.h" /* sm_op_template_t, emit_sm_args_t (ESP-13) */
-#include "bb_flat.h"              /* bb_build_flat_text (ESP-13) */
+#include "emit_sm_template.h" /* sm_op_template_t, emit_sm_args_t (ESP-13) */
+#include "emit_bb_flat.h"              /* bb_build_flat_text (ESP-13) */
 #include <assert.h>               /* assert() used in sm_codegen_text (ESP-13) */
 
 /* emitter_sm.c exports — no separate header exists; declare here (ESP-15) */
-#include "emitter_sm_template.h"
+#include "emit_sm_template.h"
 void emit_sm_op(int op);
 void emit_sm_halt(void);
 void emit_sm_return(void);
@@ -264,7 +264,7 @@ static void strtab_label(char *buf, size_t bufsz, const char *s)
 }
 
 /* EM-7c-symbolic: intern_str callback installed on text emitters so that
- * bb_flat.c can route literal strings through the SM-side .Lstr_N strtab.
+ * emitter_bb_flat.c can route literal strings through the SM-side .Lstr_N strtab.
  * Uses a static buffer — safe because callers only need the label momentarily
  * to build a bb_insn_desc_t.sym before emit_insn consumes it. */
 static char g_intern_str_buf[64];
@@ -1284,7 +1284,7 @@ static int emit_sm_pat_deref_dispatch(FILE *out, int pc)    { (void)pc; edp4_lab
  *
  * flat_is_eligible_node(p):
  *   Local, per-node invariance check — does NOT recurse into children.
- *   Matches the node-kind exclusion list in bb_flat.c:flat_is_eligible(),
+ *   Matches the node-kind exclusion list in emitter_bb_flat.c:flat_is_eligible(),
  *   but only for the single node.  The recursive whole-tree check is now
  *   `patnd_is_fully_invariant()` below (replaces the original).
  *

@@ -4,7 +4,7 @@
  * See bb_emit.h for design notes.
  */
 
-#include "emitter_bb_gen.h"
+#include "emit_bb_gen.h"
 #include "emitter.h"
 
 #include <stdio.h>

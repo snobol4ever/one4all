@@ -20,7 +20,7 @@
 
 #include "emitter.h"
 #include "templates.h"
-#include "emitter_bb_gen.h"
+#include "emit_bb_gen.h"
 #include <stdio.h>
 #include <stdlib.h>
 

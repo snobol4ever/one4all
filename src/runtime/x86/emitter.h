@@ -24,7 +24,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdarg.h>
-#include "emitter_bb_gen.h"   /* bb_emit_mode_t, bb_label_t, jmp_kind_t, bb_buf_t */
+#include "emit_bb_gen.h"   /* bb_emit_mode_t, bb_label_t, jmp_kind_t, bb_buf_t */
 
 /*============================================================================
  * Global emitter state (set by emitter_init_*; read by all emit functions)

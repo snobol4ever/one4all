@@ -52,7 +52,7 @@ extern void ir_print_node_nl(const tree_t *e, FILE *f);
 #include "runtime/x86/sm_interp.h"
 #include "runtime/x86/sm_prog.h"
 #include "runtime/x86/bb_build.h"
-#include "runtime/x86/sm_codegen.h"
+#include "runtime/x86/emit_sm_binary.h"
 #include "runtime/x86/sm_image.h"
 
 extern DESCR_t pat_at_cursor(const char *varname);

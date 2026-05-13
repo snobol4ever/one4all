@@ -1,5 +1,5 @@
 /*
- * bb_flat.h — Flat-Glob Invariant Pattern Emitter (M-DYN-FLAT)
+ * emit_bb_flat.h — Flat-Glob Invariant Pattern Emitter (M-DYN-FLAT)
  *
  * bb_build_flat(p) walks an entire invariant PATND_t tree and emits
  * ALL sub-box code into ONE contiguous buffer with direct jmps between

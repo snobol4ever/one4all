@@ -43,7 +43,7 @@
  * Date: 2026-04-07 (M-JIT-RUN), 2026-05-10 (ME-2 r12 reservation, ME-3 native blobs)
  */
 
-#include "sm_codegen.h"
+#include "emit_sm_binary.h"
 #include "sm_image.h"
 #include "sm_prog.h"
 #include "sm_interp.h"   /* SM_State, sm_push, sm_pop, sm_state_init */
@@ -54,7 +54,7 @@
 #include "bb_broker.h"   /* SN-9b: SM_BB_PUMP / SM_BB_ONCE handlers */
 #include "../../runtime/interp/coro_runtime.h"  /* GOAL-ICON-BB-COMPLETE rung13: FRAME, EVERY_GEN_SLOT_MAX, IcnFrame */
 #include "templates.h"  /* binary template dispatch */
-#include "emitter_bb_gen.h"              /* BB emitter */
+#include "emit_bb_gen.h"              /* BB emitter */
 #include "emitter.h"              /* emitter_t stub */
 
 /* GOAL-ICON-BB-COMPLETE Phase A: file-scope externs for tripwire + bridge counter.
