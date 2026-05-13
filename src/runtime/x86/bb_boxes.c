@@ -3,7 +3,7 @@
  * AUTHORS: Lon Jones Cherryholmes · Jeffrey Cooper M.D. · Claude Sonnet 4.6
  */
 #include "bb_box.h"
-#include "bb_convert.h"
+/* bb_convert.h removed EST-4 */
 #include "snobol4.h"
 #include <stdio.h>
 #include <stdlib.h>

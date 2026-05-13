@@ -43,26 +43,12 @@
  * empty (σ == NULL) signals failure (ω port fired).
  * This matches test_sno_*.c exactly.
  */
-typedef struct { const char *σ; int δ; } spec_t;
-
-/* The failure sentinel */
-static const spec_t spec_empty = { (const char *)0, 0 };
-
-/* Construct a str_t from pointer and length */
-static inline spec_t spec(const char *σ, int δ) { return (spec_t){ σ, δ }; }
-
-/* Concatenate two substrings (they must be contiguous in the subject) */
-static inline spec_t spec_cat(spec_t x, spec_t y)   { return (spec_t){ x.σ, x.δ + y.δ }; }
-
-/* Test for failure sentinel */
-static inline bool spec_is_empty(spec_t x)           { return x.σ == (const char *)0; }
-
-/* descr_match — construct a DT_S match DESCR_t from (σ, δ) without going through spec_t.
+/* descr_match — construct a DT_S match DESCR_t from (σ, δ).
  * EST-2: direct replacement for spec(σ,δ)+descr_from_spec() in rt.c / bb_boxes.c. */
 static inline DESCR_t descr_match(const char *σ, int δ) {
     DESCR_t d; d.v = DT_S; d.slen = (uint32_t)δ; d.s = (char *)σ; return d;
 }
-/* descr_match_cat — concatenate two contiguous match descriptors (EST-2 replaces spec_cat). */
+/* descr_match_cat — concatenate two contiguous match descriptors. */
 static inline DESCR_t descr_match_cat(DESCR_t x, DESCR_t y) {
     DESCR_t d; d.v = DT_S; d.slen = x.slen + y.slen; d.s = x.s; return d;
 }
@@ -163,7 +149,7 @@ typedef struct cap_s {
     void        *state;
     int          immediate;
     NAME_t       name;
-    DESCR_t      pending;   /* EST-2: was spec_t — DESCR_t (dead field, never read) */
+    DESCR_t      pending;   /* EST-4: dead field (never read); kept for struct ABI stability */
     int          has_pending;
     int          registered;
 } cap_t;

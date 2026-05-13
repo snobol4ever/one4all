@@ -6,7 +6,7 @@
 #define BB_BROKER_H
 
 #include "bb_box.h"
-#include "bb_convert.h"   /* descr_from_spec, spec_from_descr */
+/* bb_convert.h removed EST-4 */
 #include "snobol4.h"      /* DESCR_t, FAILDESCR, IS_FAIL_fn, α, β */
 
 /*------------------------------------------------------------------------------------------------------------------------------

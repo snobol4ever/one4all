@@ -1354,7 +1354,7 @@ __attribute__((weak)) int _expr_is_pat(tree_t *e)          { (void)e; return 0; 
  * Called from x86 blobs via PLT.  Replacing the old bb_* C-ABI box functions.
  * ABI: DESCR_t fn(void *zeta, int port)  — same as old bb_* ABI, but renamed
  *      and living in libscrip_rt.so so PLT calls resolve correctly. */
-#include "../../runtime/x86/bb_convert.h"
+/* bb_convert.h removed EST-4 */
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>

@@ -77,7 +77,7 @@ extern DESCR_t (*g_user_call_hook)(const char *name, DESCR_t *args, int nargs);
  * We must NOT include bb_box.h after snobol4.h (spec_t conflict).
  * Instead we redeclare bb_box.h's types manually here. */
 #include "snobol4.h"
-#include "bb_convert.h" /* spec_from_descr / descr_from_spec — U-5 */
+/* bb_convert.h removed EST-4: spec_from_descr / descr_from_spec no longer used */
 #include "bb_broker.h"  /* bb_broker, BB_SCAN — U-9 */
 #include "sil_macros.h"   /* SIL macro translations — RT + SM axes */
 #include "bb_build.h"
