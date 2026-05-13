@@ -75,12 +75,7 @@ RT_PIC_SRCS := \
     $(RT)/x86/eval_code.c \
     $(RT)/x86/eval_pat.c \
     $(RT)/x86/bb_pool.c \
-    $(RT)/x86/insn.c \
-    $(RT)/x86/emit_text.c \
-    $(RT)/x86/emit_label_new.c \
-    $(RT)/x86/emit_seq.c \
-    $(RT)/x86/emit_mode.c \
-    $(RT)/x86/emit_flat.c \
+    $(RT)/x86/emit_core.c \
     $(RT)/x86/emit_bb.c \
     $(RT)/x86/emit_sm.c \
     \
@@ -92,7 +87,6 @@ RT_PIC_SRCS := \
     $(RT)/x86/lower_ctx.c \
     $(RT)/x86/sm_image.c \
     $(RT)/x86/emit_sm_binary.c \
-    $(RT)/x86/emit_walk.c \
     $(SRC)/runtime/interp/coro_runtime.c \
     $(SRC)/runtime/interp/coro_value.c \
     $(SRC)/runtime/interp/coro_stmt.c \
@@ -234,12 +228,7 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/stmt_exec.c                  -o $(OBJ)/stmt_exec.o
 	$(CC) $(CRT)   -c $(RT)/x86/eval_code.c                  -o $(OBJ)/eval_code.o
 	$(CC) $(CRT)   -c $(RT)/x86/bb_pool.c                    -o $(OBJ)/bb_pool.o
-	$(CC) $(CRT)   -c $(RT)/x86/insn.c                    -o $(OBJ)/insn.o
-	$(CC) $(CRT)   -c $(RT)/x86/emit_label_new.c          -o $(OBJ)/emit_label_new.o
-	$(CC) $(CRT)   -c $(RT)/x86/emit_text.c               -o $(OBJ)/emit_text.o
-	$(CC) $(CRT)   -c $(RT)/x86/emit_seq.c                -o $(OBJ)/emit_seq.o
-	$(CC) $(CRT)   -c $(RT)/x86/emit_mode.c               -o $(OBJ)/emit_mode.o
-	$(CC) $(CRT)   -c $(RT)/x86/emit_flat.c                       -o $(OBJ)/emit_flat.o
+	$(CC) $(CRT)   -c $(RT)/x86/emit_core.c               -o $(OBJ)/emit_core.o
 	$(CC) $(CRT) -c $(RT)/x86/bb_boxes.c -o $(OBJ)/bb_boxes.o
 	$(CC) $(CRT) -c $(RT)/x86/bb_broker.c -o $(OBJ)/bb_broker.o
 	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -DIR_DEFINE_NAMES \
@@ -285,9 +274,8 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/lower_ctx.c  -o $(OBJ)/lower_ctx.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_image.c   -o $(OBJ)/sm_image.o
 	$(CC) $(CRT)   -c $(RT)/x86/emit_sm_binary.c -o $(OBJ)/emit_sm_binary.o
-	$(CC) $(CRT)   -c $(RT)/x86/emit_walk.c -o $(OBJ)/emit_walk.o
 	$(CC) $(CRT)   -c $(RT)/x86/emit_sm.c -o $(OBJ)/emit_sm.o
-	$(CC) $(CRT)   -c $(RT)/x86/emit_bb.c -o $(OBJ)/emit_bb_box.o
+	$(CC) $(CRT)   -c $(RT)/x86/emit_bb.c -o $(OBJ)/emit_bb.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/rt/rt.c   -o $(OBJ)/rt.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_globals.c -o $(OBJ)/interp_globals.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_label.c   -o $(OBJ)/interp_label.o

@@ -92,7 +92,7 @@
  */
 
 #include "sm_prog.h"
-#include "emit_sm_text.h"
+#include "emit_sm.h"
 
 #include <stdio.h>
 #include <stdlib.h>

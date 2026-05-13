@@ -26,7 +26,7 @@
 #include <assert.h>
 
 #include "snobol4.h"
-#include "emit_bb_flat.h"
+#include "emit_bb.h"
 #include "bb_pool.h"
 #include "emit.h"
 

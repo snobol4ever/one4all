@@ -82,7 +82,7 @@ extern DESCR_t (*g_user_call_hook)(const char *name, DESCR_t *args, int nargs);
 #include "sil_macros.h"   /* SIL macro translations — RT + SM axes */
 #include "bb_build.h"
 #include "bb_pool.h"              /* bb_pool_reset (EM-7d) */
-#include "emit_bb_flat.h"         /* bb_build_flat / bb_build_brokered — EM-RAW-PURGE-1 */
+#include "emit_bb.h"         /* bb_build_flat / bb_build_brokered — EM-RAW-PURGE-1 */
 /* rt_in_native_chunk lives in libscrip_rt.so (mode-4 only).  In the scrip
  * binary (mode-1/2/3) it is never set — provide a weak fallback that returns
  * 0 so the call resolves cleanly even when libscrip_rt is not linked. */

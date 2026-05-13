@@ -23,7 +23,7 @@ void emit_bb_xchr(PATND_t *p,
                   bb_label_t *lbl_β);
 
 
-#include "emit_bb_flat.h"
+#include "emit_bb.h"
 
 void emit_bb_charset(bb_box_fn c_fn,
                      const char *c_fn_name,

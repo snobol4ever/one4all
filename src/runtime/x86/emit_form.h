@@ -1,9 +1,7 @@
 #ifndef EMIT_FORM_H
 #define EMIT_FORM_H
 
-#include "emit_defs.h"
-#include "emit_buf.h"
-#include "emit.h"
+#include "emit_core.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
