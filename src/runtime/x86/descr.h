@@ -34,6 +34,7 @@ typedef enum {
     DT_N    =  9,   /* NAME    — l-value reference              */
     DT_K    = 10,   /* KEYWORD — protected variable             */
     DT_E    = 11,   /* EXPRESSION — unevaluated                 */
+    DT_FH   = 12,   /* FILE HANDLE — raku_fh slot index in .i  */
     DT_FAIL = 99,   /* failure sentinel (our invention)         */
     DT_DATA = 100,  /* first user-defined DT_DATA type          */
 } DTYPE_t;
@@ -67,5 +68,10 @@ typedef struct DESCR_t {
  *----------------------------------------------------------------------------------------------------------------------------*/
 #define FAILDESCR    ((DESCR_t){ .v = DT_FAIL, .i = 0 })
 static inline int IS_FAIL_fn(DESCR_t v) { return v.v == DT_FAIL; }
+
+/* DT_FH — file handle sentinel; .i holds the raku_fh slot index.
+ * Standard slots: 0=stdin, 1=stdout, 2=stderr (matches &input/&output/&errout). */
+#define FHVAL(idx_) ((DESCR_t){ .v = DT_FH, .i = (int64_t)(idx_) })
+static inline int IS_FH_fn(DESCR_t v) { return v.v == DT_FH; }
 
 #endif /* DESCR_H */

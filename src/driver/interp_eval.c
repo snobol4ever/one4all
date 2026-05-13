@@ -319,34 +319,50 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
     if (!strcmp(fn, "FAIL"))    { *out = FAILDESCR; return 1; }
     if (!strcmp(fn, "SUCCEED")) { *out = NULVCL;    return 1; }
     /* write(x1,...,xN) — concatenate all args, append newline.
-     * Icon semantics: any FAIL arg propagates; &null arg writes empty. */
+     * Icon semantics: any FAIL arg propagates; &null arg writes empty.
+     * IJ-13c: if first arg is DT_FH, route all subsequent args to that FILE*. */
     if (!strcmp(fn, "write")) {
-        for (int _wi = 0; _wi < nargs; _wi++) {
+        int start = 0;
+        FILE *dest = stdout;
+        if (nargs > 0 && IS_FH_fn(args[0])) {
+            FILE *fp = raku_fh_get((int)args[0].i);
+            if (fp) dest = fp;
+            start = 1;
+        }
+        for (int _wi = start; _wi < nargs; _wi++) {
             DESCR_t av = args[_wi];
             if (IS_FAIL_fn(av)) { *out = FAILDESCR; return 1; }
             if (av.v == DT_SNUL) continue;   /* &null → empty */
-            if (IS_INT_fn(av))       printf("%lld", (long long)av.i);
-            else if (IS_REAL_fn(av)) { char _rb[64]; printf("%s", real_str(av.r,_rb,sizeof _rb)); }
+            if (IS_INT_fn(av))       fprintf(dest, "%lld", (long long)av.i);
+            else if (IS_REAL_fn(av)) { char _rb[64]; fprintf(dest, "%s", real_str(av.r,_rb,sizeof _rb)); }
             /* IJ-11: cset — print the char content directly */
-            else if (IS_CSET_fn(av)) { if (av.s) fwrite(av.s, 1, strlen(av.s), stdout); }
-            else { const char *s = VARVAL_fn(av); if (s) fputs(s, stdout); }
+            else if (IS_CSET_fn(av)) { if (av.s) fwrite(av.s, 1, strlen(av.s), dest); }
+            else { const char *s = VARVAL_fn(av); if (s) fputs(s, dest); }
         }
-        putchar('\n');
-        *out = nargs > 0 ? args[nargs-1] : NULVCL;
+        fputc('\n', dest);
+        *out = nargs > start ? args[nargs-1] : (nargs > 0 ? args[0] : NULVCL);
         return 1;
     }
-    /* writes(x1,...,xN) — same but no newline */
+    /* writes(x1,...,xN) — same but no newline.
+     * IJ-13c: if first arg is DT_FH, route to that FILE*. */
     if (!strcmp(fn, "writes")) {
-        for (int _wi = 0; _wi < nargs; _wi++) {
+        int start = 0;
+        FILE *dest = stdout;
+        if (nargs > 0 && IS_FH_fn(args[0])) {
+            FILE *fp = raku_fh_get((int)args[0].i);
+            if (fp) dest = fp;
+            start = 1;
+        }
+        for (int _wi = start; _wi < nargs; _wi++) {
             DESCR_t av = args[_wi];
             if (IS_FAIL_fn(av)) { *out = FAILDESCR; return 1; }
             if (av.v == DT_SNUL) continue;
-            if (IS_INT_fn(av))       printf("%lld", (long long)av.i);
-            else if (IS_REAL_fn(av)) { char _rb[64]; printf("%s", real_str(av.r,_rb,sizeof _rb)); }
-            else if (IS_CSET_fn(av)) { if (av.s) fwrite(av.s, 1, strlen(av.s), stdout); }
-            else { const char *s = VARVAL_fn(av); if (s) fputs(s, stdout); }
+            if (IS_INT_fn(av))       fprintf(dest, "%lld", (long long)av.i);
+            else if (IS_REAL_fn(av)) { char _rb[64]; fprintf(dest, "%s", real_str(av.r,_rb,sizeof _rb)); }
+            else if (IS_CSET_fn(av)) { if (av.s) fwrite(av.s, 1, strlen(av.s), dest); }
+            else { const char *s = VARVAL_fn(av); if (s) fputs(s, dest); }
         }
-        *out = nargs > 0 ? args[nargs-1] : NULVCL;
+        *out = nargs > start ? args[nargs-1] : (nargs > 0 ? args[0] : NULVCL);
         return 1;
     }
     /* CH-17g-runtime-bridge-3 (2026-05-09): single-arg pure value-transforms.
@@ -1445,22 +1461,22 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         int idx = raku_fh_alloc(fp);
         if (idx < 0) { fclose(fp); *out = FAILDESCR; return 1; }
         if (idx >= 0 && idx < RAKU_FH_MAX) raku_fh_name[idx] = GC_strdup(path);  /* IJ-3 */
-        *out = INTVAL(idx); return 1;
+        *out = FHVAL(idx); return 1;
     }
 
     /* close(fh) — close a file handle. */
     if (!strcmp(fn,"close") && nargs == 1) {
-        if (IS_INT_fn(args[0])) {
+        if (IS_FH_fn(args[0]) || IS_INT_fn(args[0])) {
             int idx = (int)args[0].i;
             FILE *fp = raku_fh_get(idx);
-            if (fp) { fclose(fp); raku_fh_free(idx); }
+            if (fp && idx > 2) { fclose(fp); raku_fh_free(idx); } /* never close std streams */
         }
         *out = args[0]; return 1;
     }
 
     /* read(fh) — read one line from file handle. */
     if (!strcmp(fn,"read") && nargs == 1) {
-        FILE *fp = IS_INT_fn(args[0]) ? raku_fh_get((int)args[0].i) : NULL;
+        FILE *fp = (IS_FH_fn(args[0]) || IS_INT_fn(args[0])) ? raku_fh_get((int)args[0].i) : NULL;
         if (!fp) { *out = FAILDESCR; return 1; }
         char buf[4096];
         if (!fgets(buf, sizeof buf, fp)) { *out = FAILDESCR; return 1; }
@@ -1472,7 +1488,7 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
 
     /* reads(fh, n) — read n bytes from file handle. */
     if (!strcmp(fn,"reads") && nargs == 2) {
-        FILE *fp = IS_INT_fn(args[0]) ? raku_fh_get((int)args[0].i) : NULL;
+        FILE *fp = (IS_FH_fn(args[0]) || IS_INT_fn(args[0])) ? raku_fh_get((int)args[0].i) : NULL;
         if (!fp) { *out = FAILDESCR; return 1; }
         int n = (int)to_int(args[1]);
         if (n <= 0) { *out = FAILDESCR; return 1; }
@@ -2047,9 +2063,9 @@ DESCR_t icn_kw_read(const char *kw) {
     if (!strcmp(kw,"fail"))    return FAILDESCR;
     if (!strcmp(kw,"window"))  return NULVCL;
     /* I/O stream file handles — raku_fh_table[0]=stdin,[1]=stdout,[2]=stderr */
-    if (!strcmp(kw,"input"))   { raku_fh_ensure_init(); return INTVAL(0); }
-    if (!strcmp(kw,"output"))  { raku_fh_ensure_init(); return INTVAL(1); }
-    if (!strcmp(kw,"errout"))  { raku_fh_ensure_init(); return INTVAL(2); }
+    if (!strcmp(kw,"input"))   { raku_fh_ensure_init(); return FHVAL(0); }
+    if (!strcmp(kw,"output"))  { raku_fh_ensure_init(); return FHVAL(1); }
+    if (!strcmp(kw,"errout"))  { raku_fh_ensure_init(); return FHVAL(2); }
     /* Co-expression self-reference */
     if (!strcmp(kw,"current")) return STRVAL("co-expression_1(0)");
     if (!strcmp(kw,"main"))    return STRVAL("co-expression_1(0)");
@@ -2169,25 +2185,31 @@ DESCR_t interp_eval(tree_t *e)
             if (!strcmp(fn,"write")) {
                 if (nargs == 0) { printf("\n"); return NULVCL; }
                 /* Icon write/writes: evaluate ALL args first; fail (no output) if any fails.
-                 * IC-9: pre-fix evaluated and printed incrementally, so writes("x",fail())
-                 * would print "x" before failing — wrong.  Now buffers args first. */
+                 * IJ-13c: if first arg is DT_FH, route to that FILE*. */
                 DESCR_t *vals = (DESCR_t *)GC_malloc((size_t)nargs * sizeof(DESCR_t));
                 for (int _wi = 0; _wi < nargs; _wi++) {
                     vals[_wi] = interp_eval(e->c[1+_wi]);
                     if (IS_FAIL_fn(vals[_wi])) return FAILDESCR;
                 }
-                DESCR_t last = NULVCL;
-                for (int _wi = 0; _wi < nargs; _wi++) {
+                int start = 0;
+                FILE *dest = stdout;
+                if (nargs > 0 && IS_FH_fn(vals[0])) {
+                    FILE *fp = raku_fh_get((int)vals[0].i);
+                    if (fp) dest = fp;
+                    start = 1;
+                }
+                DESCR_t last = start > 0 ? vals[0] : NULVCL;
+                for (int _wi = start; _wi < nargs; _wi++) {
                     DESCR_t a = vals[_wi];
                     last = a;
                     if (a.v == DT_SNUL) continue;
-                    if (IS_INT_fn(a)) printf("%lld",(long long)a.i);
-                    else if (IS_REAL_fn(a)) { char _rb[64]; printf("%s",real_str(a.r,_rb,sizeof _rb)); }
+                    if (IS_INT_fn(a)) fprintf(dest, "%lld",(long long)a.i);
+                    else if (IS_REAL_fn(a)) { char _rb[64]; fprintf(dest, "%s",real_str(a.r,_rb,sizeof _rb)); }
                     /* IJ-11: cset */
-                    else if (IS_CSET_fn(a)) { if (a.s) fwrite(a.s, 1, strlen(a.s), stdout); }
-                    else { const char *s=VARVAL_fn(a); if (s) fputs(s, stdout); }
+                    else if (IS_CSET_fn(a)) { if (a.s) fwrite(a.s, 1, strlen(a.s), dest); }
+                    else { const char *s=VARVAL_fn(a); if (s) fputs(s, dest); }
                 }
-                putchar('\n');
+                fputc('\n', dest);
                 return last;
             }
             if (!strcmp(fn,"read") && nargs == 0) {
