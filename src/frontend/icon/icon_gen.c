@@ -113,7 +113,11 @@ DESCR_t coro_bb_iterate(void *zeta, int entry) {
     if (z->pos >= z->len) return FAILDESCR;
     z->ch[0] = z->str[z->pos];
     z->ch[1] = '\0';
-    return (DESCR_t){ .v = DT_S, .slen = 1, .s = z->ch };
+    /* IJ-14: must not return z->ch directly — callers like put(L,!s) store
+     * the DESCR_t.s pointer; all stored entries would alias the same z->ch
+     * buffer and see the last character.  GC_strdup gives each tick its own
+     * allocation so stored descriptors are independent. */
+    return (DESCR_t){ .v = DT_S, .slen = 1, .s = GC_strdup(z->ch) };
 }
 
 /*============================================================================================================================

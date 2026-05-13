@@ -1021,11 +1021,13 @@ DESCR_t bb_eval_value(tree_t *e)
         long cur; const char *sv;
         if (icn_frame_lookup_sv(e, &cur, &sv)) {
             if (sv) {
-                /* char-iteration: return single-char string at cur */
-                static char buf[2];
-                buf[0] = sv[cur];
-                buf[1] = '\0';
-                return STRVAL(buf);
+                /* char-iteration: return single-char string at cur.
+                 * IJ-14: must NOT use a static buf — every put(L,!s) stores
+                 * the returned DESCR_t.s pointer; a shared static means all
+                 * stored entries alias the same byte and see the last char.
+                 * Use GC_strdup for a fresh allocation each tick. */
+                char tmp[2]; tmp[0] = sv[cur]; tmp[1] = '\0';
+                return STRVAL(GC_strdup(tmp));
             }
             /* numeric iteration */
             return INTVAL(cur);
