@@ -9,9 +9,10 @@
 #include <stdint.h>
 
 bb_emit_mode_t  bb_emit_mode = EMIT_TEXT;
-FILE           *bb_emit_out  = NULL;
+FILE           *bb_emit_out  = NULL;   /* set by caller; defaults to stdout */
 
-
+/* EM-BB-FORMAT: set by --bb-format; BB templates emit 3-col macro invocations
+ * in TEXT mode instead of raw GAS.  0 = legacy raw-GAS (default). */
 int g_bb_emit_format = 0;
 
 int emit_bb_is_format_mode(void) {
@@ -19,9 +20,12 @@ int emit_bb_is_format_mode(void) {
            (bb_emit_mode == EMIT_TEXT || bb_emit_mode == EMIT_TEXT_INLINE);
 }
 
-
-static char g_fmt_label[BB_LABEL_NAME_MAX + 4];
-static char g_fmt_body[512];
+/* EM-BB-FORMAT-ARCH: port-context accumulator.
+ * In FORMAT mode, body helpers append instruction fragments here.
+ * emit_label_define saves the port label without emitting.
+ * emit_jmp flushes one 4-column ;-fused line: LABEL: ; body ; jXX target */
+static char g_fmt_label[BB_LABEL_NAME_MAX + 4];  /* "LABEL:" or "" */
+static char g_fmt_body[512];                       /* accumulated col2+col3 */
 
 static void fmt_label_save(bb_label_t *lbl) {
     if (lbl && lbl->name[0]) snprintf(g_fmt_label, sizeof(g_fmt_label), "%s:", lbl->name);
@@ -35,7 +39,7 @@ void fmt_body_append(const char *instr, const char *operands) {
     strncat(g_fmt_body, frag, sizeof(g_fmt_body) - strlen(g_fmt_body) - 1);
 }
 static void fmt_flush_jmp(const char *mn, bb_label_t *target) {
-
+    /* Emit: COL1(24) COL2(16) COL3(body ; jXX target) */
     FILE *f = bb_emit_out ? bb_emit_out : stdout;
     char jmp_part[BB_LABEL_NAME_MAX + 16];
     snprintf(jmp_part, sizeof(jmp_part), "%s %s", mn, target->name);
@@ -68,7 +72,10 @@ int             bb_emit_size = 0;
 bb_patch_t      bb_patch_list[BB_PATCH_MAX];
 int             bb_patch_count = 0;
 
-
+/* Set by emit_macro_begin in TEXT mode; cleared by emit_macro_end.
+ * When set, t_* body helpers are no-ops: TEXT mode emits only the macro
+ * invocation line (via emit_macro_begin) — the body instructions are the
+ * macro definition (MACRO_DEF) or the BINARY emission path, not TEXT. */
 static int g_in_text_macro_body = 0;
 
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
@@ -78,7 +85,18 @@ void emit_mode_set(bb_emit_mode_t m, FILE *out)
     bb_emit_out  = out;
 }
 
-/* Each helper below contains the full three-way decision.  Templates call */
+/*
+ * Each helper below contains the full three-way decision.  Templates call
+ * them as plain C functions (no `e` argument, no vtable indirection).
+ * The mode is bb_emit_mode, set by emit_mode_set() at the top of the pass.
+ *
+ * "Do nothing" is one of the three things a helper may do (e.g. comments
+ * are no-ops in binary mode; instruction encoding is a no-op in macro_def
+ * mode if the macro body is defined elsewhere).
+ *
+ * Helpers are added incrementally as templates are ported.  Each call site
+ * in the templates points at the free-standing helper instead of e->method.
+ */
 
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_comment(const char *text)
@@ -86,7 +104,7 @@ void emit_comment(const char *text)
     FILE *f;
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         return;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
@@ -105,7 +123,7 @@ void emit_bb_box_banner(const char *kind, const char *args)
     FILE *f;
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         return;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
@@ -122,7 +140,15 @@ void emit_bb_box_banner(const char *kind, const char *args)
     }
 }
 
-/* Each instruction helper renders the same x86 effect three ways. */
+/*
+ * Each instruction helper renders the same x86 effect three ways.
+ * BINARY:    write the exact byte sequence into bb_emit_buf via bb_emit_byte.
+ * TEXT:      write a three-column GAS line via bb3c_format(out, "", mn, args).
+ * MACRO_DEF: write the instruction as a line of a `.macro` body — currently
+ *            the same form as TEXT (GAS syntax inside .macro is the same
+ *            as outside); future shape with `\param` substitution will
+ *            diverge here.
+ */
 
 static FILE *emit_outf(void) { return bb_emit_out ? bb_emit_out : stdout; }
 
@@ -131,7 +157,7 @@ void emit_bb_inc_mem_r13_disp8(uint8_t disp)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:   {
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */ {
         bb_emit_byte(0x41); bb_emit_byte(0xFF);
         bb_emit_byte(0x45); bb_emit_byte(disp);
         return;
@@ -194,7 +220,11 @@ void emit_pop_rbp_frame_ret(void)
     }
 }
 
-/* EM-BB-PURGE-1 / EDP-6 — C-ABI wrapper helpers for brokered blobs. */
+/* EM-BB-PURGE-1 / EDP-6 — C-ABI wrapper helpers for brokered blobs.
+ * emit_brokered_prologue: push rbp; mov rbp, rsp
+ * emit_brokered_epilogue_ret(result): mov eax, result; pop rbp; ret
+ * The broker calls fn(zeta, port) via C call; these establish/tear down the
+ * frame around the flat BB body (which is identical in WIRED and BROKERED). */
 
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_brokered_prologue(void)
@@ -202,8 +232,8 @@ void emit_brokered_prologue(void)
     switch (bb_emit_mode) {
     case EMIT_BINARY_BROKERED:
     case EMIT_BINARY_WIRED:
-        bb_emit_byte(0x55);
-        bb_emit_byte(0x48); bb_emit_byte(0x89); bb_emit_byte(0xE5);
+        bb_emit_byte(0x55);                              /* push rbp */
+        bb_emit_byte(0x48); bb_emit_byte(0x89); bb_emit_byte(0xE5); /* mov rbp, rsp */
         return;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
@@ -226,8 +256,8 @@ void emit_brokered_epilogue_ret(int result)
         bb_emit_byte((uint8_t)((uint32_t)result >>  8));
         bb_emit_byte((uint8_t)((uint32_t)result >> 16));
         bb_emit_byte((uint8_t)((uint32_t)result >> 24));
-        bb_emit_byte(0x5D);
-        bb_emit_byte(0xC3);
+        bb_emit_byte(0x5D);   /* pop rbp */
+        bb_emit_byte(0xC3);   /* ret */
         return;
     }
     case EMIT_TEXT_INLINE:
@@ -247,10 +277,13 @@ void emit_brokered_epilogue_ret(int result)
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_pad_to_blob_size(void)
 {
-
+    /* No-op in all three modes today: mode-3 uses variable-size blobs
+     * (per-pc address table in g_blob_addrs[]); mode-4 has no fixed-blob
+     * concept; macro_def bodies don't carry blob sizes.  Kept as a hook
+     * for a future architecture where fixed-size dispatch slots return. */
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
@@ -263,7 +296,7 @@ void emit_macro_begin(const char *name, const char *const *params, int nparams)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         return;
     case EMIT_TEXT_INLINE: return;
     case EMIT_TEXT: {
@@ -275,7 +308,7 @@ void emit_macro_begin(const char *name, const char *const *params, int nparams)
                     params && params[i] ? params[i] : "?");
         }
         fputc('\n', f);
-        g_in_text_macro_body = 1;
+        g_in_text_macro_body = 1;  /* suppress body t_* calls until emit_macro_end */
         return;
     }
     case EMIT_MACRO_DEF: {
@@ -287,7 +320,7 @@ void emit_macro_begin(const char *name, const char *const *params, int nparams)
                     params && params[i] ? params[i] : "?");
         }
         fputc('\n', f);
-        g_in_text_macro_body = 1;
+        g_in_text_macro_body = 1;  /* allow body t_* output until emit_macro_end */
         return;
     }
     }
@@ -298,16 +331,16 @@ void emit_macro_end(void)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         return;
     case EMIT_TEXT_INLINE: return;
     case EMIT_TEXT:
-        g_in_text_macro_body = 0;
+        g_in_text_macro_body = 0;  /* body suppression ends here */
         return;
     case EMIT_MACRO_DEF:
         bb3c_flush_pending_cjmp_only();
         fputs(".endm\n", emit_outf());
-        g_in_text_macro_body = 0;
+        g_in_text_macro_body = 0;  /* body ends */
         return;
     }
 }
@@ -326,13 +359,13 @@ void emit_jmp(bb_label_t *target, jmp_kind_t kind)
         bb3c_emit_jmp(emit_outf(), mn, target->name);
         return;
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         switch (kind) {
         case JMP_JMP: bb_insn_jmp_rel32(target);  return;
-        case JMP_JE:  bb_insn_je_rel32(target);   return;
-        case JMP_JNE: bb_insn_jne_rel32(target);  return;
-        case JMP_JL:  bb_insn_jl_rel32(target);   return;
-        case JMP_JGE: bb_insn_jge_rel32(target);  return;
+        case JMP_JE:  bb_insn_je_rel32(target);   return;   /* rel32: no overflow on large blobs */
+        case JMP_JNE: bb_insn_jne_rel32(target);  return;   /* rel32: no overflow on large blobs */
+        case JMP_JL:  bb_insn_jl_rel32(target);   return;   /* rel32: no overflow on large blobs */
+        case JMP_JGE: bb_insn_jge_rel32(target);  return;   /* rel32: no overflow on large blobs */
         case JMP_JG:  bb_insn_jg_rel32(target);   return;
         }
         return;
@@ -342,15 +375,25 @@ void emit_jmp(bb_label_t *target, jmp_kind_t kind)
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_lea_rdi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr)
 {
-
+    /* Load address of a strtab string into rdi.
+     *
+     *   BINARY:    movabs rdi, <in_proc_ptr>    — 10 bytes: 48 BF <8>
+     *              In-process JIT: the strtab string is already in memory;
+     *              bake its address directly.  Same encoding as emit_mov_rdi_imm64.
+     *
+     *   TEXT:      lea rdi, [rip + sym_label]   — 7 bytes at link time;
+     *              GAS assembles this as a RIP-relative LEA (opcode 48 8D 3D).
+     *
+     *   MACRO_DEF: `lea rdi, [rip + \lbl]`      — same as TEXT but \lbl
+     *              is the macro parameter name, not a concrete label. */
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         emit_mov_rdi_imm64(in_proc_ptr);
         return;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT: {
-        if (g_in_text_macro_body) return;
+        if (g_in_text_macro_body) return;  /* TEXT: suppress macro body */
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         char args[80];
         snprintf(args, sizeof(args), "rdi, [rip + %s]",
@@ -368,10 +411,16 @@ void emit_lea_rdi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr)
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_lea_rdx_strtab_sym(const char *sym_label, uint64_t in_proc_ptr)
 {
-
+    /* Load address of a strtab string into rdx.  Parallel to
+     * emit_lea_rdi_strtab_sym; used for the third argument (namelist) in
+     * SM_PAT_CAPTURE_FN and SM_PAT_CAPTURE_FN_ARGS templates.
+     *
+     *   BINARY:    movabs rdx, <in_proc_ptr>  — 10 bytes: 48 BA <8>
+     *   TEXT:      lea rdx, [rip + sym_label]
+     *   MACRO_DEF: lea rdx, [rip + \namelist_lbl] */
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:   {
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */ {
         uint64_t v = in_proc_ptr;
         bb_emit_byte(0x48); bb_emit_byte(0xBA);
         bb_emit_byte((uint8_t)(v      )); bb_emit_byte((uint8_t)(v >>  8));
@@ -382,7 +431,7 @@ void emit_lea_rdx_strtab_sym(const char *sym_label, uint64_t in_proc_ptr)
     }
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT: {
-        if (g_in_text_macro_body) return;
+        if (g_in_text_macro_body) return;  /* TEXT: suppress macro body */
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         char args[80];
         snprintf(args, sizeof(args), "rdx, [rip + %s]",
@@ -401,7 +450,7 @@ void emit_mov_edx_imm32(int val)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:   {
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */ {
         uint32_t u = (uint32_t)val;
         bb_emit_byte(0xBA);
         bb_emit_byte((uint8_t)(u      )); bb_emit_byte((uint8_t)(u >>  8));
@@ -410,7 +459,7 @@ void emit_mov_edx_imm32(int val)
     }
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT: {
-        if (g_in_text_macro_body) return;
+        if (g_in_text_macro_body) return;  /* TEXT: suppress macro body */
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         char args[32];
         snprintf(args, sizeof(args), "edx, %d", val);
@@ -428,7 +477,7 @@ void emit_mov_edi_imm32(int val)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:   {
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */ {
         uint32_t u = (uint32_t)val;
         bb_emit_byte(0xBF);
         bb_emit_byte((uint8_t)(u      ));
@@ -439,7 +488,7 @@ void emit_mov_edi_imm32(int val)
     }
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT: {
-        if (g_in_text_macro_body) return;
+        if (g_in_text_macro_body) return;  /* TEXT: suppress macro body */
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         char args[32];
         snprintf(args, sizeof(args), "edi, %d", val);
@@ -455,16 +504,20 @@ void emit_mov_edi_imm32(int val)
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_jz_retskip(int pc)
 {
-
+    /* jz .Lretskip_<pc>  — conditional jump to the skip label.
+     *   BINARY:    0F 84 <rel32>  (forward ref; patch needed — not wired yet)
+     *   TEXT:      jz  .Lretskip_<pc>
+     *   MACRO_DEF: jz  .Lretskip_\pc\()   (GAS param ref + empty paste) */
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:
-
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
+        /* Mode-3 uses standard_blob; template not called in BINARY mode.
+         * Emit NOP placeholder so binary mode is at least structurally safe. */
         bb_emit_byte(0x90);
         return;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT: {
-        if (g_in_text_macro_body) return;
+        if (g_in_text_macro_body) return;  /* TEXT: suppress macro body */
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         char args[40];
         snprintf(args, sizeof(args), ".Lretskip_%d", pc);
@@ -482,11 +535,11 @@ void emit_retskip_label(int pc)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         return;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT: {
-        if (g_in_text_macro_body) return;
+        if (g_in_text_macro_body) return;  /* TEXT: suppress macro body */
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         FILE *f = emit_outf();
         fprintf(f, ".Lretskip_%d:\n", pc);
@@ -505,7 +558,7 @@ void emit_movabs_rdi_entry(uint64_t entry_ptr)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:   {
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */ {
         uint64_t v = entry_ptr;
         bb_emit_byte(0x48); bb_emit_byte(0xBF);
         bb_emit_byte((uint8_t)(v      )); bb_emit_byte((uint8_t)(v >>  8));
@@ -516,7 +569,7 @@ void emit_movabs_rdi_entry(uint64_t entry_ptr)
     }
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT: {
-        if (g_in_text_macro_body) return;
+        if (g_in_text_macro_body) return;  /* TEXT: suppress macro body */
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         char args[32];
         snprintf(args, sizeof(args), "rdi, 0x%llx", (unsigned long long)entry_ptr);
@@ -534,8 +587,8 @@ void emit_call_sym_param(const char *sym_or_param)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:
-
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
+        /* BINARY path uses standard_blob; this helper is TEXT/MACRO_DEF only. */
         return;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT: {
@@ -551,10 +604,15 @@ void emit_call_sym_param(const char *sym_or_param)
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_noop_macro(const char *macro_name)
 {
-
+    /* NOOP shape: emit one three-column line with macro_name in col 2.
+     * The .LpcN: label preceding this line is consumed by bb3c_format's
+     * label-pickup path; the macro body is empty so it assembles to nothing.
+     *   BINARY:    no-op — label is placed by bb_label_define; no bytes emitted.
+     *   TEXT:      three-column line, col2 = macro_name, no operands.
+     *   MACRO_DEF: same as TEXT. */
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         return;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
@@ -572,7 +630,7 @@ void emit_banner_stno(int stno, int lineno, const char *src_text)
     "#=======================================================================================================================\n"
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         return;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
@@ -650,7 +708,7 @@ void bb_label_define(bb_label_t *lbl)
         }
 
         bb_patch_list[i] = bb_patch_list[--bb_patch_count];
-        i--;
+        i--;   /* re-check this slot */
     }
 }
 
@@ -707,7 +765,7 @@ void bb_emit_patch_rel8(bb_label_t *lbl)
     bb_patch_list[bb_patch_count].label = lbl;
     bb_patch_list[bb_patch_count].kind  = PATCH_REL8;
     bb_patch_count++;
-    bb_emit_byte(0x00);
+    bb_emit_byte(0x00);   /* placeholder */
 }
 
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
@@ -733,10 +791,26 @@ void bb_emit_patch_rel32(bb_label_t *lbl)
     bb_patch_list[bb_patch_count].label = lbl;
     bb_patch_list[bb_patch_count].kind  = PATCH_REL32;
     bb_patch_count++;
-    bb_emit_u32(0x00000000);
+    bb_emit_u32(0x00000000);   /* placeholder */
 }
 
-/* EM-7b: byte primitives are dual-mode. */
+/*
+ * EM-7b: byte primitives are dual-mode.
+ *
+ * BINARY: write to bb_emit_buf, advance bb_emit_pos, bounds-check.
+ * TEXT:   emit ".byte 0xNN" line to bb_emit_out.  No buffer, no
+ *         bounds check.  bb_emit_pos still advances so that any code
+ *         interested in "how far have I emitted" sees a consistent
+ *         counter — but TEXT-mode label patching does not need it
+ *         (jumps go through symbolic helpers like bb_insn_jmp_rel32
+ *         which emit "jmp <name>" and let the assembler resolve).
+ *
+ * Path 1 from the EM-7b scoping audit (sess #74): preserves bb_flat.c
+ * call sites unchanged.  The resulting .s contains walls of .byte
+ * directives — acceptable for now per the readability standard
+ * (mode-4 readability lives in the SM-side emitter; BB-box bytes
+ * may be raw .byte sequences linked via external α/β/γ/ω labels).
+ */
 
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 void bb_emit_byte(uint8_t b)
@@ -818,19 +892,106 @@ void bb_text_comment(const char *fmt, ...)
     fprintf(f, "\n");
 }
 
+/* ── BB three-column line emission (EM-7c-bb-three-column) ──────────────────
+ *
+ *   LABEL:                  ACTION           GOTO
+ *   col 1 (24 wide)         col 2 (16 wide)  col 3 (free)
+ *
+ * EM-7c-s-file-beautify (2026-05-09): removed the literal `;` separators
+ * that the prior PARTIAL rung introduced.  The shape now matches SM-side
+ * (`emit_three_column_line` in sm_codegen_x64_emit.c, sm_line, and
+ * emit_sm_template's `render_call_line`) — one printf format
+ * `%-24s%-16s %s\n` shared across the entire `.s` file.
+ *
+ * NULL or empty args render as whitespace of the right column width.
+ * Trailing whitespace is preserved (cheap; keeps every line the same
+ * shape; readers can strip if desired).  Each line ends with one '\n'.
+ *
+ * Examples:
+ *   bb3c_format(f, "_α:",     "",                "");           // pure label
+ *   bb3c_format(f, "",        "lea r10, [rip+Δ]","");           // pure action
+ *   bb3c_format(f, "",        "",                "jmp _β");     // pure goto
+ *   bb3c_format(f, "_body:",  "cmp esi, 0",      "je _α_body"); // merged
+ */
+/* EM-FORMAT-BB lone-label fusion (2026-05-09):
+ *
+ * Pending-label buffer.  When a caller emits a label-only line (col-1
+ * has content; col-2 and col-3 empty), we hold it instead of writing.
+ * The next call with non-empty col-2 or col-3 fuses the pending label
+ * into its col-1 (if the caller passed an empty col-1) or flushes the
+ * pending label as a standalone line first (if the caller passed a
+ * non-empty col-1, e.g. for a multi-label chain at the same address).
+ *
+ * Multiple consecutive label-only calls form a chain at the same
+ * address: each new label-only call flushes the prior pending label
+ * as a standalone line and replaces it.  The last label in the chain
+ * is the one that fuses with the first content line that follows.
+ *
+ * `bb3c_flush_pending()` MUST be called at end-of-file before closing
+ * `out` to flush any trailing pending label.  Currently called from
+ * sm_codegen_x64_emit's emit-finalize path (added EM-FORMAT-BB).
+ *
+ * The buffer is keyed off a single static FILE*; if a different output
+ * stream comes in mid-emission, the prior pending label is flushed to
+ * its original stream first.  Multi-stream emission isn't expected in
+ * mode-4 today; this is defensive.
+ */
 
 static char  g_bb3c_pending_label[256] = "";
 static FILE *g_bb3c_pending_out          = NULL;
 
-
+/* EM-FORMAT-BB-FUSED-GOTOS (sess 2026-05-09):
+ * Deferred-emit buffer for conditional jumps so that an immediately-
+ * following unconditional jmp can fuse with the prior conditional
+ * into a single line: `<cond_mn>  <succ_target> ; jmp <fail_target>`.
+ *
+ * The pattern arises 33 times in bb_flat.c as adjacent
+ *   EV_JMP(succ, JMP_J*); EV_JMP(fail, JMP_JMP);
+ * where the first is conditional (JE/JNE/JL/JGE/JG) and the second is
+ * the unconditional fallthrough.  Reads as one "if cond goto succ
+ * else goto fail" decision.
+ *
+ * Flush rules: the pending cond-jmp must be flushed standalone before
+ * any non-jmp content (label, action, directive, banner, file end).
+ * `bb3c_format` calls `bb3c_flush_pending_cond_jmp` at its top.  The
+ * flush writes the cond-jmp via the low-level `bb3c_write_line` to
+ * avoid recursing back into bb3c_format. */
 static char  g_bb3c_pending_cjmp_mn[16]      = "";
 static char  g_bb3c_pending_cjmp_target[256] = "";
 static FILE *g_bb3c_pending_cjmp_out         = NULL;
 
-
+/* EM-FORMAT-BB-LAW (sess 2026-05-09):
+ * Per archive/BB-GEN-X86-TEXT.md "The Three-Column NASM Layout — The Law":
+ *   "Column 3 (goto): col 60+. Semicolon comment OR live `jmp`."
+ *
+ * The layout is conceptually 3 columns (LABEL / ACTION / GOTO) but the
+ * ACTION column carries macro-name + params together.  In our emitter,
+ * mnemonic and args live in separate sub-columns (16-wide MNEMONIC,
+ * variable-wide ARGS) so the layout is effectively four sub-columns:
+ *
+ *   col-1 LABEL (24)  col-2 MNEMONIC (16)  col-3 ARGS (27)  col-4 GOTO
+ *   file col 0..23    file col 24..39      file col 41..67  file col 68+
+ *
+ * BB-jxx cases:
+ *   (1) Fused cond+uncond: col-2 = cond mnemonic, col-3 = "<succ_target>;",
+ *       col-4 = "jmp <fail_target>".  The `;` lands in col-3 after the
+ *       cond's arg.  col-4 starts at vcol 68.
+ *   (2) Bare label+jmp / standalone uncond: col-2 empty, col-3 empty,
+ *       col-4 = "jmp <target>".  jmp lands at vcol 68.
+ *   (3) Standalone cond-jmp (defensive, doesn't fire on tracked corpora):
+ *       col-2 = cond mnemonic, col-3 = target, col-4 empty.
+ *
+ * Triple fusion (action+cond+uncond on one line) is NOT done here — it
+ * is a future sub-rung (EM-FORMAT-BB-LAW-TRIPLE-FUSION). */
 #define BB_COL3_WIDTH 27
 
-/* Count visual columns (display width) of a UTF-8 string. */
+/* Count visual columns (display width) of a UTF-8 string.
+ * For our purposes: bytes 0x00..0x7F are 1 column each; UTF-8 lead bytes
+ * 0xC0..0xFF start a multi-byte sequence whose continuation bytes
+ * (0x80..0xBF) DO NOT add to width.  So width = number of bytes that
+ * are NOT continuation bytes.  This treats every UTF-8 codepoint as 1
+ * column wide — fine for the Greek letters (α/β/γ/ω/Σ/Δ) we use, all
+ * of which are visually 1 column in monospace. */
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int bb3c_visual_width(const char *s)
 {
@@ -898,14 +1059,16 @@ static void bb3c_flush_pending_cond_jmp(void)
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void bb3c_flush_pending_to(FILE *target)
 {
-
+    /* Flush cond-jmp first: it logically precedes any pending label
+     * (the cond-jmp came from an earlier emit; the label is buffered
+     * waiting for the next content line). */
     bb3c_flush_pending_cond_jmp();
     if (g_bb3c_pending_label[0] && g_bb3c_pending_out) {
         bb3c_write_line(g_bb3c_pending_out, g_bb3c_pending_label, "", "");
         g_bb3c_pending_label[0] = '\0';
         g_bb3c_pending_out = NULL;
     }
-    (void)target;
+    (void)target; /* reserved for future multi-stream variants */
 }
 
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
@@ -920,7 +1083,15 @@ void bb3c_flush_pending(void)
     bb3c_flush_pending_to(NULL);
 }
 
-/* EM-FORMAT-BB-FUSED-GOTOS: emit a jmp/cond-jmp line with optional fusion. */
+/* EM-FORMAT-BB-FUSED-GOTOS: emit a jmp/cond-jmp line with optional fusion.
+ *
+ *   bb3c_emit_jmp(out, "jne", "lbl_succ");  -> defer to pending cjmp slot
+ *   bb3c_emit_jmp(out, "jmp", "lbl_fail");  -> if cjmp pending, fuse:
+ *                                              "<jne>  lbl_succ ; jmp lbl_fail"
+ *                                             else emit standalone
+ *
+ * Single entry point for both `text_emit_jmp` (in emitter_text.c) and
+ * `bb_insn_jmp/je/jne/jl/jge/jg_*` (in this file's TEXT-mode arms). */
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int bb3c_is_cond_jmp(const char *mn)
 {
@@ -954,7 +1125,17 @@ void bb3c_emit_jmp(FILE *out, const char *mn, const char *target)
     }
 
     if (g_bb3c_pending_cjmp_mn[0] && g_bb3c_pending_cjmp_out == out) {
-
+        /* EM-FORMAT-BB-LAW (4-column layout):
+         *   col-1 LABEL (24)  col-2 ACTION (16)  col-3 ARGS (27)  col-4 GOTO
+         * Fused cond+uncond:
+         *   col-2 = cond mnemonic (`je`/`jne`/...)
+         *   col-3 = "<succ_target>;" (left-anchored, padded to 27 visual cols)
+         *   col-4 = "jmp <fail_target>"
+         * The `;` lands in col-3 right after the cond's arg; col-4 starts at
+         * file vcol 68 so the uncond `jmp` aligns vertically with the GOTO
+         * column of bare label+jmp lines below.  ONE space between mnemonic
+         * and arg in col-2/col-3 (managed by bb3c_format's separator).
+         * ONE space between `jmp` and arg in col-4. */
         char rest[512];
         char col3[288];
         int n = snprintf(col3, sizeof(col3), "%s;",
@@ -1014,7 +1195,7 @@ void bb3c_format(FILE *out, const char *label, const char *action, const char *g
         const char *eff_L = L;
         if (g_bb3c_pending_label[0]) {
             if (!*eff_L) {
-
+                /* Caller didn't supply col-1; fuse pending label into this line. */
                 snprintf(fused_lbl, sizeof(fused_lbl), "%s", g_bb3c_pending_label);
                 eff_L = fused_lbl;
             } else {
@@ -1312,7 +1493,9 @@ void emit_label_define(bb_label_t *lbl)
 void emit_bb_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fallback,
                     int port, bb_label_t *lbl_succ, bb_label_t *lbl_fail)
 {
-
+    /* EM-BB-FORMAT-4: FORMAT mode produces one fused 4-column line per port.
+     * Body = "call fn@PLT ; jne lbl_succ"; final jmp lbl_fail flushes.
+     * No push/pop r10 or zeta setup in the asm text — the fn handles state. */
     if (emit_bb_is_format_mode()) {
         char call_frag[BB_LABEL_NAME_MAX + 32];
         snprintf(call_frag, sizeof(call_frag), "call %s@PLT", fn_name);
@@ -1320,13 +1503,13 @@ void emit_bb_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fallb
         char jne[BB_LABEL_NAME_MAX + 8];
         snprintf(jne, sizeof(jne), "jne %s", lbl_succ->name);
         fmt_body_append(jne, "");
-        emit_jmp(lbl_fail, JMP_JMP);
+        emit_jmp(lbl_fail, JMP_JMP);  /* flush the accumulated port line */
         return;
     }
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x41); bb_emit_byte(0x52);
+        bb_emit_byte(0x41); bb_emit_byte(0x52);   /* push r10 */
         break;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
@@ -1341,7 +1524,7 @@ void emit_bb_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fallb
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
-        bb_emit_byte(0x41); bb_emit_byte(0x5A);
+        bb_emit_byte(0x41); bb_emit_byte(0x5A);   /* pop r10 */
         break;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
@@ -1363,7 +1546,7 @@ void emit_bb_port_call_rip(uint64_t zeta_ptr, const char *zeta_label,
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
-
+        /* BINARY: zeta_label unused; fall through to standard port call */
         emit_bb_port_call(zeta_ptr, fn_name, fn_fallback, port, lbl_succ, lbl_fail);
         return;
     case EMIT_TEXT_INLINE:
@@ -1401,7 +1584,7 @@ void emit_load_delta_cmp_imm(int n, bb_label_t *lbl_succ, bb_label_t *lbl_fail)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         bb_emit_byte(0x41); bb_emit_byte(0x8B); bb_emit_byte(0x02);
         bb_emit_byte(0x3D);
         bb_emit_byte((uint8_t)((uint32_t)n      ));
@@ -1419,11 +1602,11 @@ void emit_load_delta_cmp_imm(int n, bb_label_t *lbl_succ, bb_label_t *lbl_fail)
             char args[32]; snprintf(args, sizeof(args), "eax, %d", n);
             fmt_body_append("mov", "eax, [r10]");
             fmt_body_append("cmp", args);
-
+            /* jne fail → body; final jmp succ → flush via emit_jmp */
             char jne[BB_LABEL_NAME_MAX + 8];
             snprintf(jne, sizeof(jne), "jne %s", lbl_fail->name);
             fmt_body_append(jne, "");
-            emit_jmp(lbl_succ, JMP_JMP);
+            emit_jmp(lbl_succ, JMP_JMP);  /* flush α-port line */
             return;
         }
         FILE *f = emit_outf();
@@ -1443,7 +1626,7 @@ void emit_load_siglen_sub_cmp_delta(int n, uint64_t siglen_addr,
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         bb_emit_byte(0x48); bb_emit_byte(0xB9);
         bb_emit_byte((uint8_t)(siglen_addr      ));
         bb_emit_byte((uint8_t)(siglen_addr >>  8));
@@ -1480,7 +1663,7 @@ void emit_load_siglen_sub_cmp_delta(int n, uint64_t siglen_addr,
             char jne[BB_LABEL_NAME_MAX + 8];
             snprintf(jne, sizeof(jne), "jne %s", lbl_fail->name);
             fmt_body_append(jne, "");
-            emit_jmp(lbl_succ, JMP_JMP);
+            emit_jmp(lbl_succ, JMP_JMP);  /* flush α-port line */
             return;
         }
         FILE *f = emit_outf();
@@ -1504,7 +1687,7 @@ void emit_lea_rsi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         bb_emit_byte(0x48); bb_emit_byte(0xBE);
         bb_emit_byte((uint8_t)(in_proc_ptr      ));
         bb_emit_byte((uint8_t)(in_proc_ptr >>  8));
@@ -1541,7 +1724,7 @@ void emit_sigma_plus_delta_to_rdi(uint64_t sigma_addr, uint64_t siglen_addr)
     (void)siglen_addr;
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         bb_emit_byte(0x48); bb_emit_byte(0xB9);
         bb_emit_byte((uint8_t)(sigma_addr      ));
         bb_emit_byte((uint8_t)(sigma_addr >>  8));
@@ -1586,7 +1769,7 @@ void emit_bounds_check_delta_plus_len(int len, uint64_t siglen_addr, bb_label_t 
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         bb_emit_byte(0x41); bb_emit_byte(0x8B); bb_emit_byte(0x02);
         bb_emit_byte(0x05);
         bb_emit_byte((uint8_t)((uint32_t)len      ));
@@ -1610,7 +1793,7 @@ void emit_bounds_check_delta_plus_len(int len, uint64_t siglen_addr, bb_label_t 
     case EMIT_MACRO_DEF: {
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         if (emit_bb_is_format_mode()) {
-
+            /* FORMAT-7: accumulate bounds check fragments; caller provides flush jmp */
             char add_args[32]; snprintf(add_args, sizeof(add_args), "eax, %d", len);
             fmt_body_append("mov", "eax, [r10]");
             fmt_body_append("add", add_args);
@@ -1638,7 +1821,7 @@ void emit_ret(void)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         bb_emit_byte(0xC3);
         return;
     case EMIT_TEXT_INLINE:
@@ -1691,10 +1874,13 @@ void emit_pop_r10(void)
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_test_rax_rax(void)
 {
-
+    /* test rax, rax — set ZF from rax; used before conditional jumps.
+     *   BINARY:    48 85 C0  (REX.W TEST rax, rax)
+     *   TEXT:      `test rax, rax`
+     *   MACRO_DEF: same as TEXT */
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         bb_emit_byte(0x48); bb_emit_byte(0x85); bb_emit_byte(0xC0);
         return;
     case EMIT_TEXT_INLINE:
@@ -1711,7 +1897,7 @@ void emit_test_eax_eax(void)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         bb_emit_byte(0x85); bb_emit_byte(0xC0);
         return;
     case EMIT_TEXT_INLINE:
@@ -1731,7 +1917,7 @@ void emit_mov_rdi_imm64(uint64_t val)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:   {
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */ {
         bb_emit_byte(0x48); bb_emit_byte(0xBF);
         bb_emit_byte((uint8_t)(val      ));
         bb_emit_byte((uint8_t)(val >>  8));
@@ -1760,10 +1946,17 @@ void emit_mov_rdi_imm64(uint64_t val)
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_call_sym_plt(const char *sym, uint64_t fn_fallback)
 {
-
+    /* call sym@PLT
+     *   BINARY: in-process JIT can't reach a real PLT; instead bake the
+     *           resolved fn address and call indirect through rax.
+     *           Sequence is 12 bytes: 48 B8 <8-byte fn> FF D0
+     *           (= mov rax, fn; call rax).  This matches the existing
+     *           BB_INSN_CALL_SYM_PLT binary encoding in emitter_binary.c.
+     *   TEXT:   emit `call <sym>@PLT` — GAS resolves via PLT at link time.
+     *   MACRO_DEF: same form as TEXT (sym is a fixed name in the macro). */
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:   {
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */ {
         bb_emit_byte(0x48); bb_emit_byte(0xB8);
         bb_emit_byte((uint8_t)(fn_fallback      ));
         bb_emit_byte((uint8_t)(fn_fallback >>  8));
@@ -1796,7 +1989,7 @@ void emit_mov_esi_imm32(int val)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:   {
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */ {
         uint32_t u = (uint32_t)val;
         bb_emit_byte(0xBE);
         bb_emit_byte((uint8_t)(u      ));
@@ -1807,7 +2000,7 @@ void emit_mov_esi_imm32(int val)
     }
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT: {
-        if (g_in_text_macro_body) return;
+        if (g_in_text_macro_body) return;  /* TEXT: suppress macro body */
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         char args[32];
         snprintf(args, sizeof(args), "esi, %d", val);
@@ -1825,7 +2018,7 @@ void emit_add_delta_imm(int v)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         bb_emit_byte(0x41); bb_emit_byte(0x8B); bb_emit_byte(0x02);
         bb_emit_byte(0x05);
         bb_emit_byte((uint8_t)((uint32_t)v      ));
@@ -1859,7 +2052,7 @@ void emit_sub_delta_imm(int v)
 {
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:
+    case EMIT_BINARY_BROKERED:  /* stub: same as WIRED until EM-BB-PURGE-1 */
         bb_emit_byte(0x41); bb_emit_byte(0x8B); bb_emit_byte(0x02);
         bb_emit_byte(0x2D);
         bb_emit_byte((uint8_t)((uint32_t)v      ));

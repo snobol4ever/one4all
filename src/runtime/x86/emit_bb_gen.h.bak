@@ -10,20 +10,37 @@
 typedef enum {
     EMIT_TEXT             = 0,
     EMIT_BINARY_WIRED     = 1,
-    EMIT_BINARY_BROKERED  = 2,
-    EMIT_MACRO_DEF        = 3,
-    EMIT_TEXT_INLINE      = 4
+    EMIT_BINARY_BROKERED  = 2,   /* per-box blobs, C ABI entry, rdi=ζ, ret */
+    EMIT_MACRO_DEF        = 3,   /* emit .macro NAME ... .endm body (sm_macros.s regen) */
+    EMIT_TEXT_INLINE      = 4    /* inline GAS; emit_macro_begin/end are no-ops */
 } bb_emit_mode_t;
 
 extern bb_emit_mode_t bb_emit_mode;
 
 extern int g_bb_emit_format;
-extern FILE          *bb_emit_out;
+extern FILE          *bb_emit_out;   /* text mode: output FILE* (default stdout) */
 
-/* emit_mode_set — central setter for emit pass mode. */
+/* emit_mode_set — central setter for emit pass mode.
+ *   m   = EMIT_BINARY_WIRED / EMIT_BINARY_BROKERED / EMIT_TEXT / EMIT_MACRO_DEF
+ *   out = FILE* for text / macro_def modes; ignored (pass NULL) for binary.
+ * Every low-level emit function consults bb_emit_mode to decide what to do.
+ * Templates and the helpers they call do not carry the mode in their args. */
 void emit_mode_set(bb_emit_mode_t m, FILE *out);
 
-/* Templates and template-helpers call these directly.  Each helper consults */
+/*
+ * Templates and template-helpers call these directly.  Each helper consults
+ * bb_emit_mode and produces one of {binary bytes, text line, macro_def line}
+ * — or nothing, when "do nothing" is the right answer for that mode.
+ *
+ * Helpers are added incrementally as templates are ported off emitter_t.
+ * Co-exist with the emitter_t vtable during the transition: existing call
+ * sites that have an `emitter_t *e` keep using e->method or the inline
+ * helpers in emitter.h; new template code calls these free-standing helpers
+ * directly.  The `t_` prefix marks them as the template-side surface and
+ * avoids collision with the existing inline `emit_*(emitter_t *e, ...)`
+ * names.  Once the vtable is gone, the inlines disappear and the `t_`
+ * prefix may be dropped in a rename pass.
+ */
 void emit_comment(const char *text);
 void emit_bb_box_banner(const char *kind, const char *args);
 
@@ -36,8 +53,8 @@ void emit_macro_end(void);
 #define BB_LABEL_UNRESOLVED (-1)
 
 typedef struct {
-    char name[BB_LABEL_NAME_MAX];
-    int  offset;
+    char name[BB_LABEL_NAME_MAX];   /* symbolic name — text mode + diagnostics */
+    int  offset;                    /* byte offset in current buffer; -1=unresolved */
 } bb_label_t;
 
 void bb_label_init(bb_label_t *lbl, const char *name);
@@ -76,7 +93,11 @@ void emit_label_define(bb_label_t *lbl);
 void emit_bb_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fallback,
                     int port, bb_label_t *lbl_succ, bb_label_t *lbl_fail);
 
-/* emit_bb_port_call_rip — like emit_bb_port_call but TEXT/INLINE mode uses */
+/* emit_bb_port_call_rip — like emit_bb_port_call but TEXT/INLINE mode uses
+ *   `lea rdi, [rip + zeta_label]` instead of `mov rdi, literal`.
+ *   Use for boxes whose ζ is emitted as static .data (xatp, xdsar).
+ *   BINARY: ignores zeta_label; uses zeta_ptr directly (same as emit_bb_port_call).
+ *   TEXT/INLINE: emits `lea rdi, [rip + zeta_label]`. */
 void emit_bb_format_port(bb_label_t *lbl_entry, const char *macro_name, const char *args);
 
 int  emit_bb_is_format_mode(void);
@@ -105,9 +126,9 @@ void emit_push_rbp_frame(void);
 
 void emit_pop_rbp_frame_ret(void);
 
-extern bb_buf_t  bb_emit_buf;
-extern int       bb_emit_pos;
-extern int       bb_emit_size;
+extern bb_buf_t  bb_emit_buf;   /* current pool buffer */
+extern int       bb_emit_pos;   /* current write position (bytes written so far) */
+extern int       bb_emit_size;  /* total buffer size */
 
 void bb_emit_begin(bb_buf_t buf, int size);
 
@@ -116,13 +137,13 @@ int  bb_emit_end(void);
 #define BB_PATCH_MAX  512
 
 typedef enum {
-    PATCH_REL8,
-    PATCH_REL32
+    PATCH_REL8,    /* 1-byte signed displacement, relative to patch_site+1 */
+    PATCH_REL32    /* 4-byte signed displacement, relative to patch_site+4 */
 } bb_patch_kind_t;
 
 typedef struct {
-    int              site;
-    bb_label_t      *label;
+    int              site;    /* offset of the displacement field in the buffer */
+    bb_label_t      *label;   /* label whose offset we need */
     bb_patch_kind_t  kind;
 } bb_patch_t;
 
@@ -172,7 +193,22 @@ void bb_text_label(bb_label_t *lbl);
 
 void bb_text_comment(const char *fmt, ...);
 
-/* ── BB three-column line emission (EM-7c-bb-three-column) ────────────────── */
+/* ── BB three-column line emission (EM-7c-bb-three-column) ──────────────────
+ *
+ *   LABEL: ; ACTION ; GOTO
+ *
+ * Widths: label=24, action=16, goto=free.  Separators: " ; " between
+ * columns.  GAS interprets `;` as a statement separator on x86, so
+ * empty fields parse as empty statements (legal).  Used for BB-box
+ * body lines emitted via emitter_text.c, bb_emit.c text helpers, and
+ * bb_flat.c EV_TEXT blocks.
+ *
+ * NULL or "" arguments render as the right amount of whitespace.
+ * `bb3c_text` (text mode only) writes one line; no-op in binary mode.
+ *
+ * `bb3c_format` is a re-usable formatter for callers that already
+ * have a FILE*; it does NOT route through bb_emit_mode.
+ */
 void bb3c_text(const char *label, const char *action, const char *goto_);
 void bb3c_format(FILE *out, const char *label, const char *action, const char *goto_);
 
@@ -180,7 +216,15 @@ void bb3c_flush_pending(void);
 
 void bb3c_flush_pending_cjmp_only(void);
 
-/* EM-FORMAT-BB-FUSED-GOTOS (2026-05-09): */
+/* EM-FORMAT-BB-FUSED-GOTOS (2026-05-09):
+ * Single entry point for emitting jmp-shape lines (col 1 empty,
+ * col 2 = jmp/je/jne/jl/jge/jg, col 3 = target).  Handles cond-jmp+
+ * uncond-jmp adjacency by deferring conditional jumps; if the next
+ * call is an unconditional `jmp`, the two fuse onto a single line:
+ *   <cond_mn>             <succ_target> ; jmp <fail_target>
+ * Otherwise the deferred cond-jmp flushes standalone.  Both
+ * `text_emit_jmp` (emitter_text.c) and `bb_insn_jmp/je/jne/jl/jge/
+ * jg_*` (bb_emit.c, TEXT mode) route through this. */
 void bb3c_emit_jmp(FILE *out, const char *mn, const char *target);
 
 /* ── instruction emitters (bb_emit_mode-aware; renamed from bb_emit_* EM-DEVTABLE) ─ */
@@ -195,4 +239,4 @@ void emit_mov_esi_imm32  (int val);
 void emit_add_delta_imm  (int v);
 void emit_sub_delta_imm  (int v);
 
-#endif
+#endif /* EMITTER_BB_GEN_H */

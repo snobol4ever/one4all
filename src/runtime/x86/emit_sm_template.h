@@ -1,61 +1,16 @@
-/* emit_sm_template.h -- single source of truth for SM opcode emission.
- *
- * EM-7c-sm-macros (sess #87, 2026-05-09).
- *
- * Each SM opcode binds to ONE template.  A template names an arg-shape
- * (NULLARY, INT64, LBL_INT32, …) plus a `runtime` symbol (the libscrip_rt.so
- * entry that the macro calls into) plus a unique `macro` name.  ONE
- * renderer per shape produces:
- *   (a) the GAS macro body that goes into the macro library at the top
- *       of every emitted .s file (emit_sm_macro_library); and
- *   (b) the per-instruction emission line at every dispatch site
- *       (emit_sm_template).
- *
- * Both renderings come from ONE format string per shape.  The macro
- * body and the per-call expansion cannot drift — they share one
- * source of truth, by construction.
- *
- * Adding a new SM opcode group: declare a new template (or reuse an
- * existing arg-shape), add an entry to g_sm_templates[], and call
- * emit_sm_template() from the dispatcher.  No change anywhere else.
- *
- * Author: Claude Sonnet (with Lon Jones Cherryholmes).
- */
+
 #ifndef SM_EMIT_TEMPLATE_H_
 #define SM_EMIT_TEMPLATE_H_
 
 #include <stdint.h>
 #include <stdio.h>
 
-/* ---------------------------------------------------------------------
- * Arg-shape kinds.
- *
- * Each kind names a fixed asm sequence parameterised over typed args.
- * The renderer lives in emit_sm_template.c and produces both macro
- * body and per-call line from the same body string.
- *
- * NULLARY    -- no args; body is "    call \rt@PLT"
- * INT64      -- i64 v;    body loads v into rdi (movabs), calls runtime
- * LBL        -- str L;    body loads .Lstr_N RIP-relative into rdi
- * LBL_INT32  -- str L, i32 n; body sets rdi=L, esi=n
- * LBLOPT_INT32 -- optstr L, i32 n; rdi=L|0, esi=n  (PAT_CAPTURE)
- * LBLOPT3    -- optstr L1, i32 n, optstr L2; PAT_CAPTURE_FN
- * LBLOPT_I_I -- optstr L,  i32 n1, i32 n2;  PAT_CAPTURE_FN_ARGS
- * EXEC_VAR   -- optstr L,  i32 has_repl;    SM_EXEC_STMT (variant)
- * ARITH      -- i32 op_enum;   SM_ADD..SM_MOD
- * PCREF_JMP  -- int target_pc; SM_JUMP
- * PCREF_COND -- int target_pc, int taken_when_ok; SM_JUMP_S / SM_JUMP_F
- * PUSH_EXPRESSION -- i64 entry, i32 arity
- * CALL_EXPRESSION -- int target_pc
- * RET        -- no args; emits `ret`
- * RET_VAR    -- i32 kind, i32 cond, int pc; conditional return shape
- * UNHANDLED  -- i32 op_enum; trap shape
- * --------------------------------------------------------------------- */
+
 typedef enum {
     SM_TPL_RTCALL = 0,
     SM_TPL_INT64,
     SM_TPL_LBL,
-    SM_TPL_LBLOPT,           /* label-or-null, no extra int */
+    SM_TPL_LBLOPT,
     SM_TPL_LBL_INT32,
     SM_TPL_LBLOPT_INT32,
     SM_TPL_LBLOPT3,
@@ -69,32 +24,21 @@ typedef enum {
     SM_TPL_RET,
     SM_TPL_RET_VAR,
     SM_TPL_UNHANDLED,
-    SM_TPL_NOOP,             /* no-arg, no-body marker (e.g. SM_LABEL, SM_STNO).
-                                 macro body is `.macro N\n.endm`; the per-call
-                                 line is one three-column line carrying the
-                                 macro name in col 2 so the .LpcN: prefix is
-                                 never naked. */
+    SM_TPL_NOOP,
     SM_TPL__COUNT
 } sm_tpl_kind_t;
 
-/* One template per opcode group.  A single g_sm_templates[] entry
- * binds an opcode integer to a {macro_name, runtime_symbol, kind}
- * triple; the runtime_symbol is the libscrip_rt.so PLT entry the
- * macro calls.  For shapes that don't take a runtime arg (RET,
- * PCREF_JMP, PCREF_COND, CALL_EXPRESSION, RET_VAR), runtime is NULL.
- */
+
 typedef struct {
-    int             op;            /* sm_opcode_t value (or -1 for the
-                                     trap template, indexed separately) */
-    const char     *macro_name;    /* "SM_PUSH_INT" etc. */
-    const char     *runtime;       /* "rt_push_int" or NULL */
+    int             op;
+    const char     *macro_name;
+    const char     *runtime;
     sm_tpl_kind_t   kind;
     int             const_a;
     int             const_b;
 } sm_op_template_t;
 
-/* The lookup function: given an SM opcode, return the matching template,
- * or NULL if unknown.  Constant time (linear scan; small N). */
+/* The lookup function: given an SM opcode, return the matching template, */
 const sm_op_template_t *sm_template_lookup(int op);
 
 const sm_op_template_t *sm_template_unhandled(void);
@@ -106,14 +50,14 @@ int emit_sm_macro_library(FILE *out);
 int emit_sm_macro_library_to_path(const char *path);
 
 typedef struct {
-    int64_t     i64;          /* INT64 / PUSH_EXPRESSION entry */
-    int         i32_a;        /* arity / slen / nargs / target_pc / taken / kind */
-    int         i32_b;        /* nargs / cond / 2nd int arg */
-    int         pc;           /* RET_VAR uses for unique skip-label */
-    const char *lbl;          /* primary strtab label (NULL = use xor edi,edi) */
-    const char *lbl_b;        /* secondary strtab label */
-    const char *anno;         /* optional annotation (may be NULL or "") */
-    const char *label;        /* column-1 PC label, e.g. ".Lpc13:" (NULL = no label) */
+    int64_t     i64;
+    int         i32_a;
+    int         i32_b;
+    int         pc;
+    const char *lbl;
+    const char *lbl_b;
+    const char *anno;
+    const char *label;
 } emit_sm_args_t;
 
 int emit_sm_template(FILE *out, const sm_op_template_t *t,
@@ -150,8 +94,7 @@ int emit_sm_unhandled  (FILE *out, int op);
 int emit_sm_noop       (FILE *out, const sm_op_template_t *t,
                         const char *anno);
 
-/* The exec-stmt-variant + capture-fn shapes have unique arg layouts;
- * exposed as their own thin entries for dispatcher clarity. */
+/* The exec-stmt-variant + capture-fn shapes have unique arg layouts; */
 int emit_sm_exec_var   (FILE *out, const sm_op_template_t *t,
                         const char *subj_lbl_or_null, int has_repl);
 int emit_sm_capture_fn (FILE *out, const sm_op_template_t *t,
@@ -164,16 +107,10 @@ int emit_sm_capture_fn_args(FILE *out, const sm_op_template_t *t,
                             int is_imm, int nargs,
                             const char *anno);
 
-/* ---------------------------------------------------------------------
- * Diagnostic / self-test.
- *
- * Walks every template, emits its macro body, AND emits a per-call
- * expansion using sentinel arg values; asserts both texts share the
- * same call signature.  Used by test_smoke_jit_emit_x64.sh.
- * --------------------------------------------------------------------- */
+/* --------------------------------------------------------------------- */
 int emit_sm_template_selftest(FILE *out);
 
-void        emit_sm_set_pc_label(const char *lbl);   /* lbl copied; pass NULL to clear */
-const char *emit_sm_consume_pc_label(void);          /* read+clear; returns "" if none */
+void        emit_sm_set_pc_label(const char *lbl);
+const char *emit_sm_consume_pc_label(void);
 
-#endif /* SM_EMIT_TEMPLATE_H_ */
+#endif

@@ -1,7 +1,30 @@
-
+/* emit_sm_template.c -- single source of truth for SM opcode emission.
+ *
+ * EM-7c-sm-macros (sess #87, 2026-05-09).
+ *
+ * Drift impossible by construction: each opcode shape is described
+ * ONCE in this file by:
+ *   (1) A `kind` value that picks one of the shape renderers below.
+ *   (2) A macro_name + runtime symbol baked into the template.
+ * The shape renderer produces both the GAS macro body and the
+ * per-call emission line.  Adding a new shape is a single switch
+ * arm in render_macro_body() AND in render_call_line() (paired by
+ * kind); the pairing is the contract.
+ *
+ * For the "drift impossible" property, observe: for every kind k,
+ *   - render_macro_body(k) writes ONE .macro NAME args / body / .endm.
+ *   - render_call_line(k, args) writes ONE line: MACRO_NAME formatted_args.
+ * The body of the macro is in render_macro_body; the per-call line
+ * is in render_call_line.  They share NO body text (the macro hides
+ * the body entirely from the call site).  What they share is the
+ * macro_name and the args' encoding.  Updating one without the other
+ * means the assembler complains immediately on the next regen
+ * (mismatched arg count, undefined macro, etc.) -- we cannot ship a
+ * silently-wrong byte stream.
+ */
 #include "emit_sm_template.h"
 #include "sm_prog.h"
-#include "emit_bb_gen.h"
+#include "emit_bb_gen.h"     /* EM-FORMAT-BB: bb3c_format for unified label fusion */
 
 #include <assert.h>
 #include <inttypes.h>
@@ -9,7 +32,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static char g_pending_pc_label[32] = "";
+static char g_pending_pc_label[32] = "";  /* ".Lpc%d:"  set by emit_sm_set_pc_label */
 
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_set_pc_label(const char *lbl)
@@ -36,6 +59,14 @@ const char *emit_sm_consume_pc_label(void)
     return buf;
 }
 
+/* ---------------------------------------------------------------------
+ * Template table
+ *
+ * One entry per opcode group.  The lookup is by SM opcode integer.
+ * Opcodes whose codegen falls through to the trap (e.g. SM_DUP, SM_SWAP,
+ * SM_PAT_*_ARGS that EM-7-revert removed) are absent here; they're
+ * handled by the dedicated UNHANDLED template below.
+ * --------------------------------------------------------------------- */
 
 static const sm_op_template_t g_sm_templates[] = {
     { SM_HALT,         "HALT",         "rt_halt_tos",     SM_TPL_RTCALL,    0, 0 },
@@ -128,10 +159,10 @@ static const sm_op_template_t g_sm_templates[] = {
     { SM_ICMP_LT,        "ICMP_LT",        "rt_unhandled_sm", SM_TPL_ARITH, SM_ICMP_LT,        0 },
     { SM_LOAD_FRAME,     "LOAD_FRAME",     "rt_unhandled_sm", SM_TPL_ARITH, SM_LOAD_FRAME,     0 },
     { SM_STORE_FRAME,    "STORE_FRAME",    "rt_unhandled_sm", SM_TPL_ARITH, SM_STORE_FRAME,    0 },
-
-    { SM_INCR,    "INCR",    "rt_incr",  SM_TPL_ARITH, 0 , 0 },
+    /* Int-arg ops (INCR/DECR bake n; ACOMP/LCOMP bake op-enum in const_a). */
+    { SM_INCR,    "INCR",    "rt_incr",  SM_TPL_ARITH, 0 /* n from a[0].i, not const_a */, 0 },
     { SM_DECR,    "DECR",    "rt_decr",  SM_TPL_ARITH, 0, 0 },
-    { SM_ACOMP,   "ACOMP",   "rt_acomp", SM_TPL_ARITH, 0 , 0 },
+    { SM_ACOMP,   "ACOMP",   "rt_acomp", SM_TPL_ARITH, 0 /* op from a[0].i */, 0 },
     { SM_LCOMP,   "LCOMP",   "rt_lcomp", SM_TPL_ARITH, 0, 0 },
 };
 
@@ -147,7 +178,8 @@ static const sm_op_template_t g_tpl_ret_var = {
 
 const sm_op_template_t *sm_template_lookup(int op)
 {
-
+    /* Linear scan; ~50 entries.  If this becomes hot, replace with a
+     * sparse op-indexed table generated at startup. */
     for (int i = 0; i < G_SM_TEMPLATES_N; i++) {
         if (g_sm_templates[i].op == op) return &g_sm_templates[i];
     }
@@ -157,11 +189,31 @@ const sm_op_template_t *sm_template_lookup(int op)
 const sm_op_template_t *sm_template_unhandled(void)  { return &g_tpl_unhandled; }
 const sm_op_template_t *sm_template_ret_var(void)    { return &g_tpl_ret_var; }
 
-/* --------------------------------------------------------------------- */
+/* ---------------------------------------------------------------------
+ * Shape renderers
+ *
+ * Two functions per shape kind (paired by switch arm): one renders
+ * the GAS macro body; the other renders the per-call line.  The
+ * pairing is the contract -- BOTH must update together when a shape
+ * changes.  The shape kind enum is the join key.
+ *
+ * To minimise the chance of pairing a renderer with the wrong shape:
+ *   - Every shape has a dedicated `case` arm in BOTH functions.
+ *   - The arms appear in the SAME ORDER in both functions.
+ *   - A `default: abort()` covers any unhandled kind.
+ * --------------------------------------------------------------------- */
 
 static int macro_line(FILE *out, const char *label, const char *opcode, const char *col3);
 
-/* Helper: format the .ifnb/.else/.endif block for an optional label arg. */
+/* Helper: format the .ifnb/.else/.endif block for an optional label arg.
+ *
+ * EM-7c-sm-three-column-verify (2026-05-09): rewritten to route through
+ * macro_line so every emitted line obeys the col-1/col-2/col-3 grid.
+ * Was: `\t.ifnb \\lbl\\n\t\tlea rdi, [rip + \\lbl]\\n\t.else\\n...` —
+ * 4-space-indented directives + 8-space-indented body, off the grid.
+ * Now: each line is a macro_line call: directive token in col 2, args in
+ * col 3.  Result assembles identically (GAS conditional assembly is
+ * indentation-insensitive); audit test passes. */
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_optional_lbl(FILE *out, const char *macro_arg,
                              const char *register_load_dst)
@@ -170,7 +222,8 @@ static int emit_optional_lbl(FILE *out, const char *macro_arg,
     snprintf(ifnb_arg, sizeof(ifnb_arg), "\\%s", macro_arg);
     snprintf(lea_arg,  sizeof(lea_arg),  "%s, [rip + \\%s]",
              register_load_dst, macro_arg);
-
+    /* xor edi,edi clears rdi; xor edx,edx clears rdx; etc.
+     * register_load_dst is "rdi"/"rsi"/"rdx"; we strip the 'r'. */
     snprintf(xor_arg,  sizeof(xor_arg),  "e%s, e%s",
              register_load_dst + 1, register_load_dst + 1);
     if (macro_line(out, "", ".ifnb", ifnb_arg) < 0) return -1;
@@ -206,7 +259,14 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
         macro_line(out, "", ".macro", macro_def);
         { char ct[64]; snprintf(ct, sizeof(ct), "%s@PLT", t->runtime);
           macro_line(out, "", "call", ct); }
-
+        /* SM_DEFINE_ENTRY: enter the C-ABI prologue (push rbp; mov rbp,rsp).
+         * cfn() is entered via a C-ABI `call` from call_native_chunk, so rsp%16==8
+         * at entry to the body.  The bare `push rbp` brings rsp to %16==0; the
+         * matching `mov rbp,rsp` puts rbp at %16==0 too, satisfying
+         * movaps -0x60(%rbp) in downstream callees (bb_build, etc.).
+         * NO additional `sub rsp,8` here — that would flip alignment back to 8
+         * and re-introduce the SIGSEGV.  See mode-3's ME-6a/ME-13 for the
+         * different invariant in that path. */
         if (strcmp(t->macro_name, "DEFINE_ENTRY") == 0) {
             macro_line(out, "", "push", "rbp");
             macro_line(out, "", "mov",  "rbp, rsp");
@@ -305,7 +365,12 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
         return 0;
 
     case SM_TPL_ARITH:
-
+        /* EM-7c-bb-three-column follow-up: each arithmetic SM op gets its
+         * own named no-arg macro (ADD_NUM, SUB_NUM, MUL_NUM, DIV_NUM,
+         * MOD_NUM).  Op enum is baked into the macro body via t->const_a;
+         * caller writes just "ADD_NUM" in col 2 — no opaque "ARITH 17"
+         * with redundant "# SM_ADD" annotation.  Suffix avoids collision
+         * with x86 mnemonics `add`/`sub`/`mul`/`div`. */
         snprintf(macro_def, sizeof(macro_def), "%s", t->macro_name);
         macro_line(out, "", ".macro", macro_def);
         { char op_arg[32]; snprintf(op_arg, sizeof(op_arg), "edi, %d", t->const_a);
@@ -361,7 +426,7 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
         macro_line(out, "", "mov", "rsp, rbp");
         macro_line(out, "", "pop", "rbp");
         macro_line(out, "", "ret", "");
-        fprintf(out, ".Lretskip_\\pc\\():\n");
+        fprintf(out, ".Lretskip_\\pc\\():\n");  /* GAS local label hack: must stay as-is */
         macro_line(out, "", ".endm", "");
         return 0;
 
@@ -375,7 +440,10 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
         return 0;
 
     case SM_TPL_NOOP:
-
+        /* NOOP shape: empty-bodied marker macro.  The macro name in col
+         * 2 of the per-call line declares "what executes here" so the
+         * .LpcN: label is never naked.  The macro body assembles to
+         * nothing; the .LpcN remains a valid jump target on its own. */
         snprintf(macro_def, sizeof(macro_def), "%s", t->macro_name);
         macro_line(out, "", ".macro", macro_def);
         macro_line(out, "", ".endm", "");
@@ -412,7 +480,7 @@ static int build_args_col(char *buf, int cap, const sm_op_template_t *t,
     case SM_TPL_RTCALL:
     case SM_TPL_RET:
     case SM_TPL_NOOP:
-        n = snprintf(buf, cap, "");
+        n = snprintf(buf, cap, "");  /* no args */
         break;
     case SM_TPL_INT64:
         n = snprintf(buf, cap, "%" PRId64, args->i64);
@@ -470,7 +538,7 @@ static int build_args_col(char *buf, int cap, const sm_op_template_t *t,
             n = snprintf(buf, cap, "%d", args->i32_a);
         break;
     case SM_TPL_ARITH:
-
+        /* No args; op-enum is baked into the macro body. */
         n = snprintf(buf, cap, "");
         break;
     case SM_TPL_PCREF_JMP:
@@ -505,7 +573,9 @@ static int render_call_line(FILE *out, const sm_op_template_t *t,
     char argsb[128];
     if (build_args_col(argsb, sizeof(argsb), t, args) != 0) return -1;
 
-
+    /* Determine label: explicit args->label wins; else consume the pending one.
+     * Snapshot to a local buffer before clearing g_pending_pc_label, since
+     * lbl_col may otherwise alias into it. */
     char lbl_buf[32];
     const char *lbl_col;
     if (args && args->label && *args->label) {
@@ -544,7 +614,18 @@ static int render_call_line(FILE *out, const sm_op_template_t *t,
     return 0;
 }
 
-/* emit_sm_macro_library: */
+/* emit_sm_macro_library:
+ *
+ * Walks g_sm_templates[] (plus the standalone unhandled and ret_var
+ * templates) and emits one .macro definition per UNIQUE macro_name.
+ * Multiple templates can share a macro_name (e.g. SM_ADD/SUB/MUL/DIV/MOD
+ * all share "ARITH"); each is emitted only once.
+ *
+ * Output starts with a banner; ends with a blank line.  The macro
+ * library is syntax-agnostic (only `.macro`/`.endm`/`.if` constructs
+ * which are common to AT&T and Intel syntax); placement before any
+ * `.intel_syntax noprefix` directive in the .s is fine.
+ */
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_macro_library(FILE *out)
 {
@@ -584,7 +665,11 @@ int emit_sm_macro_library(FILE *out)
 
     #undef EMIT_IF_NEW
 
-
+    /* PUSH_REAL: hand-written, not in g_sm_templates[].  SM_PUSH_LIT_F is
+     * special-cased in sm_codegen_x64_emit.c because the template bakes the
+     * literal float bits per call-site; a parameterised macro body would need
+     * to receive the bits as an integer immediate.  emit_sm_push_lit_f passes
+     * the bit-pattern as a hex string so `movabs rdi, \val` assembles correctly. */
     if (fputs(
         "# PUSH_REAL: hand-written (SM_PUSH_LIT_F special-case; param = 64-bit bits as hex)\n"
         "                        .macro           PUSH_REAL val\n"
@@ -612,7 +697,8 @@ int emit_sm_macro_library_to_path(const char *path)
     return rc;
 }
 
-/* Per-instruction generic dispatch (rarely called directly; convenience */
+/* Per-instruction generic dispatch (rarely called directly; convenience
+ * wrappers below are usually clearer at call sites). */
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_template(FILE *out, const sm_op_template_t *t,
                      const emit_sm_args_t *args)
@@ -632,7 +718,11 @@ int emit_sm_rtcall(FILE *out, const sm_op_template_t *t, const char *anno)
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_noop(FILE *out, const sm_op_template_t *t, const char *anno)
 {
-
+    /* SM_TPL_NOOP: render exactly one three-column line carrying the
+     * macro name in col 2.  The pending .LpcN: pc-label is consumed
+     * (via render_call_line's normal label-pickup path) so the label
+     * is never naked.  Macro body is empty; the .s assembles cleanly
+     * because the macro expands to nothing. */
     emit_sm_args_t a = { 0 };
     a.anno = anno;
     return emit_sm_template(out, t, &a);
@@ -712,7 +802,8 @@ int emit_sm_pcref_cond(FILE *out, const sm_op_template_t *t,
                        int target_pc, int taken_when_ok,
                        const char *anno)
 {
-
+    /* taken_when_ok is encoded in t->const_a (S=1, F=0); the per-call
+     * site only needs the target pc. */
     (void)taken_when_ok;
     emit_sm_args_t a = { 0 };
     a.i32_a = target_pc;

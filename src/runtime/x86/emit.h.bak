@@ -107,4 +107,4 @@ FILE *emitter_text_out       (void);
 int   emitter_pos            (void);
 void  emitter_init_macro_def (FILE *out);
 
-#endif
+#endif /* EMIT_H */

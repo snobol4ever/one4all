@@ -10,7 +10,7 @@
 #include "emit_bb_flat.h"
 #include "../rt/rt.h"
 
-extern DESCR_t  bb_deferred_var_exported(void *zeta, int entry);
+extern DESCR_t  bb_deferred_var_exported(void *zeta, int entry);  /* stmt_exec.c — BINARY fn_fallback for XDSAR */
 extern DESCR_t  coro_bb_alternate    (void *zeta, int entry);   extern icn_alternate_state_t      *icon_alt_new(void);
 extern DESCR_t  coro_bb_bang_binary  (void *zeta, int entry);   extern icn_bang_binary_state_t     *icon_bang_new(void);
 extern DESCR_t  coro_bb_every        (void *zeta, int entry);   extern icn_every_state_t           *icon_every_new(void);
@@ -100,9 +100,9 @@ void emit_bb_xcallcap(bb_box_fn child_fn, const char *fnc_name,
 void emit_bb_xfnce(bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
     emit_bb_box_banner("FENCE", "");
-    emit_jmp(s, JMP_JMP);
+    emit_jmp(s, JMP_JMP);               /* alpha: succeed zero-width — once succeeded, beta cuts */
     emit_label_define(b);
-    emit_jmp(f, JMP_JMP);
+    emit_jmp(f, JMP_JMP);               /* beta: always fail (FENCE cuts backtracking) */
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xfnme(bb_box_fn child_fn, const char *varname,
@@ -124,18 +124,18 @@ void emit_bb_xnme(bb_box_fn child_fn, const char *varname,
 void emit_bb_xeps(bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
     emit_bb_box_banner("EPS", "");
-    emit_jmp(s, JMP_JMP);
+    emit_jmp(s, JMP_JMP);               /* alpha: always succeed zero-width */
     emit_label_define(b);
-    emit_jmp(f, JMP_JMP);
+    emit_jmp(f, JMP_JMP);               /* beta: fail */
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xsucf(bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
     (void)f;
     emit_bb_box_banner("SUCCEED", "");
-    emit_jmp(s, JMP_JMP);
+    emit_jmp(s, JMP_JMP);               /* alpha: always succeed zero-width */
     emit_label_define(b);
-    emit_jmp(s, JMP_JMP);
+    emit_jmp(s, JMP_JMP);               /* beta: also succeed (generates another zero-width match) */
 }
 #define TEMPLATE_ADDR_SIGMA   ((uint64_t)(uintptr_t)&Σ)
 #define TEMPLATE_ADDR_SIGLEN  ((uint64_t)(uintptr_t)&Σlen)
@@ -189,7 +189,8 @@ void emit_bb_xchr(PATND_t *p, const char *lit_label,
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xdsar(const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
-
+    /* TEXT: emit .data block (name ptr, child quads, in_progress long).
+     * BINARY: flat_data_* are no-ops; bb_dvar_bin_new allocates real zeta below. */
     char banner[80]; snprintf(banner, sizeof(banner), "*%s", varname ? varname : "");
     emit_bb_box_banner("DEREF", banner);
     int id = g_flat_node_id++;
@@ -211,7 +212,8 @@ void emit_bb_xdsar(const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xatp(const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
-
+    /* TEXT: emit .data block with zeta struct (string + two longs + quad ptr).
+     * BINARY: flat_data_* are no-ops; atp_t *z allocated below. */
     emit_bb_box_banner("USERPAT", varname ? varname : "");
     int id = g_flat_node_id++;
     char zlbl[80], vlbl[80];
