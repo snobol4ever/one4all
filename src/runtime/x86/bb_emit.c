@@ -26,6 +26,39 @@ int emit_bb_is_format_mode(void) {
            (bb_emit_mode == EMIT_TEXT || bb_emit_mode == EMIT_TEXT_INLINE);
 }
 
+/* EM-BB-FORMAT-ARCH: port-context accumulator.
+ * In FORMAT mode, body helpers append instruction fragments here.
+ * emit_label_define saves the port label without emitting.
+ * emit_jmp flushes one 4-column ;-fused line: LABEL: ; body ; jXX target */
+static char g_fmt_label[BB_LABEL_NAME_MAX + 4];  /* "LABEL:" or "" */
+static char g_fmt_body[512];                       /* accumulated col2+col3 */
+
+static void fmt_label_save(bb_label_t *lbl) {
+    if (lbl && lbl->name[0]) snprintf(g_fmt_label, sizeof(g_fmt_label), "%s:", lbl->name);
+    else g_fmt_label[0] = '\0';
+}
+static void fmt_body_append(const char *instr, const char *operands) {
+    char frag[128];
+    if (operands && operands[0]) snprintf(frag, sizeof(frag), "%s %s", instr, operands);
+    else                          snprintf(frag, sizeof(frag), "%s", instr);
+    if (g_fmt_body[0]) { strncat(g_fmt_body, " ; ", sizeof(g_fmt_body) - strlen(g_fmt_body) - 1); }
+    strncat(g_fmt_body, frag, sizeof(g_fmt_body) - strlen(g_fmt_body) - 1);
+}
+static void fmt_flush_jmp(const char *mn, bb_label_t *target) {
+    /* Emit: COL1(24) COL2(16) COL3(body ; jXX target) */
+    FILE *f = bb_emit_out ? bb_emit_out : stdout;
+    char jmp_part[BB_LABEL_NAME_MAX + 16];
+    snprintf(jmp_part, sizeof(jmp_part), "%s %s", mn, target->name);
+    char col3[640];
+    if (g_fmt_body[0]) snprintf(col3, sizeof(col3), "%s ; %s", g_fmt_body, jmp_part);
+    else                snprintf(col3, sizeof(col3), "%s", jmp_part);
+    /* Print using the standard 3-column formatter: col1=label col2="" col3=body+jmp */
+    bb3c_format(f, g_fmt_label, "", col3);
+    /* Reset accumulator for next port */
+    g_fmt_label[0] = '\0';
+    g_fmt_body[0]  = '\0';
+}
+
 void emit_bb_format_port(bb_label_t *lbl_entry, const char *macro_name, const char *args)
 {
     if (!emit_bb_is_format_mode()) return;
@@ -486,17 +519,9 @@ void bb_emit_test_rax_rax(void)
 
 void emit_jmp(bb_label_t *target, jmp_kind_t kind)
 {
-    /* Emit a jump of the given kind to target.
-     *   BINARY:
-     *     JMP_JMP  -> E9 rel32
-     *     JMP_JE   -> 74 rel8 (short; near-forward within a blob)
-     *     JMP_JNE  -> 75 rel8
-     *     JMP_JL   -> 7C rel8
-     *     JMP_JGE  -> 7D rel8
-     *     JMP_JG   -> 0F 8F rel32
-     *   TEXT/MACRO_DEF: three-column `jXX target` via bb3c_emit_jmp. */
     static const char *const mn_tab[] = { "jmp", "je", "jne", "jl", "jge", "jg" };
     const char *mn = ((unsigned)kind < 6) ? mn_tab[kind] : "jmp";
+    if (emit_bb_is_format_mode()) { fmt_flush_jmp(mn, target); return; }
     switch (bb_emit_mode) {
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT:
@@ -1713,6 +1738,7 @@ void bb_insn_add_rsp_imm8(uint8_t imm)
 
 void emit_label_define(bb_label_t *lbl)
 {
+    if (emit_bb_is_format_mode()) { fmt_label_save(lbl); return; }
     bb_label_define(lbl);
 }
 
@@ -1809,6 +1835,17 @@ void emit_load_delta_cmp_imm(int n, bb_label_t *lbl_succ, bb_label_t *lbl_fail)
     case EMIT_TEXT:
     case EMIT_MACRO_DEF: {
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        if (emit_bb_is_format_mode()) {
+            char args[32]; snprintf(args, sizeof(args), "eax, %d", n);
+            fmt_body_append("mov", "eax, [r10]");
+            fmt_body_append("cmp", args);
+            /* jne fail → body; final jmp succ → flush via emit_jmp */
+            char jne[BB_LABEL_NAME_MAX + 8];
+            snprintf(jne, sizeof(jne), "jne %s", lbl_fail->name);
+            fmt_body_append(jne, "");
+            emit_jmp(lbl_succ, JMP_JMP);  /* flush α-port line */
+            return;
+        }
         FILE *f = emit_outf();
         bb3c_format(f, "", "mov", "eax, [r10]");
         char args[32]; snprintf(args, sizeof(args), "eax, %d", n);
@@ -1857,6 +1894,20 @@ void emit_load_siglen_sub_cmp_delta(int n, uint64_t siglen_addr,
     case EMIT_TEXT:
     case EMIT_MACRO_DEF: {
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        if (emit_bb_is_format_mode()) {
+            char args[32]; snprintf(args, sizeof(args), "eax, %d", n);
+            fmt_body_append("lea", "rcx, [rip + Σlen]");
+            fmt_body_append("mov", "eax, [rcx]");
+            fmt_body_append("sub", args);
+            fmt_body_append("mov", "ecx, eax");
+            fmt_body_append("mov", "eax, [r10]");
+            fmt_body_append("cmp", "eax, ecx");
+            char jne[BB_LABEL_NAME_MAX + 8];
+            snprintf(jne, sizeof(jne), "jne %s", lbl_fail->name);
+            fmt_body_append(jne, "");
+            emit_jmp(lbl_succ, JMP_JMP);  /* flush α-port line */
+            return;
+        }
         FILE *f = emit_outf();
         char args[64];
         /* EM-BB-TEXT-ADDR: RIP-relative lea, not literal address */
