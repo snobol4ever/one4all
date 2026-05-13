@@ -138,16 +138,18 @@ void emit_jmp(bb_label_t *target, jmp_kind_t kind)
 {
     static const char *const mn_tab[] = { "jmp", "je", "jne", "jl", "jge", "jg" };
     const char *mn = ((unsigned)kind < 6) ? mn_tab[kind] : "jmp";
-    if (emit_bb_is_format_mode()) { fmt_flush_jmp(mn, target); return; }
-    switch (bb_emit_mode) {
-    case EMIT_TEXT_INLINE:
-    case EMIT_TEXT:
-    case EMIT_MACRO_DEF:
+    if (emit_bb_is_format_mode())
+        fmt_flush_jmp(mn, target);
+    else {
+        switch (bb_emit_mode) {
+        case EMIT_TEXT_INLINE:
+        case EMIT_TEXT:
+        case EMIT_MACRO_DEF:
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         bb3c_emit_jmp(emit_outf(), mn, target->name);
         return;
-    case EMIT_BINARY_WIRED:
-    case EMIT_BINARY_BROKERED:
+        case EMIT_BINARY_WIRED:
+        case EMIT_BINARY_BROKERED:
         switch (kind) {
         case JMP_JMP: insn_jmp_r32(target);  return;
         case JMP_JE:  insn_je_r32(target);   return;
@@ -155,6 +157,7 @@ void emit_jmp(bb_label_t *target, jmp_kind_t kind)
         case JMP_JL:  insn_jl_r32(target);   return;
         case JMP_JGE: insn_jge_r32(target);  return;
         case JMP_JG:  insn_jg_r32(target);   return;
+    }
         }
         return;
     }
@@ -162,8 +165,11 @@ void emit_jmp(bb_label_t *target, jmp_kind_t kind)
 
 void emit_label_define(bb_label_t *lbl)
 {
-    if (emit_bb_is_format_mode()) { fmt_label_save(lbl); return; }
-    bb_label_define(lbl);
+    if (emit_bb_is_format_mode())
+        fmt_label_save(lbl);
+    else {
+        bb_label_define(lbl);
+    }
 }
 
 void bb3c_op(const char *mn, const char *fmt, ...)
@@ -1237,191 +1243,284 @@ static void tj(const char *mn, const char *target) {
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_mov_eax_i32(uint32_t v) {
-    if (IS_TEXT) { tf("mov","eax, %u",v); return; }
-    B(0xB8); U32(v);
+    if (IS_TEXT)
+        tf("mov","eax, %u",v);
+    else {
+        B(0xB8); U32(v);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_mov_rax_i64(uint64_t v) {
-    if (IS_TEXT) { tf("mov","rax, 0x%llx",(unsigned long long)v); return; }
-    B(0x48); B(0xB8); U64(v);
+    if (IS_TEXT)
+        tf("mov","rax, 0x%llx",(unsigned long long)v);
+    else {
+        B(0x48); B(0xB8); U64(v);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_mov_rcx_i64(uint64_t v) {
-    if (IS_TEXT) { tf("mov","rcx, 0x%llx",(unsigned long long)v); return; }
-    B(0x48); B(0xB9); U64(v);
+    if (IS_TEXT)
+        tf("mov","rcx, 0x%llx",(unsigned long long)v);
+    else {
+        B(0x48); B(0xB9); U64(v);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_mov_rdx_i64(uint64_t v) {
-    if (IS_TEXT) { tf("mov","rdx, 0x%llx",(unsigned long long)v); return; }
-    B(0x48); B(0xBA); U64(v);
+    if (IS_TEXT)
+        tf("mov","rdx, 0x%llx",(unsigned long long)v);
+    else {
+        B(0x48); B(0xBA); U64(v);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_mov_rsi_i64(uint64_t v) {
-    if (IS_TEXT) { tf("mov","rsi, 0x%llx",(unsigned long long)v); return; }
-    B(0x48); B(0xBE); U64(v);
+    if (IS_TEXT)
+        tf("mov","rsi, 0x%llx",(unsigned long long)v);
+    else {
+        B(0x48); B(0xBE); U64(v);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_mov_rdi_i64(uint64_t v) {
-    if (IS_TEXT) { tf("mov","rdi, 0x%llx",(unsigned long long)v); return; }
-    B(0x48); B(0xBF); U64(v);
+    if (IS_TEXT)
+        tf("mov","rdi, 0x%llx",(unsigned long long)v);
+    else {
+        B(0x48); B(0xBF); U64(v);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_mov_edx_i32(uint32_t v) {
-    if (IS_TEXT) { tf("mov","edx, %u",v); return; }
-    B(0xBA); U32(v);
+    if (IS_TEXT)
+        tf("mov","edx, %u",v);
+    else {
+        B(0xBA); U32(v);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_mov_edi_i32(uint32_t v) {
-    if (IS_TEXT) { tf("mov","edi, %u",v); return; }
-    B(0xBF); U32(v);
+    if (IS_TEXT)
+        tf("mov","edi, %u",v);
+    else {
+        B(0xBF); U32(v);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_mov_esi_i32(int v) {
     if (IS_TEXT) {
-        if (bb_emit_mode == EMIT_MACRO_DEF) { t3("mov","esi, \\n"); return; }
-        tf("mov","esi, %d",v); return;
+        if (bb_emit_mode == EMIT_MACRO_DEF)
+            t3("mov","esi, \\n");
+        else {
+            tf("mov","esi, %d",v); return;
+        }
     }
     B(0xBE); U32((uint32_t)v);
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_mov_rbp_rsp(void) {
-    if (IS_TEXT) { t3("mov","rbp, rsp"); return; }
-    B(0x48); B(0x89); B(0xE5);
+    if (IS_TEXT)
+        t3("mov","rbp, rsp");
+    else {
+        B(0x48); B(0x89); B(0xE5);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_mov_rsp_rbp(void) {
-    if (IS_TEXT) { t3("mov","rsp, rbp"); return; }
-    B(0x48); B(0x89); B(0xEC);
+    if (IS_TEXT)
+        t3("mov","rsp, rbp");
+    else {
+        B(0x48); B(0x89); B(0xEC);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_mov_ecx_eax(void) {
-    if (IS_TEXT) { t3("mov","ecx, eax"); return; }
-    B(0x89); B(0xC1);
+    if (IS_TEXT)
+        t3("mov","ecx, eax");
+    else {
+        B(0x89); B(0xC1);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_mov_rdi_rax(void) {
-    if (IS_TEXT) { t3("mov","rdi, rax"); return; }
-    B(0x48); B(0x89); B(0xC7);
+    if (IS_TEXT)
+        t3("mov","rdi, rax");
+    else {
+        B(0x48); B(0x89); B(0xC7);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_mov_eax_r10mem(void) {
-    if (IS_TEXT) { t3("mov","eax, [r10]"); return; }
-    B(0x41); B(0x8B); B(0x02);
+    if (IS_TEXT)
+        t3("mov","eax, [r10]");
+    else {
+        B(0x41); B(0x8B); B(0x02);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_mov_eax_rcxmem(void) {
-    if (IS_TEXT) { t3("mov","eax, [rcx]"); return; }
-    B(0x8B); B(0x01);
+    if (IS_TEXT)
+        t3("mov","eax, [rcx]");
+    else {
+        B(0x8B); B(0x01);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_mov_rax_rcxmem(void) {
-    if (IS_TEXT) { t3("mov","rax, [rcx]"); return; }
-    B(0x48); B(0x8B); B(0x01);
+    if (IS_TEXT)
+        t3("mov","rax, [rcx]");
+    else {
+        B(0x48); B(0x8B); B(0x01);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_lea_rcx_rip_sym(const char *sym, uint64_t addr) {
-    if (IS_TEXT) { tf("lea","rcx, [rip + %s]", sym ? sym : "??"); return; }
-    B(0x48); B(0xB9); U64(addr);   
+    if (IS_TEXT)
+        tf("lea","rcx, [rip + %s]", sym ? sym : "??");
+    else {
+        B(0x48); B(0xB9); U64(addr);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_lea_r10_rip_sym(const char *sym, uint64_t addr) {
-    if (IS_TEXT) { tf("lea","r10, [rip + %s]", sym ? sym : "??"); return; }
-    B(0x49); B(0xBA); U64(addr);   
+    if (IS_TEXT)
+        tf("lea","r10, [rip + %s]", sym ? sym : "??");
+    else {
+        B(0x49); B(0xBA); U64(addr);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_lea_rax_rax_rcx(void) {
-    if (IS_TEXT) { t3("lea","rax, [rax+rcx]"); return; }
-    B(0x48); B(0x8D); B(0x04); B(0x08);
+    if (IS_TEXT)
+        t3("lea","rax, [rax+rcx]");
+    else {
+        B(0x48); B(0x8D); B(0x04); B(0x08);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_movzx_eax_rdi_off8(uint8_t off) {
-    if (IS_TEXT) { tf("movzx","eax, byte [rdi + %u]",(unsigned)off); return; }
-    B(0x0F); B(0xB6); B(0x47); B(off);
+    if (IS_TEXT)
+        tf("movzx","eax, byte [rdi + %u]",(unsigned)off);
+    else {
+        B(0x0F); B(0xB6); B(0x47); B(off);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_movsxd_rcx_r10mem(void) {
-    if (IS_TEXT) { t3("movsxd","rcx, dword [r10]"); return; }
-    B(0x49); B(0x63); B(0x0A);
+    if (IS_TEXT)
+        t3("movsxd","rcx, dword [r10]");
+    else {
+        B(0x49); B(0x63); B(0x0A);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_cmp_esi_i8(uint8_t v) {
-    if (IS_TEXT) { tf("cmp","esi, %u",(unsigned)v); return; }
-    B(0x83); B(0xFE); B(v);
+    if (IS_TEXT)
+        tf("cmp","esi, %u",(unsigned)v);
+    else {
+        B(0x83); B(0xFE); B(v);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_cmp_esi_i32(uint32_t v) {
-    if (IS_TEXT) { tf("cmp","esi, %u",v); return; }
-    B(0x81); B(0xFE); U32(v);
+    if (IS_TEXT)
+        tf("cmp","esi, %u",v);
+    else {
+        B(0x81); B(0xFE); U32(v);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_cmp_al_i8(uint8_t v) {
-    if (IS_TEXT) { tf("cmp","al, %u",(unsigned)v); return; }
-    B(0x3C); B(v);
+    if (IS_TEXT)
+        tf("cmp","al, %u",(unsigned)v);
+    else {
+        B(0x3C); B(v);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_cmp_eax_i32(uint32_t v) {
-    if (IS_TEXT) { tf("cmp","eax, %u",v); return; }
-    B(0x3D); U32(v);
+    if (IS_TEXT)
+        tf("cmp","eax, %u",v);
+    else {
+        B(0x3D); U32(v);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_cmp_eax_ecx(void) {
-    if (IS_TEXT) { t3("cmp","eax, ecx"); return; }
-    B(0x39); B(0xC8);
+    if (IS_TEXT)
+        t3("cmp","eax, ecx");
+    else {
+        B(0x39); B(0xC8);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_cmp_eax_rcxmem(void) {
-    if (IS_TEXT) { t3("cmp","eax, [rcx]"); return; }
-    B(0x3B); B(0x01);
+    if (IS_TEXT)
+        t3("cmp","eax, [rcx]");
+    else {
+        B(0x3B); B(0x01);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_add_rsp_i8(uint8_t v) {
-    if (IS_TEXT) { tf("add","rsp, %u",(unsigned)v); return; }
-    B(0x48); B(0x83); B(0xC4); B(v);
+    if (IS_TEXT)
+        tf("add","rsp, %u",(unsigned)v);
+    else {
+        B(0x48); B(0x83); B(0xC4); B(v);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_sub_rsp_i8(uint8_t v) {
-    if (IS_TEXT) { tf("sub","rsp, %u",(unsigned)v); return; }
-    B(0x48); B(0x83); B(0xEC); B(v);
+    if (IS_TEXT)
+        tf("sub","rsp, %u",(unsigned)v);
+    else {
+        B(0x48); B(0x83); B(0xEC); B(v);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_add_eax_i32(uint32_t v) {
-    if (IS_TEXT) { tf("add","eax, %u",v); return; }
-    B(0x05); U32(v);
+    if (IS_TEXT)
+        tf("add","eax, %u",v);
+    else {
+        B(0x05); U32(v);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_sub_eax_i32(uint32_t v) {
-    if (IS_TEXT) { tf("sub","eax, %u",v); return; }
-    B(0x2D); U32(v);
+    if (IS_TEXT)
+        tf("sub","eax, %u",v);
+    else {
+        B(0x2D); U32(v);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
@@ -1461,8 +1560,11 @@ void insn_sub_delta_i(int v) {
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_test_rax_rax(void) {
     if (IS_TEXT) {
-        if (emit_bb_is_format_mode()) { fmt_body_append("test","rax, rax"); return; }
-        t3("test","rax, rax"); return;
+        if (emit_bb_is_format_mode())
+            fmt_body_append("test","rax, rax");
+        else {
+            t3("test","rax, rax"); return;
+        }
     }
     B(0x48); B(0x85); B(0xC0);
 }
@@ -1470,41 +1572,57 @@ void insn_test_rax_rax(void) {
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_test_eax_eax(void) {
     if (IS_TEXT) {
-        if (emit_bb_is_format_mode()) { fmt_body_append("test","eax, eax"); return; }
-        t3("test","eax, eax"); return;
+        if (emit_bb_is_format_mode())
+            fmt_body_append("test","eax, eax");
+        else {
+            t3("test","eax, eax"); return;
+        }
     }
     B(0x85); B(0xC0);
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_xor_eax_eax(void) {
-    if (IS_TEXT) { t3("xor","eax, eax"); return; }
-    B(0x31); B(0xC0);
+    if (IS_TEXT)
+        t3("xor","eax, eax");
+    else {
+        B(0x31); B(0xC0);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_inc_r13_disp8(uint8_t disp) {
-    if (IS_TEXT) { tf("inc","dword ptr [r13 + %u]",(unsigned)disp); return; }
-    B(0x41); B(0xFF); B(0x45); B(disp);
+    if (IS_TEXT)
+        tf("inc","dword ptr [r13 + %u]",(unsigned)disp);
+    else {
+        B(0x41); B(0xFF); B(0x45); B(disp);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_push_rbp(void) {
-    if (IS_TEXT) { t3("push","rbp"); return; }
-    B(0x55);
+    if (IS_TEXT)
+        t3("push","rbp");
+    else
+        B(0x55);
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_pop_rbp(void) {
-    if (IS_TEXT) { t3("pop","rbp"); return; }
-    B(0x5D);
+    if (IS_TEXT)
+        t3("pop","rbp");
+    else
+        B(0x5D);
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_push_r10(void) {
     if (IS_TEXT) {
-        if (emit_bb_is_format_mode()) { fmt_body_append("push","r10"); return; }
-        t3("push","r10"); return;
+        if (emit_bb_is_format_mode())
+            fmt_body_append("push","r10");
+        else {
+            t3("push","r10"); return;
+        }
     }
     B(0x41); B(0x52);
 }
@@ -1512,22 +1630,31 @@ void insn_push_r10(void) {
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_pop_r10(void) {
     if (IS_TEXT) {
-        if (emit_bb_is_format_mode()) { fmt_body_append("pop","r10"); return; }
-        t3("pop","r10"); return;
+        if (emit_bb_is_format_mode())
+            fmt_body_append("pop","r10");
+        else {
+            t3("pop","r10"); return;
+        }
     }
     B(0x41); B(0x5A);
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_push_r12(void) {
-    if (IS_TEXT) { t3("push","r12"); return; }
-    B(0x41); B(0x54);
+    if (IS_TEXT)
+        t3("push","r12");
+    else {
+        B(0x41); B(0x54);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_pop_r12(void) {
-    if (IS_TEXT) { t3("pop","r12"); return; }
-    B(0x41); B(0x5C);
+    if (IS_TEXT)
+        t3("pop","r12");
+    else {
+        B(0x41); B(0x5C);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
@@ -1541,14 +1668,19 @@ void insn_ret(void) {
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_nop(void) {
-    if (IS_TEXT) { t3("nop",""); return; }
-    B(0x90);
+    if (IS_TEXT)
+        t3("nop","");
+    else
+        B(0x90);
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_call_rax(void) {
-    if (IS_TEXT) { t3("call","rax"); return; }
-    B(0xFF); B(0xD0);
+    if (IS_TEXT)
+        t3("call","rax");
+    else {
+        B(0xFF); B(0xD0);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
@@ -1557,8 +1689,11 @@ void insn_call_plt(const char *sym, uint64_t fn_fallback) {
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         if (bb_emit_mode == EMIT_TEXT && g_in_text_macro_body) return;
         char args[80]; snprintf(args,sizeof(args),"%s@PLT",sym?sym:"??");
-        if (emit_bb_is_format_mode()) { fmt_body_append("call",args); return; }
-        t3("call",args); return;
+        if (emit_bb_is_format_mode())
+            fmt_body_append("call",args);
+        else {
+            t3("call",args); return;
+        }
     }
     B(0x48); B(0xB8); U64(fn_fallback);
     B(0xFF); B(0xD0);
@@ -1582,224 +1717,331 @@ void insn_call_plt(const char *sym, uint64_t fn_fallback) {
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_jmp_r8(bb_label_t *t) {
-    if (IS_TEXT) { tj("jmp", t->name); return; }
-    B(0xEB); bb_emit_patch_rel8(t);
+    if (IS_TEXT)
+        tj("jmp", t->name);
+    else {
+        B(0xEB); bb_emit_patch_rel8(t);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_jmp_r32(bb_label_t *t) {
-    if (IS_TEXT) { tj("jmp", t->name); return; }
-    B(0xE9); bb_emit_patch_rel32(t);
+    if (IS_TEXT)
+        tj("jmp", t->name);
+    else {
+        B(0xE9); bb_emit_patch_rel32(t);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_je_r8(bb_label_t *t) {
-    if (IS_TEXT) { tj("je", t->name); return; }
-    B(0x74); bb_emit_patch_rel8(t);
+    if (IS_TEXT)
+        tj("je", t->name);
+    else {
+        B(0x74); bb_emit_patch_rel8(t);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_je_r32(bb_label_t *t) {
-    if (IS_TEXT) { tj("je", t->name); return; }
-    B(0x0F); B(0x84); bb_emit_patch_rel32(t);
+    if (IS_TEXT)
+        tj("je", t->name);
+    else {
+        B(0x0F); B(0x84); bb_emit_patch_rel32(t);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_jne_r8(bb_label_t *t) {
-    if (IS_TEXT) { tj("jne", t->name); return; }
-    B(0x75); bb_emit_patch_rel8(t);
+    if (IS_TEXT)
+        tj("jne", t->name);
+    else {
+        B(0x75); bb_emit_patch_rel8(t);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_jne_r32(bb_label_t *t) {
-    if (IS_TEXT) { tj("jne", t->name); return; }
-    B(0x0F); B(0x85); bb_emit_patch_rel32(t);
+    if (IS_TEXT)
+        tj("jne", t->name);
+    else {
+        B(0x0F); B(0x85); bb_emit_patch_rel32(t);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_jl_r8(bb_label_t *t) {
-    if (IS_TEXT) { tj("jl", t->name); return; }
-    B(0x7C); bb_emit_patch_rel8(t);
+    if (IS_TEXT)
+        tj("jl", t->name);
+    else {
+        B(0x7C); bb_emit_patch_rel8(t);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_jl_r32(bb_label_t *t) {
-    if (IS_TEXT) { tj("jl", t->name); return; }
-    B(0x0F); B(0x8C); bb_emit_patch_rel32(t);
+    if (IS_TEXT)
+        tj("jl", t->name);
+    else {
+        B(0x0F); B(0x8C); bb_emit_patch_rel32(t);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_jge_r8(bb_label_t *t) {
-    if (IS_TEXT) { tj("jge", t->name); return; }
-    B(0x7D); bb_emit_patch_rel8(t);
+    if (IS_TEXT)
+        tj("jge", t->name);
+    else {
+        B(0x7D); bb_emit_patch_rel8(t);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_jge_r32(bb_label_t *t) {
-    if (IS_TEXT) { tj("jge", t->name); return; }
-    B(0x0F); B(0x8D); bb_emit_patch_rel32(t);
+    if (IS_TEXT)
+        tj("jge", t->name);
+    else {
+        B(0x0F); B(0x8D); bb_emit_patch_rel32(t);
+    }
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 void insn_jg_r32(bb_label_t *t) {
-    if (IS_TEXT) { tj("jg", t->name); return; }
-    B(0x0F); B(0x8F); bb_emit_patch_rel32(t);
+    if (IS_TEXT)
+        tj("jg", t->name);
+    else {
+        B(0x0F); B(0x8F); bb_emit_patch_rel32(t);
+    }
 }
 
 void bb_insn_mov_eax_imm32(uint32_t imm)
 {
-    if (bb_emit_mode == EMIT_TEXT) { bb3c_op("mov", "eax, %u", imm); return; }
-    bb_emit_byte(MOV_EAX_IMM32); bb_emit_u32(imm);
+    if (bb_emit_mode == EMIT_TEXT)
+        bb3c_op("mov", "eax, %u", imm);
+    else {
+        bb_emit_byte(MOV_EAX_IMM32); bb_emit_u32(imm);
+    }
 }
 
 void bb_insn_mov_rax_imm64(uint64_t imm)
 {
-    if (bb_emit_mode == EMIT_TEXT) { bb3c_op("mov", "rax, 0x%llx", (unsigned long long)imm); return; }
-    bb_emit_byte(REX_W); bb_emit_byte(MOV_EAX_IMM32); bb_emit_u64(imm);
+    if (bb_emit_mode == EMIT_TEXT)
+        bb3c_op("mov", "rax, 0x%llx", (unsigned long long)imm);
+    else {
+        bb_emit_byte(REX_W); bb_emit_byte(MOV_EAX_IMM32); bb_emit_u64(imm);
+    }
 }
 
 void bb_insn_ret(void)
 {
-    if (bb_emit_mode == EMIT_TEXT) { bb3c_op("ret", NULL); return; }
-    bb_emit_byte(RET);
+    if (bb_emit_mode == EMIT_TEXT)
+        bb3c_op("ret", NULL);
+    else
+        bb_emit_byte(RET);
 }
 
 void bb_insn_nop(void)
 {
-    if (bb_emit_mode == EMIT_TEXT) { bb3c_op("nop", NULL); return; }
-    bb_emit_byte(NOP);
+    if (bb_emit_mode == EMIT_TEXT)
+        bb3c_op("nop", NULL);
+    else
+        bb_emit_byte(NOP);
 }
 
 void bb_insn_call_rax(void)
 {
-    if (bb_emit_mode == EMIT_TEXT) { bb3c_op("call", "rax"); return; }
-    bb_emit_byte(INC_CALL_FF); bb_emit_byte(MODRM_CALL_RAX);
+    if (bb_emit_mode == EMIT_TEXT)
+        bb3c_op("call", "rax");
+    else {
+        bb_emit_byte(INC_CALL_FF); bb_emit_byte(MODRM_CALL_RAX);
+    }
 }
 
 void bb_insn_jmp_rel8(bb_label_t *target)
 {
-    if (bb_emit_mode == EMIT_TEXT) { bb3c_jmp("jmp", target->name); return; }
-    bb_emit_byte(JMP_REL8); bb_emit_patch_rel8(target);
+    if (bb_emit_mode == EMIT_TEXT)
+        bb3c_jmp("jmp", target->name);
+    else {
+        bb_emit_byte(JMP_REL8); bb_emit_patch_rel8(target);
+    }
 }
 
 void bb_insn_jmp_rel32(bb_label_t *target)
 {
-    if (bb_emit_mode == EMIT_TEXT) { bb3c_jmp("jmp", target->name); return; }
-    bb_emit_byte(JMP_REL32); bb_emit_patch_rel32(target);
+    if (bb_emit_mode == EMIT_TEXT)
+        bb3c_jmp("jmp", target->name);
+    else {
+        bb_emit_byte(JMP_REL32); bb_emit_patch_rel32(target);
+    }
 }
 
 void bb_insn_jl_rel8(bb_label_t *target)
 {
-    if (bb_emit_mode == EMIT_TEXT) { bb3c_jmp("jl", target->name); return; }
-    bb_emit_byte(JL_REL8); bb_emit_patch_rel8(target);
+    if (bb_emit_mode == EMIT_TEXT)
+        bb3c_jmp("jl", target->name);
+    else {
+        bb_emit_byte(JL_REL8); bb_emit_patch_rel8(target);
+    }
 }
 
 void bb_insn_jge_rel8(bb_label_t *target)
 {
-    if (bb_emit_mode == EMIT_TEXT) { bb3c_jmp("jge", target->name); return; }
-    bb_emit_byte(JGE_REL8); bb_emit_patch_rel8(target);
+    if (bb_emit_mode == EMIT_TEXT)
+        bb3c_jmp("jge", target->name);
+    else {
+        bb_emit_byte(JGE_REL8); bb_emit_patch_rel8(target);
+    }
 }
 
 void bb_insn_je_rel8(bb_label_t *target)
 {
-    if (bb_emit_mode == EMIT_TEXT) { bb3c_jmp("je", target->name); return; }
-    bb_emit_byte(JE_REL8); bb_emit_patch_rel8(target);
+    if (bb_emit_mode == EMIT_TEXT)
+        bb3c_jmp("je", target->name);
+    else {
+        bb_emit_byte(JE_REL8); bb_emit_patch_rel8(target);
+    }
 }
 
 void bb_insn_jne_rel8(bb_label_t *target)
 {
-    if (bb_emit_mode == EMIT_TEXT) { bb3c_jmp("jne", target->name); return; }
-    bb_emit_byte(JNE_REL8); bb_emit_patch_rel8(target);
+    if (bb_emit_mode == EMIT_TEXT)
+        bb3c_jmp("jne", target->name);
+    else {
+        bb_emit_byte(JNE_REL8); bb_emit_patch_rel8(target);
+    }
 }
 
 void bb_insn_jne_rel32(bb_label_t *target)
 {
-    if (bb_emit_mode == EMIT_TEXT) { bb3c_jmp("jne", target->name); return; }
-    bb_emit_byte(ESC); bb_emit_byte(TEST_RM_R); bb_emit_patch_rel32(target);
+    if (bb_emit_mode == EMIT_TEXT)
+        bb3c_jmp("jne", target->name);
+    else {
+        bb_emit_byte(ESC); bb_emit_byte(TEST_RM_R); bb_emit_patch_rel32(target);
+    }
 }
 
 void bb_insn_je_rel32(bb_label_t *target)
 {
-    if (bb_emit_mode == EMIT_TEXT) { bb3c_jmp("je", target->name); return; }
-    bb_emit_byte(ESC); bb_emit_byte(JE_REL32_X); bb_emit_patch_rel32(target);
+    if (bb_emit_mode == EMIT_TEXT)
+        bb3c_jmp("je", target->name);
+    else {
+        bb_emit_byte(ESC); bb_emit_byte(JE_REL32_X); bb_emit_patch_rel32(target);
+    }
 }
 
 void bb_insn_jl_rel32(bb_label_t *target)
 {
-    if (bb_emit_mode == EMIT_TEXT) { bb3c_jmp("jl", target->name); return; }
-    bb_emit_byte(ESC); bb_emit_byte(JL_REL32_X); bb_emit_patch_rel32(target);
+    if (bb_emit_mode == EMIT_TEXT)
+        bb3c_jmp("jl", target->name);
+    else {
+        bb_emit_byte(ESC); bb_emit_byte(JL_REL32_X); bb_emit_patch_rel32(target);
+    }
 }
 
 void bb_insn_jge_rel32(bb_label_t *target)
 {
-    if (bb_emit_mode == EMIT_TEXT) { bb3c_jmp("jge", target->name); return; }
-    bb_emit_byte(ESC); bb_emit_byte(LEA); bb_emit_patch_rel32(target);
+    if (bb_emit_mode == EMIT_TEXT)
+        bb3c_jmp("jge", target->name);
+    else {
+        bb_emit_byte(ESC); bb_emit_byte(LEA); bb_emit_patch_rel32(target);
+    }
 }
 
 void bb_insn_jg_rel32(bb_label_t *target)
 {
-    if (bb_emit_mode == EMIT_TEXT) { bb3c_jmp("jg", target->name); return; }
-    bb_emit_byte(ESC); bb_emit_byte(JG_REL32_X); bb_emit_patch_rel32(target);
+    if (bb_emit_mode == EMIT_TEXT)
+        bb3c_jmp("jg", target->name);
+    else {
+        bb_emit_byte(ESC); bb_emit_byte(JG_REL32_X); bb_emit_patch_rel32(target);
+    }
 }
 
 void bb_insn_cmp_esi_imm8(uint8_t imm)
 {
-    if (bb_emit_mode == EMIT_TEXT) { bb3c_op("cmp", "esi, %u", (unsigned)imm); return; }
-    bb_emit_byte(CMP_RM_IMM8); bb_emit_byte(MODRM_CMP_ESI); bb_emit_byte(imm);
+    if (bb_emit_mode == EMIT_TEXT)
+        bb3c_op("cmp", "esi, %u", (unsigned)imm);
+    else {
+        bb_emit_byte(CMP_RM_IMM8); bb_emit_byte(MODRM_CMP_ESI); bb_emit_byte(imm);
+    }
 }
 
 void bb_insn_cmp_esi_imm32(uint32_t imm)
 {
-    if (bb_emit_mode == EMIT_TEXT) { bb3c_op("cmp", "esi, %u", imm); return; }
-    bb_emit_byte(CMP_RM_IMM32); bb_emit_byte(MODRM_CMP_ESI); bb_emit_u32(imm);
+    if (bb_emit_mode == EMIT_TEXT)
+        bb3c_op("cmp", "esi, %u", imm);
+    else {
+        bb_emit_byte(CMP_RM_IMM32); bb_emit_byte(MODRM_CMP_ESI); bb_emit_u32(imm);
+    }
 }
 
 void bb_insn_movzx_eax_rdi_off8(uint8_t off)
 {
-    if (bb_emit_mode == EMIT_TEXT) { bb3c_op("movzx", "eax, byte [rdi + %u]", (unsigned)off); return; }
-    bb_emit_byte(ESC); bb_emit_byte(MOVZX_R_RM8); bb_emit_byte(MODRM_EAX_EDI7); bb_emit_byte(off);
+    if (bb_emit_mode == EMIT_TEXT)
+        bb3c_op("movzx", "eax, byte [rdi + %u]", (unsigned)off);
+    else {
+        bb_emit_byte(ESC); bb_emit_byte(MOVZX_R_RM8); bb_emit_byte(MODRM_EAX_EDI7); bb_emit_byte(off);
+    }
 }
 
 void bb_insn_cmp_al_imm8(uint8_t imm)
 {
-    if (bb_emit_mode == EMIT_TEXT) { bb3c_op("cmp", "al, %u", (unsigned)imm); return; }
-    bb_emit_byte(CMP_AL_IMM8); bb_emit_byte(imm);
+    if (bb_emit_mode == EMIT_TEXT)
+        bb3c_op("cmp", "al, %u", (unsigned)imm);
+    else {
+        bb_emit_byte(CMP_AL_IMM8); bb_emit_byte(imm);
+    }
 }
 
 void bb_insn_xor_eax_eax(void)
 {
-    if (bb_emit_mode == EMIT_TEXT) { bb3c_op("xor", "eax, eax"); return; }
-    bb_emit_byte(XOR_RM_R); bb_emit_byte(MODRM_EAX_EAX);
+    if (bb_emit_mode == EMIT_TEXT)
+        bb3c_op("xor", "eax, eax");
+    else {
+        bb_emit_byte(XOR_RM_R); bb_emit_byte(MODRM_EAX_EAX);
+    }
 }
 
 void bb_insn_push_rbp(void)
 {
-    if (bb_emit_mode == EMIT_TEXT) { bb3c_op("push", "rbp"); return; }
-    bb_emit_byte(PUSH_RBP);
+    if (bb_emit_mode == EMIT_TEXT)
+        bb3c_op("push", "rbp");
+    else
+        bb_emit_byte(PUSH_RBP);
 }
 
 void bb_insn_pop_rbp(void)
 {
-    if (bb_emit_mode == EMIT_TEXT) { bb3c_op("pop", "rbp"); return; }
-    bb_emit_byte(POP_RBP);
+    if (bb_emit_mode == EMIT_TEXT)
+        bb3c_op("pop", "rbp");
+    else
+        bb_emit_byte(POP_RBP);
 }
 
 void bb_insn_mov_rbp_rsp(void)
 {
-    if (bb_emit_mode == EMIT_TEXT) { bb3c_op("mov", "rbp, rsp"); return; }
-    bb_emit_byte(REX_W); bb_emit_byte(MOV_RM_R); bb_emit_byte(MODRM_RBP_RSP);
+    if (bb_emit_mode == EMIT_TEXT)
+        bb3c_op("mov", "rbp, rsp");
+    else {
+        bb_emit_byte(REX_W); bb_emit_byte(MOV_RM_R); bb_emit_byte(MODRM_RBP_RSP);
+    }
 }
 
 void bb_insn_sub_rsp_imm8(uint8_t imm)
 {
-    if (bb_emit_mode == EMIT_TEXT) { bb3c_op("sub", "rsp, %u", (unsigned)imm); return; }
-    bb_emit_byte(REX_W); bb_emit_byte(CMP_RM_IMM8); bb_emit_byte(MODRM_RSP_RBP); bb_emit_byte(imm);
+    if (bb_emit_mode == EMIT_TEXT)
+        bb3c_op("sub", "rsp, %u", (unsigned)imm);
+    else {
+        bb_emit_byte(REX_W); bb_emit_byte(CMP_RM_IMM8); bb_emit_byte(MODRM_RSP_RBP); bb_emit_byte(imm);
+    }
 }
 
 void bb_insn_add_rsp_imm8(uint8_t imm)
 {
-    if (bb_emit_mode == EMIT_TEXT) { bb3c_op("add", "rsp, %u", (unsigned)imm); return; }
-    bb_emit_byte(REX_W); bb_emit_byte(CMP_RM_IMM8); bb_emit_byte(MODRM_CMP_RSP); bb_emit_byte(imm);
+    if (bb_emit_mode == EMIT_TEXT)
+        bb3c_op("add", "rsp, %u", (unsigned)imm);
+    else {
+        bb_emit_byte(REX_W); bb_emit_byte(CMP_RM_IMM8); bb_emit_byte(MODRM_CMP_RSP); bb_emit_byte(imm);
+    }
 }
 
 void emit_ret(void)
@@ -1826,8 +2068,11 @@ void emit_push_r10(void)
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
-        if (emit_bb_is_format_mode()) { fmt_body_append("push", "r10"); return; }
-        bb3c_format(emit_outf(), "", "push", "r10"); return;
+        if (emit_bb_is_format_mode())
+            fmt_body_append("push", "r10");
+        else {
+            bb3c_format(emit_outf(), "", "push", "r10"); return;
+        }
     }
 }
 
@@ -1841,8 +2086,11 @@ void emit_pop_r10(void)
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
-        if (emit_bb_is_format_mode()) { fmt_body_append("pop", "r10"); return; }
-        bb3c_format(emit_outf(), "", "pop", "r10"); return;
+        if (emit_bb_is_format_mode())
+            fmt_body_append("pop", "r10");
+        else {
+            bb3c_format(emit_outf(), "", "pop", "r10"); return;
+        }
     }
 }
 
@@ -1870,8 +2118,11 @@ void emit_test_eax_eax(void)
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
-        if (emit_bb_is_format_mode()) { fmt_body_append("test", "eax, eax"); return; }
-        bb3c_format(emit_outf(), "", "test", "eax, eax"); return;
+        if (emit_bb_is_format_mode())
+            fmt_body_append("test", "eax, eax");
+        else {
+            bb3c_format(emit_outf(), "", "test", "eax, eax"); return;
+        }
     }
 }
 
@@ -1919,8 +2170,11 @@ void emit_call_sym_plt(const char *sym, uint64_t fn_fallback)
         if (bb_emit_mode == EMIT_TEXT && g_in_text_macro_body) return;
         char args[80];
         snprintf(args, sizeof(args), "%s@PLT", sym ? sym : "??sym??");
-        if (emit_bb_is_format_mode()) { fmt_body_append("call", args); return; }
-        bb3c_format(emit_outf(), "", "call", args); return;
+        if (emit_bb_is_format_mode())
+            fmt_body_append("call", args);
+        else {
+            bb3c_format(emit_outf(), "", "call", args); return;
+        }
     }
     }
 }
