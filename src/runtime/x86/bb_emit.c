@@ -1705,6 +1705,37 @@ void t_bb_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fallback
     t_emit_jmp(lbl_fail, JMP_JMP);
 }
 
+void t_bb_port_call_rip(uint64_t zeta_ptr, const char *zeta_label,
+                        const char *fn_name, uint64_t fn_fallback,
+                        int port, bb_label_t *lbl_succ, bb_label_t *lbl_fail)
+{
+    switch (bb_emit_mode) {
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:
+        /* BINARY: zeta_label unused; fall through to standard port call */
+        t_bb_port_call(zeta_ptr, fn_name, fn_fallback, port, lbl_succ, lbl_fail);
+        return;
+    case EMIT_TEXT_INLINE:
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF:
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        break;
+    }
+    /* TEXT/INLINE path: push r10, lea rdi [rip+label], mov esi port, call fn, pop r10, test, jmp */
+    FILE *f = emit_outf();
+    bb3c_format(f, "", "push", "r10");
+    { char args[80]; snprintf(args, sizeof(args), "rdi, [rip + %s]", zeta_label ? zeta_label : "??zeta??");
+      bb3c_format(f, "", "lea", args); }
+    { char args[16]; snprintf(args, sizeof(args), "esi, %d", port);
+      bb3c_format(f, "", "mov", args); }
+    { char sym[80]; snprintf(sym, sizeof(sym), "%s@PLT", fn_name ? fn_name : "??fn??");
+      bb3c_format(f, "", "call", sym); }
+    bb3c_format(f, "", "pop", "r10");
+    bb3c_format(f, "", "test", "rax, rax");
+    t_emit_jmp(lbl_succ, JMP_JNE);
+    t_emit_jmp(lbl_fail, JMP_JMP);
+}
+
 void t_load_delta_cmp_imm(int n, bb_label_t *lbl_succ, bb_label_t *lbl_fail)
 {
     switch (bb_emit_mode) {

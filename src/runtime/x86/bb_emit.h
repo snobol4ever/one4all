@@ -188,6 +188,15 @@ void t_label_define(bb_label_t *lbl);
 void t_bb_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fallback,
                     int port, bb_label_t *lbl_succ, bb_label_t *lbl_fail);
 
+/* t_bb_port_call_rip — like t_bb_port_call but TEXT/INLINE mode uses
+ *   `lea rdi, [rip + zeta_label]` instead of `mov rdi, literal`.
+ *   Use for boxes whose ζ is emitted as static .data (xatp, xdsar).
+ *   BINARY: ignores zeta_label; uses zeta_ptr directly (same as t_bb_port_call).
+ *   TEXT/INLINE: emits `lea rdi, [rip + zeta_label]`. */
+void t_bb_port_call_rip(uint64_t zeta_ptr, const char *zeta_label,
+                        const char *fn_name, uint64_t fn_fallback,
+                        int port, bb_label_t *lbl_succ, bb_label_t *lbl_fail);
+
 /* t_load_delta_cmp_imm — load cursor (Δ), compare to n, jump.
  *   Pattern: eax = Δ; cmp eax, n; jne lbl_fail; jmp lbl_succ.
  *   BINARY: mov eax,[r10]; cmp eax,imm32; jne; jmp.

@@ -203,36 +203,27 @@ void emit_bb_xatp(emitter_t *e, const char *varname,
                   bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     t_bb_box_banner("USERPAT", varname ? varname : "");
-    if (bb_emit_mode == EMIT_TEXT || bb_emit_mode == EMIT_TEXT_INLINE) {
-        int id = g_flat_node_id++;
-        char zlbl[80], vlbl[80];
-        snprintf(zlbl, sizeof(zlbl), ".Latp%d_z",     id);
-        snprintf(vlbl, sizeof(vlbl), ".Latp%d_vname", id);
-        const char *vn = varname ? varname : "";
-        flat_data_section(e);
-        flat3c_label(e, vlbl); flat_data_string(e, vn);
-        flat3c_label(e, zlbl);
-        flat_data_long(e, 0); flat_data_long(e, 0);
-        flat_data_quad(e, vlbl);
-        flat_text_section(e);
-        flat_intel_syntax(e);
-        char rdi_arg[120]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", zlbl);
-        flat_box_call(e, rdi_arg, "rt_bb_atp", 0);
-        flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
-        t_label_define(lbl_β);
-        flat_box_call(e, rdi_arg, "rt_bb_atp", 1);
-        flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
-        return;
-    }
-    (void)e;
-    atp_t *z = bb_atp_new(varname ? varname : "");
-    t_bb_port_call((uint64_t)(uintptr_t)z, "rt_bb_atp",
-                   (uint64_t)(uintptr_t)rt_bb_atp,
-                   0, lbl_succ, lbl_fail);
+    /* TEXT: emit .data block with ζ struct (string + two longs + quad ptr).
+     * BINARY: flat_data_* are no-ops (e->is_text=0); atp_t *z allocated below. */
+    int id = g_flat_node_id++;
+    char zlbl[80], vlbl[80];
+    snprintf(zlbl, sizeof(zlbl), ".Latp%d_z",     id);
+    snprintf(vlbl, sizeof(vlbl), ".Latp%d_vname", id);
+    const char *vn = varname ? varname : "";
+    flat_data_section(e);
+    flat3c_label(e, vlbl); flat_data_string(e, vn);
+    flat3c_label(e, zlbl);
+    flat_data_long(e, 0); flat_data_long(e, 0);
+    flat_data_quad(e, vlbl);
+    flat_text_section(e);
+    flat_intel_syntax(e);
+    /* BINARY: allocate real ζ; TEXT: zeta_ptr unused, label used by t_bb_port_call_rip */
+    atp_t *z = bb_atp_new(vn);
+    t_bb_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_atp",
+                       (uint64_t)(uintptr_t)rt_bb_atp, 0, lbl_succ, lbl_fail);
     t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "rt_bb_atp",
-                   (uint64_t)(uintptr_t)rt_bb_atp,
-                   1, lbl_succ, lbl_fail);
+    t_bb_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_atp",
+                       (uint64_t)(uintptr_t)rt_bb_atp, 1, lbl_succ, lbl_fail);
 }
 /*====================================================================================================================*/
 void emit_bb_xbal(emitter_t *e,
@@ -322,40 +313,30 @@ void emit_bb_xdsar(emitter_t *e, const char *varname,
 {
     char banner[80]; snprintf(banner, sizeof(banner), "*%s", varname ? varname : "");
     t_bb_box_banner("DEREF", banner);
-    if (bb_emit_mode == EMIT_TEXT || bb_emit_mode == EMIT_TEXT_INLINE) {
-        int id = g_flat_node_id++;
-        char zlbl[80], slbl[80];
-        snprintf(zlbl, sizeof(zlbl), ".Ldvar%d_z",    id);
-        snprintf(slbl, sizeof(slbl), ".Ldvar%d_name", id);
-        const char *vn = varname ? varname : "";
-        flat_data_section(e);
-        flat3c_label(e, slbl); flat_data_string(e, vn);
-        flat3c_label(e, zlbl);
-        flat_data_quad(e, slbl);   /* name */
-        flat_data_quad(e, "0");    /* child_fn */
-        flat_data_quad(e, "0");    /* child_state */
-        flat_data_quad(e, "0");    /* child_size */
-        flat_data_long(e, 0);      /* in_progress */
-        flat_data_long(e, 0);      /* padding */
-        flat_text_section(e);
-        flat_intel_syntax(e);
-        char rdi_arg[120]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", zlbl);
-        flat_box_call(e, rdi_arg, "bb_deferred_var_exported", 0);
-        flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
-        t_label_define(lbl_β);
-        flat_box_call(e, rdi_arg, "bb_deferred_var_exported", 1);
-        flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
-        return;
-    }
-    (void)e;
-    void *z = bb_dvar_bin_new(varname ? varname : "");
-    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_deferred_var_exported",
-                   0,
-                   0, lbl_succ, lbl_fail);
+    /* TEXT: emit .data block with ζ struct (name ptr, child_fn/state/size quads, in_progress long).
+     * BINARY: flat_data_* are no-ops; bb_dvar_bin_new allocates real ζ below. */
+    int id = g_flat_node_id++;
+    char zlbl[80], slbl[80];
+    snprintf(zlbl, sizeof(zlbl), ".Ldvar%d_z",    id);
+    snprintf(slbl, sizeof(slbl), ".Ldvar%d_name", id);
+    const char *vn = varname ? varname : "";
+    flat_data_section(e);
+    flat3c_label(e, slbl); flat_data_string(e, vn);
+    flat3c_label(e, zlbl);
+    flat_data_quad(e, slbl);   /* name */
+    flat_data_quad(e, "0");    /* child_fn */
+    flat_data_quad(e, "0");    /* child_state */
+    flat_data_quad(e, "0");    /* child_size */
+    flat_data_long(e, 0);      /* in_progress */
+    flat_data_long(e, 0);      /* padding */
+    flat_text_section(e);
+    flat_intel_syntax(e);
+    void *z = bb_dvar_bin_new(vn);
+    t_bb_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "bb_deferred_var_exported",
+                       0, 0, lbl_succ, lbl_fail);
     t_label_define(lbl_β);
-    t_bb_port_call((uint64_t)(uintptr_t)z, "bb_deferred_var_exported",
-                   0,
-                   1, lbl_succ, lbl_fail);
+    t_bb_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "bb_deferred_var_exported",
+                       0, 1, lbl_succ, lbl_fail);
 }
 /*====================================================================================================================*/
 void emit_bb_xeps(emitter_t *e,
