@@ -169,6 +169,22 @@ void bb_pool_destroy(void)
     pool_limit = NULL;
 }
 
+void bb_pool_reset(void)
+{
+    if (!pool_base) return;
+    /* Restore all used pages to RW so bump pointer can reuse them. */
+    if (pool_top > pool_base) {
+        uint8_t *lo  = pool_base;
+        uint8_t *hi  = page_ceil(pool_top);
+        size_t   len = (size_t)(hi - lo);
+        if (mprotect(lo, len, PROT_READ | PROT_WRITE) != 0) {
+            perror("bb_pool_reset: mprotect RX→RW");
+            abort();
+        }
+    }
+    pool_top = pool_base;
+}
+
 size_t bb_pool_used(void)
 {
     if (!pool_base) return 0;

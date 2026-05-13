@@ -217,4 +217,9 @@ typedef DESCR_t (*univ_box_fn)(void *zeta, int entry);
  */
 typedef enum { BB_SCAN, BB_PUMP, BB_ONCE } BrokerMode;
 
+/* EM-7d: reclaim bb_pool + flush node cache after exec_stmt().
+ * Safe in mode-4 (BB_MODE_BROKERED — no cross-statement blob cache).
+ * Called from rt_match_variant before each variant exec_stmt. */
+void exec_stmt_pool_reset(void);
+
 #endif /* BB_BOX_H */

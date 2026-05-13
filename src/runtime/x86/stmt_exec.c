@@ -81,6 +81,7 @@ extern DESCR_t (*g_user_call_hook)(const char *name, DESCR_t *args, int nargs);
 #include "bb_broker.h"  /* bb_broker, BB_SCAN — U-9 */
 #include "sil_macros.h"   /* SIL macro translations — RT + SM axes */
 #include "bb_build.h"
+#include "bb_pool.h"              /* bb_pool_reset (EM-7d) */
 #include "../x86/bb_flat.h"     /* bb_lit_emit_binary — M-DYN-B1 */
 /* rt_in_native_chunk lives in libscrip_rt.so (mode-4 only).  In the scrip
  * binary (mode-1/2/3) it is never set — provide a weak fallback that returns
@@ -261,6 +262,18 @@ void cache_reset(void)
 {
     for (int i = 0; i < DYNC_CACHE_CAP; i++) g_node_cache[i].key = NULL;
     g_cache_hits = g_cache_misses = 0;
+}
+
+/* EM-7d: reclaim bb_pool and flush the node cache together.
+ * Cached fn pointers live in bb_pool RX pages; reset without cache flush
+ * leaves dangling pointers.  Safe in BB_MODE_BROKERED (mode-4 rt_match_variant)
+ * where there is no cross-statement blob cache.  Do NOT call from sm_interp
+ * SM_EXEC_STMT — the BB_MODE_LIVE blob cache spans nested sm_interp_run calls
+ * and resetting it mid-execution corrupts in-flight pattern blobs. */
+void exec_stmt_pool_reset(void)
+{
+    bb_pool_reset();
+    cache_reset();
 }
 
 /* Public: report cache stats */

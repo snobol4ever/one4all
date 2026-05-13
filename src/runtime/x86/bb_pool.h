@@ -62,6 +62,11 @@ void bb_free(bb_buf_t buf, size_t size);
 /* Release all pool memory. Call once at shutdown. */
 void bb_pool_destroy(void);
 
+/* EM-7d: reset pool to empty (no munmap).  All used pages return to RW.
+ * Safe to call after exec_stmt() returns — patterns don't outlive their
+ * statement.  Caller must also flush the node cache (exec_stmt_pool_reset). */
+void bb_pool_reset(void);
+
 /* Diagnostic: bytes currently in use */
 size_t bb_pool_used(void);
 
