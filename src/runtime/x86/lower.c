@@ -528,11 +528,25 @@ static void lower_swap(const tree_t *t)
 {
     /* Inline fast path for two plain variables: save→copy→restore.
      * Uses SM_PUSH_VAR / SM_STORE_VAR (not emit_var_load/store) intentionally —
-     * __icn_swap_tmp__ is a synthetic global scratch and must never land in a frame slot. */
+     * __icn_swap_tmp__ is a synthetic global scratch and must never land in a frame slot.
+     * IJ-10: When one operand is a keyword (&pos, &subject, etc.), keyword assignment
+     * can fail (OOB) and the swap must be atomic.  Emit ICN_KW_SWAP which probes
+     * kw_can_assign before writing either side. */
     if (t->n >= 2 && T0(t) && T1(t)
             && T0(t)->t == TT_VAR && T1(t)->t == TT_VAR) {
         const char *ln = T0(t)->v.sval ? T0(t)->v.sval : "";
         const char *rn = T1(t)->v.sval ? T1(t)->v.sval : "";
+        if (ln[0] == '&' || rn[0] == '&') {
+            /* Keyword swap: push lv, rv, kw_name, var_name → ICN_KW_SWAP 4.
+             * Normalise: keyword is always first (lhs), plain var is always second. */
+            const char *kw  = (ln[0] == '&') ? ln : rn;
+            const char *var = (ln[0] == '&') ? rn : ln;
+            emit_var_load(kw);  emit_var_load(var);
+            sm_emit_s(g_p, SM_PUSH_LIT_S, kw);
+            sm_emit_s(g_p, SM_PUSH_LIT_S, var);
+            sm_emit_si(g_p, SM_CALL_FN, "ICN_KW_SWAP", 4);
+            return;
+        }
         emit_var_load( ln); sm_emit_s(g_p, SM_STORE_VAR, "__icn_swap_tmp__"); sm_emit(g_p, SM_VOID_POP);
         emit_var_load( rn); emit_var_store( ln);
         sm_emit_s(g_p, SM_PUSH_VAR, "__icn_swap_tmp__"); emit_var_store( rn);

@@ -360,7 +360,15 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
 
         case SM_PUSH_VAR: {
             const char *name = ins->a[0].s;
-            DESCR_t val = NV_GET_fn(name);
+            DESCR_t val;
+            /* IJ-10: In Icon mode, &pos and &subject read from scan state, not NV table. */
+            { extern int g_lang;
+              if (g_lang == LANG_ICN && name && name[0] == '&') {
+                if (!strcmp(name, "&pos"))     { val = INTVAL(scan_pos); sm_push(st, val); st->last_ok = 1; break; }
+                if (!strcmp(name, "&subject")) { val = scan_subj ? STRVAL(scan_subj) : NULVCL; sm_push(st, val); st->last_ok = 1; break; }
+              }
+            }
+            val = NV_GET_fn(name);
             /* IJ-3: if NV returned a string/null for a name that is an Icon proc,
              * promote to DT_E proc-value descriptor so `pv := p0; pv()` works.
              * Only fires when g_lang is Icon and the name is in proc_table. */
@@ -489,6 +497,22 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
              * value is unreliable for DT_DATA objects (returns SNUL on the second
              * call for the same variable).  Pushing `val` ensures DIFFER(sno=Pop())
              * sees the actual DATA value, not a stripped SNUL. */
+            /* IJ-10: Icon keyword writes (&pos, &subject) go through kw_assign
+             * for JCON normalization.  &pos := N normalizes negatives and fails
+             * on out-of-range; &subject := S resets &pos to 1.  SM_STORE_VAR
+             * previously called NV_SET_fn directly, bypassing this logic. */
+            { extern int g_lang;
+              if (g_lang == LANG_ICN && name && name[0] == '&') {
+                if (!kw_assign(name + 1, val)) {
+                    sm_push(st, FAILDESCR);
+                    st->last_ok = 0;
+                    break;
+                }
+                sm_push(st, val);
+                st->last_ok = 1;
+                break;
+              }
+            }
             NV_SET_fn(name, val);
             sm_push(st, val);
             /* SN-6: successful assignment sets last_ok=1 so a prior failure
@@ -1495,6 +1519,31 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 }
                 sm_push(st, args[0]);
                 st->last_ok = (args[0].v != DT_FAIL);
+                break;
+            }
+            /* IJ-10: ICN_KW_SWAP — atomic &keyword :=: var swap.
+             * args[0]=lhs value, args[1]=rhs value.  The caller also pushed lhs_name
+             * and rhs_name as string literals before calling.  We pop them too.
+             * Atomicity: if kw_assign would fail (OOB), neither side is written.
+             * Emitted by lower_swap when one operand is a keyword. */
+            if (name && strcmp(name, "ICN_KW_SWAP") == 0 && nargs == 4) {
+                /* args[0]=lv (old kw value), args[1]=rv (old var value),
+                 * args[2]=kw_name (DT_S), args[3]=var_name (DT_S) */
+                DESCR_t lv = args[0], rv = args[1];
+                const char *kw  = (args[2].v == DT_S && args[2].s) ? args[2].s : NULL;
+                const char *var = (args[3].v == DT_S && args[3].s) ? args[3].s : NULL;
+                if (!kw || !var || IS_FAIL_fn(lv) || IS_FAIL_fn(rv)) {
+                    sm_push(st, FAILDESCR); st->last_ok = 0; break;
+                }
+                /* Probe: would kw_assign(kw+1, rv) succeed? */
+                if (!icn_kw_can_assign(kw + 1, rv)) {
+                    /* OOB — swap fails, neither side written */
+                    sm_push(st, FAILDESCR); st->last_ok = 0; break;
+                }
+                kw_assign(kw + 1, rv);   /* write rv → keyword */
+                NV_SET_fn(var, lv);       /* write lv → var */
+                sm_push(st, rv);
+                st->last_ok = 1;
                 break;
             }
             /* PB-1: PL_UNIFY — honest TT_UNIFY lowering (no coro_eval).
