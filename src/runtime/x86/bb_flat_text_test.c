@@ -28,7 +28,7 @@
 #include "snobol4.h"
 #include "emit_bb_flat.h"
 #include "bb_pool.h"
-#include "emit_bb_gen.h"
+#include "emit.h"
 
 /* Forward decls for symbols inside libscrip_rt.so ---------------------- */
 extern void   SNO_INIT_fn(void);

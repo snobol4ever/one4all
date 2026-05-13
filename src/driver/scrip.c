@@ -71,7 +71,7 @@ extern void ir_print_node_nl(const tree_t *e, FILE *f);
 #include "../runtime/x86/bb_build.h"    /* M-BB-LIVE-WIRE: bb_mode_t, g_bb_mode */
 #include "../runtime/x86/emit_sm_binary.h"  /* mode 3: sm_codegen, sm_jit_run */
 #include "../runtime/x86/emit_sm_text.h"    /* mode 4: sm_codegen_text */
-#include "../runtime/x86/emit_bb_gen.h"              /* EM-BB-FORMAT: g_bb_emit_format */
+#include "../runtime/x86/emit.h"              /* EM-BB-FORMAT: g_bb_emit_format */
 #include "scrip_sm.h"                   /* RS-14: sm_preamble, sm_run_with_recovery */
 #include "sync_monitor.h"               /* IM-7: --monitor in-process comparator */
 #include "../runtime/x86/sm_image.h"    /* M-JIT-RUN: sm_image_init */

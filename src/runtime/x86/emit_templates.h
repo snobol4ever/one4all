@@ -5,7 +5,7 @@
 
 #include "snobol4.h"
 #include "emit.h"
-#include "emit_bb_gen.h"
+#include "emit.h"
 #include "snobol4_patnd.h"
 
 /* SM_HALT — pc++ then ret.  Mode-3 in-process; mode-4: rt_halt_tos@PLT. */

@@ -11,7 +11,7 @@
 #include "bb_broker.h"
 #include "../../runtime/interp/coro_runtime.h"
 #include "emit_templates.h"
-#include "emit_bb_gen.h"
+#include "emit.h"
 #include "emit.h"
 
 

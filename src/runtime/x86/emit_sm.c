@@ -6,7 +6,7 @@
  */
 
 #include "emit.h"
-#include "emit_bb_gen.h"
+#include "emit.h"
 #include "emit_templates.h"
 #include "sm_prog.h"
 #include <stdint.h>
@@ -395,7 +395,7 @@ void emit_sm_pat_capture_fn_args(const char *fname_lbl, uint64_t fname_ptr,
 
 #include "emit_sm_shape.h"
 #include "sm_prog.h"
-#include "emit_bb_gen.h"
+#include "emit.h"
 
 #include <assert.h>
 #include <inttypes.h>

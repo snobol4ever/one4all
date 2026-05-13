@@ -5,7 +5,7 @@
 #include "sm_prog.h"
 #include "snobol4.h"
 #include "bb_broker.h"
-#include "emit_bb_gen.h"
+#include "emit.h"
 #include "emit.h"
 #include <stdio.h>
 #include <stdlib.h>

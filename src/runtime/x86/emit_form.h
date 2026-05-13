@@ -3,7 +3,7 @@
 
 #include "emit_defs.h"
 #include "emit_buf.h"
-#include "emit_bb_gen.h"
+#include "emit.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>

@@ -1,7 +1,7 @@
 
 
 #include "emit_flat.h"
-#include "emit_bb_gen.h"
+#include "emit.h"
 #include "emit.h"
 #include "snobol4.h"
 #include "bb_box.h"
