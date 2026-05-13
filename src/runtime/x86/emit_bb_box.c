@@ -189,7 +189,6 @@ void emit_bb_xchr(PATND_t *p, const char *lit_label,
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xdsar(const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
-
     char banner[80]; snprintf(banner, sizeof(banner), "*%s", varname ? varname : "");
     emit_bb_box_banner("DEREF", banner);
     int id = g_flat_node_id++;
@@ -211,7 +210,6 @@ void emit_bb_xdsar(const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xatp(const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t *b)
 {
-
     emit_bb_box_banner("USERPAT", varname ? varname : "");
     int id = g_flat_node_id++;
     char zlbl[80], vlbl[80];

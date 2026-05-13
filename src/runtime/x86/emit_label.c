@@ -32,9 +32,7 @@ void bb_label_define(bb_label_t *lbl)
         bb3c_format(f, lbuf, "", "");
         return;
     }
-
     lbl->offset = bb_emit_pos;
-
     for (int i = 0; i < bb_patch_count; i++) {
         bb_patch_t *p = &bb_patch_list[i];
         if (p->label != lbl) continue;

@@ -74,7 +74,6 @@ static void data_buf_appendf(const char *fmt, ...)
 /* Append a fully-formatted three-column data line to the buffer.  Mirrors */
 static void data_buf_three_col(const char *lbl, const char *act, const char *got)
 {
-
     char fused_lbl[160];
     const char *eff_lbl = lbl ? lbl : "";
     if ((eff_lbl[0] == '\0') && g_flat_data_pending_lbl[0]) {
@@ -82,7 +81,6 @@ static void data_buf_three_col(const char *lbl, const char *act, const char *got
         g_flat_data_pending_lbl[0] = '\0';
         eff_lbl = fused_lbl;
     } else if (eff_lbl[0] != '\0' && g_flat_data_pending_lbl[0]) {
-
         char line[256];
         int n = snprintf(line, sizeof(line), "%-24s", g_flat_data_pending_lbl);
         if (n > 0) {
@@ -96,7 +94,6 @@ static void data_buf_three_col(const char *lbl, const char *act, const char *got
                      eff_lbl, act ? act : "", got ? got : "");
     if (n < 0) return;
     if (n >= (int)sizeof(line)) n = (int)sizeof(line) - 1;
-
     while (n > 0 && (line[n-1] == ' ' || line[n-1] == '\t')) line[--n] = '\0';
     data_buf_appendf("%s\n", line);
 }
@@ -104,7 +101,6 @@ static void data_buf_three_col(const char *lbl, const char *act, const char *got
 /* Defer a label to fuse with the next data line.  Used by flat3c_label's */
 static void data_buf_pend_label(const char *name)
 {
-
     if (g_flat_data_pending_lbl[0]) {
         char line[256];
         int n = snprintf(line, sizeof(line), "%-24s", g_flat_data_pending_lbl);
@@ -159,7 +155,6 @@ void bb_flat_set_intern_str(const char *(*fn)(const char *))
 static void flat3c(const char *lbl, const char *act, const char *got)
 {
     if (!g_is_text) return;
-
     FILE *f = bb_emit_out;
     if (!f) return;
     bb3c_format(f, lbl ? lbl : "", act ? act : "", got ? got : "");
@@ -176,7 +171,6 @@ static void data_buf_remember_label(const char *name);
 void flat3c_label(const char *name)
 {
     if (!g_is_text) return;
-
     if (g_flat_data_active) {
         data_buf_pend_label(name);
         data_buf_remember_label(name);
@@ -203,7 +197,6 @@ static void data_buf_emit_block_comment(void)
 void flat_data_section(void)
 {
     if (!g_is_text) return;
-
     g_flat_data_active = 1;
     g_flat_data_any    = 1;
     g_flat_data_block_nlbls = 0;
@@ -213,20 +206,17 @@ void flat_text_section(void)
 {
     if (!g_is_text) return;
     if (g_flat_data_active) {
-
         data_buf_emit_block_comment();
         g_flat_data_active = 0;
         g_flat_data_just_closed = 1;
         return;
     }
-
     flat3c("", ".section", ".text");
 }
 
 void flat_intel_syntax(void)
 {
     if (!g_is_text) return;
-
     if (g_flat_data_active) return;
     if (g_flat_data_just_closed) {
         g_flat_data_just_closed = 0;
@@ -238,7 +228,6 @@ void flat_intel_syntax(void)
 void flat_data_string(const char *s)
 {
     if (!g_is_text) return;
-
     char esc[1024];
     size_t o = 0;
     if (o < sizeof(esc)) esc[o++] = '"';
@@ -422,7 +411,6 @@ static void patnd_to_sno_r(const PATND_t *p, char *buf, size_t cap,
     if (*o + 4 >= cap) return;
     if (!p) { patnd_buf_append(buf, cap, o, "()"); return; }
     if (depth >= 16) { patnd_buf_append(buf, cap, o, "..."); return; }
-
     switch (p->kind) {
     case XCHR: {
         const char *s = p->STRVAL_fn ? p->STRVAL_fn : "";
@@ -568,7 +556,6 @@ static void emit_flat_xcat(PATND_t *p,
     bb_label_initf(&left_β,  "xcat%d_left_\xCE\xB2",    id);
     bb_label_initf(&right_β, "xcat%d_right_\xCE\xB2",   id);
     bb_label_initf(&xcat_ω,  "xcat%d_\xCF\x89",         id);
-
     if (p->nchildren == 0) {
         emit_jmp_label(lbl_succ, JMP_JMP);
         emit_label_define_bb(lbl_β); emit_jmp_label(lbl_fail, JMP_JMP);
@@ -584,10 +571,8 @@ static void emit_flat_xcat(PATND_t *p,
         emit_label_define_bb(&mid_γ); emit_label_define_bb(&right_ω); emit_label_define_bb(&right_β);
         return;
     }
-
     emit_flat_node(p->children[0], &mid_γ, &xcat_ω, &left_β);
     emit_label_define_bb(&mid_γ);
-
     if (p->nchildren == 2) {
         emit_flat_node(p->children[1], lbl_succ, &right_ω, &right_β);
     } else {
@@ -618,7 +603,6 @@ static void emit_flat_alt(PATND_t *p,
     int nc = p->nchildren;
     if (nc == 0) { emit_label_define_bb(lbl_β); emit_jmp_label(lbl_fail, JMP_JMP); return; }
     if (nc == 1) { emit_flat_node(p->children[0], lbl_succ, lbl_fail, lbl_β); return; }
-
     bb_label_t *ci_βs = alloca((size_t)nc * sizeof(bb_label_t));
     bb_label_t *ci_ωs = alloca((size_t)nc * sizeof(bb_label_t));
     for (int i = 0; i < nc; i++) {
@@ -643,18 +627,13 @@ static void emit_flat_lit(const char *lit, int len,
                           bb_label_t *lbl_succ, bb_label_t *lbl_fail,
                           bb_label_t *lbl_β)
 {
-
     emit_load_delta();
     emit_add_eax_imm32((uint32_t)len);
     emit_cmp_eax_siglen(ADDR_SIGLEN);
     emit_jmp_label(lbl_fail, JMP_JG);
-
-
     emit_sigma_plus_delta(ADDR_SIGMA);
     emit_mov_rdi_rax();
     emit_mov_rdx_imm64((uint64_t)(uint32_t)len);
-
-
     if (g_is_text && g_flat_intern_str) {
         const char *lbl = g_flat_intern_str(lit);
         emit_sym_lea_rcx(lbl, (uint64_t)(uintptr_t)lit);
@@ -662,17 +641,11 @@ static void emit_flat_lit(const char *lit, int len,
     } else {
         emit_mov_rsi_imm64((uint64_t)(uintptr_t)lit);
     }
-
-
     emit_call_sym_plt("memcmp", (uint64_t)(uintptr_t)memcmp);
     emit_test_eax_eax();
     emit_jmp_label(lbl_fail, JMP_JNE);
-
-
     emit_add_delta_imm(len);
     emit_jmp_label(lbl_succ, JMP_JMP);
-
-
     emit_label_define_bb(lbl_β);
     emit_sub_delta_imm(len);
     emit_jmp_label(lbl_fail, JMP_JMP);
@@ -691,13 +664,11 @@ static void emit_flat_charset_call(bb_box_fn c_fn,
                                    bb_label_t *lbl_β)
 {
     if (g_is_text) {
-
         const char *kind = "CHARSET";
         if      (c_fn_name && !strcmp(c_fn_name, "bb_span"))   kind = "SPAN";
         else if (c_fn_name && !strcmp(c_fn_name, "bb_any"))    kind = "ANY";
         else if (c_fn_name && !strcmp(c_fn_name, "bb_brk"))    kind = "BREAK";
         else if (c_fn_name && !strcmp(c_fn_name, "bb_notany")) kind = "NOTANY";
-
         char preview[40];
         if (chars && *chars) {
             int n = (int)strlen(chars);
@@ -707,7 +678,6 @@ static void emit_flat_charset_call(bb_box_fn c_fn,
             preview[0] = '\0';
         }
         emit_flat_box_banner(kind, preview, lbl_succ->name);
-
         int id = g_flat_node_id++;
         char zlbl[64], slbl[64];
         snprintf(zlbl, sizeof(zlbl), ".Lcs%d_z",     id);
@@ -732,7 +702,6 @@ static void emit_flat_charset_call(bb_box_fn c_fn,
         emit_call_sym_plt(c_fn_name, (uint64_t)(uintptr_t)c_fn);
         flat_box_dispatch_jne_jmp(lbl_succ, lbl_fail);
     } else {
-
         typedef struct { const char *chars; int delta; } cs_t;
         cs_t *z = calloc(1, sizeof(cs_t));
         z->chars = chars;
@@ -770,8 +739,6 @@ static void charset_text_body(bb_label_t *lbl_succ,
     const char *chars     = a->chars     ? a->chars     : "";
     const char *c_fn_name = a->c_fn_name ? a->c_fn_name : "";
     const char *kind      = a->kind_name ? a->kind_name : "CHARSET";
-
-
     char preview[40];
     if (chars && *chars) {
         int n = (int)strlen(chars);
@@ -781,8 +748,6 @@ static void charset_text_body(bb_label_t *lbl_succ,
         preview[0] = '\0';
     }
     emit_flat_box_banner(kind, preview, lbl_succ->name);
-
-
     int id = g_flat_node_id++;
     char zlbl[64], slbl[64];
     snprintf(zlbl, sizeof(zlbl), ".Lcs%d_z",     id);
@@ -794,8 +759,6 @@ static void charset_text_body(bb_label_t *lbl_succ,
     flat_data_quad(slbl);
     flat_data_long(0);
     flat_data_long(0);
-
-
     flat_text_section();
     flat_intel_syntax();
     char rdi_arg[96];
@@ -804,8 +767,6 @@ static void charset_text_body(bb_label_t *lbl_succ,
     flat3c_action("mov", "esi, 0");
     emit_call_sym_plt(c_fn_name, (uint64_t)(uintptr_t)a->c_fn);
     flat_box_dispatch_jne_jmp(lbl_succ, lbl_fail);
-
-
     emit_label_define_bb(lbl_β);
     flat3c_action("lea", rdi_arg);
     flat3c_action("mov", "esi, 1");
@@ -832,7 +793,6 @@ static void brkx_text_body(bb_label_t *lbl_succ,
 {
     const brkx_text_arg_t *a = (const brkx_text_arg_t *)arg_;
     const char *chars = a->chars ? a->chars : "";
-
     char preview[40];
     if (chars && *chars) {
         int n = (int)strlen(chars);
@@ -842,7 +802,6 @@ static void brkx_text_body(bb_label_t *lbl_succ,
         preview[0] = '\0';
     }
     emit_flat_box_banner("BREAKX", preview, lbl_succ->name);
-
     int id = g_flat_node_id++;
     char zlbl[64], slbl[64];
     snprintf(zlbl, sizeof(zlbl), ".Lbrkx%d_z",     id);
@@ -853,7 +812,6 @@ static void brkx_text_body(bb_label_t *lbl_succ,
     flat3c_label(zlbl);
     flat_data_quad(slbl);
     flat_data_long(0);
-
     flat_text_section();
     flat_intel_syntax();
     char rdi_arg[96];
@@ -862,7 +820,6 @@ static void brkx_text_body(bb_label_t *lbl_succ,
     flat3c_action("mov", "esi, 0");
     emit_call_sym_plt("bb_breakx", 0);
     flat_box_dispatch_jne_jmp(lbl_succ, lbl_fail);
-
     emit_label_define_bb(lbl_β);
     flat3c_action("lea", rdi_arg);
     flat3c_action("mov", "esi, 1");
@@ -889,7 +846,6 @@ static void intcur_text_body(bb_label_t *lbl_succ,
     char banner_args[32];
     snprintf(banner_args, sizeof(banner_args), "%lld", a->num);
     emit_flat_box_banner(a->kind_name, banner_args, lbl_succ->name);
-
     int id = g_flat_node_id++;
     char lbl[64];
     snprintf(lbl, sizeof(lbl), ".L%s%d_z", a->lbl_prefix, id);
@@ -918,7 +874,6 @@ void emit_flat_box_call(bb_box_fn fn, const char *fn_name,
                                bb_label_t *lbl_succ, bb_label_t *lbl_fail,
                                bb_label_t *lbl_β)
 {
-
     emit_push_r10();
     emit_mov_rdi_imm64((uint64_t)(uintptr_t)z);
     emit_mov_esi_imm32(0);
@@ -950,7 +905,6 @@ static void emit_flat_node(PATND_t *p,
                            bb_label_t *lbl_succ, bb_label_t *lbl_fail,
                            bb_label_t *lbl_β)
 {
-
     if (!p) { emit_bb_xeps(lbl_succ, lbl_fail, lbl_β); return; }
     switch (p->kind) {
     case XCHR: {
@@ -979,7 +933,6 @@ static void emit_flat_node(PATND_t *p,
     case XBRKX: emit_bb_xbrkx(p->STRVAL_fn ? p->STRVAL_fn : "", lbl_succ, lbl_fail, lbl_β); break;
     case XATP:  emit_bb_xatp (p->STRVAL_fn, lbl_succ, lbl_fail, lbl_β); break;
     case XDSAR: emit_bb_xdsar(p->STRVAL_fn, lbl_succ, lbl_fail, lbl_β); break;
-
     default:
         emit_label_define_bb(lbl_β);
         emit_jmp_label(lbl_fail, JMP_JMP);
@@ -993,8 +946,6 @@ static int flat_is_eligible(PATND_t *p)
     if (!p) return 1;
     if (p->kind == XVAR) return 0;
     if (p->kind == XCAT && p->nchildren > 2) return 0;
-
-
     if (p->kind == XNME || p->kind == XFNME || p->kind == XARBN || p->kind == XCALLCAP) return 0;
     for (int i = 0; i < p->nchildren; i++)
         if (!flat_is_eligible(p->children[i])) return 0;
@@ -1011,60 +962,40 @@ static int emit_flat_body(PATND_t *p,
     bb_label_initf(&lbl_succ,       "%s_γ",      prefix);
     bb_label_initf(&lbl_fail,       "%s_ω",      prefix);
     bb_label_initf(&lbl_β,       "%s_β",       prefix);
-
-
     if (text_externalise) data_buf_reset();
-
-
     if (text_externalise) {
-
         emit_flat_pat_banner(prefix, p);
         emit_global_sym(lbl_α.name);
         emit_global_sym(lbl_β.name);
         emit_global_sym(lbl_succ.name);
         emit_global_sym(lbl_fail.name);
-
         emit_label_define_bb(&lbl_α);
     }
-
-
     {   emit_sym_lea_r10("delta", ADDR_DELTA);
     }
     flat_box_entry_dispatch(&lbl_α_body, &lbl_β);
-
-
     emit_label_define_bb(&lbl_α_body);
     if (!text_externalise) emit_label_define_bb(&lbl_α);
     emit_flat_node(p, &lbl_succ, &lbl_fail, &lbl_β);
-
-
     emit_label_define_bb(&lbl_succ);
     emit_sigma_plus_delta(ADDR_SIGMA);
     emit_mov_rdx_rax();
     emit_mov_eax_imm32(1);
     if (brokered) emit_pop_rbp();
     emit_ret();
-
-
     emit_label_define_bb(&lbl_fail);
     emit_mov_eax_imm32(99);
     emit_xor_edx_edx();
     if (brokered) emit_pop_rbp();
     emit_ret();
-
-
     if (text_externalise && g_is_text && g_flat_data_any) {
-
         data_buf_flush_pending_label();
-
         bb3c_flush_pending();
         flat3c("", ".section", ".data");
-
         emit_fprintf_raw("%.*s", (int)g_flat_data_len, g_flat_data_buf);
         flat3c("", ".section", ".text");
         data_buf_reset();
     }
-
     return 0;
 }
 
@@ -1079,7 +1010,6 @@ bb_box_fn bb_build_flat(PATND_t *p)
     emitter_init_binary(buf, FLAT_BUF_MAX);
     emit_flat_body(p, "pat_flat", 0, 0);
     int nbytes = emitter_end();
-
     if (nbytes <= 0 || nbytes > FLAT_BUF_MAX) { bb_free(buf, FLAT_BUF_MAX); return NULL; }
     bb_seal(buf, (size_t)nbytes);
     return (bb_box_fn)buf;
@@ -1094,12 +1024,10 @@ bb_box_fn bb_build_brokered(PATND_t *p)
     g_flat_slot_count = 0; g_flat_node_id = 0;
     emit_mode_set(EMIT_BINARY_BROKERED, NULL);
     emitter_init_binary(buf, FLAT_BUF_MAX);
-
     bb_emit_byte(0x55);
     bb_emit_byte(0x48); bb_emit_byte(0x89); bb_emit_byte(0xE5);
     emit_flat_body(p, "pat_brok", 0, 1);
     int nbytes = emitter_end();
-
     emit_mode_set(EMIT_BINARY_WIRED, NULL);
     if (nbytes <= 0 || nbytes > FLAT_BUF_MAX) { bb_free(buf, FLAT_BUF_MAX); return NULL; }
     bb_seal(buf, (size_t)nbytes);
@@ -1109,20 +1037,15 @@ bb_box_fn bb_build_brokered(PATND_t *p)
 int bb_build_flat_text(PATND_t *p, FILE *out, const char *prefix)
 {
     if (!flat_is_eligible(p)) return -1;
-
     emitter_init_text(out, TEXT_MODE_INVOCATION);
-
     int rc = emit_flat_body(p, prefix, 1, 0);
     emitter_end();
-
-
     bb3c_flush_pending();
     return rc;
 }
 
 void bb_build_flat_text_reset(void)
 {
-
     g_flat_slot_count = 0;
     g_flat_node_id    = 0;
 }
@@ -1168,32 +1091,25 @@ int bb_macros_write_to_path(const char *path)
     fprintf(f, "                        .intel_syntax    noprefix\n");
     fprintf(f, "# One named .macro/.endm per leaf-box port.  Three-column shape.\n");
     fprintf(f, "# GAS expands to byte-identical inline x86 (same as emit_* emissions).\n");
-
     bm_macro(f, "DELTA_LOAD", "");
     bm_op   (f, "mov", "eax, [r10]");
     bm_endm (f);
-
     bm_macro(f, "SIGLEN_LOAD", "");
     bm_op   (f, "lea", "rcx, [rip + \xCE\xA3len]");
     bm_op   (f, "mov", "eax, [rcx]");
     bm_endm (f);
-
     bm_macro(f, "EPS_\xCE\xB1", "lbl_succ");
     bm_jmp  (f, "jmp", "lbl_succ");
     bm_endm (f);
-
     bm_macro(f, "EPS_\xCE\xB2", "lbl_fail");
     bm_jmp  (f, "jmp", "lbl_fail");
     bm_endm (f);
-
     bm_macro(f, "FAIL_\xCE\xB1", "lbl_fail");
     bm_jmp  (f, "jmp", "lbl_fail");
     bm_endm (f);
-
     bm_macro(f, "FAIL_\xCE\xB2", "lbl_fail");
     bm_jmp  (f, "jmp", "lbl_fail");
     bm_endm (f);
-
     bm_macro(f, "RPOS_\xCE\xB1", "n, lbl_succ, lbl_fail");
     bm_op   (f, "SIGLEN_LOAD", "");
     bm_op   (f, "sub", "eax, \\n");
@@ -1203,18 +1119,15 @@ int bb_macros_write_to_path(const char *path)
     bm_jmp  (f, "jne", "lbl_fail");
     bm_jmp  (f, "jmp", "lbl_succ");
     bm_endm (f);
-
     bm_macro(f, "RPOS_\xCE\xB2", "lbl_fail");
     bm_jmp  (f, "jmp", "lbl_fail");
     bm_endm (f);
-
     bm_macro(f, "POS_\xCE\xB1", "n, lbl_succ, lbl_fail");
     bm_op   (f, "DELTA_LOAD", "");
     bm_op   (f, "cmp", "eax, \\n");
     bm_jmp  (f, "jne", "lbl_fail");
     bm_jmp  (f, "jmp", "lbl_succ");
     bm_endm (f);
-
     bm_macro(f, "POS_\xCE\xB2", "lbl_fail");
     bm_jmp  (f, "jmp", "lbl_fail");
     bm_endm (f);
@@ -1225,48 +1138,36 @@ int bb_macros_write_to_path(const char *path)
 /* EDP-9: static helpers moved from bb_build.c */
 static void emit_load_int_global(const int *addr)
 {
-
     bb_emit_byte(0x48); bb_emit_byte(0xB8);
     bb_emit_u64((uint64_t)(uintptr_t)addr);
-
     bb_emit_byte(0x8B); bb_emit_byte(0x00);
 }
 
 /* emit:  mov rax, imm64(&global_ptr) / mov rax, [rax] */
 static void emit_load_ptr_global(const char **addr)
 {
-
     bb_emit_byte(0x48); bb_emit_byte(0xB8);
     bb_emit_u64((uint64_t)(uintptr_t)addr);
-
     bb_emit_byte(0x48); bb_emit_byte(0x8B); bb_emit_byte(0x00);
 }
 
 /* emit:  mov rax, imm64(&global) / add eax, imm32(val) / mov [rax], eax */
 static void emit_add_int_global(const int *addr, int32_t val)
 {
-
     bb_emit_byte(0x48); bb_emit_byte(0xB9);
     bb_emit_u64((uint64_t)(uintptr_t)addr);
-
     bb_emit_byte(0x8B); bb_emit_byte(0x01);
-
     bb_emit_byte(0x05); bb_emit_u32((uint32_t)val);
-
     bb_emit_byte(0x89); bb_emit_byte(0x01);
 }
 
 /* emit:  mov rax, imm64(&global) / sub eax, imm32(val) / mov [rax], eax */
 static void emit_sub_int_global(const int *addr, int32_t val)
 {
-
     bb_emit_byte(0x48); bb_emit_byte(0xB9);
     bb_emit_u64((uint64_t)(uintptr_t)addr);
-
     bb_emit_byte(0x8B); bb_emit_byte(0x01);
-
     bb_emit_byte(0x2D); bb_emit_u32((uint32_t)val);
-
     bb_emit_byte(0x89); bb_emit_byte(0x01);
 }
 
@@ -1314,138 +1215,85 @@ static bb_box_fn bb_build_binary_node(PATND_t *p);
 /* Emit the success-path return:  given [rsp+stk_off+0]=σ, [rsp+stk_off+8]=δ, */
 static void emit_descr_success_from_stack(int stk_off)
 {
-
     bb_emit_byte(0x48); bb_emit_byte(0x8B); bb_emit_byte(0x54); bb_emit_byte(0x24);
     bb_emit_byte((uint8_t)stk_off);
-
     bb_emit_byte(0x8B); bb_emit_byte(0x44); bb_emit_byte(0x24);
     bb_emit_byte((uint8_t)(stk_off + 8));
-
     bb_emit_byte(0x48); bb_emit_byte(0xC1); bb_emit_byte(0xE0); bb_emit_byte(0x20);
-
     bb_emit_byte(0x0C); bb_emit_byte(0x01);
 }
 
 /* Emit the failure-path return: rax = DT_FAIL (99), rdx = 0. */
 static void emit_descr_fail(void)
 {
-
     bb_emit_byte(0xB8); bb_emit_u32(99);
-
     bb_emit_byte(0x31); bb_emit_byte(0xD2);
 }
 
 bb_box_fn bb_lit_emit_binary(const char *lit, int len)
 {
 #define BUF_SIZE 768
-
     bb_buf_t buf = bb_alloc(BUF_SIZE);
     if (!buf) return NULL;
-
     bb_emit_mode = EMIT_BINARY_WIRED;
     bb_emit_begin(buf, BUF_SIZE);
-
-
     bb_label_t lbl_α, lbl_β, lbl_γ, lbl_ω;
     bb_label_init(&lbl_α, "LIT_α");
     bb_label_init(&lbl_β, "LIT_β");
     bb_label_init(&lbl_γ, "LIT_γ");
     bb_label_init(&lbl_ω, "LIT_ω");
-
-
     bb_emit_byte(0x53);
     bb_emit_byte(0x41); bb_emit_byte(0x54);
     bb_insn_sub_rsp_imm8(16);
     bb_insn_cmp_esi_imm8(0);
     bb_insn_je_rel8(&lbl_α);
     bb_insn_jmp_rel32(&lbl_β);
-
-
     bb_label_define(&lbl_α);
-
-
     emit_load_int_global(&Δ);
-
     bb_emit_byte(0x05); bb_emit_u32((uint32_t)len);
-
     bb_emit_byte(0x48); bb_emit_byte(0xB9);
     bb_emit_u64((uint64_t)(uintptr_t)&Σlen);
     bb_emit_byte(0x3B); bb_emit_byte(0x01);
-
     bb_emit_byte(0x0F); bb_emit_byte(0x8F); bb_emit_patch_rel32(&lbl_ω);
-
-
     emit_load_ptr_global(&Σ);
-
     bb_emit_byte(0x48); bb_emit_byte(0xB9);
     bb_emit_u64((uint64_t)(uintptr_t)&Δ);
     bb_emit_byte(0x48); bb_emit_byte(0x63); bb_emit_byte(0x09);
-
     bb_emit_byte(0x48); bb_emit_byte(0x8D); bb_emit_byte(0x3C); bb_emit_byte(0x08);
-
-
     bb_emit_byte(0x48); bb_emit_byte(0xBE);
     bb_emit_u64((uint64_t)(uintptr_t)lit);
-
-
     bb_emit_byte(0x48); bb_emit_byte(0xBA);
     bb_emit_u64((uint64_t)(uint32_t)len);
-
-
     bb_emit_byte(0x48); bb_emit_byte(0xB8);
     bb_emit_u64((uint64_t)(uintptr_t)memcmp);
     bb_insn_call_rax();
-
-
     bb_emit_byte(0x85); bb_emit_byte(0xC0);
-
     bb_insn_jne_rel32(&lbl_ω);
-
-
     emit_load_ptr_global(&Σ);
     bb_emit_byte(0x48); bb_emit_byte(0xB9);
     bb_emit_u64((uint64_t)(uintptr_t)&Δ);
     bb_emit_byte(0x48); bb_emit_byte(0x63); bb_emit_byte(0x09);
     bb_emit_byte(0x48); bb_emit_byte(0x8D); bb_emit_byte(0x04); bb_emit_byte(0x08);
-
     bb_emit_byte(0x48); bb_emit_byte(0x89); bb_emit_byte(0x04); bb_emit_byte(0x24);
-
-
     bb_emit_byte(0xC7); bb_emit_byte(0x44); bb_emit_byte(0x24); bb_emit_byte(0x08);
     bb_emit_u32((uint32_t)len);
-
-
     emit_add_int_global(&Δ, len);
-
-
     bb_insn_jmp_rel32(&lbl_γ);
-
-
     bb_label_define(&lbl_β);
     emit_sub_int_global(&Δ, len);
-
     bb_insn_jmp_rel32(&lbl_ω);
-
-
     bb_label_define(&lbl_γ);
-
     emit_descr_success_from_stack(0);
-
     bb_insn_add_rsp_imm8(16);
     bb_emit_byte(0x41); bb_emit_byte(0x5C);
     bb_emit_byte(0x5B);
     bb_insn_ret();
-
-
     bb_label_define(&lbl_ω);
     emit_descr_fail();
-
     bb_insn_add_rsp_imm8(16);
     bb_emit_byte(0x41); bb_emit_byte(0x5C);
     bb_emit_byte(0x5B);
     bb_insn_ret();
-
-
     int nbytes = bb_emit_end();
     if (nbytes <= 0 || nbytes > BUF_SIZE) {
         bb_free(buf, BUF_SIZE);
@@ -1453,7 +1301,6 @@ bb_box_fn bb_lit_emit_binary(const char *lit, int len)
     }
     bb_seal(buf, (size_t)nbytes);
     return (bb_box_fn)buf;
-
 #undef BUF_SIZE
 }
 
@@ -1461,66 +1308,45 @@ bb_box_fn bb_lit_emit_binary(const char *lit, int len)
 bb_box_fn bb_eps_emit_binary(void)
 {
 #define EPS_BUF_SIZE 256
-
     bb_buf_t buf = bb_alloc(EPS_BUF_SIZE);
     if (!buf) return NULL;
-
     bb_emit_mode = EMIT_BINARY_WIRED;
     bb_emit_begin(buf, EPS_BUF_SIZE);
-
     bb_label_t lbl_α, lbl_β, lbl_γ, lbl_ω;
     bb_label_init(&lbl_α, "EPS_α");
     bb_label_init(&lbl_β, "EPS_β");
     bb_label_init(&lbl_γ, "EPS_γ");
     bb_label_init(&lbl_ω, "EPS_ω");
-
-
     bb_emit_byte(0x53);
     bb_emit_byte(0x41); bb_emit_byte(0x54);
     bb_insn_sub_rsp_imm8(16);
     bb_insn_cmp_esi_imm8(0);
     bb_insn_je_rel8(&lbl_α);
     bb_insn_jmp_rel32(&lbl_β);
-
-
     bb_label_define(&lbl_α);
-
-
     emit_load_ptr_global(&Σ);
-
     bb_emit_byte(0x48); bb_emit_byte(0xB9);
     bb_emit_u64((uint64_t)(uintptr_t)&Δ);
     bb_emit_byte(0x48); bb_emit_byte(0x63); bb_emit_byte(0x09);
-
     bb_emit_byte(0x48); bb_emit_byte(0x8D); bb_emit_byte(0x04); bb_emit_byte(0x08);
-
     bb_emit_byte(0x48); bb_emit_byte(0x89); bb_emit_byte(0x04); bb_emit_byte(0x24);
-
     bb_emit_byte(0x48); bb_emit_byte(0xC7); bb_emit_byte(0x44); bb_emit_byte(0x24);
     bb_emit_byte(0x08); bb_emit_u32(0);
-
     bb_insn_jmp_rel32(&lbl_γ);
-
-
     bb_label_define(&lbl_β);
     bb_insn_jmp_rel32(&lbl_ω);
-
-
     bb_label_define(&lbl_γ);
     emit_descr_success_from_stack(0);
     bb_insn_add_rsp_imm8(16);
     bb_emit_byte(0x41); bb_emit_byte(0x5C);
     bb_emit_byte(0x5B);
     bb_insn_ret();
-
-
     bb_label_define(&lbl_ω);
     emit_descr_fail();
     bb_insn_add_rsp_imm8(16);
     bb_emit_byte(0x41); bb_emit_byte(0x5C);
     bb_emit_byte(0x5B);
     bb_insn_ret();
-
     int nbytes = bb_emit_end();
     if (nbytes <= 0 || nbytes > EPS_BUF_SIZE) {
         bb_free(buf, EPS_BUF_SIZE);
@@ -1528,6 +1354,5 @@ bb_box_fn bb_eps_emit_binary(void)
     }
     bb_seal(buf, (size_t)nbytes);
     return (bb_box_fn)buf;
-
 #undef EPS_BUF_SIZE
 }

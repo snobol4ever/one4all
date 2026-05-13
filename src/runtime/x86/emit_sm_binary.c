@@ -102,13 +102,11 @@ static void h_return_impl(int is_fret, int is_nret)
 {
     if (STATE->call_depth > 0) {
         SmCallFrame *fr = &STATE->call_stack[--STATE->call_depth];
-
         DESCR_t retval  = fr->retval_name
             ? NV_GET_fn(fr->retval_name)
             : ((STATE->sp > 0) ? STATE->stack[STATE->sp - 1] : FAILDESCR);
         for (int k = fr->nsaved - 1; k >= 0; k--)
             NV_SET_fn(fr->saved_names[k], fr->saved_vals[k]);
-
         if (fr->caller_sp > 0 && fr->caller_stack) {
             if (fr->caller_sp > STATE->stack_cap) {
                 STATE->stack = GC_realloc(STATE->stack, fr->caller_sp * sizeof(DESCR_t));
@@ -121,7 +119,6 @@ static void h_return_impl(int is_fret, int is_nret)
             PUSH(FAILDESCR); STATE->last_ok = 0;
             strncpy(kw_rtntype, "FRETURN", sizeof(kw_rtntype)-1);
         } else if (is_nret) {
-
             DESCR_t deref = retval;
             if (IS_NAMEPTR(deref))      deref = NAME_DEREF_PTR(deref);
             else if (IS_NAMEVAL(deref)) deref = NV_GET_fn(deref.s);
@@ -149,18 +146,14 @@ static void h_nreturn_f(void) { if (!STATE->last_ok) h_return_impl(0, 1); }
 
 
 static void h_stno(void) {
-
     int sm_stno = (int)CUR_INS->a[0].i;
     comm_stno(sm_stno);
     kw_stno = sm_stno;
-
     {
         extern void mon_emit_label_bin(int64_t stno);
         mon_emit_label_bin((int64_t)sm_stno);
     }
-
     STATE->sp = 0;
-
     if (g_jit_step_limit > 0 && g_jit_steps_done++ >= g_jit_step_limit)
         longjmp(g_jit_step_jmp, 1);
 }
@@ -182,7 +175,6 @@ static void h_push_null(void)  { PUSH(NULVCL); STATE->last_ok = 1; }
 
 static void h_push_var(void)
 {
-
     DESCR_t val = NV_GET_fn(CUR_INS->a[0].s);
     PUSH(val);
     STATE->last_ok = (val.v != DT_FAIL);
@@ -304,13 +296,11 @@ static void h_bb_pump_case(void)
 {
     int ncases      = (int)CUR_INS->a[0].i;
     int has_default = (int)CUR_INS->a[1].i;
-
     int default_pc = -1;
     if (has_default) {
         DESCR_t d = POP();
         default_pc = (d.v == DT_E && d.slen == 1) ? (int)d.i : -1;
     }
-
     int *cmp_kinds = (int*)GC_malloc(sizeof(int) * (ncases > 0 ? ncases : 1));
     int *val_pcs   = (int*)GC_malloc(sizeof(int) * (ncases > 0 ? ncases : 1));
     int *body_pcs  = (int*)GC_malloc(sizeof(int) * (ncases > 0 ? ncases : 1));
@@ -322,11 +312,9 @@ static void h_bb_pump_case(void)
         val_pcs[k]   = (v.v == DT_E && v.slen == 1) ? (int)v.i : -1;
         cmp_kinds[k] = (c.v == DT_I) ? (int)c.i : (int)TT_EQ;
     }
-
     DESCR_t topic_d = POP();
     int topic_pc = (topic_d.v == DT_E && topic_d.slen == 1) ? (int)topic_d.i : -1;
     DESCR_t topic = (topic_pc >= 0) ? sm_call_expression(topic_pc) : NULVCL;
-
     DESCR_t result = NULVCL;
     int matched = 0;
     for (int k = 0; k < ncases; k++) {
@@ -356,7 +344,6 @@ static void h_bb_pump_case(void)
         result = sm_call_expression(default_pc);
         matched = 1;
     }
-
     PUSH(result);
     STATE->last_ok = matched;
 }
@@ -422,7 +409,6 @@ static void h_suspend_value(void)
     if (sm_yield_to_caller(v)) {
         STATE->last_ok = 1;
     } else {
-
         PUSH(v);
         STATE->last_ok = !IS_FAIL_fn(v);
     }
@@ -432,15 +418,12 @@ static void h_store_var(void)
 {
     DESCR_t val = POP();
     if (val.v == DT_FAIL) {
-
         PUSH(FAILDESCR);
         STATE->last_ok = 0;
         return;
     }
-
     NV_SET_fn(CUR_INS->a[0].s, val);
     PUSH(val);
-
     STATE->last_ok = 1;
 }
 
@@ -449,7 +432,6 @@ static void h_pop(void) { POP(); }
 static void h_arith(void)
 {
     DESCR_t r = POP(), l = POP();
-
     if (l.v == DT_FAIL || r.v == DT_FAIL) {
         PUSH(FAILDESCR);
         STATE->last_ok = 0;
@@ -577,7 +559,6 @@ static void h_pat_deref(void)
 
 static void h_pat_refname(void)
 {
-
     const char *name = CUR_INS->a[0].s ? CUR_INS->a[0].s : "";
     PUSH(pat_ref(name));
 }
@@ -598,7 +579,6 @@ static void h_pat_capture(void)
 
 static void h_pat_capture_fn(void)
 {
-
     DESCR_t child  = POP();
     const char *fname = CUR_INS->a[0].s ? CUR_INS->a[0].s : "";
     const char *namelist = CUR_INS->a[2].s;
@@ -633,7 +613,6 @@ static void h_pat_capture_fn(void)
 
 static void h_pat_capture_fn_args(void)
 {
-
     int nargs = (int)CUR_INS->a[2].i;
     DESCR_t *argv = nargs > 0
         ? (DESCR_t *)GC_MALLOC((size_t)nargs * sizeof(DESCR_t))
@@ -649,14 +628,12 @@ static void h_pat_capture_fn_args(void)
 
 static void h_pat_usercall(void)
 {
-
     const char *fname = CUR_INS->a[0].s ? CUR_INS->a[0].s : "";
     PUSH(pat_user_call(fname, NULL, 0));
 }
 
 static void h_pat_usercall_args(void)
 {
-
     int nargs = (int)CUR_INS->a[1].i;
     DESCR_t *argv = nargs > 0
         ? (DESCR_t *)GC_MALLOC((size_t)nargs * sizeof(DESCR_t))
@@ -668,7 +645,6 @@ static void h_pat_usercall_args(void)
 
 static void h_exec_stmt(void)
 {
-
     int has_repl   = (int)CUR_INS->a[1].i;
     DESCR_t repl   = POP();
     DESCR_t subj_d = POP();
@@ -682,9 +658,7 @@ static void h_call(void)
 {
     const char *name  = CUR_INS->a[0].s;
     int         nargs = (int)CUR_INS->a[1].i;
-
     if (name && strcmp(name, "INDIR_GET") == 0) {
-
         DESCR_t name_d = POP(), val;
         if (IS_NAMEPTR(name_d)) {
             val = NAME_DEREF_PTR(name_d);
@@ -700,7 +674,6 @@ static void h_call(void)
         PUSH(val); STATE->last_ok = 1; return;
     }
     if (name && strcmp(name, "NAME_PUSH") == 0) {
-
         DESCR_t nd = POP();
         const char *vn0 = VARVAL_fn(nd);
         char *vn = GC_strdup(vn0 ? vn0 : "");
@@ -708,7 +681,6 @@ static void h_call(void)
         PUSH(NAMEVAL(vn)); STATE->last_ok = 1; return;
     }
     if (name && strcmp(name, "ASGN_INDIR") == 0) {
-
         DESCR_t nd = POP(), val = POP();
         int ok = 0;
         if (IS_NAMEPTR(nd)) {
@@ -725,7 +697,6 @@ static void h_call(void)
         PUSH(val); STATE->last_ok = ok; return;
     }
     if (name && strcmp(name, "NRETURN_ASGN") == 0) {
-
         const char *fname = CUR_INS->a[1].s;
         DESCR_t rhs = POP();
         DESCR_t fres = INVOKE_fn(fname, NULL, 0);
@@ -736,7 +707,6 @@ static void h_call(void)
             NV_SET_fn(fn, rhs); ok = 1;
         }
         else {
-
             char setname[256];
             snprintf(setname, sizeof(setname), "%s_SET", fname ? fname : "");
             DESCR_t sargs[2] = { rhs, fres };
@@ -755,11 +725,9 @@ static void h_call(void)
             DESCR_t r = subscript_get2(base, i, j);
             PUSH(r); STATE->last_ok = (r.v != DT_FAIL);
         } else {
-
             int n = nargs;
             DESCR_t raw[32];
             for (int k = 0; k < n; k++) raw[k] = POP();
-
             DESCR_t base = raw[n-1];
             DESCR_t fargs[32]; fargs[0] = base;
             for (int k = 0; k < n-1; k++) fargs[k+1] = raw[n-2-k];
@@ -781,7 +749,6 @@ static void h_call(void)
             comm_var("<lval>", val);
             PUSH(val);
         } else {
-
             int ndim = nargs - 2;
             DESCR_t idx[32];
             for (int k = ndim - 1; k >= 0; k--) idx[k] = POP();
@@ -795,10 +762,7 @@ static void h_call(void)
         }
         return;
     }
-
-
     if (name && strcmp(name, "PL_UNIFY") == 0 && nargs == 0) {
-
         DESCR_t expr_d = POP();
         tree_t *node   = (tree_t *)expr_d.ptr;
         if (!node || node->n < 2) { STATE->last_ok = 0; return; }
@@ -808,39 +772,33 @@ static void h_call(void)
         return;
     }
     if (name && strcmp(name, "PL_CUT") == 0 && nargs == 0) {
-
         POP();
         g_pl_cut_flag = 1;
         STATE->last_ok = 1;
         return;
     }
     if (name && strcmp(name, "PL_TRAIL_MARK") == 0 && nargs == 0) {
-
         DESCR_t d; d.v = DT_I; d.i = (int64_t)trail_mark(&g_pl_trail); d.ptr = NULL;
         PUSH(d);
         STATE->last_ok = 1;
         return;
     }
     if (name && strcmp(name, "PL_TRAIL_UNWIND") == 0 && nargs == 0) {
-
         DESCR_t mark_d = POP();
         trail_unwind(&g_pl_trail, (int)mark_d.i);
         STATE->last_ok = 1;
         return;
     }
     if (name && strcmp(name, "PL_BUILTIN") == 0 && nargs == 0) {
-
         DESCR_t expr_d = POP();
         tree_t *goal   = (tree_t *)expr_d.ptr;
         if (!goal) { STATE->last_ok = 0; return; }
         STATE->last_ok = interp_exec_pl_builtin(goal, g_pl_env);
         return;
     }
-
     DESCR_t args[32];
     if (nargs > 32) nargs = 32;
     for (int k = nargs - 1; k >= 0; k--) args[k] = POP();
-
     for (int k = 0; k < nargs; k++) {
         if (args[k].v == DT_FAIL) {
             PUSH(FAILDESCR);
@@ -848,7 +806,6 @@ static void h_call(void)
             return;
         }
     }
-
     DESCR_t result = FAILDESCR;
     int _data_first = (nargs >= 1 && args[0].v == DT_DATA);
     int _data_set   = (nargs >= 2 && args[1].v == DT_DATA && name &&
@@ -856,8 +813,6 @@ static void h_call(void)
                        strcasecmp(name + strlen(name) - 4, "_SET") == 0);
     if (_data_first || _data_set)
         result = sc_dat_field_call(name, args, nargs);
-
-
     if (result.v == DT_FAIL || (!_data_first && !_data_set)) {
         int body_pc = -1;
         if (!_data_first && !_data_set && name) {
@@ -875,11 +830,9 @@ static void h_call(void)
             }
         }
         if (body_pc >= 0 && STATE->call_depth < SM_CALL_STACK_MAX) {
-
             SmCallFrame *fr = &STATE->call_stack[STATE->call_depth++];
             fr->ret_pc = STATE->pc;
             fr->ret_ok = 1;
-
             fr->caller_sp = STATE->sp;
             if (STATE->sp > 0) {
                 fr->caller_stack = GC_malloc(STATE->sp * sizeof(DESCR_t));
@@ -888,25 +841,21 @@ static void h_call(void)
                 fr->caller_stack = NULL;
             }
             STATE->sp = 0;
-
             const char *entry2  = FUNC_ENTRY_fn(name);
             const char *retname = (entry2 && strcmp(entry2, name) != 0
                                    && FNCEX_fn(entry2)) ? entry2 : name;
             fr->retval_name = GC_strdup(retname);
-
             int np  = FUNC_NPARAMS_fn(name);
             int nl2 = FUNC_NLOCALS_fn(name);
             if (np  > 64) np  = 64;
             if (nl2 > 64) nl2 = 64;
             int ns = 0;
-
             if (ns < SM_SAVED_NV_MAX) {
                 fr->saved_names[ns] = GC_strdup(retname);
                 fr->saved_vals [ns] = NV_GET_fn(retname);
                 ns++;
             }
             NV_SET_fn(retname, STRVAL(""));
-
             for (int k = 0; k < np && ns < SM_SAVED_NV_MAX; k++) {
                 const char *pname = FUNC_PARAM_fn(name, k);
                 if (!pname) pname = "";
@@ -915,7 +864,6 @@ static void h_call(void)
                 ns++;
                 NV_SET_fn(pname, k < nargs ? args[k] : NULVCL);
             }
-
             for (int k = 0; k < nl2 && ns < SM_SAVED_NV_MAX; k++) {
                 const char *lname = FUNC_LOCAL_fn(name, k);
                 if (!lname) lname = "";
@@ -930,7 +878,6 @@ static void h_call(void)
             STATE->pc = body_pc;
             return;
         }
-
         if (result.v == DT_FAIL || (!_data_first && !_data_set))
             result = INVOKE_fn(name, args, nargs);
     }
@@ -1027,14 +974,12 @@ static handler_fn_t g_handlers[SM_OPCODE_COUNT];
 static void init_handler_table(void)
 {
     for (int i = 0; i < SM_OPCODE_COUNT; i++) g_handlers[i] = h_unimpl;
-
     g_handlers[SM_LABEL]      = h_label;
     g_handlers[SM_JUMP]       = h_jump;
     g_handlers[SM_JUMP_S]     = h_jump_s;
     g_handlers[SM_JUMP_F]     = h_jump_f;
     g_handlers[SM_HALT]       = h_halt;
     g_handlers[SM_STNO]       = h_stno;
-
     g_handlers[SM_PUSH_LIT_S] = h_push_lit_s;
     g_handlers[SM_PUSH_LIT_I] = h_push_lit_i;
     g_handlers[SM_PUSH_LIT_F] = h_push_lit_f;
@@ -1045,7 +990,6 @@ static void init_handler_table(void)
     g_handlers[SM_CALL_EXPRESSION] = h_call_chunk;
     g_handlers[SM_STORE_VAR]  = h_store_var;
     g_handlers[SM_VOID_POP]        = h_pop;
-
     g_handlers[SM_ADD]        = h_arith;
     g_handlers[SM_SUB]        = h_arith;
     g_handlers[SM_MUL]        = h_arith;
@@ -1055,7 +999,6 @@ static void init_handler_table(void)
     g_handlers[SM_CONCAT]     = h_concat;
     g_handlers[SM_COERCE_NUM] = h_coerce_num;
     g_handlers[SM_NEG]        = h_neg;
-
     g_handlers[SM_PAT_LIT]     = h_pat_lit;
     g_handlers[SM_PAT_ANY]     = h_pat_any;
     g_handlers[SM_PAT_NOTANY]  = h_pat_notany;
@@ -1085,7 +1028,6 @@ static void init_handler_table(void)
     g_handlers[SM_PAT_CAPTURE_FN_ARGS] = h_pat_capture_fn_args;
     g_handlers[SM_PAT_USERCALL]   = h_pat_usercall;
     g_handlers[SM_PAT_USERCALL_ARGS] = h_pat_usercall_args;
-
     g_handlers[SM_EXEC_STMT]   = h_exec_stmt;
     g_handlers[SM_CALL_FN]        = h_call;
     g_handlers[SM_RETURN]      = h_return;
@@ -1101,15 +1043,10 @@ static void init_handler_table(void)
     g_handlers[SM_DEFINE_ENTRY] = h_define_entry;
     g_handlers[SM_INCR]        = h_incr;
     g_handlers[SM_DECR]        = h_decr;
-
-
     g_handlers[SM_BB_PUMP]      = h_bb_pump;
     g_handlers[SM_BB_ONCE]      = h_bb_once;
-
     g_handlers[SM_BB_EVAL]      = NULL;
-
     g_handlers[SM_BB_ONCE_PROC] = h_bb_once_proc;
-
     g_handlers[SM_BB_PUMP_PROC] = h_bb_pump_proc;
     g_handlers[SM_BB_PUMP_CASE] = h_bb_pump_case;
     g_handlers[SM_BB_PUMP_SM]   = h_bb_pump_sm;
@@ -1124,7 +1061,6 @@ static void init_handler_table(void)
     g_handlers[SM_ICMP_LT]      = h_icmp_lt;
     g_handlers[SM_LOAD_FRAME]   = h_load_frame;
     g_handlers[SM_STORE_FRAME]  = h_store_frame;
-
 }
 
 
@@ -1136,43 +1072,25 @@ static size_t    g_trampoline_offset = 0;
 static size_t emit_trampoline(SM_Program *prog)
 {
     size_t off = seg_offset(SEG_CODE);
-
-
     seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x8b);
     seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x14);
-
-
     seg_byte(SEG_CODE, 0x3d);
     seg_u32(SEG_CODE, (uint32_t)prog->count);
-
-
     seg_byte(SEG_CODE, 0x73); seg_byte(SEG_CODE, 0x10);
-
-
     seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xb9);
     seg_u64(SEG_CODE, (uint64_t)(uintptr_t)g_blob_addrs);
-
-
     seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x8b);
     seg_byte(SEG_CODE, 0x04); seg_byte(SEG_CODE, 0xc1);
-
-
     seg_byte(SEG_CODE, 0xff); seg_byte(SEG_CODE, 0xe0);
-
-
     seg_byte(SEG_CODE, 0xc3);
-
     return off;
 }
 
 /* emit_standard_blob — emit the standard "call C handler" blob. */
 static void emit_standard_blob(handler_fn_t fn, size_t trampoline_abs_off)
 {
-
     seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
     seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x14);
-
-
     seg_byte(SEG_CODE, 0x4c); seg_byte(SEG_CODE, 0x89); seg_byte(SEG_CODE, 0xe0);
     seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x2b);
     seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x00);
@@ -1180,23 +1098,13 @@ static void emit_standard_blob(handler_fn_t fn, size_t trampoline_abs_off)
     seg_byte(SEG_CODE, 0xf8); seg_byte(SEG_CODE, 0x04);
     seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x89);
     seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x08);
-
-
     seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xb8);
     seg_u64(SEG_CODE, (uint64_t)(uintptr_t)fn);
-
-
     seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x83);
     seg_byte(SEG_CODE, 0xec); seg_byte(SEG_CODE, 0x08);
-
-
     seg_byte(SEG_CODE, 0xff); seg_byte(SEG_CODE, 0xd0);
-
-
     seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x83);
     seg_byte(SEG_CODE, 0xc4); seg_byte(SEG_CODE, 0x08);
-
-
     seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x8b);
     seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x08);
     seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xc1);
@@ -1204,8 +1112,6 @@ static void emit_standard_blob(handler_fn_t fn, size_t trampoline_abs_off)
     seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x03);
     seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x00);
     seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89); seg_byte(SEG_CODE, 0xc4);
-
-
     size_t rel32_end_off = seg_offset(SEG_CODE) + 5;
     int32_t rel = (int32_t)((int64_t)trampoline_abs_off - (int64_t)rel32_end_off);
     seg_byte(SEG_CODE, 0xe9);
@@ -1215,38 +1121,22 @@ static void emit_standard_blob(handler_fn_t fn, size_t trampoline_abs_off)
 /* emit_standard_blob_no_stack — emit a "call C handler" blob for handlers */
 static void emit_standard_blob_no_stack(handler_fn_t fn, size_t trampoline_abs_off)
 {
-
     seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
     seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x14);
-
-
     seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xb8);
     seg_u64(SEG_CODE, (uint64_t)(uintptr_t)fn);
-
-
     seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x83);
     seg_byte(SEG_CODE, 0xec); seg_byte(SEG_CODE, 0x08);
-
-
     seg_byte(SEG_CODE, 0xff); seg_byte(SEG_CODE, 0xd0);
-
-
     seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x83);
     seg_byte(SEG_CODE, 0xc4); seg_byte(SEG_CODE, 0x08);
-
-
     seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x8b);
     seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x08);
-
     seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xc1);
     seg_byte(SEG_CODE, 0xe0); seg_byte(SEG_CODE, 0x04);
-
     seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x03);
     seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x00);
-
     seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89); seg_byte(SEG_CODE, 0xc4);
-
-
     size_t rel32_end_off_ns = seg_offset(SEG_CODE) + 5;
     int32_t rel_ns = (int32_t)((int64_t)trampoline_abs_off - (int64_t)rel32_end_off_ns);
     seg_byte(SEG_CODE, 0xe9);
@@ -1258,37 +1148,24 @@ static size_t emit_cond_jump_blob_skeleton(int take_on_nonzero,
                                            int32_t target_pc,
                                            int32_t fallthru_pc)
 {
-
     seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x83);
     seg_byte(SEG_CODE, 0x7d); seg_byte(SEG_CODE, 0x10); seg_byte(SEG_CODE, 0x00);
-
-
     if (take_on_nonzero) {
-
         seg_byte(SEG_CODE, 0x74); seg_byte(SEG_CODE, 0x0d);
     } else {
-
         seg_byte(SEG_CODE, 0x75); seg_byte(SEG_CODE, 0x0d);
     }
-
-
     seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xc7);
     seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x14);
     seg_u32(SEG_CODE, (uint32_t)target_pc);
-
     seg_byte(SEG_CODE, 0xe9);
     size_t target_rel32_off = seg_offset(SEG_CODE);
     seg_u32(SEG_CODE, 0);
-
-
     seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xc7);
     seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x14);
     seg_u32(SEG_CODE, (uint32_t)fallthru_pc);
-
     seg_byte(SEG_CODE, 0xe9);
-
     seg_u32(SEG_CODE, 0);
-
     return target_rel32_off;
 }
 
@@ -1296,11 +1173,8 @@ static size_t emit_cond_jump_blob_skeleton(int take_on_nonzero,
 static void emit_halt_blob(void) __attribute__((unused));
 static void emit_halt_blob(void)
 {
-
     seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
     seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x14);
-
-
     seg_byte(SEG_CODE, 0xc3);
 }
 
@@ -1308,27 +1182,20 @@ static void emit_halt_blob(void)
 /* emit_jump_blob_skeleton — emit the SM_JUMP blob with the jmp rel32 */
 static size_t emit_jump_blob_skeleton(int32_t target_pc)
 {
-
     seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xc7);
     seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x14);
     seg_u32(SEG_CODE, (uint32_t)target_pc);
-
-
     seg_byte(SEG_CODE, 0xe9);
     size_t rel32_off = seg_offset(SEG_CODE);
     seg_u32(SEG_CODE, 0);
-
     return rel32_off;
 }
 
 /* emit_label_blob — emit a TRULY stackless SM_LABEL blob. */
 static void emit_label_blob(size_t trampoline_abs_off)
 {
-
     seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
     seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x14);
-
-
     size_t rel32_end_off = seg_offset(SEG_CODE) + 5;
     int32_t rel = (int32_t)((int64_t)trampoline_abs_off - (int64_t)rel32_end_off);
     seg_byte(SEG_CODE, 0xe9);
@@ -1341,15 +1208,11 @@ static void emit_label_blob(size_t trampoline_abs_off)
 /* Helper: 16-byte rsp alignment + call rax via imm64.  20 bytes. */
 static void emit_aligned_call_imm64(void *fn)
 {
-
     seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x83);
     seg_byte(SEG_CODE, 0xec); seg_byte(SEG_CODE, 0x08);
-
     seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xb8);
     seg_u64(SEG_CODE, (uint64_t)(uintptr_t)fn);
-
     seg_byte(SEG_CODE, 0xff); seg_byte(SEG_CODE, 0xd0);
-
     seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x83);
     seg_byte(SEG_CODE, 0xc4); seg_byte(SEG_CODE, 0x08);
 }
@@ -1370,27 +1233,18 @@ static void emit_jmp_trampoline(size_t trampoline_abs_off)
 int sm_codegen(SM_Program *prog)
 {
     init_handler_table();
-
-
     if (g_blob_addrs) { free(g_blob_addrs); g_blob_addrs = NULL; }
     g_blob_count = 0;
     g_trampoline_offset = 0;
-
     if (prog->count == 0) {
-
         return 0;
     }
-
     g_blob_addrs = (uint8_t **)calloc((size_t)prog->count, sizeof(uint8_t *));
     if (!g_blob_addrs) {
         fprintf(stderr, "sm_codegen: g_blob_addrs allocation failed\n");
         return -1;
     }
-
-
     g_trampoline_offset = emit_trampoline(prog);
-
-
     int *jump_indices = NULL;
     size_t *jump_rel32_offs = NULL;
     int    jump_count = 0;
@@ -1402,13 +1256,10 @@ int sm_codegen(SM_Program *prog)
         free(g_blob_addrs); g_blob_addrs = NULL;
         return -1;
     }
-
     for (int i = 0; i < prog->count; i++) {
         size_t off_before = seg_offset(SEG_CODE);
         g_blob_addrs[i] = scrip_segs[SEG_CODE].base + off_before;
         sm_opcode_t op = prog->instrs[i].op;
-
-
         switch (op) {
         case SM_HALT:
             emit_halt_blob();
@@ -1447,11 +1298,8 @@ int sm_codegen(SM_Program *prog)
             emit_standard_blob(g_handlers[op], g_trampoline_offset);
             break;
         }
-
     }
     g_blob_count = prog->count;
-
-
     uint8_t *seg_base = scrip_segs[SEG_CODE].base;
     for (int j = 0; j < jump_count; j++) {
         int    ji        = jump_indices[j];
@@ -1466,7 +1314,6 @@ int sm_codegen(SM_Program *prog)
             target_pc = -ji - 1;
         }
         if (target_pc < 0 || target_pc >= prog->count) {
-
             fprintf(stderr, "sm_codegen: jump at pc=%d targets out-of-range pc=%d (count=%d)\n",
                     source_pc, target_pc, prog->count);
             continue;
@@ -1476,10 +1323,7 @@ int sm_codegen(SM_Program *prog)
         int32_t rel = (int32_t)(target_abs - rel32_end_abs);
         seg_patch_u32(SEG_CODE, rel32_off, (uint32_t)rel);
     }
-
     free(jump_indices); free(jump_rel32_offs);
-
-
     seg_seal(SEG_CODE);
     return 0;
 }
@@ -1504,10 +1348,7 @@ int sm_jit_run(SM_Program *prog, SM_State *st)
     g_jit_prog   = prog;
     g_jit_state  = st;
     g_jit_halted = 0;
-
     if (prog->count == 0) return 0;
-
-
     {
         const int ME4_STACK_PREGROW = 4096;
         if (st->stack_cap < ME4_STACK_PREGROW) {
@@ -1517,20 +1358,15 @@ int sm_jit_run(SM_Program *prog, SM_State *st)
         }
         st->sp = 0;
     }
-
-
     uint8_t *tramp = scrip_segs[SEG_CODE].base + g_trampoline_offset;
     typedef void (*entry_fn_t)(void);
     entry_fn_t entry = (entry_fn_t)tramp;
-
-
     asm volatile ("mov %0, %%r13\n\t"
                   "mov %1, %%r12"
                   :
                   : "r"(st), "r"(st->stack)
                   : "r12", "r13");
     entry();
-
     return 0;
 }
 
@@ -1552,7 +1388,6 @@ int sm_jit_run_plain(SM_Program *prog, SM_State *st)
 int sm_jit_run_steps(SM_Program *prog, SM_State *st, int n) {
     g_jit_step_limit = n;
     g_jit_steps_done = 0;
-
     int rc = 0;
     if (setjmp(g_jit_step_jmp) == 0)
         rc = sm_jit_run(prog, st);

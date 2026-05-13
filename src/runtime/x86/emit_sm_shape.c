@@ -47,23 +47,18 @@ static const sm_op_template_t g_sm_templates[] = {
     { SM_PUSH_NULL,    "PUSH_NULL",    "rt_push_null",    SM_TPL_RTCALL,    0, 0 },
     { SM_CONCAT,       "CONCAT",       "rt_concat",       SM_TPL_RTCALL,    0, 0 },
     { SM_COERCE_NUM,   "COERCE_NUM",   "rt_coerce_num",   SM_TPL_RTCALL,    0, 0 },
-
     { SM_ADD,          "ADD_NUM",      "rt_arith",        SM_TPL_ARITH,     SM_ADD, 0 },
     { SM_SUB,          "SUB_NUM",      "rt_arith",        SM_TPL_ARITH,     SM_SUB, 0 },
     { SM_MUL,          "MUL_NUM",      "rt_arith",        SM_TPL_ARITH,     SM_MUL, 0 },
     { SM_DIV,          "DIV_NUM",      "rt_arith",        SM_TPL_ARITH,     SM_DIV, 0 },
     { SM_MOD,          "MOD_NUM",      "rt_arith",        SM_TPL_ARITH,     SM_MOD, 0 },
-
     { SM_JUMP,         "JUMP",         NULL,                    SM_TPL_PCREF_JMP,  0, 0 },
     { SM_JUMP_S,       "JUMP_S",       "rt_last_ok",      SM_TPL_PCREF_COND, 1, 0 },
     { SM_JUMP_F,       "JUMP_F",       "rt_last_ok",      SM_TPL_PCREF_COND, 0, 0 },
-
     { SM_PUSH_EXPRESSION,   "PUSH_EXPRESSION",   "rt_push_expression_descr", SM_TPL_PUSH_EXPRESSION, 0, 0 },
     { SM_CALL_EXPRESSION,   "CALL_EXPRESSION",   NULL,                    SM_TPL_CALL_EXPRESSION, 0, 0 },
     { SM_RETURN,       "RETURN",       NULL,                    SM_TPL_RET,        0, 0 },
-
     { SM_CALL_FN,         "CALL_FN",         "rt_call",         SM_TPL_LBL_INT32,  0, 0 },
-
     { SM_PAT_SPAN,     "PAT_SPAN",     "rt_pat_span",     SM_TPL_RTCALL,    0, 0 },
     { SM_PAT_BREAK,    "PAT_BREAK",    "rt_pat_break",    SM_TPL_RTCALL,    0, 0 },
     { SM_PAT_ANY,      "PAT_ANY",      "rt_pat_any",      SM_TPL_RTCALL,    0, 0 },
@@ -86,25 +81,19 @@ static const sm_op_template_t g_sm_templates[] = {
     { SM_PAT_CAT,      "PAT_CAT",      "rt_pat_cat",      SM_TPL_RTCALL,    0, 0 },
     { SM_PAT_ALT,      "PAT_ALT",      "rt_pat_alt",      SM_TPL_RTCALL,    0, 0 },
     { SM_PAT_DEREF,    "PAT_DEREF",    "rt_pat_deref",    SM_TPL_RTCALL,    0, 0 },
-
     { SM_PAT_LIT,      "PAT_LIT",      "rt_pat_lit",      SM_TPL_LBLOPT,     0, 0 },
     { SM_PAT_REFNAME,  "PAT_REFNAME",  "rt_pat_refname",  SM_TPL_LBLOPT,     0, 0 },
     { SM_PAT_USERCALL, "PAT_USERCALL", "rt_pat_usercall", SM_TPL_LBLOPT,     0, 0 },
-
     { SM_PAT_CAPTURE,       "PAT_CAPTURE",       "rt_pat_capture",       SM_TPL_LBLOPT_INT32, 0, 0 },
     { SM_PAT_USERCALL_ARGS, "PAT_USERCALL_ARGS", "rt_pat_usercall_args", SM_TPL_LBLOPT_INT32, 0, 0 },
-
     { SM_PAT_CAPTURE_FN,      "PAT_CAPTURE_FN",      "rt_pat_capture_fn",
       SM_TPL_LBLOPT3,         0, 0 },
     { SM_PAT_CAPTURE_FN_ARGS, "PAT_CAPTURE_FN_ARGS", "rt_pat_capture_fn_args",
       SM_TPL_LBLOPT_I_I,      0, 0 },
-
     { SM_EXEC_STMT,    "EXEC_STMT_VARIANT",  "rt_match_variant",
       SM_TPL_EXEC_VAR, 0, 0 },
-
     { SM_LABEL,        "LABEL",        NULL,                    SM_TPL_NOOP,       0, 0 },
     { SM_STNO,         "STNO",         NULL,                    SM_TPL_NOOP,       0, 0 },
-
     { SM_PUSH_NULL_NOFLIP, "PUSH_NULL_NOFLIP", "rt_push_null_noflip", SM_TPL_RTCALL, 0, 0 },
     { SM_EXP,          "EXP_NUM",      "rt_exp",          SM_TPL_RTCALL,    0, 0 },
     { SM_NEG,          "NEGATE",       "rt_neg",          SM_TPL_RTCALL,    0, 0 },
@@ -128,7 +117,6 @@ static const sm_op_template_t g_sm_templates[] = {
     { SM_ICMP_LT,        "ICMP_LT",        "rt_unhandled_sm", SM_TPL_ARITH, SM_ICMP_LT,        0 },
     { SM_LOAD_FRAME,     "LOAD_FRAME",     "rt_unhandled_sm", SM_TPL_ARITH, SM_LOAD_FRAME,     0 },
     { SM_STORE_FRAME,    "STORE_FRAME",    "rt_unhandled_sm", SM_TPL_ARITH, SM_STORE_FRAME,    0 },
-
     { SM_INCR,    "INCR",    "rt_incr",  SM_TPL_ARITH, 0 , 0 },
     { SM_DECR,    "DECR",    "rt_decr",  SM_TPL_ARITH, 0, 0 },
     { SM_ACOMP,   "ACOMP",   "rt_acomp", SM_TPL_ARITH, 0 , 0 },
@@ -147,7 +135,6 @@ static const sm_op_template_t g_tpl_ret_var = {
 
 const sm_op_template_t *sm_template_lookup(int op)
 {
-
     for (int i = 0; i < G_SM_TEMPLATES_N; i++) {
         if (g_sm_templates[i].op == op) return &g_sm_templates[i];
     }
@@ -170,7 +157,6 @@ static int emit_optional_lbl(FILE *out, const char *macro_arg,
     snprintf(ifnb_arg, sizeof(ifnb_arg), "\\%s", macro_arg);
     snprintf(lea_arg,  sizeof(lea_arg),  "%s, [rip + \\%s]",
              register_load_dst, macro_arg);
-
     snprintf(xor_arg,  sizeof(xor_arg),  "e%s, e%s",
              register_load_dst + 1, register_load_dst + 1);
     if (macro_line(out, "", ".ifnb", ifnb_arg) < 0) return -1;
@@ -206,14 +192,12 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
         macro_line(out, "", ".macro", macro_def);
         { char ct[64]; snprintf(ct, sizeof(ct), "%s@PLT", t->runtime);
           macro_line(out, "", "call", ct); }
-
         if (strcmp(t->macro_name, "DEFINE_ENTRY") == 0) {
             macro_line(out, "", "push", "rbp");
             macro_line(out, "", "mov",  "rbp, rsp");
         }
         macro_line(out, "", ".endm", "");
         return 0;
-
     case SM_TPL_RET:
         snprintf(macro_def, sizeof(macro_def), "%s", t->macro_name);
         macro_line(out, "", ".macro", macro_def);
@@ -222,7 +206,6 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
         macro_line(out, "", "ret", "");
         macro_line(out, "", ".endm", "");
         return 0;
-
     case SM_TPL_INT64:
         snprintf(macro_def, sizeof(macro_def), "%s val", t->macro_name);
         macro_line(out, "", ".macro", macro_def);
@@ -231,7 +214,6 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
           macro_line(out, "", "call", ct); }
         macro_line(out, "", ".endm", "");
         return 0;
-
     case SM_TPL_LBL:
         snprintf(macro_def, sizeof(macro_def), "%s lbl", t->macro_name);
         macro_line(out, "", ".macro", macro_def);
@@ -240,7 +222,6 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
           macro_line(out, "", "call", ct); }
         macro_line(out, "", ".endm", "");
         return 0;
-
     case SM_TPL_LBLOPT:
         snprintf(macro_def, sizeof(macro_def), "%s lbl", t->macro_name);
         macro_line(out, "", ".macro", macro_def);
@@ -249,7 +230,6 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
           macro_line(out, "", "call", ct); }
         macro_line(out, "", ".endm", "");
         return 0;
-
     case SM_TPL_LBL_INT32:
         snprintf(macro_def, sizeof(macro_def), "%s lbl, n", t->macro_name);
         macro_line(out, "", ".macro", macro_def);
@@ -259,7 +239,6 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
           macro_line(out, "", "call", ct); }
         macro_line(out, "", ".endm", "");
         return 0;
-
     case SM_TPL_LBLOPT_INT32:
         snprintf(macro_def, sizeof(macro_def), "%s n, lbl", t->macro_name);
         macro_line(out, "", ".macro", macro_def);
@@ -269,7 +248,6 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
           macro_line(out, "", "call", ct); }
         macro_line(out, "", ".endm", "");
         return 0;
-
     case SM_TPL_LBLOPT3:
         snprintf(macro_def, sizeof(macro_def), "%s is_imm, fname_lbl, namelist_lbl",
                  t->macro_name);
@@ -281,7 +259,6 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
           macro_line(out, "", "call", ct); }
         macro_line(out, "", ".endm", "");
         return 0;
-
     case SM_TPL_LBLOPT_I_I:
         snprintf(macro_def, sizeof(macro_def), "%s is_imm, nargs, fname_lbl",
                  t->macro_name);
@@ -293,7 +270,6 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
           macro_line(out, "", "call", ct); }
         macro_line(out, "", ".endm", "");
         return 0;
-
     case SM_TPL_EXEC_VAR:
         snprintf(macro_def, sizeof(macro_def), "%s has_repl, subj_lbl", t->macro_name);
         macro_line(out, "", ".macro", macro_def);
@@ -303,9 +279,7 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
           macro_line(out, "", "call", ct); }
         macro_line(out, "", ".endm", "");
         return 0;
-
     case SM_TPL_ARITH:
-
         snprintf(macro_def, sizeof(macro_def), "%s", t->macro_name);
         macro_line(out, "", ".macro", macro_def);
         { char op_arg[32]; snprintf(op_arg, sizeof(op_arg), "edi, %d", t->const_a);
@@ -314,14 +288,12 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
           macro_line(out, "", "call", ct); }
         macro_line(out, "", ".endm", "");
         return 0;
-
     case SM_TPL_PCREF_JMP:
         snprintf(macro_def, sizeof(macro_def), "%s tgt", t->macro_name);
         macro_line(out, "", ".macro", macro_def);
         macro_line(out, "", "jmp", "\\tgt");
         macro_line(out, "", ".endm", "");
         return 0;
-
     case SM_TPL_PCREF_COND:
         snprintf(macro_def, sizeof(macro_def), "%s tgt", t->macro_name);
         macro_line(out, "", ".macro", macro_def);
@@ -331,7 +303,6 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
         macro_line(out, "", t->const_a ? "jnz" : "jz", "\\tgt");
         macro_line(out, "", ".endm", "");
         return 0;
-
     case SM_TPL_PUSH_EXPRESSION:
         snprintf(macro_def, sizeof(macro_def), "%s entry, arity", t->macro_name);
         macro_line(out, "", ".macro", macro_def);
@@ -341,14 +312,12 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
           macro_line(out, "", "call", ct); }
         macro_line(out, "", ".endm", "");
         return 0;
-
     case SM_TPL_CALL_EXPRESSION:
         snprintf(macro_def, sizeof(macro_def), "%s tgt", t->macro_name);
         macro_line(out, "", ".macro", macro_def);
         macro_line(out, "", "call", "\\tgt");
         macro_line(out, "", ".endm", "");
         return 0;
-
     case SM_TPL_RET_VAR:
         snprintf(macro_def, sizeof(macro_def), "%s kind, cond, pc", t->macro_name);
         macro_line(out, "", ".macro", macro_def);
@@ -364,7 +333,6 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
         fprintf(out, ".Lretskip_\\pc\\():\n");
         macro_line(out, "", ".endm", "");
         return 0;
-
     case SM_TPL_UNHANDLED:
         snprintf(macro_def, sizeof(macro_def), "%s op", t->macro_name);
         macro_line(out, "", ".macro", macro_def);
@@ -373,14 +341,11 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
           macro_line(out, "", "call", ct); }
         macro_line(out, "", ".endm", "");
         return 0;
-
     case SM_TPL_NOOP:
-
         snprintf(macro_def, sizeof(macro_def), "%s", t->macro_name);
         macro_line(out, "", ".macro", macro_def);
         macro_line(out, "", ".endm", "");
         return 0;
-
     case SM_TPL__COUNT:
         break;
     }
@@ -470,7 +435,6 @@ static int build_args_col(char *buf, int cap, const sm_op_template_t *t,
             n = snprintf(buf, cap, "%d", args->i32_a);
         break;
     case SM_TPL_ARITH:
-
         n = snprintf(buf, cap, "");
         break;
     case SM_TPL_PCREF_JMP:
@@ -504,8 +468,6 @@ static int render_call_line(FILE *out, const sm_op_template_t *t,
 {
     char argsb[128];
     if (build_args_col(argsb, sizeof(argsb), t, args) != 0) return -1;
-
-
     char lbl_buf[32];
     const char *lbl_col;
     if (args && args->label && *args->label) {
@@ -520,7 +482,6 @@ static int render_call_line(FILE *out, const sm_op_template_t *t,
         lbl_col = "";
     }
     g_pending_pc_label[0] = '\0';
-
     char col3[256];
     const char *anno = args ? args->anno : NULL;
     if (argsb[0] && anno && *anno) {
@@ -538,7 +499,6 @@ static int render_call_line(FILE *out, const sm_op_template_t *t,
     } else {
         col3[0] = '\0';
     }
-
     bb3c_format(out, (lbl_col && *lbl_col) ? lbl_col : "",
                 t->macro_name, col3);
     return 0;
@@ -550,7 +510,6 @@ int emit_sm_macro_library(FILE *out)
 {
     const char *seen[256] = { 0 };
     int n_seen = 0;
-
     if (fputs(
         "# === BEGIN sm macro library (generated from g_sm_templates[]) ===\n"
         "# EM-7c-sm-macros: one macro per opcode group; bodies and per-call\n"
@@ -559,7 +518,6 @@ int emit_sm_macro_library(FILE *out)
         "#   shape kind in render_macro_body() / render_call_line().\n"
         "                        .intel_syntax    noprefix\n",
         out) == EOF) return -1;
-
     #define EMIT_IF_NEW(tpl) do {                                           \
         const sm_op_template_t *_t = (tpl);                                 \
         int already = 0;                                                    \
@@ -575,16 +533,12 @@ int emit_sm_macro_library(FILE *out)
             if (render_macro_body(out, _t) != 0) return -1;                 \
         }                                                                   \
     } while (0)
-
     for (int i = 0; i < G_SM_TEMPLATES_N; i++) {
         EMIT_IF_NEW(&g_sm_templates[i]);
     }
     EMIT_IF_NEW(&g_tpl_unhandled);
     EMIT_IF_NEW(&g_tpl_ret_var);
-
     #undef EMIT_IF_NEW
-
-
     if (fputs(
         "# PUSH_REAL: hand-written (SM_PUSH_LIT_F special-case; param = 64-bit bits as hex)\n"
         "                        .macro           PUSH_REAL val\n"
@@ -592,7 +546,6 @@ int emit_sm_macro_library(FILE *out)
         "                        call             rt_push_real_bits@PLT\n"
         "                        .endm\n",
         out) == EOF) return -1;
-
     if (fputs("# === END sm macro library ===\n", out) == EOF) return -1;
     return 0;
 }
@@ -632,7 +585,6 @@ int emit_sm_rtcall(FILE *out, const sm_op_template_t *t, const char *anno)
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_noop(FILE *out, const sm_op_template_t *t, const char *anno)
 {
-
     emit_sm_args_t a = { 0 };
     a.anno = anno;
     return emit_sm_template(out, t, &a);
@@ -712,7 +664,6 @@ int emit_sm_pcref_cond(FILE *out, const sm_op_template_t *t,
                        int target_pc, int taken_when_ok,
                        const char *anno)
 {
-
     (void)taken_when_ok;
     emit_sm_args_t a = { 0 };
     a.i32_a = target_pc;
@@ -832,7 +783,6 @@ int emit_sm_template_selftest(FILE *out)
         { fprintf(out, "FAIL: unhandled\n"); failures++; }
     if (render_call_line(out, &g_tpl_ret_var, &sentinel) != 0)
         { fprintf(out, "FAIL: ret_var\n"); failures++; }
-
     fprintf(out, "self-test: %d failures\n", failures);
     return failures ? -1 : 0;
 }
