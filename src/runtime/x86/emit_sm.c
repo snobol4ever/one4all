@@ -7,7 +7,7 @@
  * Sprint:  EM-UNIFY / GOAL-MODE4-EMIT
  */
 
-#include "emitter.h"
+#include "emit.h"
 #include "emit_bb_gen.h"
 #include "templates.h"
 #include "sm_prog.h"

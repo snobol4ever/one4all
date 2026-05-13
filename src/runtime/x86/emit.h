@@ -17,8 +17,8 @@
  * Sprint:  EM-DEVTABLE / GOAL-MODE4-EMIT
  */
 
-#ifndef EMITTER_H
-#define EMITTER_H
+#ifndef EMIT_H
+#define EMIT_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -194,5 +194,5 @@ int   emitter_pos            (void);   /* g_is_text ? g_emit_pos : bb_emit_pos  
 
 void emitter_init_macro_def(FILE *out);  /* TEXT_MODE_DEFINITION — for sm_macros.s regen */
 
-#endif /* EMITTER_H */
+#endif /* EMIT_H */
 

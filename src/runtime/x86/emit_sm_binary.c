@@ -55,7 +55,7 @@
 #include "../../runtime/interp/coro_runtime.h"  /* GOAL-ICON-BB-COMPLETE rung13: FRAME, EVERY_GEN_SLOT_MAX, IcnFrame */
 #include "templates.h"  /* binary template dispatch */
 #include "emit_bb_gen.h"              /* BB emitter */
-#include "emitter.h"              /* emitter_t stub */
+#include "emit.h"              /* emitter_t stub */
 
 /* GOAL-ICON-BB-COMPLETE Phase A: file-scope externs for tripwire + bridge counter.
  * g_sm_dispatch_active: A0 tripwire — set while SM dispatch is running.

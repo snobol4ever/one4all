@@ -18,7 +18,7 @@
  * Sprint:  EM-MODE4-IS-MODE3-DUMP-c / GOAL-MODE4-EMIT
  */
 
-#include "emitter.h"
+#include "emit.h"
 #include "templates.h"
 #include "emit_bb_gen.h"
 #include <stdio.h>

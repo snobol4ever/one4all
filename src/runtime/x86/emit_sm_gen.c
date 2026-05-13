@@ -15,7 +15,7 @@
 #include "snobol4.h"
 #include "bb_broker.h"
 #include "emit_bb_gen.h"
-#include "emitter.h"
+#include "emit.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

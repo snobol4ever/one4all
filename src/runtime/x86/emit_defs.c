@@ -8,7 +8,7 @@
  * Sprint:  EM-DEVTABLE / GOAL-MODE4-EMIT
  */
 
-#include "emitter.h"
+#include "emit.h"
 
 void emitter_init_macro_def(FILE *out)
 {

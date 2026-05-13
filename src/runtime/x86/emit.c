@@ -10,7 +10,7 @@
  * Sprint:  EM-DEVTABLE / GOAL-MODE4-EMIT
  */
 
-#include "emitter.h"
+#include "emit.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
