@@ -1296,7 +1296,7 @@ static void bm_jmp(FILE *f, const char *cond, const char *tgt)
 }
 
 /*--------------------------------------------------------------------------------------------------------------------*/
-int emit_flat_macros_to_path(const char *path)
+int emit_bb_macro_library_to_path(const char *path)
 {
     FILE *f = fopen(path, "w");
     if (!f) return -1;

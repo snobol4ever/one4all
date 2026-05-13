@@ -2766,7 +2766,7 @@ int emit_walk_codegen(SM_Program *prog, FILE *out, const char *src_path)
             return -1;
         }
         if (emit_three_column_line(out, "", ".include", "\"sm_macros.s\"", NULL) != 0) return -1;
-        if (emit_flat_macros_to_path("bb_macros.s") != 0) {
+        if (emit_bb_macro_library_to_path("bb_macros.s") != 0) {
             fprintf(stderr, "sm_codegen_text: failed to write bb_macros.s\n");
             return -1;
         }

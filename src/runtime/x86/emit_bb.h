@@ -13,7 +13,7 @@ bb_box_fn bb_build_brokered  (PATND_t *p);
 int  emit_flat_build         (PATND_t *p, FILE *out, const char *prefix);
 void emit_flat_set_intern_str(const char *(*fn)(const char *));
 void emit_flat_reset         (void);
-int  emit_flat_macros_to_path(const char *path);
+int  emit_bb_macro_library_to_path(const char *path);
 void emit_flat_set_cap_fixup (void (*cb)(void *cap_ptr, const char *child_alpha_label));
 void emit_flat_banner_rule   (char ch);
 void emit_flat_box_banner    (const char *kind, const char *args, const char *label_prefix);
@@ -46,7 +46,7 @@ void emit_flat_box_call_fn(bb_box_fn fn, const char *fn_name, void *z,
 #define bb_build_flat_text(p,out,pfx)   emit_flat_build(p,out,pfx)
 #define bb_flat_set_intern_str(fn)       emit_flat_set_intern_str(fn)
 #define bb_build_flat_text_reset()       emit_flat_reset()
-#define bb_macros_write_to_path(path)    emit_flat_macros_to_path(path)
+#define bb_macros_write_to_path(path)    emit_bb_macro_library_to_path(path)
 #define bb_flat_set_cap_fixup_cb(cb)     emit_flat_set_cap_fixup(cb)
 #define flat3c_label(name)               emit_flat_label(name)
 #define flat_data_section()              emit_flat_data_section()
