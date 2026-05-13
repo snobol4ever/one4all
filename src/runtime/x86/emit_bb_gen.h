@@ -7,29 +7,13 @@
 #include "emit_label.h"
 #include "emit_text3c.h"
 #include "emit_insn.h"
+#include "emit_mode.h"
 #include "bb_pool.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <stddef.h>
 
-extern bb_emit_mode_t bb_emit_mode;
-
-extern int g_bb_emit_format;
-extern FILE          *bb_emit_out;
-
-/* emit_mode_set — central setter for emit pass mode. */
-void emit_mode_set(bb_emit_mode_t m, FILE *out);
-
-extern int g_in_text_macro_body;
-FILE *emit_outf(void);
-void bb3c_op (const char *mn, const char *fmt, ...);
-void bb3c_jmp(const char *mn, const char *target);
-
-void emit_jmp(bb_label_t *target, jmp_kind_t kind);
 void emit_bb_inc_mem_r13_disp8(uint8_t disp);
-void emit_pad_to_blob_size(void);
-void emit_macro_begin(const char *name, const char *const *params, int nparams);
-void emit_macro_end(void);
 
 void emit_lea_rdi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr);
 void emit_lea_rdx_strtab_sym(const char *sym_label, uint64_t in_proc_ptr);

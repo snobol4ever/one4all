@@ -100,10 +100,7 @@ void emit_bb_dispatch_jne_jmp(bb_label_t *lbl_succ, bb_label_t *lbl_fail);
 void emit_bb_port_label      (const char *pfx, char port);
 void emit_bb_port_jmp        (const char *pfx, char port);
 
-void emit_macro_begin        (const char *name, const char *const *params, int nparams);
 void emit_macro_param_ref    (const char *name);
-void emit_macro_end          (void);
-void emit_pad_to_blob_size   (void);
 
 FILE *emitter_text_out       (void);
 int   emitter_pos            (void);
