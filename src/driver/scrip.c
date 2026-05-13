@@ -70,7 +70,7 @@ extern void ir_print_node_nl(const tree_t *e, FILE *f);
 #include "../runtime/x86/sm_prog.h"
 #include "../runtime/x86/bb_build.h"    /* M-BB-LIVE-WIRE: bb_mode_t, g_bb_mode */
 #include "../runtime/x86/sm_codegen.h"  /* M-JIT-RUN: sm_codegen, sm_jit_run */
-#include "../runtime/x86/sm_codegen_x64_emit.h" /* M-JITEM-X64 / EM-1: standalone asm emitter */
+#include "../runtime/x86/sm_codegen.h"  /* sm_codegen_text (ESP-13) */
 #include "../runtime/x86/emitter_bb_gen.h"              /* EM-BB-FORMAT: g_bb_emit_format */
 #include "scrip_sm.h"                   /* RS-14: sm_preamble, sm_run_with_recovery */
 #include "sync_monitor.h"               /* IM-7: --monitor in-process comparator */
@@ -491,8 +491,8 @@ int main(int argc, char **argv)
         g_bb_emit_format  = opt_bb_format;         /* EM-BB-FORMAT */
         SM_Program *sm = sm_preamble(ast_prog);
         if (!sm) return 1;
-        if (sm_codegen_x64_emit(sm, stdout, input_path) != 0) {
-            fprintf(stderr, "scrip: sm_codegen_x64_emit failed\n");
+        if (sm_codegen_text(sm, stdout, input_path) != 0) {
+            fprintf(stderr, "scrip: sm_codegen_text failed\n");
             sm_prog_free(sm);
             return 1;
         }

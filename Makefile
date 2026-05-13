@@ -91,7 +91,6 @@ RT_PIC_SRCS := \
     $(RT)/x86/sm_image.c \
     $(RT)/x86/sm_codegen.c \
     $(RT)/x86/emitter_sm_template.c \
-    $(RT)/x86/sm_codegen_x64_emit.c \
     $(SRC)/runtime/interp/coro_runtime.c \
     $(SRC)/runtime/interp/coro_value.c \
     $(SRC)/runtime/interp/coro_stmt.c \
@@ -157,8 +156,6 @@ out/libscrip_rt.so: $(RT_PIC_SRCS) $(RT)/rt/rt.h
 # Standalone helper: builds a 3-op SM_Program in memory and emits asm
 # via sm_codegen_x64_emit().  The shell gate then assembles/links/runs.
 out/sm_codegen_x64_emit_test: $(RT)/x86/sm_codegen_x64_emit_test.c \
-                               $(RT)/x86/sm_codegen_x64_emit.c \
-                               $(RT)/x86/sm_codegen_x64_emit.h \
                                $(RT)/x86/emitter_sm_template.c \
                                $(RT)/x86/emitter_sm_template.h \
                                $(RT)/x86/sm_prog.c \
@@ -169,7 +166,6 @@ out/sm_codegen_x64_emit_test: $(RT)/x86/sm_codegen_x64_emit_test.c \
 	    -I$(SRC) -I$(RT)/x86 -I$(RT) -I$(RT)/rt \
 	    -DDYN_ENGINE_LINKED \
 	    $(RT)/x86/sm_codegen_x64_emit_test.c \
-	    $(RT)/x86/sm_codegen_x64_emit.c \
 	    $(RT)/x86/emitter_sm_template.c \
 	    $(RT)/x86/sm_prog.c \
 	    -Lout -lscrip_rt -lgc -lm \
@@ -181,8 +177,6 @@ out/sm_codegen_x64_emit_test: $(RT)/x86/sm_codegen_x64_emit_test.c \
 # ── EM-7a Phase-2 simulator unit test ────────────────────────────────────────
 # Links against libscrip_rt.so for pat_* constructors + GC.
 out/sm_phase2_sim_test: $(RT)/x86/sm_phase2_sim_test.c \
-                        $(RT)/x86/sm_codegen_x64_emit.c \
-                        $(RT)/x86/sm_codegen_x64_emit.h \
                         $(RT)/x86/emitter_sm_template.c \
                         $(RT)/x86/emitter_sm_template.h \
                         $(RT)/x86/sm_prog.c \
@@ -193,7 +187,6 @@ out/sm_phase2_sim_test: $(RT)/x86/sm_phase2_sim_test.c \
 	    -I$(SRC) -I$(RT)/x86 -I$(RT) -I$(RT)/rt \
 	    -DDYN_ENGINE_LINKED \
 	    $(RT)/x86/sm_phase2_sim_test.c \
-	    $(RT)/x86/sm_codegen_x64_emit.c \
 	    $(RT)/x86/emitter_sm_template.c \
 	    $(RT)/x86/sm_prog.c \
 	    -Lout -lscrip_rt -lgc -lm \
@@ -206,8 +199,6 @@ out/sm_phase2_sim_test: $(RT)/x86/sm_phase2_sim_test.c \
 # Links against libscrip_rt.so (which already includes bb_flat.c +
 # bb_emit.c + pat_* constructors).
 out/bb_flat_text_test: $(RT)/x86/bb_flat_text_test.c \
-                       $(RT)/x86/sm_codegen_x64_emit.c \
-                       $(RT)/x86/sm_codegen_x64_emit.h \
                        $(RT)/x86/emitter_sm_template.c \
                        $(RT)/x86/emitter_sm_template.h \
                        $(RT)/x86/sm_prog.c \
@@ -221,7 +212,6 @@ out/bb_flat_text_test: $(RT)/x86/bb_flat_text_test.c \
 	    -I$(SRC) -I$(RT)/x86 -I$(RT) -I$(RT)/rt \
 	    -DDYN_ENGINE_LINKED \
 	    $(RT)/x86/bb_flat_text_test.c \
-	    $(RT)/x86/sm_codegen_x64_emit.c \
 	    $(RT)/x86/emitter_sm_template.c \
 	    $(RT)/x86/sm_prog.c \
 	    -Lout -lscrip_rt -lgc -lm \
@@ -301,7 +291,6 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/emitter_bb.c -o $(OBJ)/emitter_bb.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/rt/rt.c   -o $(OBJ)/rt.o
 	$(CC) $(CRT)   -c $(RT)/x86/emitter_sm_template.c -o $(OBJ)/emitter_sm_template.o
-	$(CC) $(CRT)   -c $(RT)/x86/sm_codegen_x64_emit.c -o $(OBJ)/sm_codegen_x64_emit.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_globals.c -o $(OBJ)/interp_globals.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_label.c   -o $(OBJ)/interp_label.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_call.c    -o $(OBJ)/interp_call.o

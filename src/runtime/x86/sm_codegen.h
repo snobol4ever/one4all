@@ -11,6 +11,7 @@
 #include "sm_prog.h"
 #include "sm_interp.h"   /* SM_State */
 #include <setjmp.h>
+#include <stdio.h>
 
 /*
  * sm_codegen — compile prog into SEG_DISPATCH + SEG_CODE.
@@ -31,6 +32,17 @@ int sm_jit_run(SM_Program *prog, SM_State *st);
 void sm_jit_unwind_call_stack(SM_State *st);
 
 int sm_jit_run_plain(SM_Program *prog, SM_State *st);
+
+/*
+ * sm_codegen_text — TEXT mode: emit SM_Program as GNU-as .s to `out`.
+ * src_path is optional (used for source-line annotations); may be NULL.
+ * Returns 0 on success, -1 on error.
+ * (ESP-13: moved from sm_codegen_x64_emit.c)
+ */
+int sm_codegen_text(SM_Program *prog, FILE *out, const char *src_path);
+
+/* EDP-2: set by scrip.c --jit-emit-inline; read by sm_codegen_text pipeline. */
+extern int g_jit_emit_inline;
 
 /* IM-5: step-limit — run at most n statements then return */
 extern int     g_jit_step_limit;

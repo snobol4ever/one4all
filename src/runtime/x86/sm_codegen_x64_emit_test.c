@@ -5,7 +5,7 @@
  * Date: 2026-05-06
  *
  * Builds tiny SM_Programs in memory and runs them through
- * sm_codegen_x64_emit(). The emitted asm is written to file paths
+ * sm_codegen_text(). The emitted asm is written to file paths
  * provided by argv. The companion shell script assembles, links against
  * libscrip_rt.so, runs, and checks the rc.
  *
@@ -92,7 +92,7 @@
  */
 
 #include "sm_prog.h"
-#include "sm_codegen_x64_emit.h"
+#include "sm_codegen.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -104,7 +104,7 @@ static int emit_to(const char *path, SM_Program *p)
     if (!out) { perror(path); return 1; }
     /* Synthetic programs don't have a source file; pass NULL so the
      * emitter falls back to structural banners only. */
-    int rc = sm_codegen_x64_emit(p, out, NULL);
+    int rc = sm_codegen_text(p, out, NULL);
     fclose(out);
     return rc != 0 ? 1 : 0;
 }
