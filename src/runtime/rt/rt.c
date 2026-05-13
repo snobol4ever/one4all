@@ -285,20 +285,24 @@ static DESCR_t _rt_IDENT(DESCR_t *a, int n)
     /* IDENT(x[,y]): succeed if x == y (or x is null-string when n==1).
      * Returns NULVCL (empty string) on success — matches SPITBOL SIL ident()
      * behaviour.  Returning a[0] was wrong: IDENT(bs,CHAR(8)) would push
-     * CHAR(8) onto the stack, corrupting downstream CONCAT results. */
+     * CHAR(8) onto the stack, corrupting downstream CONCAT results.
+     * 1-arg: use IS_NULL_fn so DATA/INTEGER/PATTERN values correctly
+     * count as non-null (mirrors DIFFER fix for tree_driver test 3). */
+    if (n == 1) return IS_NULL_fn(a[0]) ? NULVCL : FAILDESCR;
     const char *s1 = (n >= 1 && a[0].v == DT_S) ? (a[0].s ? a[0].s : "") : "";
     const char *s2 = (n >= 2 && a[1].v == DT_S) ? (a[1].s ? a[1].s : "") : "";
-    if (n == 1) return (s1[0] == '\0') ? NULVCL : FAILDESCR;
     return (strcmp(s1, s2) == 0) ? NULVCL : FAILDESCR;
 }
 
 static DESCR_t _rt_DIFFER(DESCR_t *a, int n)
 {
     /* DIFFER(x[,y]): succeed if x != y (or x is non-null when n==1).
-     * Returns NULVCL on success — same SPITBOL SIL convention as IDENT. */
+     * Returns NULVCL on success — same SPITBOL SIL convention as IDENT.
+     * 1-arg: use IS_NULL_fn so DATA/INTEGER/PATTERN values correctly
+     * count as non-null (tree_driver test 3: DIFFER(leaf) on a DATA node). */
+    if (n == 1) return IS_NULL_fn(a[0]) ? FAILDESCR : NULVCL;
     const char *s1 = (n >= 1 && a[0].v == DT_S) ? (a[0].s ? a[0].s : "") : "";
     const char *s2 = (n >= 2 && a[1].v == DT_S) ? (a[1].s ? a[1].s : "") : "";
-    if (n == 1) return (s1[0] != '\0') ? NULVCL : FAILDESCR;
     return (strcmp(s1, s2) != 0) ? NULVCL : FAILDESCR;
 }
 
@@ -1216,9 +1220,24 @@ void rt_call(const char *name, int nargs)
      * extra indirection and the risk of interpreter call-stack corruption. */
     void *cfn = chunk_reg_lookup(name ? name : "");
     if (cfn) {
+        strncpy(kw_rtntype, "RETURN", sizeof(kw_rtntype)-1); /* default; rt_do_return overwrites */
         DESCR_t result = call_native_chunk(name, cfn, args, nargs);
-        vstack_push(result);
-        LAST_OK_SET((result.v != DT_FAIL));
+        /* call_native_chunk reads NV[fname] for result, but FRETURN/NRETURN
+         * functions set kw_rtntype AND last_ok correctly inside rt_do_return.
+         * Do NOT overwrite last_ok with (result.v != DT_FAIL) here — that
+         * clobbers the FRETURN=0 / NRETURN=1 signal.  Instead, honour kw_rtntype:
+         * FRETURN → push FAILDESCR, last_ok=0; NRETURN → push result, last_ok=1;
+         * RETURN  → push result, last_ok=(result.v != DT_FAIL). */
+        if (strcmp(kw_rtntype, "FRETURN") == 0) {
+            vstack_push(FAILDESCR);
+            LAST_OK_SET(0);
+        } else if (strcmp(kw_rtntype, "NRETURN") == 0) {
+            vstack_push(result);
+            LAST_OK_SET(1);
+        } else {
+            vstack_push(result);
+            LAST_OK_SET((result.v != DT_FAIL));
+        }
         return;
     }
     DESCR_t result = INVOKE_fn(name ? name : "", args, nargs);
@@ -1254,6 +1273,7 @@ int rt_do_return(int kind, int cond)
         if (g_ops->depth() > 0) (void)vstack_pop();
         vstack_push(FAILDESCR);
         LAST_OK_SET(0);
+        strncpy(kw_rtntype, "FRETURN", sizeof(kw_rtntype)-1); /* RS-11 mirror */
     } else if (kind == 2) {
         /* NRETURN: pop body's retval; push a NAMEVAL.  Mode-4 deviation:
          * we don't track the function's retval-slot name at this layer, so
@@ -1270,11 +1290,13 @@ int rt_do_return(int kind, int cond)
             vstack_push(FAILDESCR);
         }
         LAST_OK_SET(1);
+        strncpy(kw_rtntype, "NRETURN", sizeof(kw_rtntype)-1); /* RS-11 mirror */
     } else {
         /* RETURN: leave TOS alone; just `ret`. */
         int ok = 0;
         if (g_ops->depth() > 0) ok = (vstack_peek().v != DT_FAIL);
         LAST_OK_SET(ok);
+        strncpy(kw_rtntype, "RETURN",  sizeof(kw_rtntype)-1); /* RS-11 mirror */
     }
     return 1;
 }
