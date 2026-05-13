@@ -3,12 +3,13 @@
  * No if-statements in any body — only insn_* / emit_jmp calls.
  * Mode dispatch lives entirely inside insn_* and emit_jmp.
  * RW-6: emit_bb_seq.c deleted (content was already in emit_seq.c).
+ * EM-SNOCONE-PREP: bb3c_format → emit_text_3col throughout.
  */
 
 #include "emit_seq.h"
 #include "insn.h"
 #include "emit_mode.h"
-#include "emit_text3c.h"
+#include "emit_text.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -46,11 +47,11 @@ void emit_seq_brokered_leave(int result) {
 void emit_seq_lea_rdi_sym(const char *sym, uint64_t ptr) {
     if (IS_TEXT) {
         if (bb_emit_mode == EMIT_MACRO_DEF) {
-            bb3c_format(emit_outf(), "", "lea", "rdi, [rip + \\lbl]");
+            emit_text_3col(emit_outf(), "", "lea", "rdi, [rip + \\lbl]");
             return;
         }
         char args[80]; snprintf(args, sizeof(args), "rdi, [rip + %s]", sym ? sym : "??");
-        bb3c_format(emit_outf(), "", "lea", args);
+        emit_text_3col(emit_outf(), "", "lea", args);
         return;
     }
     insn_mov_rdi_i64(ptr);
@@ -59,8 +60,8 @@ void emit_seq_lea_rdi_sym(const char *sym, uint64_t ptr) {
 void emit_seq_lea_rsi_sym(const char *sym, uint64_t ptr) {
     if (IS_TEXT) {
         if (bb_emit_mode == EMIT_MACRO_DEF) {
-            bb3c_format(emit_outf(), "", "lea", "rcx, [rip + \\namelist_lbl]");
-            bb3c_format(emit_outf(), "", "mov", "rsi, rcx");
+            emit_text_3col(emit_outf(), "", "lea", "rcx, [rip + \\namelist_lbl]");
+            emit_text_3col(emit_outf(), "", "mov", "rsi, rcx");
             return;
         }
         char args[80]; snprintf(args, sizeof(args), "rcx, [rip + %s]", sym ? sym : "??");
@@ -69,8 +70,8 @@ void emit_seq_lea_rsi_sym(const char *sym, uint64_t ptr) {
             fmt_body_append("mov", "rsi, rcx");
             return;
         }
-        bb3c_format(emit_outf(), "", "lea", args);
-        bb3c_format(emit_outf(), "", "mov", "rsi, rcx");
+        emit_text_3col(emit_outf(), "", "lea", args);
+        emit_text_3col(emit_outf(), "", "mov", "rsi, rcx");
         return;
     }
     insn_mov_rsi_i64(ptr);
@@ -79,11 +80,11 @@ void emit_seq_lea_rsi_sym(const char *sym, uint64_t ptr) {
 void emit_seq_lea_rdx_sym(const char *sym, uint64_t ptr) {
     if (IS_TEXT) {
         if (bb_emit_mode == EMIT_MACRO_DEF) {
-            bb3c_format(emit_outf(), "", "lea", "rdx, [rip + \\namelist_lbl]");
+            emit_text_3col(emit_outf(), "", "lea", "rdx, [rip + \\namelist_lbl]");
             return;
         }
         char args[80]; snprintf(args, sizeof(args), "rdx, [rip + %s]", sym ? sym : "??");
-        bb3c_format(emit_outf(), "", "lea", args);
+        emit_text_3col(emit_outf(), "", "lea", args);
         return;
     }
     insn_mov_rdx_i64(ptr);
@@ -99,7 +100,7 @@ void emit_seq_movabs_rdi(uint64_t ptr) {
 
 void emit_seq_mov_edx_i32(int val) {
     if (bb_emit_mode == EMIT_MACRO_DEF) {
-        bb3c_format(emit_outf(), "", "mov", "edx, \\nargs");
+        emit_text_3col(emit_outf(), "", "mov", "edx, \\nargs");
         return;
     }
     insn_mov_edx_i32((uint32_t)val);
@@ -107,7 +108,7 @@ void emit_seq_mov_edx_i32(int val) {
 
 void emit_seq_mov_edi_i32(int val) {
     if (bb_emit_mode == EMIT_MACRO_DEF) {
-        bb3c_format(emit_outf(), "", "mov", "edi, \\kind");
+        emit_text_3col(emit_outf(), "", "mov", "edi, \\kind");
         return;
     }
     insn_mov_edi_i32((uint32_t)val);
@@ -169,11 +170,11 @@ void emit_seq_jz_retskip(int pc) {
     /* TEXT: jz .Lretskip_N  BIN: nop (retskip not needed in binary path) */
     if (IS_TEXT) {
         if (bb_emit_mode == EMIT_MACRO_DEF) {
-            bb3c_format(emit_outf(), "", "jz", ".Lretskip_\\pc\\()");
+            emit_text_3col(emit_outf(), "", "jz", ".Lretskip_\\pc\\()");
             return;
         }
         char args[40]; snprintf(args, sizeof(args), ".Lretskip_%d", pc);
-        bb3c_format(emit_outf(), "", "jz", args);
+        emit_text_3col(emit_outf(), "", "jz", args);
         return;
     }
     insn_nop();
@@ -197,7 +198,7 @@ void emit_seq_zeta_rdi(uint64_t ptr, const char *sym) {
     /* TEXT: lea rdi,[rip+sym]  BIN: movabs rdi,ptr */
     if (IS_TEXT) {
         char args[128]; snprintf(args, sizeof(args), "rdi, [rip + %s]", sym ? sym : "0");
-        bb3c_format(emit_outf(), "", "lea", args);
+        emit_text_3col(emit_outf(), "", "lea", args);
         return;
     }
     insn_mov_rdi_i64(ptr);
@@ -214,15 +215,16 @@ void emit_seq_dispatch_jne_jmp(bb_label_t *lbl_succ, bb_label_t *lbl_fail) {
 /*========================================================================*/
 
 void emit_seq_call_tgt(const char *sym_or_param) {
+    if (!IS_TEXT) return;
     if (bb_emit_mode == EMIT_MACRO_DEF) {
-        bb3c_format(emit_outf(), "", "call", "\\tgt");
+        emit_text_3col(emit_outf(), "", "call", "\\tgt");
         return;
     }
-    bb3c_format(emit_outf(), "", "call", sym_or_param ? sym_or_param : "??");
+    emit_text_3col(emit_outf(), "", "call", sym_or_param ? sym_or_param : "??");
 }
 
 void emit_seq_noop_macro(const char *macro_name) {
-    if (IS_TEXT) bb3c_format(emit_outf(), "", macro_name, "");
+    if (IS_TEXT) emit_text_3col(emit_outf(), "", macro_name, "");
 }
 
 void emit_seq_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fallback,
@@ -236,14 +238,14 @@ void emit_seq_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fall
             emit_jmp(lbl_fail, JMP_JMP);
             return;
         }
-        bb3c_format(emit_outf(), "", "push", "r10");
+        emit_text_3col(emit_outf(), "", "push", "r10");
         { char a[80]; snprintf(a,sizeof(a),"rdi, [rip + %s]", fn_name?fn_name:"??");
-          bb3c_format(emit_outf(),"","lea",a); }
+          emit_text_3col(emit_outf(),"","lea",a); }
         { char a[16]; snprintf(a,sizeof(a),"esi, %d",port);
-          bb3c_format(emit_outf(),"","mov",a); }
+          emit_text_3col(emit_outf(),"","mov",a); }
         { char a[80]; snprintf(a,sizeof(a),"%s@PLT",fn_name?fn_name:"??");
-          bb3c_format(emit_outf(),"","call",a); }
-        bb3c_format(emit_outf(), "", "pop", "r10");
+          emit_text_3col(emit_outf(),"","call",a); }
+        emit_text_3col(emit_outf(), "", "pop", "r10");
         insn_test_rax_rax();
         emit_jmp(lbl_succ, JMP_JNE);
         emit_jmp(lbl_fail, JMP_JMP);
@@ -273,11 +275,11 @@ void emit_seq_port_call_rip(uint64_t zeta_ptr, const char *zeta_label,
         }
         insn_push_r10();
         { char a[80]; snprintf(a,sizeof(a),"rdi, [rip + %s]",zeta_label?zeta_label:"??");
-          bb3c_format(emit_outf(),"","lea",a); }
+          emit_text_3col(emit_outf(),"","lea",a); }
         { char a[16]; snprintf(a,sizeof(a),"esi, %d",port);
-          bb3c_format(emit_outf(),"","mov",a); }
+          emit_text_3col(emit_outf(),"","mov",a); }
         { char a[80]; snprintf(a,sizeof(a),"%s@PLT",fn_name?fn_name:"??");
-          bb3c_format(emit_outf(),"","call",a); }
+          emit_text_3col(emit_outf(),"","call",a); }
         insn_pop_r10();
         insn_test_rax_rax();
         emit_jmp(lbl_succ, JMP_JNE);
