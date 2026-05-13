@@ -22,55 +22,55 @@ static void emit_sm_nullary_rt(const char *macro_name, const char *rt_fn)
 typedef struct { int op; const char *macro_name; const char *rt_fn; } sm_nullary_entry_t;
 /*--------------------------------------------------------------------------------------------------------------------*/
 static const sm_nullary_entry_t g_sm_nullary[] = {
-    { SM_VOID_POP,        "VOID_POP",          "rt_pop_void"          },
-    { SM_CONCAT,          "CONCAT",            "rt_concat"            },
-    { SM_PUSH_NULL,       "PUSH_NULL",         "rt_push_null"         },
-    { SM_PUSH_NULL_NOFLIP,"PUSH_NULL_NOFLIP",  "rt_push_null_noflip"  },
-    { SM_COERCE_NUM,      "COERCE_NUM",        "rt_coerce_num"        },
-    { SM_EXP,             "EXP_NUM",           "rt_exp"               },
-    { SM_NEG,             "NEGATE",            "rt_neg"               },
-    { SM_DEFINE,          "DEFINE",            "rt_define"            },
-    { SM_DEFINE_ENTRY,    "DEFINE_ENTRY",      "rt_define_entry"      },
-    { SM_PAT_EPS,         "PAT_EPS",           "rt_pat_eps"           },
-    { SM_PAT_ARB,         "PAT_ARB",           "rt_pat_arb"           },
-    { SM_PAT_REM,         "PAT_REM",           "rt_pat_rem"           },
-    { SM_PAT_FAIL,        "PAT_FAIL",          "rt_pat_fail"          },
-    { SM_PAT_SUCCEED,     "PAT_SUCCEED",       "rt_pat_succeed"       },
-    { SM_PAT_ABORT,       "PAT_ABORT",         "rt_pat_abort"         },
-    { SM_PAT_BAL,         "PAT_BAL",           "rt_pat_bal"           },
-    { SM_PAT_FENCE0,      "PAT_FENCE",         "rt_pat_fence"         },
-    { SM_PAT_FENCE1,      "PAT_FENCE1",        "rt_pat_fence1"        },
-    { SM_PAT_SPAN,        "PAT_SPAN",          "rt_pat_span"          },
-    { SM_PAT_BREAK,       "PAT_BREAK",         "rt_pat_break"         },
-    { SM_PAT_ANY,         "PAT_ANY",           "rt_pat_any"           },
-    { SM_PAT_NOTANY,      "PAT_NOTANY",        "rt_pat_notany"        },
-    { SM_PAT_LEN,         "PAT_LEN",           "rt_pat_len"           },
-    { SM_PAT_POS,         "PAT_POS",           "rt_pat_pos"           },
-    { SM_PAT_RPOS,        "PAT_RPOS",          "rt_pat_rpos"          },
-    { SM_PAT_TAB,         "PAT_TAB",           "rt_pat_tab"           },
-    { SM_PAT_RTAB,        "PAT_RTAB",          "rt_pat_rtab"          },
-    { SM_PAT_ARBNO,       "PAT_ARBNO",         "rt_pat_arbno"         },
-    { SM_PAT_CAT,         "PAT_CAT",           "rt_pat_cat"           },
-    { SM_PAT_ALT,         "PAT_ALT",           "rt_pat_alt"           },
-    { SM_PAT_DEREF,       "PAT_DEREF",         "rt_pat_deref"         },
-    { SM_RESUME,          "RESUME",            "rt_unhandled_sm"      },
-    { SM_SUSPEND,         "SUSPEND",           "rt_unhandled_sm"      },
-    { SM_SUSPEND_VALUE,   "SUSPEND_VALUE",     "rt_unhandled_sm"      },
-    { SM_GEN_TICK,        "GEN_TICK",          "rt_unhandled_sm"      },
-    { SM_LOAD_GLOCAL,     "LOAD_GLOCAL",       "rt_unhandled_sm"      },
-    { SM_STORE_GLOCAL,    "STORE_GLOCAL",      "rt_unhandled_sm"      },
-    { SM_LOAD_FRAME,      "LOAD_FRAME",        "rt_unhandled_sm"      },
-    { SM_STORE_FRAME,     "STORE_FRAME",       "rt_unhandled_sm"      },
-    { SM_ICMP_GT,         "ICMP_GT",           "rt_unhandled_sm"      },
-    { SM_ICMP_LT,         "ICMP_LT",           "rt_unhandled_sm"      },
-    { SM_BB_ONCE,         "BB_ONCE",           "rt_unhandled_sm"      },
-    { SM_BB_ONCE_PROC,    "BB_ONCE_PROC",      "rt_unhandled_sm"      },
-    { SM_BB_PUMP,         "BB_PUMP",           "rt_unhandled_sm"      },
-    { SM_BB_PUMP_CASE,    "BB_PUMP_CASE",      "rt_unhandled_sm"      },
-    { SM_BB_PUMP_EVERY,   "BB_PUMP_EVERY",     "rt_unhandled_sm"      },
-    { SM_BB_PUMP_PROC,    "BB_PUMP_PROC",      "rt_unhandled_sm"      },
-    { SM_BB_PUMP_SM,      "BB_PUMP_SM",        "rt_unhandled_sm"      },
-    { -1, NULL, NULL }
+    { SM_VOID_POP        , "VOID_POP"        , "rt_pop_void" },
+    { SM_CONCAT          , "CONCAT"          , "rt_concat" },
+    { SM_PUSH_NULL       , "PUSH_NULL"       , "rt_push_null" },
+    { SM_PUSH_NULL_NOFLIP, "PUSH_NULL_NOFLIP", "rt_push_null_noflip" },
+    { SM_COERCE_NUM      , "COERCE_NUM"      , "rt_coerce_num" },
+    { SM_EXP             , "EXP_NUM"         , "rt_exp" },
+    { SM_NEG             , "NEGATE"          , "rt_neg" },
+    { SM_DEFINE          , "DEFINE"          , "rt_define" },
+    { SM_DEFINE_ENTRY    , "DEFINE_ENTRY"    , "rt_define_entry" },
+    { SM_PAT_EPS         , "PAT_EPS"         , "rt_pat_eps" },
+    { SM_PAT_ARB         , "PAT_ARB"         , "rt_pat_arb" },
+    { SM_PAT_REM         , "PAT_REM"         , "rt_pat_rem" },
+    { SM_PAT_FAIL        , "PAT_FAIL"        , "rt_pat_fail" },
+    { SM_PAT_SUCCEED     , "PAT_SUCCEED"     , "rt_pat_succeed" },
+    { SM_PAT_ABORT       , "PAT_ABORT"       , "rt_pat_abort" },
+    { SM_PAT_BAL         , "PAT_BAL"         , "rt_pat_bal" },
+    { SM_PAT_FENCE0      , "PAT_FENCE"       , "rt_pat_fence" },
+    { SM_PAT_FENCE1      , "PAT_FENCE1"      , "rt_pat_fence1" },
+    { SM_PAT_SPAN        , "PAT_SPAN"        , "rt_pat_span" },
+    { SM_PAT_BREAK       , "PAT_BREAK"       , "rt_pat_break" },
+    { SM_PAT_ANY         , "PAT_ANY"         , "rt_pat_any" },
+    { SM_PAT_NOTANY      , "PAT_NOTANY"      , "rt_pat_notany" },
+    { SM_PAT_LEN         , "PAT_LEN"         , "rt_pat_len" },
+    { SM_PAT_POS         , "PAT_POS"         , "rt_pat_pos" },
+    { SM_PAT_RPOS        , "PAT_RPOS"        , "rt_pat_rpos" },
+    { SM_PAT_TAB         , "PAT_TAB"         , "rt_pat_tab" },
+    { SM_PAT_RTAB        , "PAT_RTAB"        , "rt_pat_rtab" },
+    { SM_PAT_ARBNO       , "PAT_ARBNO"       , "rt_pat_arbno" },
+    { SM_PAT_CAT         , "PAT_CAT"         , "rt_pat_cat" },
+    { SM_PAT_ALT         , "PAT_ALT"         , "rt_pat_alt" },
+    { SM_PAT_DEREF       , "PAT_DEREF"       , "rt_pat_deref" },
+    { SM_RESUME          , "RESUME"          , "rt_unhandled_sm" },
+    { SM_SUSPEND         , "SUSPEND"         , "rt_unhandled_sm" },
+    { SM_SUSPEND_VALUE   , "SUSPEND_VALUE"   , "rt_unhandled_sm" },
+    { SM_GEN_TICK        , "GEN_TICK"        , "rt_unhandled_sm" },
+    { SM_LOAD_GLOCAL     , "LOAD_GLOCAL"     , "rt_unhandled_sm" },
+    { SM_STORE_GLOCAL    , "STORE_GLOCAL"    , "rt_unhandled_sm" },
+    { SM_LOAD_FRAME      , "LOAD_FRAME"      , "rt_unhandled_sm" },
+    { SM_STORE_FRAME     , "STORE_FRAME"     , "rt_unhandled_sm" },
+    { SM_ICMP_GT         , "ICMP_GT"         , "rt_unhandled_sm" },
+    { SM_ICMP_LT         , "ICMP_LT"         , "rt_unhandled_sm" },
+    { SM_BB_ONCE         , "BB_ONCE"         , "rt_unhandled_sm" },
+    { SM_BB_ONCE_PROC    , "BB_ONCE_PROC"    , "rt_unhandled_sm" },
+    { SM_BB_PUMP         , "BB_PUMP"         , "rt_unhandled_sm" },
+    { SM_BB_PUMP_CASE    , "BB_PUMP_CASE"    , "rt_unhandled_sm" },
+    { SM_BB_PUMP_EVERY   , "BB_PUMP_EVERY"   , "rt_unhandled_sm" },
+    { SM_BB_PUMP_PROC    , "BB_PUMP_PROC"    , "rt_unhandled_sm" },
+    { SM_BB_PUMP_SM      , "BB_PUMP_SM"      , "rt_unhandled_sm" },
+    { -1                 , NULL              , NULL },
 };
 /*--------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_op(int op)
@@ -82,54 +82,54 @@ void emit_sm_op(int op)
             emit_sm_unhandled_op(op);
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
-void emit_sm_coerce_num()     { emit_sm_op(SM_COERCE_NUM); }
-void emit_sm_exp()            { emit_sm_op(SM_EXP); }
-void emit_sm_neg()            { emit_sm_op(SM_NEG); }
-void emit_sm_define()         { emit_sm_op(SM_DEFINE); }
-void emit_sm_define_entry()   { emit_sm_op(SM_DEFINE_ENTRY); }
-void emit_sm_pat_eps()        { emit_sm_op(SM_PAT_EPS); }
-void emit_sm_pat_arb()        { emit_sm_op(SM_PAT_ARB); }
-void emit_sm_pat_rem()        { emit_sm_op(SM_PAT_REM); }
-void emit_sm_pat_fail()       { emit_sm_op(SM_PAT_FAIL); }
-void emit_sm_pat_succeed()    { emit_sm_op(SM_PAT_SUCCEED); }
-void emit_sm_pat_abort()      { emit_sm_op(SM_PAT_ABORT); }
-void emit_sm_pat_bal()        { emit_sm_op(SM_PAT_BAL); }
-void emit_sm_pat_fence()      { emit_sm_op(SM_PAT_FENCE0); }
-void emit_sm_pat_fence1()     { emit_sm_op(SM_PAT_FENCE1); }
-void emit_sm_pat_span()       { emit_sm_op(SM_PAT_SPAN); }
-void emit_sm_pat_break()      { emit_sm_op(SM_PAT_BREAK); }
-void emit_sm_pat_any()        { emit_sm_op(SM_PAT_ANY); }
-void emit_sm_pat_notany()     { emit_sm_op(SM_PAT_NOTANY); }
-void emit_sm_pat_len()        { emit_sm_op(SM_PAT_LEN); }
-void emit_sm_pat_pos()        { emit_sm_op(SM_PAT_POS); }
-void emit_sm_pat_rpos()       { emit_sm_op(SM_PAT_RPOS); }
-void emit_sm_pat_tab()        { emit_sm_op(SM_PAT_TAB); }
-void emit_sm_pat_rtab()       { emit_sm_op(SM_PAT_RTAB); }
-void emit_sm_pat_arbno()      { emit_sm_op(SM_PAT_ARBNO); }
-void emit_sm_pat_cat()        { emit_sm_op(SM_PAT_CAT); }
-void emit_sm_pat_alt()        { emit_sm_op(SM_PAT_ALT); }
-void emit_sm_pat_deref()      { emit_sm_op(SM_PAT_DEREF); }
-void emit_sm_resume()         { emit_sm_op(SM_RESUME); }
-void emit_sm_suspend()        { emit_sm_op(SM_SUSPEND); }
-void emit_sm_suspend_value()  { emit_sm_op(SM_SUSPEND_VALUE); }
-void emit_sm_gen_tick()       { emit_sm_op(SM_GEN_TICK); }
-void emit_sm_load_glocal()    { emit_sm_op(SM_LOAD_GLOCAL); }
-void emit_sm_store_glocal()   { emit_sm_op(SM_STORE_GLOCAL); }
-void emit_sm_load_frame()     { emit_sm_op(SM_LOAD_FRAME); }
-void emit_sm_store_frame()    { emit_sm_op(SM_STORE_FRAME); }
-void emit_sm_icmp_gt()        { emit_sm_op(SM_ICMP_GT); }
-void emit_sm_icmp_lt()        { emit_sm_op(SM_ICMP_LT); }
-void emit_sm_bb_once()        { emit_sm_op(SM_BB_ONCE); }
-void emit_sm_bb_once_proc()   { emit_sm_op(SM_BB_ONCE_PROC); }
-void emit_sm_bb_pump()        { emit_sm_op(SM_BB_PUMP); }
-void emit_sm_bb_pump_case()   { emit_sm_op(SM_BB_PUMP_CASE); }
-void emit_sm_bb_pump_every()  { emit_sm_op(SM_BB_PUMP_EVERY); }
-void emit_sm_bb_pump_proc()   { emit_sm_op(SM_BB_PUMP_PROC); }
-void emit_sm_bb_pump_sm()     { emit_sm_op(SM_BB_PUMP_SM); }
-void emit_sm_bb_pump_ast() { emit_sm_nullary_rt("BB_PUMP_AST", "rt_bb_pump_ast"); }
+void  emit_sm_coerce_num   ()  { emit_sm_op(SM_COERCE_NUM); }
+void  emit_sm_exp          ()  { emit_sm_op(SM_EXP); }
+void  emit_sm_neg          ()  { emit_sm_op(SM_NEG); }
+void  emit_sm_define       ()  { emit_sm_op(SM_DEFINE); }
+void  emit_sm_define_entry ()  { emit_sm_op(SM_DEFINE_ENTRY); }
+void  emit_sm_pat_eps      ()  { emit_sm_op(SM_PAT_EPS); }
+void  emit_sm_pat_arb      ()  { emit_sm_op(SM_PAT_ARB); }
+void  emit_sm_pat_rem      ()  { emit_sm_op(SM_PAT_REM); }
+void  emit_sm_pat_fail     ()  { emit_sm_op(SM_PAT_FAIL); }
+void  emit_sm_pat_succeed  ()  { emit_sm_op(SM_PAT_SUCCEED); }
+void  emit_sm_pat_abort    ()  { emit_sm_op(SM_PAT_ABORT); }
+void  emit_sm_pat_bal      ()  { emit_sm_op(SM_PAT_BAL); }
+void  emit_sm_pat_fence    ()  { emit_sm_op(SM_PAT_FENCE0); }
+void  emit_sm_pat_fence1   ()  { emit_sm_op(SM_PAT_FENCE1); }
+void  emit_sm_pat_span     ()  { emit_sm_op(SM_PAT_SPAN); }
+void  emit_sm_pat_break    ()  { emit_sm_op(SM_PAT_BREAK); }
+void  emit_sm_pat_any      ()  { emit_sm_op(SM_PAT_ANY); }
+void  emit_sm_pat_notany   ()  { emit_sm_op(SM_PAT_NOTANY); }
+void  emit_sm_pat_len      ()  { emit_sm_op(SM_PAT_LEN); }
+void  emit_sm_pat_pos      ()  { emit_sm_op(SM_PAT_POS); }
+void  emit_sm_pat_rpos     ()  { emit_sm_op(SM_PAT_RPOS); }
+void  emit_sm_pat_tab      ()  { emit_sm_op(SM_PAT_TAB); }
+void  emit_sm_pat_rtab     ()  { emit_sm_op(SM_PAT_RTAB); }
+void  emit_sm_pat_arbno    ()  { emit_sm_op(SM_PAT_ARBNO); }
+void  emit_sm_pat_cat      ()  { emit_sm_op(SM_PAT_CAT); }
+void  emit_sm_pat_alt      ()  { emit_sm_op(SM_PAT_ALT); }
+void  emit_sm_pat_deref    ()  { emit_sm_op(SM_PAT_DEREF); }
+void  emit_sm_resume       ()  { emit_sm_op(SM_RESUME); }
+void  emit_sm_suspend      ()  { emit_sm_op(SM_SUSPEND); }
+void  emit_sm_suspend_value()  { emit_sm_op(SM_SUSPEND_VALUE); }
+void  emit_sm_gen_tick     ()  { emit_sm_op(SM_GEN_TICK); }
+void  emit_sm_load_glocal  ()  { emit_sm_op(SM_LOAD_GLOCAL); }
+void  emit_sm_store_glocal ()  { emit_sm_op(SM_STORE_GLOCAL); }
+void  emit_sm_load_frame   ()  { emit_sm_op(SM_LOAD_FRAME); }
+void  emit_sm_store_frame  ()  { emit_sm_op(SM_STORE_FRAME); }
+void  emit_sm_icmp_gt      ()  { emit_sm_op(SM_ICMP_GT); }
+void  emit_sm_icmp_lt      ()  { emit_sm_op(SM_ICMP_LT); }
+void  emit_sm_bb_once      ()  { emit_sm_op(SM_BB_ONCE); }
+void  emit_sm_bb_once_proc ()  { emit_sm_op(SM_BB_ONCE_PROC); }
+void  emit_sm_bb_pump      ()  { emit_sm_op(SM_BB_PUMP); }
+void  emit_sm_bb_pump_case ()  { emit_sm_op(SM_BB_PUMP_CASE); }
+void  emit_sm_bb_pump_every()  { emit_sm_op(SM_BB_PUMP_EVERY); }
+void  emit_sm_bb_pump_proc ()  { emit_sm_op(SM_BB_PUMP_PROC); }
+void  emit_sm_bb_pump_sm   ()  { emit_sm_op(SM_BB_PUMP_SM); }
+void  emit_sm_bb_pump_ast  ()  { emit_sm_nullary_rt("BB_PUMP_AST", "rt_bb_pump_ast"); }
 static const struct { int op; const char *mn; } g_sm_arith[] = {
-    { SM_ADD,"ADD_NUM" },{ SM_SUB,"SUB_NUM" },{ SM_MUL,"MUL_NUM" },
-    { SM_DIV,"DIV_NUM" },{ SM_MOD,"MOD_NUM" },{ -1,NULL }
+    { SM_ADD, "ADD_NUM" },{ SM_SUB, "SUB_NUM" },{ SM_MUL, "MUL_NUM" },
+    { SM_DIV, "DIV_NUM" },{ SM_MOD, "MOD_NUM" },{ -1    , NULL },
 };
 /*--------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_arith_dispatch(int op)
@@ -149,11 +149,11 @@ void emit_sm_arith_op(int op_enum, const char *macro_name)
     emit_macro_end(); emit_pad_to_blob_size();
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
-void emit_sm_add() { emit_sm_arith_dispatch(SM_ADD); }
-void emit_sm_sub() { emit_sm_arith_dispatch(SM_SUB); }
-void emit_sm_mul() { emit_sm_arith_dispatch(SM_MUL); }
-void emit_sm_div() { emit_sm_arith_dispatch(SM_DIV); }
-void emit_sm_mod() { emit_sm_arith_dispatch(SM_MOD); }
+void  emit_sm_add()  { emit_sm_arith_dispatch(SM_ADD); }
+void  emit_sm_sub()  { emit_sm_arith_dispatch(SM_SUB); }
+void  emit_sm_mul()  { emit_sm_arith_dispatch(SM_MUL); }
+void  emit_sm_div()  { emit_sm_arith_dispatch(SM_DIV); }
+void  emit_sm_mod()  { emit_sm_arith_dispatch(SM_MOD); }
 /*--------------------------------------------------------------------------------------------------------------------*/
 static void emit_sm_int_arg(const char *mn, const char *rt_fn,
                               const char *param_name, int val)
@@ -165,9 +165,9 @@ static void emit_sm_int_arg(const char *mn, const char *rt_fn,
     emit_macro_end(); emit_pad_to_blob_size();
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
-void emit_sm_acomp(int op)       { emit_sm_int_arg("ACOMP",    "rt_acomp",       "op", op); }
-void emit_sm_lcomp(int op)       { emit_sm_int_arg("LCOMP",    "rt_lcomp",       "op", op); }
-void emit_sm_unhandled_op(int op){ emit_sm_int_arg("UNHANDLED","rt_unhandled_op","op", op); }
+void  emit_sm_acomp       (int op)  { emit_sm_int_arg("ACOMP",    "rt_acomp",       "op", op); }
+void  emit_sm_lcomp       (int op)  { emit_sm_int_arg("LCOMP",    "rt_lcomp",       "op", op); }
+void  emit_sm_unhandled_op(int op)  { emit_sm_int_arg("UNHANDLED","rt_unhandled_op","op", op); }
 /*--------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_incr(int64_t n)
 {
@@ -206,14 +206,14 @@ void emit_sm_return_variant(int kind, int cond, int pc)
     emit_macro_end(); emit_pad_to_blob_size();
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
-void emit_sm_freturn  (int pc) { emit_sm_return_variant(1,0,pc); }
-void emit_sm_nreturn  (int pc) { emit_sm_return_variant(2,0,pc); }
-void emit_sm_return_s (int pc) { emit_sm_return_variant(0,1,pc); }
-void emit_sm_return_f (int pc) { emit_sm_return_variant(0,2,pc); }
-void emit_sm_freturn_s(int pc) { emit_sm_return_variant(1,1,pc); }
-void emit_sm_freturn_f(int pc) { emit_sm_return_variant(1,2,pc); }
-void emit_sm_nreturn_s(int pc) { emit_sm_return_variant(2,1,pc); }
-void emit_sm_nreturn_f(int pc) { emit_sm_return_variant(2,2,pc); }
+void  emit_sm_freturn  (int pc)  { emit_sm_return_variant(1,0,pc); }
+void  emit_sm_nreturn  (int pc)  { emit_sm_return_variant(2,0,pc); }
+void  emit_sm_return_s (int pc)  { emit_sm_return_variant(0,1,pc); }
+void  emit_sm_return_f (int pc)  { emit_sm_return_variant(0,2,pc); }
+void  emit_sm_freturn_s(int pc)  { emit_sm_return_variant(1,1,pc); }
+void  emit_sm_freturn_f(int pc)  { emit_sm_return_variant(1,2,pc); }
+void  emit_sm_nreturn_s(int pc)  { emit_sm_return_variant(2,1,pc); }
+void  emit_sm_nreturn_f(int pc)  { emit_sm_return_variant(2,2,pc); }
 static void make_pc_label(bb_label_t *lbl, int pc) { emit_label_initf(lbl,".L%d",pc); }
 /*--------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_jump(int pc)
@@ -227,8 +227,8 @@ void emit_sm_jump_f(int pc)
 { emit_call_sym_plt("rt_last_ok",0); emit_test_rax_rax();
   bb_label_t t; make_pc_label(&t,pc); emit_jmp(&t,JMP_JE); }
 /*--------------------------------------------------------------------------------------------------------------------*/
-void emit_sm_label()                                      { emit_seq_noop_macro("LABEL"); }
-void emit_sm_stno(int stno, int lineno, const char *src) { emit_text_stno_banner(stno,lineno,src); emit_seq_noop_macro("STNO"); }
+void  emit_sm_label()                                       { emit_seq_noop_macro("LABEL"); }
+void  emit_sm_stno (int stno, int lineno, const char *src)  { emit_text_stno_banner(stno,lineno,src); emit_seq_noop_macro("STNO"); }
 /*--------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_push_lit_i(int64_t val)
 {
@@ -327,9 +327,9 @@ static void emit_sm_pat_str(const char *mn, const char *rt_fn,
     emit_call_sym_plt(rt_fn,0); emit_macro_end(); emit_pad_to_blob_size();
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
-void emit_sm_pat_lit     (const char *l, uint64_t p) { emit_sm_pat_str("PAT_LIT",      "rt_pat_lit",      l,p); }
-void emit_sm_pat_refname (const char *l, uint64_t p) { emit_sm_pat_str("PAT_REFNAME",  "rt_pat_refname",  l,p); }
-void emit_sm_pat_usercall(const char *l, uint64_t p) { emit_sm_pat_str("PAT_USERCALL", "rt_pat_usercall", l,p); }
+void  emit_sm_pat_lit     (const char *l, uint64_t p)  { emit_sm_pat_str("PAT_LIT",      "rt_pat_lit",      l,p); }
+void  emit_sm_pat_refname (const char *l, uint64_t p)  { emit_sm_pat_str("PAT_REFNAME",  "rt_pat_refname",  l,p); }
+void  emit_sm_pat_usercall(const char *l, uint64_t p)  { emit_sm_pat_str("PAT_USERCALL", "rt_pat_usercall", l,p); }
 /*--------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_pat_capture(const char *name_lbl, uint64_t name_ptr, int kind)
 {
@@ -478,35 +478,35 @@ static const sm_op_template_t g_sm_templates[] = {
       SM_TPL_LBLOPT_I_I,      0, 0 },
     { SM_EXEC_STMT,    "EXEC_STMT_VARIANT",  "rt_match_variant",
       SM_TPL_EXEC_VAR, 0, 0 },
-    { SM_LABEL,        "LABEL",        NULL,                    SM_TPL_NOOP,       0, 0 },
-    { SM_STNO,         "STNO",         NULL,                    SM_TPL_NOOP,       0, 0 },
-    { SM_PUSH_NULL_NOFLIP, "PUSH_NULL_NOFLIP", "rt_push_null_noflip", SM_TPL_RTCALL, 0, 0 },
-    { SM_EXP,          "EXP_NUM",      "rt_exp",          SM_TPL_RTCALL,    0, 0 },
-    { SM_NEG,          "NEGATE",       "rt_neg",          SM_TPL_RTCALL,    0, 0 },
-    { SM_DEFINE_ENTRY, "DEFINE_ENTRY", "rt_define_entry", SM_TPL_RTCALL,    0, 0 },
-    { SM_DEFINE,       "DEFINE",       "rt_define",       SM_TPL_RTCALL,    0, 0 },
-    { SM_SUSPEND,        "SUSPEND",        "rt_unhandled_sm", SM_TPL_ARITH, SM_SUSPEND,        0 },
-    { SM_RESUME,         "RESUME",         "rt_unhandled_sm", SM_TPL_ARITH, SM_RESUME,         0 },
-    { SM_SUSPEND_VALUE,  "SUSPEND_VALUE",  "rt_unhandled_sm", SM_TPL_ARITH, SM_SUSPEND_VALUE,  0 },
-    { SM_GEN_TICK,       "GEN_TICK",       "rt_unhandled_sm", SM_TPL_ARITH, SM_GEN_TICK,       0 },
-    { SM_BB_PUMP,        "BB_PUMP",        "rt_unhandled_sm", SM_TPL_ARITH, SM_BB_PUMP,        0 },
-    { SM_BB_ONCE,        "BB_ONCE",        "rt_unhandled_sm", SM_TPL_ARITH, SM_BB_ONCE,        0 },
-    { SM_BB_EVAL,        "BB_EVAL",        "rt_unhandled_sm", SM_TPL_ARITH, SM_BB_EVAL,        0 },
-    { SM_BB_ONCE_PROC,   "BB_ONCE_PROC",   "rt_unhandled_sm", SM_TPL_ARITH, SM_BB_ONCE_PROC,   0 },
-    { SM_BB_PUMP_PROC,   "BB_PUMP_PROC",   "rt_unhandled_sm", SM_TPL_ARITH, SM_BB_PUMP_PROC,   0 },
-    { SM_BB_PUMP_CASE,   "BB_PUMP_CASE",   "rt_unhandled_sm", SM_TPL_ARITH, SM_BB_PUMP_CASE,   0 },
-    { SM_BB_PUMP_SM,     "BB_PUMP_SM",     "rt_unhandled_sm", SM_TPL_ARITH, SM_BB_PUMP_SM,     0 },
-    { SM_BB_PUMP_EVERY,  "BB_PUMP_EVERY",  "rt_unhandled_sm", SM_TPL_ARITH, SM_BB_PUMP_EVERY,  0 },
-    { SM_LOAD_GLOCAL,    "LOAD_GLOCAL",    "rt_unhandled_sm", SM_TPL_ARITH, SM_LOAD_GLOCAL,    0 },
-    { SM_STORE_GLOCAL,   "STORE_GLOCAL",   "rt_unhandled_sm", SM_TPL_ARITH, SM_STORE_GLOCAL,   0 },
-    { SM_ICMP_GT,        "ICMP_GT",        "rt_unhandled_sm", SM_TPL_ARITH, SM_ICMP_GT,        0 },
-    { SM_ICMP_LT,        "ICMP_LT",        "rt_unhandled_sm", SM_TPL_ARITH, SM_ICMP_LT,        0 },
-    { SM_LOAD_FRAME,     "LOAD_FRAME",     "rt_unhandled_sm", SM_TPL_ARITH, SM_LOAD_FRAME,     0 },
-    { SM_STORE_FRAME,    "STORE_FRAME",    "rt_unhandled_sm", SM_TPL_ARITH, SM_STORE_FRAME,    0 },
-    { SM_INCR,    "INCR",    "rt_incr",  SM_TPL_ARITH, 0 , 0 },
-    { SM_DECR,    "DECR",    "rt_decr",  SM_TPL_ARITH, 0, 0 },
-    { SM_ACOMP,   "ACOMP",   "rt_acomp", SM_TPL_ARITH, 0 , 0 },
-    { SM_LCOMP,   "LCOMP",   "rt_lcomp", SM_TPL_ARITH, 0, 0 },
+    { SM_LABEL           , "LABEL"           , NULL                 , SM_TPL_NOOP  , 0               , 0 },
+    { SM_STNO            , "STNO"            , NULL                 , SM_TPL_NOOP  , 0               , 0 },
+    { SM_PUSH_NULL_NOFLIP, "PUSH_NULL_NOFLIP", "rt_push_null_noflip", SM_TPL_RTCALL, 0               , 0 },
+    { SM_EXP             , "EXP_NUM"         , "rt_exp"             , SM_TPL_RTCALL, 0               , 0 },
+    { SM_NEG             , "NEGATE"          , "rt_neg"             , SM_TPL_RTCALL, 0               , 0 },
+    { SM_DEFINE_ENTRY    , "DEFINE_ENTRY"    , "rt_define_entry"    , SM_TPL_RTCALL, 0               , 0 },
+    { SM_DEFINE          , "DEFINE"          , "rt_define"          , SM_TPL_RTCALL, 0               , 0 },
+    { SM_SUSPEND         , "SUSPEND"         , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_SUSPEND      , 0 },
+    { SM_RESUME          , "RESUME"          , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_RESUME       , 0 },
+    { SM_SUSPEND_VALUE   , "SUSPEND_VALUE"   , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_SUSPEND_VALUE, 0 },
+    { SM_GEN_TICK        , "GEN_TICK"        , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_GEN_TICK     , 0 },
+    { SM_BB_PUMP         , "BB_PUMP"         , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_BB_PUMP      , 0 },
+    { SM_BB_ONCE         , "BB_ONCE"         , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_BB_ONCE      , 0 },
+    { SM_BB_EVAL         , "BB_EVAL"         , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_BB_EVAL      , 0 },
+    { SM_BB_ONCE_PROC    , "BB_ONCE_PROC"    , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_BB_ONCE_PROC , 0 },
+    { SM_BB_PUMP_PROC    , "BB_PUMP_PROC"    , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_BB_PUMP_PROC , 0 },
+    { SM_BB_PUMP_CASE    , "BB_PUMP_CASE"    , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_BB_PUMP_CASE , 0 },
+    { SM_BB_PUMP_SM      , "BB_PUMP_SM"      , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_BB_PUMP_SM   , 0 },
+    { SM_BB_PUMP_EVERY   , "BB_PUMP_EVERY"   , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_BB_PUMP_EVERY, 0 },
+    { SM_LOAD_GLOCAL     , "LOAD_GLOCAL"     , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_LOAD_GLOCAL  , 0 },
+    { SM_STORE_GLOCAL    , "STORE_GLOCAL"    , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_STORE_GLOCAL , 0 },
+    { SM_ICMP_GT         , "ICMP_GT"         , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_ICMP_GT      , 0 },
+    { SM_ICMP_LT         , "ICMP_LT"         , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_ICMP_LT      , 0 },
+    { SM_LOAD_FRAME      , "LOAD_FRAME"      , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_LOAD_FRAME   , 0 },
+    { SM_STORE_FRAME     , "STORE_FRAME"     , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_STORE_FRAME  , 0 },
+    { SM_INCR            , "INCR"            , "rt_incr"            , SM_TPL_ARITH , 0               , 0 },
+    { SM_DECR            , "DECR"            , "rt_decr"            , SM_TPL_ARITH , 0               , 0 },
+    { SM_ACOMP           , "ACOMP"           , "rt_acomp"           , SM_TPL_ARITH , 0               , 0 },
+    { SM_LCOMP           , "LCOMP"           , "rt_lcomp"           , SM_TPL_ARITH , 0               , 0 },
 };
 /*--------------------------------------------------------------------------------------------------------------------*/
 #define G_SM_TEMPLATES_N (int)(sizeof(g_sm_templates) / sizeof(g_sm_templates[0]))
@@ -1337,9 +1337,9 @@ static void strtab_escape(char *out, size_t outsz, const char *s)
     for (const char *p = s; *p && j + 6 < outsz; p++) {
         unsigned char c = (unsigned char)*p;
         if      (c == '\\') { out[j++] = '\\'; out[j++] = '\\'; }
-        else if (c == '"')  { out[j++] = '\\'; out[j++] = '"';  }
-        else if (c == '\n') { out[j++] = '\\'; out[j++] = 'n';  }
-        else if (c == '\t') { out[j++] = '\\'; out[j++] = 't';  }
+        else  if(c == '"')   { out[j++] = '\\'; out[j++] = '"';  }
+        else  if(c == '\n')  { out[j++] = '\\'; out[j++] = 'n';  }
+        else  if(c == '\t')  { out[j++] = '\\'; out[j++] = 't';  }
         else if (c < 0x20 || c == 0x7f) {
             j += (size_t)snprintf(out + j, outsz - j, "\\%03o", c);
         } else {
@@ -1985,28 +1985,28 @@ static int emit_sm_define_dispatch(FILE *out, const SM_Instr *ins, int pc) {
     return emit_sm_noop(out, sm_template_lookup(SM_DEFINE), anno);
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_pat_span_dispatch(FILE *out, int pc)     { (void)pc; edp4_label_then(out, emit_sm_pat_span);     return 0; }
-static int emit_sm_pat_break_dispatch(FILE *out, int pc)    { (void)pc; edp4_label_then(out, emit_sm_pat_break);    return 0; }
-static int emit_sm_pat_any_dispatch(FILE *out, int pc)      { (void)pc; edp4_label_then(out, emit_sm_pat_any);      return 0; }
-static int emit_sm_pat_notany_dispatch(FILE *out, int pc)   { (void)pc; edp4_label_then(out, emit_sm_pat_notany);   return 0; }
-static int emit_sm_pat_len_dispatch(FILE *out, int pc)      { (void)pc; edp4_label_then(out, emit_sm_pat_len);      return 0; }
-static int emit_sm_pat_pos_dispatch(FILE *out, int pc)      { (void)pc; edp4_label_then(out, emit_sm_pat_pos);      return 0; }
-static int emit_sm_pat_rpos_dispatch(FILE *out, int pc)     { (void)pc; edp4_label_then(out, emit_sm_pat_rpos);     return 0; }
-static int emit_sm_pat_tab_dispatch(FILE *out, int pc)      { (void)pc; edp4_label_then(out, emit_sm_pat_tab);      return 0; }
-static int emit_sm_pat_rtab_dispatch(FILE *out, int pc)     { (void)pc; edp4_label_then(out, emit_sm_pat_rtab);     return 0; }
-static int emit_sm_pat_arb_dispatch(FILE *out, int pc)      { (void)pc; edp4_label_then(out, emit_sm_pat_arb);      return 0; }
-static int emit_sm_pat_arbno_dispatch(FILE *out, int pc)    { (void)pc; edp4_label_then(out, emit_sm_pat_arbno);    return 0; }
-static int emit_sm_pat_rem_dispatch(FILE *out, int pc)      { (void)pc; edp4_label_then(out, emit_sm_pat_rem);      return 0; }
-static int emit_sm_pat_fence0_dispatch(FILE *out, int pc)   { (void)pc; edp4_label_then(out, emit_sm_pat_fence);    return 0; }
-static int emit_sm_pat_fence1_dispatch(FILE *out, int pc)   { (void)pc; edp4_label_then(out, emit_sm_pat_fence1);   return 0; }
-static int emit_sm_pat_fail_dispatch(FILE *out, int pc)     { (void)pc; edp4_label_then(out, emit_sm_pat_fail);     return 0; }
-static int emit_sm_pat_abort_dispatch(FILE *out, int pc)    { (void)pc; edp4_label_then(out, emit_sm_pat_abort);    return 0; }
-static int emit_sm_pat_succeed_dispatch(FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_succeed);  return 0; }
-static int emit_sm_pat_bal_dispatch(FILE *out, int pc)      { (void)pc; edp4_label_then(out, emit_sm_pat_bal);      return 0; }
-static int emit_sm_pat_eps_dispatch(FILE *out, int pc)      { (void)pc; edp4_label_then(out, emit_sm_pat_eps);      return 0; }
-static int emit_sm_pat_cat_dispatch(FILE *out, int pc)      { (void)pc; edp4_label_then(out, emit_sm_pat_cat);      return 0; }
-static int emit_sm_pat_alt_dispatch(FILE *out, int pc)      { (void)pc; edp4_label_then(out, emit_sm_pat_alt);      return 0; }
-static int emit_sm_pat_deref_dispatch(FILE *out, int pc)    { (void)pc; edp4_label_then(out, emit_sm_pat_deref);    return 0; }
+static int  emit_sm_pat_span_dispatch   (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_span);     return 0; }
+static int  emit_sm_pat_break_dispatch  (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_break);    return 0; }
+static int  emit_sm_pat_any_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_any);      return 0; }
+static int  emit_sm_pat_notany_dispatch (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_notany);   return 0; }
+static int  emit_sm_pat_len_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_len);      return 0; }
+static int  emit_sm_pat_pos_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_pos);      return 0; }
+static int  emit_sm_pat_rpos_dispatch   (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_rpos);     return 0; }
+static int  emit_sm_pat_tab_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_tab);      return 0; }
+static int  emit_sm_pat_rtab_dispatch   (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_rtab);     return 0; }
+static int  emit_sm_pat_arb_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_arb);      return 0; }
+static int  emit_sm_pat_arbno_dispatch  (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_arbno);    return 0; }
+static int  emit_sm_pat_rem_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_rem);      return 0; }
+static int  emit_sm_pat_fence0_dispatch (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_fence);    return 0; }
+static int  emit_sm_pat_fence1_dispatch (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_fence1);   return 0; }
+static int  emit_sm_pat_fail_dispatch   (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_fail);     return 0; }
+static int  emit_sm_pat_abort_dispatch  (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_abort);    return 0; }
+static int  emit_sm_pat_succeed_dispatch(FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_succeed);  return 0; }
+static int  emit_sm_pat_bal_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_bal);      return 0; }
+static int  emit_sm_pat_eps_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_eps);      return 0; }
+static int  emit_sm_pat_cat_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_cat);      return 0; }
+static int  emit_sm_pat_alt_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_alt);      return 0; }
+static int  emit_sm_pat_deref_dispatch  (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_deref);    return 0; }
 /*--------------------------------------------------------------------------------------------------------------------*/
 #define PHASE2_SIM_DEPTH  128
 typedef struct {

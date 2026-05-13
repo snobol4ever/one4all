@@ -287,11 +287,11 @@ void bb_emit_byte(uint8_t b)
     bb_emit_buf[bb_emit_pos++] = b;
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
-void bb_emit_u16(uint16_t v) { bb_emit_byte((uint8_t)(v)); bb_emit_byte((uint8_t)(v >> 8)); }
-void bb_emit_u32(uint32_t v) { bb_emit_byte((uint8_t)(v)); bb_emit_byte((uint8_t)(v>>8)); bb_emit_byte((uint8_t)(v>>16)); bb_emit_byte((uint8_t)(v>>24)); }
-void bb_emit_u64(uint64_t v) { bb_emit_u32((uint32_t)(v)); bb_emit_u32((uint32_t)(v >> 32)); }
-void bb_emit_i8 (int8_t  v) { bb_emit_byte((uint8_t)v); }
-void bb_emit_i32(int32_t v) { uint32_t u; memcpy(&u, &v, 4); bb_emit_u32(u); }
+void  bb_emit_u16(uint16_t v)  { bb_emit_byte((uint8_t)(v)); bb_emit_byte((uint8_t)(v >> 8)); }
+void  bb_emit_u32(uint32_t v)  { bb_emit_byte((uint8_t)(v)); bb_emit_byte((uint8_t)(v>>8)); bb_emit_byte((uint8_t)(v>>16)); bb_emit_byte((uint8_t)(v>>24)); }
+void  bb_emit_u64(uint64_t v)  { bb_emit_u32((uint32_t)(v)); bb_emit_u32((uint32_t)(v >> 32)); }
+void  bb_emit_i8 (int8_t  v)   { bb_emit_byte((uint8_t)v); }
+void  bb_emit_i32(int32_t v)   { uint32_t u; memcpy(&u, &v, 4); bb_emit_u32(u); }
 /*--------------------------------------------------------------------------------------------------------------------*/
 int  g_is_text        = 0;
 int  g_emit_text_mode = TEXT_MODE_INVOCATION;
@@ -314,12 +314,12 @@ int  emitter_end(void)        { return g_is_text ? g_emit_pos : bb_emit_end(); }
 FILE *emitter_text_out(void)  { return g_is_text ? bb_emit_out : NULL; }
 int   emitter_pos(void)       { return g_is_text ? g_emit_pos  : bb_emit_pos; }
 void  emitter_init_macro_def(FILE *out) { emitter_init_text(out, TEXT_MODE_DEFINITION); }
-static void ef_b1(uint8_t a)                                  { bb_emit_byte(a); }
-static void ef_b2(uint8_t a, uint8_t b)                       { bb_emit_byte(a); bb_emit_byte(b); }
-static void ef_b3(uint8_t a, uint8_t b, uint8_t c)            { bb_emit_byte(a); bb_emit_byte(b); bb_emit_byte(c); }
-static void ef_b4(uint8_t a, uint8_t b, uint8_t c, uint8_t d) { bb_emit_byte(a); bb_emit_byte(b); bb_emit_byte(c); bb_emit_byte(d); }
-static void ef_u32(uint32_t v) { bb_emit_u32(v); }
-static void ef_u64(uint64_t v) { bb_emit_u64(v); }
+static void  ef_b1 (uint8_t a)                                   { bb_emit_byte(a); }
+static void  ef_b2 (uint8_t a, uint8_t b)                        { bb_emit_byte(a); bb_emit_byte(b); }
+static void  ef_b3 (uint8_t a, uint8_t b, uint8_t c)             { bb_emit_byte(a); bb_emit_byte(b); bb_emit_byte(c); }
+static void  ef_b4 (uint8_t a, uint8_t b, uint8_t c, uint8_t d)  { bb_emit_byte(a); bb_emit_byte(b); bb_emit_byte(c); bb_emit_byte(d); }
+static void  ef_u32(uint32_t v)                                  { bb_emit_u32(v); }
+static void  ef_u64(uint64_t v)                                  { bb_emit_u64(v); }
 /*--------------------------------------------------------------------------------------------------------------------*/
 static void ef_t3c(const char *mnem, const char *fmt, ...)
 {
@@ -422,13 +422,13 @@ void emit_sym_lea_r10(const char *sym, uint64_t addr)
     else           { ef_b2(0x49,0xBA); ef_u64(addr); }
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
-void emit_load_r10_delta_ptr(uint64_t addr)  { emit_sym_lea_r10("\xCE\x94", addr); }
-void emit_load_delta(void)                    { emit_mov_eax_r10mem(); }
-void emit_store_delta(void)                   { emit_mov_r10mem_eax(); }
-void emit_load_sigma(uint64_t a)             { emit_sym_lea_rcx("\xCE\xA3", a);        emit_mov_rax_rcxmem(); }
-void emit_load_siglen(uint64_t a)            { emit_sym_lea_rcx("\xCE\xA3""len", a);   emit_mov_eax_rcxmem(); }
-void emit_sigma_plus_delta(uint64_t a)       { emit_load_sigma(a); emit_movsxd_rcx_r10mem(); emit_lea_rax_raxrcx(); }
-void emit_cmp_eax_siglen(uint64_t a)         { emit_sym_lea_rcx("\xCE\xA3""len", a);   emit_cmp_eax_rcxmem(); }
+void  emit_load_r10_delta_ptr(uint64_t addr)  { emit_sym_lea_r10("\xCE\x94", addr); }
+void  emit_load_delta        (void)           { emit_mov_eax_r10mem(); }
+void  emit_store_delta       (void)           { emit_mov_r10mem_eax(); }
+void  emit_load_sigma        (uint64_t a)     { emit_sym_lea_rcx("\xCE\xA3", a);        emit_mov_rax_rcxmem(); }
+void  emit_load_siglen       (uint64_t a)     { emit_sym_lea_rcx("\xCE\xA3""len", a);   emit_mov_eax_rcxmem(); }
+void  emit_sigma_plus_delta  (uint64_t a)     { emit_load_sigma(a); emit_movsxd_rcx_r10mem(); emit_lea_rax_raxrcx(); }
+void  emit_cmp_eax_siglen    (uint64_t a)     { emit_sym_lea_rcx("\xCE\xA3""len", a);   emit_cmp_eax_rcxmem(); }
 /*--------------------------------------------------------------------------------------------------------------------*/
 void emit_label_define_bb(bb_label_t *lbl)
 {
@@ -745,8 +745,8 @@ static void bb3c_flush_pending_to(FILE *target)
     (void)target;
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
-void bb3c_flush_pending_cjmp_only(void) { bb3c_flush_pending_cond_jmp(); }
-void bb3c_flush_pending(void)           { bb3c_flush_pending_to(NULL); }
+void  bb3c_flush_pending_cjmp_only(void)  { bb3c_flush_pending_cond_jmp(); }
+void  bb3c_flush_pending          (void)  { bb3c_flush_pending_to(NULL); }
 /*--------------------------------------------------------------------------------------------------------------------*/
 static int bb3c_is_cond_jmp(const char *mn)
 {
@@ -939,8 +939,8 @@ void emit_text_op(const char *label, const char *action, const char *goto_) {
     bb3c_text(label, action, goto_);
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
-void emit_text_flush_cjmp(void) { bb3c_flush_pending_cjmp_only(); }
-void emit_text_flush(void)      { bb3c_flush_pending(); }
+void  emit_text_flush_cjmp(void)  { bb3c_flush_pending_cjmp_only(); }
+void  emit_text_flush     (void)  { bb3c_flush_pending(); }
 /*--------------------------------------------------------------------------------------------------------------------*/
 void emit_text_rawf(const char *fmt, ...) {
     if (bb_emit_mode != EMIT_TEXT) return;
@@ -956,8 +956,8 @@ void emit_text_comment(const char *fmt, ...) {
     fputc('\n', emit_outf());
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
-void emit_text_box_banner(const char *kind, const char *args) { emit_bb_box_banner(kind, args); }
-void emit_text_stno_banner(int stno, int lineno, const char *src_text) { emit_banner_stno(stno, lineno, src_text); }
+void  emit_text_box_banner (const char *kind, const char *args)          { emit_bb_box_banner(kind, args); }
+void  emit_text_stno_banner(int stno, int lineno, const char *src_text)  { emit_banner_stno(stno, lineno, src_text); }
 /*--------------------------------------------------------------------------------------------------------------------*/
 void emit_text_global(const char *name) {
     if (!IS_TEXT) return;

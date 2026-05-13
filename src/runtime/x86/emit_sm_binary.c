@@ -11,8 +11,8 @@
 #include "emit_templates.h"
 #include "emit.h"
 #include "emit.h"
-extern int g_sm_dispatch_active;
-extern int g_ast_pump_active;
+extern int    g_sm_dispatch_active  ;
+extern int    g_ast_pump_active     ;
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,58 +29,58 @@ int      g_jit_steps_done = 0;
 jmp_buf  g_jit_step_jmp;
 /* ME-1: jit_pat_stack removed — SM_PAT_* ops use value stack (PUSH/POP) */
 /* ── Externs from snobol4 runtime ────────────────────────────────────── */
-extern DESCR_t  NV_GET_fn(const char *name);
-extern DESCR_t  NV_SET_fn(const char *name, DESCR_t val);
-extern char    *VARVAL_fn(DESCR_t d);
-extern DESCR_t  CONCAT_fn(DESCR_t l, DESCR_t r);
-extern DESCR_t  INVOKE_fn(const char *name, DESCR_t *args, int nargs);
-extern DESCR_t  sc_dat_field_call(const char *name, DESCR_t *args, int nargs);
-extern DESCR_t  NAME_fn(const char *name);
-extern int      exec_stmt(const char *subj_name, DESCR_t *subj_var,
+extern DESCR_t    NV_GET_fn          (const char *name);
+extern DESCR_t    NV_SET_fn          (const char *name, DESCR_t val);
+extern char     * VARVAL_fn          (DESCR_t d);
+extern DESCR_t    CONCAT_fn          (DESCR_t l, DESCR_t r);
+extern DESCR_t    INVOKE_fn          (const char *name, DESCR_t *args, int nargs);
+extern DESCR_t    sc_dat_field_call  (const char *name, DESCR_t *args, int nargs);
+extern DESCR_t    NAME_fn            (const char *name);
+extern int        exec_stmt          (const char *subj_name, DESCR_t *subj_var,
                           DESCR_t pat, DESCR_t *repl, int has_repl);
 extern void     comm_stno(int n);
 /* subscript helpers */
-extern DESCR_t subscript_get(DESCR_t base, DESCR_t idx);
-extern DESCR_t subscript_get2(DESCR_t base, DESCR_t i, DESCR_t j);
-extern int     subscript_set(DESCR_t base, DESCR_t idx, DESCR_t val);
-extern int     subscript_set2(DESCR_t base, DESCR_t i, DESCR_t j, DESCR_t val);
+extern DESCR_t    subscript_get   (DESCR_t base, DESCR_t idx);
+extern DESCR_t    subscript_get2  (DESCR_t base, DESCR_t i, DESCR_t j);
+extern int        subscript_set   (DESCR_t base, DESCR_t idx, DESCR_t val);
+extern int        subscript_set2  (DESCR_t base, DESCR_t i, DESCR_t j, DESCR_t val);
 /* pattern constructors */
-extern DESCR_t pat_lit(const char *s);
-extern DESCR_t pat_span(const char *chars);
-extern DESCR_t pat_break_(const char *chars);
-extern DESCR_t pat_breakx(const char *chars);
-extern DESCR_t pat_any_cs(const char *chars);
-extern DESCR_t pat_notany(const char *chars);
-extern DESCR_t pat_len(int64_t n);
-extern DESCR_t pat_pos(int64_t n);
-extern DESCR_t pat_rpos(int64_t n);
-extern DESCR_t pat_tab(int64_t n);
-extern DESCR_t pat_rtab(int64_t n);
-extern DESCR_t pat_arb(void);
-extern DESCR_t pat_arbno(DESCR_t inner);
-extern DESCR_t pat_arbno(DESCR_t inner);
-extern DESCR_t pat_rem(void);
-extern DESCR_t pat_fence(void);
-extern DESCR_t pat_fail(void);
-extern DESCR_t pat_abort(void);
-extern DESCR_t pat_succeed(void);
-extern DESCR_t pat_bal(void);
-extern DESCR_t pat_epsilon(void);
-extern DESCR_t pat_cat(DESCR_t left, DESCR_t right);
-extern DESCR_t pat_alt(DESCR_t left, DESCR_t right);
-extern DESCR_t pat_ref(const char *name);
-extern DESCR_t pat_assign_imm(DESCR_t child, DESCR_t var);
-extern DESCR_t pat_assign_cond(DESCR_t child, DESCR_t var);
-extern DESCR_t pat_at_cursor(const char *varname);
+extern DESCR_t    pat_lit          (const char *s);
+extern DESCR_t    pat_span         (const char *chars);
+extern DESCR_t    pat_break_       (const char *chars);
+extern DESCR_t    pat_breakx       (const char *chars);
+extern DESCR_t    pat_any_cs       (const char *chars);
+extern DESCR_t    pat_notany       (const char *chars);
+extern DESCR_t    pat_len          (int64_t n);
+extern DESCR_t    pat_pos          (int64_t n);
+extern DESCR_t    pat_rpos         (int64_t n);
+extern DESCR_t    pat_tab          (int64_t n);
+extern DESCR_t    pat_rtab         (int64_t n);
+extern DESCR_t    pat_arb          (void);
+extern DESCR_t    pat_arbno        (DESCR_t inner);
+extern DESCR_t    pat_arbno        (DESCR_t inner);
+extern DESCR_t    pat_rem          (void);
+extern DESCR_t    pat_fence        (void);
+extern DESCR_t    pat_fail         (void);
+extern DESCR_t    pat_abort        (void);
+extern DESCR_t    pat_succeed      (void);
+extern DESCR_t    pat_bal          (void);
+extern DESCR_t    pat_epsilon      (void);
+extern DESCR_t    pat_cat          (DESCR_t left, DESCR_t right);
+extern DESCR_t    pat_alt          (DESCR_t left, DESCR_t right);
+extern DESCR_t    pat_ref          (const char *name);
+extern DESCR_t    pat_assign_imm   (DESCR_t child, DESCR_t var);
+extern DESCR_t    pat_assign_cond  (DESCR_t child, DESCR_t var);
+extern DESCR_t    pat_at_cursor    (const char *varname);
 #define CUR_INS  (&g_jit_prog->instrs[g_jit_state->pc - 1])
 #define STATE    (g_jit_state)
 #define PUSH(d)  sm_push(STATE, (d))
 #define POP()    sm_pop(STATE)
 /*--------------------------------------------------------------------------------------------------------------------*/
-static void h_label(void)    {  }
-static void h_halt(void)     { g_jit_halted = 1; }
-static void h_define(void)   {  }
-static void h_define_entry(void) {  }
+static void  h_label       (void)  {  }
+static void  h_halt        (void)  { g_jit_halted = 1; }
+static void  h_define      (void)  {  }
+static void  h_define_entry(void)  {  }
 /*--------------------------------------------------------------------------------------------------------------------*/
 /* RS-9c: SM-frame-aware return handlers — mirror sm_interp.c SM_RETURN/SM_FRETURN/SM_NRETURN */
 static void h_return_impl(int is_fret, int is_nret)
@@ -120,15 +120,15 @@ static void h_return_impl(int is_fret, int is_nret)
     }
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
-static void h_return(void)    { h_return_impl(0, 0); }
-static void h_freturn(void)   { h_return_impl(1, 0); }
-static void h_nreturn(void)   { h_return_impl(0, 1); }
-static void h_return_s(void)  { if ( STATE->last_ok) h_return_impl(0, 0); }
-static void h_return_f(void)  { if (!STATE->last_ok) h_return_impl(0, 0); }
-static void h_freturn_s(void) { if ( STATE->last_ok) h_return_impl(1, 0); }
-static void h_freturn_f(void) { if (!STATE->last_ok) h_return_impl(1, 0); }
-static void h_nreturn_s(void) { if ( STATE->last_ok) h_return_impl(0, 1); }
-static void h_nreturn_f(void) { if (!STATE->last_ok) h_return_impl(0, 1); }
+static void  h_return   (void)  { h_return_impl(0, 0); }
+static void  h_freturn  (void)  { h_return_impl(1, 0); }
+static void  h_nreturn  (void)  { h_return_impl(0, 1); }
+static void  h_return_s (void)  { if ( STATE->last_ok) h_return_impl(0, 0); }
+static void  h_return_f (void)  { if (!STATE->last_ok) h_return_impl(0, 0); }
+static void  h_freturn_s(void)  { if ( STATE->last_ok) h_return_impl(1, 0); }
+static void  h_freturn_f(void)  { if (!STATE->last_ok) h_return_impl(1, 0); }
+static void  h_nreturn_s(void)  { if ( STATE->last_ok) h_return_impl(0, 1); }
+static void  h_nreturn_f(void)  { if (!STATE->last_ok) h_return_impl(0, 1); }
 /*--------------------------------------------------------------------------------------------------------------------*/
 static void h_stno(void) {
     int sm_stno = (int)CUR_INS->a[0].i;
@@ -143,9 +143,9 @@ static void h_stno(void) {
         longjmp(g_jit_step_jmp, 1);
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
-static void h_jump(void)   { STATE->pc = (int)CUR_INS->a[0].i; }
-static void h_jump_s(void) { if ( STATE->last_ok) STATE->pc = (int)CUR_INS->a[0].i; }
-static void h_jump_f(void) { if (!STATE->last_ok) STATE->pc = (int)CUR_INS->a[0].i; }
+static void  h_jump  (void)  { STATE->pc = (int)CUR_INS->a[0].i; }
+static void  h_jump_s(void)  { if ( STATE->last_ok) STATE->pc = (int)CUR_INS->a[0].i; }
+static void  h_jump_f(void)  { if (!STATE->last_ok) STATE->pc = (int)CUR_INS->a[0].i; }
 /*--------------------------------------------------------------------------------------------------------------------*/
 static void h_push_lit_s(void)
 {
@@ -155,9 +155,9 @@ static void h_push_lit_s(void)
     PUSH(d);
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
-static void h_push_lit_i(void) { PUSH(INTVAL(CUR_INS->a[0].i)); }
-static void h_push_lit_f(void) { PUSH(REALVAL(CUR_INS->a[0].f)); }
-static void h_push_null(void)  { PUSH(NULVCL); STATE->last_ok = 1; }
+static void  h_push_lit_i(void)  { PUSH(INTVAL(CUR_INS->a[0].i)); }
+static void  h_push_lit_f(void)  { PUSH(REALVAL(CUR_INS->a[0].f)); }
+static void  h_push_null (void)  { PUSH(NULVCL); STATE->last_ok = 1; }
 /*--------------------------------------------------------------------------------------------------------------------*/
 static void h_push_var(void)
 {
@@ -517,16 +517,16 @@ static void h_pat_rtab(void)
     PUSH(pat_rtab(arg.v == DT_I ? arg.i : 0));
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
-static void h_pat_arb(void)     { PUSH(pat_arb()); }
-static void h_pat_arbno(void)   { DESCR_t _inner = POP(); PUSH(pat_arbno(_inner)); }
-static void h_pat_rem(void)     { PUSH(pat_rem()); }
-static void h_pat_fail(void)    { PUSH(pat_fail()); }
-static void h_pat_succeed(void) { PUSH(pat_succeed()); }
-static void h_pat_eps(void)     { PUSH(pat_epsilon()); }
-static void h_pat_fence(void)   { PUSH(pat_fence()); }
-static void h_pat_fence1(void)  { DESCR_t _ch = POP(); PUSH(pat_fence_p(_ch)); }
-static void h_pat_abort(void)   { PUSH(pat_abort()); }
-static void h_pat_bal(void)     { PUSH(pat_bal()); }
+static void  h_pat_arb    (void)  { PUSH(pat_arb()); }
+static void  h_pat_arbno  (void)  { DESCR_t _inner = POP(); PUSH(pat_arbno(_inner)); }
+static void  h_pat_rem    (void)  { PUSH(pat_rem()); }
+static void  h_pat_fail   (void)  { PUSH(pat_fail()); }
+static void  h_pat_succeed(void)  { PUSH(pat_succeed()); }
+static void  h_pat_eps    (void)  { PUSH(pat_epsilon()); }
+static void  h_pat_fence  (void)  { PUSH(pat_fence()); }
+static void  h_pat_fence1 (void)  { DESCR_t _ch = POP(); PUSH(pat_fence_p(_ch)); }
+static void  h_pat_abort  (void)  { PUSH(pat_abort()); }
+static void  h_pat_bal    (void)  { PUSH(pat_bal()); }
 /*--------------------------------------------------------------------------------------------------------------------*/
 static void h_pat_cat(void)
 {
@@ -883,8 +883,8 @@ static void h_call(void)
     STATE->last_ok = (result.v != DT_FAIL);
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
-static void h_incr(void) { DESCR_t v = POP(); PUSH(INTVAL(v.i + CUR_INS->a[0].i)); }
-static void h_decr(void) { DESCR_t v = POP(); PUSH(INTVAL(v.i - CUR_INS->a[0].i)); }
+static void  h_incr(void)  { DESCR_t v = POP(); PUSH(INTVAL(v.i + CUR_INS->a[0].i)); }
+static void  h_decr(void)  { DESCR_t v = POP(); PUSH(INTVAL(v.i - CUR_INS->a[0].i)); }
 /*--------------------------------------------------------------------------------------------------------------------*/
 /* CHUNKS-step14: SM_SUSPEND / SM_RESUME codegen stubs. */
 static void h_suspend(void) {

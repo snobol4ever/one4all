@@ -36,15 +36,15 @@ typedef struct { int site; bb_label_t *label; bb_patch_kind_t kind; } bb_patch_t
 #define EMIT_PATCH_MAX    BB_PATCH_MAX
 #define emit_label_ok(l)  bb_label_defined(l)
 typedef int emitter_t;
-extern bb_emit_mode_t  bb_emit_mode;
-extern FILE           *bb_emit_out;
-extern int             g_bb_emit_format;
-extern int             g_in_text_macro_body;
-extern bb_buf_t   bb_emit_buf;
-extern int        bb_emit_pos;
-extern int        bb_emit_size;
-extern bb_patch_t bb_patch_list[BB_PATCH_MAX];
-extern int        bb_patch_count;
+extern bb_emit_mode_t    bb_emit_mode          ;
+extern FILE            * bb_emit_out           ;
+extern int               g_bb_emit_format      ;
+extern int               g_in_text_macro_body  ;
+extern bb_buf_t          bb_emit_buf           ;
+extern int               bb_emit_pos           ;
+extern int               bb_emit_size          ;
+extern bb_patch_t        bb_patch_list         [BB_PATCH_MAX];
+extern int               bb_patch_count        ;
 void bb_emit_begin(bb_buf_t buf, int size);
 int  bb_emit_end(void);
 void bb_emit_patch_rel8 (bb_label_t *lbl);

@@ -14,8 +14,8 @@ void    emitter_init_macro_def  (FILE *out);
 FILE *  emitter_text_out        (void);
 int     emitter_pos             (void);
 int     emitter_end             (void);
-extern int g_is_text;
-extern int g_emit_text_mode;
+extern int    g_is_text         ;
+extern int    g_emit_text_mode  ;
 #define TEXT_MODE_INVOCATION  0
 #define TEXT_MODE_DEFINITION  1
 void emit_banner                (const char *text);

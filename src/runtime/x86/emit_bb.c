@@ -11,29 +11,29 @@
 #include <stdarg.h>
 extern const char * Σ;
 extern int          Σlen;
-extern DESCR_t  bb_deferred_var_exported    (void *zeta, int entry);
-extern DESCR_t  coro_bb_alternate           (void *zeta, int entry);    extern icn_alternate_state_t       * icon_alt_new(void);
-extern DESCR_t  coro_bb_bang_binary         (void *zeta, int entry);    extern icn_bang_binary_state_t     * icon_bang_new(void);
-extern DESCR_t  coro_bb_every               (void *zeta, int entry);    extern icn_every_state_t           * icon_every_new(void);
-extern DESCR_t  coro_bb_iterate             (void *zeta, int entry);    extern icn_iterate_state_t         * icon_iterate_new(void);
-extern DESCR_t  coro_bb_list_iterate        (void *zeta, int entry);    extern icn_list_iterate_state_t    * icon_list_iterate_new(void);
-extern DESCR_t  coro_bb_tbl_iterate         (void *zeta, int entry);    extern icn_tbl_iterate_state_t     * icon_tbl_iterate_new(void);
-extern DESCR_t  coro_bb_record_iterate      (void *zeta, int entry);    extern icn_record_iterate_state_t  * icon_record_iterate_new(void);
-extern DESCR_t  coro_bb_cat                 (void *zeta, int entry);    extern icn_cat_gen_state_t         * icon_lconcat_new(void);
-extern DESCR_t  coro_bb_limit               (void *zeta, int entry);    extern icn_limit_state_t           * icon_limit_new(void);
-extern DESCR_t  coro_bb_seq_expr            (void *zeta, int entry);    extern icn_seq_state_t             * icon_seq_new(void);
-extern DESCR_t  coro_bb_to                  (void *zeta, int entry);    extern icn_to_state_t              * icon_to_new(void);
-extern DESCR_t  coro_bb_to_by               (void *zeta, int entry);    extern icn_to_by_state_t           * icon_to_by_new(void);
-extern atp_t  * bb_atp_new                  (const char *varname);
-extern bal_t  * bb_bal_new                  (void);
-extern brkx_t * bb_breakx_new               (const char *chars);
-extern cap_t  * bb_cap_new_call             (bb_box_fn child_fn, void *child_state, const char *fnc_name, DESCR_t *fnc_args, int fnc_nargs, char **fnc_arg_names, int fnc_n_arg_names, int immediate);
-extern void   * bb_dvar_bin_new             (const char *name);
-extern arb_t  * bb_arb_new                  (void);
-extern len_t  * bb_len_new                  (int n);
-extern tab_t  * bb_tab_new                  (int n);
-extern rtab_t * bb_rtab_new                 (int n);
-extern rem_t  * bb_rem_new                  (void);
+extern DESCR_t    bb_deferred_var_exported  (void *zeta, int entry);
+extern DESCR_t    coro_bb_alternate         (void *zeta, int entry);    extern icn_alternate_state_t       * icon_alt_new(void);
+extern DESCR_t    coro_bb_bang_binary       (void *zeta, int entry);    extern icn_bang_binary_state_t     * icon_bang_new(void);
+extern DESCR_t    coro_bb_every             (void *zeta, int entry);    extern icn_every_state_t           * icon_every_new(void);
+extern DESCR_t    coro_bb_iterate           (void *zeta, int entry);    extern icn_iterate_state_t         * icon_iterate_new(void);
+extern DESCR_t    coro_bb_list_iterate      (void *zeta, int entry);    extern icn_list_iterate_state_t    * icon_list_iterate_new(void);
+extern DESCR_t    coro_bb_tbl_iterate       (void *zeta, int entry);    extern icn_tbl_iterate_state_t     * icon_tbl_iterate_new(void);
+extern DESCR_t    coro_bb_record_iterate    (void *zeta, int entry);    extern icn_record_iterate_state_t  * icon_record_iterate_new(void);
+extern DESCR_t    coro_bb_cat               (void *zeta, int entry);    extern icn_cat_gen_state_t         * icon_lconcat_new(void);
+extern DESCR_t    coro_bb_limit             (void *zeta, int entry);    extern icn_limit_state_t           * icon_limit_new(void);
+extern DESCR_t    coro_bb_seq_expr          (void *zeta, int entry);    extern icn_seq_state_t             * icon_seq_new(void);
+extern DESCR_t    coro_bb_to                (void *zeta, int entry);    extern icn_to_state_t              * icon_to_new(void);
+extern DESCR_t    coro_bb_to_by             (void *zeta, int entry);    extern icn_to_by_state_t           * icon_to_by_new(void);
+extern atp_t    * bb_atp_new                (const char *varname);
+extern bal_t    * bb_bal_new                (void);
+extern brkx_t   * bb_breakx_new             (const char *chars);
+extern cap_t    * bb_cap_new_call           (bb_box_fn child_fn, void *child_state, const char *fnc_name, DESCR_t *fnc_args, int fnc_nargs, char **fnc_arg_names, int fnc_n_arg_names, int immediate);
+extern void     * bb_dvar_bin_new           (const char *name);
+extern arb_t    * bb_arb_new                (void);
+extern len_t    * bb_len_new                (int n);
+extern tab_t    * bb_tab_new                (int n);
+extern rtab_t   * bb_rtab_new               (int n);
+extern rem_t    * bb_rem_new                (void);
 #define TEMPLATE_ADDR_SIGMA   ((uint64_t)(uintptr_t)&Σ)
 #define TEMPLATE_ADDR_SIGLEN  ((uint64_t)(uintptr_t)&Σlen)
 static void emit_bb_jmp_pair(const char *banner, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_beta, int beta_first)
@@ -52,30 +52,30 @@ static void emit_bb_stateful(const char *banner, const char *arg, void *zeta, co
     emit_seq_port_call((uint64_t)(uintptr_t)zeta, fn_name, fn_fallback, 1, lbl_succ, lbl_fail);
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
-void emit_bb_xabrt          (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_jmp_pair("ABORT",  s, f, b, 0); }
-void emit_bb_xcat           (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_jmp_pair("CAT",    s, f, b, 1); }
-void emit_bb_xfail          (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_jmp_pair("FAIL",   s, f, b, 0); }
-void emit_bb_xor            (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_jmp_pair("ALT",    s, f, b, 1); }
-void emit_bb_xvar           (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_jmp_pair("VAR",    s, f, b, 1); }
-void emit_bb_xeps           (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_box_banner("EPS",""); emit_jmp(s, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
-void emit_bb_xsucf          (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_box_banner("SUCCEED",""); emit_jmp(s, JMP_JMP); emit_label_define(b); emit_jmp(s, JMP_JMP); }
-void emit_bb_xbal           (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("BAL",  "", bb_bal_new(),         "rt_bb_bal",  (uint64_t)(uintptr_t)rt_bb_bal,  s,f,b); }
-void emit_bb_xfarb          (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ARB",  "", bb_arb_new(),         "rt_bb_arb",  (uint64_t)(uintptr_t)rt_bb_arb,  s,f,b); }
-void emit_bb_xstar          (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("REM",  "", bb_rem_new(),         "rt_bb_rem",  (uint64_t)(uintptr_t)rt_bb_rem,  s,f,b); }
-void emit_bb_xlnth          (long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("LEN",  "", bb_len_new((int)n),  "rt_bb_len",  (uint64_t)(uintptr_t)rt_bb_len,  s,f,b); }
-void emit_bb_xrtb           (long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("RTAB", "", bb_rtab_new((int)n), "rt_bb_rtab", (uint64_t)(uintptr_t)rt_bb_rtab, s,f,b); }
-void emit_bb_xtb            (long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("TAB",  "", bb_tab_new((int)n),  "rt_bb_tab",  (uint64_t)(uintptr_t)rt_bb_tab,  s,f,b); }
-void emit_bb_icon_alt       (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_ALT",     "", icon_alt_new(),     "coro_bb_alternate",   (uint64_t)(uintptr_t)coro_bb_alternate,   s,f,b); }
-void emit_bb_icon_bang      (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_BANG",    "", icon_bang_new(),    "coro_bb_bang_binary", (uint64_t)(uintptr_t)coro_bb_bang_binary, s,f,b); }
-void emit_bb_icon_every     (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_EVERY",   "", icon_every_new(),   "coro_bb_every",       (uint64_t)(uintptr_t)coro_bb_every,       s,f,b); }
-void emit_bb_icon_iterate   (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_ITERATE", "", icon_iterate_new(), "coro_bb_iterate",     (uint64_t)(uintptr_t)coro_bb_iterate,     s,f,b); }
-void emit_bb_icon_lconcat   (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_LCONCAT", "", icon_lconcat_new(), "coro_bb_cat",         (uint64_t)(uintptr_t)coro_bb_cat,         s,f,b); }
-void emit_bb_icon_limit     (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_LIMIT",   "", icon_limit_new(),   "coro_bb_limit",       (uint64_t)(uintptr_t)coro_bb_limit,       s,f,b); }
-void emit_bb_icon_seq       (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_SEQ",     "", icon_seq_new(),     "coro_bb_seq_expr",    (uint64_t)(uintptr_t)coro_bb_seq_expr,    s,f,b); }
-void emit_bb_icon_to        (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_TO",      "", icon_to_new(),      "coro_bb_to",          (uint64_t)(uintptr_t)coro_bb_to,          s,f,b); }
-void emit_bb_icon_to_by     (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_TO_BY",   "", icon_to_by_new(),   "coro_bb_to_by",       (uint64_t)(uintptr_t)coro_bb_to_by,       s,f,b); }
-void emit_bb_xarbn          (bb_box_fn child_fn, bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ARBNO", "", rt_bb_arbno_new(child_fn, NULL), "rt_bb_arbno", (uint64_t)(uintptr_t)rt_bb_arbno, s,f,b); }
-void emit_bb_xbrkx(const char *chars, bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("BREAKX", chars ? chars : "", bb_breakx_new(chars), "rt_bb_breakx", (uint64_t)(uintptr_t)rt_bb_breakx, s,f,b); }
+void  emit_bb_xabrt       (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_jmp_pair("ABORT",  s, f, b, 0); }
+void  emit_bb_xcat        (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_jmp_pair("CAT",    s, f, b, 1); }
+void  emit_bb_xfail       (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_jmp_pair("FAIL",   s, f, b, 0); }
+void  emit_bb_xor         (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_jmp_pair("ALT",    s, f, b, 1); }
+void  emit_bb_xvar        (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_jmp_pair("VAR",    s, f, b, 1); }
+void  emit_bb_xeps        (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_box_banner("EPS",""); emit_jmp(s, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void  emit_bb_xsucf       (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_box_banner("SUCCEED",""); emit_jmp(s, JMP_JMP); emit_label_define(b); emit_jmp(s, JMP_JMP); }
+void  emit_bb_xbal        (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_stateful("BAL",  "", bb_bal_new(),         "rt_bb_bal",  (uint64_t)(uintptr_t)rt_bb_bal,  s,f,b); }
+void  emit_bb_xfarb       (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_stateful("ARB",  "", bb_arb_new(),         "rt_bb_arb",  (uint64_t)(uintptr_t)rt_bb_arb,  s,f,b); }
+void  emit_bb_xstar       (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_stateful("REM",  "", bb_rem_new(),         "rt_bb_rem",  (uint64_t)(uintptr_t)rt_bb_rem,  s,f,b); }
+void  emit_bb_xlnth       (long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b)         { emit_bb_stateful("LEN",  "", bb_len_new((int)n),  "rt_bb_len",  (uint64_t)(uintptr_t)rt_bb_len,  s,f,b); }
+void  emit_bb_xrtb        (long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b)         { emit_bb_stateful("RTAB", "", bb_rtab_new((int)n), "rt_bb_rtab", (uint64_t)(uintptr_t)rt_bb_rtab, s,f,b); }
+void  emit_bb_xtb         (long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b)         { emit_bb_stateful("TAB",  "", bb_tab_new((int)n),  "rt_bb_tab",  (uint64_t)(uintptr_t)rt_bb_tab,  s,f,b); }
+void  emit_bb_icon_alt    (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_stateful("ICN_ALT",     "", icon_alt_new(),     "coro_bb_alternate",   (uint64_t)(uintptr_t)coro_bb_alternate,   s,f,b); }
+void  emit_bb_icon_bang   (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_stateful("ICN_BANG",    "", icon_bang_new(),    "coro_bb_bang_binary", (uint64_t)(uintptr_t)coro_bb_bang_binary, s,f,b); }
+void  emit_bb_icon_every  (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_stateful("ICN_EVERY",   "", icon_every_new(),   "coro_bb_every",       (uint64_t)(uintptr_t)coro_bb_every,       s,f,b); }
+void  emit_bb_icon_iterate(bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_stateful("ICN_ITERATE", "", icon_iterate_new(), "coro_bb_iterate",     (uint64_t)(uintptr_t)coro_bb_iterate,     s,f,b); }
+void  emit_bb_icon_lconcat(bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_stateful("ICN_LCONCAT", "", icon_lconcat_new(), "coro_bb_cat",         (uint64_t)(uintptr_t)coro_bb_cat,         s,f,b); }
+void  emit_bb_icon_limit  (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_stateful("ICN_LIMIT",   "", icon_limit_new(),   "coro_bb_limit",       (uint64_t)(uintptr_t)coro_bb_limit,       s,f,b); }
+void  emit_bb_icon_seq    (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_stateful("ICN_SEQ",     "", icon_seq_new(),     "coro_bb_seq_expr",    (uint64_t)(uintptr_t)coro_bb_seq_expr,    s,f,b); }
+void  emit_bb_icon_to     (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_stateful("ICN_TO",      "", icon_to_new(),      "coro_bb_to",          (uint64_t)(uintptr_t)coro_bb_to,          s,f,b); }
+void  emit_bb_icon_to_by  (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_stateful("ICN_TO_BY",   "", icon_to_by_new(),   "coro_bb_to_by",       (uint64_t)(uintptr_t)coro_bb_to_by,       s,f,b); }
+void  emit_bb_xarbn       (bb_box_fn child_fn, bb_label_t *s, bb_label_t *f, bb_label_t *b)  { emit_bb_stateful("ARBNO", "", rt_bb_arbno_new(child_fn, NULL), "rt_bb_arbno", (uint64_t)(uintptr_t)rt_bb_arbno, s,f,b); }
+void  emit_bb_xbrkx       (const char *chars, bb_label_t *s, bb_label_t *f, bb_label_t *b)   { emit_bb_stateful("BREAKX", chars ? chars : "", bb_breakx_new(chars), "rt_bb_breakx", (uint64_t)(uintptr_t)rt_bb_breakx, s,f,b); }
 /*--------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xcallcap(bb_box_fn child_fn, const char *fnc_name, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
     emit_bb_stateful("CALLCAP", fnc_name ? fnc_name : "", bb_cap_new_call(child_fn, NULL, fnc_name, NULL, 0, NULL, 0, 0), "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, s,f,b);
@@ -179,9 +179,9 @@ void emit_bb_charset(bb_box_fn c_fn, const char *c_fn_name, const char *kind_nam
     cs_t *z = calloc(1, sizeof(cs_t)); z->chars = chars;
     const char *rt_name; uint64_t rt_fn;
     if      (c_fn_name && strcmp(c_fn_name,"bb_span")   == 0) { rt_name="rt_bb_span";   rt_fn=(uint64_t)(uintptr_t)rt_bb_span;   }
-    else if (c_fn_name && strcmp(c_fn_name,"bb_brk")    == 0) { rt_name="rt_bb_brk";    rt_fn=(uint64_t)(uintptr_t)rt_bb_brk;    }
-    else if (c_fn_name && strcmp(c_fn_name,"bb_any")    == 0) { rt_name="rt_bb_any";    rt_fn=(uint64_t)(uintptr_t)rt_bb_any;    }
-    else if (c_fn_name && strcmp(c_fn_name,"bb_notany") == 0) { rt_name="rt_bb_notany"; rt_fn=(uint64_t)(uintptr_t)rt_bb_notany; }
+    else  if(c_fn_name && strcmp(c_fn_name,"bb_brk")    == 0)  { rt_name="rt_bb_brk";    rt_fn=(uint64_t)(uintptr_t)rt_bb_brk;    }
+    else  if(c_fn_name && strcmp(c_fn_name,"bb_any")    == 0)  { rt_name="rt_bb_any";    rt_fn=(uint64_t)(uintptr_t)rt_bb_any;    }
+    else  if(c_fn_name && strcmp(c_fn_name,"bb_notany") == 0)  { rt_name="rt_bb_notany"; rt_fn=(uint64_t)(uintptr_t)rt_bb_notany; }
     else                                                       { rt_name="rt_bb_span";   rt_fn=(uint64_t)(uintptr_t)rt_bb_span;   }
     emit_bb_stateful(kind_name ? kind_name : "CHARSET", chars ? chars : "", z, rt_name, rt_fn, s,f,b);
 }
@@ -192,16 +192,16 @@ void emit_bb_charset(bb_box_fn c_fn, const char *c_fn_name, const char *kind_nam
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdarg.h>
-extern len_t   *bb_len_new(int n);
-extern tab_t   *bb_tab_new(int n);
-extern rtab_t  *bb_rtab_new(int n);
-extern fence_t *bb_fence_new(void);
-extern arb_t   *bb_arb_new(void);
-extern void    *bb_arbno_new(bb_box_fn fn, void *state);
-extern brkx_t  *bb_breakx_new(const char *chars);
-extern rem_t   *bb_rem_new(void);
-extern atp_t   *bb_atp_new(const char *varname);
-extern cap_t   *bb_cap_new(bb_box_fn child_fn, void *child_state,
+extern len_t    * bb_len_new     (int n);
+extern tab_t    * bb_tab_new     (int n);
+extern rtab_t   * bb_rtab_new    (int n);
+extern fence_t  * bb_fence_new   (void);
+extern arb_t    * bb_arb_new     (void);
+extern void     * bb_arbno_new   (bb_box_fn fn, void *state);
+extern brkx_t   * bb_breakx_new  (const char *chars);
+extern rem_t    * bb_rem_new     (void);
+extern atp_t    * bb_atp_new     (const char *varname);
+extern cap_t    * bb_cap_new     (bb_box_fn child_fn, void *child_state,
                             const char *varname, DESCR_t *var_ptr, int immediate);
 extern void    *bb_dvar_bin_new(const char *name);
 #define FLAT_BUF_MAX  (16 * 1024)
