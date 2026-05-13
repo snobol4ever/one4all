@@ -77,7 +77,7 @@ RT_PIC_SRCS := \
     $(RT)/x86/bb_pool.c \
     $(RT)/x86/bb_emit.c \
     $(RT)/x86/emitter.c \
-    $(RT)/x86/emitter_macro_def.c \
+    $(RT)/x86/emitter_defs.c \
     $(RT)/x86/bb_flat.c \
     $(RT)/x86/emitter_bb.c \
     $(RT)/x86/emitter_sm.c \
@@ -250,7 +250,7 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/bb_pool.c                    -o $(OBJ)/bb_pool.o
 	$(CC) $(CRT)   -c $(RT)/x86/bb_emit.c                    -o $(OBJ)/bb_emit.o
 	$(CC) $(CRT)   -c $(RT)/x86/emitter.c                    -o $(OBJ)/emitter.o
-	$(CC) $(CRT)   -c $(RT)/x86/emitter_macro_def.c          -o $(OBJ)/emitter_macro_def.o
+	$(CC) $(CRT)   -c $(RT)/x86/emitter_defs.c          -o $(OBJ)/emitter_defs.o
 	$(CC) $(CRT)   -c $(RT)/x86/bb_flat.c                    -o $(OBJ)/bb_flat.o
 	$(CC) $(CRT) -c $(RT)/x86/bb_boxes.c -o $(OBJ)/bb_boxes.o
 	$(CC) $(CRT) -c $(RT)/x86/bb_broker.c -o $(OBJ)/bb_broker.o

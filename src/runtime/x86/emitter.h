@@ -349,7 +349,7 @@ emitter_t *emitter_text_new_mode(FILE *out, emitter_text_mode_t mode);
 
 /* EM-MODE4-IS-MODE3-DUMP-b: macro-definition backend.  Thin wrapper that
  * constructs a text emitter in DEFINITION mode, suitable for regenerating
- * sm_macros.s from per-opcode templates.  See emitter_macro_def.c. */
+ * sm_macros.s from per-opcode templates.  See emitter_defs.c. */
 emitter_t *emitter_macro_def_new(FILE *out);
 
 /* EM-MODE4-IS-MODE3-DUMP-b: NULL-safe optional-method invoker.
