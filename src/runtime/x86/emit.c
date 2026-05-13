@@ -1,4 +1,5 @@
 #include "emit.h"
+#include "emit_buf.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>

@@ -3,6 +3,7 @@
 #define EMITTER_BB_GEN_H
 
 #include "emit_defs.h"
+#include "emit_buf.h"
 #include "bb_pool.h"
 #include <stdio.h>
 #include <stdint.h>
@@ -79,26 +80,8 @@ void emit_push_rbp_frame(void);
 
 void emit_pop_rbp_frame_ret(void);
 
-extern bb_buf_t  bb_emit_buf;
-extern int       bb_emit_pos;
-extern int       bb_emit_size;
-
-void bb_emit_begin(bb_buf_t buf, int size);
-
-int  bb_emit_end(void);
-
-extern bb_patch_t bb_patch_list[BB_PATCH_MAX];
-extern int        bb_patch_count;
-
 void bb_emit_patch_rel8 (bb_label_t *lbl);
 void bb_emit_patch_rel32(bb_label_t *lbl);
-
-void bb_emit_byte(uint8_t b);
-void bb_emit_u16 (uint16_t v);
-void bb_emit_u32 (uint32_t v);
-void bb_emit_u64 (uint64_t v);
-void bb_emit_i8  (int8_t   v);
-void bb_emit_i32 (int32_t  v);
 
 void bb_insn_mov_eax_imm32(uint32_t imm);
 void bb_insn_mov_rax_imm64(uint64_t imm);
