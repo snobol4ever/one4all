@@ -2,18 +2,11 @@
 #ifndef EMITTER_BB_GEN_H
 #define EMITTER_BB_GEN_H
 
+#include "emit_defs.h"
 #include "bb_pool.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <stddef.h>
-
-typedef enum {
-    EMIT_TEXT             = 0,
-    EMIT_BINARY_WIRED     = 1,
-    EMIT_BINARY_BROKERED  = 2,
-    EMIT_MACRO_DEF        = 3,
-    EMIT_TEXT_INLINE      = 4
-} bb_emit_mode_t;
 
 extern bb_emit_mode_t bb_emit_mode;
 
@@ -32,30 +25,11 @@ void emit_pad_to_blob_size(void);
 void emit_macro_begin(const char *name, const char *const *params, int nparams);
 void emit_macro_end(void);
 
-#define BB_LABEL_NAME_MAX  80
-#define BB_LABEL_UNRESOLVED (-1)
-
-typedef struct {
-    char name[BB_LABEL_NAME_MAX];
-    int  offset;
-} bb_label_t;
-
 void bb_label_init(bb_label_t *lbl, const char *name);
 
 void bb_label_initf(bb_label_t *lbl, const char *fmt, ...);
 
 void bb_label_define(bb_label_t *lbl);
-
-#define bb_label_defined(lbl)  ((lbl)->offset != BB_LABEL_UNRESOLVED)
-
-typedef enum {
-    JMP_JMP = 0,
-    JMP_JE,
-    JMP_JNE,
-    JMP_JL,
-    JMP_JGE,
-    JMP_JG,
-} jmp_kind_t;
 
 void emit_jmp(bb_label_t *target, jmp_kind_t kind);
 
@@ -112,19 +86,6 @@ extern int       bb_emit_size;
 void bb_emit_begin(bb_buf_t buf, int size);
 
 int  bb_emit_end(void);
-
-#define BB_PATCH_MAX  512
-
-typedef enum {
-    PATCH_REL8,
-    PATCH_REL32
-} bb_patch_kind_t;
-
-typedef struct {
-    int              site;
-    bb_label_t      *label;
-    bb_patch_kind_t  kind;
-} bb_patch_t;
 
 extern bb_patch_t bb_patch_list[BB_PATCH_MAX];
 extern int        bb_patch_count;
