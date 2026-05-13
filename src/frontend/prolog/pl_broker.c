@@ -25,7 +25,7 @@
  * Internal γ sentinel — NULVCL (non-fail DESCR_t); U-5: bb_box_fn now returns DESCR_t.
  * ω is FAILDESCR.  spec_t is no longer used by Prolog boxes.
  *--------------------------------------------------------------------------------------------------------------------*/
-static inline DESCR_t pl_gamma(void) { return NULVCL; }
+static inline DESCR_t pl_gamma(void) { return descr_bool(1); }  /* EXVAL-2: descr_bool is canonical */
 
 /*======================================================================================================================
  * S-BB-2 — Leaf boxes

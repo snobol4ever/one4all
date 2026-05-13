@@ -43,14 +43,24 @@
  * empty (σ == NULL) signals failure (ω port fired).
  * This matches test_sno_*.c exactly.
  */
-/* descr_match — construct a DT_S match DESCR_t from (σ, δ).
- * EST-2: direct replacement for spec(σ,δ)+descr_from_spec() in rt.c / bb_boxes.c. */
-static inline DESCR_t descr_match(const char *σ, int δ) {
+/* descr_match / descr_match_span — construct a DT_S match DESCR_t from (σ, δ).
+ * descr_match_span is the canonical cross-language name (EXVAL-2); descr_match
+ * is kept as an alias for existing call sites in rt.c / bb_boxes.c. */
+static inline DESCR_t descr_match_span(const char *σ, int δ) {
     DESCR_t d; d.v = DT_S; d.slen = (uint32_t)δ; d.s = (char *)σ; return d;
 }
+static inline DESCR_t descr_match(const char *σ, int δ) { return descr_match_span(σ, δ); }
 /* descr_match_cat — concatenate two contiguous match descriptors. */
 static inline DESCR_t descr_match_cat(DESCR_t x, DESCR_t y) {
     DESCR_t d; d.v = DT_S; d.slen = x.slen + y.slen; d.s = x.s; return d;
+}
+/* descr_bool — construct a Prolog/Icon success/failure DESCR_t.
+ * ok=1 → NULVCL (DT_SNUL, canonical γ sentinel); ok=0 → FAILDESCR.
+ * Prolog boxes returning NULVCL on success already satisfy this convention;
+ * descr_bool(1) == NULVCL and descr_bool(0) == FAILDESCR. */
+static inline DESCR_t descr_bool(int ok) {
+    if (ok) { DESCR_t d; d.v = DT_SNUL; d.slen = 0; d.s = (char *)""; return d; }
+    return FAILDESCR;
 }
 
 /* ── entry ports ────────────────────────────────────────────────────────── */
