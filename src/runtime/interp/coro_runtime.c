@@ -2321,11 +2321,15 @@ DESCR_t coro_bb_cset_compl(void *zeta, int entry) {
  * Outer scan context (scan_subj/scan_pos before entry) is saved on each call and
  * restored before every return — callers always see clean globals.
  *
+ * JCON semantics: each subject contributes exactly ONE body α tick.  External β
+ * always advances to the next subject — never resumes the body generator.
+ * (JCON JVM: scan_bfail → icn_77_β advances subject; body β is never fired externally.)
+ *
  * For each subject value:
  *   - Install subject string, pos=1 as current scan context.
  *   - Build body_gen via coro_eval(body); fire α → first result.
- *   - On β: re-install (body_subj, body_pos), pump β, capture updated pos, restore outer.
- *   - When body exhausted, move to next subject (β-tick subj_gen).
+ *   - On external β: set body_live=0, fall through to next subject advance.
+ *   - When subject generator exhausted, return FAIL.
  *--------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t coro_bb_scan_gen(void *zeta, int entry) {
     icn_scan_gen_state_t *z = (icn_scan_gen_state_t *)zeta;
@@ -2333,18 +2337,13 @@ DESCR_t coro_bb_scan_gen(void *zeta, int entry) {
     const char *outer_subj = scan_subj;
     int          outer_pos  = scan_pos;
 
-    /* β path: resume current body generator. */
+    /* β path: JCON semantics — each subject contributes exactly ONE body α tick.
+     * On external β we must advance to the NEXT subject, never resume the body.
+     * (JCON JVM: icn_76_scan_bfail → icn_77_β = advances subject on body exhaustion.)
+     * Do NOT call body_gen.fn(β) here — just mark body done and fall through. */
     if (entry != α && z->body_live) {
-        /* Re-install body's scan context (body_pos advanced by prior tick). */
-        scan_subj = z->body_subj;
-        scan_pos  = z->body_pos;
-        DESCR_t r2 = z->body_gen.fn(z->body_gen.ζ, β);
-        /* Capture whatever pos the body advanced to. */
-        z->body_pos = scan_pos;
-        scan_subj = outer_subj; scan_pos = outer_pos;
-        if (!IS_FAIL_fn(r2)) return r2;
-        /* Body exhausted for this subject — fall through to next subject. */
         z->body_live = 0;
+        /* fall through to subject advance */
     }
 
     /* Advance to next subject. */
