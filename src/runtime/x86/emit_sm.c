@@ -1,9 +1,4 @@
-/* emit_sm.c — SM opcode templates + text codegen walker (RW-CONSOLIDATE).
- *
- * Absorbs: emit_sm.c (opcode templates + shape renderers) +
- *          emit_walk.c (text SM codegen walker).
- * Both source files are now deleted.
- */
+
 #include "emit_sm.h"
 #include "emit_templates.h"
 #include "emit_form.h"
@@ -14,22 +9,11 @@
 #include <stdlib.h>
 #include <stdarg.h>
 
-/*====================================================================*/
-/* emit_sm.c (opcode templates + shape renderers) content            */
-/*====================================================================*/
-/* emit_sm.c — RW-4: SM opcode templates + shape renderers.
- *
- * Merges emit_sm_op.c + emit_sm_shape.c into one file.
- * All public signatures unchanged — callers (emit_sm_text.c) unmodified.
- * Old emit_sm_op.c and emit_sm_shape.c deleted at this step.
- */
-
 #include "emit_templates.h"
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_sm_nullary_rt(const char *macro_name, const char *rt_fn)
 {
     emit_macro_begin(macro_name, NULL, 0);
@@ -92,7 +76,6 @@ static const sm_nullary_entry_t g_sm_nullary[] = {
     { -1, NULL, NULL }
 };
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_op(int op)
 {
     for (const sm_nullary_entry_t *e = g_sm_nullary; e->op >= 0; e++)
@@ -151,7 +134,6 @@ static const struct { int op; const char *mn; } g_sm_arith[] = {
     { SM_DIV,"DIV_NUM" },{ SM_MOD,"MOD_NUM" },{ -1,NULL }
 };
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_arith_dispatch(int op)
 {
     for (int i = 0; g_sm_arith[i].op >= 0; i++)
@@ -159,7 +141,6 @@ void emit_sm_arith_dispatch(int op)
     emit_sm_unhandled_op(op);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_arith_op(int op_enum, const char *macro_name)
 {
     emit_macro_begin(macro_name ? macro_name : "ARITH", NULL, 0);
@@ -174,7 +155,6 @@ void emit_sm_mul() { emit_sm_arith_dispatch(SM_MUL); }
 void emit_sm_div() { emit_sm_arith_dispatch(SM_DIV); }
 void emit_sm_mod() { emit_sm_arith_dispatch(SM_MOD); }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_sm_int_arg(const char *mn, const char *rt_fn,
                               const char *param_name, int val)
 {
@@ -189,7 +169,6 @@ void emit_sm_acomp(int op)       { emit_sm_int_arg("ACOMP",    "rt_acomp",      
 void emit_sm_lcomp(int op)       { emit_sm_int_arg("LCOMP",    "rt_lcomp",       "op", op); }
 void emit_sm_unhandled_op(int op){ emit_sm_int_arg("UNHANDLED","rt_unhandled_op","op", op); }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_incr(int64_t n)
 {
     const char *const params[] = { "n" };
@@ -199,7 +178,6 @@ void emit_sm_incr(int64_t n)
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_decr(int64_t n)
 {
     const char *const params[] = { "n" };
@@ -209,15 +187,12 @@ void emit_sm_decr(int64_t n)
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_halt()
 { emit_seq_inc_r13(20); emit_ret(); emit_pad_to_blob_size(); }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_return()
 { emit_macro_begin("RETURN",NULL,0); emit_ret(); emit_macro_end(); emit_pad_to_blob_size(); }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_return_variant(int kind, int cond, int pc)
 {
     static const char *const params[] = { "kind","cond","pc" };
@@ -240,16 +215,13 @@ void emit_sm_nreturn_f(int pc) { emit_sm_return_variant(2,2,pc); }
 
 static void make_pc_label(bb_label_t *lbl, int pc) { emit_label_initf(lbl,".L%d",pc); }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_jump(int pc)
 { bb_label_t t; make_pc_label(&t,pc); emit_jmp(&t,JMP_JMP); }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_jump_s(int pc)
 { emit_call_sym_plt("rt_last_ok",0); emit_test_rax_rax();
   bb_label_t t; make_pc_label(&t,pc); emit_jmp(&t,JMP_JNE); }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_jump_f(int pc)
 { emit_call_sym_plt("rt_last_ok",0); emit_test_rax_rax();
   bb_label_t t; make_pc_label(&t,pc); emit_jmp(&t,JMP_JE); }
@@ -257,7 +229,6 @@ void emit_sm_jump_f(int pc)
 void emit_sm_label()                                      { emit_seq_noop_macro("LABEL"); }
 void emit_sm_stno(int stno, int lineno, const char *src) { emit_text_stno_banner(stno,lineno,src); emit_seq_noop_macro("STNO"); }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_push_lit_i(int64_t val)
 {
     static const char *const p[] = {"val"};
@@ -267,7 +238,6 @@ void emit_sm_push_lit_i(int64_t val)
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_push_lit_f(double val)
 {
     uint64_t bits; __builtin_memcpy(&bits,&val,8);
@@ -279,7 +249,6 @@ void emit_sm_push_lit_f(double val)
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_push_lit_s(const char *str_lbl, uint64_t str_ptr, int len)
 {
     static const char *const p[] = {"lbl","n"};
@@ -290,7 +259,6 @@ void emit_sm_push_lit_s(const char *str_lbl, uint64_t str_ptr, int len)
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_push_expr(uint64_t ptr_val)
 {
     static const char *const p[] = {"ptr"};
@@ -300,7 +268,6 @@ void emit_sm_push_expr(uint64_t ptr_val)
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_push_expression(uint64_t entry_ptr, int arity)
 {
     static const char *const p[] = {"entry","arity"};
@@ -310,7 +277,6 @@ void emit_sm_push_expression(uint64_t entry_ptr, int arity)
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_call_expression(const char *tgt_sym)
 {
     static const char *const p[] = {"tgt"};
@@ -319,7 +285,6 @@ void emit_sm_call_expression(const char *tgt_sym)
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_exec_stmt(const char *subj_lbl, uint64_t subj_ptr, int has_repl)
 {
     static const char *const p[] = {"has_repl","subj_lbl"};
@@ -329,7 +294,6 @@ void emit_sm_exec_stmt(const char *subj_lbl, uint64_t subj_ptr, int has_repl)
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_call_fn(const char *name_lbl, uint64_t name_ptr, int nargs)
 {
     (void)name_lbl; (void)name_ptr; (void)nargs;
@@ -340,7 +304,6 @@ void emit_sm_call_fn(const char *name_lbl, uint64_t name_ptr, int nargs)
     emit_macro_end(); emit_pad_to_blob_size();
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_push_var(const char *lbl, uint64_t ptr)
 {
     static const char *const p[] = {"lbl"};
@@ -348,7 +311,6 @@ void emit_sm_push_var(const char *lbl, uint64_t ptr)
     emit_call_sym_plt("rt_nv_get",0); emit_macro_end(); emit_pad_to_blob_size();
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_store_var(const char *lbl, uint64_t ptr)
 {
     static const char *const p[] = {"lbl"};
@@ -356,7 +318,6 @@ void emit_sm_store_var(const char *lbl, uint64_t ptr)
     emit_call_sym_plt("rt_nv_set",0); emit_macro_end(); emit_pad_to_blob_size();
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_sm_pat_str(const char *mn, const char *rt_fn,
                              const char *lbl, uint64_t ptr)
 {
@@ -369,7 +330,6 @@ void emit_sm_pat_lit     (const char *l, uint64_t p) { emit_sm_pat_str("PAT_LIT"
 void emit_sm_pat_refname (const char *l, uint64_t p) { emit_sm_pat_str("PAT_REFNAME",  "rt_pat_refname",  l,p); }
 void emit_sm_pat_usercall(const char *l, uint64_t p) { emit_sm_pat_str("PAT_USERCALL", "rt_pat_usercall", l,p); }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_pat_capture(const char *name_lbl, uint64_t name_ptr, int kind)
 {
     static const char *const p[] = {"lbl","n"};
@@ -378,7 +338,6 @@ void emit_sm_pat_capture(const char *name_lbl, uint64_t name_ptr, int kind)
     emit_call_sym_plt("rt_pat_capture",0); emit_macro_end(); emit_pad_to_blob_size();
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_pat_usercall_args(const char *name_lbl, uint64_t name_ptr, int nargs)
 {
     static const char *const p[] = {"lbl","n"};
@@ -387,7 +346,6 @@ void emit_sm_pat_usercall_args(const char *name_lbl, uint64_t name_ptr, int narg
     emit_call_sym_plt("rt_pat_usercall_args",0); emit_macro_end(); emit_pad_to_blob_size();
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_pat_capture_fn(const char *fname_lbl, uint64_t fname_ptr,
                              int is_imm, const char *namelist_lbl, uint64_t namelist_ptr)
 {
@@ -398,7 +356,6 @@ void emit_sm_pat_capture_fn(const char *fname_lbl, uint64_t fname_ptr,
     emit_call_sym_plt("rt_pat_capture_fn",0); emit_macro_end(); emit_pad_to_blob_size();
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_pat_capture_fn_args(const char *fname_lbl, uint64_t fname_ptr,
                                   int is_imm, int nargs)
 {
@@ -409,7 +366,6 @@ void emit_sm_pat_capture_fn_args(const char *fname_lbl, uint64_t fname_ptr,
     emit_call_sym_plt("rt_pat_capture_fn_args",0); emit_macro_end(); emit_pad_to_blob_size();
 }
 
-
 #include <assert.h>
 #include <inttypes.h>
 #include <stdio.h>
@@ -418,7 +374,6 @@ void emit_sm_pat_capture_fn_args(const char *fname_lbl, uint64_t fname_ptr,
 
 static char g_pending_pc_label[32] = "";
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_set_pc_label(const char *lbl)
 {
     if (lbl && *lbl) {
@@ -443,8 +398,6 @@ const char *emit_sm_consume_pc_label(void)
     return buf;
 }
 
-
-/* SM template types (were in emit_sm_shape.h, now internal to emit_sm.c) */
 typedef enum {
     SM_TPL_RTCALL=0, SM_TPL_INT64, SM_TPL_LBL, SM_TPL_LBLOPT,
     SM_TPL_LBL_INT32, SM_TPL_LBLOPT_INT32, SM_TPL_LBLOPT3,
@@ -580,12 +533,8 @@ const sm_op_template_t *sm_template_lookup(int op)
 const sm_op_template_t *sm_template_unhandled(void)  { return &g_tpl_unhandled; }
 const sm_op_template_t *sm_template_ret_var(void)    { return &g_tpl_ret_var; }
 
-/* --------------------------------------------------------------------- */
-
 static int macro_line(FILE *out, const char *label, const char *opcode, const char *col3);
 
-/* Helper: format the .ifnb/.else/.endif block for an optional label arg. */
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_optional_lbl(FILE *out, const char *macro_arg,
                              const char *register_load_dst)
 {
@@ -603,7 +552,6 @@ static int emit_optional_lbl(FILE *out, const char *macro_arg,
     return 0;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int macro_line(FILE *out, const char *label, const char *opcode, const char *col3)
 {
     const char *lbl = (label  && *label)  ? label  : "";
@@ -618,7 +566,6 @@ static int macro_line(FILE *out, const char *label, const char *opcode, const ch
     return (fputs(line, out) < 0 || fputc('\n', out) == EOF) ? -1 : 0;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int render_macro_body(FILE *out, const sm_op_template_t *t)
 {
     char macro_def[64];
@@ -795,7 +742,6 @@ static const char *anno_or_empty(const char *anno)
     return (anno && *anno) ? anno : NULL;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int write_anno(FILE *out, const char *anno)
 {
     const char *a = anno_or_empty(anno);
@@ -804,7 +750,6 @@ static int write_anno(FILE *out, const char *anno)
     return fprintf(out, "  # %s\n", a) < 0 ? -1 : 0;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int build_args_col(char *buf, int cap, const sm_op_template_t *t,
                           const emit_sm_args_t *args)
 {
@@ -898,7 +843,6 @@ static int build_args_col(char *buf, int cap, const sm_op_template_t *t,
     return (n < 0 || n >= cap) ? -1 : 0;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int render_call_line(FILE *out, const sm_op_template_t *t,
                             const emit_sm_args_t *args)
 {
@@ -940,8 +884,6 @@ static int render_call_line(FILE *out, const sm_op_template_t *t,
     return 0;
 }
 
-/* emit_sm_macro_library: */
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_macro_library(FILE *out)
 {
     const char *seen[256] = { 0 };
@@ -986,7 +928,6 @@ int emit_sm_macro_library(FILE *out)
     return 0;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_macro_library_to_path(const char *path)
 {
     if (!path || !*path) return -1;
@@ -1001,8 +942,6 @@ int emit_sm_macro_library_to_path(const char *path)
     return rc;
 }
 
-/* Per-instruction generic dispatch (rarely called directly; convenience */
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_template(FILE *out, const sm_op_template_t *t,
                      const emit_sm_args_t *args)
 {
@@ -1010,7 +949,6 @@ int emit_sm_template(FILE *out, const sm_op_template_t *t,
     return render_call_line(out, t, args);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_rtcall(FILE *out, const sm_op_template_t *t, const char *anno)
 {
     emit_sm_args_t a = { 0 };
@@ -1018,7 +956,6 @@ int emit_sm_rtcall(FILE *out, const sm_op_template_t *t, const char *anno)
     return emit_sm_template(out, t, &a);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_noop(FILE *out, const sm_op_template_t *t, const char *anno)
 {
     emit_sm_args_t a = { 0 };
@@ -1026,7 +963,6 @@ int emit_sm_noop(FILE *out, const sm_op_template_t *t, const char *anno)
     return emit_sm_template(out, t, &a);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_int64(FILE *out, const sm_op_template_t *t,
                   int64_t v, const char *anno)
 {
@@ -1036,7 +972,6 @@ int emit_sm_int64(FILE *out, const sm_op_template_t *t,
     return emit_sm_template(out, t, &a);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_lbl(FILE *out, const sm_op_template_t *t,
                 const char *lbl, const char *anno)
 {
@@ -1046,7 +981,6 @@ int emit_sm_lbl(FILE *out, const sm_op_template_t *t,
     return emit_sm_template(out, t, &a);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_lblopt(FILE *out, const sm_op_template_t *t,
                    const char *lbl_or_null, const char *anno)
 {
@@ -1056,7 +990,6 @@ int emit_sm_lblopt(FILE *out, const sm_op_template_t *t,
     return emit_sm_template(out, t, &a);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_lbl_int32(FILE *out, const sm_op_template_t *t,
                       const char *lbl, int n, const char *anno)
 {
@@ -1067,7 +1000,6 @@ int emit_sm_lbl_int32(FILE *out, const sm_op_template_t *t,
     return emit_sm_template(out, t, &a);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_lblopt_int32(FILE *out, const sm_op_template_t *t,
                          const char *lbl_or_null, int n, const char *anno)
 {
@@ -1078,14 +1010,12 @@ int emit_sm_lblopt_int32(FILE *out, const sm_op_template_t *t,
     return emit_sm_template(out, t, &a);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_arith(FILE *out, const sm_op_template_t *t)
 {
     emit_sm_args_t a = { 0 };
     return emit_sm_template(out, t, &a);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_pcref_jmp(FILE *out, const sm_op_template_t *t,
                       int target_pc, const char *anno)
 {
@@ -1095,7 +1025,6 @@ int emit_sm_pcref_jmp(FILE *out, const sm_op_template_t *t,
     return emit_sm_template(out, t, &a);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_pcref_cond(FILE *out, const sm_op_template_t *t,
                        int target_pc, int taken_when_ok,
                        const char *anno)
@@ -1107,7 +1036,6 @@ int emit_sm_pcref_cond(FILE *out, const sm_op_template_t *t,
     return emit_sm_template(out, t, &a);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int edp4_emit_push_expression(FILE *out, const sm_op_template_t *t,
                        int64_t entry_pc, int arity)
 {
@@ -1117,7 +1045,6 @@ int edp4_emit_push_expression(FILE *out, const sm_op_template_t *t,
     return emit_sm_template(out, t, &a);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int edp4_emit_call_expression(FILE *out, const sm_op_template_t *t, int target_pc)
 {
     emit_sm_args_t a = { 0 };
@@ -1125,13 +1052,11 @@ int edp4_emit_call_expression(FILE *out, const sm_op_template_t *t, int target_p
     return emit_sm_template(out, t, &a);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_ret(FILE *out, const sm_op_template_t *t, const char *anno)
 {
     return emit_sm_rtcall(out, t, anno);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_ret_var(FILE *out, int kind, int cond, int pc, const char *anno)
 {
     emit_sm_args_t a = { 0 };
@@ -1142,7 +1067,6 @@ int emit_sm_ret_var(FILE *out, int kind, int cond, int pc, const char *anno)
     return emit_sm_template(out, sm_template_ret_var(), &a);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_unhandled(FILE *out, int op)
 {
     emit_sm_args_t a = { 0 };
@@ -1150,7 +1074,6 @@ int emit_sm_unhandled(FILE *out, int op)
     return emit_sm_template(out, sm_template_unhandled(), &a);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_exec_var(FILE *out, const sm_op_template_t *t,
                      const char *subj_lbl_or_null, int has_repl)
 {
@@ -1160,7 +1083,6 @@ int emit_sm_exec_var(FILE *out, const sm_op_template_t *t,
     return emit_sm_template(out, t, &a);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_capture_fn(FILE *out, const sm_op_template_t *t,
                        const char *fname_lbl_or_null,
                        int is_imm,
@@ -1175,7 +1097,6 @@ int emit_sm_capture_fn(FILE *out, const sm_op_template_t *t,
     return emit_sm_template(out, t, &a);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_capture_fn_args(FILE *out, const sm_op_template_t *t,
                             const char *fname_lbl_or_null,
                             int is_imm, int nargs,
@@ -1189,7 +1110,6 @@ int emit_sm_capture_fn_args(FILE *out, const sm_op_template_t *t,
     return emit_sm_template(out, t, &a);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_template_selftest(FILE *out)
 {
     int failures = 0;
@@ -1223,9 +1143,6 @@ int emit_sm_template_selftest(FILE *out)
     return failures ? -1 : 0;
 }
 
-/*====================================================================*/
-/* emit_walk.c (text SM codegen walker) content                      */
-/*====================================================================*/
 #include "sm_image.h"
 #include "bb_broker.h"
 #include <stdio.h>
@@ -1234,7 +1151,6 @@ int emit_sm_template_selftest(FILE *out)
 #include <stdint.h>
 
 #include <assert.h>
-
 
 void emit_sm_op(int op);
 void emit_sm_halt(void);
@@ -1309,8 +1225,6 @@ typedef struct {
     const char *path;
 } SrcLines;
 
-/* Slurp src_path into sl.  Returns 0 on success, -1 on error. */
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int srclines_load(SrcLines *sl, const char *src_path)
 {
     memset(sl, 0, sizeof(*sl));
@@ -1350,7 +1264,6 @@ static int srclines_load(SrcLines *sl, const char *src_path)
     return 0;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void srclines_free(SrcLines *sl)
 {
     free(sl->lines);
@@ -1364,7 +1277,6 @@ static const char *srclines_get(const SrcLines *sl, int lineno)
     return sl->lines[lineno];
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void srcline_strip_cr(char *s)
 {
     if (!s) return;
@@ -1382,14 +1294,11 @@ typedef struct {
 static StrEntry g_strtab[STRTAB_CAP];
 static int      g_strtab_n = 0;
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void strtab_reset(void)
 {
     g_strtab_n = 0;
 }
 
-/* Intern a string; return its label index (0-based). */
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int strtab_intern(const char *s)
 {
     if (!s) s = "";
@@ -1407,8 +1316,6 @@ static int strtab_intern(const char *s)
     return idx;
 }
 
-/* Look up a string; return its label index or -1 if not interned. */
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int strtab_lookup(const char *s)
 {
     if (!s) s = "";
@@ -1418,7 +1325,6 @@ static int strtab_lookup(const char *s)
     return -1;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void strtab_label(char *buf, size_t bufsz, const char *s)
 {
     if (!s) s = "";
@@ -1438,7 +1344,6 @@ static const char *codegen_intern_str(const char *s)
     return g_intern_str_buf;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void strtab_escape(char *out, size_t outsz, const char *s)
 {
     size_t j = 0;
@@ -1459,7 +1364,6 @@ static void strtab_escape(char *out, size_t outsz, const char *s)
     if (j < outsz) out[j] = '\0';
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void strtab_collect(const SM_Program *prog)
 {
     strtab_reset();
@@ -1495,11 +1399,9 @@ static void strtab_collect(const SM_Program *prog)
     }
 }
 
-
 static uint8_t *g_pc_used_as_target = NULL;
 static int      g_pc_used_count     = 0;
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int pc_used_alloc(const SM_Program *prog)
 {
     if (g_pc_used_as_target) {
@@ -1521,7 +1423,6 @@ static inline void pc_used_mark(int pc)
         g_pc_used_as_target[pc] = 1;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int pc_is_used_as_target(int pc)
 {
     if (!g_pc_used_as_target) return 1;
@@ -1529,7 +1430,6 @@ static int pc_is_used_as_target(int pc)
     return g_pc_used_as_target[pc] ? 1 : 0;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void release_pc_used_as_target(void)
 {
     if (g_pc_used_as_target) {
@@ -1565,7 +1465,6 @@ static int emit_three_column_line(FILE *out,
     return 0;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int strtab_emit_rodata(FILE *out)
 {
     if (g_strtab_n == 0) return 0;
@@ -1581,8 +1480,6 @@ static int strtab_emit_rodata(FILE *out)
     return 0;
 }
 
-/* EM-7d-usercall-reentrant: emit .datan expression registry table. */
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_expression_registry(FILE *out, const SM_Program *prog)
 {
     int n = 0;
@@ -1623,7 +1520,6 @@ static int         g_cap_fixups_n = 0;
 
 static void cap_fixups_reset(void) { g_cap_fixups_n = 0; }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void cap_fixup_add(void *cap_ptr, const char *child_label)
 {
     if (g_cap_fixups_n >= MAX_CAP_FIXUPS) return;
@@ -1633,7 +1529,6 @@ static void cap_fixup_add(void *cap_ptr, const char *child_label)
     g_cap_fixups_n++;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_file_header(FILE *out, int count, int has_expression_registry)
 {
     if (emit_three_column_line(out, "", ".intel_syntax", "noprefix", NULL) != 0) return -1;
@@ -1691,7 +1586,6 @@ static int emit_file_header(FILE *out, int count, int has_expression_registry)
     return 0;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_file_footer(FILE *out)
 {
     bb3c_flush_pending();
@@ -1703,7 +1597,6 @@ static int emit_file_footer(FILE *out)
     return 0;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int sm_line(FILE *out, const char *label, const char *action,
                    const char *goto_col)
 {
@@ -1739,7 +1632,6 @@ static int sm_line(FILE *out, const char *label, const char *action,
     return 0;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_major_break(FILE *out, int stno, int lineno,
                             const char *src_text)
 {
@@ -1761,7 +1653,6 @@ static int emit_major_break(FILE *out, int stno, int lineno,
     return 0;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_minor_break(FILE *out, const char *caption)
 {
     bb3c_flush_pending();
@@ -1776,7 +1667,7 @@ static int emit_sm_minor_break(FILE *out, const char *caption)
 }
 
 #define STR_PREVIEW_MAX  40
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
+
 static void render_str_preview(char *dst, size_t cap,
                                const char *s, int slen)
 {
@@ -1802,20 +1693,17 @@ static void render_str_preview(char *dst, size_t cap,
     dst[o] = '\0';
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_pc_label(FILE *out, int pc)
 {
     return fprintf(out, ".L%d:\n", pc) < 0 ? -1 : 0;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_halt_line(FILE *out, int pc)
 {
     (void)pc;
     return emit_sm_rtcall(out, sm_template_lookup(SM_HALT), NULL);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_push_lit_i_line(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -1824,7 +1712,7 @@ static int emit_push_lit_i_line(FILE *out, const SM_Instr *ins, int pc)
 }
 
 __attribute__((unused))
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
+
 static int emit_sm_push_lit_i_legacy(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -1832,7 +1720,6 @@ static int emit_sm_push_lit_i_legacy(FILE *out, const SM_Instr *ins, int pc)
                          ins->a[0].i, NULL);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_push_lit_s_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -1846,7 +1733,6 @@ static int emit_sm_push_lit_s_dispatch(FILE *out, const SM_Instr *ins, int pc)
                              lbl, (int)slen, anno);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_push_var_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -1857,7 +1743,6 @@ static int emit_sm_push_var_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return emit_sm_lbl(out, sm_template_lookup(SM_PUSH_VAR), lbl, anno);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_store_var_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -1868,7 +1753,6 @@ static int emit_sm_store_var_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return emit_sm_lbl(out, sm_template_lookup(SM_STORE_VAR), lbl, anno);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_pop(FILE *out, int pc)
 {
     (void)pc;
@@ -1878,14 +1762,13 @@ static int emit_sm_pop(FILE *out, int pc)
 }
 
 __attribute__((unused))
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
+
 static int emit_sm_pop_legacy(FILE *out, int pc)
 {
     (void)pc;
     return emit_sm_rtcall(out, sm_template_lookup(SM_VOID_POP), NULL);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int edp4_sm_arith(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -1896,7 +1779,6 @@ static int edp4_sm_arith(FILE *out, const SM_Instr *ins, int pc)
     return 0;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_label_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)ins; (void)pc;
@@ -1905,7 +1787,6 @@ static int emit_sm_label_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return 0;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_jump_line(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -1914,7 +1795,6 @@ static int emit_sm_jump_line(FILE *out, const SM_Instr *ins, int pc)
     return 0;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_jump_cond(FILE *out, const SM_Instr *ins, int pc,
                              int take_when_ok)
 {
@@ -1926,21 +1806,16 @@ static int emit_sm_jump_cond(FILE *out, const SM_Instr *ins, int pc,
     return 0;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_jump_s_line(FILE *out, const SM_Instr *ins, int pc)
 {
     return emit_sm_jump_cond(out, ins, pc, 1);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_jump_f_line(FILE *out, const SM_Instr *ins, int pc)
 {
     return emit_sm_jump_cond(out, ins, pc, 0);
 }
 
-/* ----------------------------------------------------------------------- */
-
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_push_expression_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -1948,7 +1823,6 @@ static int emit_sm_push_expression_dispatch(FILE *out, const SM_Instr *ins, int 
                               ins->a[0].i, (int)ins->a[1].i);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_call_expression_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -1956,16 +1830,12 @@ static int emit_sm_call_expression_dispatch(FILE *out, const SM_Instr *ins, int 
                               (int)ins->a[0].i);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_return_dispatch(FILE *out, int pc)
 {
     (void)pc;
     return emit_sm_ret(out, sm_template_lookup(SM_RETURN), NULL);
 }
 
-/* ----------------------------------------------------------------------- */
-
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_stno_dispatch(FILE *out, const SM_Instr *ins, int pc,
                         const SrcLines *sl)
 {
@@ -1996,9 +1866,6 @@ static int emit_sm_stno_dispatch(FILE *out, const SM_Instr *ins, int pc,
     return 0;
 }
 
-/* ----------------------------------------------------------------------- */
-
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_concat_dispatch(FILE *out, int pc)
 {
     (void)pc;
@@ -2007,7 +1874,6 @@ static int emit_sm_concat_dispatch(FILE *out, int pc)
     return 0;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_push_null_dispatch(FILE *out, int pc)
 {
     (void)pc;
@@ -2016,7 +1882,6 @@ static int emit_sm_push_null_dispatch(FILE *out, int pc)
     return 0;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_coerce_num_dispatch(FILE *out, int pc)
 {
     (void)pc;
@@ -2025,7 +1890,6 @@ static int emit_sm_coerce_num_dispatch(FILE *out, int pc)
     return 0;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_push_null_noflip_dispatch(FILE *out, int pc)
 {
     (void)pc;
@@ -2034,7 +1898,6 @@ static int emit_sm_push_null_noflip_dispatch(FILE *out, int pc)
     return 0;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_push_lit_f_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -2043,7 +1906,6 @@ static int emit_sm_push_lit_f_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return 0;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_push_expr_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -2052,7 +1914,6 @@ static int emit_sm_push_expr_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return 0;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_incr_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -2061,7 +1922,6 @@ static int emit_sm_incr_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return 0;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_decr_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -2070,7 +1930,6 @@ static int emit_sm_decr_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return 0;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_acomp_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -2079,7 +1938,6 @@ static int emit_sm_acomp_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return 0;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_lcomp_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -2088,8 +1946,6 @@ static int emit_sm_lcomp_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return 0;
 }
 
-/* SM_CALL_FN: general function call.  All dispatch (pseudo-calls, builtins, */
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_call_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -2103,7 +1959,7 @@ static int emit_sm_call_dispatch(FILE *out, const SM_Instr *ins, int pc)
 }
 
 __attribute__((unused))
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
+
 static int emit_sm_call_legacy(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -2116,7 +1972,6 @@ static int emit_sm_call_legacy(FILE *out, const SM_Instr *ins, int pc)
                              lbl, nargs, anno);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_return_variant_dispatch(FILE *out, sm_opcode_t op, int pc)
 {
     int kind = 0;
@@ -2128,7 +1983,6 @@ static int emit_sm_return_variant_dispatch(FILE *out, sm_opcode_t op, int pc)
     return emit_sm_ret_var(out, kind, cond, pc, sm_opcode_name(op));
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void edp4_label_then(FILE *out, void (*fn)(emitter_t *))
 {
     const char *lbl = emit_sm_consume_pc_label();
@@ -2137,12 +1991,15 @@ static void edp4_label_then(FILE *out, void (*fn)(emitter_t *))
     fn(NULL);
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_define_entry_dispatch(FILE *out, const SM_Instr *ins, int pc, const SM_Program *prog) {
     (void)ins;
     const char *name = (pc > 0 && prog->instrs[pc-1].a[0].s) ? prog->instrs[pc-1].a[0].s : "";
     char anno[80]; snprintf(anno, sizeof(anno), "# %s", name);
     return emit_sm_noop(out, sm_template_lookup(SM_DEFINE_ENTRY), anno);
 }
+
+/*--------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_define_dispatch(FILE *out, const SM_Instr *ins, int pc) {
     (void)pc;
     const char *name = ins->a[0].s ? ins->a[0].s : "";
@@ -2172,7 +2029,6 @@ static int emit_sm_pat_cat_dispatch(FILE *out, int pc)      { (void)pc; edp4_lab
 static int emit_sm_pat_alt_dispatch(FILE *out, int pc)      { (void)pc; edp4_label_then(out, emit_sm_pat_alt);      return 0; }
 static int emit_sm_pat_deref_dispatch(FILE *out, int pc)    { (void)pc; edp4_label_then(out, emit_sm_pat_deref);    return 0; }
 
-
 #define PHASE2_SIM_DEPTH  128
 
 typedef struct {
@@ -2188,7 +2044,6 @@ typedef struct {
 
 static void simstack_init(SimStack *ss) { ss->top = 0; }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void simstack_push(SimStack *ss, SimVal v)
 {
     if (ss->top < PHASE2_SIM_DEPTH) ss->slots[ss->top++] = v;
@@ -2201,7 +2056,6 @@ static SimVal simstack_pop(SimStack *ss)
     return v;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void simstack_push_const_s(SimStack *ss, const char *s)
 {
     SimVal v;
@@ -2213,7 +2067,6 @@ static void simstack_push_const_s(SimStack *ss, const char *s)
     simstack_push(ss, v);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void simstack_push_const_i(SimStack *ss, int64_t n)
 {
     SimVal v;
@@ -2225,7 +2078,6 @@ static void simstack_push_const_i(SimStack *ss, int64_t n)
     simstack_push(ss, v);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void simstack_push_variant_val(SimStack *ss)
 {
     SimVal v;
@@ -2244,14 +2096,12 @@ static SimVal make_pat_val(DESCR_t d, int is_variant)
     return v;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_flat_eligible(const PATND_t *p)
 {
     if (!p) return 1;
     return p->kind != XVAR;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_flat_invariant(const PATND_t *p)
 {
     if (!p) return 1;
@@ -2268,8 +2118,6 @@ static PATND_t *patnd_of(DESCR_t d)
     return (PATND_t *)d.s;
 }
 
-/* Walk SM instructions [phase2_start, phase2_end) and simulate Phase-2 */
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t emit_walk_phase2(const SM_Program *prog,
                             int phase2_start, int phase2_end,
                             int *out_variant)
@@ -2462,7 +2310,6 @@ DESCR_t emit_walk_phase2(const SM_Program *prog,
     return ss.slots[ss.top - 1].val;
 }
 
-
 #define MAX_PATTERN_WINDOWS 4096
 
 typedef struct {
@@ -2478,7 +2325,6 @@ static pattern_window_t g_pat_windows[MAX_PATTERN_WINDOWS];
 static int              g_pat_windows_n   = 0;
 static int              g_pat_windows_id  = 0;
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void pattern_windows_reset(void)
 {
     g_pat_windows_n  = 0;
@@ -2486,7 +2332,6 @@ static void pattern_windows_reset(void)
     cap_fixups_reset();
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int pattern_window_at_pc(int pc)
 {
     for (int i = 0; i < g_pat_windows_n; i++) {
@@ -2497,7 +2342,6 @@ static int pattern_window_at_pc(int pc)
     return -1;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int pattern_window_for_exec_stmt(int pc)
 {
     for (int i = 0; i < g_pat_windows_n; i++) {
@@ -2507,7 +2351,6 @@ static int pattern_window_for_exec_stmt(int pc)
     return -1;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static void pattern_windows_collect(const SM_Program *prog)
 {
     pattern_windows_reset();
@@ -2553,7 +2396,6 @@ static void pattern_windows_collect(const SM_Program *prog)
     }
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_pattern_blobs(FILE *out)
 {
     int n_invariant = 0;
@@ -2580,8 +2422,6 @@ static int emit_pattern_blobs(FILE *out)
     return 0;
 }
 
-/* SM_EXEC_STMT for a registered invariant pattern: emit the runtime call. */
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_exec_stmt_blob(FILE *out, const SM_Instr *ins, int pc, int win_idx)
 {
     pattern_window_t *w = &g_pat_windows[win_idx];
@@ -2619,8 +2459,6 @@ static int emit_sm_exec_stmt_blob(FILE *out, const SM_Instr *ins, int pc, int wi
     return 0;
 }
 
-/* Emit a real three-column line for an SM op that was absorbed into an */
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_pat_baked(FILE *out, const SM_Instr *ins, int pc, int win_idx)
 {
     pattern_window_t *w = &g_pat_windows[win_idx];
@@ -2649,8 +2487,6 @@ static int emit_sm_pat_baked(FILE *out, const SM_Instr *ins, int pc, int win_idx
     return 0;
 }
 
-/* ----------------------------------------------------------------------- */
-
 static const char *pat_arg_label(char *lbl_buf, size_t lbl_buf_n,
                                  const char *arg)
 {
@@ -2659,7 +2495,6 @@ static const char *pat_arg_label(char *lbl_buf, size_t lbl_buf_n,
     return lbl_buf;
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_pat_lit_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -2673,7 +2508,6 @@ static int emit_sm_pat_lit_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return emit_sm_lblopt(out, sm_template_lookup(SM_PAT_LIT), l, NULL);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_pat_refname_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -2687,7 +2521,6 @@ static int emit_sm_pat_refname_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return emit_sm_lblopt(out, sm_template_lookup(SM_PAT_REFNAME), l, NULL);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_pat_capture_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -2703,7 +2536,6 @@ static int emit_sm_pat_capture_dispatch(FILE *out, const SM_Instr *ins, int pc)
                                 l, kind, anno);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_pat_capture_fn_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -2719,7 +2551,6 @@ static int emit_sm_pat_capture_fn_dispatch(FILE *out, const SM_Instr *ins, int p
                               fl, is_imm, nl, anno);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_pat_capture_fn_args_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -2734,7 +2565,6 @@ static int emit_sm_pat_capture_fn_args_dispatch(FILE *out, const SM_Instr *ins, 
                                    fl, is_imm, nargs, anno);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_pat_usercall_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -2748,7 +2578,6 @@ static int emit_sm_pat_usercall_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return emit_sm_lblopt(out, sm_template_lookup(SM_PAT_USERCALL), l, NULL);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_pat_usercall_args_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -2764,8 +2593,6 @@ static int emit_sm_pat_usercall_args_dispatch(FILE *out, const SM_Instr *ins, in
                                 l, nargs, NULL);
 }
 
-/* SM_PAT_<no-arg>: dispatch via template lookup.  Each NULLARY-shape */
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_pat_noarg(FILE *out, sm_opcode_t op, int pc)
 {
     (void)pc;
@@ -2774,7 +2601,6 @@ static int emit_sm_pat_noarg(FILE *out, sm_opcode_t op, int pc)
     return emit_sm_rtcall(out, t, NULL);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_exec_stmt_variant(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -2795,7 +2621,6 @@ static int emit_sm_exec_stmt_variant(FILE *out, const SM_Instr *ins, int pc)
     return emit_sm_template(out, sm_template_lookup(SM_EXEC_STMT), &a);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 static int edp4_sm_unhandled(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -2807,7 +2632,6 @@ static int edp4_sm_unhandled(FILE *out, const SM_Instr *ins, int pc)
     return emit_sm_template(out, sm_template_unhandled(), &a);
 }
 
-/*----------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_walk_codegen(SM_Program *prog, FILE *out, const char *src_path)
 {
     assert(prog != NULL);

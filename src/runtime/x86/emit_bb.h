@@ -1,8 +1,3 @@
-/* emit_bb.h — BB box templates + flat-glob builder (RW-CONSOLIDATE).
- *
- * Absorbs: emit_flat.h (flat-glob builder public API).
- * emit_bb.c absorbs: emit_flat.c.
- */
 
 #ifndef EMIT_BB_H
 #define EMIT_BB_H
@@ -12,15 +7,6 @@
 #include "snobol4.h"
 #include "bb_box.h"
 #include <stdio.h>
-
-/*======================================================================*/
-/* BB box templates — declared in emit_templates.h (include that file)  */
-/* emit_bb.c implements those functions; no redeclaration here.         */
-/*======================================================================*/
-
-/*======================================================================*/
-/* Flat-glob builder (was emit_flat.h)                                  */
-/*======================================================================*/
 
 bb_box_fn bb_build_flat      (PATND_t *p);
 bb_box_fn bb_build_brokered  (PATND_t *p);
@@ -57,7 +43,6 @@ typedef void (*bb_nullary_text_fn)(bb_label_t *, bb_label_t *, bb_label_t *, voi
 void emit_flat_box_call_fn(bb_box_fn fn, const char *fn_name, void *z,
                            bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_beta);
 
-/* Backward-compat aliases */
 #define bb_build_flat_text(p,out,pfx)   emit_flat_build(p,out,pfx)
 #define bb_flat_set_intern_str(fn)       emit_flat_set_intern_str(fn)
 #define bb_build_flat_text_reset()       emit_flat_reset()
@@ -78,7 +63,6 @@ void emit_flat_box_call_fn(bb_box_fn fn, const char *fn_name, void *z,
 #define flat_box_dispatch_jne_jmp(s,f)   emit_flat_dispatch_jne_jmp(s,f)
 #define flat_box_entry_dispatch(a,b)     emit_flat_entry_dispatch(a,b)
 
-/* emit_bb_flat.h / emit_bb_gen.h shim compat */
 #define bb_build_flat_text_reset()       emit_flat_reset()
 
-#endif /* EMIT_BB_H */
+#endif 

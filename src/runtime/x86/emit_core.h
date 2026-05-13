@@ -1,11 +1,3 @@
-/* emit_core.h — consolidated emitter core (RW-CONSOLIDATE).
- *
- * Absorbs: emit_defs.h, emit_buf.h, emit_mode.h, emit_label_new.h,
- *          insn.h, emit_text.h, emit_seq.h
- * (All those headers are now deleted; include this file instead.)
- *
- * Compat aliases for old names still compile without changes.
- */
 
 #ifndef EMIT_CORE_H
 #define EMIT_CORE_H
@@ -18,10 +10,6 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdarg.h>
-
-/*======================================================================*/
-/* Types (was emit_defs.h)                                              */
-/*======================================================================*/
 
 typedef enum {
     EMIT_TEXT             = 0,
@@ -47,7 +35,6 @@ typedef enum { JMP_JMP=0, JMP_JE, JMP_JNE, JMP_JL, JMP_JGE, JMP_JG } jmp_kind_t;
 typedef enum { PATCH_REL8, PATCH_REL32 } bb_patch_kind_t;
 typedef struct { int site; bb_label_t *label; bb_patch_kind_t kind; } bb_patch_t;
 
-/* New-name aliases (ARCH-EMITTER) */
 #define EMIT_BINARY       EMIT_BINARY_WIRED
 #define EMIT_UNRESOLVED   BB_LABEL_UNRESOLVED
 #define EMIT_LABEL_MAX    BB_LABEL_NAME_MAX
@@ -56,24 +43,16 @@ typedef struct { int site; bb_label_t *label; bb_patch_kind_t kind; } bb_patch_t
 
 typedef int emitter_t;
 
-/*======================================================================*/
-/* Raw buffer globals + primitives (was emit_buf.h / emit_mode.c)       */
-/*======================================================================*/
-
 extern bb_emit_mode_t  bb_emit_mode;
 extern FILE           *bb_emit_out;
 extern int             g_bb_emit_format;
 extern int             g_in_text_macro_body;
-
-/* old-name aliases */
 
 extern bb_buf_t   bb_emit_buf;
 extern int        bb_emit_pos;
 extern int        bb_emit_size;
 extern bb_patch_t bb_patch_list[BB_PATCH_MAX];
 extern int        bb_patch_count;
-
-/* old-name aliases */
 
 void bb_emit_begin(bb_buf_t buf, int size);
 int  bb_emit_end(void);
@@ -85,12 +64,6 @@ void bb_emit_u32 (uint32_t v);
 void bb_emit_u64 (uint64_t v);
 void bb_emit_i8  (int8_t   v);
 void bb_emit_i32 (int32_t  v);
-
-/* new-name aliases */
-
-/*======================================================================*/
-/* Mode lifecycle (was emit_mode.h)                                     */
-/*======================================================================*/
 
 void  emit_mode_set(bb_emit_mode_t m, FILE *out);
 FILE *emit_outf(void);
@@ -105,26 +78,12 @@ void  bb3c_jmp(const char *mn, const char *target);
 void  emit_jmp         (bb_label_t *target, jmp_kind_t kind);
 void  emit_label_define(bb_label_t *lbl);
 
-/* new-name aliases */
-
-/*======================================================================*/
-/* Label init (was emit_label_new.h)                                    */
-/*======================================================================*/
-
 void emit_label_init (bb_label_t *lbl, const char *name);
 void emit_label_initf(bb_label_t *lbl, const char *fmt, ...);
 
-/* old-name compat: bb_label_init/initf/define are aliases for the emit_ names.
- * Declared as separate forward declarations (not macros) to avoid
- * conflicting with the actual function bodies in emit_core.c.
- */
 void bb_label_init  (bb_label_t *lbl, const char *name);
 void bb_label_initf (bb_label_t *lbl, const char *fmt, ...);
-void bb_label_define(bb_label_t *lbl);  /* old-name real function in emit_core.c */
-
-/*======================================================================*/
-/* Mode-test macros (was insn.h)                                        */
-/*======================================================================*/
+void bb_label_define(bb_label_t *lbl);  
 
 #define IS_TEXT     (bb_emit_mode != EMIT_BINARY_WIRED && \
                      bb_emit_mode != EMIT_BINARY_BROKERED)
@@ -132,10 +91,6 @@ void bb_label_define(bb_label_t *lbl);  /* old-name real function in emit_core.c
                      bb_emit_mode == EMIT_BINARY_BROKERED)
 #define IS_WIRED    (bb_emit_mode == EMIT_BINARY_WIRED)
 #define IS_BROKERED (bb_emit_mode == EMIT_BINARY_BROKERED)
-
-/*======================================================================*/
-/* Leaf x86 instruction emitters (was insn.h / insn.c)                  */
-/*======================================================================*/
 
 void insn_mov_eax_i32       (uint32_t v);
 void insn_mov_rax_i64       (uint64_t v);
@@ -196,12 +151,6 @@ void insn_nop               (void);
 void insn_call_rax          (void);
 void insn_call_plt          (const char *sym, uint64_t fn_fallback);
 
-/* old bb_insn_* / emit_* compat aliases */
-
-/*======================================================================*/
-/* TEXT-mode 3-col formatter (was emit_text.h)                          */
-/*======================================================================*/
-
 void emit_text_3col    (FILE *out, const char *label, const char *action, const char *goto_);
 void emit_text_jmp     (FILE *out, const char *mn, const char *target);
 void emit_text_op      (const char *label, const char *action, const char *goto_);
@@ -213,12 +162,6 @@ void emit_text_label   (bb_label_t *lbl);
 void emit_text_comment (const char *fmt, ...);
 void emit_text_box_banner (const char *kind, const char *args);
 void emit_text_stno_banner(int stno, int lineno, const char *src_text);
-
-/* old-name aliases */
-
-/*======================================================================*/
-/* Compound BB sequences (was emit_seq.h)                               */
-/*======================================================================*/
 
 void emit_seq_frame_enter      (void);
 void emit_seq_frame_leave      (void);
@@ -248,11 +191,6 @@ void emit_seq_port_call        (uint64_t zeta_ptr, const char *fn_name,
 void emit_seq_port_call_rip    (uint64_t zeta_ptr, const char *zeta_label,
                                 const char *fn_name, uint64_t fn_fallback,
                                 int port, bb_label_t *lbl_succ, bb_label_t *lbl_fail);
-
-
-/*======================================================================*/
-/* Old-name forward declarations (real functions in emit_core.c)        */
-/*======================================================================*/
 
 void bb_emit_begin(bb_buf_t buf, int size);
 int  bb_emit_end(void);
@@ -314,4 +252,4 @@ void emit_add_delta_imm(int v); void emit_sub_delta_imm(int v);
 void bb_label_init (bb_label_t *lbl, const char *name);
 void bb_label_initf(bb_label_t *lbl, const char *fmt, ...);
 
-#endif /* EMIT_CORE_H */
+#endif 
