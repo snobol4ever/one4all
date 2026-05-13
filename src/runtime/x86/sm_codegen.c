@@ -2038,7 +2038,7 @@ static void emit_halt_blob_via_template(void)
     /* Run the template.  This populates buf[0..bb_emit_pos) with the
      * x86 byte sequence the binary backend renders for SM_HALT.
      * Formatting/comment calls on the emitter no-op for binary. */
-    emit_sm_halt(e);
+    emit_sm_halt();
 
     /* Capture the byte count before freeing the emitter (which leaves
      * bb_emit_pos at its last-write value but is in any case a global

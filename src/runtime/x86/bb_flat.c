@@ -286,7 +286,6 @@ static void data_buf_remember_label(const char *name)
 
 static void data_buf_emit_block_comment(emitter_t *e)
 {
-    (void)e;
     g_flat_data_block_nlbls = 0;
 }
 
@@ -1200,32 +1199,32 @@ static void flat_emit_node(emitter_t *e, PATND_t *p,
                            bb_label_t *lbl_β)
 {
     /* EDP-5: thin dispatcher — every case calls the matching emit_bb_* template. */
-    if (!p) { emit_bb_xeps(e, lbl_succ, lbl_fail, lbl_β); return; }
+    if (!p) { emit_bb_xeps(lbl_succ, lbl_fail, lbl_β); return; }
     switch (p->kind) {
     case XCHR: {
         const char *lit = p->STRVAL_fn ? p->STRVAL_fn : "";
         const char *lit_label = (g_flat_intern_str && e->is_text)
                                 ? g_flat_intern_str(e, lit) : NULL;
-        emit_bb_xchr(e, p, lit_label, lbl_succ, lbl_fail, lbl_β);
+        emit_bb_xchr(p, lit_label, lbl_succ, lbl_fail, lbl_β);
         break;
     }
-    case XEPS:  emit_bb_xeps (e, lbl_succ, lbl_fail, lbl_β); break;
-    case XFAIL: emit_bb_xfail(e, lbl_succ, lbl_fail, lbl_β); break;
-    case XPOSI: emit_bb_xposi(e, (int)p->num, lbl_succ, lbl_fail, lbl_β); break;
-    case XRPSI: emit_bb_xrpsi(e, (int)p->num, lbl_succ, lbl_fail, lbl_β); break;
+    case XEPS:  emit_bb_xeps (lbl_succ, lbl_fail, lbl_β); break;
+    case XFAIL: emit_bb_xfail(lbl_succ, lbl_fail, lbl_β); break;
+    case XPOSI: emit_bb_xposi((int)p->num, lbl_succ, lbl_fail, lbl_β); break;
+    case XRPSI: emit_bb_xrpsi((int)p->num, lbl_succ, lbl_fail, lbl_β); break;
     case XCAT:  flat_emit_xcat(e, p, lbl_succ, lbl_fail, lbl_β); break;
     case XOR:   flat_emit_alt (e, p, lbl_succ, lbl_fail, lbl_β); break;
-    case XSPNC: emit_bb_charset(e, NULL,   "bb_span",   "SPAN",   p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
-    case XANYC: emit_bb_charset(e, NULL,    "bb_any",    "ANY",    p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
-    case XBRKC: emit_bb_charset(e, NULL,    "bb_brk",    "BREAK",  p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
-    case XNNYC: emit_bb_charset(e, NULL, "bb_notany", "NOTANY", p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
-    case XLNTH: emit_bb_xlnth(e, (long long)p->num, lbl_succ, lbl_fail, lbl_β); break;
-    case XTB:   emit_bb_xtb  (e, (long long)p->num, lbl_succ, lbl_fail, lbl_β); break;
-    case XRTB:  emit_bb_xrtb (e, (long long)p->num, lbl_succ, lbl_fail, lbl_β); break;
-    case XFNCE: emit_bb_xfnce(e, lbl_succ, lbl_fail, lbl_β); break;
-    case XFARB: emit_bb_xfarb(e, lbl_succ, lbl_fail, lbl_β); break;
-    case XSTAR: emit_bb_xstar(e, lbl_succ, lbl_fail, lbl_β); break;
-    case XBRKX: emit_bb_xbrkx(e, p->STRVAL_fn ? p->STRVAL_fn : "", lbl_succ, lbl_fail, lbl_β); break;
+    case XSPNC: emit_bb_charset(NULL,   "bb_span",   "SPAN",   p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
+    case XANYC: emit_bb_charset(NULL,    "bb_any",    "ANY",    p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
+    case XBRKC: emit_bb_charset(NULL,    "bb_brk",    "BREAK",  p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
+    case XNNYC: emit_bb_charset(NULL, "bb_notany", "NOTANY", p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
+    case XLNTH: emit_bb_xlnth((long long)p->num, lbl_succ, lbl_fail, lbl_β); break;
+    case XTB:   emit_bb_xtb  ((long long)p->num, lbl_succ, lbl_fail, lbl_β); break;
+    case XRTB:  emit_bb_xrtb ((long long)p->num, lbl_succ, lbl_fail, lbl_β); break;
+    case XFNCE: emit_bb_xfnce(lbl_succ, lbl_fail, lbl_β); break;
+    case XFARB: emit_bb_xfarb(lbl_succ, lbl_fail, lbl_β); break;
+    case XSTAR: emit_bb_xstar(lbl_succ, lbl_fail, lbl_β); break;
+    case XBRKX: emit_bb_xbrkx(p->STRVAL_fn ? p->STRVAL_fn : "", lbl_succ, lbl_fail, lbl_β); break;
     case XATP:  emit_bb_xatp (e, p->STRVAL_fn, lbl_succ, lbl_fail, lbl_β); break;
     case XDSAR: emit_bb_xdsar(e, p->STRVAL_fn, lbl_succ, lbl_fail, lbl_β); break;
     /* XNME/XFNME/XARBN/XCALLCAP: excluded from flat_is_eligible — these cases

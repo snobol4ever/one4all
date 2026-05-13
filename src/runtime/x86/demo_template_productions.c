@@ -32,7 +32,7 @@ int main(void)
         unsigned char buf[16];
         bb_buf_t cap = buf;
         emitter_t *e = emitter_binary_new(cap, sizeof(buf));
-        emit_sm_halt(e);
+        emit_sm_halt();
         int n = emitter_end(e);
         emitter_free(e);
         printf("  bytes (%d total):", n);
@@ -44,7 +44,7 @@ int main(void)
     printf("\n=== emit_sm_halt — TEXT_INVOCATION backend ===\n");
     {
         emitter_t *e = emitter_text_new_mode(stdout, TEXT_MODE_INVOCATION);
-        emit_sm_halt(e);
+        emit_sm_halt();
         emitter_free(e);
     }
 
@@ -52,7 +52,7 @@ int main(void)
     printf("\n=== emit_sm_halt — TEXT_DEFINITION (== MACRO_DEF) backend ===\n");
     {
         emitter_t *e = emitter_macro_def_new(stdout);
-        emit_sm_halt(e);
+        emit_sm_halt();
         emitter_free(e);
     }
 

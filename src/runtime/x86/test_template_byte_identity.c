@@ -46,7 +46,7 @@ int main(void)
         return 1;
     }
 
-    emit_sm_halt(e);
+    emit_sm_halt();
 
     int n = emitter_end(e);
     emitter_free(e);

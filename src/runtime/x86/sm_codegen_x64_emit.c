@@ -834,7 +834,7 @@ static int emit_sm_pop(FILE *out, int pc)
      * as __attribute__((unused)) for rollback reference. */
     emitter_t *e = emitter_text_new(out);
     if (!e) return -1;
-    emit_sm_void_pop(e);
+    emit_sm_void_pop();
     emitter_free(e);
     return 0;
 }
@@ -855,7 +855,7 @@ static int emit_sm_arith(FILE *out, const SM_Instr *ins, int pc)
     if (!t) return -1;
     emitter_t *e = emitter_text_new(out);
     if (!e) return -1;
-    emit_sm_arith_op(e, (int)ins->op, t->macro_name);
+    emit_sm_arith_op((int)ins->op, t->macro_name);
     emitter_free(e);
     return 0;
 }
@@ -877,7 +877,7 @@ static int emit_sm_jump_line(FILE *out, const SM_Instr *ins, int pc)
     /* EM-MODE4-IS-MODE3-DUMP-j: routed through per-opcode template. */
     emitter_t *e = emitter_text_new(out);
     if (!e) return -1;
-    emit_sm_jump(e, (int)ins->a[0].i);
+    emit_sm_jump((int)ins->a[0].i);
     emitter_free(e);
     return 0;
 }
@@ -892,8 +892,8 @@ static int emit_sm_jump_cond(FILE *out, const SM_Instr *ins, int pc,
     int  target = (int)ins->a[0].i;
     emitter_t *e = emitter_text_new(out);
     if (!e) return -1;
-    if (take_when_ok) emit_sm_jump_s(e, target);
-    else              emit_sm_jump_f(e, target);
+    if (take_when_ok) emit_sm_jump_s(target);
+    else              emit_sm_jump_f(target);
     emitter_free(e);
     return 0;
 }
@@ -1016,7 +1016,7 @@ static int emit_sm_stno_dispatch(FILE *out, const SM_Instr *ins, int pc,
         banner_lineno = 0;
 
     emit_mode_set(TEXT_MODE(), out);
-    emit_sm_stno(NULL, stno, banner_lineno, src);
+    emit_sm_stno(stno, banner_lineno, src);
     return 0;
 }
 
@@ -1082,7 +1082,7 @@ static int emit_sm_push_lit_f_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     emit_mode_set(TEXT_MODE(), out);
-    emit_sm_push_lit_f(NULL, ins->a[0].f);
+    emit_sm_push_lit_f(ins->a[0].f);
     return 0;
 }
 
@@ -1090,7 +1090,7 @@ static int emit_sm_push_expr_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     emit_mode_set(TEXT_MODE(), out);
-    emit_sm_push_expr(NULL, (uint64_t)(uintptr_t)ins->a[0].ptr);
+    emit_sm_push_expr((uint64_t)(uintptr_t)ins->a[0].ptr);
     return 0;
 }
 
@@ -1098,7 +1098,7 @@ static int emit_sm_incr_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     emit_mode_set(TEXT_MODE(), out);
-    emit_sm_incr(NULL, ins->a[0].i);
+    emit_sm_incr(ins->a[0].i);
     return 0;
 }
 
@@ -1106,7 +1106,7 @@ static int emit_sm_decr_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     emit_mode_set(TEXT_MODE(), out);
-    emit_sm_decr(NULL, ins->a[0].i);
+    emit_sm_decr(ins->a[0].i);
     return 0;
 }
 
@@ -1114,7 +1114,7 @@ static int emit_sm_acomp_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     emit_mode_set(TEXT_MODE(), out);
-    emit_sm_acomp(NULL, (int)ins->a[0].i);
+    emit_sm_acomp((int)ins->a[0].i);
     return 0;
 }
 
@@ -1122,7 +1122,7 @@ static int emit_sm_lcomp_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     emit_mode_set(TEXT_MODE(), out);
-    emit_sm_lcomp(NULL, (int)ins->a[0].i);
+    emit_sm_lcomp((int)ins->a[0].i);
     return 0;
 }
 
