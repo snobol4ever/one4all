@@ -5,6 +5,7 @@
 #include "emit_defs.h"
 #include "emit_buf.h"
 #include "emit_label.h"
+#include "emit_text3c.h"
 #include "bb_pool.h"
 #include <stdio.h>
 #include <stdint.h>
@@ -18,16 +19,11 @@ extern FILE          *bb_emit_out;
 /* emit_mode_set — central setter for emit pass mode. */
 void emit_mode_set(bb_emit_mode_t m, FILE *out);
 
-/* Templates and template-helpers call these directly.  Each helper consults */
-void emit_comment(const char *text);
-void emit_bb_box_banner(const char *kind, const char *args);
-
+void emit_jmp(bb_label_t *target, jmp_kind_t kind);
 void emit_bb_inc_mem_r13_disp8(uint8_t disp);
 void emit_pad_to_blob_size(void);
 void emit_macro_begin(const char *name, const char *const *params, int nparams);
 void emit_macro_end(void);
-
-void emit_jmp(bb_label_t *target, jmp_kind_t kind);
 
 void emit_lea_rdi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr);
 void emit_lea_rdx_strtab_sym(const char *sym_label, uint64_t in_proc_ptr);
@@ -38,10 +34,6 @@ void emit_call_sym_param(const char *sym_or_param);
 void emit_jz_retskip(int pc);
 void emit_retskip_label(int pc);
 void emit_noop_macro(const char *macro_name);
-
-void emit_banner_stno(int stno, int lineno, const char *src_text);
-
-void emit_label_define(bb_label_t *lbl);
 
 void emit_bb_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fallback,
                     int port, bb_label_t *lbl_succ, bb_label_t *lbl_fail);
@@ -105,24 +97,7 @@ void bb_insn_mov_rbp_rsp(void);
 void bb_insn_sub_rsp_imm8(uint8_t imm);
 void bb_insn_add_rsp_imm8(uint8_t imm);
 
-void bb_text(const char *fmt, ...);
-
-void bb_text_label(bb_label_t *lbl);
-
-void bb_text_comment(const char *fmt, ...);
-
-/* ── BB three-column line emission (EM-7c-bb-three-column) ────────────────── */
-void bb3c_text(const char *label, const char *action, const char *goto_);
-void bb3c_format(FILE *out, const char *label, const char *action, const char *goto_);
-
-void bb3c_flush_pending(void);
-
-void bb3c_flush_pending_cjmp_only(void);
-
-/* EM-FORMAT-BB-FUSED-GOTOS (2026-05-09): */
-void bb3c_emit_jmp(FILE *out, const char *mn, const char *target);
-
-/* ── instruction emitters (bb_emit_mode-aware; renamed from bb_emit_* EM-DEVTABLE) ─ */
+/* ── instruction emitters (bb_emit_mode-aware) ─ */
 void emit_ret            (void);
 void emit_push_r10       (void);
 void emit_pop_r10        (void);
