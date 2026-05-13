@@ -22,14 +22,10 @@ typedef struct {
     int  offset;
 } bb_label_t;
 #define bb_label_defined(lbl)  ((lbl)->offset != BB_LABEL_UNRESOLVED)
-
 typedef enum { JMP_JMP=0, JMP_JE, JMP_JNE, JMP_JL, JMP_JGE, JMP_JG } jmp_kind_t;
-
 #define BB_PATCH_MAX  512
-
 typedef enum { PATCH_REL8, PATCH_REL32 } bb_patch_kind_t;
 typedef struct { int site; bb_label_t *label; bb_patch_kind_t kind; } bb_patch_t;
-
 #define EMIT_BINARY       EMIT_BINARY_WIRED
 #define EMIT_UNRESOLVED   BB_LABEL_UNRESOLVED
 #define EMIT_LABEL_MAX    BB_LABEL_NAME_MAX
