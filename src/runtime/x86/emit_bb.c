@@ -1,4 +1,3 @@
-
 #include "emit_bb.h"
 #include "emit_form.h"
 #include "emit_templates.h"
@@ -121,7 +120,6 @@ void emit_bb_xchr(PATND_t *p, const char *lit_label, bb_label_t *s, bb_label_t *
     emit_seq_bounds_len(len, TEMPLATE_ADDR_SIGLEN, f);
     emit_seq_sigma_delta_rdi(TEMPLATE_ADDR_SIGMA, TEMPLATE_ADDR_SIGLEN);
     emit_seq_lea_rsi_sym(lit_label, (uint64_t)(uintptr_t)lit);
-
     { uint64_t val = (uint64_t)(uint32_t)len;
       switch (bb_emit_mode) {
       case EMIT_BINARY_WIRED: case EMIT_BINARY_BROKERED: insn_mov_rdx_i64(val); break;
@@ -190,7 +188,6 @@ void emit_bb_charset(bb_box_fn c_fn, const char *c_fn_name, const char *kind_nam
     else                                                       { rt_name="rt_bb_span";   rt_fn=(uint64_t)(uintptr_t)rt_bb_span;   }
     emit_bb_stateful(kind_name ? kind_name : "CHARSET", chars ? chars : "", z, rt_name, rt_fn, s,f,b);
 }
-
 /*--------------------------------------------------------------------------------------------------------------------*/
 #include "emit_templates.h"
 #include <string.h>

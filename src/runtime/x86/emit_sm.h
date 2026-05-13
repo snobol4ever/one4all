@@ -1,14 +1,10 @@
-
 #ifndef EMIT_SM_H
 #define EMIT_SM_H
-
 #include "emit_core.h"
 #include "sm_prog.h"
 #include "emit_bb.h"
 #include <stdio.h>
-
 void emit_sm_selftest(void);
-
 void emit_sm_op_label        (int pc);
 void emit_sm_op_stno         (int stno, int lineno, const char *src);
 void emit_sm_op_halt         (void);
@@ -65,17 +61,14 @@ void emit_sm_op_return_s     (void);   void emit_sm_op_return_f   (void);
 void emit_sm_op_freturn_s    (void);   void emit_sm_op_freturn_f  (void);
 void emit_sm_op_nreturn_s    (void);   void emit_sm_op_nreturn_f  (void);
 void emit_sm_op_unhandled    (int opc);
-
 int  emit_walk_codegen (SM_Program *prog, FILE *out, const char *src_path);
 extern int g_emit_inline;
 int  emit_flat_eligible(const PATND_t *p);
 int  emit_flat_invariant(const PATND_t *p);
 DESCR_t emit_walk_phase2(const SM_Program *prog, int phase2_start, int phase2_end, int *out_variant);
-
 #define sm_codegen_text(prog,out,src) emit_walk_codegen(prog,out,src)
 #define g_jit_emit_inline             g_emit_inline
 #define flat_is_eligible_node(p)      emit_flat_eligible(p)
 #define patnd_is_fully_invariant(p)   emit_flat_invariant(p)
 #define sm_phase2_to_patnd(pr,s,e,ov) emit_walk_phase2(pr,s,e,ov)
-
 #endif 

@@ -1,5 +1,3 @@
-
-
 #include "emit_sm_binary.h"
 #include "sm_image.h"
 #include "sm_prog.h"
@@ -13,11 +11,8 @@
 #include "emit_templates.h"
 #include "emit.h"
 #include "emit.h"
-
-
 extern int g_sm_dispatch_active;
 extern int g_ast_pump_active;
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,21 +21,14 @@ extern int g_ast_pump_active;
 #include "../../runtime/common/coerce.h"
 #include <setjmp.h>
 #include <gc/gc.h>
-
-
 static SM_Program *g_jit_prog   = NULL;
 static SM_State   *g_jit_state  = NULL;
 static int         g_jit_halted = 0;
-
-
 int      g_jit_step_limit = 0;
 int      g_jit_steps_done = 0;
 jmp_buf  g_jit_step_jmp;
-
 /* ME-1: jit_pat_stack removed — SM_PAT_* ops use value stack (PUSH/POP) */
-
 /* ── Externs from snobol4 runtime ────────────────────────────────────── */
-
 extern DESCR_t  NV_GET_fn(const char *name);
 extern DESCR_t  NV_SET_fn(const char *name, DESCR_t val);
 extern char    *VARVAL_fn(DESCR_t d);
@@ -51,13 +39,11 @@ extern DESCR_t  NAME_fn(const char *name);
 extern int      exec_stmt(const char *subj_name, DESCR_t *subj_var,
                           DESCR_t pat, DESCR_t *repl, int has_repl);
 extern void     comm_stno(int n);
-
 /* subscript helpers */
 extern DESCR_t subscript_get(DESCR_t base, DESCR_t idx);
 extern DESCR_t subscript_get2(DESCR_t base, DESCR_t i, DESCR_t j);
 extern int     subscript_set(DESCR_t base, DESCR_t idx, DESCR_t val);
 extern int     subscript_set2(DESCR_t base, DESCR_t i, DESCR_t j, DESCR_t val);
-
 /* pattern constructors */
 extern DESCR_t pat_lit(const char *s);
 extern DESCR_t pat_span(const char *chars);
@@ -86,13 +72,10 @@ extern DESCR_t pat_ref(const char *name);
 extern DESCR_t pat_assign_imm(DESCR_t child, DESCR_t var);
 extern DESCR_t pat_assign_cond(DESCR_t child, DESCR_t var);
 extern DESCR_t pat_at_cursor(const char *varname);
-
-
 #define CUR_INS  (&g_jit_prog->instrs[g_jit_state->pc - 1])
 #define STATE    (g_jit_state)
 #define PUSH(d)  sm_push(STATE, (d))
 #define POP()    sm_pop(STATE)
-
 static void h_label(void)    {  }
 static void h_halt(void)     { g_jit_halted = 1; }
 static void h_define(void)   {  }
@@ -143,8 +126,6 @@ static void h_freturn_s(void) { if ( STATE->last_ok) h_return_impl(1, 0); }
 static void h_freturn_f(void) { if (!STATE->last_ok) h_return_impl(1, 0); }
 static void h_nreturn_s(void) { if ( STATE->last_ok) h_return_impl(0, 1); }
 static void h_nreturn_f(void) { if (!STATE->last_ok) h_return_impl(0, 1); }
-
-
 static void h_stno(void) {
     int sm_stno = (int)CUR_INS->a[0].i;
     comm_stno(sm_stno);
@@ -157,11 +138,9 @@ static void h_stno(void) {
     if (g_jit_step_limit > 0 && g_jit_steps_done++ >= g_jit_step_limit)
         longjmp(g_jit_step_jmp, 1);
 }
-
 static void h_jump(void)   { STATE->pc = (int)CUR_INS->a[0].i; }
 static void h_jump_s(void) { if ( STATE->last_ok) STATE->pc = (int)CUR_INS->a[0].i; }
 static void h_jump_f(void) { if (!STATE->last_ok) STATE->pc = (int)CUR_INS->a[0].i; }
-
 static void h_push_lit_s(void)
 {
     const char *s = CUR_INS->a[0].s ? CUR_INS->a[0].s : "";
@@ -172,14 +151,12 @@ static void h_push_lit_s(void)
 static void h_push_lit_i(void) { PUSH(INTVAL(CUR_INS->a[0].i)); }
 static void h_push_lit_f(void) { PUSH(REALVAL(CUR_INS->a[0].f)); }
 static void h_push_null(void)  { PUSH(NULVCL); STATE->last_ok = 1; }
-
 static void h_push_var(void)
 {
     DESCR_t val = NV_GET_fn(CUR_INS->a[0].s);
     PUSH(val);
     STATE->last_ok = (val.v != DT_FAIL);
 }
-
 /* SN-9a: frozen DT_E descriptor for *expr / EVAL().  Mirrors sm_interp.c */
 static void h_push_expr(void)
 {
@@ -190,7 +167,6 @@ static void h_push_expr(void)
     PUSH(d);
     STATE->last_ok = 1;
 }
-
 /* CHUNKS-step02: SM_PUSH_EXPRESSION — push DT_E expression descriptor (slen=1, i=entry_pc). */
 static void h_push_chunk(void)
 {
@@ -224,7 +200,6 @@ static void h_call_chunk(void)
     STATE->sp = 0;
     STATE->pc = entry_pc;
 }
-
 /* SN-9b: Byrd-box broker opcodes — Icon (SM_BB_PUMP) / Prolog (SM_BB_ONCE). */
 extern bb_node_t coro_eval(tree_t *e);
 static void jit_pump_print(DESCR_t val, void *arg)
@@ -233,7 +208,6 @@ static void jit_pump_print(DESCR_t val, void *arg)
     char *s = VARVAL_fn(val);
     if (s) printf("%s\n", s);
 }
-
 static void h_bb_pump(void)
 {
     DESCR_t expr_d = POP();
@@ -243,7 +217,6 @@ static void h_bb_pump(void)
     int ticks = bb_broker(node, BB_PUMP, jit_pump_print, NULL);
     STATE->last_ok = (ticks > 0);
 }
-
 static void h_bb_once(void)
 {
     DESCR_t expr_d = POP();
@@ -253,8 +226,6 @@ static void h_bb_once(void)
     int ticks = bb_broker(node, BB_ONCE, NULL, NULL);
     STATE->last_ok = (ticks > 0);
 }
-
-
 #include "../../frontend/prolog/pl_broker.h"
 #include "../../runtime/interp/pl_runtime.h"
 static void h_bb_once_proc(void)
@@ -267,7 +238,6 @@ static void h_bb_once_proc(void)
     int ticks = bb_broker(node, BB_ONCE, NULL, NULL);
     STATE->last_ok = (ticks > 0);
 }
-
 /* CHUNKS-step12: name-driven Icon proc BB pump — mirror of SM_BB_PUMP_PROC */
 extern bb_node_t coro_pump_proc_by_name(const char *name, DESCR_t *args, int nargs);
 static void h_bb_pump_proc(void)
@@ -290,7 +260,6 @@ static void h_bb_pump_proc(void)
     g_ast_pump_active--;
     STATE->last_ok = (ticks > 0);
 }
-
 /* CHUNKS-step13: Raku CASE dispatch — JIT mirror of SM_BB_PUMP_CASE */
 static void h_bb_pump_case(void)
 {
@@ -347,7 +316,6 @@ static void h_bb_pump_case(void)
     PUSH(result);
     STATE->last_ok = matched;
 }
-
 /* CHUNKS-step15: BB pump for an SM generator expression — JIT mirror of */
 static void h_bb_pump_sm(void)
 {
@@ -366,7 +334,6 @@ static void h_bb_pump_sm(void)
     int ticks = bb_broker_drive_sm(gs, jit_pump_print, NULL);
     STATE->last_ok = (ticks > 0);
 }
-
 /* CHUNKS-step17i-every-suspend: JIT mirror of SM_BB_PUMP_EVERY in sm_interp.c. */
 static void h_bb_pump_every(void)
 {
@@ -384,7 +351,6 @@ static void h_bb_pump_every(void)
     STATE->last_ok = (ticks > 0);
     PUSH(NULVCL);
 }
-
 /* GOAL-ICON-BB-COMPLETE rung13: JIT mirror of SM_GEN_TICK in sm_interp.c. */
 static void h_gen_tick(void)
 {
@@ -400,7 +366,6 @@ static void h_gen_tick(void)
     STATE->last_ok = ok;
     PUSH(ok ? out : FAILDESCR);
 }
-
 /* CHUNKS-step17i-suspend: JIT mirror of SM_SUSPEND_VALUE in sm_interp.c. */
 extern int sm_yield_to_caller(DESCR_t v);
 static void h_suspend_value(void)
@@ -413,7 +378,6 @@ static void h_suspend_value(void)
         STATE->last_ok = !IS_FAIL_fn(v);
     }
 }
-
 static void h_store_var(void)
 {
     DESCR_t val = POP();
@@ -426,9 +390,7 @@ static void h_store_var(void)
     PUSH(val);
     STATE->last_ok = 1;
 }
-
 static void h_pop(void) { POP(); }
-
 static void h_arith(void)
 {
     DESCR_t r = POP(), l = POP();
@@ -445,14 +407,12 @@ static void h_arith(void)
     PUSH(result);
     STATE->last_ok = (result.v != DT_FAIL);
 }
-
 static void h_neg(void)
 {
     DESCR_t v = POP();
     if (v.v == DT_I) PUSH(INTVAL(-v.i));
     else              PUSH(REALVAL(-to_real(v)));
 }
-
 static void h_concat(void)
 {
     DESCR_t r = POP(), l = POP();
@@ -460,7 +420,6 @@ static void h_concat(void)
     PUSH(result);
     STATE->last_ok = (result.v != DT_FAIL);
 }
-
 static void h_coerce_num(void)
 {
     DESCR_t v = POP();
@@ -471,8 +430,6 @@ static void h_coerce_num(void)
     } else { PUSH(v); }
     STATE->last_ok = 1;
 }
-
-
 static void h_pat_lit(void)
 {
     PUSH(pat_lit(CUR_INS->a[0].s ? CUR_INS->a[0].s : ""));
@@ -532,7 +489,6 @@ static void h_pat_fence(void)   { PUSH(pat_fence()); }
 static void h_pat_fence1(void)  { DESCR_t _ch = POP(); PUSH(pat_fence_p(_ch)); }
 static void h_pat_abort(void)   { PUSH(pat_abort()); }
 static void h_pat_bal(void)     { PUSH(pat_bal()); }
-
 static void h_pat_cat(void)
 {
     DESCR_t right = POP(), left = POP();
@@ -543,7 +499,6 @@ static void h_pat_alt(void)
     DESCR_t right = POP(), left = POP();
     PUSH(pat_alt(left, right));
 }
-
 static void h_pat_deref(void)
 {
     DESCR_t v = POP();
@@ -556,13 +511,11 @@ static void h_pat_deref(void)
         PUSH(pat_ref(name ? name : ""));
     }
 }
-
 static void h_pat_refname(void)
 {
     const char *name = CUR_INS->a[0].s ? CUR_INS->a[0].s : "";
     PUSH(pat_ref(name));
 }
-
 static void h_pat_capture(void)
 {
     DESCR_t child  = POP();
@@ -576,7 +529,6 @@ static void h_pat_capture(void)
     else
         PUSH(pat_assign_cond(child, var));
 }
-
 static void h_pat_capture_fn(void)
 {
     DESCR_t child  = POP();
@@ -610,7 +562,6 @@ static void h_pat_capture_fn(void)
             : pat_assign_callcap(child, fname, NULL, 0));
     }
 }
-
 static void h_pat_capture_fn_args(void)
 {
     int nargs = (int)CUR_INS->a[2].i;
@@ -625,13 +576,11 @@ static void h_pat_capture_fn_args(void)
         ? pat_assign_callcap_named_imm(child, fname, argv, nargs, NULL, 0)
         : pat_assign_callcap(child, fname, argv, nargs));
 }
-
 static void h_pat_usercall(void)
 {
     const char *fname = CUR_INS->a[0].s ? CUR_INS->a[0].s : "";
     PUSH(pat_user_call(fname, NULL, 0));
 }
-
 static void h_pat_usercall_args(void)
 {
     int nargs = (int)CUR_INS->a[1].i;
@@ -642,7 +591,6 @@ static void h_pat_usercall_args(void)
     const char *fname = CUR_INS->a[0].s ? CUR_INS->a[0].s : "";
     PUSH(pat_user_call(fname, argv, nargs));
 }
-
 static void h_exec_stmt(void)
 {
     int has_repl   = (int)CUR_INS->a[1].i;
@@ -653,7 +601,6 @@ static void h_exec_stmt(void)
     int ok = exec_stmt(sn, &subj_d, pat_d, has_repl ? &repl : NULL, has_repl);
     STATE->last_ok = ok;
 }
-
 static void h_call(void)
 {
     const char *name  = CUR_INS->a[0].s;
@@ -886,10 +833,8 @@ static void h_call(void)
     PUSH(result);
     STATE->last_ok = (result.v != DT_FAIL);
 }
-
 static void h_incr(void) { DESCR_t v = POP(); PUSH(INTVAL(v.i + CUR_INS->a[0].i)); }
 static void h_decr(void) { DESCR_t v = POP(); PUSH(INTVAL(v.i - CUR_INS->a[0].i)); }
-
 /* CHUNKS-step14: SM_SUSPEND / SM_RESUME codegen stubs. */
 static void h_suspend(void) {
     fprintf(stderr, "sm_codegen FATAL: SM_SUSPEND reached in jit-run — "
@@ -901,7 +846,6 @@ static void h_resume(void) {
             "generator JIT not yet implemented (CHUNKS M5/EM-10)\n");
     STATE->last_ok = 0;
 }
-
 /* CHUNKS-step14b: SM_LOAD_GLOCAL / SM_STORE_GLOCAL JIT mirrors. */
 static void h_load_glocal(void)
 {
@@ -914,7 +858,6 @@ static void h_load_glocal(void)
         STATE->last_ok = 0;
     }
 }
-
 static void h_store_glocal(void)
 {
     int slot = (int)CUR_INS->a[0].i;
@@ -928,35 +871,30 @@ static void h_store_glocal(void)
         STATE->last_ok = 0;
     }
 }
-
 /* CHUNKS-step15a: SM_ICMP_GT — named FATAL stub; JIT codegen is M5 territory. */
 static void h_icmp_gt(void)
 {
     fprintf(stderr, "FATAL: SM_ICMP_GT reached in JIT codegen — M5 not yet implemented\n");
     STATE->last_ok = 0;
 }
-
 /* CHUNKS-step15a: SM_ICMP_LT — named FATAL stub; JIT codegen is M5 territory. */
 static void h_icmp_lt(void)
 {
     fprintf(stderr, "FATAL: SM_ICMP_LT reached in JIT codegen — M5 not yet implemented\n");
     STATE->last_ok = 0;
 }
-
 /* CHUNKS-step17b'' (CH-17b''): SM_LOAD_FRAME — named FATAL stub. */
 static void h_load_frame(void)
 {
     fprintf(stderr, "FATAL: SM_LOAD_FRAME reached in JIT codegen — M5 not yet implemented\n");
     STATE->last_ok = 0;
 }
-
 /* CHUNKS-step17b'' (CH-17b''): SM_STORE_FRAME — named FATAL stub (mirror of LOAD). */
 static void h_store_frame(void)
 {
     fprintf(stderr, "FATAL: SM_STORE_FRAME reached in JIT codegen — M5 not yet implemented\n");
     STATE->last_ok = 0;
 }
-
 /* Unimplemented stubs — emit warning, set last_ok=0 */
 static void h_unimpl(void)
 {
@@ -964,13 +902,9 @@ static void h_unimpl(void)
             (int)CUR_INS->op, sm_opcode_name(CUR_INS->op), STATE->pc - 1);
     STATE->last_ok = 0;
 }
-
 /* ── Handler dispatch table ──────────────────────────────────────────── */
-
 typedef void (*handler_fn_t)(void);
-
 static handler_fn_t g_handlers[SM_OPCODE_COUNT];
-
 static void init_handler_table(void)
 {
     for (int i = 0; i < SM_OPCODE_COUNT; i++) g_handlers[i] = h_unimpl;
@@ -1062,12 +996,9 @@ static void init_handler_table(void)
     g_handlers[SM_LOAD_FRAME]   = h_load_frame;
     g_handlers[SM_STORE_FRAME]  = h_store_frame;
 }
-
-
 static uint8_t **g_blob_addrs = NULL;
 static int       g_blob_count = 0;
 static size_t    g_trampoline_offset = 0;
-
 /* emit_trampoline — emit the shared dispatch trampoline at the current */
 static size_t emit_trampoline(SM_Program *prog)
 {
@@ -1085,7 +1016,6 @@ static size_t emit_trampoline(SM_Program *prog)
     seg_byte(SEG_CODE, 0xc3);
     return off;
 }
-
 /* emit_standard_blob — emit the standard "call C handler" blob. */
 static void emit_standard_blob(handler_fn_t fn, size_t trampoline_abs_off)
 {
@@ -1117,7 +1047,6 @@ static void emit_standard_blob(handler_fn_t fn, size_t trampoline_abs_off)
     seg_byte(SEG_CODE, 0xe9);
     seg_u32(SEG_CODE, (uint32_t)rel);
 }
-
 /* emit_standard_blob_no_stack — emit a "call C handler" blob for handlers */
 static void emit_standard_blob_no_stack(handler_fn_t fn, size_t trampoline_abs_off)
 {
@@ -1142,7 +1071,6 @@ static void emit_standard_blob_no_stack(handler_fn_t fn, size_t trampoline_abs_o
     seg_byte(SEG_CODE, 0xe9);
     seg_u32(SEG_CODE, (uint32_t)rel_ns);
 }
-
 /* emit_cond_jump_blob_skeleton — inline-native lowering of SM_JUMP_S / */
 static size_t emit_cond_jump_blob_skeleton(int take_on_nonzero,
                                            int32_t target_pc,
@@ -1168,7 +1096,6 @@ static size_t emit_cond_jump_blob_skeleton(int take_on_nonzero,
     seg_u32(SEG_CODE, 0);
     return target_rel32_off;
 }
-
 /* emit_halt_blob — emit the SM_HALT blob: advance pc past HALT, */
 static void emit_halt_blob(void) __attribute__((unused));
 static void emit_halt_blob(void)
@@ -1177,8 +1104,6 @@ static void emit_halt_blob(void)
     seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x14);
     seg_byte(SEG_CODE, 0xc3);
 }
-
-
 /* emit_jump_blob_skeleton — emit the SM_JUMP blob with the jmp rel32 */
 static size_t emit_jump_blob_skeleton(int32_t target_pc)
 {
@@ -1190,7 +1115,6 @@ static size_t emit_jump_blob_skeleton(int32_t target_pc)
     seg_u32(SEG_CODE, 0);
     return rel32_off;
 }
-
 /* emit_label_blob — emit a TRULY stackless SM_LABEL blob. */
 static void emit_label_blob(size_t trampoline_abs_off)
 {
@@ -1201,10 +1125,7 @@ static void emit_label_blob(size_t trampoline_abs_off)
     seg_byte(SEG_CODE, 0xe9);
     seg_u32(SEG_CODE, (uint32_t)rel);
 }
-
-
 /* ── ME-4-post-r12-tos inline-native blob emitters ──────────────────────── */
-
 /* Helper: 16-byte rsp alignment + call rax via imm64.  20 bytes. */
 static void emit_aligned_call_imm64(void *fn)
 {
@@ -1216,7 +1137,6 @@ static void emit_aligned_call_imm64(void *fn)
     seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x83);
     seg_byte(SEG_CODE, 0xc4); seg_byte(SEG_CODE, 0x08);
 }
-
 /* Helper: jmp rel32 to trampoline.  5 bytes. */
 static void emit_jmp_trampoline(size_t trampoline_abs_off)
 {
@@ -1225,10 +1145,7 @@ static void emit_jmp_trampoline(size_t trampoline_abs_off)
     seg_byte(SEG_CODE, 0xe9);
     seg_u32(SEG_CODE, (uint32_t)rel);
 }
-
-
 /* ── Main codegen entry point ─────────────────────────────────────────── */
-
 /* sm_codegen — compile SM_Program into SEG_CODE per ME-3/ME-4 layout. */
 int sm_codegen(SM_Program *prog)
 {
@@ -1327,11 +1244,8 @@ int sm_codegen(SM_Program *prog)
     seg_seal(SEG_CODE);
     return 0;
 }
-
 /* ── JIT execution runner ─────────────────────────────────────────────── */
-
 /* sm_jit_run — execute a codegen'd SM_Program per ME-3. */
-
 /* sm_jit_unwind_call_stack — called by sm_run_with_recovery after a longjmp */
 void sm_jit_unwind_call_stack(SM_State *st)
 {
@@ -1342,7 +1256,6 @@ void sm_jit_unwind_call_stack(SM_State *st)
     }
     st->sp = 0;
 }
-
 int sm_jit_run(SM_Program *prog, SM_State *st)
 {
     g_jit_prog   = prog;
@@ -1369,7 +1282,6 @@ int sm_jit_run(SM_Program *prog, SM_State *st)
     entry();
     return 0;
 }
-
 /* sm_jit_run_plain — debug: pure C dispatch, no SEG_CODE, proves handler correctness */
 int sm_jit_run_plain(SM_Program *prog, SM_State *st)
 {
@@ -1383,7 +1295,6 @@ int sm_jit_run_plain(SM_Program *prog, SM_State *st)
     }
     return 0;
 }
-
 /* IM-5: sm_jit_run_steps — run at most n statements then return. */
 int sm_jit_run_steps(SM_Program *prog, SM_State *st, int n) {
     g_jit_step_limit = n;

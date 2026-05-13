@@ -1,13 +1,10 @@
-
 #ifndef EMIT_BB_H
 #define EMIT_BB_H
-
 #include "emit_core.h"
 #include "bb_pool.h"
 #include "snobol4.h"
 #include "bb_box.h"
 #include <stdio.h>
-
 bb_box_fn bb_build_flat      (PATND_t *p);
 bb_box_fn bb_build_brokered  (PATND_t *p);
 int  emit_flat_build         (PATND_t *p, FILE *out, const char *prefix);
@@ -18,7 +15,6 @@ void emit_flat_set_cap_fixup (void (*cb)(void *cap_ptr, const char *child_alpha_
 void emit_flat_banner_rule   (char ch);
 void emit_flat_box_banner    (const char *kind, const char *args, const char *label_prefix);
 extern int g_flat_node_id;
-
 void emit_flat_label         (const char *name);
 void emit_flat_data_section  (void);
 void emit_flat_text_section  (void);
@@ -33,16 +29,13 @@ void emit_flat_box_call      (const char *rdi_load, const char *fn, int mode);
 void emit_flat_box_call_slot (const char *slot_lbl, const char *fn, int mode);
 void emit_flat_dispatch_jne_jmp(bb_label_t *lbl_succ, bb_label_t *lbl_fail);
 void emit_flat_entry_dispatch(bb_label_t *lbl_alpha_body, bb_label_t *lbl_beta);
-
 typedef void (*bb_charset_text_fn)(bb_label_t *, bb_label_t *, bb_label_t *, void *);
 typedef void (*bb_intcur_text_fn) (bb_label_t *, bb_label_t *, bb_label_t *, void *);
 typedef void (*bb_brkx_text_fn)   (bb_label_t *, bb_label_t *, bb_label_t *, void *);
 typedef void (*bb_pos_text_fn)    (int, bb_label_t *, bb_label_t *, bb_label_t *, void *);
 typedef void (*bb_nullary_text_fn)(bb_label_t *, bb_label_t *, bb_label_t *, void *);
-
 void emit_flat_box_call_fn(bb_box_fn fn, const char *fn_name, void *z,
                            bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_beta);
-
 #define bb_build_flat_text(p,out,pfx)   emit_flat_build(p,out,pfx)
 #define bb_flat_set_intern_str(fn)       emit_flat_set_intern_str(fn)
 #define bb_build_flat_text_reset()       emit_flat_reset()
@@ -62,7 +55,5 @@ void emit_flat_box_call_fn(bb_box_fn fn, const char *fn_name, void *z,
 #define flat_box_call_slot(slot,fn,mode) emit_flat_box_call_slot(slot,fn,mode)
 #define flat_box_dispatch_jne_jmp(s,f)   emit_flat_dispatch_jne_jmp(s,f)
 #define flat_box_entry_dispatch(a,b)     emit_flat_entry_dispatch(a,b)
-
 #define bb_build_flat_text_reset()       emit_flat_reset()
-
 #endif 

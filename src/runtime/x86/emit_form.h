@@ -1,25 +1,19 @@
 #ifndef EMIT_FORM_H
 #define EMIT_FORM_H
-
 #include "emit_core.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdarg.h>
-
 extern int  g_is_text;
 extern int  g_emit_text_mode;
 extern int  g_emit_pos;
-
 typedef int emitter_t;
-
 #define TEXT_MODE_INVOCATION  0
 #define TEXT_MODE_DEFINITION  1
-
 void emitter_init_binary(bb_buf_t buf, int size);
 void emitter_init_text  (FILE *out, int mode);
 int  emitter_end        (void);
-
 void emit_form_reg64_imm64(uint8_t prefix, uint8_t reg, uint64_t val, const char *mnem);
 void emit_form_reg32_imm32(uint8_t op, uint32_t val, const char *mnem);
 void emit_form_alu_eax_imm32(uint8_t op, uint32_t val, const char *mnem);
@@ -36,7 +30,6 @@ void emit_form_nullary3(uint8_t b0, uint8_t b1, uint8_t b2, const char *text);
 void emit_sym_lea_rcx (const char *sym, uint64_t addr_fallback);
 void emit_sym_lea_r10 (const char *sym, uint64_t addr_fallback);
 void emit_call_sym_plt(const char *sym, uint64_t fn_fallback);
-
 static inline void emit_mov_r10_imm64(uint64_t v) { emit_form_reg64_imm64(0x49,0xBA,v,"r10"); }
 static inline void emit_mov_rax_imm64(uint64_t v) { emit_form_reg64_imm64(0x48,0xB8,v,"rax"); }
 static inline void emit_mov_rsi_imm64(uint64_t v) { emit_form_reg64_imm64(0x48,0xBE,v,"rsi"); }
@@ -64,7 +57,6 @@ static inline void emit_pop_rbp  (void) { emit_form_nullary1(0x5D,      "pop rbp
 static inline void emit_inc_mem_r13_disp8(uint8_t disp) {
     emit_form_r13_disp8(0x41,0xFF,0x45, disp, "inc dword ptr [r13 + %u]");
 }
-
 void emit_load_r10_delta_ptr (uint64_t addr);
 void emit_load_delta         (void);
 void emit_store_delta        (void);
@@ -74,12 +66,10 @@ void emit_load_sigma         (uint64_t sigma_addr);
 void emit_load_siglen        (uint64_t siglen_addr);
 void emit_sigma_plus_delta   (uint64_t sigma_addr);
 void emit_cmp_eax_siglen     (uint64_t siglen_addr);
-
 void emit_label_define_bb    (bb_label_t *lbl);
 void emit_label_name         (const char *name);
 void emit_pc_label           (int pc);
 void emit_jmp_label          (bb_label_t *target, jmp_kind_t kind);
-
 void emit_section            (const char *name);
 void emit_directive          (const char *line);
 void emit_global_sym         (const char *name);
@@ -87,21 +77,16 @@ void emit_banner             (const char *text);
 void emit_minor_break        (const char *text);
 void emit_blank_line         (void);
 void emit_fprintf_raw        (const char *fmt, ...);
-
 void emit_data_quad          (uint64_t val);
 void emit_data_quad_sym      (const char *sym);
 void emit_data_string        (const char *bytes, size_t len);
 void emit_data_long          (int32_t val);
-
 void emit_bb_zeta_rdi        (uint64_t ptr, const char *sym);
 void emit_bb_dispatch_jne_jmp(bb_label_t *lbl_succ, bb_label_t *lbl_fail);
 void emit_bb_port_label      (const char *pfx, char port);
 void emit_bb_port_jmp        (const char *pfx, char port);
-
 void emit_macro_param_ref    (const char *name);
-
 FILE *emitter_text_out       (void);
 int   emitter_pos            (void);
 void  emitter_init_macro_def (FILE *out);
-
 #endif /* EMIT_FORM_H */

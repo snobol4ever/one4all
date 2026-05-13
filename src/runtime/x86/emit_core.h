@@ -1,17 +1,13 @@
-
 #ifndef EMIT_CORE_H
 #define EMIT_CORE_H
-
 #define TEXT_MODE_INVOCATION  0
 #define TEXT_MODE_DEFINITION  1
-
 #include "bb_pool.h"
 #include "x86_opcodes.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdarg.h>
-
 typedef enum {
     EMIT_TEXT             = 0,
     EMIT_BINARY_WIRED     = 1,
@@ -19,42 +15,32 @@ typedef enum {
     EMIT_MACRO_DEF        = 3,
     EMIT_TEXT_INLINE      = 4
 } bb_emit_mode_t;
-
 #define BB_LABEL_NAME_MAX  80
 #define BB_LABEL_UNRESOLVED (-1)
-
 typedef struct {
     char name[BB_LABEL_NAME_MAX];
     int  offset;
 } bb_label_t;
-
 #define bb_label_defined(lbl)  ((lbl)->offset != BB_LABEL_UNRESOLVED)
-
 typedef enum { JMP_JMP=0, JMP_JE, JMP_JNE, JMP_JL, JMP_JGE, JMP_JG } jmp_kind_t;
-
 #define BB_PATCH_MAX  512
 typedef enum { PATCH_REL8, PATCH_REL32 } bb_patch_kind_t;
 typedef struct { int site; bb_label_t *label; bb_patch_kind_t kind; } bb_patch_t;
-
 #define EMIT_BINARY       EMIT_BINARY_WIRED
 #define EMIT_UNRESOLVED   BB_LABEL_UNRESOLVED
 #define EMIT_LABEL_MAX    BB_LABEL_NAME_MAX
 #define EMIT_PATCH_MAX    BB_PATCH_MAX
 #define emit_label_ok(l)  bb_label_defined(l)
-
 typedef int emitter_t;
-
 extern bb_emit_mode_t  bb_emit_mode;
 extern FILE           *bb_emit_out;
 extern int             g_bb_emit_format;
 extern int             g_in_text_macro_body;
-
 extern bb_buf_t   bb_emit_buf;
 extern int        bb_emit_pos;
 extern int        bb_emit_size;
 extern bb_patch_t bb_patch_list[BB_PATCH_MAX];
 extern int        bb_patch_count;
-
 void bb_emit_begin(bb_buf_t buf, int size);
 int  bb_emit_end(void);
 void bb_emit_patch_rel8 (bb_label_t *lbl);
@@ -65,7 +51,6 @@ void bb_emit_u32 (uint32_t v);
 void bb_emit_u64 (uint64_t v);
 void bb_emit_i8  (int8_t   v);
 void bb_emit_i32 (int32_t  v);
-
 void  emit_mode_set(bb_emit_mode_t m, FILE *out);
 FILE *emit_outf(void);
 int   emit_bb_is_format_mode(void);
@@ -78,21 +63,17 @@ void  bb3c_op (const char *mn, const char *fmt, ...);
 void  bb3c_jmp(const char *mn, const char *target);
 void  emit_jmp         (bb_label_t *target, jmp_kind_t kind);
 void  emit_label_define(bb_label_t *lbl);
-
 void emit_label_init (bb_label_t *lbl, const char *name);
 void emit_label_initf(bb_label_t *lbl, const char *fmt, ...);
-
 void bb_label_init  (bb_label_t *lbl, const char *name);
 void bb_label_initf (bb_label_t *lbl, const char *fmt, ...);
 void bb_label_define(bb_label_t *lbl);  
-
 #define IS_TEXT     (bb_emit_mode != EMIT_BINARY_WIRED && \
                      bb_emit_mode != EMIT_BINARY_BROKERED)
 #define IS_BIN      (bb_emit_mode == EMIT_BINARY_WIRED || \
                      bb_emit_mode == EMIT_BINARY_BROKERED)
 #define IS_WIRED    (bb_emit_mode == EMIT_BINARY_WIRED)
 #define IS_BROKERED (bb_emit_mode == EMIT_BINARY_BROKERED)
-
 void insn_mov_eax_i32       (uint32_t v);
 void insn_mov_rax_i64       (uint64_t v);
 void insn_mov_rcx_i64       (uint64_t v);
@@ -151,7 +132,6 @@ void insn_ret               (void);
 void insn_nop               (void);
 void insn_call_rax          (void);
 void insn_call_plt          (const char *sym, uint64_t fn_fallback);
-
 void emit_text_3col    (FILE *out, const char *label, const char *action, const char *goto_);
 void emit_text_jmp     (FILE *out, const char *mn, const char *target);
 void emit_text_op      (const char *label, const char *action, const char *goto_);
@@ -163,7 +143,6 @@ void emit_text_label   (bb_label_t *lbl);
 void emit_text_comment (const char *fmt, ...);
 void emit_text_box_banner (const char *kind, const char *args);
 void emit_text_stno_banner(int stno, int lineno, const char *src_text);
-
 void emit_seq_frame_enter      (void);
 void emit_seq_frame_leave      (void);
 void emit_seq_brokered_enter   (void);
@@ -192,7 +171,6 @@ void emit_seq_port_call        (uint64_t zeta_ptr, const char *fn_name,
 void emit_seq_port_call_rip    (uint64_t zeta_ptr, const char *zeta_label,
                                 const char *fn_name, uint64_t fn_fallback,
                                 int port, bb_label_t *lbl_succ, bb_label_t *lbl_fail);
-
 void bb_emit_begin(bb_buf_t buf, int size);
 int  bb_emit_end(void);
 void bb_emit_patch_rel8 (bb_label_t *lbl);
@@ -203,7 +181,6 @@ void bb_emit_u32 (uint32_t v);
 void bb_emit_u64 (uint64_t v);
 void bb_emit_i8  (int8_t   v);
 void bb_emit_i32 (int32_t  v);
-
 void bb3c_format(FILE *out, const char *label, const char *action, const char *goto_);
 void bb3c_text  (const char *label, const char *action, const char *goto_);
 void bb3c_emit_jmp(FILE *out, const char *mn, const char *target);
@@ -215,7 +192,6 @@ void bb_text_comment(const char *fmt, ...);
 void emit_comment   (const char *text);
 void emit_bb_box_banner(const char *kind, const char *args);
 void emit_banner_stno(int stno, int lineno, const char *src_text);
-
 void bb_insn_mov_eax_imm32(uint32_t imm);
 void bb_insn_mov_rax_imm64(uint64_t imm);
 void bb_insn_ret(void); void bb_insn_nop(void); void bb_insn_call_rax(void);
@@ -241,7 +217,6 @@ void bb_insn_mov_ecx_eax(void); void bb_insn_cmp_eax_ecx(void);
 void bb_insn_mov_rax_mem_rcx(void); void bb_insn_movsxd_rcx_r10mem(void);
 void bb_insn_lea_rax_rax_rcx(void); void bb_insn_mov_rdi_rax(void);
 void bb_insn_add_eax_imm32(uint32_t v); void bb_insn_cmp_eax_mem_rcx(void);
-
 void emit_ret(void);
 void emit_push_r10(void); void emit_pop_r10(void);
 void emit_test_rax_rax(void); void emit_test_eax_eax(void);
@@ -249,8 +224,6 @@ void emit_mov_rdi_imm64(uint64_t v);
 void emit_call_sym_plt(const char *sym, uint64_t fn_fallback);
 void emit_mov_esi_imm32(int v);
 void emit_add_delta_imm(int v); void emit_sub_delta_imm(int v);
-
 void bb_label_init (bb_label_t *lbl, const char *name);
 void bb_label_initf(bb_label_t *lbl, const char *fmt, ...);
-
 #endif 
