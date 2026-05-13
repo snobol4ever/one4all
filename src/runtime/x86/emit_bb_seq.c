@@ -1,10 +1,17 @@
+/* emit_bb_seq.c — L3: compound BB helper sequences.
+ *
+ * Combines L0–L2 primitives into multi-instruction sequences used by
+ * BB box templates (L4).  Each function handles all four emit modes.
+ */
 
-#include "emit_bb_gen.h"
-#include "emit_label.h"
-#include "emit_text3c.h"
+#include "emit_bb_seq.h"
+#include "emit_defs.h"
 #include "emit_buf.h"
+#include "emit_form.h"
+#include "emit_text3c.h"
+#include "emit_insn.h"
 #include "emit_mode.h"
-#include "emit.h"
+#include "emit_label.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -133,7 +140,6 @@ void emit_brokered_epilogue_ret(int result)
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_lea_rdi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr)
 {
-
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
@@ -159,7 +165,6 @@ void emit_lea_rdi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr)
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_lea_rdx_strtab_sym(const char *sym_label, uint64_t in_proc_ptr)
 {
-
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:   {
@@ -246,11 +251,9 @@ void emit_mov_edi_imm32(int val)
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_jz_retskip(int pc)
 {
-
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
-
         bb_emit_byte(0x90);
         return;
     case EMIT_TEXT_INLINE:
@@ -326,7 +329,6 @@ void emit_call_sym_param(const char *sym_or_param)
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
-
         return;
     case EMIT_TEXT_INLINE:
     case EMIT_TEXT: {
@@ -342,7 +344,6 @@ void emit_call_sym_param(const char *sym_or_param)
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_noop_macro(const char *macro_name)
 {
-
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
@@ -355,11 +356,11 @@ void emit_noop_macro(const char *macro_name)
         return;
     }
 }
+
 /*----------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fallback,
                     int port, bb_label_t *lbl_succ, bb_label_t *lbl_fail)
 {
-
     if (emit_bb_is_format_mode()) {
         char call_frag[BB_LABEL_NAME_MAX + 32];
         snprintf(call_frag, sizeof(call_frag), "call %s@PLT", fn_name);
@@ -410,7 +411,6 @@ void emit_bb_port_call_rip(uint64_t zeta_ptr, const char *zeta_label,
     switch (bb_emit_mode) {
     case EMIT_BINARY_WIRED:
     case EMIT_BINARY_BROKERED:
-
         emit_bb_port_call(zeta_ptr, fn_name, fn_fallback, port, lbl_succ, lbl_fail);
         return;
     case EMIT_TEXT_INLINE:
@@ -466,7 +466,6 @@ void emit_load_delta_cmp_imm(int n, bb_label_t *lbl_succ, bb_label_t *lbl_fail)
             char args[32]; snprintf(args, sizeof(args), "eax, %d", n);
             fmt_body_append("mov", "eax, [r10]");
             fmt_body_append("cmp", args);
-
             char jne[BB_LABEL_NAME_MAX + 8];
             snprintf(jne, sizeof(jne), "jne %s", lbl_fail->name);
             fmt_body_append(jne, "");
@@ -518,7 +517,7 @@ void emit_load_siglen_sub_cmp_delta(int n, uint64_t siglen_addr,
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         if (emit_bb_is_format_mode()) {
             char args[32]; snprintf(args, sizeof(args), "eax, %d", n);
-            fmt_body_append("lea", "rcx, [rip + Σlen]");
+            fmt_body_append("lea", "rcx, [rip + \xCE\xA3len]");
             fmt_body_append("mov", "eax, [rcx]");
             fmt_body_append("sub", args);
             fmt_body_append("mov", "ecx, eax");
@@ -532,7 +531,7 @@ void emit_load_siglen_sub_cmp_delta(int n, uint64_t siglen_addr,
         }
         FILE *f = emit_outf();
         char args[64];
-        bb3c_format(f, "", "lea", "rcx, [rip + Σlen]");
+        bb3c_format(f, "", "lea", "rcx, [rip + \xCE\xA3len]");
         bb3c_format(f, "", "mov", "eax, [rcx]");
         snprintf(args, sizeof(args), "eax, %d", n);
         bb3c_format(f, "", "sub", args);
@@ -608,7 +607,7 @@ void emit_sigma_plus_delta_to_rdi(uint64_t sigma_addr, uint64_t siglen_addr)
     case EMIT_MACRO_DEF: {
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         if (emit_bb_is_format_mode()) {
-            fmt_body_append("lea", "rcx, [rip + Σ]");
+            fmt_body_append("lea", "rcx, [rip + \xCE\xA3]");
             fmt_body_append("mov", "rax, [rcx]");
             fmt_body_append("movsxd", "rcx, [r10]");
             fmt_body_append("lea", "rax, [rax+rcx]");
@@ -616,9 +615,7 @@ void emit_sigma_plus_delta_to_rdi(uint64_t sigma_addr, uint64_t siglen_addr)
             return;
         }
         FILE *f = emit_outf();
-        char args[80];
-        (void)args;
-        bb3c_format(f, "", "lea", "rcx, [rip + Σ]");
+        bb3c_format(f, "", "lea", "rcx, [rip + \xCE\xA3]");
         bb3c_format(f, "", "mov", "rax, [rcx]");
         bb3c_format(f, "", "movsxd", "rcx, [r10]");
         bb3c_format(f, "", "lea", "rax, [rax+rcx]");
@@ -657,11 +654,10 @@ void emit_bounds_check_delta_plus_len(int len, uint64_t siglen_addr, bb_label_t 
     case EMIT_MACRO_DEF: {
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         if (emit_bb_is_format_mode()) {
-
             char add_args[32]; snprintf(add_args, sizeof(add_args), "eax, %d", len);
             fmt_body_append("mov", "eax, [r10]");
             fmt_body_append("add", add_args);
-            fmt_body_append("lea", "rcx, [rip + Σlen]");
+            fmt_body_append("lea", "rcx, [rip + \xCE\xA3len]");
             fmt_body_append("cmp", "eax, [rcx]");
             char jg[BB_LABEL_NAME_MAX + 8];
             snprintf(jg, sizeof(jg), "jg %s", lbl_fail->name);
@@ -672,20 +668,10 @@ void emit_bounds_check_delta_plus_len(int len, uint64_t siglen_addr, bb_label_t 
         bb3c_format(f, "", "mov", "eax, [r10]");
         char args[32]; snprintf(args, sizeof(args), "eax, %d", len);
         bb3c_format(f, "", "add", args);
-        bb3c_format(f, "", "lea", "rcx, [rip + Σlen]");
+        bb3c_format(f, "", "lea", "rcx, [rip + \xCE\xA3len]");
         bb3c_format(f, "", "cmp", "eax, [rcx]");
         emit_jmp(lbl_fail, JMP_JG);
         return;
     }
     }
 }
-
-
-
-
-
-
-
-
-
-
