@@ -175,8 +175,15 @@ static DESCR_t bb_strrel(tree_t *e, bb_strrelop_t op)
     DESCR_t l = bb_eval_value(e->c[0]);
     DESCR_t r = bb_eval_value(e->c[1]);
     if (IS_FAIL_fn(l) || IS_FAIL_fn(r)) return FAILDESCR;
-    const char *ls = VARVAL_fn(l); if (!ls) ls = "";
-    const char *rs = VARVAL_fn(r); if (!rs) rs = "";
+    /* Coerce integer/real to string image for comparison */
+    char _lb[64], _rb[64];
+    const char *ls, *rs;
+    if (IS_INT_fn(l))       { snprintf(_lb,sizeof _lb,"%lld",(long long)l.i); ls=_lb; }
+    else if (IS_REAL_fn(l)) { real_str(l.r,_lb,sizeof _lb); ls=_lb; }
+    else                    { ls=VARVAL_fn(l); if(!ls) ls=""; }
+    if (IS_INT_fn(r))       { snprintf(_rb,sizeof _rb,"%lld",(long long)r.i); rs=_rb; }
+    else if (IS_REAL_fn(r)) { real_str(r.r,_rb,sizeof _rb); rs=_rb; }
+    else                    { rs=VARVAL_fn(r); if(!rs) rs=""; }
     int cmp = strcmp(ls, rs);
     int ok;
     switch (op) {
@@ -188,7 +195,7 @@ static DESCR_t bb_strrel(tree_t *e, bb_strrelop_t op)
     case BBS_LNE: ok = (cmp != 0); break;
     default:      ok = 0;          break;
     }
-    return ok ? r : FAILDESCR;
+    return ok ? STRVAL(GC_strdup(rs)) : FAILDESCR;
 }
 
 /*------------------------------------------------------------------------------------------------------------------------------
