@@ -87,7 +87,7 @@ RT_PIC_SRCS := \
     $(RT)/x86/emit_mode.c \
     $(RT)/x86/emit_bb_seq.c \
     $(RT)/x86/emit_bb_flat.c \
-    $(RT)/x86/emit_bb_box.c \
+    $(RT)/x86/emit_bb.c \
     $(RT)/x86/emit_sm_op.c \
     \
     $(RT)/x86/bb_boxes.c \
@@ -302,7 +302,7 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/emit_sm_binary.c -o $(OBJ)/emit_sm_binary.o
 	$(CC) $(CRT)   -c $(RT)/x86/emit_sm_text.c -o $(OBJ)/emit_sm_text.o
 	$(CC) $(CRT)   -c $(RT)/x86/emit_sm_op.c -o $(OBJ)/emit_sm_op.o
-	$(CC) $(CRT)   -c $(RT)/x86/emit_bb_box.c -o $(OBJ)/emit_bb_box.o
+	$(CC) $(CRT)   -c $(RT)/x86/emit_bb.c -o $(OBJ)/emit_bb_box.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/rt/rt.c   -o $(OBJ)/rt.o
 	$(CC) $(CRT)   -c $(RT)/x86/emit_sm_shape.c -o $(OBJ)/emit_sm_shape.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_globals.c -o $(OBJ)/interp_globals.o
