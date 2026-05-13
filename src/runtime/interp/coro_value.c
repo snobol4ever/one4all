@@ -382,6 +382,39 @@ static void bb_augop_writeback(tree_t *lhs, DESCR_t res)
  * FRAME.env[ival].  Outside an Icon frame, TT_VAR delegates to eval_node which
  * does the SNOBOL4 NV_GET_fn lookup.
  *----------------------------------------------------------------------------------------------------------------------------*/
+
+/* IJ-3: icn_proc_as_value — resolve a bare name to a procedure value.
+ * When a TT_VAR name is used as a value and NV_GET returns null,
+ * check if it names a user proc or known builtin.
+ * Returns DT_E for user procs, DT_S(name) for builtins, FAILDESCR if neither. */
+static DESCR_t icn_proc_as_value(const char *name)
+{
+    if (!name || name[0] == '&') return FAILDESCR;
+    for (int i = 0; i < proc_count; i++) {
+        if (proc_table[i].name && strcmp(proc_table[i].name, name) == 0) {
+            DESCR_t pv; pv.v = DT_E;
+            pv.slen = (uint32_t)(proc_table[i].nparams > 0 ? proc_table[i].nparams : 0);
+            pv.i = proc_table[i].entry_pc;
+            return pv;
+        }
+    }
+    static const char *builtins[] = {
+        "write","writes","read","reads","close","open","remove","flush",
+        "put","get","pull","push","pop","list","image","proc","type","copy",
+        "string","integer","real","numeric","ord","char","reverse","sort","sortf",
+        "find","match","many","any","upto","bal","move","tab","pos",
+        "map","repl","trim","left","right","center","detab","entab",
+        "abs","sqrt","sin","cos","tan","atan","exp","log",
+        "iand","ior","ixor","ishift","icom",
+        "table","key","insert","delete","member","args","level",
+        "collect","stop","exit","runerr","name","variable","seq",
+        NULL
+    };
+    for (int i = 0; builtins[i]; i++)
+        if (strcmp(builtins[i], name) == 0) return STRVAL(name);
+    return FAILDESCR;
+}
+
 DESCR_t bb_eval_value(tree_t *e)
 {
     if (!e) return NULVCL;
@@ -411,7 +444,14 @@ DESCR_t bb_eval_value(tree_t *e)
              * them from the scope to force NV storage during lower_proc_skeletons. */
             if (sv.v != 0) return sv;
         }
-        if (e->v.sval) return NV_GET_fn(e->v.sval);
+        if (e->v.sval) {
+            DESCR_t nv = NV_GET_fn(e->v.sval);
+            /* IJ-3: if NV doesn't have it, try proc lookup */
+            if (!IS_FAIL_fn(nv) && (nv.v != DT_SNUL)) return nv;
+            DESCR_t pv = icn_proc_as_value(e->v.sval);
+            if (!IS_FAIL_fn(pv)) return pv;
+            return nv;  /* original NV result (null) */
+        }
         return NULVCL;
     }
 
@@ -425,9 +465,17 @@ DESCR_t bb_eval_value(tree_t *e)
     case TT_NUL:
     case TT_KEYWORD:
         return eval_node(e);
-    case TT_VAR:
-        /* frame_depth == 0: SNOBOL4-style lookup via eval_node */
-        return eval_node(e);
+    case TT_VAR: {
+        /* frame_depth == 0: SNOBOL4-style lookup via eval_node.
+         * IJ-3: if NV has no value, fall back to proc lookup. */
+        DESCR_t r = eval_node(e);
+        if (!IS_FAIL_fn(r) && r.v != DT_SNUL) return r;
+        if (e->v.sval) {
+            DESCR_t pv = icn_proc_as_value(e->v.sval);
+            if (!IS_FAIL_fn(pv)) return pv;
+        }
+        return r;
+    }
 
     /* RS-22a: TT_ASSIGN — slot store, IDX, FIELD, ITERATE, RANDOM lvalue paths.
      * Mirrors interp_eval.c lines 373-474; all interp_eval(child) replaced

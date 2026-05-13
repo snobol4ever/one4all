@@ -83,6 +83,7 @@ extern int   g_kw_ctx;           /* set by execute_program, read by NV_SET_fn gu
 /* ── Raku file-handle table (defined in interp_globals.c) ─────────────── */
 #define RAKU_FH_MAX 64
 extern FILE *raku_fh_table[RAKU_FH_MAX];
+extern char *raku_fh_name[RAKU_FH_MAX];  /* IJ-3: filename for image() */
 extern int   raku_fh_init;
 void  raku_fh_ensure_init(void);
 int   raku_fh_alloc(FILE *fp);

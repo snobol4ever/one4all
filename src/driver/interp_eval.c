@@ -460,15 +460,79 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
     if (!strcmp(fn,"image") && nargs == 0) {
         *out = STRVAL("&null"); return 1;
     }
+    /* IJ-3: args(proc_val) — return arity of a procedure value.
+     * args(f) where f is DT_E (user proc): return nparams (-1 = varargs, 0 = none).
+     * args(f) where f is DT_S (builtin name): return -2 (vararg convention). */
+    if (!strcmp(fn,"args") && nargs == 1) {
+        DESCR_t a = args[0];
+        if (a.v == DT_E) {
+            /* Look up proc by entry_pc */
+            for (int i=0;i<proc_count;i++) {
+                if (proc_table[i].entry_pc == (int)a.i) {
+                    *out = INTVAL(proc_table[i].nparams <= 0 ? -2 : proc_table[i].nparams);
+                    return 1;
+                }
+            }
+            *out = INTVAL(-2); return 1;
+        }
+        if (IS_STR_fn(a)) {
+            /* Builtin: -2 = vararg */
+            *out = INTVAL(-2); return 1;
+        }
+        *out = FAILDESCR; return 1;
+    }
+    /* IJ-3: proc(name, arity) — look up procedure by name+arity */
+    if (!strcmp(fn,"proc") && nargs == 2) {
+        const char *pname = VARVAL_fn(args[0]);
+        int arity = (int)to_int(args[1]);
+        if (!pname) { *out = FAILDESCR; return 1; }
+        for (int i = 0; i < proc_count; i++) {
+            if (proc_table[i].name && strcmp(proc_table[i].name, pname) == 0) {
+                if (arity < 0 || proc_table[i].nparams == arity || proc_table[i].nparams <= 0) {
+                    DESCR_t pv; pv.v = DT_E;
+                    pv.slen = (uint32_t)(arity >= 0 ? arity : 0);
+                    pv.i    = proc_table[i].entry_pc;
+                    *out = pv; return 1;
+                }
+            }
+        }
+        /* Builtin proc: return DT_S with the name as a callable sentinel */
+        *out = STRVAL(GC_strdup(pname)); return 1;
+    }
     if (!strcmp(fn,"image") && nargs == 1) {
         DESCR_t av = args[0];
         if (IS_FAIL_fn(av)) { *out = FAILDESCR; return 1; }
-        char *buf = GC_malloc(128);
+        char *buf = GC_malloc(256);
         if (av.v == DT_SNUL)     { *out = STRVAL("&null"); return 1; }
-        if (IS_INT_fn(av))       { snprintf(buf,128,"%lld",(long long)av.i); *out = STRVAL(buf); return 1; }
+        /* IJ-3: file values — integer FH index with name in raku_fh_name */
+        if (IS_INT_fn(av)) {
+            int idx = (int)av.i;
+            if (idx >= 0 && idx < RAKU_FH_MAX && raku_fh_name[idx]) {
+                snprintf(buf,256,"file(%s)",raku_fh_name[idx]);
+                *out = STRVAL(buf); return 1;
+            }
+            snprintf(buf,256,"%lld",(long long)av.i); *out = STRVAL(buf); return 1;
+        }
         if (IS_REAL_fn(av))      { real_str(av.r,buf,128); *out = STRVAL(buf); return 1; }
         if (av.v==DT_T)          { snprintf(buf,128,"table(%d)",av.tbl?av.tbl->size:0); *out = STRVAL(buf); return 1; }
-        if (av.v==DT_DATA)       { snprintf(buf,128,"record"); *out = STRVAL(buf); return 1; }
+        /* IJ-3: DT_DATA — distinguish icnlist from user records */
+        if (av.v==DT_DATA && av.u) {
+            const char *tname = av.u->type ? av.u->type->name : "record";
+            if (strcmp(tname,"icnlist")==0) {
+                int cnt = (av.u->type && av.u->type->nfields>=2 && av.u->fields)
+                          ? (int)av.u->fields[1].i : 0;
+                snprintf(buf,128,"list(%d)",cnt); *out = STRVAL(buf); return 1;
+            }
+            snprintf(buf,256,"record(%s)",tname); *out = STRVAL(buf); return 1;
+        }
+        if (av.v==DT_DATA)       { *out = STRVAL("record"); return 1; }
+        /* IJ-3: DT_E = procedure value */
+        if (av.v==DT_E) {
+            for (int i=0;i<proc_count;i++)
+                if (proc_table[i].entry_pc==(int)av.i)
+                    { snprintf(buf,128,"procedure %s",proc_table[i].name); *out=STRVAL(buf); return 1; }
+            snprintf(buf,128,"procedure"); *out=STRVAL(buf); return 1;
+        }
         const char *s=VARVAL_fn(av); if (!s) s = "";
         int sl = (int)strlen(s);
         char *outs = GC_malloc(sl*4 + 3);
@@ -1196,6 +1260,7 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         if (!fp) { *out = FAILDESCR; return 1; }
         int idx = raku_fh_alloc(fp);
         if (idx < 0) { fclose(fp); *out = FAILDESCR; return 1; }
+        if (idx >= 0 && idx < RAKU_FH_MAX) raku_fh_name[idx] = GC_strdup(path);  /* IJ-3 */
         *out = INTVAL(idx); return 1;
     }
 
@@ -2504,12 +2569,28 @@ DESCR_t interp_eval(tree_t *e)
             if (!strcmp(fn,"image") && nargs == 1) {
                 DESCR_t av = interp_eval(e->c[1]);
                 if (IS_FAIL_fn(av)) return FAILDESCR;  /* IC-9: image(?T_empty) etc must fail */
-                char *buf = GC_malloc(128);
+                char *buf = GC_malloc(256);
                 if (av.v == DT_SNUL)     return STRVAL("&null");
-                if (IS_INT_fn(av))       { snprintf(buf,128,"%lld",(long long)av.i); return STRVAL(buf); }
+                /* IJ-3: file values */
+                if (IS_INT_fn(av)) {
+                    int idx=(int)av.i;
+                    if(idx>=0&&idx<RAKU_FH_MAX&&raku_fh_name[idx]){snprintf(buf,256,"file(%s)",raku_fh_name[idx]);return STRVAL(buf);}
+                    snprintf(buf,256,"%lld",(long long)av.i); return STRVAL(buf);
+                }
                 if (IS_REAL_fn(av))      { real_str(av.r,buf,128); return STRVAL(buf); }
                 if (av.v==DT_T)          { snprintf(buf,128,"table(%d)",av.tbl?av.tbl->size:0); return STRVAL(buf); }
-                if (av.v==DT_DATA)       { snprintf(buf,128,"record"); return STRVAL(buf); }
+                /* IJ-3: DT_DATA — list vs record */
+                if (av.v==DT_DATA && av.u) {
+                    const char *tname=av.u->type?av.u->type->name:"record";
+                    if(strcmp(tname,"icnlist")==0){int cnt=(av.u->type&&av.u->type->nfields>=2&&av.u->fields)?(int)av.u->fields[1].i:0;snprintf(buf,128,"list(%d)",cnt);return STRVAL(buf);}
+                    snprintf(buf,256,"record(%s)",tname); return STRVAL(buf);
+                }
+                if (av.v==DT_DATA)       { return STRVAL("record"); }
+                /* IJ-3: DT_E = procedure */
+                if (av.v==DT_E) {
+                    for(int i=0;i<proc_count;i++) if(proc_table[i].entry_pc==(int)av.i){snprintf(buf,128,"procedure %s",proc_table[i].name);return STRVAL(buf);}
+                    return STRVAL("procedure");
+                }
                 /* String: produce "abc" with C-style escapes for control chars and " and \. */
                 const char *s=VARVAL_fn(av); if (!s) s = "";
                 int sl = (int)strlen(s);

@@ -15,16 +15,19 @@ const char *g_raku_subject = ""; /* subject of last match */
 /* RK-38: file handle table */
 #define RAKU_FH_MAX 64
 FILE *raku_fh_table[RAKU_FH_MAX];
+char *raku_fh_name[RAKU_FH_MAX];   /* IJ-3: filename for image() */
 int   raku_fh_init = 0;
 void raku_fh_ensure_init(void) {
     if (raku_fh_init) return;
     memset(raku_fh_table,0,sizeof raku_fh_table);
+    memset(raku_fh_name,0,sizeof raku_fh_name);
     raku_fh_table[0]=stdin; raku_fh_table[1]=stdout; raku_fh_table[2]=stderr;
+    raku_fh_name[0]="&input"; raku_fh_name[1]="&output"; raku_fh_name[2]="&errout";
     raku_fh_init=1;
 }
 int raku_fh_alloc(FILE *fp) {
     raku_fh_ensure_init();
-    for(int i=3;i<RAKU_FH_MAX;i++) if(!raku_fh_table[i]){raku_fh_table[i]=fp;return i;}
+    for(int i=3;i<RAKU_FH_MAX;i++) if(!raku_fh_table[i]){raku_fh_table[i]=fp;raku_fh_name[i]=NULL;return i;}
     return -1;
 }
 FILE *raku_fh_get(int idx){
@@ -33,7 +36,7 @@ FILE *raku_fh_get(int idx){
     return raku_fh_table[idx];
 }
 void raku_fh_free(int idx){
-    if(raku_fh_init&&idx>=3&&idx<RAKU_FH_MAX) raku_fh_table[idx]=NULL;
+    if(raku_fh_init&&idx>=3&&idx<RAKU_FH_MAX){ raku_fh_table[idx]=NULL; /* IJ-3: keep name for image() */ }
 }
 
 static void stmt_init(void) {}
