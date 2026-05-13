@@ -161,6 +161,7 @@ static void emit_mov_rdx_imm32(int v)
     case EMIT_TEXT_INLINE:
     case EMIT_MACRO_DEF: {
         char args[32]; snprintf(args, sizeof(args), "rdx, %d", v);
+        if (emit_bb_is_format_mode()) { fmt_body_append("mov", args); return; }
         bb3c_format(bb_emit_out ? bb_emit_out : stdout, "", "mov", args);
         return;
     }

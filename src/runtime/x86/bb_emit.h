@@ -138,6 +138,8 @@ void emit_bb_format_port(bb_label_t *lbl_entry, const char *macro_name, const ch
 
 /* emit_bb_is_format_mode — returns 1 if g_bb_emit_format and TEXT/TEXT_INLINE mode. */
 int  emit_bb_is_format_mode(void);
+/* fmt_body_append — accumulate one instruction fragment into the FORMAT port body buffer. */
+void fmt_body_append(const char *instr, const char *operands);
 
 void emit_bb_port_call_rip(uint64_t zeta_ptr, const char *zeta_label,
                         const char *fn_name, uint64_t fn_fallback,

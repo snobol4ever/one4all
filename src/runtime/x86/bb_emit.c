@@ -37,7 +37,7 @@ static void fmt_label_save(bb_label_t *lbl) {
     if (lbl && lbl->name[0]) snprintf(g_fmt_label, sizeof(g_fmt_label), "%s:", lbl->name);
     else g_fmt_label[0] = '\0';
 }
-static void fmt_body_append(const char *instr, const char *operands) {
+void fmt_body_append(const char *instr, const char *operands) {
     char frag[128];
     if (operands && operands[0]) snprintf(frag, sizeof(frag), "%s %s", instr, operands);
     else                          snprintf(frag, sizeof(frag), "%s", instr);
@@ -222,6 +222,7 @@ void bb_emit_push_r10(void)
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        if (emit_bb_is_format_mode()) { fmt_body_append("push", "r10"); return; }
         bb3c_format(emit_outf(), "", "push", "r10");
         return;
     }
@@ -239,6 +240,7 @@ void bb_emit_pop_r10(void)
     case EMIT_TEXT:
     case EMIT_MACRO_DEF:
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        if (emit_bb_is_format_mode()) { fmt_body_append("pop", "r10"); return; }
         bb3c_format(emit_outf(), "", "pop", "r10");
         return;
     }
@@ -429,6 +431,7 @@ void bb_emit_call_sym_plt(const char *sym, uint64_t fn_fallback)
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         char args[80];
         snprintf(args, sizeof(args), "%s@PLT", sym ? sym : "??sym??");
+        if (emit_bb_is_format_mode()) { fmt_body_append("call", args); return; }
         bb3c_format(emit_outf(), "", "call", args);
         return;
     }
@@ -728,6 +731,7 @@ void bb_emit_test_eax_eax(void)
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         if (bb_emit_mode == EMIT_TEXT && g_in_text_macro_body) return;
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        if (emit_bb_is_format_mode()) { fmt_body_append("test", "eax, eax"); return; }
         bb3c_format(emit_outf(), "", "test", "eax, eax");
         return;
     }
@@ -1813,6 +1817,17 @@ void emit_bb_port_call_rip(uint64_t zeta_ptr, const char *zeta_label,
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         break;
     }
+    /* EM-BB-FORMAT-8: FORMAT mode — same fused shape as emit_bb_port_call */
+    if (emit_bb_is_format_mode()) {
+        char call_frag[BB_LABEL_NAME_MAX + 32];
+        snprintf(call_frag, sizeof(call_frag), "call %s@PLT", fn_name ? fn_name : "??fn??");
+        fmt_body_append(call_frag, "");
+        char jne[BB_LABEL_NAME_MAX + 8];
+        snprintf(jne, sizeof(jne), "jne %s", lbl_succ->name);
+        fmt_body_append(jne, "");
+        emit_jmp(lbl_fail, JMP_JMP);
+        return;
+    }
     /* TEXT/INLINE path: push r10, lea rdi [rip+label], mov esi port, call fn, pop r10, test, jmp */
     FILE *f = emit_outf();
     bb3c_format(f, "", "push", "r10");
@@ -1958,10 +1973,15 @@ void emit_lea_rsi_strtab_sym(const char *sym_label, uint64_t in_proc_ptr)
     case EMIT_TEXT:
     case EMIT_MACRO_DEF: {
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
-        FILE *f = emit_outf();
         char args[80];
         snprintf(args, sizeof(args), "rcx, [rip + %s]",
                  sym_label ? sym_label : "??sym??");
+        if (emit_bb_is_format_mode()) {
+            fmt_body_append("lea", args);
+            fmt_body_append("mov", "rsi, rcx");
+            return;
+        }
+        FILE *f = emit_outf();
         bb3c_format(f, "", "lea", args);
         bb3c_format(f, "", "mov", "rsi, rcx");
         return;
@@ -1989,9 +2009,15 @@ void bb_emit_add_delta_imm(int v)
     case EMIT_TEXT:
     case EMIT_MACRO_DEF: {
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        char args[32]; snprintf(args, sizeof(args), "eax, %d", v);
+        if (emit_bb_is_format_mode()) {
+            fmt_body_append("mov", "eax, [r10]");
+            fmt_body_append("add", args);
+            fmt_body_append("mov", "[r10], eax");
+            return;
+        }
         FILE *f = emit_outf();
         bb3c_format(f, "", "mov", "eax, [r10]");
-        char args[32]; snprintf(args, sizeof(args), "eax, %d", v);
         bb3c_format(f, "", "add", args);
         bb3c_format(f, "", "mov", "[r10], eax");
         return;
@@ -2019,9 +2045,15 @@ void bb_emit_sub_delta_imm(int v)
     case EMIT_TEXT:
     case EMIT_MACRO_DEF: {
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        char args[32]; snprintf(args, sizeof(args), "eax, %d", v);
+        if (emit_bb_is_format_mode()) {
+            fmt_body_append("mov", "eax, [r10]");
+            fmt_body_append("sub", args);
+            fmt_body_append("mov", "[r10], eax");
+            return;
+        }
         FILE *f = emit_outf();
         bb3c_format(f, "", "mov", "eax, [r10]");
-        char args[32]; snprintf(args, sizeof(args), "eax, %d", v);
         bb3c_format(f, "", "sub", args);
         bb3c_format(f, "", "mov", "[r10], eax");
         return;
@@ -2058,8 +2090,18 @@ void emit_sigma_plus_delta_to_rdi(uint64_t sigma_addr, uint64_t siglen_addr)
     case EMIT_TEXT:
     case EMIT_MACRO_DEF: {
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        if (emit_bb_is_format_mode()) {
+            /* FORMAT-7: accumulate sigma+delta→rdi fragments */
+            fmt_body_append("lea", "rcx, [rip + Σ]");
+            fmt_body_append("mov", "rax, [rcx]");
+            fmt_body_append("movsxd", "rcx, [r10]");
+            fmt_body_append("lea", "rax, [rax+rcx]");
+            fmt_body_append("mov", "rdi, rax");
+            return;
+        }
         FILE *f = emit_outf();
         char args[80];
+        (void)args;
         /* EM-BB-TEXT-ADDR: RIP-relative lea, not literal address */
         bb3c_format(f, "", "lea", "rcx, [rip + Σ]");
         bb3c_format(f, "", "mov", "rax, [rcx]");
@@ -2102,6 +2144,18 @@ void emit_bounds_check_delta_plus_len(int len, uint64_t siglen_addr, bb_label_t 
     case EMIT_TEXT:
     case EMIT_MACRO_DEF: {
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        if (emit_bb_is_format_mode()) {
+            /* FORMAT-7: accumulate bounds check fragments; caller provides flush jmp */
+            char add_args[32]; snprintf(add_args, sizeof(add_args), "eax, %d", len);
+            fmt_body_append("mov", "eax, [r10]");
+            fmt_body_append("add", add_args);
+            fmt_body_append("lea", "rcx, [rip + Σlen]");
+            fmt_body_append("cmp", "eax, [rcx]");
+            char jg[BB_LABEL_NAME_MAX + 8];
+            snprintf(jg, sizeof(jg), "jg %s", lbl_fail->name);
+            fmt_body_append(jg, "");
+            return;
+        }
         FILE *f = emit_outf();
         bb3c_format(f, "", "mov", "eax, [r10]");
         char args[32]; snprintf(args, sizeof(args), "eax, %d", len);
