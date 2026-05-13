@@ -22,10 +22,14 @@ typedef struct {
     int  offset;
 } bb_label_t;
 #define bb_label_defined(lbl)  ((lbl)->offset != BB_LABEL_UNRESOLVED)
+
 typedef enum { JMP_JMP=0, JMP_JE, JMP_JNE, JMP_JL, JMP_JGE, JMP_JG } jmp_kind_t;
+
 #define BB_PATCH_MAX  512
+
 typedef enum { PATCH_REL8, PATCH_REL32 } bb_patch_kind_t;
 typedef struct { int site; bb_label_t *label; bb_patch_kind_t kind; } bb_patch_t;
+
 #define EMIT_BINARY       EMIT_BINARY_WIRED
 #define EMIT_UNRESOLVED   BB_LABEL_UNRESOLVED
 #define EMIT_LABEL_MAX    BB_LABEL_NAME_MAX
@@ -67,7 +71,7 @@ void emit_label_init (bb_label_t *lbl, const char *name);
 void emit_label_initf(bb_label_t *lbl, const char *fmt, ...);
 void bb_label_init  (bb_label_t *lbl, const char *name);
 void bb_label_initf (bb_label_t *lbl, const char *fmt, ...);
-void bb_label_define(bb_label_t *lbl);  
+void bb_label_define(bb_label_t *lbl);
 #define IS_TEXT     (bb_emit_mode != EMIT_BINARY_WIRED && \
                      bb_emit_mode != EMIT_BINARY_BROKERED)
 #define IS_BIN      (bb_emit_mode == EMIT_BINARY_WIRED || \
@@ -226,4 +230,4 @@ void emit_mov_esi_imm32(int v);
 void emit_add_delta_imm(int v); void emit_sub_delta_imm(int v);
 void bb_label_init (bb_label_t *lbl, const char *name);
 void bb_label_initf(bb_label_t *lbl, const char *fmt, ...);
-#endif 
+#endif

@@ -56,4 +56,4 @@ void emit_flat_box_call_fn(bb_box_fn fn, const char *fn_name, void *z,
 #define flat_box_dispatch_jne_jmp(s,f)   emit_flat_dispatch_jne_jmp(s,f)
 #define flat_box_entry_dispatch(a,b)     emit_flat_entry_dispatch(a,b)
 #define bb_build_flat_text_reset()       emit_flat_reset()
-#endif 
+#endif

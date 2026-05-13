@@ -71,4 +71,4 @@ DESCR_t emit_walk_phase2(const SM_Program *prog, int phase2_start, int phase2_en
 #define flat_is_eligible_node(p)      emit_flat_eligible(p)
 #define patnd_is_fully_invariant(p)   emit_flat_invariant(p)
 #define sm_phase2_to_patnd(pr,s,e,ov) emit_walk_phase2(pr,s,e,ov)
-#endif 
+#endif
