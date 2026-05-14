@@ -111,7 +111,7 @@ int     is_global(const char *name);
 void    global_register(const char *name);
 
 
-extern DESCR_t  coro_drive_val;    /* the suspended value to return          */
+extern DESCR_t  icn_drive_val;    /* the suspended value to return          */
 
 int     scope_add(IcnScope *sc, const char *name);
 int     scope_get(IcnScope *sc, const char *name);

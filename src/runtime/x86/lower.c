@@ -1270,9 +1270,9 @@ static void lower_expr_inner(const tree_t *t)
     case TT_GLOBAL:                           lower_global(t);        return;
     case TT_INITIAL:                          lower_initial(t);       return;
     /* sections */
-    case TT_SECTION:                          lower_section_3(t, "ICN_SECTION_RANGE"); return;
-    case TT_SECTION_PLUS:                     lower_section_3(t, "ICN_SECTION_PLUS");  return;
-    case TT_SECTION_MINUS:                    lower_section_3(t, "ICN_SECTION_MINUS"); return;
+    case TT_SECTION:       { ICN_BB_EVAL(t); lower_section_3(t, "ICN_SECTION_RANGE"); return; }
+    case TT_SECTION_PLUS:  { ICN_BB_EVAL(t); lower_section_3(t, "ICN_SECTION_PLUS");  return; }
+    case TT_SECTION_MINUS: { ICN_BB_EVAL(t); lower_section_3(t, "ICN_SECTION_MINUS"); return; }
     case TT_BANG_BINARY:                      lower_bang_binary(t);   return;
     /* generators */
     case TT_SUSPEND:                          lower_suspend(t);       return;

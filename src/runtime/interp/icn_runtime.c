@@ -90,10 +90,10 @@ IcnFrame frame_stack[FRAME_STACK_MAX];
 int      frame_depth = 0;
 
 /* coro_drive_fnc suspend-value passthrough: while running the every-body,
- * set coro_drive_node = the TT_FNC being driven and coro_drive_val = suspended value.
- * interp_eval(TT_FNC) returns coro_drive_val directly when e == coro_drive_node. */
-tree_t  *coro_drive_node = NULL;
-DESCR_t  coro_drive_val;
+ * set icn_drive_node = the TT_FNC being driven and icn_drive_val = suspended value.
+ * interp_eval(TT_FNC) returns icn_drive_val directly when e == icn_drive_node. */
+tree_t  *icn_drive_node = NULL;
+DESCR_t  icn_drive_val;
 
 /* Convenience helpers that mirror the old flat-global helpers */
 void frame_push(tree_t *n, long v, const char *sv) {
@@ -753,7 +753,7 @@ tree_t *find_leaf_suspendable(tree_t *e) {
 /*----------------------------------------------------------------------------------------------------------------------------
  * icn_bb_cat — TT_CAT with generative child  ("str" || gen_expr)
  *
- * Pumps the leaf generator child, injects each tick via coro_drive_node,
+ * Pumps the leaf generator child, injects each tick via icn_drive_node,
  * re-evaluates the full TT_CAT expression each tick to produce the concatenated
  * result string.  Handles the polyglot case: every write("ICN: " || (1 to 3)).
  *--------------------------------------------------------------------------------------------------------------------------*/
@@ -769,10 +769,10 @@ DESCR_t icn_bb_cat(void *zeta, int entry) {
     for (;;) {
         DESCR_t tick = z->gen.fn(z->gen.ζ, e2);
         if (IS_FAIL_fn(tick)) return FAILDESCR;
-        coro_drive_node = z->leaf;
-        coro_drive_val  = tick;
+        icn_drive_node = z->leaf;
+        icn_drive_val  = tick;
         DESCR_t result = bb_eval_value(z->cat_expr);
-        coro_drive_node = NULL;
+        icn_drive_node = NULL;
         if (!IS_FAIL_fn(result)) return result;
         e2 = β;  /* try next leaf value */
     }
@@ -787,7 +787,7 @@ DESCR_t icn_bb_cat(void *zeta, int entry) {
  *     Pumps rhs_gen each tick, writes result to lhs.
  *   icn_bb_assign_cat — RHS has mutable scalars alongside a generator:
  *     e.g.  every total := total + (1 to n)
- *     Re-evaluates full RHS each tick via coro_drive_node so `total` is fresh.
+ *     Re-evaluates full RHS each tick via icn_drive_node so `total` is fresh.
  *--------------------------------------------------------------------------------------------------------------------------*/
 typedef struct { bb_node_t rhs_gen; tree_t *lhs; } icn_assign_gen_state_t;
 static DESCR_t icn_assign_write(tree_t *lhs, DESCR_t val) {
@@ -815,10 +815,10 @@ static DESCR_t icn_bb_assign_cat(void *zeta, int entry) {
     for (;;) {
         DESCR_t tick = z->leaf_gen.fn(z->leaf_gen.ζ, e2);
         if (IS_FAIL_fn(tick)) return FAILDESCR;
-        coro_drive_node = z->leaf;
-        coro_drive_val  = tick;
+        icn_drive_node = z->leaf;
+        icn_drive_val  = tick;
         DESCR_t val = bb_eval_value(z->rhs_expr);
-        coro_drive_node = NULL;
+        icn_drive_node = NULL;
         if (!IS_FAIL_fn(val)) return icn_assign_write(z->lhs, val);
         e2 = β;
     }
@@ -1735,7 +1735,7 @@ bb_node_t icn_bb_build(tree_t *e) {
     /* ── TT_ASSIGN with generative RHS — IC-6 / mutable-scalar fix ─────────────
      * Two variants selected at icn_bb_build time:
      *   cat: RHS has an TT_VAR sibling of the leaf generator — re-eval full RHS
-     *        each tick via coro_drive_node injection so mutable vars (e.g. `total`
+     *        each tick via icn_drive_node injection so mutable vars (e.g. `total`
      *        in `total := total + (1 to n)`) are read fresh on every iteration.
      *   gen: pure generator RHS, no mutable scalar siblings — pump directly. */
     if (e->t == TT_ASSIGN && e->n >= 2 && is_suspendable(e->c[1])) {
@@ -1954,10 +1954,10 @@ DESCR_t icn_bb_every(void *zeta, int entry) {
         /* Inject generator value so the body's reference to the same generator AST
          * node (e.g. `(1 to n)` in `x := x + (1 to n)`) returns the already-produced
          * value rather than building a fresh icn_bb_build and restarting from α. */
-        tree_t *saved_drive_node = coro_drive_node;
-        DESCR_t saved_drive_val = coro_drive_val;
-        coro_drive_node = z->gen_ast;
-        coro_drive_val  = v;
+        tree_t *saved_drive_node = icn_drive_node;
+        DESCR_t saved_drive_val = icn_drive_val;
+        icn_drive_node = z->gen_ast;
+        icn_drive_val  = v;
         /* GOAL-ICON-BB-COMPLETE: clear loop_next before body so that a `next`
          * fired in a prior iteration (which set FRAME.loop_next=1 and caused
          * bb_exec_stmt to return early) does not bleed into this iteration's
@@ -1969,8 +1969,8 @@ DESCR_t icn_bb_every(void *zeta, int entry) {
         FRAME.loop_next = 0;
         bb_exec_stmt(z->body);
         FRAME.loop_next = saved_loop_next;  /* restore outer loop's next state */
-        coro_drive_node = saved_drive_node;
-        coro_drive_val  = saved_drive_val;
+        icn_drive_node = saved_drive_node;
+        icn_drive_val  = saved_drive_val;
     }
     return v;
 }
@@ -2086,11 +2086,11 @@ DESCR_t icn_bb_bang_binary(void *zeta, int entry) {
         /* E1 is a TT_FNC call node — inject arg as the first argument child
          * via drive passthrough (original mechanism for  f(x)!generator). */
         if (z->proc_expr->n >= 2 && z->proc_expr->c[1]) {
-            coro_drive_node = z->proc_expr->c[1];
-            coro_drive_val  = arg;
+            icn_drive_node = z->proc_expr->c[1];
+            icn_drive_val  = arg;
         }
         DESCR_t result = bb_eval_value(z->proc_expr);
-        coro_drive_node = NULL;
+        icn_drive_node = NULL;
         if (!IS_FAIL_fn(result)) return result;
         /* E1 failed — try next E2 value */
     }
