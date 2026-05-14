@@ -90,6 +90,19 @@ static void emit_bb_rtcall_data(int nquads, char *zlbl_out) {
     bb3c_format(out, "", ".intel_syntax", "noprefix");
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static void emit_bb_icn_text_data(int nquads, char *zlbl_out) {
+    int id = g_flat_node_id++;
+    snprintf(zlbl_out, 80, ".Licn%d_z", id);
+    char zlbl_def[88]; snprintf(zlbl_def, sizeof(zlbl_def), "%s:", zlbl_out);
+    FILE *out = emit_outf();
+    bb3c_format(out, "",       ".section", ".data");
+    bb3c_format(out, zlbl_def, ".quad",    "0");
+    for (int i = 1; i < nquads; i++)
+        bb3c_format(out, "", ".quad", "0");
+    bb3c_format(out, "", ".section", ".text");
+    bb3c_format(out, "", ".intel_syntax", "noprefix");
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_bb_rtcall(const char *banner, const char *arg, void *zeta, const char *fn_name, uint64_t fn_fallback, int nquads, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_beta) {
     emit_bb_box_banner(banner, arg ? arg : "");
     if (IS_TEXT) {
