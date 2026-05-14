@@ -459,6 +459,19 @@ IR_t * IR_exec_node(IR_t * nd) {
         }
         nd->state = 0; nd->value = FAILDESCR; return nd->ω;
     }
+    case IR_ICN_LIMIT: {
+        icn_lim_dcg_t *z = (icn_lim_dcg_t *)nd->opaque;
+        if (!z) { nd->value = FAILDESCR; return nd->ω; }
+        if (nd->state == 0) z->count = 0;
+        nd->state = 1;
+        if (z->count >= z->max) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+        int tick = (z->count == 0) ? α : β;
+        DESCR_t v = z->gen.fn(z->gen.ζ, tick);
+        if (IS_FAIL_fn(v)) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+        z->count++;
+        nd->value = v;
+        return nd->γ;
+    }
     case IR_ICN_EVERY: {
         bb_node_t *gen = (bb_node_t *)nd->opaque;
         if (!gen) { nd->value = FAILDESCR; return nd->ω; }

@@ -136,3 +136,23 @@ IR_block_t *lower_icn_alternate(bb_node_t left, bb_node_t right) {
     cfg->entry = nd;
     return cfg;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* lower_icn_limit — DCG for (gen \ N) limit generator.
+ * Single node; opaque=icn_lim_dcg_t*{gen,max,count}; yields up to max ticks from gen. */
+IR_block_t *lower_icn_limit(bb_node_t gen, int64_t max) {
+    IR_block_t *cfg = IR_alloc(4, IR_LANG_ICN);
+    if (!cfg) return NULL;
+    IR_t *nd = IR_node_alloc(cfg, IR_ICN_LIMIT);
+    if (!nd) return NULL;
+    icn_lim_dcg_t *z = calloc(1, sizeof(*z));
+    z->gen   = gen;
+    z->max   = max < 0 ? 0 : max;
+    z->count = 0;
+    nd->opaque = (void *)z;
+    nd->α = nd;
+    nd->β = nd;
+    nd->γ = NULL;
+    nd->ω = NULL;
+    cfg->entry = nd;
+    return cfg;
+}

@@ -107,6 +107,7 @@ typedef enum {
     IR_ICN_TO_BY,       /* i to j by k — integer range with step; ival=lo, ival2=hi, ival3=step      */
     IR_ICN_ITERATE,     /* !str — char-by-char iteration; sval2=str, ival=len, counter=pos               */
     IR_ICN_ALTERNATE,   /* A|B — opaque=icn_alt_dcg_t*{gen[2],which}; left first then right              */
+    IR_ICN_LIMIT,       /* gen\N — opaque=icn_lim_dcg_t*{gen,max,count}; yield up to max ticks            */
     IR_E_COUNT       /* sentinel — number of kinds                                             */
 } IR_e;
 

@@ -1576,11 +1576,13 @@ bb_node_t icn_bb_build(tree_t *e) {
 
     /* ── IC-2b: TT_LIMIT  (gen \ N) ──────────────────────────────────────── */
     if (e->t == TT_LIMIT && e->n >= 2) {
-        icn_limit_state_t *z = calloc(1, sizeof(*z));
-        z->gen = icn_bb_build(e->c[0]);
-        DESCR_t nd = bb_eval_value(e->c[1]);
-        z->max = IS_INT_fn(nd) ? nd.i : 0;
-        return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
+        bb_node_t lim_gen = icn_bb_build(e->c[0]);
+        DESCR_t lim_nd = bb_eval_value(e->c[1]);
+        int64_t lim_max = IS_INT_fn(lim_nd) ? (int64_t)lim_nd.i : 0;
+        IR_block_t *lim_cfg = lower_icn_limit(lim_gen, lim_max);
+        icn_dcg_state_t *lim_dz = calloc(1, sizeof(*lim_dz));
+        lim_dz->cfg = lim_cfg; lim_dz->first = 1;
+        return (bb_node_t){ icn_bb_dcg, lim_dz, 0 };
     }
 
     /* ── IC-2b: TT_EVERY  (every gen [do body]) ──────────────────────────── */
