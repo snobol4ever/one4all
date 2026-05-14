@@ -52,9 +52,8 @@ void emit_bb_format_port(bb_label_t *lbl_entry, const char *macro_name, const ch
 {
     if (!emit_bb_is_format_mode()) return;
     char lbl_str[BB_LABEL_NAME_MAX + 2] = "";
-    if (lbl_entry && lbl_entry->name[0]) {
+    if (lbl_entry && lbl_entry->name[0])
         snprintf(lbl_str, sizeof(lbl_str), "%s:", lbl_entry->name);
-    }
     bb3c_format(bb_emit_out ? bb_emit_out : stdout,
                 lbl_str,
                 macro_name ? macro_name : "",
@@ -158,9 +157,8 @@ void emit_label_define(bb_label_t *lbl)
 {
     if (emit_bb_is_format_mode())
         fmt_label_save(lbl);
-    else {
+    else
         bb_label_define(lbl);
-    }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void bb3c_op(const char *mn, const char *fmt, ...)
@@ -1248,9 +1246,8 @@ void insn_mov_esi_i32(int v) {
     if (IS_TEXT) {
         if (bb_emit_mode == EMIT_MACRO_DEF)
             t3("mov","esi, \\n");
-        else {
+        else
             tf("mov","esi, %d",v); return;
-        }
     }
     B(0xBE); U32((uint32_t)v);
 }
@@ -1335,9 +1332,8 @@ void insn_test_rax_rax(void) {
     if (IS_TEXT) {
         if (emit_bb_is_format_mode())
             fmt_body_append("test","rax, rax");
-        else {
+        else
             t3("test","rax, rax"); return;
-        }
     }
     B(0x48); B(0x85); B(0xC0);
 }
@@ -1346,9 +1342,8 @@ void insn_test_eax_eax(void) {
     if (IS_TEXT) {
         if (emit_bb_is_format_mode())
             fmt_body_append("test","eax, eax");
-        else {
+        else
             t3("test","eax, eax"); return;
-        }
     }
     B(0x85); B(0xC0);
 }
@@ -1365,9 +1360,8 @@ void insn_push_r10(void) {
     if (IS_TEXT) {
         if (emit_bb_is_format_mode())
             fmt_body_append("push","r10");
-        else {
+        else
             t3("push","r10"); return;
-        }
     }
     B(0x41); B(0x52);
 }
@@ -1376,9 +1370,8 @@ void insn_pop_r10(void) {
     if (IS_TEXT) {
         if (emit_bb_is_format_mode())
             fmt_body_append("pop","r10");
-        else {
+        else
             t3("pop","r10"); return;
-        }
     }
     B(0x41); B(0x5A);
 }
@@ -1406,9 +1399,8 @@ void insn_call_plt(const char *sym, uint64_t fn_fallback) {
         char args[80]; snprintf(args,sizeof(args),"%s@PLT",sym?sym:"??");
         if (emit_bb_is_format_mode())
             fmt_body_append("call",args);
-        else {
+        else
             t3("call",args); return;
-        }
     }
     B(0x48); B(0xB8); U64(fn_fallback);
     B(0xFF); B(0xD0);
@@ -1540,9 +1532,8 @@ void emit_push_r10(void)
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         if (emit_bb_is_format_mode())
             fmt_body_append("push", "r10");
-        else {
+        else
             bb3c_format(emit_outf(), "", "push", "r10"); return;
-        }
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -1558,9 +1549,8 @@ void emit_pop_r10(void)
         if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
         if (emit_bb_is_format_mode())
             fmt_body_append("pop", "r10");
-        else {
+        else
             bb3c_format(emit_outf(), "", "pop", "r10"); return;
-        }
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/

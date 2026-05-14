@@ -904,9 +904,8 @@ int emit_sm_macro_library(FILE *out)
             if (render_macro_body(out, _t) != 0) return -1;                 \
         }                                                                   \
     } while (0)
-    for (int i = 0; i < G_SM_TEMPLATES_N; i++) {
+    for (int i = 0; i < G_SM_TEMPLATES_N; i++)
         EMIT_IF_NEW(&g_sm_templates[i]);
-    }
     EMIT_IF_NEW(&g_tpl_unhandled);
     EMIT_IF_NEW(&g_tpl_ret_var);
     #undef EMIT_IF_NEW
@@ -2356,9 +2355,8 @@ static void pattern_windows_collect(const SM_Program *prog)
         if (phase2_end < stmt_start) phase2_end = stmt_start;
         int has_variant = 0;
         DESCR_t root = sm_phase2_to_patnd(prog, stmt_start, phase2_end, &has_variant);
-        if (g_pat_windows_n >= MAX_PATTERN_WINDOWS) {
+        if (g_pat_windows_n >= MAX_PATTERN_WINDOWS)
             continue;
-        }
         pattern_window_t *w = &g_pat_windows[g_pat_windows_n++];
         w->phase2_start = stmt_start;
         w->phase2_end   = phase2_end;
@@ -2388,9 +2386,8 @@ static int emit_pattern_blobs(FILE *out)
         char prefix[64];
         snprintf(prefix, sizeof(prefix), "pat_inv_%d", w->pat_id);
         PATND_t *p = (PATND_t *)w->root.p;
-        if (emit_flat_build(p, out, prefix) != 0) {
+        if (emit_flat_build(p, out, prefix) != 0)
             w->is_invariant = 0;
-        }
     }
     bb3c_flush_pending();
     return 0;
@@ -2640,9 +2637,8 @@ int emit_walk_codegen(SM_Program *prog, FILE *out, const char *src_path)
         const SM_Instr *ins = &prog->instrs[pc];
         {
             const char *leftover = emit_sm_consume_pc_label();
-            if (leftover && *leftover) {
+            if (leftover && *leftover)
                 bb3c_format(out, leftover, "", "");
-            }
             if (pc_is_used_as_target(pc)) {
                 char lbl[32];
                 snprintf(lbl, sizeof(lbl), ".L%d:", pc);
@@ -2754,9 +2750,8 @@ int emit_walk_codegen(SM_Program *prog, FILE *out, const char *src_path)
     }
     {
         const char *leftover = emit_sm_consume_pc_label();
-        if (leftover && *leftover) {
+        if (leftover && *leftover)
             bb3c_format(out, leftover, "", "");
-        }
     }
     int frc = emit_file_footer(out);
     bb3c_flush_pending();
