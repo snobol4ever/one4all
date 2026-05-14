@@ -18,6 +18,23 @@
 #include "../../runtime/x86/descr.h"
 
 /*==================================================================================================
+ * Value constructors — mirrors snobol4.h macros; defined here so ir_exec.c
+ * does not need to include the full snobol4.h / GC headers.
+ *================================================================================================*/
+#ifndef NULVCL
+#  define NULVCL       ((DESCR_t){ .v = DT_SNUL, .slen = 0, .s = "" })
+#endif
+#ifndef INTVAL
+#  define INTVAL(i_)   ((DESCR_t){ .v = DT_I, .i = (int64_t)(i_) })
+#endif
+#ifndef REALVAL
+#  define REALVAL(r_)  ((DESCR_t){ .v = DT_R, .r = (double)(r_) })
+#endif
+#ifndef STRVAL
+#  define STRVAL(s_)   ((DESCR_t){ .v = DT_S, .slen = 0, .s = (s_) })
+#endif
+
+/*==================================================================================================
  * Language tags — stored in ir_node_t.lang and ir_graph_t.lang
  *================================================================================================*/
 #define IR_LANG_SNO  1   /* SNOBOL4  */
