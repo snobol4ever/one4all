@@ -237,43 +237,114 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->value = FAILDESCR;
         return nd->ω;
     }
+    /*-- IR_PAT_LEN: match exactly n characters. Non-generative.
+     * counter = n (set from ival at first call). -----------------------------------------------------------------------*/
+    case IR_PAT_LEN: {
+        int64_t n = nd->ival;
+        if (nd->state == 0) {
+            if (n < 0 || Δ + (int)n > Σlen) { nd->value = FAILDESCR; return nd->ω; }
+            nd->counter = n;
+            nd->state   = 1;
+            nd->value   = descr_match_span(Σ + Δ, (int)n);
+            Δ += (int)n;
+            return nd->γ;
+        }
+        Δ -= (int)nd->counter;
+        nd->state = 0; nd->value = FAILDESCR; return nd->ω;
+    }
+    /*-- IR_PAT_NOTANY: match one char NOT in charset. Non-generative. -----------------------------------------------*/
+    case IR_PAT_NOTANY: {
+        const char *chars = nd->sval ? nd->sval : "";
+        if (nd->state == 0) {
+            if (Δ >= Σlen || strchr(chars, Σ[Δ])) { nd->value = FAILDESCR; return nd->ω; }
+            nd->state = 1;
+            nd->value = descr_match_span(Σ + Δ, 1);
+            Δ++;
+            return nd->γ;
+        }
+        Δ--; nd->state = 0; nd->value = FAILDESCR; return nd->ω;
+    }
+    /*-- IR_PAT_POS: zero-width cursor assert.
+     * ival = n (position argument). sval = "R" for RPOS, else POS.
+     * Non-generative. ---------------------------------------------------------------*/
+    case IR_PAT_POS: {
+        if (nd->state == 0) {
+            int64_t n   = nd->ival;
+            int     pos = (nd->sval && nd->sval[0] == 'R') ? (Σlen - (int)n) : (int)n;
+            if (pos < 0 || pos > Σlen || Δ != pos) { nd->value = FAILDESCR; return nd->ω; }
+            nd->state = 1;
+            nd->value = NULVCL;
+            return nd->γ;
+        }
+        nd->state = 0; nd->value = FAILDESCR; return nd->ω;
+    }
+    /*-- IR_PAT_TAB: advance cursor to position n. ival=0 → TAB (from left), ival=1 → RTAB (from right).
+     * sval reused to store n as int64 (we use nd->counter for Δ_saved).
+     * Non-generative (succeeds if Δ ≤ target). ---------------------------------------------------------*/
+    case IR_PAT_TAB: {
+        if (nd->state == 0) {
+            int64_t n      = nd->ival;   /* position argument stored in ival by build_node */
+            int     target = (nd->sval && nd->sval[0] == 'R') ? (Σlen - (int)n) : (int)n;
+            if (target < 0 || target > Σlen || Δ > target) { nd->value = FAILDESCR; return nd->ω; }
+            nd->counter = Δ;   /* save Δ_before for resume */
+            nd->state   = 1;
+            nd->value   = descr_match_span(Σ + Δ, target - Δ);
+            Δ = target;
+            return nd->γ;
+        }
+        /* resume: restore Δ */
+        Δ = (int)nd->counter;
+        nd->state = 0; nd->value = FAILDESCR; return nd->ω;
+    }
     /*-- IR_PAT_CAT / IR_PAT_ALT: wiring-only nodes — routing handled by port pointers.
      * IR_exec_node is not called on these during normal walk; if called, pass through. ---------------------------*/
     case IR_PAT_CAT:
     case IR_PAT_ALT:
         nd->value = NULVCL;
         return nd->γ;
-    /*-- IR_PAT_ASSIGN_COND (P $ V): conditional capture — assign matched span to variable on pattern success.
-     * The inner pattern is wired as α; we fire NV_SET_fn when succ arrives.
-     * counter = Δ at entry (to compute matched span on success). ---------------------------------------------------*/
+    /*-- IR_PAT_ASSIGN_COND (P $ V): conditional capture.
+     * nd sits between inner's γ and the real sp.
+     * state 0: record Δ_before, return nd->α (= inner entry) to start inner.
+     * state 1: inner succeeded and routed to nd as its sp; do assignment,
+     *          reset to state 0, return nd->γ (= real sp). */
     case IR_PAT_ASSIGN_COND: {
         if (nd->state == 0) {
-            nd->counter = Δ;   /* record Δ before inner pattern runs */
+            nd->counter = Δ;   /* record Δ before inner runs */
             nd->state   = 1;
             nd->value   = NULVCL;
-            return nd->γ;   /* pass through to inner; wiring routes succ here after inner */
+            return nd->α;      /* enter inner pattern */
         }
-        /* Called again on inner success — assign */
+        /* state 1: inner succeeded, we are its sp */
         if (nd->sval && *nd->sval) {
-            DESCR_t matched = descr_match_span(Σ + (int)nd->counter, Δ - (int)nd->counter);
+            int matched_len = Δ - (int)nd->counter;
+            if (matched_len < 0) matched_len = 0;
+            /* null-terminate copy so NV table and OUTPUT use strlen safely */
+            char *copy = (char *)GC_MALLOC((size_t)matched_len + 1);
+            if (copy) { memcpy(copy, Σ + (int)nd->counter, (size_t)matched_len); copy[matched_len] = '\0'; }
+            DESCR_t matched = { .v = DT_S, .slen = (uint32_t)matched_len, .s = copy ? copy : "" };
             NV_SET_fn(nd->sval, matched);
         }
+        nd->state = 0;
         nd->value = NULVCL;
-        return nd->γ;
+        return nd->γ;   /* real sp */
     }
-    /*-- IR_PAT_ASSIGN_IMM (P . V): immediate capture — assign on every match attempt (including failed ones).
-     * Simpler than COND: assign matched span each time inner succeeds. Same port structure. ----------------------*/
+    /*-- IR_PAT_ASSIGN_IMM (P . V): immediate capture — same structure as COND. */
     case IR_PAT_ASSIGN_IMM: {
         if (nd->state == 0) {
             nd->counter = Δ;
             nd->state   = 1;
             nd->value   = NULVCL;
-            return nd->γ;
+            return nd->α;
         }
         if (nd->sval && *nd->sval) {
-            DESCR_t matched = descr_match_span(Σ + (int)nd->counter, Δ - (int)nd->counter);
+            int matched_len = Δ - (int)nd->counter;
+            if (matched_len < 0) matched_len = 0;
+            char *copy = (char *)GC_MALLOC((size_t)matched_len + 1);
+            if (copy) { memcpy(copy, Σ + (int)nd->counter, (size_t)matched_len); copy[matched_len] = '\0'; }
+            DESCR_t matched = { .v = DT_S, .slen = (uint32_t)matched_len, .s = copy ? copy : "" };
             NV_SET_fn(nd->sval, matched);
         }
+        nd->state = 0;
         nd->value = NULVCL;
         return nd->γ;
     }

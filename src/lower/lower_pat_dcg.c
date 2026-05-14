@@ -81,54 +81,113 @@ static IR_prog_t * build_node(IR_prog_t * cfg, const tree_t * t, IR_t * sp, IR_t
     case TT_SEQ:
     case TT_CAT: {
         if (t->n == 0) return sp;
+        if (t->n == 1) return build_node(cfg, t->c[0], sp, fp);
+        /* Build children right-to-left; each child's sp = next child's entry. */
         IR_t * chain = sp;
-        IR_t ** entries = GC_malloc(t->n * sizeof(IR_t *));
+        IR_t ** entries = (IR_t **)GC_malloc(t->n * sizeof(IR_t *));
         for (int i = t->n - 1; i >= 0; i--) {
             IR_t * e = build_node(cfg, t->c[i], chain, fp);
             if (!e) return NULL;
             entries[i] = e;
             chain = e;
         }
-        /* wire back-edges: child[i+1].fail -> child[i].resume */
+        /* wire back-edges for generative nodes: child[i+1].ω → child[i].β */
         for (int i = 0; i < t->n - 1; i++) {
             IR_t * a = entries[i], * b = entries[i+1];
-            if (a && b) b->ω = a->β ? a->β : fp;
+            if (a && b && b->ω == fp) b->ω = a->β ? a->β : fp;
         }
-        nd = IR_node_alloc(cfg, IR_PAT_CAT);
-        nd->α = entries[0];
-        nd->β = entries[0] ? entries[0]->β : fp;
-        nd->γ = sp; nd->ω = fp;
-        return nd;
+        /* entry is the first child — no wrapper node needed */
+        return entries[0];
     }
     case TT_ALT: {
         if (t->n == 0) return fp;
+        if (t->n == 1) return build_node(cfg, t->c[0], sp, fp);
+        /* Build alternatives right-to-left; each alt's fp = next alt's entry. */
         IR_t * alt_fail = fp;
-        IR_t * last = NULL;
+        IR_t * first    = NULL;
         for (int i = t->n - 1; i >= 0; i--) {
             IR_t * e = build_node(cfg, t->c[i], sp, alt_fail);
             if (!e) return NULL;
-            last = e; alt_fail = e;
+            first    = e;
+            alt_fail = e;
         }
-        nd = IR_node_alloc(cfg, IR_PAT_ALT);
-        nd->α = last; nd->β = last; nd->γ = sp; nd->ω = fp;
-        return nd;
+        return first;   /* no wrapper needed — first alt is the entry */
     }
     case TT_CAPT_COND_ASGN: {
+        /* P $ V — conditional capture: assign on final pattern success.
+         * nd is the intercept node: inner runs with sp=nd; when inner
+         * succeeds it routes to nd (state 1) which does assignment then
+         * routes to the real sp. */
         if (t->n < 1) return NULL;
-        IR_t * inner = build_node(cfg, t->c[0], sp, fp);
-        if (!inner) return NULL;
         nd = IR_node_alloc(cfg, IR_PAT_ASSIGN_COND);
         nd->sval = (t->n > 1 && t->c[1] && t->c[1]->v.sval) ? t->c[1]->v.sval : NULL;
-        nd->α = inner; nd->β = inner->β;
+        nd->γ = sp;
+        nd->ω = fp;
+        IR_t * inner = build_node(cfg, t->c[0], nd, fp);
+        if (!inner) return NULL;
+        nd->α = inner;
+        nd->β = inner->β;
         return nd;
     }
     case TT_CAPT_IMMED_ASGN: {
+        /* P . V — immediate capture: assign on every inner success. */
         if (t->n < 1) return NULL;
-        IR_t * inner = build_node(cfg, t->c[0], sp, fp);
-        if (!inner) return NULL;
         nd = IR_node_alloc(cfg, IR_PAT_ASSIGN_IMM);
         nd->sval = (t->n > 1 && t->c[1] && t->c[1]->v.sval) ? t->c[1]->v.sval : NULL;
-        nd->α = inner; nd->β = inner->β;
+        nd->γ = sp;
+        nd->ω = fp;
+        IR_t * inner = build_node(cfg, t->c[0], nd, fp);
+        if (!inner) return NULL;
+        nd->α = inner;
+        nd->β = inner->β;
+        return nd;
+    }
+    case TT_LEN: {
+        /* LEN(n): child 0 must be TT_ILIT */
+        if (t->n < 1 || !t->c[0] || t->c[0]->t != TT_ILIT) return NULL;
+        nd = IR_node_alloc(cfg, IR_PAT_LEN);
+        nd->ival = t->c[0]->v.ival;   /* n */
+        nd->α = nd; nd->β = fp; nd->γ = sp; nd->ω = fp;
+        return nd;
+    }
+    case TT_NOTANY: {
+        /* NOTANY(cset): child 0 must be TT_QLIT */
+        if (t->n < 1 || !t->c[0] || t->c[0]->t != TT_QLIT) return NULL;
+        nd = IR_node_alloc(cfg, IR_PAT_NOTANY);
+        nd->sval = t->c[0]->v.sval ? t->c[0]->v.sval : "";
+        nd->α = nd; nd->β = fp; nd->γ = sp; nd->ω = fp;
+        return nd;
+    }
+    case TT_POS: {
+        if (t->n < 1 || !t->c[0] || t->c[0]->t != TT_ILIT) return NULL;
+        nd = IR_node_alloc(cfg, IR_PAT_POS);
+        nd->ival = t->c[0]->v.ival;   /* n; sval=NULL → POS (left) */
+        nd->sval = NULL;
+        nd->α = nd; nd->β = fp; nd->γ = sp; nd->ω = fp;
+        return nd;
+    }
+    case TT_RPOS: {
+        if (t->n < 1 || !t->c[0] || t->c[0]->t != TT_ILIT) return NULL;
+        nd = IR_node_alloc(cfg, IR_PAT_POS);
+        nd->ival = t->c[0]->v.ival;
+        nd->sval = "R";   /* flag: RPOS */
+        nd->α = nd; nd->β = fp; nd->γ = sp; nd->ω = fp;
+        return nd;
+    }
+    case TT_TAB: {
+        if (t->n < 1 || !t->c[0] || t->c[0]->t != TT_ILIT) return NULL;
+        nd = IR_node_alloc(cfg, IR_PAT_TAB);
+        nd->ival = t->c[0]->v.ival;   /* n; sval=NULL → TAB (left) */
+        nd->sval = NULL;
+        nd->α = nd; nd->β = fp; nd->γ = sp; nd->ω = fp;
+        return nd;
+    }
+    case TT_RTAB: {
+        if (t->n < 1 || !t->c[0] || t->c[0]->t != TT_ILIT) return NULL;
+        nd = IR_node_alloc(cfg, IR_PAT_TAB);
+        nd->ival = t->c[0]->v.ival;
+        nd->sval = "R";   /* flag: RTAB */
+        nd->α = nd; nd->β = fp; nd->γ = sp; nd->ω = fp;
         return nd;
     }
     default:

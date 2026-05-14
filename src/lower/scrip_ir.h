@@ -87,8 +87,10 @@ typedef enum {
     IR_PAT_ALT,         /* P1 | P2                                                                */
     IR_PAT_ASSIGN_IMM,  /* P . V                                                                  */
     IR_PAT_ASSIGN_COND, /* P $ V                                                                  */
-    IR_PAT_POS,         /* POS(n) / RPOS(n)                                                      */
-    IR_PAT_TAB,         /* TAB(n) / RTAB(n)                                                      */
+    IR_PAT_LEN,         /* LEN(n) — match exactly n chars                                        */
+    IR_PAT_NOTANY,      /* NOTANY(cset) — match one char NOT in charset                          */
+    IR_PAT_POS,         /* POS(n) / RPOS(n) — ival=0 left, ival=1 right                         */
+    IR_PAT_TAB,         /* TAB(n) / RTAB(n) — ival=0 left, ival=1 right                         */
     IR_PAT_REM,         /* REM                                                                    */
     IR_PAT_FENCE,       /* FENCE                                                                  */
     IR_PAT_ABORT,       /* ABORT                                                                  */

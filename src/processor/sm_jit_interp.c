@@ -11,6 +11,7 @@
 #include "emit_templates.h"
 #include "emit.h"
 #include "emit.h"
+#include "ir_exec.h"
 extern int    g_sm_dispatch_active  ;
 extern int    g_ast_pump_active     ;
 #include <stdio.h>
@@ -632,7 +633,13 @@ static void h_exec_stmt(void)
     DESCR_t subj_d = POP();
     DESCR_t pat_d  = POP();
     const char *sn = CUR_INS->a[0].s;
-    int ok = exec_stmt(sn, &subj_d, pat_d, has_repl ? &repl : NULL, has_repl);
+    int ok;
+    IR_prog_t *pat_dcg = (IR_prog_t *)CUR_INS->a[2].ptr;
+    if (pat_dcg) {
+        ok = IR_exec_pat(pat_dcg, sn, &subj_d, has_repl ? &repl : NULL, has_repl);
+    } else {
+        ok = exec_stmt(sn, &subj_d, pat_d, has_repl ? &repl : NULL, has_repl);
+    }
     STATE->last_ok = ok;
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
