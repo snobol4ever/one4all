@@ -272,4 +272,59 @@ bb_node_t coro_eval(tree_t *e);
 extern void gather_trampoline(void);
 extern coro_t *gather_trampoline_ss;
 
+
+/*----------------------------------------------------------------------------------------------------------------------------
+ * State types for all 43 JCON BBs (IJ-18..43)
+ *--------------------------------------------------------------------------------------------------------------------------*/
+typedef struct { tree_t *expr; int frame_popped; } icn_not_state_t;
+typedef struct { tree_t *expr; int started; int ever_succeeded; bb_node_t inner; } icn_repalt_state_t;
+typedef struct { tree_t *expr; tree_t *body; } icn_while_state_t;
+typedef struct { tree_t *expr; tree_t *body; } icn_until_state_t;
+typedef struct { tree_t *body; } icn_repeat_state_t;
+typedef struct { bb_node_t obj_gen; const char *field; } icn_field_gen_state_t;
+typedef struct { const char *kw; int fired; DESCR_t val; } icn_kw_gen_state_t;
+typedef enum { ICN_SEC_RANGE, ICN_SEC_PLUS, ICN_SEC_MINUS } icn_sec_kind_t;
+#define ICN_CASE_MAX     32
+#define ICN_COMPOUND_MAX 32
+#define ICN_LISTCON_MAX  64
+typedef struct {
+    DESCR_t disc; tree_t *clause_exprs[ICN_CASE_MAX]; tree_t *clause_bodies[ICN_CASE_MAX];
+    int n_clauses; tree_t *dflt; int cur_clause; bb_node_t body_box; int body_started;
+} icn_case_state_t;
+typedef struct { tree_t *children[ICN_COMPOUND_MAX]; int n; bb_node_t last_box; int started; } icn_compound_state_t;
+typedef struct {
+    bb_node_t val_gen; bb_node_t left_gen; bb_node_t right_gen;
+    tree_t *val_expr; tree_t *left_expr; tree_t *right_expr;
+    icn_sec_kind_t kind; DESCR_t cur_val; DESCR_t cur_left;
+    int val_started; int left_started; int right_started;
+} icn_section_gen_state_t;
+typedef struct { tree_t *children[ICN_LISTCON_MAX]; int n; int fired; } icn_listcon_state_t;
+typedef struct {
+    tree_t *proc; int body_start; int nbody; int stmt_idx;
+    bb_node_t expr_box; int in_suspend; tree_t *suspend_body; int frame_popped;
+} icn_proc_state_t;
+typedef struct { icn_proc_state_t base; DESCR_t args[16]; int nargs; } icn_proc_call_state_t;
+/* Non-generative state types */
+typedef struct { int dummy; }                              icn_noop_state_t;
+typedef struct { long long val; }                          icn_intlit_state_t;
+typedef struct { double val; }                             icn_reallit_state_t;
+typedef struct { const char *s; }                          icn_strlit_state_t;
+typedef struct { const char *s; }                          icn_csetlit_state_t;
+typedef struct { int dummy; }                              icn_global_state_t;
+typedef struct { tree_t *cond; tree_t *then_e; tree_t *else_e; } icn_if_state_t;
+typedef struct { tree_t *body; }                           icn_initial_state_t;
+typedef struct { int dummy; }                              icn_invocable_state_t;
+typedef struct { int dummy; }                              icn_link_state_t;
+typedef struct { const char *name; int nfields; }          icn_record_state_t;
+typedef struct { tree_t *expr; }                           icn_return_state_t;
+typedef struct { int dummy; }                              icn_fail_state_t;
+typedef struct { const char *op; tree_t *operand; }        icn_unop_state_t;
+typedef struct { int dummy; }                              icn_next_state_t;
+typedef struct { tree_t *expr; }                           icn_break_state_t;
+typedef struct { tree_t *expr; }                           icn_create_state_t;
+typedef struct { int dummy; }                              icn_coexplist_state_t;
+typedef struct { int dummy; }                              icn_arglist_state_t;
+typedef struct { tree_t *proc; }                           icn_procdecl_state_t;
+typedef struct { tree_t *body; }                           icn_procbody_state_t;
+typedef struct { tree_t *init; tree_t *body; }             icn_proccode_state_t;
 #endif /* ICON_GEN_H */

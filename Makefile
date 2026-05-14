@@ -88,7 +88,6 @@ RT_PIC_SRCS := \
     $(RT)/x86/sm_image.c \
     $(RT)/x86/emit_sm_binary.c \
     $(SRC)/runtime/interp/icon_gen.c \
-    $(SRC)/runtime/interp/icon_gen_missing.c \
     $(SRC)/runtime/interp/coro_runtime.c \
     $(SRC)/runtime/interp/coro_value.c \
     $(SRC)/runtime/interp/coro_stmt.c \
@@ -267,7 +266,6 @@ scrip:
 	$(CC) $(CRT)   -c $(SRC)/runtime/interp/pl_runtime.c  -o $(OBJ)/pl_runtime.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/interp/icon_box_rt.c  -o $(OBJ)/icon_box_rt.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/interp/icon_gen.c         -o $(OBJ)/icon_gen.o
-	$(CC) $(CRT)   -c $(SRC)/runtime/interp/icon_gen_missing.c -o $(OBJ)/icon_gen_missing.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/common/coerce.c      -o $(OBJ)/coerce.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/common/ast_clone.c    -o $(OBJ)/ast_clone.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_prog.c    -o $(OBJ)/sm_prog.o

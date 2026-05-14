@@ -2,7 +2,6 @@
 #include "emit_form.h"
 #include "emit_templates.h"
 #include "../frontend/icon/icon_gen.h"
-#include "../interp/icon_gen_missing.h"
 #include "snobol4_patnd.h"
 #include "../rt/rt.h"
 #include <string.h>
@@ -25,6 +24,41 @@ extern DESCR_t    coro_bb_limit             (void *zeta, int entry);    extern i
 extern DESCR_t    coro_bb_seq_expr          (void *zeta, int entry);    extern icn_seq_state_t             * icon_seq_new(void);
 extern DESCR_t    coro_bb_to                (void *zeta, int entry);    extern icn_to_state_t              * icon_to_new(void);
 extern DESCR_t    coro_bb_to_by             (void *zeta, int entry);    extern icn_to_by_state_t           * icon_to_by_new(void);
+/* All 43 JCON BB functions (now in icon_gen.c) */
+extern DESCR_t coro_bb_not(void*,int);          extern icn_not_state_t         *icon_not_new(void);
+extern DESCR_t coro_bb_repalt(void*,int);        extern icn_repalt_state_t      *icon_repalt_new(void);
+extern DESCR_t coro_bb_while_gen(void*,int);     extern icn_while_state_t       *icon_while_gen_new(void);
+extern DESCR_t coro_bb_until_gen(void*,int);     extern icn_until_state_t       *icon_until_gen_new(void);
+extern DESCR_t coro_bb_repeat_gen(void*,int);    extern icn_repeat_state_t      *icon_repeat_gen_new(void);
+extern DESCR_t coro_bb_case_gen(void*,int);      extern icn_case_state_t        *icon_case_gen_new(void);
+extern DESCR_t coro_bb_compound_gen(void*,int);  extern icn_compound_state_t    *icon_compound_gen_new(void);
+extern DESCR_t coro_bb_field_gen(void*,int);     extern icn_field_gen_state_t   *icon_field_gen_new(void);
+extern DESCR_t coro_bb_section_gen(void*,int);   extern icn_section_gen_state_t *icon_section_gen_new(void);
+extern DESCR_t coro_bb_key_gen(void*,int);       extern icn_kw_gen_state_t      *icon_kw_gen_new(void);
+extern DESCR_t coro_bb_listcon_gen(void*,int);   extern icn_listcon_state_t     *icon_listcon_gen_new(void);
+extern DESCR_t icn_bb_proc_call(void*,int);      extern icn_proc_call_state_t   *icon_proc_call_new(void);
+extern DESCR_t coro_bb_noop(void*,int);          extern icn_noop_state_t        *icon_noop_new(void);
+extern DESCR_t coro_bb_intlit(void*,int);        extern icn_intlit_state_t      *icon_intlit_new(void);
+extern DESCR_t coro_bb_reallit(void*,int);       extern icn_reallit_state_t     *icon_reallit_new(void);
+extern DESCR_t coro_bb_strlit(void*,int);        extern icn_strlit_state_t      *icon_strlit_new(void);
+extern DESCR_t coro_bb_csetlit(void*,int);       extern icn_csetlit_state_t     *icon_csetlit_new(void);
+extern DESCR_t coro_bb_global(void*,int);        extern icn_global_state_t      *icon_global_new(void);
+extern DESCR_t coro_bb_if_bb(void*,int);         extern icn_if_state_t          *icon_if_new(void);
+extern DESCR_t coro_bb_initial(void*,int);       extern icn_initial_state_t     *icon_initial_new(void);
+extern DESCR_t coro_bb_invocable(void*,int);     extern icn_invocable_state_t   *icon_invocable_new(void);
+extern DESCR_t coro_bb_link(void*,int);          extern icn_link_state_t        *icon_link_new(void);
+extern DESCR_t coro_bb_record_bb(void*,int);     extern icn_record_state_t      *icon_record_new(void);
+extern DESCR_t coro_bb_return_bb(void*,int);     extern icn_return_state_t      *icon_return_new(void);
+extern DESCR_t coro_bb_fail_bb(void*,int);       extern icn_fail_state_t        *icon_fail_new(void);
+extern DESCR_t coro_bb_unop(void*,int);          extern icn_unop_state_t        *icon_unop_new(void);
+extern DESCR_t coro_bb_next_bb(void*,int);       extern icn_next_state_t        *icon_next_new(void);
+extern DESCR_t coro_bb_break_bb(void*,int);      extern icn_break_state_t       *icon_break_new(void);
+extern DESCR_t coro_bb_create(void*,int);        extern icn_create_state_t      *icon_create_new(void);
+extern DESCR_t coro_bb_coexplist(void*,int);     extern icn_coexplist_state_t   *icon_coexplist_new(void);
+extern DESCR_t coro_bb_arglist(void*,int);       extern icn_arglist_state_t     *icon_arglist_new(void);
+extern DESCR_t coro_bb_procdecl(void*,int);      extern icn_procdecl_state_t    *icon_procdecl_new(void);
+extern DESCR_t coro_bb_procbody(void*,int);      extern icn_procbody_state_t    *icon_procbody_new(void);
+extern DESCR_t coro_bb_proccode(void*,int);      extern icn_proccode_state_t    *icon_proccode_new(void);
 extern DESCR_t    coro_bb_scan_gen          (void *zeta, int entry);    extern icn_scan_gen_state_t        * icon_scan_gen_new(void);
 extern DESCR_t    coro_bb_suspend           (void *zeta, int entry);    extern void                        * icon_suspend_new(void);
 extern atp_t    * bb_atp_new                (const char *varname);
@@ -1268,3 +1302,29 @@ int emit_bb_macro_library_to_path(const char *path)
     fprintf(f, "# === END bb macro library ===\n");
     return fclose(f) == 0 ? 0 : -1;
 }
+
+/* ============================================================
+ * All 43 JCON BB emit_bb_icon_* template functions
+ * ============================================================ */
+void emit_bb_icon_noop     (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_stateful("ICN_NOOP",     "",icon_noop_new(),        "coro_bb_noop",      (uint64_t)(uintptr_t)coro_bb_noop,      s,f,b);}
+void emit_bb_icon_intlit   (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_stateful("ICN_INTLIT",   "",icon_intlit_new(),      "coro_bb_intlit",    (uint64_t)(uintptr_t)coro_bb_intlit,    s,f,b);}
+void emit_bb_icon_reallit  (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_stateful("ICN_REALLIT",  "",icon_reallit_new(),     "coro_bb_reallit",   (uint64_t)(uintptr_t)coro_bb_reallit,   s,f,b);}
+void emit_bb_icon_strlit   (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_stateful("ICN_STRLIT",   "",icon_strlit_new(),      "coro_bb_strlit",    (uint64_t)(uintptr_t)coro_bb_strlit,    s,f,b);}
+void emit_bb_icon_csetlit  (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_stateful("ICN_CSETLIT",  "",icon_csetlit_new(),     "coro_bb_csetlit",   (uint64_t)(uintptr_t)coro_bb_csetlit,   s,f,b);}
+void emit_bb_icon_global   (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_stateful("ICN_GLOBAL",   "",icon_global_new(),      "coro_bb_global",    (uint64_t)(uintptr_t)coro_bb_global,    s,f,b);}
+void emit_bb_icon_if       (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_stateful("ICN_IF",       "",icon_if_new(),          "coro_bb_if_bb",     (uint64_t)(uintptr_t)coro_bb_if_bb,     s,f,b);}
+void emit_bb_icon_initial  (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_stateful("ICN_INITIAL",  "",icon_initial_new(),     "coro_bb_initial",   (uint64_t)(uintptr_t)coro_bb_initial,   s,f,b);}
+void emit_bb_icon_invocable(bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_stateful("ICN_INVOCABLE","",icon_invocable_new(),   "coro_bb_invocable", (uint64_t)(uintptr_t)coro_bb_invocable, s,f,b);}
+void emit_bb_icon_link     (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_stateful("ICN_LINK",     "",icon_link_new(),        "coro_bb_link",      (uint64_t)(uintptr_t)coro_bb_link,      s,f,b);}
+void emit_bb_icon_record   (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_stateful("ICN_RECORD",   "",icon_record_new(),      "coro_bb_record_bb", (uint64_t)(uintptr_t)coro_bb_record_bb,  s,f,b);}
+void emit_bb_icon_return   (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_stateful("ICN_RETURN",   "",icon_return_new(),      "coro_bb_return_bb", (uint64_t)(uintptr_t)coro_bb_return_bb,  s,f,b);}
+void emit_bb_icon_fail     (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_stateful("ICN_FAIL",     "",icon_fail_new(),        "coro_bb_fail_bb",   (uint64_t)(uintptr_t)coro_bb_fail_bb,   s,f,b);}
+void emit_bb_icon_unop     (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_stateful("ICN_UNOP",     "",icon_unop_new(),        "coro_bb_unop",      (uint64_t)(uintptr_t)coro_bb_unop,      s,f,b);}
+void emit_bb_icon_next     (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_stateful("ICN_NEXT",     "",icon_next_new(),        "coro_bb_next_bb",   (uint64_t)(uintptr_t)coro_bb_next_bb,   s,f,b);}
+void emit_bb_icon_break    (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_stateful("ICN_BREAK",    "",icon_break_new(),       "coro_bb_break_bb",  (uint64_t)(uintptr_t)coro_bb_break_bb,  s,f,b);}
+void emit_bb_icon_create   (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_stateful("ICN_CREATE",   "",icon_create_new(),      "coro_bb_create",    (uint64_t)(uintptr_t)coro_bb_create,    s,f,b);}
+void emit_bb_icon_coexplist(bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_stateful("ICN_COEXPLIST","",icon_coexplist_new(),   "coro_bb_coexplist", (uint64_t)(uintptr_t)coro_bb_coexplist, s,f,b);}
+void emit_bb_icon_arglist  (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_stateful("ICN_ARGLIST",  "",icon_arglist_new(),     "coro_bb_arglist",   (uint64_t)(uintptr_t)coro_bb_arglist,   s,f,b);}
+void emit_bb_icon_procdecl (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_stateful("ICN_PROCDECL", "",icon_procdecl_new(),    "coro_bb_procdecl",  (uint64_t)(uintptr_t)coro_bb_procdecl,  s,f,b);}
+void emit_bb_icon_procbody (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_stateful("ICN_PROCBODY", "",icon_procbody_new(),    "coro_bb_procbody",  (uint64_t)(uintptr_t)coro_bb_procbody,  s,f,b);}
+void emit_bb_icon_proccode (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_stateful("ICN_PROCCODE", "",icon_proccode_new(),    "coro_bb_proccode",  (uint64_t)(uintptr_t)coro_bb_proccode,  s,f,b);}
