@@ -201,7 +201,45 @@ void emit_bb_charset(bb_box_fn c_fn, const char *c_fn_name, const char *kind_nam
     else  if(c_fn_name && strcmp(c_fn_name,"bb_any")    == 0)  { rt_name="rt_bb_any";    rt_fn=(uint64_t)(uintptr_t)rt_bb_any;    }
     else  if(c_fn_name && strcmp(c_fn_name,"bb_notany") == 0)  { rt_name="rt_bb_notany"; rt_fn=(uint64_t)(uintptr_t)rt_bb_notany; }
     else                                                       { rt_name="rt_bb_span";   rt_fn=(uint64_t)(uintptr_t)rt_bb_span;   }
-    emit_bb_stateful(kind_name ? kind_name : "CHARSET", chars ? chars : "", z, rt_name, rt_fn, s,f,b);
+    if (IS_TEXT) {
+        /* Text mode: emit chars string + cs_t {.quad chars_label, .long 0}
+         * directly to the output stream (bypassing the flat_data_buf so we
+         * don't corrupt the data-buffer state used by emit_flat_body).
+         * Same pattern as XDSAR/XATP but written inline. */
+        emit_bb_box_banner(kind_name ? kind_name : "CHARSET", chars ? chars : "");
+        int id = g_flat_node_id++;
+        char slbl[80], zlbl[80];
+        snprintf(slbl, sizeof(slbl), ".Lcs%d_chars", id);
+        snprintf(zlbl, sizeof(zlbl), ".Lcs%d_z",     id);
+        const char *ch = chars ? chars : "";
+        /* Escaped chars string */
+        char esc[1024]; size_t o = 0;
+        if (o < sizeof(esc)) esc[o++] = '"';
+        for (const char *cp = ch; *cp && o + 5 < sizeof(esc); cp++) {
+            unsigned char c = (unsigned char)*cp;
+            if (c == '"' || c == '\\') { esc[o++] = '\\'; esc[o++] = (char)c; }
+            else if (c >= 32 && c < 127) { esc[o++] = (char)c; }
+            else { o += snprintf(esc + o, sizeof(esc) - o, "\\%03o", c); }
+        }
+        if (o + 1 < sizeof(esc)) esc[o++] = '"';
+        esc[o] = '\0';
+        FILE *out = emit_outf();
+        char slbl_def[88], zlbl_def[88];
+        snprintf(slbl_def, sizeof(slbl_def), "%s:", slbl);
+        snprintf(zlbl_def, sizeof(zlbl_def), "%s:", zlbl);
+        bb3c_format(out, "", ".section", ".data");
+        bb3c_format(out, slbl_def, ".string",  esc);
+        bb3c_format(out, zlbl_def, ".quad",    slbl);
+        bb3c_format(out, "",       ".long",    "0");
+        bb3c_format(out, "",       ".long",    "0");
+        bb3c_format(out, "",       ".section", ".text");
+        bb3c_format(out, "",       ".intel_syntax", "noprefix");
+        emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, rt_name, rt_fn, 0, s, f);
+        emit_label_define(b);
+        emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, rt_name, rt_fn, 1, s, f);
+    } else {
+        emit_bb_stateful(kind_name ? kind_name : "CHARSET", chars ? chars : "", z, rt_name, rt_fn, s,f,b);
+    }
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
 #include "emit_templates.h"
