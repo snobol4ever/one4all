@@ -1082,7 +1082,9 @@ DESCR_t bb_eval_value(tree_t *e)
         if (e->n < 1) return FAILDESCR;
         DESCR_t subj_d = bb_eval_value(e->c[0]);
         if (IS_FAIL_fn(subj_d)) return FAILDESCR;
-        const char *subj_s = VARVAL_fn(subj_d); if (!subj_s) subj_s = "";
+        const char *subj_s;
+        if (IS_REAL_fn(subj_d)) { char _rb[64]; real_str(subj_d.r,_rb,sizeof _rb); subj_s = GC_strdup(_rb); }
+        else { subj_s = VARVAL_fn(subj_d); if (!subj_s) subj_s = ""; }
         if (scan_depth < SCAN_STACK_MAX) {
             scan_stack[scan_depth].subj = scan_subj;
             scan_stack[scan_depth].pos  = scan_pos;

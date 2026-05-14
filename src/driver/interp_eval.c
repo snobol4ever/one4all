@@ -1067,7 +1067,9 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
     extern int         scan_depth;
     extern ScanEntry   scan_stack[];
     if (!strcmp(fn,"ICN_SCAN_PUSH") && nargs == 1) {
-        const char *s = VARVAL_fn(args[0]); if (!s) s = "";
+        const char *s;
+        if (IS_REAL_fn(args[0])) { char _rb[64]; real_str(args[0].r,_rb,sizeof _rb); s = GC_strdup(_rb); }
+        else { s = VARVAL_fn(args[0]); if (!s) s = ""; }
         if (scan_depth < SCAN_STACK_MAX) {
             scan_stack[scan_depth].subj = scan_subj;
             scan_stack[scan_depth].pos  = scan_pos;
@@ -1092,7 +1094,7 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         if (!scan_subj) { *out = FAILDESCR; return 1; }
         int slen = (int)strlen(scan_subj), p0 = scan_pos - 1;
         if (p0 < 0 || p0 >= slen || !strchr(cv, scan_subj[p0])) { *out = FAILDESCR; return 1; }
-        scan_pos++; *out = INTVAL(scan_pos); return 1;
+        *out = INTVAL(p0 + 2); return 1;
     }
     if (!strcmp(fn,"many") && nargs >= 1 && scan_pos > 0) {
         const char *cv = VARVAL_fn(args[0]); if (!cv) { *out = FAILDESCR; return 1; }
@@ -1100,7 +1102,7 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         int slen = (int)strlen(scan_subj), p0 = scan_pos - 1;
         if (p0 < 0 || p0 >= slen || !strchr(cv, scan_subj[p0])) { *out = FAILDESCR; return 1; }
         while (p0 < slen && strchr(cv, scan_subj[p0])) p0++;
-        scan_pos = p0 + 1; *out = INTVAL(scan_pos); return 1;
+        *out = INTVAL(p0 + 1); return 1;
     }
     if (!strcmp(fn,"upto") && nargs >= 1 && scan_pos > 0) {
         const char *cv = VARVAL_fn(args[0]); if (!cv) { *out = FAILDESCR; return 1; }
@@ -1108,7 +1110,7 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         int slen = (int)strlen(scan_subj), p0 = scan_pos - 1;
         while (p0 < slen && !strchr(cv, scan_subj[p0])) p0++;
         if (p0 >= slen) { *out = FAILDESCR; return 1; }
-        scan_pos = p0 + 1; *out = INTVAL(scan_pos); return 1;
+        *out = INTVAL(p0 + 1); return 1;
     }
     if (!strcmp(fn,"tab") && nargs == 1 && scan_pos > 0) {
         if (!scan_subj) { *out = FAILDESCR; return 1; }
@@ -4867,7 +4869,9 @@ DESCR_t interp_eval(tree_t *e)
         /* ── Icon / Prolog context: generator scan ── */
         DESCR_t subj_d = interp_eval(e->c[0]);
         if (IS_FAIL_fn(subj_d)) return FAILDESCR;
-        const char *subj_s = VARVAL_fn(subj_d); if (!subj_s) subj_s = "";
+        const char *subj_s;
+        if (IS_REAL_fn(subj_d)) { char _rb[64]; real_str(subj_d.r,_rb,sizeof _rb); subj_s = GC_strdup(_rb); }
+        else { subj_s = VARVAL_fn(subj_d); if (!subj_s) subj_s = ""; }
         if (scan_depth < SCAN_STACK_MAX) {
             scan_stack[scan_depth].subj = scan_subj;
             scan_stack[scan_depth].pos  = scan_pos;

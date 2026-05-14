@@ -1467,7 +1467,9 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
              * ICN_SCAN_POP must pass a failed body result through, and
              * ICN_SCAN_PUSH must not be treated as a normal function call. */
             if (name && strcmp(name, "ICN_SCAN_PUSH") == 0 && nargs == 1) {
-                const char *s = VARVAL_fn(args[0]); if (!s) s = "";
+                const char *s;
+                if (IS_REAL_fn(args[0])) { char _rb[64]; real_str(args[0].r,_rb,sizeof _rb); s = GC_strdup(_rb); }
+                else { s = VARVAL_fn(args[0]); if (!s) s = ""; }
                 if (scan_depth < SCAN_STACK_MAX) {
                     scan_stack[scan_depth].subj = scan_subj;
                     scan_stack[scan_depth].pos  = scan_pos;

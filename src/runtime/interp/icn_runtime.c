@@ -1901,7 +1901,9 @@ DESCR_t icn_bb_scan_gen(void *zeta, int entry) {
         if (IS_FAIL_fn(subj_d)) { scan_subj = outer_subj; scan_pos = outer_pos; return FAILDESCR; }
 
         /* Install new subject. */
-        const char *subj_s = VARVAL_fn(subj_d); if (!subj_s) subj_s = "";
+        const char *subj_s;
+        if (IS_REAL_fn(subj_d)) { char _rb[64]; real_str(subj_d.r,_rb,sizeof _rb); subj_s = GC_strdup(_rb); }
+        else { subj_s = VARVAL_fn(subj_d); if (!subj_s) subj_s = ""; }
         scan_subj = subj_s; scan_pos = 1;
 
         if (!z->body) { scan_subj = outer_subj; scan_pos = outer_pos; return NULVCL; }

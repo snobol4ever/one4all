@@ -78,12 +78,12 @@ int scan_try_call_builtin(tree_t *call, DESCR_t *args, int nargs, DESCR_t *out)
             slen = (int)strlen(s); p = scan_pos - 1; end = slen;
         }
         if (p < 0 || p >= slen || p >= end || !strchr(cv, s[p])) { *out = FAILDESCR; return 1; }
-        if (nargs < 2) { scan_pos++; *out = INTVAL(scan_pos); return 1; }
+        if (nargs < 2) { *out = INTVAL(p + 2); return 1; }
         *out = INTVAL(p + 2);
         return 1;
     }
 
-    /* many(c, [s, i1, i2]) — match a run of cset c chars; advance pos to end. */
+    /* many(c, [s, i1, i2]) — match a run of cset c chars; return end pos, no advance. */
     if (!strcmp(fn, "many") && nargs >= 1 && (scan_pos > 0 || nargs >= 2)) {
         const char *cv = VARVAL_fn(args[0]);
         if (!cv) { *out = FAILDESCR; return 1; }
@@ -102,7 +102,6 @@ int scan_try_call_builtin(tree_t *call, DESCR_t *args, int nargs, DESCR_t *out)
         }
         if (p < 0 || p >= slen || p >= end || !strchr(cv, s[p])) { *out = FAILDESCR; return 1; }
         while (p < end && p < slen && strchr(cv, s[p])) p++;
-        if (nargs < 2) { scan_pos = p + 1; *out = INTVAL(scan_pos); return 1; }
         *out = INTVAL(p + 1);
         return 1;
     }
