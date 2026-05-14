@@ -7,7 +7,7 @@
 #include <string.h>
 #include <stdio.h>
 /*------------------------------------------------------------------------------------------------------------------------------------*/
-static const char * kind_names[IR_KIND_COUNT] = {
+static const char * kind_names[IR_E_COUNT] = {
     "IR_LIT_I", "IR_LIT_S", "IR_LIT_F", "IR_LIT_NUL",
     "IR_VAR", "IR_ASSIGN", "IR_AUGOP", "IR_BINOP", "IR_UNOP", "IR_CALL",
     "IR_SEQ", "IR_FAIL", "IR_SUCCEED", "IR_GOTO", "IR_RETURN",
@@ -20,8 +20,8 @@ static const char * kind_names[IR_KIND_COUNT] = {
     "IR_PL_CHOICE", "IR_PL_UNIFY", "IR_PL_CUT", "IR_PL_CALL"
 };
 /*------------------------------------------------------------------------------------------------------------------------------------*/
-const char * IR_kind_name(IR_kind_t k) {
-    if (k >= 0 && k < IR_KIND_COUNT) return kind_names[k];
+const char * IR_e_name(IR_e k) {
+    if (k >= 0 && k < IR_E_COUNT) return kind_names[k];
     return "IR_UNKNOWN";
 }
 /*------------------------------------------------------------------------------------------------------------------------------------*/
@@ -36,7 +36,7 @@ IR_prog_t * IR_alloc(int max_nodes, int lang) {
     return cfg;
 }
 /*------------------------------------------------------------------------------------------------------------------------------------*/
-IR_t * IR_node_alloc(IR_prog_t * cfg, IR_kind_t kind, int lang) {
+IR_t * IR_node_alloc(IR_prog_t * cfg, IR_e kind, int lang) {
     IR_t * nd = calloc(1, sizeof(IR_t));
     if (!nd) return NULL;
     nd->kind        = kind;
@@ -95,7 +95,7 @@ void IR_print(const IR_prog_t * cfg, FILE * fp) {
     for (int i = 0; i < cfg->n; i++) {
         const IR_t * nd = cfg->all[i];
         if (!nd) continue;
-        fprintf(fp, "  [%d] %s gen=%d", nd->id, IR_kind_name(nd->kind), nd->generative);
+        fprintf(fp, "  [%d] %s gen=%d", nd->id, IR_e_name(nd->kind), nd->generative);
         print_port(fp, "start",  nd->port_start);
         print_port(fp, "resume", nd->port_resume);
         print_port(fp, "succ",   nd->port_succ);

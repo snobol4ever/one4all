@@ -52,4 +52,15 @@ int IR_exec_pump(IR_prog_t * cfg, IR_body_fn body_fn, void * ctx);
  * Exported so the unit test can drive individual nodes directly. */
 IR_t * IR_exec_node(IR_t * nd);
 
+/* LR-S1b: SNOBOL4 pattern match via IR graph.
+ * Equivalent to exec_stmt() but uses the compile-time wired IR_prog_t
+ * instead of the dynamic bb_node_t broker.  Called from SM_EXEC_STMT
+ * when ins->a[2].ptr is non-NULL.
+ * Returns 1 on match (:S), 0 on no-match (:F). */
+int IR_exec_pat(IR_prog_t *cfg,
+                const char *subj_name,
+                DESCR_t    *subj_var,
+                DESCR_t    *repl,
+                int         has_repl);
+
 #endif /* IR_EXEC_H */

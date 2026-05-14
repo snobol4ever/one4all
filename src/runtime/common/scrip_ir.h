@@ -1,4 +1,4 @@
-/* scrip_ir.h — Universal generator IR: IR_t (node) / IR_prog_t (graph) / IR_kind_t (LR-0)
+/* scrip_ir.h — Universal generator IR: IR_t (node) / IR_prog_t (graph) / IR_e (LR-0)
  * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6 (LR-0, 2026-05-14)
  *
  * Directed Cyclic Graph (DCG) for all goal-directed computation across all six languages.
@@ -45,7 +45,7 @@
 #define IR_LANG_RKU  6   /* Raku     */
 
 /*==================================================================================================
- * IR_kind_t — kind of every IR_t node
+ * IR_e — kind of every IR_t node
  *================================================================================================*/
 typedef enum {
     /* ── Universal scalar ─────────────────────────────────────────────────────────────────────── */
@@ -98,8 +98,8 @@ typedef enum {
     IR_PL_UNIFY,        /* unification                                                            */
     IR_PL_CUT,          /* !                                                                      */
     IR_PL_CALL,         /* call(Goal)                                                             */
-    IR_KIND_COUNT       /* sentinel — number of kinds                                             */
-} IR_kind_t;
+    IR_E_COUNT       /* sentinel — number of kinds                                             */
+} IR_e;
 
 /*==================================================================================================
  * IR_t — one node in the DCG
@@ -107,7 +107,7 @@ typedef enum {
  *================================================================================================*/
 typedef struct ir_node IR_t;
 struct ir_node {
-    IR_kind_t      kind;
+    IR_e      kind;
     /* ── Four control ports (wired by lower; back-edges create cycles) ─────────────────────── */
     IR_t    * port_start;   /* entry: first evaluation attempt                             */
     IR_t    * port_resume;  /* backtrack: try next value (NULL → scalar / non-generative)  */
@@ -155,7 +155,7 @@ IR_prog_t * IR_alloc(int max_nodes, int lang);
 
 /* Allocate one IR_t node, append it to cfg->all, assign cfg-unique id.
  * Returns NULL if cfg->all is full (capacity = max_nodes passed to IR_alloc). */
-IR_t       * IR_node_alloc(IR_prog_t * cfg, IR_kind_t kind, int lang);
+IR_t       * IR_node_alloc(IR_prog_t * cfg, IR_e kind, int lang);
 
 /* Reset all runtime state (value, counter, state, visited) in every node of cfg.
  * Call before re-executing a graph. */
@@ -168,6 +168,6 @@ void         IR_free(IR_prog_t * cfg);
 void         IR_print(const IR_prog_t * cfg, FILE * fp);
 
 /* Return the canonical name string for a kind (e.g. "IR_PAT_ARB"). */
-const char * IR_kind_name(IR_kind_t k);
+const char * IR_e_name(IR_e k);
 
 #endif /* SCRIP_IR_H */

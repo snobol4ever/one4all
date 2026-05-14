@@ -822,6 +822,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
              *   [subj_descr] [pat_descr(DT_P)] [repl_or_zero]
              *   a[0].s  = subject variable name (or NULL)
              *   a[1].i  = has_repl flag
+             *   a[2].ptr= IR_prog_t* (compile-time wired BB graph, or NULL → old path)
              *
              * ME-1: pattern is now on the value stack alongside subj and repl.
              * sm_lower push order: pat_tree, subject, repl — so pop order is repl, subj, pat.
@@ -833,8 +834,16 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
 
             const char *sname = ins->a[0].s;   /* subject var name for write-back */
 
-            int ok = exec_stmt(sname, &subj_d, pat_d,
+            /* LR-S1b: IR path — use compile-time wired BB graph when available. */
+            IR_prog_t *pat_dcg = (IR_prog_t *)ins->a[2].ptr;
+            int ok;
+            if (pat_dcg) {
+                ok = IR_exec_pat(pat_dcg, sname, &subj_d,
+                                 has_repl ? &repl : NULL, has_repl);
+            } else {
+                ok = exec_stmt(sname, &subj_d, pat_d,
                                has_repl ? &repl : NULL, has_repl);
+            }
             st->last_ok = ok;
             break;
         }
