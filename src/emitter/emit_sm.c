@@ -2128,6 +2128,7 @@ int emit_flat_invariant(const PATND_t *p)
     if (!p) return 1;
     if (!flat_is_eligible_node(p)) return 0;
     if (p->kind == XCAT && p->nchildren > 2) return 0;
+    if (p->kind == XNME || p->kind == XFNME || p->kind == XCALLCAP) return 0;
     for (int i = 0; i < p->nchildren; i++)
         if (!patnd_is_fully_invariant(p->children[i])) return 0;
     return 1;

@@ -346,7 +346,6 @@ DESCR_t rt_bb_notany (void *zeta, int port);
 DESCR_t rt_bb_arbno  (void *zeta, int port);
 DESCR_t rt_bb_atp    (void *zeta, int port);
 DESCR_t rt_bb_cap    (void *zeta, int port);
-DESCR_t rt_bb_cap_direct(void *zeta, int port);
 void   *rt_bb_arbno_new(bb_box_fn fn, void *state);
 void    rt_flush_pending_captures(void);
 

@@ -88,6 +88,8 @@ void bb_pool_init(void)
     pool_limit = pool_base + BB_POOL_SIZE;
 }
 
+int bb_in_pool(const void *p) { return pool_base && (const uint8_t *)p >= pool_base && (const uint8_t *)p < pool_limit; }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 bb_buf_t bb_alloc(size_t size)
 {
     if (!pool_base) {

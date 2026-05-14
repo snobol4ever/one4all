@@ -273,7 +273,13 @@ void emit_bb_xlnth(long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
         bb3c_format(out, "", "jmp", jmp_succ);
         emit_label_define(b);
         bb3c_format(out, "", "jmp", jmp_fail);
+        return;
     }
+    emit_seq_bounds_len((int)n, TEMPLATE_ADDR_SIGLEN, f);
+    emit_add_delta_imm((int)n);
+    emit_jmp(s, JMP_JMP);
+    emit_label_define(b);
+    emit_jmp(f, JMP_JMP);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* SF-4: emit_bb_xtb -- flat inline TAB(n) box. n baked at emit time. */
@@ -296,7 +302,16 @@ void emit_bb_xtb(long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
         bb3c_format(out, "", "jmp", jmp_succ);
         emit_label_define(b);
         bb3c_format(out, "", "jmp", jmp_fail);
+        return;
     }
+    insn_mov_eax_r10mem();
+    insn_cmp_eax_i32((uint32_t)n);
+    emit_jmp(f, JMP_JG);
+    insn_mov_eax_i32((uint32_t)n);
+    emit_store_delta();
+    emit_jmp(s, JMP_JMP);
+    emit_label_define(b);
+    emit_jmp(f, JMP_JMP);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* SF-4: emit_bb_xrtb -- flat inline RTAB(n) box. n baked at emit time. */
@@ -320,7 +335,22 @@ void emit_bb_xrtb(long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
         bb3c_format(out, "", "jmp", jmp_succ);
         emit_label_define(b);
         bb3c_format(out, "", "jmp", jmp_fail);
+        return;
     }
+    insn_mov_rcx_i64(TEMPLATE_ADDR_SIGLEN);
+    insn_mov_eax_rcxmem();
+    insn_sub_eax_i32((uint32_t)n);
+    insn_mov_ecx_eax();
+    insn_mov_eax_r10mem();
+    insn_cmp_eax_ecx();
+    emit_jmp(f, JMP_JG);
+    insn_mov_rcx_i64(TEMPLATE_ADDR_SIGLEN);
+    insn_mov_eax_rcxmem();
+    insn_sub_eax_i32((uint32_t)n);
+    emit_store_delta();
+    emit_jmp(s, JMP_JMP);
+    emit_label_define(b);
+    emit_jmp(f, JMP_JMP);
 }
 /* Forward declarations — defined later in this file */
 static void (*g_cap_fixup_cb)(void *cap_ptr, const char *child_α_label) = NULL;
@@ -1401,14 +1431,6 @@ static void emit_flat_node(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fai
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int flat_is_eligible(PATND_t *p) {
-    if (!p) return 1;
-    if (p->kind == XVAR) return 0;
-    if (p->kind == XCAT && p->nchildren > 2) return 0;
-    for (int i = 0; i < p->nchildren; i++)
-        if (!flat_is_eligible(p->children[i])) return 0;
-    return 1;
-}
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_flat_body(PATND_t *p, const char *prefix, int text_externalise, int brokered) {
     bb_label_t lbl_α, lbl_α_body, lbl_succ, lbl_fail, lbl_β;
@@ -1469,7 +1491,6 @@ static void pre_build_children(PATND_t *p) {
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 bb_box_fn bb_build_flat(PATND_t *p) {
-    if (!flat_is_eligible(p)) return NULL;
     bb_buf_t buf = bb_alloc(FLAT_BUF_MAX);
     if (!buf) return NULL;
     if (!g_in_prebuild) { g_child_cache_n = 0; g_in_prebuild = 1; pre_build_children(p); g_in_prebuild = 0; }
@@ -1483,7 +1504,6 @@ bb_box_fn bb_build_flat(PATND_t *p) {
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 bb_box_fn bb_build_brokered(PATND_t *p) {
-    if (!flat_is_eligible(p)) return NULL;
     bb_buf_t buf = bb_alloc(FLAT_BUF_MAX);
     if (!buf) return NULL;
     if (!g_in_prebuild) { g_child_cache_n = 0; g_in_prebuild = 1; pre_build_children(p); g_in_prebuild = 0; }
@@ -1500,7 +1520,6 @@ bb_box_fn bb_build_brokered(PATND_t *p) {
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_flat_build(PATND_t *p, FILE *out, const char *prefix) {
-    if (!flat_is_eligible(p)) return -1;
     emitter_init_text(out, TEXT_MODE_INVOCATION);
     int rc = emit_flat_body(p, prefix, 1, 0);
     emitter_end();

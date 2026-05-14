@@ -36,6 +36,7 @@ typedef uint8_t * bb_buf_t;
 
 /* Initialise the pool. Must be called before any bb_alloc(). */
 void bb_pool_init(void);
+int  bb_in_pool(const void *p);
 
 /*
  * Allocate a RW buffer of at least `size` bytes from the pool.

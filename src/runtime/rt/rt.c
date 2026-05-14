@@ -42,7 +42,8 @@
 #include "descr.h"
 #include "sil_macros.h"   /* EM-7: IS_NAMEPTR / IS_NAMEVAL / NAME_DEREF_PTR */
 #include "bb_pool.h"
-#include "bb_box.h"       /* EM-7c: bb_box_fn + exec_stmt_blob */
+#include "bb_box.h"
+#include "../../processor/bb_pool.h"       /* EM-7c: bb_box_fn + exec_stmt_blob */
 #include "bb_build.h"     /* EM-7c-variant: g_bb_mode + BB_MODE_LIVE */
 #include "../../ast/ast.h"                  /* TT_EQ/TT_NE/TT_LT/TT_LE/TT_GT/TT_GE/TT_L* for rt_acomp/rt_lcomp */
 
@@ -1515,14 +1516,6 @@ extern void reset_capture_registry(void);
 extern void clear_pending_flags(void);
 static void rt_register_cap(cap_t *c);
 
-DESCR_t rt_bb_cap_direct(void *zeta, int port)
-{
-    void *slot0_save = *(void **)zeta;
-    *(void **)zeta = NULL;
-    DESCR_t r = rt_bb_cap(zeta, port);
-    *(void **)zeta = slot0_save;
-    return r;
-}
 DESCR_t rt_bb_cap(void *zeta, int port)
 {
     /* In mode-4 TEXT path the .data slot holds a cap_t* set by rt_init_cap.
@@ -1530,7 +1523,7 @@ DESCR_t rt_bb_cap(void *zeta, int port)
      * (fn non-null), use it as cap_t*; else treat zeta itself as cap_t*. */
     cap_t *ζ;
     void *slot0 = *(void **)zeta;
-    if (slot0 && ((cap_t *)slot0)->fn) ζ = (cap_t *)slot0;
+    if (slot0 && !bb_in_pool(slot0) && ((cap_t *)slot0)->fn) ζ = (cap_t *)slot0;
     else ζ = (cap_t *)zeta;
     DESCR_t cr;
     if (port == 0) {
