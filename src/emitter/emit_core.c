@@ -1128,7 +1128,7 @@ void emit_seq_zeta_rdi(uint64_t ptr, const char *sym) {
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_seq_dispatch_jne_jmp(bb_label_t *lbl_succ, bb_label_t *lbl_fail) {
-    insn_test_rax_rax();
+    insn_cmp_al_i8(99);
     emit_jmp(lbl_succ, JMP_JNE);
     emit_jmp(lbl_fail, JMP_JMP);
 }
@@ -1165,7 +1165,7 @@ void emit_seq_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fall
         { char a[80]; snprintf(a,sizeof(a),"%s@PLT",fn_name?fn_name:"??");
           emit_text_3col(emit_outf(),"","call",a); }
         emit_text_3col(emit_outf(), "", "pop", "r10");
-        insn_test_rax_rax();
+        insn_cmp_al_i8(99);
         emit_jmp(lbl_succ, JMP_JNE);
         emit_jmp(lbl_fail, JMP_JMP);
         return;
@@ -1175,7 +1175,7 @@ void emit_seq_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fall
     insn_mov_esi_i32(port);
     insn_call_plt(fn_name, fn_fallback);
     insn_pop_r12();
-    insn_test_rax_rax();
+    insn_cmp_al_i8(99);
     emit_jmp(lbl_succ, JMP_JNE);
     emit_jmp(lbl_fail, JMP_JMP);
 }
@@ -1200,7 +1200,7 @@ void emit_seq_port_call_rip(uint64_t zeta_ptr, const char *zeta_label,
         { char a[80]; snprintf(a,sizeof(a),"%s@PLT",fn_name?fn_name:"??");
           emit_text_3col(emit_outf(),"","call",a); }
         insn_pop_r10();
-        insn_test_rax_rax();
+        insn_cmp_al_i8(99);
         emit_jmp(lbl_succ, JMP_JNE);
         emit_jmp(lbl_fail, JMP_JMP);
         return;
@@ -1211,7 +1211,7 @@ void emit_seq_port_call_rip(uint64_t zeta_ptr, const char *zeta_label,
     insn_mov_esi_i32(port);
     insn_call_plt(fn_name, fn_fallback);
     insn_pop_r10();
-    insn_test_rax_rax();
+    insn_cmp_al_i8(99);
     emit_jmp(lbl_succ, JMP_JNE);
     emit_jmp(lbl_fail, JMP_JMP);
 }

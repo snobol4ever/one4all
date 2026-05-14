@@ -1425,7 +1425,7 @@ static void emit_flat_node(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fai
                 emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 1, lbl_succ, lbl_fail);
             } else {
                 emit_seq_port_call((uint64_t)(uintptr_t)z, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 0, lbl_succ, lbl_fail);
-                emit_label_define(lbl_β);
+                emit_label_define_bb(lbl_β);
                 emit_seq_port_call((uint64_t)(uintptr_t)z, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 1, lbl_succ, lbl_fail);
             }
         } else {
