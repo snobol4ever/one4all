@@ -78,6 +78,29 @@ static IR_prog_t * build_node(IR_prog_t * cfg, const tree_t * t, IR_t * sp, IR_t
         nd->γ = inner ? inner : sp; nd->ω = fp;
         return nd;
     }
+    case TT_ARBNO: {
+        /* ARBNO(inner): match inner zero or more times, greedy.
+         * nd->c    = void*[2]: [0]=inner IR_prog_t*, [1]=int* position stack
+         * nd->n    = position stack capacity
+         * nd->state = current stack depth (0=fresh; IR_reset zeros → clears stack) */
+        if (t->n < 1 || !t->c[0]) return NULL;
+        int inner_cap = count_tree(t->c[0]) * 8 + 16;
+        IR_prog_t * inner_cfg = IR_alloc(inner_cap, IR_LANG_SNO);
+        if (!inner_cfg) return NULL;
+        IR_t * inner_entry = build_node(inner_cfg, t->c[0], NULL, NULL);
+        if (!inner_entry) { IR_free(inner_cfg); return NULL; }
+        inner_cfg->entry = inner_entry;
+        nd = IR_node_alloc(cfg, IR_PAT_ARBNO);
+        int stack_cap = 64;
+        int * pos_stack = (int *)GC_MALLOC((size_t)stack_cap * sizeof(int));
+        void ** storage = (void **)GC_MALLOC(2 * sizeof(void *));
+        storage[0] = inner_cfg;
+        storage[1] = pos_stack;
+        nd->c = (IR_t **)storage;
+        nd->n = stack_cap;
+        nd->α = nd; nd->β = nd; nd->γ = sp; nd->ω = fp;
+        return nd;
+    }
     case TT_SEQ:
     case TT_CAT: {
         if (t->n == 0) return sp;

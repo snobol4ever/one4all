@@ -26,6 +26,7 @@ extern int         Σlen;
  * Self-evaluating scalar kinds set nd->value and return γ or ω.
  * Generative kinds consult nd->state / nd->counter and update them.
  * Unimplemented kinds return ω (explicit, safe, detectable in tests). */
+DESCR_t IR_exec_once(IR_prog_t * cfg);
 IR_t * IR_exec_node(IR_t * nd) {
     switch (nd->t) {
     /*-- Literals: always succeed, value is the literal. ----------------------------------------------------------------*/
@@ -349,6 +350,40 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->value = NULVCL;
         return nd->γ;
     }
+    /*-- IR_PAT_ARBNO: match inner zero or more times (greedy).
+     * nd->c    = void*[2]: [0]=inner IR_prog_t*, [1]=int* position stack
+     * nd->n    = position stack capacity
+     * nd->state = 0 → fresh (build greedy stack); N → have N items; -1 → exhausted.
+     * On first call: loop inner_cfg until it fails, push each Δ.
+     * On each yield: return γ with Δ = stack top (or start if empty).
+     * On resume (β=nd): pop one, return γ. When stack empty → return ω. -------*/
+    case IR_PAT_ARBNO: {
+        IR_prog_t * inner_cfg = nd->c ? (IR_prog_t *)((void **)nd->c)[0] : NULL;
+        int       * pos_stack = nd->c ? (int       *)((void **)nd->c)[1] : NULL;
+        if (!inner_cfg || !pos_stack) { nd->value = FAILDESCR; return nd->ω; }
+        if (nd->state == 0) {
+            /* Build greedy stack: try inner from current Δ repeatedly. */
+            int depth = 0;
+            int cap   = nd->n;
+            nd->counter = Δ;   /* save start position for full-unwind resume */
+            while (depth < cap) {
+                int pre = Δ;
+                DESCR_t r = IR_exec_once(inner_cfg);
+                if (IS_FAIL_fn(r) || Δ == pre) break;  /* fail or zero-progress → stop */
+                pos_stack[depth++] = Δ;
+            }
+            nd->state = depth;
+            /* Yield greedy match: Δ is already at max position. */
+            nd->value = NULVCL;
+            return nd->γ;
+        }
+        /* Resume: pop one position (try one fewer repetition). */
+        nd->state--;
+        if (nd->state < 0) { nd->value = FAILDESCR; return nd->ω; }
+        Δ = (nd->state > 0) ? pos_stack[nd->state - 1] : (int)nd->counter;
+        nd->value = NULVCL;
+        return nd->γ;
+    }
     /*-- All other kinds: not yet implemented — return ω explicitly. ----------------------------------------*/
     default:
         nd->value = FAILDESCR;
@@ -370,7 +405,6 @@ DESCR_t IR_exec_once(IR_prog_t * cfg) {
         if (!next) {
             return IS_FAIL_fn(cur->value) ? FAILDESCR : cur->value;
         }
-        if (next == cur) return FAILDESCR;
         cur = next;
     }
     return FAILDESCR;
