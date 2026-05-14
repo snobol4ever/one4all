@@ -718,29 +718,15 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         }
         buf[sl]='\0'; *out = STRVAL(buf); return 1;
     }
-    /* trim(s, [c]) — Icon: trailing chars in cset; Raku: both ends, whitespace */
+    /* trim(s, [c]) — Icon: trailing chars in cset only (this fn is Icon-context always) */
     if (!strcmp(fn,"trim") && (nargs == 1 || nargs == 2)) {
         const char *s=VARVAL_fn(args[0]); if(!s)s="";
         const char *cset = " ";
-        if (nargs == 2) {
-            DESCR_t cv = args[1];
-            if (cv.v != DT_SNUL) {
-                const char *cs = VARVAL_fn(cv);
-                if (cs) cset = cs;
-            }
-        }
-        if (g_lang == 1 || nargs == 2) {
-            int sl=(int)strlen(s);
-            while (sl > 0 && strchr(cset, s[sl-1])) sl--;
-            char *buf=GC_malloc(sl+1); memcpy(buf,s,sl); buf[sl]='\0';
-            *out = STRVAL(buf); return 1;
-        } else {
-            while(*s==' '||*s=='\t'||*s=='\n'||*s=='\r') s++;
-            size_t len=strlen(s);
-            while(len>0&&(s[len-1]==' '||s[len-1]=='\t'||s[len-1]=='\n'||s[len-1]=='\r')) len--;
-            char *buf=GC_malloc(len+1); memcpy(buf,s,len); buf[len]='\0';
-            *out = STRVAL(buf); return 1;
-        }
+        if (nargs == 2) { DESCR_t cv = args[1]; if (cv.v != DT_SNUL) { const char *cs = VARVAL_fn(cv); if (cs) cset = cs; } }
+        int sl=(int)strlen(s);
+        while (sl > 0 && strchr(cset, s[sl-1])) sl--;
+        char *buf=GC_malloc(sl+1); memcpy(buf,s,sl); buf[sl]='\0';
+        *out = STRVAL(buf); return 1;
     }
     /* left(s, [n], [p]) — pad/truncate string left-aligned */
     if (!strcmp(fn,"left") && nargs >= 1) {

@@ -1985,7 +1985,11 @@ bb_node_t icn_bb_build(tree_t *e) {
         z->hi   = (long long)9e18;   /* effectively infinite */
         z->step = (e->n >= 3) ? (long long)to_int(bb_eval_value(e->c[2])) : 1;
         z->cur  = z->lo;
-        return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
+        IR_block_t *seq_cfg = lower_icn_to_by(z->lo, (int64_t)9e18, z->step);
+        icn_dcg_state_t *sdz = calloc(1, sizeof(*sdz));
+        sdz->cfg = seq_cfg; sdz->first = 1;
+        free(z);
+        return (bb_node_t){ icn_bb_dcg, sdz, 0 };
     }
 
     /* ── IC-7: user proc call with generative arg — pump arg, call proc each tick ──
