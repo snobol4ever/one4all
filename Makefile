@@ -195,8 +195,6 @@ out/bb_flat_text_test: $(RT)/x86/bb_flat_text_test.c \
                        $(RT)/x86/sm_prog.c \
                        $(RT)/x86/sm_prog.h \
                        out/libscrip_rt.so \
-                       $(RT)/x86/emit_bb_flat.h \
-                       $(RT)/x86/emit_bb_gen.h \
                        $(RT)/x86/bb_pool.h
 	@mkdir -p out
 	$(CC) -O0 -g $(WARN) \

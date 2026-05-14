@@ -577,8 +577,6 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
     case SM_TPL_RET:
         snprintf(macro_def, sizeof(macro_def), "%s", t->macro_name);
         macro_line(out, "", ".macro", macro_def);
-        macro_line(out, "", "mov",  "rsp, rbp");
-        macro_line(out, "", "pop",  "rbp");
         macro_line(out, "", "ret", "");
         macro_line(out, "", ".endm", "");
         return 0;
@@ -656,7 +654,7 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
         macro_line(out, "", ".endm", "");
         return 0;
     case SM_TPL_ARITH:
-        snprintf(macro_def, sizeof(macro_def), "%s", t->macro_name);
+        snprintf(macro_def, sizeof(macro_def), "%s n=0", t->macro_name);
         macro_line(out, "", ".macro", macro_def);
         { char op_arg[32]; snprintf(op_arg, sizeof(op_arg), "edi, %d", t->const_a);
           macro_line(out, "", "mov", op_arg); }
@@ -1753,30 +1751,34 @@ static int emit_sm_label_dispatch(FILE *out, const SM_Instr *ins, int pc)
 static int emit_sm_jump_line(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
+    const sm_op_template_t *t = sm_template_lookup(SM_JUMP);
+    if (!t) return -1;
     emitter_init_text(out, TEXT_MODE_INVOCATION);
-    emit_sm_jump((int)ins->a[0].i);
-    return 0;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_jump_cond(FILE *out, const SM_Instr *ins, int pc,
-                             int take_when_ok)
-{
-    (void)pc;
-    int  target = (int)ins->a[0].i;
-    emitter_init_text(out, TEXT_MODE_INVOCATION);
-    if (take_when_ok) emit_sm_jump_s(target);
-    else              emit_sm_jump_f(target);
-    return 0;
+    emit_sm_args_t a = { 0 };
+    a.i32_a = (int)ins->a[0].i;
+    return render_call_line(out, t, &a);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_jump_s_line(FILE *out, const SM_Instr *ins, int pc)
 {
-    return emit_sm_jump_cond(out, ins, pc, 1);
+    (void)pc;
+    const sm_op_template_t *t = sm_template_lookup(SM_JUMP_S);
+    if (!t) return -1;
+    emitter_init_text(out, TEXT_MODE_INVOCATION);
+    emit_sm_args_t a = { 0 };
+    a.i32_a = (int)ins->a[0].i;
+    return render_call_line(out, t, &a);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_jump_f_line(FILE *out, const SM_Instr *ins, int pc)
 {
-    return emit_sm_jump_cond(out, ins, pc, 0);
+    (void)pc;
+    const sm_op_template_t *t = sm_template_lookup(SM_JUMP_F);
+    if (!t) return -1;
+    emitter_init_text(out, TEXT_MODE_INVOCATION);
+    emit_sm_args_t a = { 0 };
+    a.i32_a = (int)ins->a[0].i;
+    return render_call_line(out, t, &a);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int edp4_emit_push_expression(FILE *out, const sm_op_template_t *t,

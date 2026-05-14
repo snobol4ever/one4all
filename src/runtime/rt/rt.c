@@ -561,22 +561,19 @@ void rt_pop_descr(DESCR_t *out)
 
 void rt_arith(int op)
 {
-    /* op: SM_ADD=17 SM_SUB=18 SM_MUL=19 SM_DIV=20 SM_MOD=22 */
     DESCR_t r = vstack_pop();
     DESCR_t l = vstack_pop();
-
     int64_t lv = (l.v == DT_I) ? l.i : to_int(l);
     int64_t rv = (r.v == DT_I) ? r.i : to_int(r);
     int64_t result;
-
     switch (op) {
-        case 17: result = lv + rv; break;
-        case 18: result = lv - rv; break;
-        case 19: result = lv * rv; break;
-        case 20:
+        case 18: result = lv + rv; break;
+        case 19: result = lv - rv; break;
+        case 20: result = lv * rv; break;
+        case 21:
             if (!rv) { fprintf(stderr, "libscrip_rt: SM_DIV by zero.\n"); abort(); }
             result = lv / rv; break;
-        case 22:
+        case 23:
             if (!rv) { fprintf(stderr, "libscrip_rt: SM_MOD by zero.\n"); abort(); }
             result = lv % rv; break;
         default:

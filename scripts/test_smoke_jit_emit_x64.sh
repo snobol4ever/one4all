@@ -34,7 +34,7 @@
 #     (jmp/jz/jnz forms all present).
 #   - 6b: synthetic 6-op countdown body uses SM_JUMP_F backward.  A
 #     thin C driver overrides rt_last_ok to return 0 twice then
-#     1, proving the backward branch lands on its .Lpc<top> label.
+#     1, proving the backward branch lands on its .L<top> label.
 #     Expected rc=0.
 #
 # EM-5+ rungs add tests in this file; the runtime test for the real
@@ -73,15 +73,16 @@ fi
 # every .s by sm_emit_macro_library); the call site reads `SM_PUSH_INT 42`.
 # Both are verified below — body proves the encoding; call-site proves the
 # dispatcher routed through the template.
-grep -qE '^(\.Lpc[0-9]+:)?[[:space:]]+PUSH_INT[[:space:]]+42\b' "$TMP/em2_a.s" || { echo "FAIL no PUSH_INT 42 macro call"; exit 1; }
+grep -qE '^(\.L[0-9]+:)?[[:space:]]+PUSH_INT[[:space:]]+42\b' "$TMP/em2_a.s" || { echo "FAIL no PUSH_INT 42 macro call"; exit 1; }
 grep -q "rt_push_int@PLT"       "$ROOT/sm_macros.s" || { echo "FAIL no push_int call in sm_macros.s"; exit 1; }
 grep -q "rt_halt_tos@PLT"       "$ROOT/sm_macros.s" || { echo "FAIL no halt_tos call in sm_macros.s"; exit 1; }
 echo "  PASS PUSH_LIT_I+HALT  (rc=42; emit shape correct)"
 
-# ── Test 2: unhandled-op trap fires on SM_INCR ─────────────────────────
-# Build a tiny inline harness that emits SM_PUSH_LIT_I + SM_INCR + SM_HALT.
+# ── Test 2: unhandled-op trap fires on SM_SUSPEND ─────────────────────────
+# Build a tiny inline harness that emits SM_PUSH_LIT_I + SM_SUSPEND + SM_HALT.
 # Run; expect non-zero rc + diagnostic on stderr.
-# (SM_CONCAT was used pre-EM-7 — replaced with SM_INCR which remains unhandled.)
+# SM_SUSPEND has no case in the emit_walk_codegen switch → hits edp4_sm_unhandled
+# which emits UNHANDLED <op> → calls rt_unhandled_op() → prints diagnostic + abort().
 cat > "$TMP/unh.c" <<'CEOF'
 #include "sm_prog.h"
 #include "sm_codegen_x64_emit.h"
@@ -90,7 +91,7 @@ int main(int argc, char **argv) {
     if (argc != 2) return 2;
     SM_Program *p = sm_prog_new();
     sm_emit_i(p, SM_PUSH_LIT_I, 1);
-    sm_emit_i(p, SM_INCR, 1);
+    sm_emit(p, SM_SUSPEND);
     sm_emit(p, SM_HALT);
     FILE *f = fopen(argv[1], "w");
     sm_codegen_x64_emit(p, f, NULL);
@@ -172,8 +173,8 @@ fi
 # SM_ADD" form).  Suffix `_NUM` avoids collision with x86 add/sub/mul/div
 # mnemonics (GAS macro-name match is case-insensitive).
 # The em3 program is (2+3)*4 — must contain at least ADD_NUM and MUL_NUM.
-grep -qE '^(\.Lpc[0-9]+:)?[[:space:]]+ADD_NUM\b' "$TMP/em3.s" || { echo "FAIL no ADD_NUM macro call in em3 asm"; exit 1; }
-grep -qE '^(\.Lpc[0-9]+:)?[[:space:]]+MUL_NUM\b' "$TMP/em3.s" || { echo "FAIL no MUL_NUM macro call in em3 asm"; exit 1; }
+grep -qE '^(\.L[0-9]+:)?[[:space:]]+ADD_NUM\b' "$TMP/em3.s" || { echo "FAIL no ADD_NUM macro call in em3 asm"; exit 1; }
+grep -qE '^(\.L[0-9]+:)?[[:space:]]+MUL_NUM\b' "$TMP/em3.s" || { echo "FAIL no MUL_NUM macro call in em3 asm"; exit 1; }
 grep -q "rt_arith@PLT" "$ROOT/sm_macros.s" || { echo "FAIL no arith PLT call in sm_macros.s"; exit 1; }
 echo "  PASS EM-3 arithmetic  ((2+3)*4=20; emit->link->run verified)"
 
@@ -195,11 +196,11 @@ fi
 # Asm-shape sanity: forward jmp, JUMP_F (jz) and JUMP_S (jnz) all present.
 # Post EM-7c-sm-three-column: the literal `jmp/jz/jnz \tgt` instructions live
 # in the .macro JUMP / JUMP_F / JUMP_S bodies in the externalised sm_macros.s
-# (one copy per emit run); the dispatcher emits `JUMP .LpcN`, `JUMP_F .LpcN`,
-# `JUMP_S .LpcN` at the call sites in three-column form.  Both forms verified.
-grep -qE '^(\.Lpc[0-9]+:)?[[:space:]]+JUMP[[:space:]]+\.Lpc' "$TMP/em4a.s" || { echo "FAIL no JUMP .LpcN call in em4a asm"; exit 1; }
-grep -qE '^(\.Lpc[0-9]+:)?[[:space:]]+JUMP_F[[:space:]]+\.Lpc' "$TMP/em4a.s" || { echo "FAIL no JUMP_F .LpcN call in em4a asm"; exit 1; }
-grep -qE '^(\.Lpc[0-9]+:)?[[:space:]]+JUMP_S[[:space:]]+\.Lpc' "$TMP/em4a.s" || { echo "FAIL no JUMP_S .LpcN call in em4a asm"; exit 1; }
+# (one copy per emit run); the dispatcher emits `JUMP .LN`, `JUMP_F .LN`,
+# `JUMP_S .LN` at the call sites in three-column form.  Both forms verified.
+grep -qE '^(\.L[0-9]+:)?[[:space:]]+JUMP[[:space:]]+\.L' "$TMP/em4a.s" || { echo "FAIL no JUMP .LN call in em4a asm"; exit 1; }
+grep -qE '^(\.L[0-9]+:)?[[:space:]]+JUMP_F[[:space:]]+\.L' "$TMP/em4a.s" || { echo "FAIL no JUMP_F .LN call in em4a asm"; exit 1; }
+grep -qE '^(\.L[0-9]+:)?[[:space:]]+JUMP_S[[:space:]]+\.L' "$TMP/em4a.s" || { echo "FAIL no JUMP_S .LN call in em4a asm"; exit 1; }
 grep -q "rt_last_ok@PLT" "$ROOT/sm_macros.s" || { echo "FAIL no last_ok call in sm_macros.s"; exit 1; }
 # Macro-body instructions: confirm the .macro definitions actually emitted
 # the conditional branches with \tgt as the target operand.
@@ -211,7 +212,7 @@ echo "  PASS EM-4a control flow (forward JUMP + JUMP_F not-taken + JUMP_S taken;
 # 6-op SM body: counter=3, decrement, JUMP_F backward.  The driver below
 # overrides rt_last_ok to return 0 twice (loop iterates 2x: 3->2, 2->1)
 # then 1 (exit; counter -=1 -> 0; HALT rc=0).  Proves the JUMP_F backward
-# branch lands on the .Lpc<top> label correctly.
+# branch lands on the .L<top> label correctly.
 cat > "$TMP/em4b_driver.c" <<'CEOF'
 /* EM-4b loop driver: rt_last_ok override drives the backward loop.
  * Defined here so the linker resolves it before falling back to libscrip_rt.so. */
@@ -232,11 +233,11 @@ set -e
 if [ "$RC" -ne 0 ]; then
     echo "FAIL em4b expected rc=0 got rc=$RC"; exit 1
 fi
-# Asm-shape sanity: the backward jz must target the loop-top label (.Lpc1).
-# Post EM-7c-sm-three-column: the call site emits `.LpcN: JUMP_F .Lpc1` (the
+# Asm-shape sanity: the backward jz must target the loop-top label (.L1).
+# Post EM-7c-sm-three-column: the call site emits `.LN: JUMP_F .L1` (the
 # dispatcher's encoding of "jump-to-pc-1-on-failure"); the literal `jz \tgt`
 # lives in the .macro JUMP_F body in sm_macros.s and resolves at assembly time.
-grep -qE '^(\.Lpc[0-9]+:)?[[:space:]]+JUMP_F[[:space:]]+\.Lpc1\b' "$TMP/em4b.s" || { echo "FAIL no backward JUMP_F .Lpc1 in em4b"; exit 1; }
+grep -qE '^(\.L[0-9]+:)?[[:space:]]+JUMP_F[[:space:]]+\.L1\b' "$TMP/em4b.s" || { echo "FAIL no backward JUMP_F .L1 in em4b"; exit 1; }
 echo "  PASS EM-4b backward loop (JUMP_F backward x2, fallthrough; rc=0)"
 
 # -- Test 7a: EM-5 expression call/return -- two expressions calling each other -------
@@ -255,12 +256,12 @@ if [ "$RC" -ne 13 ]; then
     echo "FAIL em5 expected rc=13 got rc=$RC"; exit 1
 fi
 # Asm-shape sanity: RETURN bakes direct ret; CALL_EXPRESSION bakes
-# direct call to a .LpcN target -- no PLT call for either opcode.
+# direct call to a .LN target -- no PLT call for either opcode.
 # Post EM-7c-sm-three-column: RETURN's `ret` and CALL_EXPRESSION's `call \tgt`
 # live in the .macro bodies in sm_macros.s; the dispatcher emits
-# `.LpcN: RETURN` (no args) and `.LpcN: CALL_EXPRESSION .LpcM` at the call sites.
-grep -qE '^(\.Lpc[0-9]+:)?[[:space:]]+RETURN\b'                "$TMP/em5.s" || { echo "FAIL no RETURN call in em5"; exit 1; }
-grep -qE '^(\.Lpc[0-9]+:)?[[:space:]]+CALL_EXPRESSION[[:space:]]+\.Lpc' "$TMP/em5.s" || { echo "FAIL no CALL_EXPRESSION .LpcN call in em5"; exit 1; }
+# `.LN: RETURN` (no args) and `.LN: CALL_EXPRESSION .LM` at the call sites.
+grep -qE '^(\.L[0-9]+:)?[[:space:]]+RETURN\b'                "$TMP/em5.s" || { echo "FAIL no RETURN call in em5"; exit 1; }
+grep -qE '^(\.L[0-9]+:)?[[:space:]]+CALL_EXPRESSION[[:space:]]+\.L' "$TMP/em5.s" || { echo "FAIL no CALL_EXPRESSION .LN call in em5"; exit 1; }
 # Macro-body instructions: confirm the templates emitted the right bytes.
 # `call \tgt` lives in the .macro CALL_EXPRESSION body; `ret` lives in RETURN.
 grep -qE 'call[[:space:]]+\\tgt' "$ROOT/sm_macros.s" || { echo "FAIL no 'call \\\\tgt' in CALL_EXPRESSION macro body"; exit 1; }

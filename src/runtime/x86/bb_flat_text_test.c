@@ -51,6 +51,28 @@ static int n_pass = 0, n_fail = 0;
     else { n_fail++; fprintf(stderr, "FAIL: %s\n", (msg)); } \
 } while (0)
 
+/* Simple intern_str for TEXT-mode flat emit: returns ".Llit<n>" label.
+ * Records each distinct pointer so emit_lit_data can write .rodata entries. */
+static struct { const char *s; char lbl[32]; } g_lits[64];
+static int g_nlit = 0;
+static const char *test_intern_str(const char *s) {
+    for (int i = 0; i < g_nlit; i++)
+        if (g_lits[i].s == s) return g_lits[i].lbl;
+    if (g_nlit >= 64) return ".Llit_ovf";
+    snprintf(g_lits[g_nlit].lbl, 32, ".Llit%d", g_nlit);
+    g_lits[g_nlit].s = s;
+    return g_lits[g_nlit++].lbl;
+}
+static void emit_lit_data(FILE *out) {
+    if (!g_nlit) return;
+    fprintf(out, "    .section .rodata\n");
+    for (int i = 0; i < g_nlit; i++) {
+        const char *p = g_lits[i].s ? g_lits[i].s : "";
+        fprintf(out, "%s:\n    .asciz \"%s\"\n", g_lits[i].lbl, p);
+    }
+    fprintf(out, "    .text\n    .intel_syntax noprefix\n");
+}
+
 /* ─────────────────────────────────────────────────────────────────── */
 
 int main(int argc, char **argv) {
@@ -71,6 +93,9 @@ int main(int argc, char **argv) {
     int invar = patnd_is_fully_invariant(p);
     CHECK(invar == 1, "pat_lit(\"hello\") should be fully invariant");
 
+    /* Set intern_str callback so literal refs get symbolic labels, not '??'. */
+    emit_flat_set_intern_str(test_intern_str);
+
     /* ── 2. Emit TEXT-mode flat blob ── */
     FILE *out = fopen(out_path, "w");
     CHECK(out != NULL, "fopen output .s file");
@@ -88,6 +113,9 @@ int main(int argc, char **argv) {
 
     int rc = bb_build_flat_text(p, out, "pat_inv_42_0");
     CHECK(rc == 0, "bb_build_flat_text returned 0 for invariant pattern");
+
+    /* Append .rodata section for any interned literal strings. */
+    emit_lit_data(out);
 
     fclose(out);
 
