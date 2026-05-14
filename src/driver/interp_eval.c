@@ -2066,7 +2066,7 @@ DESCR_t icn_kw_read(const char *kw) {
     if (!strcmp(kw,"row"))     return INTVAL(0);
     if (!strcmp(kw,"x"))       return INTVAL(0);
     if (!strcmp(kw,"y"))       return INTVAL(0);
-    if (!strcmp(kw,"level"))   return INTVAL(1);
+    { extern int frame_depth; if (!strcmp(kw,"level")) return INTVAL(frame_depth); }
     /* Mouse/event keywords — fixed negative sentinels per JCON */
     if (!strcmp(kw,"lpress"))   return INTVAL(-1);
     if (!strcmp(kw,"mpress"))   return INTVAL(-2);
