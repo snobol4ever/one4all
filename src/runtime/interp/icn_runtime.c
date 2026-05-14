@@ -1199,12 +1199,14 @@ bb_node_t icn_bb_build(tree_t *e) {
 #undef _TO_COERCE
         /* JCON: all to-by bounds truncate to integer regardless of type (no pure-real path) */
 #define _TO_INT(d, def) (IS_REAL_fn(d) ? (long)(d).r : (IS_FAIL_fn(d) ? (def) : (d).i))
-        icn_to_by_state_t *z = calloc(1, sizeof(*z));
-        z->lo   = _TO_INT(lo_d,   0);
-        z->hi   = _TO_INT(hi_d,   0);
-        z->step = _TO_INT(step_d, 1); if (!z->step) z->step = 1;
+        int64_t to_by_lo   = _TO_INT(lo_d,   0);
+        int64_t to_by_hi   = _TO_INT(hi_d,   0);
+        int64_t to_by_step = _TO_INT(step_d, 1); if (!to_by_step) to_by_step = 1;
 #undef _TO_INT
-        return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
+        IR_block_t *to_by_cfg = lower_icn_to_by(to_by_lo, to_by_hi, to_by_step);
+        icn_dcg_state_t *to_by_dz = calloc(1, sizeof(*to_by_dz));
+        to_by_dz->cfg = to_by_cfg; to_by_dz->first = 1;
+        return (bb_node_t){ icn_bb_dcg, to_by_dz, 0 };
     }
 
     /* ── TT_ITERATE: (!str) / Raku for @arr -> $x ────────────────────────── */

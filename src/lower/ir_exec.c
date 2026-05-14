@@ -414,6 +414,16 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->value = INTVAL(nd->counter);
         return nd->γ;
     }
+    case IR_ICN_TO_BY: {
+        int64_t step = nd->ival3 ? nd->ival3 : 1;
+        if (nd->state == 0) nd->counter = nd->ival;
+        else nd->counter += step;
+        nd->state = 1;
+        int exhausted = (step > 0) ? (nd->counter > nd->ival2) : (nd->counter < nd->ival2);
+        if (exhausted) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+        nd->value = INTVAL(nd->counter);
+        return nd->γ;
+    }
     case IR_ICN_EVERY: {
         bb_node_t *gen = (bb_node_t *)nd->opaque;
         if (!gen) { nd->value = FAILDESCR; return nd->ω; }

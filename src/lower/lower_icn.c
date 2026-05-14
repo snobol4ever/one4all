@@ -77,3 +77,22 @@ IR_block_t *lower_icn_every(bb_node_t *gen, void *body) {
     cfg->entry = nd;
     return cfg;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* lower_icn_to_by — DCG for (lo to hi by step) integer range generator.
+ * Single node; ival=lo, ival2=hi, ival3=step; counter=cur; state 0=α, 1=β. */
+IR_block_t *lower_icn_to_by(int64_t lo, int64_t hi, int64_t step) {
+    IR_block_t *cfg = IR_alloc(4, IR_LANG_ICN);
+    if (!cfg) return NULL;
+    IR_t *nd = IR_node_alloc(cfg, IR_ICN_TO_BY);
+    if (!nd) return NULL;
+    nd->ival    = lo;
+    nd->ival2   = hi;
+    nd->ival3   = step ? step : 1;
+    nd->counter = lo;
+    nd->α = nd;
+    nd->β = nd;
+    nd->γ = NULL;
+    nd->ω = NULL;
+    cfg->entry = nd;
+    return cfg;
+}
