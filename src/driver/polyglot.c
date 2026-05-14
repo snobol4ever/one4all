@@ -28,8 +28,8 @@ extern int64_t kw_case;   /* &CASE: 0=fold, 1=sensitive; default 1 matches SPITB
 #include "runtime/interp/pl_runtime.h"
 #include "driver/interp.h"
 #include "driver/polyglot.h"
-#include "runtime/x86/lower.h"   /* CH-17g-irrun-lowers: sm_lower */
-#include "runtime/x86/sm_prog.h"    /* CH-17g-irrun-lowers: sm_prog_free */
+#include "lower.h"   /* CH-17g-irrun-lowers: sm_lower */
+#include "sm_prog.h"    /* CH-17g-irrun-lowers: sm_prog_free */
 /* PB-8: scrip_sm.h include removed — sm_resolve_irrun_entry_pcs deleted */
 
 ScripModuleRegistry g_registry;   /* zero-initialised; nmod==0 for single-lang */

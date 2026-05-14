@@ -38,12 +38,12 @@
 #include "rt.h"
 
 /* Full SNOBOL4 runtime headers — .so links all runtime objects -fPIC. */
-#include "../../runtime/x86/snobol4.h"
-#include "../../runtime/x86/descr.h"
-#include "../../runtime/x86/sil_macros.h"   /* EM-7: IS_NAMEPTR / IS_NAMEVAL / NAME_DEREF_PTR */
-#include "../../runtime/x86/bb_pool.h"
-#include "../../runtime/x86/bb_box.h"       /* EM-7c: bb_box_fn + exec_stmt_blob */
-#include "../../runtime/x86/bb_build.h"     /* EM-7c-variant: g_bb_mode + BB_MODE_LIVE */
+#include "snobol4.h"
+#include "descr.h"
+#include "sil_macros.h"   /* EM-7: IS_NAMEPTR / IS_NAMEVAL / NAME_DEREF_PTR */
+#include "bb_pool.h"
+#include "bb_box.h"       /* EM-7c: bb_box_fn + exec_stmt_blob */
+#include "bb_build.h"     /* EM-7c-variant: g_bb_mode + BB_MODE_LIVE */
 #include "../../ast/ast.h"                  /* TT_EQ/TT_NE/TT_LT/TT_LE/TT_GT/TT_GE/TT_L* for rt_acomp/rt_lcomp */
 
 #include <stdint.h>
@@ -1342,8 +1342,8 @@ int rt_do_return(int kind, int cond)
  * replaced by real implementations in later rungs (EM-10+).
  *============================================================================*/
 
-#include "../../runtime/x86/sm_interp.h"  /* DESCR_t sm_call_expression(int) */
-#include "../../runtime/x86/sm_prog.h"    /* sm_opcode_name */
+#include "sm_interp.h"  /* DESCR_t sm_call_expression(int) */
+#include "sm_prog.h"    /* sm_opcode_name */
 
 /* sm_call_expression: used by eval_code.c when a DT_E expression is EVAL'd.
  * Not exercised in EM-6 SNOBOL4 pattern gate (no expression-via-EVAL paths).

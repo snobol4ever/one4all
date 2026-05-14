@@ -11,7 +11,7 @@
 
 #include "../ast/ast.h"
 #include "../../frontend/snobol4/scrip_cc.h"
-#include "../../runtime/x86/bb_broker.h"
+#include "bb_broker.h"
 #include "../../frontend/icon/icon_gen.h"
 
 /*------------------------------------------------------------------------

@@ -59,22 +59,22 @@ extern void ir_print_node   (const tree_t *e, FILE *f);
 extern void ir_print_node_nl(const tree_t *e, FILE *f);
 
 /* ── runtime ──────────────────────────────────────────────────────────── */
-#include "../runtime/x86/snobol4.h"
-#include "../runtime/x86/sil_macros.h"   /* SIL macro translations — both RT and SM axes */
-#include "../runtime/x86/snobol4_runtime_shim.h"
+#include "snobol4.h"
+#include "sil_macros.h"   /* SIL macro translations — both RT and SM axes */
+#include "snobol4_runtime_shim.h"
 
 /* ── SM stack machine (M-SCRIP-U3) ───────────────────────────────────── */
-#include "../runtime/x86/lower.h"
-#include "../runtime/x86/sm_interp.h"
-#include "../runtime/x86/sm_prog.h"
-#include "../runtime/x86/bb_build.h"    /* M-BB-LIVE-WIRE: bb_mode_t, g_bb_mode */
-#include "../runtime/x86/sm_jit_interp.h"  /* mode 3: sm_codegen, sm_jit_run */
-#include "../runtime/x86/emit_sm.h"    /* mode 4: sm_codegen_text */
-#include "../runtime/x86/emit.h"              /* EM-BB-FORMAT: g_bb_emit_format */
-#include "../runtime/x86/emit_bb.h"
+#include "lower.h"
+#include "sm_interp.h"
+#include "sm_prog.h"
+#include "bb_build.h"    /* M-BB-LIVE-WIRE: bb_mode_t, g_bb_mode */
+#include "sm_jit_interp.h"  /* mode 3: sm_codegen, sm_jit_run */
+#include "emit_sm.h"    /* mode 4: sm_codegen_text */
+#include "emit.h"              /* EM-BB-FORMAT: g_bb_emit_format */
+#include "emit_bb.h"
 #include "scrip_sm.h"                   /* RS-14: sm_preamble, sm_run_with_recovery */
 #include "sync_monitor.h"               /* IM-7: --monitor in-process comparator */
-#include "../runtime/x86/sm_image.h"    /* M-JIT-RUN: sm_image_init */
+#include "sm_image.h"    /* M-JIT-RUN: sm_image_init */
 
 /* pat_at_cursor not exposed in snobol4.h — forward-declare here */
 extern DESCR_t pat_at_cursor(const char *varname);

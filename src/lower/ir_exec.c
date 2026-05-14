@@ -18,9 +18,9 @@ extern int         Δ;
 extern int         Ω;
 extern int         Σlen;
 /* NV_SET_fn for conditional/immediate capture assignment (IR_PAT_ASSIGN_*). */
-#include "../../runtime/x86/snobol4.h"
+#include "snobol4.h"
 /* descr_match_span: construct DT_S match descriptor from (base, len). */
-#include "../../runtime/x86/bb_box.h"
+#include "bb_box.h"
 /*------------------------------------------------------------------------------------------------------------------------------------*/
 /* IR_exec_node — evaluate nd in its current state; return next port.
  * Self-evaluating scalar kinds set nd->value and return γ or ω.

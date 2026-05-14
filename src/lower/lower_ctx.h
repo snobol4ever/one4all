@@ -45,7 +45,7 @@ void expression_scope_walk(IcnScope *sc, tree_t *e);
 
 /* ── Macros used by lower.c handlers ────────────────────────────────────── */
 
-#include "../common/ast_clone.h"
+#include "ast_clone.h"
 
 #define T0(t) ((t)->n > 0 ? (t)->c[0] : NULL)
 #define T1(t) ((t)->n > 1 ? (t)->c[1] : NULL)

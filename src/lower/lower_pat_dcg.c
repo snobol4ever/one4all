@@ -12,7 +12,7 @@
  * Unimplemented tree kinds: return NULL (fall through to existing bb_node_t path).
  */
 #include "lower_pat_dcg.h"
-#include "../../runtime/common/scrip_ir.h"
+#include "scrip_ir.h"
 #include "../ast/ast.h"
 #include "snobol4.h"
 #include <gc/gc.h>

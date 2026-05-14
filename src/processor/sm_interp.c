@@ -10,8 +10,8 @@
 
 #include "sm_interp.h"
 #include "sm_prog.h"
-#include "../../runtime/common/coerce.h"  /* shared_arith (F-1 RS-7) */
-#include "../../runtime/common/ir_exec.h"    /* IR_exec_once, IR_exec_pump (LR-2) */
+#include "coerce.h"  /* shared_arith (F-1 RS-7) */
+#include "ir_exec.h"    /* IR_exec_once, IR_exec_pump (LR-2) */
 
 #include <stdio.h>
 #include <stdlib.h>

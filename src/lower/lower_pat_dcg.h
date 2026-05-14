@@ -3,7 +3,7 @@
 #pragma once
 #ifndef LOWER_PAT_DCG_H
 #define LOWER_PAT_DCG_H
-#include "../../runtime/common/scrip_ir.h"
+#include "scrip_ir.h"
 #include "../ast/ast.h"
 /* Build IR_prog_t DCG from pat_tree. Returns NULL if any node kind is
  * unsupported (caller falls back to existing bb_node_t path). */

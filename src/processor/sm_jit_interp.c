@@ -18,7 +18,7 @@ extern int    g_ast_pump_active     ;
 #include <string.h>
 #include <stdint.h>
 #include <math.h>
-#include "../../runtime/common/coerce.h"
+#include "coerce.h"
 #include <setjmp.h>
 #include <gc/gc.h>
 static SM_Program *g_jit_prog   = NULL;

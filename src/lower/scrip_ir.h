@@ -15,7 +15,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
-#include "../../runtime/x86/descr.h"
+#include "descr.h"
 
 /*==================================================================================================
  * Value constructors — mirrors snobol4.h macros; defined here so ir_exec.c

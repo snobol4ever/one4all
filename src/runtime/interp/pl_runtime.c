@@ -35,7 +35,7 @@
  * to avoid scrip_cc.h path issues from runtime/interp context. */
 extern tree_t *pl_assert_term(Term *t, int *functor_out, int *arity_out);
 #include "../../frontend/prolog/pl_broker.h"
-#include "../../runtime/x86/bb_broker.h"
+#include "bb_broker.h"
 #include "icn_value.h"   /* RS-18: bb_eval_value — shared Icon/Prolog value-context evaluator */
 #include <stdio.h>
 #include <stdlib.h>

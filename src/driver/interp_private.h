@@ -45,15 +45,15 @@ extern void ir_print_node   (const tree_t *e, FILE *f);
 extern void ir_print_node_nl(const tree_t *e, FILE *f);
 
 /* ── runtime ──────────────────────────────────────────────────────────── */
-#include "runtime/x86/snobol4.h"
-#include "runtime/x86/sil_macros.h"
-#include "runtime/x86/snobol4_runtime_shim.h"
-#include "runtime/x86/lower.h"
-#include "runtime/x86/sm_interp.h"
-#include "runtime/x86/sm_prog.h"
-#include "runtime/x86/bb_build.h"
-#include "runtime/x86/sm_jit_interp.h"
-#include "runtime/x86/sm_image.h"
+#include "snobol4.h"
+#include "sil_macros.h"
+#include "snobol4_runtime_shim.h"
+#include "lower.h"
+#include "sm_interp.h"
+#include "sm_prog.h"
+#include "bb_build.h"
+#include "sm_jit_interp.h"
+#include "sm_image.h"
 
 extern DESCR_t pat_at_cursor(const char *varname);
 

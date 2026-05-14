@@ -10,7 +10,7 @@
  *
  * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6 (RS-6/RS-7, 2026-05-02)
  */
-#include "runtime/common/coerce.h"
+#include "coerce.h"
 #include <string.h>
 #include <stdio.h>
 #include <math.h>

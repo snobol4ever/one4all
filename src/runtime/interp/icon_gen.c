@@ -13,7 +13,7 @@
 
 #include "../../frontend/icon/icon_gen.h"
 #include "../ast/ast.h"            /* tree_t, tree_e, TT_TO, TT_TO_BY, TT_ITERATE, TT_SUSPEND, TT_FNC */
-#include "../../runtime/common/coerce.h"  /* descr_to_str_icn (D-1/D-2 RS-6) */
+#include "coerce.h"  /* descr_to_str_icn (D-1/D-2 RS-6) */
 #include "../../runtime/interp/icn_runtime.h"  /* CORO_STACK_SZ */
 #include <stdio.h>
 #include <stdlib.h>
@@ -533,7 +533,7 @@ int main(void) {
 icn_scan_gen_state_t *icon_scan_gen_new(void) { return calloc(1, sizeof(icn_scan_gen_state_t)); }
 #include "../../runtime/interp/icn_value.h"
 #include "../../runtime/interp/icn_stmt.h"
-#include "../../runtime/x86/snobol4.h"
+#include "snobol4.h"
 
 /* Forward declarations from icn_runtime.c */
 typedef struct { tree_t *expr; } icn_lazy_state_t;

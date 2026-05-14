@@ -18,9 +18,9 @@
 #include "icn_stmt.h"
 #include "../ast/ast.h"
 #include "../../frontend/snobol4/scrip_cc.h"
-#include "../../runtime/x86/bb_broker.h"
+#include "bb_broker.h"
 #include "../../frontend/icon/icon_gen.h"
-#include "../../runtime/common/coerce.h"
+#include "coerce.h"
 #include "scan_builtins.h"
 #include <stdlib.h>
 #include <string.h>

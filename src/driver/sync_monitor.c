@@ -11,14 +11,14 @@
 #include <stdio.h>
 
 #include "sync_monitor.h"
-#include "runtime/x86/snobol4.h"
+#include "snobol4.h"
 #include "runtime/interp/icn_runtime.h"
 #include "runtime/interp/pl_runtime.h"
-#include "runtime/x86/lower.h"
-#include "runtime/x86/sm_prog.h"
-#include "runtime/x86/sm_interp.h"
-#include "runtime/x86/sm_jit_interp.h"
-#include "runtime/x86/sm_image.h"
+#include "lower.h"
+#include "sm_prog.h"
+#include "sm_interp.h"
+#include "sm_jit_interp.h"
+#include "sm_image.h"
 #include "interp.h"
 #include "frontend/snobol4/scrip_cc.h"  /* tree_t, stmt_attr_* */
 #include "frontend/prolog/term.h"        /* IM-11: Term, TERM_REF, term_deref */

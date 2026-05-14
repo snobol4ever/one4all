@@ -32,7 +32,7 @@
 #include "sm_interp.h"
 #include "../../frontend/snobol4/scrip_cc.h"
 #include "../ast/ast.h"
-#include "../../runtime/common/ast_clone.h"
+#include "ast_clone.h"
 #include "lower_pat_dcg.h"         /* LR-S1: build IR_prog_t alongside pattern lowering */
 #include "../../runtime/interp/icn_runtime.h"
 #include "../../runtime/interp/pl_runtime.h"

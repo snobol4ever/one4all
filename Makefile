@@ -27,13 +27,13 @@
 ROOT    := $(shell pwd)
 SRC     := $(ROOT)/src
 RT      := $(SRC)/runtime
-BOXES   := $(RT)/x86
+BOXES   := $(SRC)/processor
 CORPUS  ?= $(ROOT)/../corpus
 OBJ     := /tmp/si_objs
 CC      := gcc
 WARN    := -w
-CBASE   := -O0 -g $(WARN) -I$(SRC) -I$(RT)/x86 -I$(RT) -I$(RT)/x86
-CRT     := $(CBASE) -I$(RT)/x86 -DDYN_ENGINE_LINKED
+CBASE   := -O0 -g $(WARN) -I$(SRC) -I$(SRC)/lower -I$(SRC)/processor -I$(SRC)/emitter -I$(SRC)/runtime/snobol4 -I$(RT)
+CRT     := $(CBASE) -DDYN_ENGINE_LINKED
 LIBS    := -lgc -lm
 
 # Runner defaults
@@ -65,29 +65,29 @@ libscrip_rt: out/libscrip_rt.so
 # EM-6 runtime objects (all compiled -fPIC so they can go into the .so)
 RT_PIC_SRCS := \
     $(RT)/rt/rt.c \
-    $(RT)/x86/snobol4.c \
-    $(RT)/x86/snobol4_pattern.c \
-    $(RT)/x86/snobol4_invoke.c \
-    $(RT)/x86/snobol4_argval.c \
-    $(RT)/x86/snobol4_nmd.c \
-    $(RT)/x86/name_t.c \
-    $(RT)/x86/stmt_exec.c \
-    $(RT)/x86/eval_code.c \
-    $(RT)/x86/eval_pat.c \
-    $(RT)/x86/bb_pool.c \
-    $(RT)/x86/emit_core.c \
-    $(RT)/x86/emit_bb.c \
-    $(RT)/x86/emit_sm.c \
+    $(SRC)/runtime/snobol4/snobol4.c \
+    $(SRC)/runtime/snobol4/snobol4_pattern.c \
+    $(SRC)/runtime/snobol4/snobol4_invoke.c \
+    $(SRC)/runtime/snobol4/snobol4_argval.c \
+    $(SRC)/runtime/snobol4/snobol4_nmd.c \
+    $(SRC)/runtime/snobol4/name_t.c \
+    $(SRC)/runtime/snobol4/stmt_exec.c \
+    $(SRC)/runtime/snobol4/eval_code.c \
+    $(SRC)/runtime/snobol4/eval_pat.c \
+    $(SRC)/processor/bb_pool.c \
+    $(SRC)/emitter/emit_core.c \
+    $(SRC)/emitter/emit_bb.c \
+    $(SRC)/emitter/emit_sm.c \
     \
-    $(RT)/x86/bb_boxes.c \
-    $(RT)/x86/bb_broker.c \
-    $(RT)/x86/sm_prog.c \
-    $(RT)/x86/sm_interp.c \
-    $(RT)/x86/lower.c \
-    $(RT)/x86/lower_ctx.c \
-    $(RT)/x86/lower_pat_dcg.c \
-    $(RT)/x86/sm_image.c \
-    $(RT)/x86/sm_jit_interp.c \
+    $(SRC)/processor/bb_boxes.c \
+    $(SRC)/processor/bb_broker.c \
+    $(SRC)/lower/sm_prog.c \
+    $(SRC)/processor/sm_interp.c \
+    $(SRC)/lower/lower.c \
+    $(SRC)/lower/lower_ctx.c \
+    $(SRC)/lower/lower_pat_dcg.c \
+    $(SRC)/processor/sm_image.c \
+    $(SRC)/processor/sm_jit_interp.c \
     $(SRC)/runtime/interp/icon_gen.c \
     $(SRC)/runtime/interp/icn_runtime.c \
     $(SRC)/runtime/interp/icn_value.c \
@@ -96,10 +96,10 @@ RT_PIC_SRCS := \
     $(SRC)/runtime/interp/raku_builtins.c \
     $(SRC)/runtime/interp/pl_runtime.c \
     $(SRC)/runtime/interp/icon_box_rt.c \
-    $(SRC)/runtime/common/coerce.c \
-    $(SRC)/runtime/common/ast_clone.c \
-    $(SRC)/runtime/common/scrip_ir.c \
-    $(SRC)/runtime/common/ir_exec.c \
+    $(SRC)/runtime/snobol4/coerce.c \
+    $(SRC)/lower/ast_clone.c \
+    $(SRC)/lower/scrip_ir.c \
+    $(SRC)/lower/ir_exec.c \
     $(SRC)/driver/interp_globals.c \
     $(SRC)/driver/interp_label.c \
     $(SRC)/driver/interp_call.c \
@@ -143,7 +143,7 @@ RT_PIC_SRCS := \
 out/libscrip_rt.so: $(RT_PIC_SRCS) $(RT)/rt/rt.h
 	@mkdir -p out
 	$(CC) -O0 -g $(WARN) -fPIC -shared \
-	    -I$(SRC) -I$(RT)/x86 -I$(RT) -I$(RT)/rt \
+	    -I$(SRC) -I$(SRC)/lower -I$(SRC)/processor -I$(SRC)/emitter -I$(SRC)/runtime/snobol4 -I$(RT) -I$(RT)/rt \
 	    -I$(SRC)/frontend/snobol4 -I$(SRC)/frontend/raku \
 	    -DDYN_ENGINE_LINKED -DIR_DEFINE_NAMES \
 	    $(RT_PIC_SRCS) \
@@ -154,17 +154,17 @@ out/libscrip_rt.so: $(RT_PIC_SRCS) $(RT)/rt/rt.h
 # ── EM-2 synthetic-program harness ───────────────────────────────────────────
 # Standalone helper: builds a 3-op SM_Program in memory and emits asm
 # via sm_codegen_x64_emit().  The shell gate then assembles/links/runs.
-out/sm_codegen_x64_emit_test: $(RT)/x86/sm_codegen_x64_emit_test.c \
+out/sm_codegen_x64_emit_test: $(SRC)/emitter/sm_codegen_x64_emit_test.c \
                                 \
-                               $(RT)/x86/sm_prog.c \
-                               $(RT)/x86/sm_prog.h \
+                               $(SRC)/lower/sm_prog.c \
+                               $(SRC)/lower/sm_prog.h \
                                out/libscrip_rt.so
 	@mkdir -p out
 	$(CC) -O0 -g $(WARN) \
-	    -I$(SRC) -I$(RT)/x86 -I$(RT) -I$(RT)/rt \
+	    -I$(SRC) -I$(SRC)/lower -I$(SRC)/processor -I$(SRC)/emitter -I$(SRC)/runtime/snobol4 -I$(RT) -I$(RT)/rt \
 	    -DDYN_ENGINE_LINKED \
-	    $(RT)/x86/sm_codegen_x64_emit_test.c \
-	    $(RT)/x86/sm_prog.c \
+	    $(SRC)/emitter/sm_codegen_x64_emit_test.c \
+	    $(SRC)/lower/sm_prog.c \
 	    -Lout -lscrip_rt -lgc -lm \
 	    -Wl,-rpath,$(shell pwd)/out \
 	    -o out/sm_codegen_x64_emit_test
@@ -173,17 +173,17 @@ out/sm_codegen_x64_emit_test: $(RT)/x86/sm_codegen_x64_emit_test.c \
 
 # ── EM-7a Phase-2 simulator unit test ────────────────────────────────────────
 # Links against libscrip_rt.so for pat_* constructors + GC.
-out/sm_phase2_sim_test: $(RT)/x86/sm_phase2_sim_test.c \
+out/sm_phase2_sim_test: $(SRC)/emitter/sm_phase2_sim_test.c \
                          \
-                        $(RT)/x86/sm_prog.c \
-                        $(RT)/x86/sm_prog.h \
+                        $(SRC)/lower/sm_prog.c \
+                        $(SRC)/lower/sm_prog.h \
                         out/libscrip_rt.so
 	@mkdir -p out
 	$(CC) -O0 -g $(WARN) \
-	    -I$(SRC) -I$(RT)/x86 -I$(RT) -I$(RT)/rt \
+	    -I$(SRC) -I$(SRC)/lower -I$(SRC)/processor -I$(SRC)/emitter -I$(SRC)/runtime/snobol4 -I$(RT) -I$(RT)/rt \
 	    -DDYN_ENGINE_LINKED \
-	    $(RT)/x86/sm_phase2_sim_test.c \
-	    $(RT)/x86/sm_prog.c \
+	    $(SRC)/emitter/sm_phase2_sim_test.c \
+	    $(SRC)/lower/sm_prog.c \
 	    -Lout -lscrip_rt -lgc -lm \
 	    -Wl,-rpath,$(shell pwd)/out \
 	    -o out/sm_phase2_sim_test
@@ -193,18 +193,18 @@ out/sm_phase2_sim_test: $(RT)/x86/sm_phase2_sim_test.c \
 # the four externally-visible α/β/γ/ω labels and assembles cleanly.
 # Links against libscrip_rt.so (which already includes bb_flat.c +
 # bb_emit.c + pat_* constructors).
-out/bb_flat_text_test: $(RT)/x86/bb_flat_text_test.c \
+out/bb_flat_text_test: $(SRC)/emitter/bb_flat_text_test.c \
                         \
-                       $(RT)/x86/sm_prog.c \
-                       $(RT)/x86/sm_prog.h \
+                       $(SRC)/lower/sm_prog.c \
+                       $(SRC)/lower/sm_prog.h \
                        out/libscrip_rt.so \
-                       $(RT)/x86/bb_pool.h
+                       $(SRC)/processor/bb_pool.h
 	@mkdir -p out
 	$(CC) -O0 -g $(WARN) \
-	    -I$(SRC) -I$(RT)/x86 -I$(RT) -I$(RT)/rt \
+	    -I$(SRC) -I$(SRC)/lower -I$(SRC)/processor -I$(SRC)/emitter -I$(SRC)/runtime/snobol4 -I$(RT) -I$(RT)/rt \
 	    -DDYN_ENGINE_LINKED \
-	    $(RT)/x86/bb_flat_text_test.c \
-	    $(RT)/x86/sm_prog.c \
+	    $(SRC)/emitter/bb_flat_text_test.c \
+	    $(SRC)/lower/sm_prog.c \
 	    -Lout -lscrip_rt -lgc -lm \
 	    -Wl,-rpath,$(shell pwd)/out \
 	    -o out/bb_flat_text_test
@@ -220,18 +220,18 @@ scrip:
 	@rm -f $(OBJ)/*.o
 	$(CC) $(CBASE) -c $(SRC)/frontend/snobol4/snobol4.lex.c -o $(OBJ)/snobol4.lex.o
 	$(CC) $(CBASE) -c $(SRC)/frontend/snobol4/snobol4.tab.c -o $(OBJ)/snobol4.tab.o
-	$(CC) $(CRT)   -c $(RT)/x86/snobol4.c               -o $(OBJ)/snobol4.o
-	$(CC) $(CRT)   -c $(RT)/x86/snobol4_pattern.c        -o $(OBJ)/snobol4_pattern.o
-	$(CC) $(CRT)   -c $(RT)/x86/snobol4_invoke.c                 -o $(OBJ)/snobol4_invoke.o
-	$(CC) $(CRT)   -c $(RT)/x86/snobol4_argval.c                 -o $(OBJ)/snobol4_argval.o
-	$(CC) $(CRT)   -c $(RT)/x86/snobol4_nmd.c                    -o $(OBJ)/snobol4_nmd.o
-	$(CC) $(CRT)   -c $(RT)/x86/name_t.c                         -o $(OBJ)/name_t.o
-	$(CC) $(CRT)   -c $(RT)/x86/stmt_exec.c                  -o $(OBJ)/stmt_exec.o
-	$(CC) $(CRT)   -c $(RT)/x86/eval_code.c                  -o $(OBJ)/eval_code.o
-	$(CC) $(CRT)   -c $(RT)/x86/bb_pool.c                    -o $(OBJ)/bb_pool.o
-	$(CC) $(CRT)   -c $(RT)/x86/emit_core.c               -o $(OBJ)/emit_core.o
-	$(CC) $(CRT) -c $(RT)/x86/bb_boxes.c -o $(OBJ)/bb_boxes.o
-	$(CC) $(CRT) -c $(RT)/x86/bb_broker.c -o $(OBJ)/bb_broker.o
+	$(CC) $(CRT)   -c $(SRC)/runtime/snobol4/snobol4.c               -o $(OBJ)/snobol4.o
+	$(CC) $(CRT)   -c $(SRC)/runtime/snobol4/snobol4_pattern.c        -o $(OBJ)/snobol4_pattern.o
+	$(CC) $(CRT)   -c $(SRC)/runtime/snobol4/snobol4_invoke.c                 -o $(OBJ)/snobol4_invoke.o
+	$(CC) $(CRT)   -c $(SRC)/runtime/snobol4/snobol4_argval.c                 -o $(OBJ)/snobol4_argval.o
+	$(CC) $(CRT)   -c $(SRC)/runtime/snobol4/snobol4_nmd.c                    -o $(OBJ)/snobol4_nmd.o
+	$(CC) $(CRT)   -c $(SRC)/runtime/snobol4/name_t.c                         -o $(OBJ)/name_t.o
+	$(CC) $(CRT)   -c $(SRC)/runtime/snobol4/stmt_exec.c                  -o $(OBJ)/stmt_exec.o
+	$(CC) $(CRT)   -c $(SRC)/runtime/snobol4/eval_code.c                  -o $(OBJ)/eval_code.o
+	$(CC) $(CRT)   -c $(SRC)/processor/bb_pool.c                    -o $(OBJ)/bb_pool.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/emit_core.c               -o $(OBJ)/emit_core.o
+	$(CC) $(CRT) -c $(SRC)/processor/bb_boxes.c -o $(OBJ)/bb_boxes.o
+	$(CC) $(CRT) -c $(SRC)/processor/bb_broker.c -o $(OBJ)/bb_broker.o
 	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -DIR_DEFINE_NAMES \
 	    -c $(SRC)/ast/ast_print.c -o $(OBJ)/ast_print.o
 	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -c $(SRC)/frontend/snocone/snocone_lex.c        -o $(OBJ)/snocone_lex.o
@@ -267,26 +267,26 @@ scrip:
 	$(CC) $(CRT)   -c $(SRC)/runtime/interp/pl_runtime.c  -o $(OBJ)/pl_runtime.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/interp/icon_box_rt.c  -o $(OBJ)/icon_box_rt.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/interp/icon_gen.c         -o $(OBJ)/icon_gen.o
-	$(CC) $(CRT)   -c $(SRC)/runtime/common/coerce.c      -o $(OBJ)/coerce.o
-	$(CC) $(CRT)   -c $(SRC)/runtime/common/ast_clone.c    -o $(OBJ)/ast_clone.o
-	$(CC) $(CRT)   -c $(SRC)/runtime/common/scrip_ir.c     -o $(OBJ)/scrip_ir.o
-	$(CC) $(CRT)   -c $(SRC)/runtime/common/ir_exec.c      -o $(OBJ)/ir_exec.o
-	$(CC) $(CRT)   -c $(RT)/x86/sm_prog.c    -o $(OBJ)/sm_prog.o
-	$(CC) $(CRT)   -c $(RT)/x86/sm_interp.c  -o $(OBJ)/sm_interp.o
-	$(CC) $(CRT)   -c $(RT)/x86/lower.c      -o $(OBJ)/lower.o
-	$(CC) $(CRT)   -c $(RT)/x86/lower_ctx.c  -o $(OBJ)/lower_ctx.o
-	$(CC) $(CRT)   -c $(RT)/x86/lower_pat_dcg.c -o $(OBJ)/lower_pat_dcg.o
-	$(CC) $(CRT)   -c $(RT)/x86/sm_image.c   -o $(OBJ)/sm_image.o
-	$(CC) $(CRT)   -c $(RT)/x86/sm_jit_interp.c -o $(OBJ)/sm_jit_interp.o
-	$(CC) $(CRT)   -c $(RT)/x86/emit_sm.c -o $(OBJ)/emit_sm.o
-	$(CC) $(CRT)   -c $(RT)/x86/emit_bb.c -o $(OBJ)/emit_bb.o
+	$(CC) $(CRT)   -c $(SRC)/runtime/snobol4/coerce.c      -o $(OBJ)/coerce.o
+	$(CC) $(CRT)   -c $(SRC)/lower/ast_clone.c    -o $(OBJ)/ast_clone.o
+	$(CC) $(CRT)   -c $(SRC)/lower/scrip_ir.c     -o $(OBJ)/scrip_ir.o
+	$(CC) $(CRT)   -c $(SRC)/lower/ir_exec.c      -o $(OBJ)/ir_exec.o
+	$(CC) $(CRT)   -c $(SRC)/lower/sm_prog.c    -o $(OBJ)/sm_prog.o
+	$(CC) $(CRT)   -c $(SRC)/processor/sm_interp.c  -o $(OBJ)/sm_interp.o
+	$(CC) $(CRT)   -c $(SRC)/lower/lower.c      -o $(OBJ)/lower.o
+	$(CC) $(CRT)   -c $(SRC)/lower/lower_ctx.c  -o $(OBJ)/lower_ctx.o
+	$(CC) $(CRT)   -c $(SRC)/lower/lower_pat_dcg.c -o $(OBJ)/lower_pat_dcg.o
+	$(CC) $(CRT)   -c $(SRC)/processor/sm_image.c   -o $(OBJ)/sm_image.o
+	$(CC) $(CRT)   -c $(SRC)/processor/sm_jit_interp.c -o $(OBJ)/sm_jit_interp.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/emit_sm.c -o $(OBJ)/emit_sm.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/emit_bb.c -o $(OBJ)/emit_bb.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/rt/rt.c   -o $(OBJ)/rt.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_globals.c -o $(OBJ)/interp_globals.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_label.c   -o $(OBJ)/interp_label.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_call.c    -o $(OBJ)/interp_call.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_eval.c    -o $(OBJ)/interp_eval.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_ref.c     -o $(OBJ)/interp_ref.o
-	$(CC) $(CRT)   -c $(SRC)/runtime/x86/eval_pat.c  -o $(OBJ)/eval_pat.o
+	$(CC) $(CRT)   -c $(SRC)/runtime/snobol4/eval_pat.c  -o $(OBJ)/eval_pat.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_exec.c    -o $(OBJ)/interp_exec.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_hooks.c   -o $(OBJ)/interp_hooks.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_data.c    -o $(OBJ)/interp_data.o

@@ -338,7 +338,7 @@ int rt_in_native_chunk(void);
 /* rt_bb_* — BB box runtime functions (EC-1 / zero-C-BB goal).
  * Same ABI as old bb_* C box functions: DESCR_t fn(void *zeta, int port).
  * Called from x86 blobs via PLT.  Live in libscrip_rt.so. */
-#include "../x86/bb_box.h"
+#include "bb_box.h"
 DESCR_t rt_bb_span   (void *zeta, int port);
 DESCR_t rt_bb_brk    (void *zeta, int port);
 DESCR_t rt_bb_any    (void *zeta, int port);

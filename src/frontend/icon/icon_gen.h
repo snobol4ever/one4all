@@ -18,8 +18,8 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include "../../runtime/x86/bb_broker.h"   /* bb_box_fn, bb_node_t, BrokerMode, bb_broker, DESCR_t, FAILDESCR, IS_FAIL_fn, α/β */
-#include "../../runtime/x86/snobol4.h"     /* TBBLK_t, TBPAIR_t, table_new, table_get, table_set, TABLE_BUCKETS */
+#include "bb_broker.h"   /* bb_box_fn, bb_node_t, BrokerMode, bb_broker, DESCR_t, FAILDESCR, IS_FAIL_fn, α/β */
+#include "snobol4.h"     /* TBBLK_t, TBPAIR_t, table_new, table_get, table_set, TABLE_BUCKETS */
 
 /*----------------------------------------------------------------------------------------------------------------------------
  * ICN_FAIL_GEN — a generator that immediately fires ω.  Used as a sentinel / no-op.

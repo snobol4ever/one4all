@@ -20,7 +20,7 @@
  * Retry belongs to the OR-box (pl_box_choice), not the broker.
  *--------------------------------------------------------------------------------------------------------------------*/
 
-#include "runtime/x86/bb_broker.h"         /* bb_box_fn, bb_node_t, BrokerMode, bb_broker, DESCR_t, FAILDESCR, IS_FAIL_fn, α, β */
+#include "bb_broker.h"         /* bb_box_fn, bb_node_t, BrokerMode, bb_broker, DESCR_t, FAILDESCR, IS_FAIL_fn, α, β */
 #include "frontend/prolog/prolog_runtime.h"
 #include "frontend/snobol4/scrip_cc.h"      /* tree_t — needed for pl_box_builtin */
 #include "frontend/prolog/prolog_builtin.h" /* interp_exec_pl_builtin */

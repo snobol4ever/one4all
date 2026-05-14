@@ -83,8 +83,8 @@
 #include "icn_stmt.h"         /* RS-23c: bb_exec_stmt used in TT_EVERY body dispatch */
 #include "icn_runtime.h"   /* FRAME, frame_depth, scan_pos, scan_subj, icn_descr_identical, g_lang, is_suspendable, icn_bb_build */
 #include "../../driver/interp_private.h"  /* RS-22a: icn_call_builtin, icn_string_section_assign, set_and_trace, data_field_ptr, kw_assign; RS-22d: IcnTkKind via icon_lex.h */
-#include "../common/coerce.h"             /* RS-22b: shared_arith */
-#include "../x86/bb_broker.h"             /* RS-22d: α, β, bb_node_t for TT_AUGOP generator-RHS path */
+#include "coerce.h"             /* RS-22b: shared_arith */
+#include "bb_broker.h"             /* RS-22d: α, β, bb_node_t for TT_AUGOP generator-RHS path */
 #include "snobol4.h"
 #include <string.h>
 #include <gc/gc.h>

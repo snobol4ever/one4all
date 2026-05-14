@@ -24,8 +24,8 @@
 #ifndef SCRIP_SM_H
 #define SCRIP_SM_H
 
-#include "../runtime/x86/sm_prog.h"
-#include "../runtime/x86/sm_interp.h"
+#include "sm_prog.h"
+#include "sm_interp.h"
 #include "../ast/ast.h"  /* tree_t */
 
 /* Build label table, prescan DEFINEs, lower IR to SM_Program.
