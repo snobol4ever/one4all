@@ -1377,87 +1377,6 @@ __attribute__((weak)) int _expr_is_pat(tree_t *e)          { (void)e; return 0; 
 #include <stdio.h>
 #include <gc/gc.h>
 
-/* ── arb ──────────────────────────────────────────────────────────────── */
-/* _XFARB: match 0..n chars lazily; β extends by 1 */
-DESCR_t rt_bb_arb(void *zeta, int port)
-{
-    arb_t *ζ = zeta;
-    if (port == 0) { ζ->count = 0; ζ->start = Δ; return descr_match_span(Σ+Δ, 0); }
-    ζ->count++;
-    if (ζ->start + ζ->count > Σlen) return FAILDESCR;
-    Δ = ζ->start; DESCR_t ARB = descr_match_span(Σ+Δ, ζ->count); Δ += ζ->count;
-    return ARB;
-}
-
-/* ── len ──────────────────────────────────────────────────────────────── */
-DESCR_t rt_bb_len(void *zeta, int port)
-{
-    len_t *ζ = zeta;
-    if (port == 0) {
-        if (Δ + ζ->n > Σlen) return FAILDESCR;
-        DESCR_t LEN = descr_match_span(Σ+Δ, ζ->n); Δ += ζ->n;
-        return LEN;
-    }
-    Δ -= ζ->n; return FAILDESCR;
-}
-
-/* ── tab ──────────────────────────────────────────────────────────────── */
-DESCR_t rt_bb_tab(void *zeta, int port)
-{
-    tab_t *ζ = zeta;
-    if (port == 0) {
-        if (Δ > ζ->n) return FAILDESCR;
-        ζ->advance = ζ->n - Δ; DESCR_t TAB = descr_match_span(Σ+Δ, ζ->advance); Δ = ζ->n;
-        return TAB;
-    }
-    Δ -= ζ->advance; return FAILDESCR;
-}
-
-/* ── rtab ─────────────────────────────────────────────────────────────── */
-DESCR_t rt_bb_rtab(void *zeta, int port)
-{
-    rtab_t *ζ = zeta;
-    if (port == 0) {
-        if (Δ > Σlen - ζ->n) return FAILDESCR;
-        ζ->advance = (Σlen - ζ->n) - Δ; DESCR_t RTAB = descr_match_span(Σ+Δ, ζ->advance); Δ = Σlen - ζ->n;
-        return RTAB;
-    }
-    Δ -= ζ->advance; return FAILDESCR;
-}
-
-/* ── bal ──────────────────────────────────────────────────────────────── */
-DESCR_t rt_bb_bal(void *zeta, int port)
-{
-    bal_t *ζ = zeta;
-    if (port == 0) {
-        int pos = Δ, depth = 0;
-        while (pos < Σlen) {
-            char c = Σ[pos];
-            if (c == '(') { depth++; pos++; }
-            else if (c == ')') { if (depth == 0) break; depth--; pos++; }
-            else { pos++; }
-        }
-        ζ->δ = pos - Δ;
-        DESCR_t BAL = descr_match_span(Σ+Δ, ζ->δ); Δ += ζ->δ;
-        return BAL;
-    }
-    Δ -= ζ->δ; return FAILDESCR;
-}
-
-/* ── breakx ───────────────────────────────────────────────────────────── */
-DESCR_t rt_bb_breakx(void *zeta, int port)
-{
-    brkx_t *ζ = zeta;
-    if (port == 0) {
-        ζ->δ = 0;
-        while (Δ+ζ->δ < Σlen && !strchr(ζ->chars, Σ[Δ+ζ->δ])) ζ->δ++;
-        if (ζ->δ == 0 || Δ+ζ->δ >= Σlen) return FAILDESCR;
-        DESCR_t BREAKX = descr_match_span(Σ+Δ, ζ->δ); Δ += ζ->δ;
-        return BREAKX;
-    }
-    Δ -= ζ->δ; return FAILDESCR;
-}
-
 /* ── charset (span/brk/any/notany) ───────────────────────────────────── */
 /* zeta = { const char *chars; int delta; } — same layout as in bb_templates.c */
 typedef struct { const char *chars; int delta; } rt_cs_t;
@@ -1634,10 +1553,3 @@ void rt_flush_pending_captures(void)
     g_rt_cap_count = 0;
 }
 
-/* ── rem ──────────────────────────────────────────────────────────────── */
-DESCR_t rt_bb_rem(void *zeta, int port)
-{
-    (void)zeta;
-    if (port == 0) { DESCR_t REM = descr_match_span(Σ+Δ, Σlen-Δ); Δ = Σlen; return REM; }
-    return FAILDESCR;
-}

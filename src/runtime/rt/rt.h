@@ -339,12 +339,6 @@ int rt_in_native_chunk(void);
  * Same ABI as old bb_* C box functions: DESCR_t fn(void *zeta, int port).
  * Called from x86 blobs via PLT.  Live in libscrip_rt.so. */
 #include "../x86/bb_box.h"
-DESCR_t rt_bb_arb    (void *zeta, int port);
-DESCR_t rt_bb_len    (void *zeta, int port);
-DESCR_t rt_bb_tab    (void *zeta, int port);
-DESCR_t rt_bb_rtab   (void *zeta, int port);
-DESCR_t rt_bb_bal    (void *zeta, int port);
-DESCR_t rt_bb_breakx (void *zeta, int port);
 DESCR_t rt_bb_span   (void *zeta, int port);
 DESCR_t rt_bb_brk    (void *zeta, int port);
 DESCR_t rt_bb_any    (void *zeta, int port);
@@ -352,7 +346,6 @@ DESCR_t rt_bb_notany (void *zeta, int port);
 DESCR_t rt_bb_arbno  (void *zeta, int port);
 DESCR_t rt_bb_atp    (void *zeta, int port);
 DESCR_t rt_bb_cap    (void *zeta, int port);
-DESCR_t rt_bb_rem    (void *zeta, int port);
 void   *rt_bb_arbno_new(bb_box_fn fn, void *state);
 void    rt_flush_pending_captures(void);
 

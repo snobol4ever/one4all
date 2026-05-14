@@ -64,15 +64,8 @@ extern DESCR_t icn_bb_proccode(void*,int);      extern icn_proccode_state_t    *
 extern DESCR_t    icn_bb_scan_gen          (void *zeta, int entry);    extern icn_scan_gen_state_t        * icon_scan_gen_new(void);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern atp_t    * bb_atp_new                (const char *varname);
-extern bal_t    * bb_bal_new                (void);
-extern brkx_t   * bb_breakx_new             (const char *chars);
 extern cap_t    * bb_cap_new_call           (bb_box_fn child_fn, void *child_state, const char *fnc_name, DESCR_t *fnc_args, int fnc_nargs, char **fnc_arg_names, int fnc_n_arg_names, int immediate);
 extern void     * bb_dvar_bin_new           (const char *name);
-extern arb_t    * bb_arb_new                (void);
-extern len_t    * bb_len_new                (int n);
-extern tab_t    * bb_tab_new                (int n);
-extern rtab_t   * bb_rtab_new               (int n);
-extern rem_t    * bb_rem_new                (void);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 #define TEMPLATE_ADDR_SIGMA   ((uint64_t)(uintptr_t)&Σ)
 #define TEMPLATE_ADDR_SIGLEN  ((uint64_t)(uintptr_t)&Σlen)
@@ -120,29 +113,8 @@ void  emit_bb_xvar (bb_label_t *s, bb_label_t *f, bb_label_t *b)       { emit_bb
 void  emit_bb_xeps (bb_label_t *s, bb_label_t *f, bb_label_t *b)       { emit_bb_box_banner("EPS",""); emit_jmp(s, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
 void  emit_bb_xsucf(bb_label_t *s, bb_label_t *f, bb_label_t *b)       { emit_bb_box_banner("SUCCEED",""); emit_jmp(s, JMP_JMP); emit_label_define(b); emit_jmp(s, JMP_JMP); }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* Approximate emitter-function byte sizes (measured from scrip binary; used by --bb-inline-limit). */
-/* When g_bb_inline_limit > 0 and a box's size exceeds the limit, TEXT path falls back to RTCALL.  */
-#define BB_SZ_BRKX    3482
-#define BB_SZ_BAL     2782
-#define BB_SZ_CHARSET 1716
-#define BB_SZ_ARB     1677
-#define BB_SZ_LEN     1079
-#define BB_SZ_RTAB     887
-#define BB_SZ_TAB      852
-#define BB_SZ_REM      659
-#define BB_SZ_CHR      608
-#define BB_SZ_DSAR     607
-#define BB_SZ_ATP      520
-#define BB_SZ_CALLCAP  491
-#define BB_SZ_CAP      477
-#define BB_SZ_ARBNO    427
-#define BB_SZ_POS      171
-/* Macro: true when TEXT mode AND limit is set AND this box exceeds the limit. */
-#define BB_OVER_LIMIT(sz)  (IS_TEXT && g_bb_inline_limit > 0 && (sz) > g_bb_inline_limit)
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* SF-1: emit_bb_xbal -- flat inline BAL box. DATA: .long delta; .long 0. */
 void emit_bb_xbal(bb_label_t *s, bb_label_t *f, bb_label_t *b) {
-    if (BB_OVER_LIMIT(BB_SZ_BAL)) { emit_bb_rtcall("BAL", "", bb_bal_new(), "rt_bb_bal", (uint64_t)(uintptr_t)rt_bb_bal, 6, s, f, b); return; }
     emit_bb_box_banner("BAL", "");
     if (IS_TEXT) {
         int id = g_flat_node_id++;
@@ -212,17 +184,12 @@ void emit_bb_xbal(bb_label_t *s, bb_label_t *f, bb_label_t *b) {
         bb3c_format(out, "",       "sub", "dword ptr [r8], eax");
         char jmp_fail[128]; snprintf(jmp_fail, sizeof(jmp_fail), "%s", f->name);
         bb3c_format(out, "",       "jmp", jmp_fail);
-        return;
     }
-    emit_seq_port_call((uint64_t)(uintptr_t)bb_bal_new(), "rt_bb_bal", (uint64_t)(uintptr_t)rt_bb_bal, 0, s, f);
-    emit_label_define(b);
-    emit_seq_port_call((uint64_t)(uintptr_t)bb_bal_new(), "rt_bb_bal", (uint64_t)(uintptr_t)rt_bb_bal, 1, s, f);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* SF-2: emit_bb_xfarb -- flat inline ARB box. DATA: .long count; .long start. */
 /* α: count=0; start=Δ; advance 0 → γ. β: count++; if start+count > Σlen → ω; else Δ=start+count → γ. */
 void emit_bb_xfarb(bb_label_t *s, bb_label_t *f, bb_label_t *b) {
-    if (BB_OVER_LIMIT(BB_SZ_ARB)) { emit_bb_rtcall("ARB", "", bb_arb_new(), "rt_bb_arb", (uint64_t)(uintptr_t)rt_bb_arb, 6, s, f, b); return; }
     emit_bb_box_banner("ARB", "");
     if (IS_TEXT) {
         int id = g_flat_node_id++;
@@ -266,16 +233,11 @@ void emit_bb_xfarb(bb_label_t *s, bb_label_t *f, bb_label_t *b) {
         bb3c_format(out, "", "lea",  "rax, [rip + Δ]");
         bb3c_format(out, "", "mov",  "dword ptr [rax], edx");
         bb3c_format(out, "", "jmp",  jmp_succ);
-        return;
     }
-    emit_seq_port_call((uint64_t)(uintptr_t)bb_arb_new(), "rt_bb_arb", (uint64_t)(uintptr_t)rt_bb_arb, 0, s, f);
-    emit_label_define(b);
-    emit_seq_port_call((uint64_t)(uintptr_t)bb_arb_new(), "rt_bb_arb", (uint64_t)(uintptr_t)rt_bb_arb, 1, s, f);
 }
 /* SF-3: emit_bb_xstar -- flat inline REM box. No DATA needed (stateless). */
 /* α: Δ=Σlen (match rest of string) → γ. β: → ω (no re-entry). */
 void emit_bb_xstar(bb_label_t *s, bb_label_t *f, bb_label_t *b) {
-    if (BB_OVER_LIMIT(BB_SZ_REM)) { emit_bb_rtcall("REM", "", bb_rem_new(), "rt_bb_rem", (uint64_t)(uintptr_t)rt_bb_rem, 6, s, f, b); return; }
     emit_bb_box_banner("REM", "");
     if (IS_TEXT) {
         FILE *out = emit_outf();
@@ -289,17 +251,12 @@ void emit_bb_xstar(bb_label_t *s, bb_label_t *f, bb_label_t *b) {
         emit_label_define(b);
         char jmp_fail[128]; snprintf(jmp_fail, sizeof(jmp_fail), "%s", f->name);
         bb3c_format(out, "", "jmp", jmp_fail);
-        return;
     }
-    emit_seq_port_call((uint64_t)(uintptr_t)bb_rem_new(), "rt_bb_rem", (uint64_t)(uintptr_t)rt_bb_rem, 0, s, f);
-    emit_label_define(b);
-    emit_seq_port_call((uint64_t)(uintptr_t)bb_rem_new(), "rt_bb_rem", (uint64_t)(uintptr_t)rt_bb_rem, 1, s, f);
 }
 /* SF-4: emit_bb_xlnth -- flat inline LEN(n) box. n baked at emit time. */
 /* α: if Δ+n > Σlen → ω; else Δ+=n → γ. β: → ω (positional, no re-entry). */
 void emit_bb_xlnth(long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
     char nbuf[32]; snprintf(nbuf, sizeof(nbuf), "%d", (int)n);
-    if (BB_OVER_LIMIT(BB_SZ_LEN)) { emit_bb_rtcall("LEN", nbuf, bb_len_new((int)n), "rt_bb_len", (uint64_t)(uintptr_t)rt_bb_len, 6, s, f, b); return; }
     emit_bb_box_banner("LEN", nbuf);
     if (IS_TEXT) {
         FILE *out = emit_outf();
@@ -322,18 +279,13 @@ void emit_bb_xlnth(long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
         bb3c_format(out, "", "jmp", jmp_succ);
         emit_label_define(b);
         bb3c_format(out, "", "jmp", jmp_fail);
-        return;
     }
-    emit_seq_port_call((uint64_t)(uintptr_t)bb_len_new((int)n), "rt_bb_len", (uint64_t)(uintptr_t)rt_bb_len, 0, s, f);
-    emit_label_define(b);
-    emit_seq_port_call((uint64_t)(uintptr_t)bb_len_new((int)n), "rt_bb_len", (uint64_t)(uintptr_t)rt_bb_len, 1, s, f);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* SF-4: emit_bb_xtb -- flat inline TAB(n) box. n baked at emit time. */
 /* α: if Δ > n → ω; else Δ=n → γ. β: → ω (positional, no re-entry). */
 void emit_bb_xtb(long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
     char nbuf[32]; snprintf(nbuf, sizeof(nbuf), "%d", (int)n);
-    if (BB_OVER_LIMIT(BB_SZ_TAB)) { emit_bb_rtcall("TAB", nbuf, bb_tab_new((int)n), "rt_bb_tab", (uint64_t)(uintptr_t)rt_bb_tab, 6, s, f, b); return; }
     emit_bb_box_banner("TAB", nbuf);
     if (IS_TEXT) {
         FILE *out = emit_outf();
@@ -350,18 +302,13 @@ void emit_bb_xtb(long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
         bb3c_format(out, "", "jmp", jmp_succ);
         emit_label_define(b);
         bb3c_format(out, "", "jmp", jmp_fail);
-        return;
     }
-    emit_seq_port_call((uint64_t)(uintptr_t)bb_tab_new((int)n), "rt_bb_tab", (uint64_t)(uintptr_t)rt_bb_tab, 0, s, f);
-    emit_label_define(b);
-    emit_seq_port_call((uint64_t)(uintptr_t)bb_tab_new((int)n), "rt_bb_tab", (uint64_t)(uintptr_t)rt_bb_tab, 1, s, f);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* SF-4: emit_bb_xrtb -- flat inline RTAB(n) box. n baked at emit time. */
 /* α: if Δ > Σlen-n → ω; else Δ=Σlen-n → γ. β: → ω (positional, no re-entry). */
 void emit_bb_xrtb(long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
     char nbuf[32]; snprintf(nbuf, sizeof(nbuf), "%d", (int)n);
-    if (BB_OVER_LIMIT(BB_SZ_RTAB)) { emit_bb_rtcall("RTAB", nbuf, bb_rtab_new((int)n), "rt_bb_rtab", (uint64_t)(uintptr_t)rt_bb_rtab, 6, s, f, b); return; }
     emit_bb_box_banner("RTAB", nbuf);
     if (IS_TEXT) {
         FILE *out = emit_outf();
@@ -379,11 +326,7 @@ void emit_bb_xrtb(long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
         bb3c_format(out, "", "jmp", jmp_succ);
         emit_label_define(b);
         bb3c_format(out, "", "jmp", jmp_fail);
-        return;
     }
-    emit_seq_port_call((uint64_t)(uintptr_t)bb_rtab_new((int)n), "rt_bb_rtab", (uint64_t)(uintptr_t)rt_bb_rtab, 0, s, f);
-    emit_label_define(b);
-    emit_seq_port_call((uint64_t)(uintptr_t)bb_rtab_new((int)n), "rt_bb_rtab", (uint64_t)(uintptr_t)rt_bb_rtab, 1, s, f);
 }
 /* SF-6: ICN_* boxes — DATA block sized to actual state struct (zeroed on α-entry). */
 #define ICN_NQ(T) ((int)(((int)sizeof(T)+7)/8))
@@ -419,7 +362,6 @@ void  emit_bb_icon_scan(bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_r
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void  emit_bb_xarbn(bb_box_fn child_fn, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
     void *z = rt_bb_arbno_new(child_fn, NULL);
-    if (BB_OVER_LIMIT(BB_SZ_ARBNO)) { emit_bb_rtcall("ARBNO", "", z, "rt_bb_arbno", (uint64_t)(uintptr_t)rt_bb_arbno, 6, s, f, b); return; }
     emit_bb_box_banner("ARBNO", "");
     if (IS_TEXT) {
         char zlbl[80]; emit_bb_rtcall_data(6, zlbl);
@@ -434,8 +376,6 @@ void  emit_bb_xarbn(bb_box_fn child_fn, bb_label_t *s, bb_label_t *f, bb_label_t
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void  emit_bb_xbrkx(const char *chars, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
-    brkx_t *z = bb_breakx_new(chars);
-    if (BB_OVER_LIMIT(BB_SZ_BRKX)) { emit_bb_rtcall("BREAKX", chars ? chars : "", z, "rt_bb_breakx", (uint64_t)(uintptr_t)rt_bb_breakx, 6, s, f, b); return; }
     if (IS_TEXT) {
         emit_bb_box_banner("BREAKX", chars ? chars : "");
         int id = g_flat_node_id++;
@@ -530,16 +470,11 @@ void  emit_bb_xbrkx(const char *chars, bb_label_t *s, bb_label_t *f, bb_label_t 
         bb3c_format(out, "", "sub",   "ecx, r9d");
         bb3c_format(out, "", "mov",   "dword ptr [rax], ecx");
         bb3c_format(out, "", "jmp",   jmp_fail);
-        return;
     }
-    emit_seq_port_call((uint64_t)(uintptr_t)z, "rt_bb_breakx", (uint64_t)(uintptr_t)rt_bb_breakx, 0, s, f);
-    emit_label_define(b);
-    emit_seq_port_call((uint64_t)(uintptr_t)z, "rt_bb_breakx", (uint64_t)(uintptr_t)rt_bb_breakx, 1, s, f);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xcallcap(bb_box_fn child_fn, const char *fnc_name, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
     void *z = bb_cap_new_call(child_fn, NULL, fnc_name, NULL, 0, NULL, 0, 0);
-    if (BB_OVER_LIMIT(BB_SZ_CALLCAP)) { emit_bb_rtcall("CALLCAP", fnc_name ? fnc_name : "", z, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 6, s, f, b); return; }
     emit_bb_box_banner("CALLCAP", fnc_name ? fnc_name : "");
     if (IS_TEXT) {
         char zlbl[80]; emit_bb_rtcall_data(6, zlbl);
@@ -559,7 +494,6 @@ void emit_bb_xfnce(bb_label_t *s, bb_label_t *f, bb_label_t *b) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xfnme(bb_box_fn child_fn, const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
     void *z = bb_cap_new(child_fn, NULL, varname, NULL, 1);
-    if (BB_OVER_LIMIT(BB_SZ_CAP)) { emit_bb_rtcall("CAP_IMM", varname ? varname : "", z, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 6, s, f, b); return; }
     emit_bb_box_banner("CAP_IMM", varname ? varname : "");
     if (IS_TEXT) {
         char zlbl[80]; emit_bb_rtcall_data(6, zlbl);
@@ -575,7 +509,6 @@ void emit_bb_xfnme(bb_box_fn child_fn, const char *varname, bb_label_t *s, bb_la
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xnme(bb_box_fn child_fn, const char *varname, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
     void *z = bb_cap_new(child_fn, NULL, varname, NULL, 0);
-    if (BB_OVER_LIMIT(BB_SZ_CAP)) { emit_bb_rtcall("CAP_COND", varname ? varname : "", z, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 6, s, f, b); return; }
     emit_bb_box_banner("CAP_COND", varname ? varname : "");
     if (IS_TEXT) {
         char zlbl[80]; emit_bb_rtcall_data(6, zlbl);
@@ -680,7 +613,6 @@ void emit_bb_charset(bb_box_fn c_fn, const char *c_fn_name, const char *kind_nam
     else  if(c_fn_name && strcmp(c_fn_name,"bb_any")    == 0)  { rt_name="rt_bb_any";    rt_fn=(uint64_t)(uintptr_t)rt_bb_any;    }
     else  if(c_fn_name && strcmp(c_fn_name,"bb_notany") == 0)  { rt_name="rt_bb_notany"; rt_fn=(uint64_t)(uintptr_t)rt_bb_notany; }
     else                                                       { rt_name="rt_bb_span";   rt_fn=(uint64_t)(uintptr_t)rt_bb_span;   }
-    if (BB_OVER_LIMIT(BB_SZ_CHARSET)) { emit_bb_rtcall(kind_name ? kind_name : "CHARSET", chars ? chars : "", z, rt_name, rt_fn, 6, s, f, b); return; }
     if (IS_TEXT) {
         emit_bb_box_banner(kind_name ? kind_name : "CHARSET", chars ? chars : "");
         int id = g_flat_node_id++;
@@ -719,28 +651,8 @@ void emit_bb_charset(bb_box_fn c_fn, const char *c_fn_name, const char *kind_nam
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-#include "emit_templates.h"
-#include <string.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <stdarg.h>
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-extern len_t    * bb_len_new     (int n);
-extern tab_t    * bb_tab_new     (int n);
-extern rtab_t   * bb_rtab_new    (int n);
-extern fence_t  * bb_fence_new   (void);
-extern arb_t    * bb_arb_new     (void);
-extern void     * bb_arbno_new   (bb_box_fn fn, void *state);
-extern brkx_t   * bb_breakx_new  (const char *chars);
-extern rem_t    * bb_rem_new     (void);
-extern atp_t    * bb_atp_new     (const char *varname);
-extern cap_t    * bb_cap_new     (bb_box_fn child_fn, void *child_state, const char *varname, DESCR_t *var_ptr, int immediate);
-extern void    *bb_dvar_bin_new(const char *name);
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 #define FLAT_BUF_MAX  (16 * 1024)
 int g_flat_node_id   = 0;
-int g_bb_inline_limit = 0;
 static int g_flat_slot_count = 0;
 #define FLAT_DATA_BUF_MAX     (32 * 1024)
 #define FLAT_DATA_LBL_MAX     32
@@ -1322,45 +1234,6 @@ static void charset_text_body(bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_lab
     flat3c_action("lea", rdi_arg);
     flat3c_action("mov", "esi, 1");
     emit_call_sym_plt(c_fn_name, (uint64_t)(uintptr_t)a->c_fn);
-    flat_box_dispatch_jne_jmp(lbl_succ, lbl_fail);
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-extern brkx_t  *bb_breakx_new(const char *chars);
-typedef struct { const char *chars; } brkx_text_arg_t;
-static void brkx_text_body(bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β, void *arg_) {
-    const brkx_text_arg_t *a = (const brkx_text_arg_t *)arg_;
-    const char *chars = a->chars ? a->chars : "";
-    char preview[40];
-    if (chars && *chars) {
-        int n = (int)strlen(chars);
-        if (n > 24) snprintf(preview, sizeof(preview), "'%.24s...'", chars);
-        else        snprintf(preview, sizeof(preview), "'%s'", chars);
-    } else {
-        preview[0] = '\0';
-    }
-    emit_flat_box_banner("BREAKX", preview, lbl_succ->name);
-    int id = g_flat_node_id++;
-    char zlbl[64], slbl[64];
-    snprintf(zlbl, sizeof(zlbl), ".Lbrkx%d_z",     id);
-    snprintf(slbl, sizeof(slbl), ".Lbrkx%d_chars", id);
-    flat_data_section();
-    flat3c_label(slbl);
-    flat_data_string(chars);
-    flat3c_label(zlbl);
-    flat_data_quad(slbl);
-    flat_data_long(0);
-    flat_text_section();
-    flat_intel_syntax();
-    char rdi_arg[96];
-    snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", zlbl);
-    flat3c_action("lea", rdi_arg);
-    flat3c_action("mov", "esi, 0");
-    emit_call_sym_plt("bb_breakx", 0);
-    flat_box_dispatch_jne_jmp(lbl_succ, lbl_fail);
-    emit_label_define_bb(lbl_β);
-    flat3c_action("lea", rdi_arg);
-    flat3c_action("mov", "esi, 1");
-    emit_call_sym_plt("bb_breakx", 0);
     flat_box_dispatch_jne_jmp(lbl_succ, lbl_fail);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/

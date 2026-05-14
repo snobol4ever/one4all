@@ -15,13 +15,6 @@
 
 
 
-/* ───── arb ───── */
-/* _XFARB    ARB         match 0..n chars lazily; β extends by 1 */
-
-
-arb_t *bb_arb_new(void)
-{ return calloc(1,sizeof(arb_t)); }
-
 /* ───── arbno ───── */
 /* _XARBN    ARBNO       zero-or-more greedy; zero-advance guard; β unwinds stack */
 
@@ -47,48 +40,6 @@ arbno_t *bb_arbno_new(bb_box_fn fn, void *state)
 
 
 
-
-/* ───── breakx ───── */
-/* _XBRKX    BREAKX      like BRK but fails on zero advance */
-
-
-brkx_t *bb_breakx_new(const char *chars)
-{ brkx_t *ζ=calloc(1,sizeof(brkx_t)); ζ->chars=chars; return ζ; }
-
-/* ───── len ───── */
-/* _XLNTH    LEN         match exactly n characters */
-
-
-len_t *bb_len_new(int n)
-{ len_t *ζ=calloc(1,sizeof(len_t)); ζ->n=n; return ζ; }
-
-
-
-/* ───── tab ───── */
-/* _XTB      TAB         advance cursor TO absolute position n */
-
-
-tab_t *bb_tab_new(int n)
-{ tab_t *ζ=calloc(1,sizeof(tab_t)); ζ->n=n; return ζ; }
-
-/* ───── rem ───── */
-/* _XSTAR    REM         match entire remainder; no backtrack */
-
-
-rem_t *bb_rem_new(void)
-{ return calloc(1,sizeof(rem_t)); }
-
-
-
-/* ───── bal ───── */
-/* _XBAL     BAL         balanced parens — matches a "balanced" string:
- * zero or more chars that are not ( or ), or a ( followed by a BAL string
- * followed by ), all concatenated.  Equivalent to the SNOBOL4 primitive BAL.
- * On α: scan from Δ consuming the maximal balanced prefix (may be zero-width).
- * On β: undo the match and fail (no shorter alternative — BAL is deterministic). */
-
-bal_t *bb_bal_new(void)
-{ return calloc(1,sizeof(bal_t)); }
 
 /* ───── abort ───── */
 /* _XABRT    ABORT       always ω — force match failure */
@@ -249,13 +200,6 @@ fence_t *bb_fence_new(void)
 
 
 
-
-/* ───── rtab ───── */
-/* _XRTB     RTAB        advance cursor TO position Σlen-n */
-
-
-rtab_t *bb_rtab_new(int n)
-{ rtab_t *ζ=calloc(1,sizeof(rtab_t)); ζ->n=n; return ζ; }
 
 /* ───── succeed ───── */
 /* _XSUCF    SUCCEED     always γ zero-width; outer loop retries */
