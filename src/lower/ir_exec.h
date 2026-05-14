@@ -1,7 +1,7 @@
 /* ir_exec.h — DCG graph-walk executor: IR_exec_once, IR_exec_pump (LR-2)
  * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6 (LR-2, 2026-05-14)
  *
- * Drives a wired IR_prog_t (Directed Cyclic Graph) produced by lower.
+ * Drives a wired IR_block_t (Directed Cyclic Graph) produced by lower.
  * Two entry points:
  *
  *   IR_exec_once(cfg)          — drive cfg from entry to first succ or fail.
@@ -38,13 +38,13 @@ typedef int (*IR_body_fn)(DESCR_t value, void * ctx);
 
 /* Drive cfg once from entry: follow α → ... → γ (return value)
  * or ω (return FAILDESCR).  Resets node runtime state before driving.
- * cfg must be a fully wired IR_prog_t (all port_* set by lower). */
-DESCR_t IR_exec_once(IR_prog_t * cfg);
+ * cfg must be a fully wired IR_block_t (all port_* set by lower). */
+DESCR_t IR_exec_once(IR_block_t * cfg);
 
 /* Drive cfg to exhaustion: call body_fn(value, ctx) for each value produced.
  * Returns the total tick count (number of successful body_fn calls).
  * Resets node runtime state before first drive; leaves cfg exhausted after. */
-int IR_exec_pump(IR_prog_t * cfg, IR_body_fn body_fn, void * ctx);
+int IR_exec_pump(IR_block_t * cfg, IR_body_fn body_fn, void * ctx);
 
 /* Evaluate one node in isolation: compute nd->value, return γ or
  * ω.  Called by the graph walker for self-evaluating kinds.
@@ -53,11 +53,11 @@ int IR_exec_pump(IR_prog_t * cfg, IR_body_fn body_fn, void * ctx);
 IR_t * IR_exec_node(IR_t * nd);
 
 /* LR-S1b: SNOBOL4 pattern match via IR graph.
- * Equivalent to exec_stmt() but uses the compile-time wired IR_prog_t
+ * Equivalent to exec_stmt() but uses the compile-time wired IR_block_t
  * instead of the dynamic bb_node_t broker.  Called from SM_EXEC_STMT
  * when ins->a[2].ptr is non-NULL.
  * Returns 1 on match (:S), 0 on no-match (:F). */
-int IR_exec_pat(IR_prog_t *cfg,
+int IR_exec_pat(IR_block_t *cfg,
                 const char *subj_name,
                 DESCR_t    *subj_var,
                 DESCR_t    *repl,

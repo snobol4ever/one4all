@@ -1,10 +1,10 @@
 /*
- * lower_pat_dcg.c -- build IR_prog_t (DCG) from SNOBOL4 pattern tree_t (LR-S1)
+ * lower_pat_dcg.c -- build IR_block_t (DCG) from SNOBOL4 pattern tree_t (LR-S1)
  * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6 (LR-S1, 2026-05-14)
  *
  * Additive: called from lower.c after lower_pat_expr() to also build the DCG.
  * Existing SM_PAT_* / bb_node_t path is UNCHANGED -- this is a parallel compile-time
- * wiring pass from tree_t*. On success, caller stores IR_prog_t* in SM_EXEC_STMT a[2].ptr.
+ * wiring pass from tree_t*. On success, caller stores IR_block_t* in SM_EXEC_STMT a[2].ptr.
  * exec_stmt() checks a[2].ptr and routes through IR_exec_once() when set.
  *
  * Phase 1 (LR-S1): TT_QLIT, TT_CAT, TT_ALT, TT_ARB, TT_SPAN, TT_ANY,
@@ -23,8 +23,8 @@ static int count_tree(const tree_t * t) {
     for (int i = 0; i < t->n; i++) n += count_tree(t->c[i]);
     return n;
 }
-static IR_prog_t * build_node(IR_prog_t * cfg, const tree_t * t, IR_t * sp, IR_t * fp);
-static IR_prog_t * build_node(IR_prog_t * cfg, const tree_t * t, IR_t * sp, IR_t * fp) {
+static IR_block_t * build_node(IR_block_t * cfg, const tree_t * t, IR_t * sp, IR_t * fp);
+static IR_block_t * build_node(IR_block_t * cfg, const tree_t * t, IR_t * sp, IR_t * fp) {
     if (!t) return sp;
     IR_t * nd = NULL;
     switch (t->t) {
@@ -80,21 +80,23 @@ static IR_prog_t * build_node(IR_prog_t * cfg, const tree_t * t, IR_t * sp, IR_t
     }
     case TT_ARBNO: {
         /* ARBNO(inner): match inner zero or more times, greedy.
-         * nd->c    = void*[2]: [0]=inner IR_prog_t*, [1]=int* position stack
+         * Inner nodes live in a separate IR_block_t — their own reset domain.
+         * nd->c[0] = IR_block_t* inner block (cast via void**)
+         * nd->c[1] = int* position stack (cap=64)
          * nd->n    = position stack capacity
          * nd->state = current stack depth (0=fresh; IR_reset zeros → clears stack) */
         if (t->n < 1 || !t->c[0]) return NULL;
         int inner_cap = count_tree(t->c[0]) * 8 + 16;
-        IR_prog_t * inner_cfg = IR_alloc(inner_cap, IR_LANG_SNO);
-        if (!inner_cfg) return NULL;
-        IR_t * inner_entry = build_node(inner_cfg, t->c[0], NULL, NULL);
-        if (!inner_entry) { IR_free(inner_cfg); return NULL; }
-        inner_cfg->entry = inner_entry;
+        IR_block_t * inner_blk = IR_alloc(inner_cap, IR_LANG_SNO);
+        if (!inner_blk) return NULL;
+        IR_t * inner_entry = build_node(inner_blk, t->c[0], NULL, NULL);
+        if (!inner_entry) { IR_free(inner_blk); return NULL; }
+        inner_blk->entry = inner_entry;
         nd = IR_node_alloc(cfg, IR_PAT_ARBNO);
         int stack_cap = 64;
         int * pos_stack = (int *)GC_MALLOC((size_t)stack_cap * sizeof(int));
         void ** storage = (void **)GC_MALLOC(2 * sizeof(void *));
-        storage[0] = inner_cfg;
+        storage[0] = inner_blk;
         storage[1] = pos_stack;
         nd->c = (IR_t **)storage;
         nd->n = stack_cap;
@@ -217,10 +219,10 @@ static IR_prog_t * build_node(IR_prog_t * cfg, const tree_t * t, IR_t * sp, IR_t
         return NULL;   /* unsupported -- fall back to bb_node_t path */
     }
 }
-IR_prog_t * IR_lower_pat(const tree_t * pat_tree) {
+IR_block_t * IR_lower_pat(const tree_t * pat_tree) {
     if (!pat_tree) return NULL;
     int cap = count_tree(pat_tree) * 8 + 32;
-    IR_prog_t * cfg = IR_alloc(cap, IR_LANG_SNO);
+    IR_block_t * cfg = IR_alloc(cap, IR_LANG_SNO);
     if (!cfg) return NULL;
     IR_t * entry = build_node(cfg, pat_tree, NULL, NULL);
     if (!entry) { IR_free(cfg); return NULL; }

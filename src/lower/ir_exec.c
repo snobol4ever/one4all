@@ -26,7 +26,7 @@ extern int         Σlen;
  * Self-evaluating scalar kinds set nd->value and return γ or ω.
  * Generative kinds consult nd->state / nd->counter and update them.
  * Unimplemented kinds return ω (explicit, safe, detectable in tests). */
-DESCR_t IR_exec_once(IR_prog_t * cfg);
+DESCR_t IR_exec_once(IR_block_t * cfg);
 IR_t * IR_exec_node(IR_t * nd) {
     switch (nd->t) {
     /*-- Literals: always succeed, value is the literal. ----------------------------------------------------------------*/
@@ -351,16 +351,16 @@ IR_t * IR_exec_node(IR_t * nd) {
         return nd->γ;
     }
     /*-- IR_PAT_ARBNO: match inner zero or more times (greedy).
-     * nd->c    = void*[2]: [0]=inner IR_prog_t*, [1]=int* position stack
+     * nd->c    = void*[2]: [0]=inner IR_block_t*, [1]=int* position stack
      * nd->n    = position stack capacity
      * nd->state = 0 → fresh (build greedy stack); N → have N items; -1 → exhausted.
      * On first call: loop inner_cfg until it fails, push each Δ.
      * On each yield: return γ with Δ = stack top (or start if empty).
      * On resume (β=nd): pop one, return γ. When stack empty → return ω. -------*/
     case IR_PAT_ARBNO: {
-        IR_prog_t * inner_cfg = nd->c ? (IR_prog_t *)((void **)nd->c)[0] : NULL;
+        IR_block_t * inner_blk = nd->c ? (IR_block_t *)((void **)nd->c)[0] : NULL;
         int       * pos_stack = nd->c ? (int       *)((void **)nd->c)[1] : NULL;
-        if (!inner_cfg || !pos_stack) { nd->value = FAILDESCR; return nd->ω; }
+        if (!inner_blk || !pos_stack) { nd->value = FAILDESCR; return nd->ω; }
         if (nd->state == 0) {
             /* Build greedy stack: try inner from current Δ repeatedly. */
             int depth = 0;
@@ -368,7 +368,7 @@ IR_t * IR_exec_node(IR_t * nd) {
             nd->counter = Δ;   /* save start position for full-unwind resume */
             while (depth < cap) {
                 int pre = Δ;
-                DESCR_t r = IR_exec_once(inner_cfg);
+                DESCR_t r = IR_exec_once(inner_blk);
                 if (IS_FAIL_fn(r) || Δ == pre) break;  /* fail or zero-progress → stop */
                 pos_stack[depth++] = Δ;
             }
@@ -395,7 +395,7 @@ IR_t * IR_exec_node(IR_t * nd) {
  * Graph walker: pointer-chase from entry through γ/ω.
  * Back-edges (cycles) are traversed by the pointer chain; exhaustion is
  * when a node routes to ω with no further resume path. */
-DESCR_t IR_exec_once(IR_prog_t * cfg) {
+DESCR_t IR_exec_once(IR_block_t * cfg) {
     if (!cfg || !cfg->entry) return FAILDESCR;
     IR_reset(cfg);
     IR_t * cur = cfg->entry;
@@ -414,7 +414,7 @@ DESCR_t IR_exec_once(IR_prog_t * cfg) {
  * After IR_exec_once returns a value, resume by following β of the
  * deepest node that has one.  Implementation: simple retry loop using
  * IR_exec_once_resume which starts from β of the last-succ node. */
-int IR_exec_pump(IR_prog_t * cfg, IR_body_fn body_fn, void * ctx) {
+int IR_exec_pump(IR_block_t * cfg, IR_body_fn body_fn, void * ctx) {
     if (!cfg || !cfg->entry) return 0;
     IR_reset(cfg);
     int ticks  = 0;
@@ -444,7 +444,7 @@ int IR_exec_pump(IR_prog_t * cfg, IR_body_fn body_fn, void * ctx) {
 /*------------------------------------------------------------------------------------------------------------------------------------*/
 /* IR_exec_pat — LR-S1b: IR-path equivalent of exec_stmt() for SNOBOL4 patterns.
  *
- * Called from SM_EXEC_STMT when ins->a[2].ptr is a non-NULL IR_prog_t* (built by
+ * Called from SM_EXEC_STMT when ins->a[2].ptr is a non-NULL IR_block_t* (built by
  * IR_lower_pat at lower time).  Mirrors exec_stmt Phases 1+3+4+5 using the IR graph
  * walker instead of the dynamic bb_node_t broker.
  *
@@ -454,7 +454,7 @@ int IR_exec_pump(IR_prog_t * cfg, IR_body_fn body_fn, void * ctx) {
  *
  * Returns 1 on match (:S branch), 0 on no-match (:F branch).
  */
-int IR_exec_pat(IR_prog_t *cfg,
+int IR_exec_pat(IR_block_t *cfg,
                 const char *subj_name,
                 DESCR_t    *subj_var,
                 DESCR_t    *repl,

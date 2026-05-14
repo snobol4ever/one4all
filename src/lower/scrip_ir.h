@@ -1,8 +1,8 @@
-/* scrip_ir.h — Universal generator IR: IR_t (node) / IR_prog_t (graph) / IR_e (LR-0)
+/* scrip_ir.h — Universal generator IR: IR_t (node) / IR_block_t (graph) / IR_e (LR-0)
  * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6 (LR-0, 2026-05-14)
  *
  * Directed Cyclic Graph (DCG) for all goal-directed computation across all six languages.
- * Built at lower time; driven by ir_exec (ir_exec.h).  SM_EXEC_BB(IR_prog_t*) is the
+ * Built at lower time; driven by ir_exec (ir_exec.h).  SM_EXEC_BB(IR_block_t*) is the
  * sole SM→BB entry point.  Tree-shaped subgraphs serialise to SM arrays; cyclic subgraphs
  * (patterns, generators, choice points) route through ir_exec directly.
  *
@@ -35,7 +35,7 @@
 #endif
 
 /*==================================================================================================
- * Language tags — stored in IR_t.lang and IR_prog_t.lang
+ * Language tags — stored in IR_t.lang and IR_block_t.lang
  *================================================================================================*/
 #define IR_LANG_SNO  1   /* SNOBOL4  */
 #define IR_LANG_SCO  2   /* Snocone  */
@@ -127,36 +127,36 @@ struct IR_t {
 };
 
 /*==================================================================================================
- * IR_prog_t — a complete wired generator DCG for one procedure or pattern
+ * IR_block_t — a complete wired generator DCG for one procedure or pattern
  *================================================================================================*/
 typedef struct {
     IR_t    * entry;        /* == root node's α                      */
     IR_t   ** all;          /* flat array of all nodes (for reset / GC / print) */
     int            n;       /* count of nodes in .all                           */
     int            lang;    /* IR_LANG_* — language that produced this graph    */
-} IR_prog_t;
+} IR_block_t;
 
 /*==================================================================================================
  * API — alloc / free / reset / print
  *================================================================================================*/
 
-/* Allocate a fresh IR_prog_t with capacity for max_nodes nodes.
+/* Allocate a fresh IR_block_t with capacity for max_nodes nodes.
  * All node slots are NULL.  Returns NULL on OOM. */
-IR_prog_t * IR_alloc(int max_nodes, int lang);
+IR_block_t * IR_alloc(int max_nodes, int lang);
 
 /* Allocate one IR_t node, append it to cfg->all, assign cfg-unique id.
  * Returns NULL if cfg->all is full (capacity = max_nodes passed to IR_alloc). */
-IR_t       * IR_node_alloc(IR_prog_t * cfg, IR_e t);
+IR_t       * IR_node_alloc(IR_block_t * cfg, IR_e t);
 
 /* Reset all runtime state (value, counter, state, visited) in every node of cfg.
  * Call before re-executing a graph. */
-void         IR_reset(IR_prog_t * cfg);
+void         IR_reset(IR_block_t * cfg);
 
 /* Free cfg and all its nodes.  After return cfg is invalid. */
-void         IR_free(IR_prog_t * cfg);
+void         IR_free(IR_block_t * cfg);
 
 /* Print a human-readable dump of cfg to fp (for debugging / --dump-ir). */
-void         IR_print(const IR_prog_t * cfg, FILE * fp);
+void         IR_print(const IR_block_t * cfg, FILE * fp);
 
 /* Return the canonical name string for a kind (e.g. "IR_PAT_ARB"). */
 const char * IR_e_name(IR_e k);

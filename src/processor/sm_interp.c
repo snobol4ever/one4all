@@ -822,7 +822,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
              *   [subj_descr] [pat_descr(DT_P)] [repl_or_zero]
              *   a[0].s  = subject variable name (or NULL)
              *   a[1].i  = has_repl flag
-             *   a[2].ptr= IR_prog_t* (compile-time wired BB graph, or NULL → old path)
+             *   a[2].ptr= IR_block_t* (compile-time wired BB graph, or NULL → old path)
              *
              * ME-1: pattern is now on the value stack alongside subj and repl.
              * sm_lower push order: pat_tree, subject, repl — so pop order is repl, subj, pat.
@@ -835,7 +835,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             const char *sname = ins->a[0].s;   /* subject var name for write-back */
 
             /* LR-S1b: IR path — use compile-time wired BB graph when available. */
-            IR_prog_t *pat_dcg = (IR_prog_t *)ins->a[2].ptr;
+            IR_block_t *pat_dcg = (IR_block_t *)ins->a[2].ptr;
             int ok;
             if (pat_dcg) {
                 ok = IR_exec_pat(pat_dcg, sname, &subj_d,
@@ -1098,21 +1098,21 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             break;
         }
 
-        /* LR-2+LR-3: SM_EXEC_BB -- drive IR_prog_t* once (GOAL-LOWER-REDESIGN).
-         * a[0].ptr = IR_prog_t* (compile-time wired DCG).
+        /* LR-2+LR-3: SM_EXEC_BB -- drive IR_block_t* once (GOAL-LOWER-REDESIGN).
+         * a[0].ptr = IR_block_t* (compile-time wired DCG).
          * Nothing emits this yet; handler is live for future LR-S1 emitters. */
         case SM_EXEC_BB: {
-            IR_prog_t * cfg = (IR_t *)ins->a[0].ptr;
+            IR_block_t * cfg = (IR_t *)ins->a[0].ptr;
             DESCR_t _val = cfg ? IR_exec_once(cfg) : FAILDESCR;
             st->last_ok = !IS_FAIL_fn(_val);
             sm_push(st, _val);
             break;
         }
-        /* LR-2+LR-3: SM_PUMP_BB -- drive IR_prog_t* to exhaustion (GOAL-LOWER-REDESIGN).
-         * a[0].ptr = IR_prog_t*, a[1].i = body entry_pc.
+        /* LR-2+LR-3: SM_PUMP_BB -- drive IR_block_t* to exhaustion (GOAL-LOWER-REDESIGN).
+         * a[0].ptr = IR_block_t*, a[1].i = body entry_pc.
          * body_fn = NULL for now; tick count pushed as DT_I. */
         case SM_PUMP_BB: {
-            IR_prog_t * cfg = (IR_t *)ins->a[0].ptr;
+            IR_block_t * cfg = (IR_t *)ins->a[0].ptr;
             int _ticks = cfg ? IR_exec_pump(cfg, NULL, NULL) : 0;
             st->last_ok = (_ticks > 0);
             sm_push(st, INTVAL(_ticks));

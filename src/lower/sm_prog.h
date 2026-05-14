@@ -280,17 +280,17 @@ typedef enum {
     SM_LOAD_FRAME,
     SM_STORE_FRAME,
 
-    /* LR-3: SM_EXEC_BB — drive a compile-time wired IR_prog_t* once.
+    /* LR-3: SM_EXEC_BB — drive a compile-time wired IR_block_t* once.
      * Replaces SM_BB_EVAL(tree_t*) for the new DCG pipeline (GOAL-LOWER-REDESIGN).
-     * a[0].ptr = IR_prog_t* (compile-time wired generator DCG, GC-pinned).
+     * a[0].ptr = IR_block_t* (compile-time wired generator DCG, GC-pinned).
      * Calls IR_exec_once(cfg) → DESCR_t; pushes result; sets st->last_ok.
      * Nothing emits this opcode yet — added here so the enum is stable and
      * the interp handler slot exists.  Emitters follow in LR-S1 (SNOBOL4 pats),
      * LR-6 (Icon), LR-10 (Prolog), LR-12 (Snocone). */
     SM_EXEC_BB,
-    /* LR-3: SM_PUMP_BB — drive a compile-time wired IR_prog_t* to exhaustion.
+    /* LR-3: SM_PUMP_BB — drive a compile-time wired IR_block_t* to exhaustion.
      * For generative contexts (every, while, gather): replaces SM_BB_PUMP+table-id.
-     * a[0].ptr = IR_prog_t* (same BB pointer as SM_EXEC_BB).
+     * a[0].ptr = IR_block_t* (same BB pointer as SM_EXEC_BB).
      * a[1].i  = body entry_pc in SM_Program (int — body block executed per value).
      * Calls IR_exec_pump(cfg, body_fn) until graph exhausted; pushes tick count
      * as DT_I.  Nothing emits this opcode yet — stub handler only. */

@@ -1,5 +1,5 @@
 /*
- * scrip_ir.c — Universal generator IR: IR_prog_t / IR_t alloc/free/reset/print (LR-0)
+ * scrip_ir.c — Universal generator IR: IR_block_t / IR_t alloc/free/reset/print (LR-0)
  * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6 (LR-0, 2026-05-14)
  */
 #include "scrip_ir.h"
@@ -26,8 +26,8 @@ const char * IR_e_name(IR_e k) {
     return "IR_UNKNOWN";
 }
 /*------------------------------------------------------------------------------------------------------------------------------------*/
-IR_prog_t * IR_alloc(int max_nodes, int lang) {
-    IR_prog_t * cfg = calloc(1, sizeof(IR_prog_t));
+IR_block_t * IR_alloc(int max_nodes, int lang) {
+    IR_block_t * cfg = calloc(1, sizeof(IR_block_t));
     if (!cfg) return NULL;
     cfg->all  = calloc((size_t)max_nodes, sizeof(IR_t *));
     if (!cfg->all) { free(cfg); return NULL; }
@@ -37,7 +37,7 @@ IR_prog_t * IR_alloc(int max_nodes, int lang) {
     return cfg;
 }
 /*------------------------------------------------------------------------------------------------------------------------------------*/
-IR_t * IR_node_alloc(IR_prog_t * cfg, IR_e t) {
+IR_t * IR_node_alloc(IR_block_t * cfg, IR_e t) {
     IR_t * nd = calloc(1, sizeof(IR_t));
     if (!nd) return NULL;
     nd->t       = t;
@@ -54,7 +54,7 @@ IR_t * IR_node_alloc(IR_prog_t * cfg, IR_e t) {
     return nd;
 }
 /*------------------------------------------------------------------------------------------------------------------------------------*/
-void IR_reset(IR_prog_t * cfg) {
+void IR_reset(IR_block_t * cfg) {
     if (!cfg) return;
     for (int i = 0; i < cfg->n; i++) {
         IR_t * nd = cfg->all[i];
@@ -65,7 +65,7 @@ void IR_reset(IR_prog_t * cfg) {
     }
 }
 /*------------------------------------------------------------------------------------------------------------------------------------*/
-void IR_free(IR_prog_t * cfg) {
+void IR_free(IR_block_t * cfg) {
     if (!cfg) return;
     for (int i = 0; i < cfg->n; i++) {
         IR_t * nd = cfg->all[i];
@@ -81,11 +81,11 @@ static void print_port(FILE * fp, const char * label, const IR_t * nd) {
     fprintf(fp, " %s=%s", label, nd ? "set" : "NULL");
 }
 /*------------------------------------------------------------------------------------------------------------------------------------*/
-void IR_print(const IR_prog_t * cfg, FILE * fp) {
-    if (!cfg) { fprintf(fp, "(null IR_prog_t)\n"); return; }
+void IR_print(const IR_block_t * cfg, FILE * fp) {
+    if (!cfg) { fprintf(fp, "(null IR_block_t)\n"); return; }
     static const char * lang_names[] = { "?", "SNO", "SCO", "REB", "ICN", "PL", "RKU" };
     const char * lname = (cfg->lang >= 1 && cfg->lang <= 6) ? lang_names[cfg->lang] : "?";
-    fprintf(fp, "IR_prog_t lang=%s n=%d entry=%s\n", lname, cfg->n, cfg->entry ? "set" : "NULL");
+    fprintf(fp, "IR_block_t lang=%s n=%d entry=%s\n", lname, cfg->n, cfg->entry ? "set" : "NULL");
     for (int i = 0; i < cfg->n; i++) {
         const IR_t * nd = cfg->all[i];
         if (!nd) continue;
