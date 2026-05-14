@@ -1274,7 +1274,7 @@ void insn_lea_rax_rax_rcx(void) { if (IS_TEXT) t3("lea","rax, [rax+rcx]"); else 
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void insn_movzx_eax_rdi_off8(uint8_t off) { if (IS_TEXT) tf("movzx","eax, byte [rdi + %u]",(unsigned)off); else { B(0x0F); B(0xB6); B(0x47); B(off); } }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void insn_movsxd_rcx_r10mem(void) { if (IS_TEXT) t3("movsxd","rcx, dword [r10]"); else { B(0x49); B(0x63); B(0x0A); } }
+void insn_movsxd_rcx_r10mem(void) { if (IS_TEXT) t3("movsxd","rcx, dword ptr [r10]"); else { B(0x49); B(0x63); B(0x0A); } }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void insn_cmp_esi_i8(uint8_t v) { if (IS_TEXT) tf("cmp","esi, %u",(unsigned)v); else { B(0x83); B(0xFE); B(v); } }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -1763,7 +1763,7 @@ void bb_insn_cmp_eax_ecx(void) { if (IS_BIN) { bb_emit_byte(CMP_RM_R); bb_emit_b
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_mov_rax_mem_rcx(void) { if (IS_BIN) { bb_emit_byte(REX_W); bb_emit_byte(MOV_R_RM); bb_emit_byte(MODRM_RCX_INDIR); } else bb3c_format(emit_outf(), "", "mov", "rax, [rcx]"); }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void bb_insn_movsxd_rcx_r10mem(void) { if (IS_BIN) { bb_emit_byte(REX_WB); bb_emit_byte(MOVSXD_R_RM); bb_emit_byte(MODRM_RCX_R10); } else bb3c_format(emit_outf(), "", "movsxd", "rcx, dword [r10]"); }
+void bb_insn_movsxd_rcx_r10mem(void) { if (IS_BIN) { bb_emit_byte(REX_WB); bb_emit_byte(MOVSXD_R_RM); bb_emit_byte(MODRM_RCX_R10); } else bb3c_format(emit_outf(), "", "movsxd", "rcx, dword ptr [r10]"); }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void bb_insn_lea_rax_rax_rcx(void) {
     if (IS_BIN) { bb_emit_byte(REX_W); bb_emit_byte(LEA); bb_emit_byte(MODRM_RAX_RAXRCX); bb_emit_byte(SIB_RAX_RCX); }
