@@ -88,7 +88,6 @@ RT_PIC_SRCS := \
     $(SRC)/lower/lower_pat_dcg.c \
     $(SRC)/processor/sm_image.c \
     $(SRC)/processor/sm_jit_interp.c \
-    $(SRC)/runtime/interp/icon_gen.c \
     $(SRC)/runtime/interp/icn_runtime.c \
     $(SRC)/runtime/interp/icn_value.c \
     $(SRC)/runtime/interp/icn_stmt.c \
@@ -266,7 +265,6 @@ scrip:
 	$(CC) $(CRT)   -c $(SRC)/runtime/interp/scan_builtins.c -o $(OBJ)/scan_builtins.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/interp/pl_runtime.c  -o $(OBJ)/pl_runtime.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/interp/icon_box_rt.c  -o $(OBJ)/icon_box_rt.o
-	$(CC) $(CRT)   -c $(SRC)/runtime/interp/icon_gen.c         -o $(OBJ)/icon_gen.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/snobol4/coerce.c      -o $(OBJ)/coerce.o
 	$(CC) $(CRT)   -c $(SRC)/lower/ast_clone.c    -o $(OBJ)/ast_clone.o
 	$(CC) $(CRT)   -c $(SRC)/lower/scrip_ir.c     -o $(OBJ)/scrip_ir.o

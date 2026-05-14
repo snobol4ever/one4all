@@ -1824,10 +1824,11 @@ bb_node_t icn_bb_build(tree_t *e) {
         return (bb_node_t){ icn_lazy_box, z, 0 };
     }
 
-    /* ── IJ-18..28: missing JCON BBs dispatched here before lazy fallback ── */
+    /* ── Lazy fallback for unimplemented constructs ── */
     {
-        extern bb_node_t icn_bb_build_missing(tree_t *e);
-        return icn_bb_build_missing(e);
+        icn_lazy_state_t *z = calloc(1, sizeof(*z));
+        z->expr = e;
+        return (bb_node_t){ icn_lazy_box, z, 0 };
     }
 }
 
