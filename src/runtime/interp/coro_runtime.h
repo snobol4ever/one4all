@@ -89,7 +89,7 @@ extern int          frame_depth;
 #define FRAME (frame_stack[frame_depth - 1])
 
 extern const char  *scan_subj;
-extern coro_t *active_coro;
+/* IJ-CORO: active_coro/coro_t removed — swapcontext machinery deleted */
 extern int          scan_pos;
 typedef struct { const char *subj; int pos; } ScanEntry;
 extern ScanEntry scan_stack[SCAN_STACK_MAX];
@@ -110,20 +110,13 @@ int     frame_active(tree_t *n);
 int     is_global(const char *name);
 void    global_register(const char *name);
 
-int     coro_drive(tree_t *e);
-int     coro_drive_fnc(tree_t *e);   /* suspend-aware driver for user proc generators */
 
-/* Set by coro_drive_fnc while running the every-body with a suspended value.
- * interp_eval(TT_FNC) checks this: if the TT_FNC node matches coro_drive_node,
- * return coro_drive_val directly instead of calling the procedure again. */
-extern tree_t  *coro_drive_node;   /* the TT_FNC node currently being driven */
 extern DESCR_t  coro_drive_val;    /* the suspended value to return          */
 
 int     scope_add(IcnScope *sc, const char *name);
 int     scope_get(IcnScope *sc, const char *name);
 void    icn_scope_patch(IcnScope *sc, tree_t *e);
 
-DESCR_t coro_call(tree_t *proc, DESCR_t *args, int nargs);
 /* CH-17c: SM-dispatch entry for proc bodies lowered into named expressions. */
 DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs);
 /* CH-17g-call-sites: dispatch helper for proc_table[pi].  Routes through
@@ -159,7 +152,7 @@ const char *icn_cset_inter(const char *a, const char *b);
 const char *icn_cset_canonical(const char *cs);
 
 /* IC-9 (session #26): Icon-keyword assign / probe (defined in driver/interp.c).
- * Used by coro_bb_revswap to perform atomic swap-with-revert on &pos / &subject.
+ * Used by icn_bb_revswap to perform atomic swap-with-revert on &pos / &subject.
  * kw_assign returns 1 on success, 0 on OOB-fail (and writes nothing on fail).
  * icn_kw_can_assign answers the same question without writing. */
 int kw_assign(const char *kw, DESCR_t val);

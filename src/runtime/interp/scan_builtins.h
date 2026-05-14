@@ -26,7 +26,7 @@
 int scan_try_call_builtin(tree_t *call, DESCR_t *args, int nargs, DESCR_t *out);
 
 /* Returns 1 if name is a position-advancing scan builtin (upto/find/move/tab/pos/
- * rpos/any/many/notany/match/bal).  Used by coro_bb_fnc to decide whether to
+ * rpos/any/many/notany/match/bal).  Used by icn_bb_fnc to decide whether to
  * loop on failure when the builtin has a generative arg (IJ-9). */
 int is_scan_builtin_name(const char *name);
 

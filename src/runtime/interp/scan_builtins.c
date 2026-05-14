@@ -26,7 +26,7 @@
  *   2. bb_eval_value's TT_FNC case — before the generic builtin arg-eval
  *      loop is fine because args are already pre-evaluated (the dispatch
  *      uses args[] directly, not call->c).
- *   3. icn_call_builtin top — defensive coverage for the coro_bb_fnc path
+ *   3. icn_call_builtin top — defensive coverage for the icn_bb_fnc path
  *      and for any caller that pre-evaluates args.
  *
  * Design notes.
@@ -39,7 +39,7 @@
  * - `find` uses `icn_frame_lookup(call, &pos)` to honour outer-pump
  *   iteration.  That symbol is exported from coro_runtime.h.
  * - These ARE the scalar fast paths; the generator (Byrd-box) variants
- *   for upto/find/bal etc. live in coro_runtime.c (coro_bb_upto, etc.)
+ *   for upto/find/bal etc. live in coro_runtime.c (icn_bb_upto, etc.)
  *   and are reached only via coro_eval, not via this dispatcher.
  *
  * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet
@@ -221,7 +221,7 @@ int scan_try_call_builtin(tree_t *call, DESCR_t *args, int nargs, DESCR_t *out)
     }
 
     /* find(needle, hay) — first position of needle in hay (or scan-default).
-     * The Byrd-box version (coro_bb_find) handles α/β iteration; this scalar
+     * The Byrd-box version (icn_bb_find) handles α/β iteration; this scalar
      * path just returns the first position.  icn_frame_lookup honours outer-
      * pump iteration: if a driver has staged a pos value for this call node,
      * return it directly. */
@@ -240,7 +240,7 @@ int scan_try_call_builtin(tree_t *call, DESCR_t *args, int nargs, DESCR_t *out)
 
 /* IJ-9: returns 1 if name is a scan-context position builtin whose failure
  * means "not found at this arg value" rather than "generator exhausted".
- * Used by coro_bb_fnc to loop to the next arg value on builtin failure. */
+ * Used by icn_bb_fnc to loop to the next arg value on builtin failure. */
 int is_scan_builtin_name(const char *name) {
     if (!name) return 0;
     static const char *scan_names[] = {

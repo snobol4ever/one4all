@@ -52,7 +52,7 @@
 #include "../frontend/icon/icon_driver.h"
 #include "../frontend/raku/raku_driver.h"
 #include "../frontend/rebus/rebus_lower.h"
-#include "../frontend/icon/icon_gen.h"    /* coro_bb_to/by/iterate/suspend, state types — U-17 */
+#include "../frontend/icon/icon_gen.h"    /* icn_bb_to/by/iterate/suspend, state types — U-17 */
 #include "../frontend/icon/icon_lex.h"    /* IcnTkKind — TK_AUG* for TT_AUGOP in unified interp */
 
 /* ir_print_node — from src/ast/ast_print.c (linked via Makefile) */

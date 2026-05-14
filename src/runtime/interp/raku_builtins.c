@@ -24,7 +24,7 @@
  *      because Raku block-receiving builtins (raku_try / raku_map / raku_grep /
  *      raku_sort) need tree_t access and must not be subject to FAIL-prop on
  *      the body argument.
- *   3. icn_call_builtin top — defensive coverage for the coro_bb_fnc path.
+ *   3. icn_call_builtin top — defensive coverage for the icn_bb_fnc path.
  *
  * Design notes.
  * - Internal recursions use `bb_eval_value` (not `interp_eval`), per the rung's

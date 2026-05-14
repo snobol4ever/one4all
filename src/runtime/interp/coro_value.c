@@ -549,10 +549,10 @@ DESCR_t bb_eval_value(tree_t *e)
      * Builtin path evaluates args through bb_eval_value then calls icn_call_builtin
      * (already IR-free).  Mirror of interp_eval.c TT_FNC case but recursion-safe. */
     case TT_FNC: {
-        /* IJ-2: injection check — outer driver (e.g. coro_bb_cat driving key(t) inside t[key(t)])
+        /* IJ-2: injection check — outer driver (e.g. icn_bb_cat driving key(t) inside t[key(t)])
          * staged a value for this exact node. Return it directly rather than re-evaluating,
          * which would build a fresh generator box and restart from alpha. */
-        if (coro_drive_node && e == coro_drive_node) return coro_drive_val;
+        /* IJ-CORO: coro_drive_node removed */
         if (e->n < 1) return NULVCL;
         int nargs = e->n - 1;
         /* IJ-3: indirect call — callee node is not a plain TT_VAR (e.g. !plist,
@@ -1002,7 +1002,7 @@ DESCR_t bb_eval_value(tree_t *e)
     case TT_TO:
     case TT_TO_BY: {
         /* (2) injection check — outer driver staged a value */
-        if (coro_drive_node && e == coro_drive_node) return coro_drive_val;
+        /* IJ-CORO: coro_drive_node removed */
         /* (1) frame check — outer pump is iterating this node */
         long cur;
         if (icn_frame_lookup(e, &cur)) return INTVAL(cur);
@@ -1013,7 +1013,7 @@ DESCR_t bb_eval_value(tree_t *e)
 
     case TT_ITERATE: {
         /* (2) injection check */
-        if (coro_drive_node && e == coro_drive_node) return coro_drive_val;
+        /* IJ-CORO: coro_drive_node removed */
         /* (1) frame check — !L pump pushes TT_ITERATE onto frame as the
          * generator node; current cur is the index, sval is the string for
          * char-iter or the list bucket.  Mirrors interp_eval.c TT_ITERATE in
@@ -1041,7 +1041,7 @@ DESCR_t bb_eval_value(tree_t *e)
     case TT_ALTERNATE:
     case TT_SEQ_EXPR: {
         /* (2) injection check */
-        if (coro_drive_node && e == coro_drive_node) return coro_drive_val;
+        /* IJ-CORO: coro_drive_node removed */
         /* These three don't carry per-tick scalar state on FRAME.gen the way
          * TT_TO/TT_ITERATE do; they are pure generator combinators whose
          * internal state lives in the bb_node_t.  Outer-pump retries reach
@@ -1250,10 +1250,8 @@ DESCR_t bb_eval_value(tree_t *e)
             DESCR_t tick = rbox.fn(rbox.ζ, α);
             while (!IS_FAIL_fn(tick) && !FRAME.returning && !FRAME.loop_break) {
                 FRAME.loop_next = 0;
-                coro_drive_node = leaf;
-                coro_drive_val  = tick;
+                /* IJ-CORO: drive injection removed; eval gen directly */
                 (void)bb_eval_value(gen);
-                coro_drive_node = NULL;
                 if (body) bb_exec_stmt(body);
                 if (FRAME.returning || FRAME.loop_break) break;
                 tick = rbox.fn(rbox.ζ, β);
@@ -1392,7 +1390,7 @@ DESCR_t bb_eval_value(tree_t *e)
      * separate oneshot path).  Diag prior to this rung showed:
      *   TT_BANG_BINARY  caller=bb_eval_value     via=bb_eval_value
      *   TT_IF           caller=bb_eval_value     via=bb_eval_value
-     *   TT_IF           caller=coro_bb_seq_expr  via=bb_eval_value
+     *   TT_IF           caller=icn_bb_seq_expr  via=bb_eval_value
      *   TT_PROC_FAIL    caller=(direct)          via=bb_eval_value
      *   TT_REVASSIGN    caller=bb_exec_stmt      via=bb_exec_stmt   (in coro_stmt.c)
      * Precondition: RS-23-extra-prep2 (smart fallback in icn_call_builtin)
@@ -1440,7 +1438,7 @@ DESCR_t bb_eval_value(tree_t *e)
     /* TT_REVASSIGN in value context — `x <- v`, reversible assign.
      * Mirrors interp_eval.c:606-637 (the standalone path).  Outside `every`
      * no driver backtracks the operation, so we just perform the assign and
-     * succeed.  The revert semantics live in coro_bb_revassign and are
+     * succeed.  The revert semantics live in icn_bb_revassign and are
      * reached only when coro_eval is asked for a box (every / alt-driven
      * contexts) — that path is unaffected.  Three lvalue shapes: TT_VAR
      * (slot or NV name), TT_IDX (subscript_set), TT_FIELD (data_field_ptr). */
@@ -1478,7 +1476,7 @@ DESCR_t bb_eval_value(tree_t *e)
     case TT_BANG_BINARY: {
         /* (2) injection check — outer pump might have already produced
          * a tick we should return verbatim. */
-        if (coro_drive_node && e == coro_drive_node) return coro_drive_val;
+        /* IJ-CORO: coro_drive_node removed */
         /* (3) fresh first-value via coro_eval+α */
         bb_node_t box = coro_eval(e);
         return box.fn(box.ζ, α);

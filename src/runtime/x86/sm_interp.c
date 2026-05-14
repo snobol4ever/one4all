@@ -395,7 +395,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 }
                 /* IJ-4: if still not found as user proc, check Icon builtin names.
                  * e.g. `f := sqrt; f(4.0)` — sqrt is a builtin, not in proc_table.
-                 * Return DT_S(name) so coro_bb_indirect_callee / SM_CALL_FN can call it. */
+                 * Return DT_S(name) so icn_bb_indirect_callee / SM_CALL_FN can call it. */
                 if (val.v == DT_SNUL || val.v == DT_S) {
                     extern DESCR_t icn_proc_as_value(const char *);
                     DESCR_t pv = icn_proc_as_value(name);
@@ -1053,7 +1053,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
          * every_table_lookup(id) returns the borrowed tree_t* registered
          * by sm_lower at expression-body lowering time.  Runtime delegates
          * to the existing IR broker (coro_eval(TT_EVERY) builds an
-         * icn_every_state_t whose body field is e->c[1]; coro_bb_every
+         * icn_every_state_t whose body field is e->c[1]; icn_bb_every
          * pumps gen and calls bb_exec_stmt(body) per tick — this is the
          * "boxes stay; graph-construction moves to lower-time" boundary
          * the orientation note draws).  The SM bytecode and value stack
@@ -1069,7 +1069,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
          *
          * Body-function: NULL.  TT_EVERY-as-statement runs its own body
          * (the do-clause, e.g. `write(v)`) via bb_exec_stmt inside
-         * coro_bb_every — passing pump_print would double-print yielded
+         * icn_bb_every — passing pump_print would double-print yielded
          * values, since the user's body already produces output. */
         case SM_BB_PUMP_EVERY: {
             int every_id = (int)ins->a[0].i;
@@ -1378,8 +1378,8 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
              *   DT_T            : table value iteration (pos = flat entry index across buckets)
              * Advances GLOCAL[1] by 1 on each successful tick.
              * Pushes next element on success (last_ok=1), FAILDESCR on exhaustion (last_ok=0).
-             * Mirrors coro_bb_iterate / coro_bb_list_iterate / coro_bb_tbl_iterate /
-             * coro_bb_record_iterate in icon_gen.c. */
+             * Mirrors icn_bb_iterate / icn_bb_list_iterate / icn_bb_tbl_iterate /
+             * icn_bb_record_iterate in icon_gen.c. */
             if (name && strcmp(name, "ICN_BANG_NEXT") == 0) {
                 DESCR_t result = FAILDESCR;
                 if (!g_current_gen_state) { sm_push(st, FAILDESCR); st->last_ok = 0; break; }

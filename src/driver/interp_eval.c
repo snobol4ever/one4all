@@ -1726,7 +1726,7 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
 }
 
 /* icn_call_builtin — call a builtin TT_FNC with pre-resolved args array.
- * Used by coro_bb_fnc to avoid re-evaluating generator children.
+ * Used by icn_bb_fnc to avoid re-evaluating generator children.
  * Dispatches write/writes/upto/find/any/many/upto/tab/move/match by name.
  * For user procs, calls coro_call directly. */
 DESCR_t icn_call_builtin(tree_t *call, DESCR_t *args, int nargs) {
@@ -1734,7 +1734,7 @@ DESCR_t icn_call_builtin(tree_t *call, DESCR_t *args, int nargs) {
     const char *fn = call->c[0]->v.sval;
     if (!fn) return NULVCL;
     /* RS-23a-raku: Raku-builtin dispatch — defensive coverage for the
-     * coro_bb_fnc → icn_call_builtin path.  raku_try_call_builtin re-evaluates
+     * icn_bb_fnc → icn_call_builtin path.  raku_try_call_builtin re-evaluates
      * its own args from call->c[] (it ignores `args`/`nargs`), so this
      * is correct even though args may already be pre-evaluated by caller. */
     {
@@ -2127,7 +2127,7 @@ DESCR_t interp_eval(tree_t *e)
      * (set by TT_EVERY leaf-gen injection or coro_drive_fnc), return the staged value
      * directly without recursing into children.  Covers TT_TO, TT_FNC, and any other
      * node kind that find_leaf_suspendable or coro_drive_fnc selects as the leaf. */
-    if (coro_drive_node && e == coro_drive_node) return coro_drive_val;
+    /* IJ-CORO: drive injection removed */
 
     /* OE-5: Icon frame dispatch — TT_VAR/TT_ASSIGN/TT_FNC differ between SNO and ICN.
      * All other EKinds fall through to the shared switch (already has Icon cases
@@ -2360,7 +2360,7 @@ DESCR_t interp_eval(tree_t *e)
             if (!strcmp(fn,"bal") && nargs>=1) {
                 /* bal(c1, c2, c3, s, i1, i2) — find first position where c1-chars appear
                    at nesting depth 0 w.r.t. c2/c3 open/close delimiters.
-                   Scalar path; generator path is in coro_eval via coro_bb_bal. */
+                   Scalar path; generator path is in coro_eval via icn_bb_bal. */
                 DESCR_t cd=interp_eval(e->c[1]);
                 const char *c1=VARVAL_fn(cd); if(!c1) return FAILDESCR;
                 const char *c2="(", *c3=")";
@@ -2399,7 +2399,7 @@ DESCR_t interp_eval(tree_t *e)
             /* coro_drive_fnc passthrough: if this TT_FNC node is currently being
              * driven by coro_drive_fnc, return the suspended value directly
              * instead of re-calling the procedure (which would recurse). */
-            if (e == coro_drive_node) return coro_drive_val;
+            /* IJ-CORO: drive injection removed */
             for (int i=0; i<proc_count; i++) {
                 if (!strcmp(proc_table[i].name,fn)) {
                     DESCR_t args[FRAME_SLOT_MAX];
@@ -2721,7 +2721,7 @@ DESCR_t interp_eval(tree_t *e)
             if (!strcmp(fn,"key") && nargs == 1) {
                 DESCR_t td = interp_eval(e->c[1]);
                 if (td.v != DT_T || !td.tbl) return FAILDESCR;
-                /* oneshot: return first key; every uses coro_bb_tbl_iterate for keys */
+                /* oneshot: return first key; every uses icn_bb_tbl_iterate for keys */
                 for (int _bi = 0; _bi < TABLE_BUCKETS; _bi++)
                     if (td.tbl->buckets[_bi])
                         return td.tbl->buckets[_bi]->key_descr;
@@ -4463,10 +4463,8 @@ DESCR_t interp_eval(tree_t *e)
                 /* Inject the raw generator tick value via drive passthrough,
                  * then re-evaluate gen (the assign/augop) — interp_eval re-reads
                  * the current frame value of any TT_VAR in the expression. */
-                coro_drive_node = leaf;
-                coro_drive_val  = tick;
+                /* IJ-CORO: drive injection removed */
                 interp_eval(gen);
-                coro_drive_node = NULL;
                 if (body) interp_eval(body);
                 if (FRAME.returning || FRAME.loop_break) break;
                 tick = rbox.fn(rbox.ζ, β);
@@ -4886,7 +4884,7 @@ DESCR_t interp_eval(tree_t *e)
     }
 
     case TT_ITERATE: {
-        /* IC-3: DT_T table — return first value (oneshot; every uses coro_bb_tbl_iterate) */
+        /* IC-3: DT_T table — return first value (oneshot; every uses icn_bb_tbl_iterate) */
         if (e->n >= 1) {
             DESCR_t sv = interp_eval(e->c[0]);
             if (sv.v == DT_T && sv.tbl) {
@@ -4907,7 +4905,7 @@ DESCR_t interp_eval(tree_t *e)
                 }
                 /* IC-9 (2026-05-01): DT_DATA record — !R returns first field value.
                  * Mirrors the icnlist branch above: scalar context yields child 0,
-                 * every-context drives the rest via coro_bb_record_iterate.  See
+                 * every-context drives the rest via icn_bb_record_iterate.  See
                  * coro_eval TT_ITERATE for the box. */
                 if (sv.u && sv.u->type && sv.u->type->nfields > 0 && sv.u->fields) {
                     return sv.u->fields[0];
@@ -4977,7 +4975,7 @@ DESCR_t interp_eval(tree_t *e)
     /* ── IC-9 session #26: TT_REVSWAP — x <-> y  reversible value swap ────
      * Outside `every`, no driver backtracks; behaves identically to
      * left-to-right halt-on-fail TT_SWAP.  Inside `every`, coro_eval
-     * routes to coro_bb_revswap for snapshot + revert on β.                */
+     * routes to icn_bb_revswap for snapshot + revert on β.                */
     case TT_REVSWAP: {
         if (e->n < 2 || frame_depth <= 0) return NULVCL;
         tree_t *lhs = e->c[0], *rhs = e->c[1];

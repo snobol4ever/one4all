@@ -5,7 +5,7 @@
  * goes through __wrap_interp_eval first.  We use backtrace(3) to inspect
  * the call chain; if any ancestor frame is a BB-adapter symbol
  * (bb_eval_value, bb_exec_stmt, coro_call, coro_eval, coro_drive,
- * coro_drive_fnc, coro_bb_every) we log the (kind, immediate-caller) pair
+ * coro_drive_fnc, icn_bb_every) we log the (kind, immediate-caller) pair
  * once and then defer to __real_interp_eval.
  *
  * Output: one line per unique (kind, caller) pair to stderr, prefixed
@@ -73,7 +73,7 @@ static int has_bb_ancestor(char *out_caller, size_t cap,
             strstr(s, "coro_call")     ||
             strstr(s, "coro_eval")     ||
             strstr(s, "coro_drive")    ||
-            strstr(s, "coro_bb_every")) {
+            strstr(s, "icn_bb_every")) {
             if (!found) { strncpy(out_bb, s, bb_cap - 1); out_bb[bb_cap - 1] = '\0'; found = 1; }
         }
     }

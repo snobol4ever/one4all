@@ -217,7 +217,7 @@ typedef enum {
      *
      * Runtime handler: if active_coro != NULL (running inside proc_trampoline /
      * gather_trampoline), set active_coro->yielded = v and swapcontext to
-     * caller_ctx — exactly the same yield protocol as coro_bb_suspend
+     * caller_ctx — exactly the same yield protocol as icn_bb_suspend
      * (icon_gen.c:211–240).  When the caller resumes us, control returns
      * naturally to the next SM instruction.  If active_coro is NULL
      * (top-level suspend, semantically rare and not in current corpus),
@@ -280,7 +280,7 @@ typedef enum {
      * and SM_STORE_GLOCAL is a no-op (with last_ok cleared).  These slots
      * survive SUSPEND/RESUME because the SmGenState is the persistent
      * envelope — they are the per-invocation equivalent of the closure-state
-     * struct that coro_bb_to et al. allocate fresh per coro_eval call. */
+     * struct that icn_bb_to et al. allocate fresh per coro_eval call. */
     SM_LOAD_GLOCAL,
     SM_STORE_GLOCAL,
 

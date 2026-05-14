@@ -250,7 +250,7 @@ void bb_exec_stmt(tree_t *e)
      * Statement context: perform the reversible assign and discard the
      * returned value.  bb_eval_value carries the full native implementation
      * (added in this rung to coro_value.c).  The revert semantics for
-     * every/alt-driven contexts are unaffected — those reach coro_bb_revassign
+     * every/alt-driven contexts are unaffected — those reach icn_bb_revassign
      * via coro_eval, not via this path.
      *======================================================================*/
     case TT_REVASSIGN: {

@@ -18,19 +18,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ucontext.h>
 #include <sys/mman.h>
 #include <unistd.h>
 
 /*============================================================================================================================
- * B-3: coro_bb_to — TT_TO Byrd box  (i to j)
+ * B-3: icn_bb_to — TT_TO Byrd box  (i to j)
  *
  * State: lo, hi, cur.
  *   α: cur = lo; if cur > hi → ω; else return integer cur (γ).
  *   β: cur++; if cur > hi → ω; else return integer cur (γ).
  *============================================================================================================================*/
 
-DESCR_t coro_bb_to(void *zeta, int entry) {
+DESCR_t icn_bb_to(void *zeta, int entry) {
     icn_to_state_t *z = (icn_to_state_t *)zeta;
     if (entry == α) z->cur = z->lo;
     else            z->cur++;
@@ -39,7 +38,7 @@ DESCR_t coro_bb_to(void *zeta, int entry) {
 }
 
 /*============================================================================================================================
- * coro_bb_to_nested — (lo_gen) to (hi_gen) cross-product Byrd box
+ * icn_bb_to_nested — (lo_gen) to (hi_gen) cross-product Byrd box
  *
  * JCON irgen.icn ir_a_To nested case: when lo or hi is itself a generator,
  * pre-collect all values from each, then iterate outer lo × hi pairs,
@@ -51,7 +50,7 @@ DESCR_t coro_bb_to(void *zeta, int entry) {
  * ω: li >= nlo.
  *============================================================================================================================*/
 
-DESCR_t coro_bb_to_nested(void *zeta, int entry) {
+DESCR_t icn_bb_to_nested(void *zeta, int entry) {
     icn_to_nested_state_t *z = (icn_to_nested_state_t *)zeta;
     if (z->nlo == 0 || z->nhi == 0) return FAILDESCR;
     if (entry == α) { z->li = 0; z->hi2 = 0; z->cur = z->lo_vals[0]; }
@@ -70,7 +69,7 @@ DESCR_t coro_bb_to_nested(void *zeta, int entry) {
 }
 
 /*============================================================================================================================
- * B-4: coro_bb_to_by — TT_TO_BY Byrd box  (i to j by k)
+ * B-4: icn_bb_to_by — TT_TO_BY Byrd box  (i to j by k)
  *
  * State: lo, hi, step, cur.
  *   α: cur = lo.
@@ -78,7 +77,7 @@ DESCR_t coro_bb_to_nested(void *zeta, int entry) {
  *   if step > 0: cur > hi → ω.   if step < 0: cur < hi → ω.
  *============================================================================================================================*/
 
-DESCR_t coro_bb_to_by(void *zeta, int entry) {
+DESCR_t icn_bb_to_by(void *zeta, int entry) {
     icn_to_by_state_t *z = (icn_to_by_state_t *)zeta;
     if (entry == α) z->cur = z->lo;
     else            z->cur += z->step;
@@ -88,8 +87,8 @@ DESCR_t coro_bb_to_by(void *zeta, int entry) {
     return (DESCR_t){ .v = DT_I, .i = z->cur };
 }
 
-/* coro_bb_to_by_real — TT_TO_BY with real (float) step/bounds */
-DESCR_t coro_bb_to_by_real(void *zeta, int entry) {
+/* icn_bb_to_by_real — TT_TO_BY with real (float) step/bounds */
+DESCR_t icn_bb_to_by_real(void *zeta, int entry) {
     icn_to_by_real_state_t *z = (icn_to_by_real_state_t *)zeta;
     if (entry == α) z->cur = z->lo;
     else            z->cur += z->step;
@@ -100,13 +99,13 @@ DESCR_t coro_bb_to_by_real(void *zeta, int entry) {
 }
 
 /*============================================================================================================================
- * B-5: coro_bb_iterate — TT_ITERATE Byrd box  (!str, Icon char iteration)
+ * B-5: icn_bb_iterate — TT_ITERATE Byrd box  (!str, Icon char iteration)
  *
  * State: str, len, pos.
  *   α: pos = 0.  β: pos++.  ω: pos >= len.  γ: single-char string at pos.
  *============================================================================================================================*/
 
-DESCR_t coro_bb_iterate(void *zeta, int entry) {
+DESCR_t icn_bb_iterate(void *zeta, int entry) {
     icn_iterate_state_t *z = (icn_iterate_state_t *)zeta;
     if (entry == α) z->pos = 0;
     else            z->pos++;
@@ -121,7 +120,7 @@ DESCR_t coro_bb_iterate(void *zeta, int entry) {
 }
 
 /*============================================================================================================================
- * B-5b: coro_bb_tbl_iterate — TT_ITERATE Byrd box for DT_T tables  (!T yields values)
+ * B-5b: icn_bb_tbl_iterate — TT_ITERATE Byrd box for DT_T tables  (!T yields values)
  *
  * State: tbl, bucket (0..TABLE_BUCKETS-1), entry (current TBPAIR_t*).
  *   α: bucket=0, entry=tbl->buckets[0].
@@ -130,7 +129,7 @@ DESCR_t coro_bb_iterate(void *zeta, int entry) {
  *   γ: return entry->val.
  *============================================================================================================================*/
 
-DESCR_t coro_bb_tbl_iterate(void *zeta, int entry) {
+DESCR_t icn_bb_tbl_iterate(void *zeta, int entry) {
     icn_tbl_iterate_state_t *z = (icn_tbl_iterate_state_t *)zeta;
     if (!z->tbl) return FAILDESCR;
     if (entry == α) { z->bucket = 0; z->entry = z->tbl->buckets[0]; }
@@ -145,13 +144,13 @@ DESCR_t coro_bb_tbl_iterate(void *zeta, int entry) {
 }
 
 /*============================================================================================================================
- * IC-5: coro_bb_list_iterate — TT_ITERATE Byrd box for DT_DATA icnlist  (!L yields elements)
+ * IC-5: icn_bb_list_iterate — TT_ITERATE Byrd box for DT_DATA icnlist  (!L yields elements)
  *   Holds the live list DT_DATA descriptor so it sees elements added by put() after box creation.
  *   α: reset pos=0, return elems[0].
  *   β: advance pos, return elems[pos].
  *   ω: pos >= n.
  *============================================================================================================================*/
-DESCR_t coro_bb_list_iterate(void *zeta, int entry) {
+DESCR_t icn_bb_list_iterate(void *zeta, int entry) {
     icn_list_iterate_state_t *z = (icn_list_iterate_state_t *)zeta;
     /* Re-read elems and size from live object each tick */
     DESCR_t ea = FIELD_GET_fn(z->list_obj, "frame_elems");
@@ -165,14 +164,14 @@ DESCR_t coro_bb_list_iterate(void *zeta, int entry) {
 }
 
 /*============================================================================================================================
- * IC-9 (2026-05-01): coro_bb_record_iterate — TT_ITERATE Byrd box for DT_DATA records (!R yields field values).
+ * IC-9 (2026-05-01): icn_bb_record_iterate — TT_ITERATE Byrd box for DT_DATA records (!R yields field values).
  *   Records are DT_DATA but NOT the icnlist shape (no "icn_type" tag of "list"); their structure lives in
  *   inst.u->type->nfields and inst.u->fields[i].  Iterates fields in declaration order.  Re-reads the live
  *   instance each tick so mutations made between ticks (rare; field-iteration usually one-pass) are visible.
  *   α: pos=0, return fields[0] (or fail if nfields==0).
  *   β: pos++, return fields[pos] (or fail when pos >= nfields).
  *============================================================================================================================*/
-DESCR_t coro_bb_record_iterate(void *zeta, int entry) {
+DESCR_t icn_bb_record_iterate(void *zeta, int entry) {
     icn_record_iterate_state_t *z = (icn_record_iterate_state_t *)zeta;
     if (z->inst.v != DT_DATA || !z->inst.u || !z->inst.u->type) return FAILDESCR;
     int n = z->inst.u->type->nfields;
@@ -184,10 +183,10 @@ DESCR_t coro_bb_record_iterate(void *zeta, int entry) {
 }
 
 /*============================================================================================================================
- * IC-6: coro_bb_tbl_key_iterate — key(T) generator: yields each key in table T
- *   Same bucket-walk as coro_bb_tbl_iterate but returns entry->key_descr instead of entry->val.
+ * IC-6: icn_bb_tbl_key_iterate — key(T) generator: yields each key in table T
+ *   Same bucket-walk as icn_bb_tbl_iterate but returns entry->key_descr instead of entry->val.
  *============================================================================================================================*/
-DESCR_t coro_bb_tbl_key_iterate(void *zeta, int entry) {
+DESCR_t icn_bb_tbl_key_iterate(void *zeta, int entry) {
     icn_tbl_key_iterate_state_t *z = (icn_tbl_key_iterate_state_t *)zeta;
     if (!z->tbl) return FAILDESCR;
     if (entry == α) { z->bucket = 0; z->entry = z->tbl->buckets[0]; }
@@ -200,59 +199,8 @@ DESCR_t coro_bb_tbl_key_iterate(void *zeta, int entry) {
     return z->entry->key_descr;
 }
 
-
-
 /*============================================================================================================================
- * B-6: coro_bb_suspend — TT_SUSPEND Byrd box (coroutine wrapper)
- *
- * Wraps existing ucontext coroutine machinery from scrip.c.
- * The zeta pointer carries an opaque Icn_coro_entry* already set up by the caller.
- * α: start (fresh call) — swapcontext into coroutine.
- * β: resume — swapcontext into coroutine again.
- * ω: coroutine set exhausted=1.
- *
- * This box does NOT own the coroutine — coro_eval (B-8) wires it up.
- * The zeta is cast to coro_t which the broker caller populates.
- *============================================================================================================================*/
-
-DESCR_t coro_bb_suspend(void *zeta, int entry) {
-    coro_t *z = (coro_t *)zeta;
-    /* exhausted+yielded_returned: truly done, return ω */
-    if (z->exhausted && z->yielded_returned) return FAILDESCR;
-    if (entry == α && !z->started) {
-        /* First α: set up and enter the coroutine */
-        z->started = 1;
-        getcontext(&z->gen_ctx);
-        /* IB-10 post: use CORO_STACK_SZ (now 1MB) and install a guard page at
-         * the bottom of the malloc'd stack so overflow gives a clean SIGSEGV
-         * rather than silently corrupting adjacent heap/mmap regions. */
-        { static long _pg = 0; if (!_pg) _pg = sysconf(_SC_PAGESIZE);
-          mprotect(z->stack, (size_t)_pg, PROT_NONE); }
-        z->gen_ctx.uc_stack.ss_sp   = z->stack;
-        z->gen_ctx.uc_stack.ss_size = CORO_STACK_SZ;
-        z->gen_ctx.uc_link          = NULL;
-        /* RK-21: if using gather trampoline, pass ss via the static staging pointer
-         * (makecontext cannot pass pointer args portably on x86-64). */
-        if (z->trampoline == gather_trampoline)
-            gather_trampoline_ss = z;
-        makecontext(&z->gen_ctx, z->trampoline, 0);
-        swapcontext(&z->caller_ctx, &z->gen_ctx);
-    } else if (!z->exhausted) {
-        /* β or α-after-started: resume only if not exhausted */
-        swapcontext(&z->caller_ctx, &z->gen_ctx);
-    } else {
-        /* exhausted but not yet returned — fall through to return yielded */
-    }
-    if (z->exhausted) {
-        if (IS_FAIL_fn(z->yielded)) return FAILDESCR;   /* proc failed — ω immediately */
-        z->yielded_returned = 1;
-        return z->yielded;
-    }
-    return z->yielded;
-}
-
-/*============================================================================================================================
- * B-8: coro_bb_bal — bal(c1,c2,c3) generator Byrd box
+ * B-8: icn_bb_bal — bal(c1,c2,c3) generator Byrd box
  *
  * Walks scan subject from current &pos, yields 1-based positions where chars in c1
  * appear at nesting depth 0 w.r.t. c2/c3 open/close delimiters.
@@ -261,7 +209,7 @@ DESCR_t coro_bb_suspend(void *zeta, int entry) {
  *   ω: no more matches.
  *============================================================================================================================*/
 
-DESCR_t coro_bb_bal(void *zeta, int entry) {
+DESCR_t icn_bb_bal(void *zeta, int entry) {
     icn_bal_state_t *z = (icn_bal_state_t *)zeta;
     if (entry == α) z->pos = (z->pos > 0 ? z->pos : 0); /* already set at construction */
     int p = z->pos, depth = 0;
@@ -279,7 +227,7 @@ DESCR_t coro_bb_bal(void *zeta, int entry) {
 }
 
 /*============================================================================================================================
- * B-7: coro_bb_find — find() generator Byrd box
+ * B-7: icn_bb_find — find() generator Byrd box
  *
  * State: needle, haystack, pos (byte offset into haystack, 0-based).
  *   α: pos = 0, find first match.
@@ -287,7 +235,7 @@ DESCR_t coro_bb_bal(void *zeta, int entry) {
  *   returns 1-based position of match, or ω.
  *============================================================================================================================*/
 
-DESCR_t coro_bb_find(void *zeta, int entry) {
+DESCR_t icn_bb_find(void *zeta, int entry) {
     icn_find_state_t *z = (icn_find_state_t *)zeta;
     if (entry == α) z->next = z->hay;
     const char *hit = strstr(z->next, z->needle);
@@ -298,11 +246,11 @@ DESCR_t coro_bb_find(void *zeta, int entry) {
 }
 
 /*============================================================================================================================
- * coro_bb_find_subj — find(needle, scan_subject): drive subject generator, exhaust
+ * icn_bb_find_subj — find(needle, scan_subject): drive subject generator, exhaust
  * find positions for each subject before advancing to the next subject.
  *   α/β: advance within current subject first; when exhausted, pull next subject.
  *============================================================================================================================*/
-DESCR_t coro_bb_find_subj(void *zeta, int entry) {
+DESCR_t icn_bb_find_subj(void *zeta, int entry) {
     icn_find_gen_subj_t *z = (icn_find_gen_subj_t *)zeta;
     for (;;) {
         if (z->hay) {
@@ -325,10 +273,10 @@ DESCR_t coro_bb_find_subj(void *zeta, int entry) {
 }
 
 /*============================================================================================================================
- * coro_bb_upto_subj — upto(cset, scan_subject): drive subject generator, yield
+ * icn_bb_upto_subj — upto(cset, scan_subject): drive subject generator, yield
  * positions of chars in cset for each subject before advancing.
  *============================================================================================================================*/
-DESCR_t coro_bb_upto_subj(void *zeta, int entry) {
+DESCR_t icn_bb_upto_subj(void *zeta, int entry) {
     icn_upto_gen_subj_t *z = (icn_upto_gen_subj_t *)zeta;
     for (;;) {
         if (z->hay) {
@@ -358,7 +306,7 @@ DESCR_t coro_bb_upto_subj(void *zeta, int entry) {
 }
 
 /*============================================================================================================================
- * coro_bb_binop — IC-2a: generative binary operator Byrd box
+ * icn_bb_binop — IC-2a: generative binary operator Byrd box
  *
  * Protocol (JCON irgen.icn §4.3, funcs-set):
  *   α: pump left α → get left_val; pump right α → get right_val; apply op.
@@ -415,7 +363,7 @@ static DESCR_t icn_binop_apply(IcnBinopKind op, DESCR_t lv, DESCR_t rv, int *rel
     }
 }
 
-DESCR_t coro_bb_binop(void *zeta, int entry) {
+DESCR_t icn_bb_binop(void *zeta, int entry) {
     icn_binop_gen_state_t *z = (icn_binop_gen_state_t *)zeta;
 
     if (entry == α) {
@@ -459,14 +407,14 @@ DESCR_t coro_bb_binop(void *zeta, int entry) {
 }
 
 /*============================================================================================================================
- * coro_bb_alternate — IC-2a: TT_ALTERNATE Byrd box
+ * icn_bb_alternate — IC-2a: TT_ALTERNATE Byrd box
  *
  * JCON irgen.icn ir_a_Alt (binary case):
  *   α: pump gen[0] α; if γ → return. If ω → switch which=1, pump gen[1] α.
  *   β: pump current gen β; if ω and which==0 → switch to gen[1] α.
  *============================================================================================================================*/
 
-DESCR_t coro_bb_alternate(void *zeta, int entry) {
+DESCR_t icn_bb_alternate(void *zeta, int entry) {
     icn_alternate_state_t *z = (icn_alternate_state_t *)zeta;
     if (entry == α) {
         z->which = 0;
@@ -488,7 +436,7 @@ DESCR_t coro_bb_alternate(void *zeta, int entry) {
 /* coro_eval — implemented in scrip.c where interp_eval and proc tables are visible. */
 
 /*============================================================================================================================
- * Unit tests: B-2 constant box, B-3 coro_bb_to, B-4 coro_bb_to_by, B-5 coro_bb_iterate, B-7 coro_bb_find
+ * Unit tests: B-2 constant box, B-3 icn_bb_to, B-4 icn_bb_to_by, B-5 icn_bb_iterate, B-7 icn_bb_find
  *============================================================================================================================*/
 #ifdef ICON_GEN_UNIT_TEST
 
@@ -528,11 +476,11 @@ int main(void) {
         free(s);
     }
 
-    /* B-3: coro_bb_to (1 to 5) → 1,2,3,4,5 */
+    /* B-3: icn_bb_to (1 to 5) → 1,2,3,4,5 */
     {
         icn_to_state_t *s = calloc(1, sizeof(*s));
         s->lo = 1; s->hi = 5;
-        bb_node_t gen = { coro_bb_to, s, 0 };
+        bb_node_t gen = { icn_bb_to, s, 0 };
         long vals[8]; collector_t c = { vals, 0, 8 };
         int ticks = bb_broker(gen, BB_PUMP, collect_int, &c);
         ASSERT(ticks == 5, "B-3: ticks==5");
@@ -540,11 +488,11 @@ int main(void) {
         free(s);
     }
 
-    /* B-4: coro_bb_to_by (1 to 10 by 2) → 1,3,5,7,9 */
+    /* B-4: icn_bb_to_by (1 to 10 by 2) → 1,3,5,7,9 */
     {
         icn_to_by_state_t *s = calloc(1, sizeof(*s));
         s->lo = 1; s->hi = 10; s->step = 2;
-        bb_node_t gen = { coro_bb_to_by, s, 0 };
+        bb_node_t gen = { icn_bb_to_by, s, 0 };
         long vals[8]; collector_t c = { vals, 0, 8 };
         int ticks = bb_broker(gen, BB_PUMP, collect_int, &c);
         ASSERT(ticks == 5, "B-4: ticks==5");
@@ -552,11 +500,11 @@ int main(void) {
         free(s);
     }
 
-    /* B-5: coro_bb_iterate !("abc") → 'a','b','c' */
+    /* B-5: icn_bb_iterate !("abc") → 'a','b','c' */
     {
         icn_iterate_state_t *s = calloc(1, sizeof(*s));
         s->str = "abc"; s->len = 3;
-        bb_node_t gen = { coro_bb_iterate, s, 0 };
+        bb_node_t gen = { icn_bb_iterate, s, 0 };
         char got[4] = {0};
         str_collector_t sc = { got, 0, 3 };
         bb_broker(gen, BB_PUMP, collect_str, &sc);
@@ -564,11 +512,11 @@ int main(void) {
         free(s);
     }
 
-    /* B-7: coro_bb_find find("is","this is it") → 3,6 */
+    /* B-7: icn_bb_find find("is","this is it") → 3,6 */
     {
         icn_find_state_t *s = calloc(1, sizeof(*s));
         s->needle = "is"; s->hay = "this is it"; s->nlen = 2; s->next = s->hay;
-        bb_node_t gen = { coro_bb_find, s, 0 };
+        bb_node_t gen = { icn_bb_find, s, 0 };
         long vals[8]; collector_t c = { vals, 0, 8 };
         int ticks = bb_broker(gen, BB_PUMP, collect_int, &c);
         ASSERT(ticks == 2, "B-7: find ticks==2");
@@ -583,7 +531,6 @@ int main(void) {
 #endif /* ICON_GEN_UNIT_TEST */
 
 icn_scan_gen_state_t *icon_scan_gen_new(void) { return calloc(1, sizeof(icn_scan_gen_state_t)); }
-coro_t               *icon_suspend_new(void)  { return calloc(1, sizeof(coro_t)); }
 #include "../../runtime/interp/coro_value.h"
 #include "../../runtime/interp/coro_stmt.h"
 #include "../../runtime/x86/snobol4.h"
@@ -595,7 +542,7 @@ extern int is_suspendable(tree_t *e);
 
 
 /*----------------------------------------------------------------------------------------------------------------------------
- * IJ-18: coro_bb_not -- ir_a_Not
+ * IJ-18: icn_bb_not -- ir_a_Not
  *
  * JCON wiring:
  *   start -> expr.start
@@ -608,7 +555,7 @@ extern int is_suspendable(tree_t *e);
  * beta:  FAILDESCR (not-E is always bounded/one-shot).
  *--------------------------------------------------------------------------------------------------------------------------*/
 
-DESCR_t coro_bb_not(void *zeta, int entry) {
+DESCR_t icn_bb_not(void *zeta, int entry) {
     if (entry != 0) return FAILDESCR;  /* one-shot: resume always fails */
     icn_not_state_t *z = (icn_not_state_t *)zeta;
     if (!z->expr) return NULVCL;
@@ -618,7 +565,7 @@ DESCR_t coro_bb_not(void *zeta, int entry) {
 }
 
 /*----------------------------------------------------------------------------------------------------------------------------
- * IJ-18: coro_bb_repalt -- ir_a_RepAlt  (|E  repeated alternation)
+ * IJ-18: icn_bb_repalt -- ir_a_RepAlt  (|E  repeated alternation)
  *
  * JCON wiring (unbounded):
  *   start: save failure label = ir.failure; goto expr.start
@@ -634,7 +581,7 @@ DESCR_t coro_bb_not(void *zeta, int entry) {
  *
  * State: inner box, started flag.
  *--------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t coro_bb_repalt(void *zeta, int entry) {
+DESCR_t icn_bb_repalt(void *zeta, int entry) {
     icn_repalt_state_t *z = (icn_repalt_state_t *)zeta;
     for (;;) {
         int port = (z->started) ? 1 : 0;
@@ -657,7 +604,7 @@ DESCR_t coro_bb_repalt(void *zeta, int entry) {
 }
 
 /*----------------------------------------------------------------------------------------------------------------------------
- * IJ-20: coro_bb_while_gen -- ir_a_While  (while E do B, used as generator)
+ * IJ-20: icn_bb_while_gen -- ir_a_While  (while E do B, used as generator)
  *
  * JCON wiring:
  *   start -> expr.start
@@ -671,7 +618,7 @@ DESCR_t coro_bb_repalt(void *zeta, int entry) {
  * State: expr_node, body_node. On each pump: test expr, run body.
  *--------------------------------------------------------------------------------------------------------------------------*/
 
-DESCR_t coro_bb_while_gen(void *zeta, int entry) {
+DESCR_t icn_bb_while_gen(void *zeta, int entry) {
     icn_while_state_t *z = (icn_while_state_t *)zeta;
     /* Both alpha and beta: test expr, if succeeds run body, return body value.
      * Loop control (next/break) is handled at statement level. */
@@ -686,7 +633,7 @@ DESCR_t coro_bb_while_gen(void *zeta, int entry) {
 }
 
 /*----------------------------------------------------------------------------------------------------------------------------
- * IJ-20: coro_bb_until_gen -- ir_a_Until  (until E do B, used as generator)
+ * IJ-20: icn_bb_until_gen -- ir_a_Until  (until E do B, used as generator)
  *
  * JCON wiring:
  *   expr.success -> ir.failure  (expr true -> stop)
@@ -694,7 +641,7 @@ DESCR_t coro_bb_while_gen(void *zeta, int entry) {
  *   body.success/failure -> expr.start  (keep looping)
  *--------------------------------------------------------------------------------------------------------------------------*/
 
-DESCR_t coro_bb_until_gen(void *zeta, int entry) {
+DESCR_t icn_bb_until_gen(void *zeta, int entry) {
     icn_until_state_t *z = (icn_until_state_t *)zeta;
     for (;;) {
         DESCR_t test = z->expr ? bb_eval_value(z->expr) : NULVCL;
@@ -705,13 +652,13 @@ DESCR_t coro_bb_until_gen(void *zeta, int entry) {
 }
 
 /*----------------------------------------------------------------------------------------------------------------------------
- * IJ-20: coro_bb_repeat_gen -- ir_a_Repeat  (repeat B, used as generator)
+ * IJ-20: icn_bb_repeat_gen -- ir_a_Repeat  (repeat B, used as generator)
  *
  * JCON wiring: unconditional loop. body.success/failure both -> ir.start.
  * As a BB: infinite generator yielding body values.
  *--------------------------------------------------------------------------------------------------------------------------*/
 
-DESCR_t coro_bb_repeat_gen(void *zeta, int entry) {
+DESCR_t icn_bb_repeat_gen(void *zeta, int entry) {
     icn_repeat_state_t *z = (icn_repeat_state_t *)zeta;
     for (;;) {
         DESCR_t bval = z->body ? bb_eval_value(z->body) : NULVCL;
@@ -721,7 +668,7 @@ DESCR_t coro_bb_repeat_gen(void *zeta, int entry) {
 }
 
 /*----------------------------------------------------------------------------------------------------------------------------
- * IJ-21: coro_bb_case_gen -- ir_a_Case  (case E of { C: B ... } used as generator)
+ * IJ-21: icn_bb_case_gen -- ir_a_Case  (case E of { C: B ... } used as generator)
  *
  * JCON wiring:
  *   eval E (bounded); compare === each clause expr; on match pump clause body.
@@ -744,7 +691,7 @@ static int descr_identical(DESCR_t a, DESCR_t b) {
     return a.ptr == b.ptr;
 }
 
-DESCR_t coro_bb_case_gen(void *zeta, int entry) {
+DESCR_t icn_bb_case_gen(void *zeta, int entry) {
     icn_case_state_t *z = (icn_case_state_t *)zeta;
     /* If already in a body, pump beta first */
     if (z->body_started && entry == 1) {
@@ -791,7 +738,7 @@ DESCR_t coro_bb_case_gen(void *zeta, int entry) {
  *--------------------------------------------------------------------------------------------------------------------------*/
 
 /*----------------------------------------------------------------------------------------------------------------------------
- * IJ-26: coro_bb_makelist_gen -- ir_a_ListConstructor with generative elements
+ * IJ-26: icn_bb_makelist_gen -- ir_a_ListConstructor with generative elements
  *
  * JCON wiring: evaluate each element left-to-right (all bounded for list construction).
  * The list constructor itself is one-shot (bounded) -- it produces one list.
@@ -808,7 +755,7 @@ DESCR_t coro_bb_case_gen(void *zeta, int entry) {
  * machinery by pumping the generative elements. For now: eager eval, one list. */
 
 /*----------------------------------------------------------------------------------------------------------------------------
- * IJ-27: coro_bb_compound_gen -- ir_a_Compound  ((E1; E2; ...; EN) generative)
+ * IJ-27: icn_bb_compound_gen -- ir_a_Compound  ((E1; E2; ...; EN) generative)
  *
  * JCON wiring:
  *   E1..E(N-1): evaluate for side effects (bounded); if any fail, continue.
@@ -819,7 +766,7 @@ DESCR_t coro_bb_case_gen(void *zeta, int entry) {
  *   L[N].success -> ir.success; L[N].failure -> ir.failure
  *--------------------------------------------------------------------------------------------------------------------------*/
 
-DESCR_t coro_bb_compound_gen(void *zeta, int entry) {
+DESCR_t icn_bb_compound_gen(void *zeta, int entry) {
     icn_compound_state_t *z = (icn_compound_state_t *)zeta;
     if (entry == 0 || !z->started) {
         /* eval all but last for side effects */
@@ -834,13 +781,13 @@ DESCR_t coro_bb_compound_gen(void *zeta, int entry) {
 }
 
 /*----------------------------------------------------------------------------------------------------------------------------
- * IJ-28: coro_bb_field_gen -- ir_a_Field with generative object
+ * IJ-28: icn_bb_field_gen -- ir_a_Field with generative object
  *
  * JCON: val = eval(object generator each tick); result = val.field
  * alpha/beta: pump object_gen, evaluate field on each result.
  *--------------------------------------------------------------------------------------------------------------------------*/
 
-DESCR_t coro_bb_field_gen(void *zeta, int entry) {
+DESCR_t icn_bb_field_gen(void *zeta, int entry) {
     icn_field_gen_state_t *z = (icn_field_gen_state_t *)zeta;
     DESCR_t obj = z->obj_gen.fn(z->obj_gen.ζ, entry);
     if (IS_FAIL_fn(obj)) return FAILDESCR;
@@ -860,7 +807,7 @@ bb_node_t coro_eval_missing_base(tree_t *e) {
     if (e->t == TT_NOT) {
         icn_not_state_t *z = calloc(1, sizeof(*z));
         z->expr = (e->n >= 1) ? e->c[0] : NULL;
-        return (bb_node_t){ coro_bb_not, z, 0 };
+        return (bb_node_t){ icn_bb_not, z, 0 };
     }
 
     /* ir_a_While (as generator) */
@@ -868,7 +815,7 @@ bb_node_t coro_eval_missing_base(tree_t *e) {
         icn_while_state_t *z = calloc(1, sizeof(*z));
         z->expr = (e->n >= 1) ? e->c[0] : NULL;
         z->body = (e->n >= 2) ? e->c[1] : NULL;
-        return (bb_node_t){ coro_bb_while_gen, z, 0 };
+        return (bb_node_t){ icn_bb_while_gen, z, 0 };
     }
 
     /* ir_a_Until (as generator) */
@@ -876,14 +823,14 @@ bb_node_t coro_eval_missing_base(tree_t *e) {
         icn_until_state_t *z = calloc(1, sizeof(*z));
         z->expr = (e->n >= 1) ? e->c[0] : NULL;
         z->body = (e->n >= 2) ? e->c[1] : NULL;
-        return (bb_node_t){ coro_bb_until_gen, z, 0 };
+        return (bb_node_t){ icn_bb_until_gen, z, 0 };
     }
 
     /* ir_a_Repeat (as generator) */
     if (e->t == TT_REPEAT) {
         icn_repeat_state_t *z = calloc(1, sizeof(*z));
         z->body = (e->n >= 1) ? e->c[0] : NULL;
-        return (bb_node_t){ coro_bb_repeat_gen, z, 0 };
+        return (bb_node_t){ icn_bb_repeat_gen, z, 0 };
     }
 
     /* ir_a_Case (as generator) */
@@ -901,7 +848,7 @@ bb_node_t coro_eval_missing_base(tree_t *e) {
             i += 2;
         }
         z->dflt = (i < e->n) ? e->c[i] : NULL;
-        return (bb_node_t){ coro_bb_case_gen, z, 0 };
+        return (bb_node_t){ icn_bb_case_gen, z, 0 };
     }
 
     /* ir_a_Compound (generative -- last child is generator) */
@@ -910,7 +857,7 @@ bb_node_t coro_eval_missing_base(tree_t *e) {
         z->n = 0;
         for (int i = 0; i < e->n && z->n < ICN_COMPOUND_MAX; i++)
             z->children[z->n++] = e->c[i];
-        return (bb_node_t){ coro_bb_compound_gen, z, 0 };
+        return (bb_node_t){ icn_bb_compound_gen, z, 0 };
     }
 
     /* ir_a_Field with generative object */
@@ -918,19 +865,19 @@ bb_node_t coro_eval_missing_base(tree_t *e) {
         icn_field_gen_state_t *z = calloc(1, sizeof(*z));
         z->obj_gen = coro_eval(e->c[0]);
         z->field   = e->v.sval;
-        return (bb_node_t){ coro_bb_field_gen, z, 0 };
+        return (bb_node_t){ icn_bb_field_gen, z, 0 };
     }
 
     /* ir_a_RepAlt -- TT_ALTERNATE with single child wrapping repeat semantics.
      * In our AST, |E is represented as TT_ALTERNATE with one child.
-     * Standard TT_ALTERNATE with 2+ children is handled by coro_bb_alternate. */
-    /* (covered by existing coro_bb_alternate for n>=2; n==1 is |E) */
+     * Standard TT_ALTERNATE with 2+ children is handled by icn_bb_alternate. */
+    /* (covered by existing icn_bb_alternate for n>=2; n==1 is |E) */
     if (e->t == TT_ALTERNATE && e->n == 1) {
         icn_repalt_state_t *z = calloc(1, sizeof(*z));
         z->expr          = e->c[0];
         z->started       = 0;
         z->ever_succeeded = 0;
-        return (bb_node_t){ coro_bb_repalt, z, 0 };
+        return (bb_node_t){ icn_bb_repalt, z, 0 };
     }
 
     /* fallback: lazy box */
@@ -940,7 +887,7 @@ bb_node_t coro_eval_missing_base(tree_t *e) {
 }
 
 /*============================================================================================================================
- * icn_bb_proc_call -- pure BB Icon procedure executor (replaces coro_bb_suspend + swapcontext)
+ * icn_bb_proc_call -- pure BB Icon procedure executor (replaces icn_bb_suspend + swapcontext)
  *
  * ir_a_Suspend wiring (JCON):
  *   start  → expr.start   (pump the expr generator α)
@@ -1112,7 +1059,7 @@ DESCR_t icn_bb_proc_call(void *zeta, int entry) {
 
 /*----------------------------------------------------------------------------------------------------------------------------
  * icn_bb_make_proc_box -- build an icn_bb_proc_call box for a proc node.
- * Called from coro_eval TT_FNC user-proc path to replace coro_bb_suspend.
+ * Called from coro_eval TT_FNC user-proc path to replace icn_bb_suspend.
  *--------------------------------------------------------------------------------------------------------------------------*/
 bb_node_t icn_bb_make_proc_box(tree_t *proc, DESCR_t *args, int nargs) {
     icn_proc_call_state_t *zz = calloc(1, sizeof(*zz));
@@ -1127,7 +1074,7 @@ bb_node_t icn_bb_make_proc_box(tree_t *proc, DESCR_t *args, int nargs) {
 }
 
 /*============================================================================================================================
- * coro_bb_section_gen -- ir_a_Sectionop with generative operands
+ * icn_bb_section_gen -- ir_a_Sectionop with generative operands
  *
  * JCON wiring: val (object), left (i), right (j) all potentially generative.
  * Drive val first; on each val tick drive left; on each left tick drive right;
@@ -1159,7 +1106,7 @@ static DESCR_t icn_apply_section(DESCR_t val, DESCR_t left, DESCR_t right, icn_s
     return STRVAL(buf);
 }
 
-DESCR_t coro_bb_section_gen(void *zeta, int entry) {
+DESCR_t icn_bb_section_gen(void *zeta, int entry) {
     icn_section_gen_state_t *z = (icn_section_gen_state_t *)zeta;
     int vport = (z->val_started   && entry == 1) ? 1 : 0;
     int lport = (z->left_started  && entry == 1) ? 1 : 0;
@@ -1199,7 +1146,7 @@ DESCR_t coro_bb_section_gen(void *zeta, int entry) {
 }
 
 /*============================================================================================================================
- * coro_bb_key_gen -- ir_a_Key for generative keywords (&features, &allocated, etc.)
+ * icn_bb_key_gen -- ir_a_Key for generative keywords (&features, &allocated, etc.)
  *
  * JCON: generative keywords emit ir_ResumeValue; one-shot keywords emit ir_Key once.
  * Generative keywords in Icon: &features (generates feature strings), &allocated (3 ints),
@@ -1207,7 +1154,7 @@ DESCR_t coro_bb_section_gen(void *zeta, int entry) {
  * Actual generators added per keyword as needed.
  *============================================================================================================================*/
 
-DESCR_t coro_bb_key_gen(void *zeta, int entry) {
+DESCR_t icn_bb_key_gen(void *zeta, int entry) {
     icn_kw_gen_state_t *z = (icn_kw_gen_state_t *)zeta;
     if (entry == 1 || z->fired) return FAILDESCR;
     z->fired = 1;
@@ -1216,7 +1163,7 @@ DESCR_t coro_bb_key_gen(void *zeta, int entry) {
 }
 
 /*============================================================================================================================
- * coro_bb_listcon_gen -- ir_a_ListConstructor with generative elements
+ * icn_bb_listcon_gen -- ir_a_ListConstructor with generative elements
  *
  * JCON: evaluate each element (bounded); collect into a list; return it once.
  * The ListConstructor itself is one-shot (always bounded in JCON).
@@ -1224,7 +1171,7 @@ DESCR_t coro_bb_key_gen(void *zeta, int entry) {
  * State: child exprs, count.
  *============================================================================================================================*/
 
-DESCR_t coro_bb_listcon_gen(void *zeta, int entry) {
+DESCR_t icn_bb_listcon_gen(void *zeta, int entry) {
     icn_listcon_state_t *z = (icn_listcon_state_t *)zeta;
     if (entry == 1 || z->fired) return FAILDESCR;
     z->fired = 1;
@@ -1269,7 +1216,7 @@ bb_node_t coro_eval_missing(tree_t *e) {
         z->kind       = (e->t == TT_SECTION_PLUS) ? ICN_SEC_PLUS
                       : (e->t == TT_SECTION_MINUS) ? ICN_SEC_MINUS
                       : ICN_SEC_RANGE;
-        return (bb_node_t){ coro_bb_section_gen, z, 0 };
+        return (bb_node_t){ icn_bb_section_gen, z, 0 };
     }
 
     /* ir_a_Key -- generative keyword */
@@ -1277,7 +1224,7 @@ bb_node_t coro_eval_missing(tree_t *e) {
         icn_kw_gen_state_t *z = calloc(1, sizeof(*z));
         z->kw    = e->v.sval;
         z->fired = 0;
-        return (bb_node_t){ coro_bb_key_gen, z, 0 };
+        return (bb_node_t){ icn_bb_key_gen, z, 0 };
     }
 
     /* ir_a_ListConstructor -- generative list [e1, e2, ...] */
@@ -1287,7 +1234,7 @@ bb_node_t coro_eval_missing(tree_t *e) {
         z->fired = 0;
         for (int i = 0; i < e->n && z->n < ICN_LISTCON_MAX; i++)
             z->children[z->n++] = e->c[i];
-        return (bb_node_t){ coro_bb_listcon_gen, z, 0 };
+        return (bb_node_t){ icn_bb_listcon_gen, z, 0 };
     }
 
     fallback:
@@ -1337,25 +1284,25 @@ icn_procdecl_state_t  *icon_procdecl_new(void) { return calloc(1,sizeof(icn_proc
 icn_procbody_state_t  *icon_procbody_new(void) { return calloc(1,sizeof(icn_procbody_state_t)); }
 icn_proccode_state_t  *icon_proccode_new(void) { return calloc(1,sizeof(icn_proccode_state_t)); }
 
-DESCR_t coro_bb_noop     (void *z,int p){if(p)return FAILDESCR;return NULVCL;}
-DESCR_t coro_bb_intlit   (void *z,int p){if(p)return FAILDESCR;return INTVAL(((icn_intlit_state_t*)z)->val);}
-DESCR_t coro_bb_reallit  (void *z,int p){if(p)return FAILDESCR;return REALVAL(((icn_reallit_state_t*)z)->val);}
-DESCR_t coro_bb_strlit   (void *z,int p){if(p)return FAILDESCR;const char *s=((icn_strlit_state_t*)z)->s;return s?STRVAL(s):NULVCL;}
-DESCR_t coro_bb_csetlit  (void *z,int p){if(p)return FAILDESCR;const char *s=((icn_csetlit_state_t*)z)->s;return s?CSETVAL(s):NULVCL;}
-DESCR_t coro_bb_global   (void *z,int p){if(p)return FAILDESCR;return NULVCL;}
-DESCR_t coro_bb_if_bb    (void *z,int p){if(p)return FAILDESCR;icn_if_state_t *s=(icn_if_state_t*)z;DESCR_t c=s->cond?bb_eval_value(s->cond):FAILDESCR;return bb_eval_value(IS_FAIL_fn(c)?s->else_e:s->then_e);}
-DESCR_t coro_bb_initial  (void *z,int p){if(p)return FAILDESCR;icn_initial_state_t *s=(icn_initial_state_t*)z;return s->body?bb_eval_value(s->body):NULVCL;}
-DESCR_t coro_bb_invocable(void *z,int p){if(p)return FAILDESCR;return NULVCL;}
-DESCR_t coro_bb_link     (void *z,int p){if(p)return FAILDESCR;return NULVCL;}
-DESCR_t coro_bb_record_bb(void *z,int p){if(p)return FAILDESCR;return NULVCL;}
-DESCR_t coro_bb_return_bb(void *z,int p){if(p)return FAILDESCR;icn_return_state_t *s=(icn_return_state_t*)z;DESCR_t v=s->expr?bb_eval_value(s->expr):NULVCL;if(frame_depth>0){FRAME.return_val=v;FRAME.returning=1;}return v;}
-DESCR_t coro_bb_fail_bb  (void *z,int p){if(p)return FAILDESCR;if(frame_depth>0){FRAME.return_val=FAILDESCR;FRAME.returning=1;}return FAILDESCR;}
-DESCR_t coro_bb_unop     (void *z,int p){if(p)return FAILDESCR;icn_unop_state_t *s=(icn_unop_state_t*)z;DESCR_t v=s->operand?bb_eval_value(s->operand):NULVCL;DESCR_t out;if(s->op&&icn_try_call_builtin_by_name(s->op,&v,1,&out))return out;return FAILDESCR;}
-DESCR_t coro_bb_next_bb  (void *z,int p){if(p)return FAILDESCR;if(frame_depth>0)FRAME.loop_next=1;return NULVCL;}
-DESCR_t coro_bb_break_bb (void *z,int p){if(p)return FAILDESCR;icn_break_state_t *s=(icn_break_state_t*)z;if(frame_depth>0)FRAME.loop_break=1;return s->expr?bb_eval_value(s->expr):NULVCL;}
-DESCR_t coro_bb_create   (void *z,int p){if(p)return FAILDESCR;return NULVCL;}
-DESCR_t coro_bb_coexplist(void *z,int p){(void)z;(void)p;return FAILDESCR;}
-DESCR_t coro_bb_arglist  (void *z,int p){(void)z;(void)p;return FAILDESCR;}
-DESCR_t coro_bb_procdecl (void *z,int p){if(p)return FAILDESCR;return NULVCL;}
-DESCR_t coro_bb_procbody (void *z,int p){if(p)return FAILDESCR;icn_procbody_state_t *s=(icn_procbody_state_t*)z;return s->body?bb_eval_value(s->body):NULVCL;}
-DESCR_t coro_bb_proccode (void *z,int p){if(p)return FAILDESCR;icn_proccode_state_t *s=(icn_proccode_state_t*)z;if(s->init)bb_eval_value(s->init);return s->body?bb_eval_value(s->body):NULVCL;}
+DESCR_t icn_bb_noop     (void *z,int p){if(p)return FAILDESCR;return NULVCL;}
+DESCR_t icn_bb_intlit   (void *z,int p){if(p)return FAILDESCR;return INTVAL(((icn_intlit_state_t*)z)->val);}
+DESCR_t icn_bb_reallit  (void *z,int p){if(p)return FAILDESCR;return REALVAL(((icn_reallit_state_t*)z)->val);}
+DESCR_t icn_bb_strlit   (void *z,int p){if(p)return FAILDESCR;const char *s=((icn_strlit_state_t*)z)->s;return s?STRVAL(s):NULVCL;}
+DESCR_t icn_bb_csetlit  (void *z,int p){if(p)return FAILDESCR;const char *s=((icn_csetlit_state_t*)z)->s;return s?CSETVAL(s):NULVCL;}
+DESCR_t icn_bb_global   (void *z,int p){if(p)return FAILDESCR;return NULVCL;}
+DESCR_t icn_bb_if_bb    (void *z,int p){if(p)return FAILDESCR;icn_if_state_t *s=(icn_if_state_t*)z;DESCR_t c=s->cond?bb_eval_value(s->cond):FAILDESCR;return bb_eval_value(IS_FAIL_fn(c)?s->else_e:s->then_e);}
+DESCR_t icn_bb_initial  (void *z,int p){if(p)return FAILDESCR;icn_initial_state_t *s=(icn_initial_state_t*)z;return s->body?bb_eval_value(s->body):NULVCL;}
+DESCR_t icn_bb_invocable(void *z,int p){if(p)return FAILDESCR;return NULVCL;}
+DESCR_t icn_bb_link     (void *z,int p){if(p)return FAILDESCR;return NULVCL;}
+DESCR_t icn_bb_record_bb(void *z,int p){if(p)return FAILDESCR;return NULVCL;}
+DESCR_t icn_bb_return_bb(void *z,int p){if(p)return FAILDESCR;icn_return_state_t *s=(icn_return_state_t*)z;DESCR_t v=s->expr?bb_eval_value(s->expr):NULVCL;if(frame_depth>0){FRAME.return_val=v;FRAME.returning=1;}return v;}
+DESCR_t icn_bb_fail_bb  (void *z,int p){if(p)return FAILDESCR;if(frame_depth>0){FRAME.return_val=FAILDESCR;FRAME.returning=1;}return FAILDESCR;}
+DESCR_t icn_bb_unop     (void *z,int p){if(p)return FAILDESCR;icn_unop_state_t *s=(icn_unop_state_t*)z;DESCR_t v=s->operand?bb_eval_value(s->operand):NULVCL;DESCR_t out;if(s->op&&icn_try_call_builtin_by_name(s->op,&v,1,&out))return out;return FAILDESCR;}
+DESCR_t icn_bb_next_bb  (void *z,int p){if(p)return FAILDESCR;if(frame_depth>0)FRAME.loop_next=1;return NULVCL;}
+DESCR_t icn_bb_break_bb (void *z,int p){if(p)return FAILDESCR;icn_break_state_t *s=(icn_break_state_t*)z;if(frame_depth>0)FRAME.loop_break=1;return s->expr?bb_eval_value(s->expr):NULVCL;}
+DESCR_t icn_bb_create   (void *z,int p){if(p)return FAILDESCR;return NULVCL;}
+DESCR_t icn_bb_coexplist(void *z,int p){(void)z;(void)p;return FAILDESCR;}
+DESCR_t icn_bb_arglist  (void *z,int p){(void)z;(void)p;return FAILDESCR;}
+DESCR_t icn_bb_procdecl (void *z,int p){if(p)return FAILDESCR;return NULVCL;}
+DESCR_t icn_bb_procbody (void *z,int p){if(p)return FAILDESCR;icn_procbody_state_t *s=(icn_procbody_state_t*)z;return s->body?bb_eval_value(s->body):NULVCL;}
+DESCR_t icn_bb_proccode (void *z,int p){if(p)return FAILDESCR;icn_proccode_state_t *s=(icn_proccode_state_t*)z;if(s->init)bb_eval_value(s->init);return s->body?bb_eval_value(s->body):NULVCL;}
