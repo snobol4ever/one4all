@@ -313,20 +313,20 @@ grep -q "^PASS=18 FAIL=0" "$TMP/em7b.err" || {
 # externally-visible α/β/γ/ω globals.
 gcc -c "$TMP/em7b.s" -o "$TMP/em7b.o" 2> "$TMP/em7b.as_err" || {
     echo "FAIL EM-7b .s does not assemble"; cat "$TMP/em7b.as_err"; exit 1; }
-SYMS=$(objdump -t "$TMP/em7b.o" 2>/dev/null | awk '/pat_inv_42_0_/{print $NF}' | grep -v '_α_body$' | sort)
-EXPECT=$(printf "pat_inv_42_0_α\npat_inv_42_0_β\npat_inv_42_0_γ\npat_inv_42_0_ω")
+SYMS=$(objdump -t "$TMP/em7b.o" 2>/dev/null | awk '/pat_42_0_/{print $NF}' | grep -v '_α_body$' | sort)
+EXPECT=$(printf "pat_42_0_α\npat_42_0_β\npat_42_0_γ\npat_42_0_ω")
 [ "$SYMS" = "$EXPECT" ] || {
     echo "FAIL EM-7b external labels missing or extra"; echo "got: $SYMS"; echo "expect: $EXPECT"; exit 1; }
 # Verify all four entry labels are GLOBAL (not local) — `g` flag in objdump column 2.
 # (`_α_body` is internal, may be local; we filter it before counting.)
-GLOBAL_COUNT=$(objdump -t "$TMP/em7b.o" 2>/dev/null | awk '/pat_inv_42_0_/ && !/_α_body/ && $2 ~ /g/ {n++} END{print n+0}')
+GLOBAL_COUNT=$(objdump -t "$TMP/em7b.o" 2>/dev/null | awk '/pat_42_0_/ && !/_α_body/ && $2 ~ /g/ {n++} END{print n+0}')
 [ "$GLOBAL_COUNT" = "4" ] || {
     echo "FAIL EM-7b only $GLOBAL_COUNT/4 entry labels are global"; exit 1; }
 echo "  PASS EM-7b bb_flat TEXT mode (PASS=18 unit + .s assembles + 4/4 external α/β/γ/ω)"
 
 # ── Test 13: EM-7c invariant-pattern blob emit shape ───────────────────────────
 # Verifies that an invariant pattern statement produces:
-#   1. a `pat_inv_<id>_α/_β/_γ/_ω` block in the emitted `.s`,
+#   1. a `pat_<id>_α/_β/_γ/_ω` block in the emitted `.s`,
 #   2. a `rt_match_blob@PLT` call at the SM_EXEC_STMT site,
 #   3. an `.s` that assembles AND links cleanly against libscrip_rt.so.
 # Runtime correctness of the linked binary is NOT checked here — bb_flat.c
@@ -342,10 +342,10 @@ END
 EOF
 "$SCRIP" --jit-emit --x64 "$TMP/em7c_inv.sno" > "$TMP/em7c.s" 2> "$TMP/em7c.err" || {
     echo "FAIL EM-7c emit"; cat "$TMP/em7c.err"; exit 1; }
-grep -q "^pat_inv_0_α:"     "$TMP/em7c.s" || {
-    echo "FAIL EM-7c no pat_inv_0_α label"; exit 1; }
-grep -q "^pat_inv_0_β:"      "$TMP/em7c.s" || {
-    echo "FAIL EM-7c no pat_inv_0_β label"; exit 1; }
+grep -q "^pat_0_α:"     "$TMP/em7c.s" || {
+    echo "FAIL EM-7c no pat_0_α label"; exit 1; }
+grep -q "^pat_0_β:"      "$TMP/em7c.s" || {
+    echo "FAIL EM-7c no pat_0_β label"; exit 1; }
 grep -q "rt_match_blob@PLT" "$TMP/em7c.s" || {
     echo "FAIL EM-7c no rt_match_blob@PLT call"; exit 1; }
 gcc -c "$TMP/em7c.s" -o "$TMP/em7c.o" 2> "$TMP/em7c.as_err" || {

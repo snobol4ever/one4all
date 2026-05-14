@@ -130,7 +130,7 @@ void rt_push_expression_descr(int64_t entry_pc, int64_t arity);
  * expressions (via bb_build_flat_text); at SM_EXEC_STMT, the emitted code
  * pushes [subj][repl_or_zero] on the value stack and calls this entry.
  *
- *   blob_α  — address of `_pat_inv_<id>_α` (the baked entry)
+ *   blob_α  — address of `_pat_<id>_α` (the baked entry)
  *   subj_name   — subject NV name for write-back, or NULL
  *   has_repl    — 1 if a real replacement is on the stack, 0 if dummy
  *

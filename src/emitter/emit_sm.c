@@ -2430,7 +2430,7 @@ static int emit_pattern_blobs(FILE *out)
         pattern_window_t *w = &g_pat_windows[i];
         if (!w->is_invariant) continue;
         char prefix[64];
-        snprintf(prefix, sizeof(prefix), "pat_inv_%d", w->pat_id);
+        snprintf(prefix, sizeof(prefix), "pat_%d", w->pat_id);
         PATND_t *p = (PATND_t *)w->root.p;
         if (emit_flat_build(p, out, prefix) != 0) {
             w->is_invariant = 0;
@@ -2450,7 +2450,7 @@ static int emit_sm_exec_stmt_blob(FILE *out, const SM_Instr *ins, int pc, int wi
     int has_repl      = (int)ins->a[1].i;
     char act[160];
     snprintf(act, sizeof(act),
-             "rdi, [rip + pat_inv_%d_α]", w->pat_id);
+             "rdi, [rip + pat_%d_α]", w->pat_id);
     const char *anno = NULL;
     char lbl[32];
     const char *pending = emit_sm_consume_pc_label();
@@ -2501,7 +2501,7 @@ static int emit_sm_pat_baked(FILE *out, const SM_Instr *ins, int pc, int win_idx
     snprintf(op_col, sizeof(op_col), "# %s", opname);
     char col3[160];
     snprintf(col3, sizeof(col3),
-             "baked  pat_inv_%d pc=%d..%d",
+             "baked  pat_%d pc=%d..%d",
              w->pat_id, w->phase2_start, w->phase2_end - 1);
     if (emit_three_column_line(out, lbl, op_col, col3, NULL) != 0) return -1;
     (void)pc;

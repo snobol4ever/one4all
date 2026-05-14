@@ -1035,7 +1035,7 @@ Success:
  *
  * The mode-4 emitter (sm_codegen_x64_emit.c) bakes invariant pattern
  * sub-trees as flat .text expressions via bb_build_flat_text.  At Phase-3
- * time it has a function pointer (the address of `_pat_inv_<id>_α`)
+ * time it has a function pointer (the address of `_pat_<id>_α`)
  * but no PATND_t — the tree is gone, only the code remains.
  *
  * exec_stmt_blob() lets the emitted binary call into Phase-1+3+4+5
@@ -1046,7 +1046,7 @@ Success:
  *
  * Parameters: identical to exec_stmt, except pat is replaced by
  *   root_fn — the entry point of the baked invariant pattern blob
- *             (i.e. the address of the `_pat_inv_<id>_α` symbol).
+ *             (i.e. the address of the `_pat_<id>_α` symbol).
  *
  * Returns 1 → :S, 0 → :F.
  * ══════════════════════════════════════════════════════════════════════════ */

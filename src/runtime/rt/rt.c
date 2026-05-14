@@ -197,7 +197,7 @@ const void *rt_get_default_vstack_backend(void)
  * Future rung (EM-7c-variant-bb-pool-emit, the architectural ideal): replace
  * the runtime PATND_t build with per-variant-node bb_pool emit driven by an
  * emit-time partition, so invariant subtrees of partly-variant patterns
- * resolve via linker-baked _pat_inv_<pid>_<sid>_α labels rather than being
+ * resolve via linker-baked _pat_<pid>_<sid>_α labels rather than being
  * rebuilt into bb_pool at runtime. */
 
 static int     g_halt_rc  = 0;
@@ -643,7 +643,7 @@ void rt_push_expression_descr(int64_t entry_pc, int64_t arity)
  *
  * The mode-4 emitter bakes invariant pattern sub-trees as flat .text
  * expressions via bb_build_flat_text(), with externally-visible entry
- * symbols `_pat_inv_<id>_α` etc.  At runtime, the emitted binary
+ * symbols `_pat_<id>_α` etc.  At runtime, the emitted binary
  * pushes the subject and replacement on the SM value stack and calls
  * rt_match_blob(blob_α, sname, has_repl).
  *
@@ -652,7 +652,7 @@ void rt_push_expression_descr(int64_t entry_pc, int64_t arity)
  *   [subj_descr]
  *
  * Parameters:
- *   blob_α   — address of `_pat_inv_<id>_α`
+ *   blob_α   — address of `_pat_<id>_α`
  *   subj_name    — subject variable name for write-back, or NULL
  *   has_repl     — 1 if a replacement is present
  *
