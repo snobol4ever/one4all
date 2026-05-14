@@ -1083,6 +1083,71 @@ static DESCR_t icn_bb_revswap(void *zeta, int entry) {
     return FAILDESCR;
 }
 /*----------------------------------------------------------------------------------------------------------------------------
+ * icn_bb_list_iterate — !L generator for DT_DATA icnlist  IC-5
+ * Holds the live list object; re-reads elems/size each tick so put() mutations are visible.
+ * α: reset pos=0; β: advance pos.  ω when pos >= n.
+ *--------------------------------------------------------------------------------------------------------------------------*/
+DESCR_t icn_bb_list_iterate(void *zeta, int entry) {
+    icn_list_iterate_state_t *z = (icn_list_iterate_state_t *)zeta;
+    DESCR_t ea = FIELD_GET_fn(z->list_obj, "frame_elems");
+    int n = (int)FIELD_GET_fn(z->list_obj, "frame_size").i;
+    DESCR_t *elems = (ea.v == DT_DATA) ? (DESCR_t *)ea.ptr : NULL;
+    if (!elems || n <= 0) return FAILDESCR;
+    if (entry == α) z->pos = 0;
+    else            z->pos++;
+    if (z->pos >= n) return FAILDESCR;
+    return elems[z->pos];
+}
+
+/*----------------------------------------------------------------------------------------------------------------------------
+ * icn_bb_tbl_iterate — !T generator for DT_T tables  IC-3
+ * Walks buckets; α resets, β advances.  Returns entry->val.
+ *--------------------------------------------------------------------------------------------------------------------------*/
+DESCR_t icn_bb_tbl_iterate(void *zeta, int entry) {
+    icn_tbl_iterate_state_t *z = (icn_tbl_iterate_state_t *)zeta;
+    if (!z->tbl) return FAILDESCR;
+    if (entry == α) { z->bucket = 0; z->entry = z->tbl->buckets[0]; }
+    else if (z->entry) { z->entry = z->entry->next; }
+    while (!z->entry && z->bucket < TABLE_BUCKETS - 1) {
+        z->bucket++;
+        z->entry = z->tbl->buckets[z->bucket];
+    }
+    if (!z->entry) return FAILDESCR;
+    return z->entry->val;
+}
+
+/*----------------------------------------------------------------------------------------------------------------------------
+ * icn_bb_tbl_key_iterate — key(T) generator: yields each key in T  IC-6
+ *--------------------------------------------------------------------------------------------------------------------------*/
+DESCR_t icn_bb_tbl_key_iterate(void *zeta, int entry) {
+    icn_tbl_key_iterate_state_t *z = (icn_tbl_key_iterate_state_t *)zeta;
+    if (!z->tbl) return FAILDESCR;
+    if (entry == α) { z->bucket = 0; z->entry = z->tbl->buckets[0]; }
+    else if (z->entry) { z->entry = z->entry->next; }
+    while (!z->entry && z->bucket < TABLE_BUCKETS - 1) {
+        z->bucket++;
+        z->entry = z->tbl->buckets[z->bucket];
+    }
+    if (!z->entry) return FAILDESCR;
+    return z->entry->key_descr;
+}
+
+/*----------------------------------------------------------------------------------------------------------------------------
+ * icn_bb_record_iterate — !R generator for DT_DATA records  IC-9
+ * Yields field values in declaration order.
+ *--------------------------------------------------------------------------------------------------------------------------*/
+DESCR_t icn_bb_record_iterate(void *zeta, int entry) {
+    icn_record_iterate_state_t *z = (icn_record_iterate_state_t *)zeta;
+    if (z->inst.v != DT_DATA || !z->inst.u || !z->inst.u->type) return FAILDESCR;
+    int n = z->inst.u->type->nfields;
+    if (n <= 0 || !z->inst.u->fields) return FAILDESCR;
+    if (entry == α) z->pos = 0;
+    else            z->pos++;
+    if (z->pos >= n) return FAILDESCR;
+    return z->inst.u->fields[z->pos];
+}
+
+/*----------------------------------------------------------------------------------------------------------------------------
  * icn_bb_seq_expr — TT_SEQ_EXPR  (E1; E2; ...; En)  as a generator  IC-2b
  *
  * α: execute E1..En-1 as side effects (bb_exec_stmt), build a generator box
@@ -1275,9 +1340,9 @@ bb_node_t icn_bb_build(tree_t *e) {
             DESCR_t tag = FIELD_GET_fn(sv, "icn_type");
             if (tag.v == DT_S && tag.s && strcmp(tag.s, "list") == 0) {
                 icn_list_iterate_state_t *lz = calloc(1, sizeof(*lz));
-                lz->list_obj = sv;  /* live DT_DATA — re-read each tick so put() mutations are visible */
+                lz->list_obj = sv;
                 lz->pos      = 0;
-                return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
+                return (bb_node_t){ icn_bb_list_iterate, lz, 0 };
             }
             /* IC-9 (2026-05-01): DT_DATA record — !R yields each field value.
              * Must also precede descr_to_str_icn for the same reason. */
@@ -1285,17 +1350,17 @@ bb_node_t icn_bb_build(tree_t *e) {
                 icn_record_iterate_state_t *rz = calloc(1, sizeof(*rz));
                 rz->inst = sv;
                 rz->pos  = 0;
-                return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
+                return (bb_node_t){ icn_bb_record_iterate, rz, 0 };
             }
         }
         /* IC-3: DT_T table iteration — !T yields each value.
          * Also check before string coercion. */
         if (sv.v == DT_T) {
             icn_tbl_iterate_state_t *z = calloc(1, sizeof(*z));
-            z->tbl = sv.tbl;
+            z->tbl    = sv.tbl;
             z->bucket = 0;
-            z->entry = NULL;
-            return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
+            z->entry  = NULL;
+            return (bb_node_t){ icn_bb_tbl_iterate, z, 0 };
         }
         /* IC-8: coerce numeric scalars to image-string before string-iterate path (D-1).
          * Only reached for string/numeric — DT_DATA/DT_T handled above. */
