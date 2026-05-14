@@ -124,6 +124,7 @@ struct IR_t {
         double         dval;     /* LIT_F                                                       */
         const char   * sval;     /* LIT_S, VAR name, CALL name, charset                        */
     };
+    const char   * sval2;       /* second string arg (IR_ICN_UPTO hay; others: NULL) — not reset by IR_reset */
     DESCR_t        value;        /* current result value (live during ir_exec graph walk)       */
     int64_t        counter;      /* generative scratch: chars consumed, step position, etc.     */
     int            state;        /* executor state machine (0 = fresh)                          */

@@ -701,6 +701,31 @@ typedef struct {
     int        is_gen[ICN_FNC_GEN_ARGS];      /* 1 if arg is generative */
 } icn_fnc_multi_frag_t; /* IJ-CORO: orphan tail — will be cleaned */
 
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* icn_bb_every — TT_EVERY Byrd box.  Drives inner gen to exhaustion;
+ * evaluates body tree_t* (via bb_exec_stmt) per successful tick.
+ * If body == NULL, gen side-effects (e.g. write inside icn_bb_fnc) handle output.
+ * alpha: reset gen box (pass alpha), pump first tick.
+ * beta:  pump gen beta; if exhausted return FAILDESCR. */
+DESCR_t icn_bb_every(void *zeta, int entry) {
+    icn_every_state_t *z = (icn_every_state_t *)zeta;
+    if (!z) return FAILDESCR;
+    int tick = (entry == α) ? α : β;
+    DESCR_t v = z->gen.fn(z->gen.ζ, tick);
+    if (IS_FAIL_fn(v)) return FAILDESCR;
+    if (z->body) bb_exec_stmt(z->body);
+    return v;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* icn_bb_to — TT_TO Byrd box (lo to hi).  α: cur=lo; β: cur++.  ω when cur>hi. */
+DESCR_t icn_bb_to(void *zeta, int entry) {
+    icn_to_state_t *z = (icn_to_state_t *)zeta;
+    if (!z) return FAILDESCR;
+    if (entry == α) z->cur = z->lo;
+    else             z->cur++;
+    if (z->cur > z->hi) return FAILDESCR;
+    return INTVAL(z->cur);
+}
 /*============================================================================================================================
  * RK-18a: icn_bb_raku_array — Raku @array Byrd box  (for @arr -> $x)
  *
@@ -975,8 +1000,6 @@ static DESCR_t icn_bb_revassign(void *zeta, int entry) {
     }
     return FAILDESCR;
 }
-
-
 /*----------------------------------------------------------------------------------------------------------------------------
  * icn_bb_revswap — TT_REVSWAP  (lhs <-> rhs)  reversible value swap
  *
@@ -1082,8 +1105,6 @@ static DESCR_t icn_bb_revswap(void *zeta, int entry) {
     }
     return FAILDESCR;
 }
-
-
 /*----------------------------------------------------------------------------------------------------------------------------
  * icn_bb_identical_gen — TT_IDENTICAL  (a === b)  with one or both operands generative
  *
@@ -1174,7 +1195,7 @@ bb_node_t icn_bb_build(tree_t *e) {
         icn_to_state_t *z = calloc(1, sizeof(*z));
         z->lo = IS_FAIL_fn(lo_d) ? 0 : lo_d.i;
         z->hi = IS_FAIL_fn(hi_d) ? 0 : hi_d.i;
-        return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
+        return (bb_node_t){ icn_bb_to, z, 0 };
     }
 
     /* ── TT_TO_BY: (lo to hi by step) ─────────────────────────────────────── */
@@ -1585,7 +1606,8 @@ bb_node_t icn_bb_build(tree_t *e) {
         z->gen     = icn_bb_build(e->c[0]);
         z->gen_ast = e->c[0];
         z->body    = (e->n >= 2) ? e->c[1] : NULL;
-        return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
+        z->started = 0;
+        return (bb_node_t){ icn_bb_every, z, 0 };
     }
 
     /* ── IC-2b: TT_BANG_BINARY  (E1 ! E2) ────────────────────────────────── */

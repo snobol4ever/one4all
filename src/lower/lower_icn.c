@@ -30,10 +30,9 @@ IR_block_t *lower_icn_upto(const char *cset, const char *hay) {
     if (!cfg) return NULL;
     IR_t *nd = IR_node_alloc(cfg, IR_ICN_UPTO);
     if (!nd) return NULL;
-    nd->sval       = cset;
-    nd->value.s    = (char *)hay;
-    nd->value.slen = (uint32_t)strlen(hay);
-    nd->counter    = 0;
+    nd->sval    = cset;
+    nd->sval2   = hay;
+    nd->counter = 0;
     nd->α = nd;   /* re-enter on α (fresh) and β (advance) — executor distinguishes via state */
     nd->β = nd;
     nd->γ = NULL; /* wired by caller / executor to success continuation */
