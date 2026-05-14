@@ -54,6 +54,7 @@ void lower_stmt    (const tree_t *s);
  * Only one lowering pass runs at a time (lower() is not reentrant).
  *────────────────────────────────────────────────────────────────────────────*/
 #define LOWER_UNHANDLED_WORDS 4
+#define ICN_BB_EVAL(t) do { if (g_lang == LANG_ICN) { sm_emit_i(g_p, SM_BB_EVAL, (int64_t)every_table_register((tree_t *)(t))); return; } } while(0)
 static SM_Program  *g_p;
 static LabelTable   g_labtab;
 static int          g_in_proc_body;
@@ -183,19 +184,19 @@ static void emit_thunk(const tree_t *body)
 
 /*── Literals ────────────────────────────────────────────────────────────────*/
 
-static void lower_strlit(const tree_t *t) { sm_emit_s(g_p, SM_PUSH_LIT_S, t->v.sval ? t->v.sval : ""); }
-static void lower_ilit  (const tree_t *t) { sm_emit_i(g_p, SM_PUSH_LIT_I, (int64_t)t->v.ival); }
-static void lower_flit  (const tree_t *t) { sm_emit_f(g_p, SM_PUSH_LIT_F, t->v.dval); }
-static void lower_nul   (const tree_t *t) { (void)t; sm_emit(g_p, SM_PUSH_NULL); }
+static void lower_strlit(const tree_t *t) { ICN_BB_EVAL(t); sm_emit_s(g_p, SM_PUSH_LIT_S, t->v.sval ? t->v.sval : ""); }
+static void lower_ilit  (const tree_t *t) { ICN_BB_EVAL(t); sm_emit_i(g_p, SM_PUSH_LIT_I, (int64_t)t->v.ival); }
+static void lower_flit  (const tree_t *t) { ICN_BB_EVAL(t); sm_emit_f(g_p, SM_PUSH_LIT_F, t->v.dval); }
+static void lower_nul   (const tree_t *t) { ICN_BB_EVAL(t); (void)t; sm_emit(g_p, SM_PUSH_NULL); }
 
 /*── Variable references ─────────────────────────────────────────────────────*/
 
-static void lower_var(const tree_t *t)     { emit_var_load(t->v.sval ? t->v.sval : ""); }
-static void lower_keyword(const tree_t *t) { sm_emit_s(g_p, SM_PUSH_VAR, kw_canonicalize(t->v.sval)); }
+static void lower_var(const tree_t *t)     { ICN_BB_EVAL(t); emit_var_load(t->v.sval ? t->v.sval : ""); }
+static void lower_keyword(const tree_t *t) { ICN_BB_EVAL(t); sm_emit_s(g_p, SM_PUSH_VAR, kw_canonicalize(t->v.sval)); }
 
 static void lower_indirect(const tree_t *t)
 {
-    /* $.var[idx] fast path: bypass INDIR_GET, emit PUSH_VAR + IDX directly. */
+    ICN_BB_EVAL(t);
     const tree_t *ch = T0(t);
     if (ch && ch->t == TT_NAME && ch->n == 1) {
         const tree_t *inner = ch->c[0];
@@ -220,23 +221,24 @@ static void lower_defer(const tree_t *t)
 
 /*── Arithmetic ──────────────────────────────────────────────────────────────*/
 
-static void lower_interrogate(const tree_t *t) { lower_expr(T0(t)); }
+static void lower_interrogate(const tree_t *t) { ICN_BB_EVAL(t); lower_expr(T0(t)); }
 
 static void lower_name(const tree_t *t)
 {
+    ICN_BB_EVAL(t);
     const char *vname = (T0(t) && T0(t)->v.sval) ? T0(t)->v.sval : "";
     sm_emit_s(g_p, SM_PUSH_LIT_S, vname);
     sm_emit_si(g_p, SM_CALL_FN, "NAME_PUSH", 1);
 }
 
-static void lower_mns(const tree_t *t) { LOWER1_VAL(SM_NEG); }
-static void lower_pls(const tree_t *t) { LOWER1_VAL(SM_COERCE_NUM); }
-static void lower_add(const tree_t *t) { LOWER2(SM_ADD); }
-static void lower_sub(const tree_t *t) { LOWER2(SM_SUB); }
-static void lower_mul(const tree_t *t) { LOWER2(SM_MUL); }
-static void lower_div(const tree_t *t) { LOWER2(SM_DIV); }
-static void lower_mod(const tree_t *t) { LOWER2(SM_MOD); }
-static void lower_pow(const tree_t *t) { LOWER2(SM_EXP); }
+static void lower_mns(const tree_t *t) { ICN_BB_EVAL(t); LOWER1_VAL(SM_NEG); }
+static void lower_pls(const tree_t *t) { ICN_BB_EVAL(t); LOWER1_VAL(SM_COERCE_NUM); }
+static void lower_add(const tree_t *t) { ICN_BB_EVAL(t); LOWER2(SM_ADD); }
+static void lower_sub(const tree_t *t) { ICN_BB_EVAL(t); LOWER2(SM_SUB); }
+static void lower_mul(const tree_t *t) { ICN_BB_EVAL(t); LOWER2(SM_MUL); }
+static void lower_div(const tree_t *t) { ICN_BB_EVAL(t); LOWER2(SM_DIV); }
+static void lower_mod(const tree_t *t) { ICN_BB_EVAL(t); LOWER2(SM_MOD); }
+static void lower_pow(const tree_t *t) { ICN_BB_EVAL(t); LOWER2(SM_EXP); }
 
 /*── Sequences and alternation ───────────────────────────────────────────────*/
 
@@ -257,10 +259,7 @@ static void lower_vlist(const tree_t *t)
 
 static void lower_cat_seq(const tree_t *t)
 {
-    /* Icon & conjunction uses TT_SEQ but is goal-directed, not string concat.
-     * When lowering an Icon statement, emit JUMP_F between children so that
-     * a failing operand short-circuits the whole conjunction.
-     * SNOBOL4/Snocone TT_SEQ (pattern concatenation) is unaffected. */
+    ICN_BB_EVAL(t);
     if (t->t == TT_SEQ && g_lang == LANG_ICN) {
         if (t->n == 0) { sm_emit(g_p, SM_PUSH_NULL); return; }
         if (t->n == 1) { lower_expr(t->c[0]); return; }
@@ -465,6 +464,7 @@ static void lower_fnc(const tree_t *t)
 
 static void lower_idx(const tree_t *t)
 {
+    ICN_BB_EVAL(t);
     for (int i = 0; i < t->n; i++) lower_expr(t->c[i]);
     sm_emit_si(g_p, SM_CALL_FN, "IDX", (int64_t)t->n);
 }
@@ -569,6 +569,7 @@ static void lower_swap(const tree_t *t)
 
 static void lower_comp(const tree_t *t, sm_opcode_t op)
 {
+    ICN_BB_EVAL(t);
     lower_expr(T0(t)); lower_expr(T1(t));
     sm_emit_i(g_p, op, (int64_t)t->t);
 }
@@ -579,6 +580,7 @@ static void lower_lcomp(const tree_t *t) { lower_comp(t, SM_LCOMP); }
 
 static void lower_lconcat(const tree_t *t)
 {
+    ICN_BB_EVAL(t);
     int has_gen = 0;
     for (int i = 0; i < t->n && !has_gen; i++)
         if (is_suspendable(t->c[i])) has_gen = 1;
@@ -588,24 +590,24 @@ static void lower_lconcat(const tree_t *t)
         for (int i = 1; i < t->n; i++) sm_emit(g_p, SM_CONCAT);
         return;
     }
-    if (g_lang == LANG_ICN) { fprintf(stderr, "BUG: Icon AST pump — kind %d\n", t->t); abort(); }
-    lower_unhandled(t);  /* non-ICN generative lconcat not yet migrated */
+    lower_unhandled(t);
 }
 
 /*── Unary Icon ops ──────────────────────────────────────────────────────────*/
 
-static void lower_nonnull (const tree_t *t) { lower_expr(T0(t)); sm_emit_si(g_p, SM_CALL_FN, "NONNULL",    1); }
-static void lower_null    (const tree_t *t) { lower_expr(T0(t)); sm_emit_si(g_p, SM_CALL_FN, "ICN_NULL",  1); }
-static void lower_size    (const tree_t *t) { lower_expr(T0(t)); sm_emit_si(g_p, SM_CALL_FN, "SIZE",      1); }
-static void lower_identical(const tree_t *t){ lower_expr(T0(t)); lower_expr(T1(t)); sm_emit_si(g_p, SM_CALL_FN, "IDENTICAL", 2); }
+static void lower_nonnull (const tree_t *t) { ICN_BB_EVAL(t); lower_expr(T0(t)); sm_emit_si(g_p, SM_CALL_FN, "NONNULL",    1); }
+static void lower_null    (const tree_t *t) { ICN_BB_EVAL(t); lower_expr(T0(t)); sm_emit_si(g_p, SM_CALL_FN, "ICN_NULL",  1); }
+static void lower_size    (const tree_t *t) { ICN_BB_EVAL(t); lower_expr(T0(t)); sm_emit_si(g_p, SM_CALL_FN, "SIZE",      1); }
+static void lower_identical(const tree_t *t){ ICN_BB_EVAL(t); lower_expr(T0(t)); lower_expr(T1(t)); sm_emit_si(g_p, SM_CALL_FN, "IDENTICAL", 2); }
 static void lower_random  (const tree_t *t)
 {
+    ICN_BB_EVAL(t);
     if (t->n >= 1) { lower_expr(T0(t)); sm_emit_si(g_p, SM_CALL_FN, "ICN_RANDOM", 1); }
     else           { sm_emit(g_p, SM_PUSH_NULL); }
 }
-
 static void lower_not(const tree_t *t)
 {
+    ICN_BB_EVAL(t);
     lower_expr(T0(t));
     int js = sm_emit_i(g_p, SM_JUMP_S, 0);
     sm_emit(g_p, SM_VOID_POP); sm_emit(g_p, SM_PUSH_NULL);
@@ -816,12 +818,13 @@ static void lower_record(const tree_t *t)
 
 static void lower_field(const tree_t *t)
 {
+    ICN_BB_EVAL(t);
     lower_expr(T0(t));
     sm_emit_s(g_p, SM_PUSH_LIT_S, t->v.sval ? t->v.sval : "");
     sm_emit_si(g_p, SM_CALL_FN, "FIELD_GET", 2);
 }
 
-static void lower_global(const tree_t *t) { (void)t; sm_emit(g_p, SM_PUSH_NULL); }
+static void lower_global(const tree_t *t) { ICN_BB_EVAL(t); (void)t; sm_emit(g_p, SM_PUSH_NULL); }
 
 static void lower_initial(const tree_t *t)
 {
@@ -1197,8 +1200,7 @@ static void lower_expr_inner(const tree_t *t)
     /* literals */
     case TT_QLIT:                             lower_strlit(t);        return;
     case TT_CSET: {
-        /* IJ-5: cset literals are sets — emit canonical sorted+dedup form
-         * IJ-15: use SM_PUSH_LIT_CS so sm_interp pushes CSETVAL, not plain DT_S */
+        if (g_lang == LANG_ICN) { sm_emit_i(g_p, SM_BB_EVAL, (int64_t)every_table_register((tree_t *)t)); return; }
         const char *raw = t->v.sval ? t->v.sval : "";
         const char *canon = icn_cset_canonical(raw);
         sm_emit_s(g_p, SM_PUSH_LIT_CS, canon);
@@ -1243,10 +1245,10 @@ static void lower_expr_inner(const tree_t *t)
     case TT_LLT: case TT_LLE: case TT_LGT: case TT_LGE: case TT_LEQ: case TT_LNE:
                                                lower_lcomp(t);         return;
     /* cset / list */
-    case TT_CSET_UNION: lower_expr(T0(t)); lower_expr(T1(t)); sm_emit_si(g_p, SM_CALL_FN, "++", 2); return;
-    case TT_CSET_DIFF:  lower_expr(T0(t)); lower_expr(T1(t)); sm_emit_si(g_p, SM_CALL_FN, "--", 2); return;
-    case TT_CSET_INTER: lower_expr(T0(t)); lower_expr(T1(t)); sm_emit_si(g_p, SM_CALL_FN, "**", 2); return;
-    case TT_CSET_COMPL: lower_expr(T0(t));                    sm_emit_si(g_p, SM_CALL_FN, "~", 1); return;
+    case TT_CSET_UNION: ICN_BB_EVAL(t); lower_expr(T0(t)); lower_expr(T1(t)); sm_emit_si(g_p, SM_CALL_FN, "++", 2); return;
+    case TT_CSET_DIFF:  ICN_BB_EVAL(t); lower_expr(T0(t)); lower_expr(T1(t)); sm_emit_si(g_p, SM_CALL_FN, "--", 2); return;
+    case TT_CSET_INTER: ICN_BB_EVAL(t); lower_expr(T0(t)); lower_expr(T1(t)); sm_emit_si(g_p, SM_CALL_FN, "**", 2); return;
+    case TT_CSET_COMPL: ICN_BB_EVAL(t); lower_expr(T0(t));                    sm_emit_si(g_p, SM_CALL_FN, "~", 1); return;
     /* IJ-15: above cases replace emit_push_expr fallback so sm_interp handles cset ops
      * via icn_try_call_builtin_by_name (++/--/**) and IJ-7 ~~.  Generative cset children
      * (e.g. ~~(A|B|C)) are rare and still handled by icn_runtime when they arise via BB. */
