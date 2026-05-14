@@ -678,6 +678,17 @@ static int g_flat_slot_count = 0;
 static char   g_flat_data_buf[FLAT_DATA_BUF_MAX];
 static size_t g_flat_data_len    = 0;
 static int    g_flat_data_active = 0;
+#define CHILD_CACHE_MAX 64
+static struct { PATND_t *key; bb_box_fn fn; } g_child_cache[CHILD_CACHE_MAX];
+static int g_child_cache_n = 0;
+static bb_box_fn child_cache_get(PATND_t *p) {
+    for (int i = 0; i < g_child_cache_n; i++)
+        if (g_child_cache[i].key == p) return g_child_cache[i].fn;
+    return NULL;
+}
+static void child_cache_put(PATND_t *p, bb_box_fn fn) {
+    if (g_child_cache_n < CHILD_CACHE_MAX) { g_child_cache[g_child_cache_n].key = p; g_child_cache[g_child_cache_n].fn = fn; g_child_cache_n++; }
+}
 static int    g_flat_data_any    = 0;
 static int    g_flat_data_just_closed = 0;
 static char   g_flat_data_pending_lbl[160] = "";
@@ -1344,6 +1355,42 @@ static void emit_flat_node(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fai
     case XBRKX: emit_bb_xbrkx       (p->STRVAL_fn ? p->STRVAL_fn : "", lbl_succ, lbl_fail, lbl_β); break;
     case XATP:  emit_bb_xatp        (p->STRVAL_fn, lbl_succ, lbl_fail, lbl_β); break;
     case XDSAR: emit_bb_xdsar       (p->STRVAL_fn, lbl_succ, lbl_fail, lbl_β); break;
+    case XARBN: {
+        PATND_t *ch = (p->nchildren > 0) ? p->children[0] : NULL;
+        bb_box_fn cfn = ch ? child_cache_get(ch) : NULL;
+        emit_bb_xarbn(cfn, lbl_succ, lbl_fail, lbl_β);
+        break;
+    }
+    case XFNME: {
+        PATND_t *ch = (p->nchildren > 0) ? p->children[0] : NULL;
+        bb_box_fn cfn = ch ? child_cache_get(ch) : NULL;
+        const char *vn = (p->var.v == DT_S || p->var.v == DT_SNUL || p->var.v == DT_N) ? p->var.s : VARVAL_fn(p->var);
+        void *z = bb_cap_new(cfn, NULL, vn, NULL, 1);
+        emit_bb_box_banner("CAP_IMM", vn ? vn : "");
+        if (IS_TEXT) { char zlbl[80]; emit_bb_rtcall_data(6, zlbl); emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 0, lbl_succ, lbl_fail); emit_label_define(lbl_β); emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 1, lbl_succ, lbl_fail); break; }
+        emit_seq_port_call((uint64_t)(uintptr_t)z, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 0, lbl_succ, lbl_fail);
+        emit_label_define(lbl_β);
+        emit_seq_port_call((uint64_t)(uintptr_t)z, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 1, lbl_succ, lbl_fail);
+        break;
+    }
+    case XNME: {
+        PATND_t *ch = (p->nchildren > 0) ? p->children[0] : NULL;
+        bb_box_fn cfn = ch ? child_cache_get(ch) : NULL;
+        const char *vn = (p->var.v == DT_S || p->var.v == DT_SNUL || p->var.v == DT_N) ? p->var.s : VARVAL_fn(p->var);
+        void *z = bb_cap_new(cfn, NULL, vn, NULL, 0);
+        emit_bb_box_banner("CAP_COND", vn ? vn : "");
+        if (IS_TEXT) { char zlbl[80]; emit_bb_rtcall_data(6, zlbl); emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 0, lbl_succ, lbl_fail); emit_label_define(lbl_β); emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 1, lbl_succ, lbl_fail); break; }
+        emit_seq_port_call((uint64_t)(uintptr_t)z, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 0, lbl_succ, lbl_fail);
+        emit_label_define(lbl_β);
+        emit_seq_port_call((uint64_t)(uintptr_t)z, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 1, lbl_succ, lbl_fail);
+        break;
+    }
+    case XCALLCAP: {
+        PATND_t *ch = (p->nchildren > 0) ? p->children[0] : NULL;
+        bb_box_fn cfn = ch ? child_cache_get(ch) : NULL;
+        emit_bb_xcallcap(cfn, p->STRVAL_fn, lbl_succ, lbl_fail, lbl_β);
+        break;
+    }
     default:
         emit_label_define_bb(lbl_β);
         emit_jmp_label(lbl_fail, JMP_JMP);
@@ -1356,7 +1403,6 @@ static int flat_is_eligible(PATND_t *p) {
     if (!p) return 1;
     if (p->kind == XVAR) return 0;
     if (p->kind == XCAT && p->nchildren > 2) return 0;
-    if (p->kind == XNME || p->kind == XFNME || p->kind == XARBN || p->kind == XCALLCAP || p->kind == XDSAR) return 0;
     for (int i = 0; i < p->nchildren; i++)
         if (!flat_is_eligible(p->children[i])) return 0;
     return 1;
@@ -1405,10 +1451,26 @@ static int emit_flat_body(PATND_t *p, const char *prefix, int text_externalise, 
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static int g_in_prebuild = 0;
+static void pre_build_children(PATND_t *p) {
+    if (!p) return;
+    if (p->kind == XARBN || p->kind == XNME || p->kind == XFNME || p->kind == XCALLCAP) {
+        PATND_t *ch = (p->nchildren > 0) ? p->children[0] : NULL;
+        if (ch && !child_cache_get(ch)) {
+            bb_box_fn fn = bb_build_flat(ch);
+            if (!fn) fn = bb_build_brokered(ch);
+            child_cache_put(ch, fn);
+        }
+        return;
+    }
+    for (int i = 0; i < p->nchildren; i++) pre_build_children(p->children[i]);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 bb_box_fn bb_build_flat(PATND_t *p) {
     if (!flat_is_eligible(p)) return NULL;
     bb_buf_t buf = bb_alloc(FLAT_BUF_MAX);
     if (!buf) return NULL;
+    if (!g_in_prebuild) { g_child_cache_n = 0; g_in_prebuild = 1; pre_build_children(p); g_in_prebuild = 0; }
     g_flat_slot_count = 0; g_flat_node_id = 0;
     emitter_init_binary(buf, FLAT_BUF_MAX);
     emit_flat_body(p, "pat_flat", 0, 0);
@@ -1422,6 +1484,7 @@ bb_box_fn bb_build_brokered(PATND_t *p) {
     if (!flat_is_eligible(p)) return NULL;
     bb_buf_t buf = bb_alloc(FLAT_BUF_MAX);
     if (!buf) return NULL;
+    if (!g_in_prebuild) { g_child_cache_n = 0; g_in_prebuild = 1; pre_build_children(p); g_in_prebuild = 0; }
     g_flat_slot_count = 0; g_flat_node_id = 0;
     emit_mode_set(EMIT_BINARY_BROKERED, NULL);
     emitter_init_binary(buf, FLAT_BUF_MAX);
