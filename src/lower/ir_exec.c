@@ -19,6 +19,7 @@ extern int         Ω;
 extern int         Σlen;
 /* NV_SET_fn for conditional/immediate capture assignment (IR_PAT_ASSIGN_*). */
 #include "snobol4.h"
+#include "lower_icn.h"
 extern void bb_exec_stmt(void *e);
 /* descr_match_span: construct DT_S match descriptor from (base, len). */
 #include "bb_box.h"
@@ -436,6 +437,27 @@ IR_t * IR_exec_node(IR_t * nd) {
         ch[1] = '\0';
         nd->value = (DESCR_t){ .v = DT_S, .slen = 1, .s = ch };
         return nd->γ;
+    }
+    case IR_ICN_ALTERNATE: {
+        icn_alt_dcg_t *z = (icn_alt_dcg_t *)nd->opaque;
+        if (!z) { nd->value = FAILDESCR; return nd->ω; }
+        if (nd->state == 0) {
+            z->which = 0;
+            DESCR_t v = z->gen[0].fn(z->gen[0].ζ, α);
+            if (!IS_FAIL_fn(v)) { nd->value = v; nd->state = 1; return nd->γ; }
+            z->which = 1;
+            DESCR_t v2 = z->gen[1].fn(z->gen[1].ζ, α);
+            if (!IS_FAIL_fn(v2)) { nd->value = v2; nd->state = 1; return nd->γ; }
+            nd->value = FAILDESCR; return nd->ω;
+        }
+        DESCR_t v = z->gen[z->which].fn(z->gen[z->which].ζ, β);
+        if (!IS_FAIL_fn(v)) { nd->value = v; return nd->γ; }
+        if (z->which == 0) {
+            z->which = 1;
+            DESCR_t v2 = z->gen[1].fn(z->gen[1].ζ, α);
+            if (!IS_FAIL_fn(v2)) { nd->value = v2; return nd->γ; }
+        }
+        nd->state = 0; nd->value = FAILDESCR; return nd->ω;
     }
     case IR_ICN_EVERY: {
         bb_node_t *gen = (bb_node_t *)nd->opaque;

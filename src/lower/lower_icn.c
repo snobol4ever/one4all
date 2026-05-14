@@ -115,3 +115,24 @@ IR_block_t *lower_icn_iterate(const char *str, int64_t len) {
     cfg->entry = nd;
     return cfg;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* lower_icn_alternate — DCG for (A|B) alternate generator.
+ * Single node; opaque=icn_alt_dcg_t*{gen[2],which}.
+ * state 0=α(fresh): try left α then right α. state 1=β: pump current; fallthrough to right. */
+IR_block_t *lower_icn_alternate(bb_node_t left, bb_node_t right) {
+    IR_block_t *cfg = IR_alloc(4, IR_LANG_ICN);
+    if (!cfg) return NULL;
+    IR_t *nd = IR_node_alloc(cfg, IR_ICN_ALTERNATE);
+    if (!nd) return NULL;
+    icn_alt_dcg_t *z = calloc(1, sizeof(*z));
+    z->gen[0] = left;
+    z->gen[1] = right;
+    z->which  = 0;
+    nd->opaque = (void *)z;
+    nd->α = nd;
+    nd->β = nd;
+    nd->γ = NULL;
+    nd->ω = NULL;
+    cfg->entry = nd;
+    return cfg;
+}

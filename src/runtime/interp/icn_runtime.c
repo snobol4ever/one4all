@@ -1323,18 +1323,19 @@ bb_node_t icn_bb_build(tree_t *e) {
          * so that exhausting each branch naturally falls through to the next. */
         bb_node_t acc;
         {
-            icn_alternate_state_t *z = calloc(1, sizeof(*z));
-            z->gen[0] = icn_bb_build(e->c[0]);
-            z->gen[1] = icn_bb_build(e->c[1]);
-            z->which  = 0;
-            acc = (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
+            bb_node_t left  = icn_bb_build(e->c[0]);
+            bb_node_t right = icn_bb_build(e->c[1]);
+            IR_block_t *cfg = lower_icn_alternate(left, right);
+            icn_dcg_state_t *dz = calloc(1, sizeof(*dz));
+            dz->cfg = cfg; dz->first = 1;
+            acc = (bb_node_t){ icn_bb_dcg, dz, 0 };
         }
         for (int _ai = 2; _ai < e->n; _ai++) {
-            icn_alternate_state_t *z2 = calloc(1, sizeof(*z2));
-            z2->gen[0] = acc;
-            z2->gen[1] = icn_bb_build(e->c[_ai]);
-            z2->which  = 0;
-            acc = (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
+            bb_node_t right2 = icn_bb_build(e->c[_ai]);
+            IR_block_t *cfg2 = lower_icn_alternate(acc, right2);
+            icn_dcg_state_t *dz2 = calloc(1, sizeof(*dz2));
+            dz2->cfg = cfg2; dz2->first = 1;
+            acc = (bb_node_t){ icn_bb_dcg, dz2, 0 };
         }
         return acc;
     }
