@@ -1088,6 +1088,23 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             break;
         }
 
+        /* LR-3: SM_EXEC_GEN stub handler (GOAL-LOWER-REDESIGN).
+         * a[0].ptr = ir_graph_t*. Nothing emits this yet.
+         * Replace body with ir_exec_once(cfg) when ir_exec.c lands (LR-2). */
+        case SM_EXEC_GEN: {
+            st->last_ok = 0;
+            sm_push(st, FAILDESCR);
+            break;
+        }
+        /* LR-3: SM_PUMP_GEN stub handler (GOAL-LOWER-REDESIGN).
+         * a[0].ptr = ir_graph_t*, a[1].i = body entry_pc. Nothing emits this yet.
+         * Replace body with ir_exec_pump(cfg, body_fn) when ir_exec.c lands (LR-2). */
+        case SM_PUMP_GEN: {
+            st->last_ok = 0;
+            sm_push(st, FAILDESCR);
+            break;
+        }
+
         /* CHUNKS-step17i-suspend: yield primitive for `suspend E [do body]`.
          *
          * Pops one value (the yield value) from the SM stack.  If we're

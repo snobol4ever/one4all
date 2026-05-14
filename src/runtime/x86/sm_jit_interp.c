@@ -1026,6 +1026,8 @@ static void init_handler_table(void)
     g_handlers[SM_ICMP_LT]      = h_icmp_lt;
     g_handlers[SM_LOAD_FRAME]   = h_load_frame;
     g_handlers[SM_STORE_FRAME]  = h_store_frame;
+    g_handlers[SM_EXEC_GEN]     = NULL;   /* LR-3: stub */
+    g_handlers[SM_PUMP_GEN]     = NULL;   /* LR-3: stub */
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
 static uint8_t **g_blob_addrs = NULL;
