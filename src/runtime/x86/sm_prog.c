@@ -173,7 +173,7 @@ void sm_stno_label_record(SM_Program *p, int stno, const char *label)
 static const char *opnames[SM_OPCODE_COUNT] = {
     "SM_LABEL","SM_JUMP","SM_JUMP_S","SM_JUMP_F","SM_HALT",
     "SM_STNO",
-    "SM_PUSH_LIT_S","SM_PUSH_LIT_I","SM_PUSH_LIT_F","SM_PUSH_NULL","SM_PUSH_NULL_NOFLIP",
+    "SM_PUSH_LIT_S","SM_PUSH_LIT_CS","SM_PUSH_LIT_I","SM_PUSH_LIT_F","SM_PUSH_NULL","SM_PUSH_NULL_NOFLIP",
     "SM_PUSH_VAR","SM_PUSH_EXPR","SM_PUSH_EXPRESSION","SM_CALL_EXPRESSION","SM_STORE_VAR","SM_VOID_POP",
     "SM_ADD","SM_SUB","SM_MUL","SM_DIV","SM_EXP","SM_MOD","SM_CONCAT","SM_COERCE_NUM","SM_NEG",
     "SM_PAT_LIT","SM_PAT_ANY","SM_PAT_NOTANY","SM_PAT_SPAN","SM_PAT_BREAK",
@@ -217,6 +217,7 @@ void sm_prog_print(const SM_Program *p, FILE *out)
         switch (in->op) {
             /* string operands */
             case SM_PUSH_LIT_S:
+            case SM_PUSH_LIT_CS:  /* IJ-15: cset literal, same string operand format */
             case SM_PAT_LIT:
             case SM_PAT_ANY: case SM_PAT_NOTANY:
             case SM_PAT_SPAN: case SM_PAT_BREAK:

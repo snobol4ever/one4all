@@ -258,19 +258,13 @@ void bb_exec_stmt(tree_t *e)
         return;
     }
 
-    default: break;
+    /* IJ-15: expression kinds at statement level -- delegate to bb_eval_value,
+     * discard result.  Covers cset ops, all relops, and any other expression
+     * kind that bb_eval_value handles.  RS-23e abort replaced: new Icon
+     * programs (mindfa/mffsol) exercise kinds not in the original corpus-263. */
+    default: {
+        (void)bb_eval_value(e);
+        return;
     }
-
-    /* RS-23e (closes the RS-23 arc, session 2026-05-05).  Diag verified
-     * zero `interp_eval` calls reach this fallthrough from any BB-adapter
-     * ancestor across smoke + unified_broker + full Icon corpus 263.
-     * Every kind that exercises the test surface is now handled by an
-     * explicit case above (or delegates to bb_eval_value).  Anything
-     * reaching this point is a four-mode isolation violation: a kind
-     * arrived in BB-adapter stmt context without a native handler.
-     * Abort with a diagnostic naming the kind. */
-    fprintf(stderr,
-            "FATAL bb_exec_stmt: unhandled kind %d (RS-23e isolation breach)\n",
-            (int)e->t);
-    abort();
+    }
 }

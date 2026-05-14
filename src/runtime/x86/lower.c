@@ -666,6 +666,10 @@ static void lower_augop(const tree_t *t)
         case TK_AUGSLE:  sm_emit_i(g_p, SM_LCOMP, TT_LLE); emit_augop_store(lslot, is_kw, lname); return;
         case TK_AUGSGT:  sm_emit_i(g_p, SM_LCOMP, TT_LGT); emit_augop_store(lslot, is_kw, lname); return;
         case TK_AUGSGE:  sm_emit_i(g_p, SM_LCOMP, TT_LGE); emit_augop_store(lslot, is_kw, lname); return;
+        /* IJ-15: cset augmented ops — SM_CALL_FN dispatches to icn_try_call_builtin_by_name */
+        case TK_AUGCSET_UNION: sm_emit_si(g_p, SM_CALL_FN, "++", 2); emit_augop_store(lslot, is_kw, lname); return;
+        case TK_AUGCSET_DIFF:  sm_emit_si(g_p, SM_CALL_FN, "--", 2); emit_augop_store(lslot, is_kw, lname); return;
+        case TK_AUGCSET_INTER: sm_emit_si(g_p, SM_CALL_FN, "**", 2); emit_augop_store(lslot, is_kw, lname); return;
         default:
             sm_emit_i(g_p, SM_PUSH_LIT_I, (int64_t)op);
             sm_emit_si(g_p, SM_CALL_FN, "AUGOP", 3);
@@ -1196,10 +1200,11 @@ static void lower_expr_inner(const tree_t *t)
     /* literals */
     case TT_QLIT:                             lower_strlit(t);        return;
     case TT_CSET: {
-        /* IJ-5: cset literals are sets — emit canonical sorted+dedup form */
+        /* IJ-5: cset literals are sets — emit canonical sorted+dedup form
+         * IJ-15: use SM_PUSH_LIT_CS so sm_interp pushes CSETVAL, not plain DT_S */
         const char *raw = t->v.sval ? t->v.sval : "";
         const char *canon = icn_cset_canonical(raw);
-        sm_emit_s(g_p, SM_PUSH_LIT_S, canon);
+        sm_emit_s(g_p, SM_PUSH_LIT_CS, canon);
         return;
     }
     case TT_ILIT:                             lower_ilit(t);          return;
@@ -1241,8 +1246,13 @@ static void lower_expr_inner(const tree_t *t)
     case TT_LLT: case TT_LLE: case TT_LGT: case TT_LGE: case TT_LEQ: case TT_LNE:
                                                lower_lcomp(t);         return;
     /* cset / list */
-    case TT_CSET_COMPL: case TT_CSET_UNION: case TT_CSET_DIFF: case TT_CSET_INTER:
-                                               emit_push_expr(t);      return;
+    case TT_CSET_UNION: lower_expr(T0(t)); lower_expr(T1(t)); sm_emit_si(g_p, SM_CALL_FN, "++", 2); return;
+    case TT_CSET_DIFF:  lower_expr(T0(t)); lower_expr(T1(t)); sm_emit_si(g_p, SM_CALL_FN, "--", 2); return;
+    case TT_CSET_INTER: lower_expr(T0(t)); lower_expr(T1(t)); sm_emit_si(g_p, SM_CALL_FN, "**", 2); return;
+    case TT_CSET_COMPL: lower_expr(T0(t));                    sm_emit_si(g_p, SM_CALL_FN, "~", 1); return;
+    /* IJ-15: above cases replace emit_push_expr fallback so sm_interp handles cset ops
+     * via icn_try_call_builtin_by_name (++/--/**) and IJ-7 ~~.  Generative cset children
+     * (e.g. ~~(A|B|C)) are rare and still handled by coro_runtime when they arise via BB. */
     case TT_LCONCAT:                          lower_lconcat(t);       return;
     /* unary Icon */
     case TT_NONNULL:                          lower_nonnull(t);       return;

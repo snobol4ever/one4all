@@ -1747,7 +1747,11 @@ bb_node_t coro_eval(tree_t *e) {
         icn_iterate_state_t *z = calloc(1, sizeof(*z));
         if (!IS_FAIL_fn(sv) && sv.s) {
             z->str = sv.s;
-            z->len = sv.slen > 0 ? sv.slen : (long)strlen(sv.s);
+            /* IJ-15: CSETVAL uses slen=0xFFFFFFFF as sentinel — use strlen.
+             * Plain DT_S with explicit slen>0 uses that length. */
+            z->len = IS_CSET_fn(sv) ? (long)strlen(sv.s)
+                   : (sv.slen > 0 && sv.slen != 0xFFFFFFFFu) ? (long)sv.slen
+                   : (long)strlen(sv.s);
         }
         return (bb_node_t){ coro_bb_iterate, z, 0 };
     }

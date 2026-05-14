@@ -1345,6 +1345,7 @@ static void strtab_collect(const SM_Program *prog)
         const SM_Instr *ins = &prog->instrs[i];
         switch (ins->op) {
         case SM_PUSH_LIT_S:
+        case SM_PUSH_LIT_CS:  /* IJ-15: cset literal — same string storage as SM_PUSH_LIT_S */
         case SM_PUSH_VAR:
         case SM_STORE_VAR:
         case SM_PAT_LIT:
@@ -2110,6 +2111,7 @@ DESCR_t emit_walk_phase2(const SM_Program *prog,
         const SM_Instr *ins = &prog->instrs[pc];
         switch (ins->op) {
         case SM_PUSH_LIT_S:
+        case SM_PUSH_LIT_CS:  /* IJ-15: cset literal — treated as const string for simstack */
             simstack_push_const_s(&ss, ins->a[0].s ? ins->a[0].s : "");
             break;
         case SM_PUSH_LIT_I:
@@ -2682,6 +2684,7 @@ int emit_walk_codegen(SM_Program *prog, FILE *out, const char *src_path)
             case SM_PUSH_LIT_F:   rc = emit_sm_push_lit_f_dispatch(out, ins, pc);  break;
             case SM_PUSH_EXPR:    rc = emit_sm_push_expr_dispatch(out, ins, pc);   break;
             case SM_PUSH_LIT_S:   rc = emit_sm_push_lit_s_dispatch(out, ins, pc); break;
+            case SM_PUSH_LIT_CS:  rc = emit_sm_push_lit_s_dispatch(out, ins, pc); break; /* IJ-15: cset literal; x86 JIT uses same rt_push_str; CSETVAL distinction handled in sm_interp */
             case SM_PUSH_VAR:     rc = emit_sm_push_var_dispatch(out, ins, pc);   break;
             case SM_STORE_VAR:    rc = emit_sm_store_var_dispatch(out, ins, pc);  break;
             case SM_VOID_POP:          rc = emit_sm_pop(out, pc);             break;

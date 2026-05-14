@@ -29,6 +29,7 @@ typedef enum {
 
     /* Values */
     SM_PUSH_LIT_S,
+    SM_PUSH_LIT_CS,    /* IJ-15: push a cset literal — CSETVAL(canonical) */
     SM_PUSH_LIT_I,
     SM_PUSH_LIT_F,
     SM_PUSH_NULL,

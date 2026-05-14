@@ -462,6 +462,20 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         char *buf = GC_malloc(2); buf[0]=(char)(n&0xFF); buf[1]='\0';
         *out = STRVAL(buf); return 1;
     }
+    /* IJ-15: cset(x) — convert x to a cset value.
+     * string/cset -> CSETVAL of canonical (sorted+dedup) form.
+     * integer/real -> CSETVAL of decimal image treated as char set.
+     * Already-cset -> return unchanged. */
+    if (!strcmp(fn,"cset") && nargs == 1) {
+        DESCR_t av = args[0];
+        if (IS_CSET_fn(av)) { *out = av; return 1; }
+        char _cbuf[64];
+        const char *raw;
+        if (IS_INT_fn(av))       { snprintf(_cbuf,sizeof _cbuf,"%lld",(long long)av.i); raw=_cbuf; }
+        else if (IS_REAL_fn(av)) { real_str(av.r,_cbuf,sizeof _cbuf); raw=_cbuf; }
+        else { raw = VARVAL_fn(av); if (!raw) raw = ""; }
+        *out = CSETVAL(icn_cset_canonical(raw)); return 1;
+    }
     if (!strcmp(fn,"ord") && nargs == 1) {
         DESCR_t av = args[0];
         const char *s = VARVAL_fn(av); if (!s||!*s) { *out = FAILDESCR; return 1; }

@@ -340,6 +340,12 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             sm_push(st, d);
             break;
         }
+        case SM_PUSH_LIT_CS: {
+            /* IJ-15: cset literal — push as CSETVAL (slen=0xFFFFFFFF sentinel) */
+            const char *s = ins->a[0].s ? ins->a[0].s : "";
+            sm_push(st, CSETVAL(s));
+            break;
+        }
 
         case SM_PUSH_LIT_I:
             sm_push(st, INTVAL(ins->a[0].i));
@@ -1382,7 +1388,11 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 /* String / cset character iteration */
                 if (container.v == DT_S || container.v == DT_SNUL) {
                     const char *s = container.s ? container.s : "";
-                    long slen = container.slen > 0 ? (long)container.slen : (long)strlen(s);
+                    /* IJ-15: CSETVAL uses slen=0xFFFFFFFF as sentinel — use strlen for bounds.
+                     * Plain DT_S may have explicit slen>0 from SM_PUSH_LIT_S; fall back to strlen. */
+                    long slen = IS_CSET_fn(container) ? (long)strlen(s)
+                              : (container.slen > 0 && container.slen != 0xFFFFFFFFu) ? (long)container.slen
+                              : (long)strlen(s);
                     if (pos < slen) {
                         char *ch = GC_malloc(2); ch[0] = s[pos]; ch[1] = '\0';
                         result = (DESCR_t){ .v = DT_S, .slen = 1, .s = ch };
