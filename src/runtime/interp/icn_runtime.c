@@ -956,6 +956,16 @@ static DESCR_t icn_bb_revassign(void *zeta, int entry) {
                     subscript_set(base, idx, rv);
                 }
             }
+        } else if (lhs && lhs->t == TT_RANDOM && lhs->n >= 1) {
+            DESCR_t base = bb_eval_value(lhs->c[0]);
+            if (base.v == DT_DATA && base.u && base.u->type && base.u->type->nfields > 0 && base.u->fields) {
+                extern unsigned long bb_icn_rnd_seed;
+                bb_icn_rnd_seed = bb_icn_rnd_seed * 6364136223846793005UL + 1442695040888963407UL;
+                int fi = (int)((bb_icn_rnd_seed >> 33) % (unsigned long)base.u->type->nfields);
+                z->saved = base.u->fields[fi]; z->have_saved = 1;
+                z->cell = &base.u->fields[fi];
+                base.u->fields[fi] = rv;
+            }
         }
         return rv;
     }

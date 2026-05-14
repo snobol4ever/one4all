@@ -543,6 +543,23 @@ DESCR_t bb_eval_value(tree_t *e)
                     }
                 }
             }
+        } else if (lhs && lhs->t == TT_RANDOM && lhs->n >= 1) {
+            DESCR_t base = bb_eval_value(lhs->c[0]);
+            if (base.v == DT_DATA && base.u && base.u->type && base.u->type->nfields > 0 && base.u->fields) {
+                extern unsigned long bb_icn_rnd_seed;
+                bb_icn_rnd_seed = bb_icn_rnd_seed * 6364136223846793005UL + 1442695040888963407UL;
+                int fi = (int)((bb_icn_rnd_seed >> 33) % (unsigned long)base.u->type->nfields);
+                base.u->fields[fi] = val;
+            } else if (base.v == DT_T && base.tbl && base.tbl->size > 0) {
+                extern unsigned long bb_icn_rnd_seed;
+                bb_icn_rnd_seed = bb_icn_rnd_seed * 6364136223846793005UL + 1442695040888963407UL;
+                int target = (int)((bb_icn_rnd_seed >> 33) % (unsigned long)base.tbl->size);
+                int seen = 0;
+                for (int _b = 0; _b < TABLE_BUCKETS; _b++)
+                    for (TBPAIR_t *p = base.tbl->buckets[_b]; p; p = p->next)
+                        if (seen++ == target) { p->val = val; goto _random_lhs_done; }
+                _random_lhs_done:;
+            }
         }
         return val;
     }
