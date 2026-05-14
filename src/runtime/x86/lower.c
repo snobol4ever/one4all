@@ -33,6 +33,7 @@
 #include "../../frontend/snobol4/scrip_cc.h"
 #include "../ast/ast.h"
 #include "../../runtime/common/ast_clone.h"
+#include "lower_pat_dcg.h"         /* LR-S1: build ir_graph_t alongside pattern lowering */
 #include "../../runtime/interp/icn_runtime.h"
 #include "../../runtime/interp/pl_runtime.h"
 #include "../../frontend/icon/icon_lex.h"
@@ -1148,7 +1149,9 @@ void lower_stmt(const tree_t *s)
         else                       sm_emit_i(g_p, SM_PUSH_LIT_I, 0);
         const char *sname = (subject && (subject->t == TT_VAR
                               || subject->t == TT_KEYWORD)) ? subject->v.sval : NULL;
-        sm_emit_si(g_p, SM_EXEC_STMT, sname, (int64_t)has_eq);
+        /* LR-S1: build DCG alongside existing SM_PAT_* path (additive). */
+        ir_graph_t *pat_dcg = lower_pat_build_dcg(pattern);
+        sm_emit_sip(g_p, SM_EXEC_STMT, sname, (int64_t)has_eq, (void *)pat_dcg);
         goto emit_gotos;
     }
 

@@ -85,6 +85,7 @@ RT_PIC_SRCS := \
     $(RT)/x86/sm_interp.c \
     $(RT)/x86/lower.c \
     $(RT)/x86/lower_ctx.c \
+    $(RT)/x86/lower_pat_dcg.c \
     $(RT)/x86/sm_image.c \
     $(RT)/x86/sm_jit_interp.c \
     $(SRC)/runtime/interp/icon_gen.c \
@@ -274,6 +275,7 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/sm_interp.c  -o $(OBJ)/sm_interp.o
 	$(CC) $(CRT)   -c $(RT)/x86/lower.c      -o $(OBJ)/lower.o
 	$(CC) $(CRT)   -c $(RT)/x86/lower_ctx.c  -o $(OBJ)/lower_ctx.o
+	$(CC) $(CRT)   -c $(RT)/x86/lower_pat_dcg.c -o $(OBJ)/lower_pat_dcg.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_image.c   -o $(OBJ)/sm_image.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_jit_interp.c -o $(OBJ)/sm_jit_interp.o
 	$(CC) $(CRT)   -c $(RT)/x86/emit_sm.c -o $(OBJ)/emit_sm.o
