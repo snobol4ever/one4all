@@ -1109,6 +1109,20 @@ void emit_flat_box_banner(const char *kind, const char *args, const char *label_
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_flat_node(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
+static void emit_flat_xfnce(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β) {
+    if (p->nchildren == 0) { emit_bb_xfnce(lbl_succ, lbl_fail, lbl_β); return; }
+    int id = g_flat_node_id++;
+    bb_label_t child_γ, child_ω;
+    emit_label_initf(&child_γ, "xfnce%d_γ", id);
+    emit_label_initf(&child_ω, "xfnce%d_ω", id);
+    emit_flat_node(p->children[0], &child_γ, &child_ω, lbl_β);
+    emit_label_define_bb(&child_γ);
+    emit_jmp_label(lbl_succ, JMP_JMP);
+    emit_label_define_bb(&child_ω);
+    emit_jmp_label(lbl_fail, JMP_JMP);
+    emit_label_define_bb(lbl_β);
+    emit_jmp_label(lbl_fail, JMP_JMP);
+}
 static void emit_flat_xcat(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β) {
     int id = g_flat_node_id++;
     bb_label_t mid_γ, right_ω, left_β, right_β, xcat_ω;
@@ -1393,7 +1407,7 @@ static void emit_flat_node(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fai
     case XLNTH: emit_bb_xlnth       ((long long)p->num, lbl_succ, lbl_fail, lbl_β); break;
     case XTB:   emit_bb_xtb         ((long long)p->num, lbl_succ, lbl_fail, lbl_β); break;
     case XRTB:  emit_bb_xrtb        ((long long)p->num, lbl_succ, lbl_fail, lbl_β); break;
-    case XFNCE: emit_bb_xfnce       (lbl_succ, lbl_fail, lbl_β); break;
+    case XFNCE: emit_flat_xfnce     (p, lbl_succ, lbl_fail, lbl_β); break;
     case XFARB: emit_bb_xfarb       (lbl_succ, lbl_fail, lbl_β); break;
     case XSTAR: emit_bb_xstar       (lbl_succ, lbl_fail, lbl_β); break;
     case XBRKX: emit_bb_xbrkx       (p->STRVAL_fn ? p->STRVAL_fn : "", lbl_succ, lbl_fail, lbl_β); break;
