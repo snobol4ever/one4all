@@ -95,7 +95,6 @@ DESCR_t icn_bb_upto_subj(void *zeta, int entry);
 /*----------------------------------------------------------------------------------------------------------------------------
  * Box function declarations — implemented in icon_gen.c
  *--------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t icn_bb_to(void *zeta, int entry);
 DESCR_t icn_bb_to_by(void *zeta, int entry);
 DESCR_t icn_bb_iterate(void *zeta, int entry);
 DESCR_t icn_bb_tbl_iterate(void *zeta, int entry);
@@ -197,7 +196,6 @@ typedef struct {
     tree_t    *body;   /* may be NULL */
     int        started;
 } icn_every_state_t;
-DESCR_t icn_bb_every(void *zeta, int entry);
 
 /*----------------------------------------------------------------------------------------------------------------------------
  * icn_bb_mutual — TT_SEQ (Icon A & B) when B is also generative   IJ-12

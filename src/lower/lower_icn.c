@@ -40,3 +40,40 @@ IR_block_t *lower_icn_upto(const char *cset, const char *hay) {
     cfg->entry = nd;
     return cfg;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* lower_icn_to — DCG for (lo to hi) integer range generator.
+ * Single node; ival=lo, ival2=hi; counter=cur; state 0=α(fresh), 1=β(advance). */
+IR_block_t *lower_icn_to(int64_t lo, int64_t hi) {
+    IR_block_t *cfg = IR_alloc(4, IR_LANG_ICN);
+    if (!cfg) return NULL;
+    IR_t *nd = IR_node_alloc(cfg, IR_ICN_TO);
+    if (!nd) return NULL;
+    nd->ival    = lo;
+    nd->ival2   = hi;
+    nd->counter = lo;
+    nd->α = nd;
+    nd->β = nd;
+    nd->γ = NULL;
+    nd->ω = NULL;
+    cfg->entry = nd;
+    return cfg;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* lower_icn_every — DCG for (every gen [do body]).
+ * Single node; opaque=bb_node_t* gen box; sval2=tree_t* body (may be NULL).
+ * state 0=α(pump gen fresh), 1=β(pump gen next). */
+IR_block_t *lower_icn_every(bb_node_t *gen, void *body) {
+    if (!gen) return NULL;
+    IR_block_t *cfg = IR_alloc(4, IR_LANG_ICN);
+    if (!cfg) return NULL;
+    IR_t *nd = IR_node_alloc(cfg, IR_ICN_EVERY);
+    if (!nd) return NULL;
+    nd->opaque = (void *)gen;
+    nd->sval2  = (const char *)body;
+    nd->α = nd;
+    nd->β = nd;
+    nd->γ = NULL;
+    nd->ω = NULL;
+    cfg->entry = nd;
+    return cfg;
+}

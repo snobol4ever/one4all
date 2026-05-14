@@ -19,6 +19,7 @@ extern int         Ω;
 extern int         Σlen;
 /* NV_SET_fn for conditional/immediate capture assignment (IR_PAT_ASSIGN_*). */
 #include "snobol4.h"
+extern void bb_exec_stmt(void *e);
 /* descr_match_span: construct DT_S match descriptor from (base, len). */
 #include "bb_box.h"
 /*------------------------------------------------------------------------------------------------------------------------------------*/
@@ -404,6 +405,25 @@ IR_t * IR_exec_node(IR_t * nd) {
             }
         }
         nd->state = 0; nd->value = FAILDESCR; return nd->ω;
+    }
+    case IR_ICN_TO: {
+        if (nd->state == 0) nd->counter = nd->ival;
+        else nd->counter++;
+        nd->state = 1;
+        if (nd->counter > nd->ival2) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+        nd->value = INTVAL(nd->counter);
+        return nd->γ;
+    }
+    case IR_ICN_EVERY: {
+        bb_node_t *gen = (bb_node_t *)nd->opaque;
+        if (!gen) { nd->value = FAILDESCR; return nd->ω; }
+        int tick = (nd->state == 0) ? α : β;
+        nd->state = 1;
+        DESCR_t v = gen->fn(gen->ζ, tick);
+        if (IS_FAIL_fn(v)) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+        if (nd->sval2) bb_exec_stmt((void *)nd->sval2);
+        nd->value = v;
+        return nd->γ;
     }
     /*-- All other kinds: not yet implemented — return ω explicitly. ----------------------------------------*/
     default:

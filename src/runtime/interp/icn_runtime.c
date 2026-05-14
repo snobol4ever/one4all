@@ -23,6 +23,7 @@
 #include "coerce.h"
 #include "scan_builtins.h"
 #include "../../lower/ir_exec.h"
+#include "../../lower/lower_icn.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -430,7 +431,7 @@ DESCR_t proc_table_call(int pi, DESCR_t *args, int nargs)
  * icn_bb_build — U-17 (B-8): walk Icon IR node, return a drivable bb_node_t.
  *
  * Dispatch:
- *   TT_TO        → icn_bb_to      (icn_to_state_t:    lo/hi/cur)
+ *   TT_TO        → lower_icn_to   (IR_ICN_TO DCG: ival=lo, ival2=hi)
  *   TT_TO_BY     → icn_bb_to_by   (icn_to_by_state_t: lo/hi/step/cur)
  *   TT_ITERATE   → icn_bb_iterate  (icn_iterate_state_t: str/len/pos)
  *   TT_FNC (user proc) → icn_bb_suspend (coroutine wrapping coro_call)
@@ -702,30 +703,6 @@ typedef struct {
 } icn_fnc_multi_frag_t; /* IJ-CORO: orphan tail — will be cleaned */
 
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* icn_bb_every — TT_EVERY Byrd box.  Drives inner gen to exhaustion;
- * evaluates body tree_t* (via bb_exec_stmt) per successful tick.
- * If body == NULL, gen side-effects (e.g. write inside icn_bb_fnc) handle output.
- * alpha: reset gen box (pass alpha), pump first tick.
- * beta:  pump gen beta; if exhausted return FAILDESCR. */
-DESCR_t icn_bb_every(void *zeta, int entry) {
-    icn_every_state_t *z = (icn_every_state_t *)zeta;
-    if (!z) return FAILDESCR;
-    int tick = (entry == α) ? α : β;
-    DESCR_t v = z->gen.fn(z->gen.ζ, tick);
-    if (IS_FAIL_fn(v)) return FAILDESCR;
-    if (z->body) bb_exec_stmt(z->body);
-    return v;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* icn_bb_to — TT_TO Byrd box (lo to hi).  α: cur=lo; β: cur++.  ω when cur>hi. */
-DESCR_t icn_bb_to(void *zeta, int entry) {
-    icn_to_state_t *z = (icn_to_state_t *)zeta;
-    if (!z) return FAILDESCR;
-    if (entry == α) z->cur = z->lo;
-    else             z->cur++;
-    if (z->cur > z->hi) return FAILDESCR;
-    return INTVAL(z->cur);
-}
 /*============================================================================================================================
  * RK-18a: icn_bb_raku_array — Raku @array Byrd box  (for @arr -> $x)
  *
@@ -1192,10 +1169,12 @@ bb_node_t icn_bb_build(tree_t *e) {
         }
         DESCR_t lo_d = bb_eval_value(lo_expr);
         DESCR_t hi_d = bb_eval_value(hi_expr);
-        icn_to_state_t *z = calloc(1, sizeof(*z));
-        z->lo = IS_FAIL_fn(lo_d) ? 0 : lo_d.i;
-        z->hi = IS_FAIL_fn(hi_d) ? 0 : hi_d.i;
-        return (bb_node_t){ icn_bb_to, z, 0 };
+        int64_t lo = IS_FAIL_fn(lo_d) ? 0 : lo_d.i;
+        int64_t hi = IS_FAIL_fn(hi_d) ? 0 : hi_d.i;
+        IR_block_t *cfg = lower_icn_to(lo, hi);
+        icn_dcg_state_t *dz = calloc(1, sizeof(*dz));
+        dz->cfg = cfg; dz->first = 1;
+        return (bb_node_t){ icn_bb_dcg, dz, 0 };
     }
 
     /* ── TT_TO_BY: (lo to hi by step) ─────────────────────────────────────── */
@@ -1602,12 +1581,13 @@ bb_node_t icn_bb_build(tree_t *e) {
 
     /* ── IC-2b: TT_EVERY  (every gen [do body]) ──────────────────────────── */
     if (e->t == TT_EVERY && e->n >= 1) {
-        icn_every_state_t *z = calloc(1, sizeof(*z));
-        z->gen     = icn_bb_build(e->c[0]);
-        z->gen_ast = e->c[0];
-        z->body    = (e->n >= 2) ? e->c[1] : NULL;
-        z->started = 0;
-        return (bb_node_t){ icn_bb_every, z, 0 };
+        bb_node_t *gen = calloc(1, sizeof(*gen));
+        *gen = icn_bb_build(e->c[0]);
+        tree_t *body = (e->n >= 2) ? e->c[1] : NULL;
+        IR_block_t *cfg = lower_icn_every(gen, body);
+        icn_dcg_state_t *dz = calloc(1, sizeof(*dz));
+        dz->cfg = cfg; dz->first = 1;
+        return (bb_node_t){ icn_bb_dcg, dz, 0 };
     }
 
     /* ── IC-2b: TT_BANG_BINARY  (E1 ! E2) ────────────────────────────────── */
@@ -1668,11 +1648,12 @@ bb_node_t icn_bb_build(tree_t *e) {
             z->b_started = 0;
             return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
         }
-        icn_every_state_t *z = calloc(1, sizeof(*z));
-        z->gen     = icn_bb_build(e->c[0]);
-        z->gen_ast = e->c[0];
-        z->body    = e->c[1];
-        return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
+        bb_node_t *gen = calloc(1, sizeof(*gen));
+        *gen = icn_bb_build(e->c[0]);
+        IR_block_t *cfg = lower_icn_every(gen, e->c[1]);
+        icn_dcg_state_t *dz = calloc(1, sizeof(*dz));
+        dz->cfg = cfg; dz->first = 1;
+        return (bb_node_t){ icn_bb_dcg, dz, 0 };
     }
 
     /* ── TT_CSET_COMPL with generative child — ~~(A|B|C) maps complement over gen ── */

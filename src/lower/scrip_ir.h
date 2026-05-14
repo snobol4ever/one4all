@@ -103,6 +103,7 @@ typedef enum {
     /* ── Icon specific ────────────────────────────────────────────────────────────────────────── */
     IR_ICN_TO,          /* i to j — integer range generator; ival=lo, ival2=hi                   */
     IR_ICN_UPTO,        /* upto(cset,str) — positions where cset char appears; sval=cset,sval2=str */
+    IR_ICN_EVERY,       /* every gen [do body] — drives child bb_node_t via opaque; body in sval2 */
     IR_E_COUNT       /* sentinel — number of kinds                                             */
 } IR_e;
 
@@ -125,6 +126,8 @@ struct IR_t {
         const char   * sval;     /* LIT_S, VAR name, CALL name, charset                        */
     };
     const char   * sval2;       /* second string arg (IR_ICN_UPTO hay; others: NULL) — not reset by IR_reset */
+    int64_t        ival2;       /* second integer arg (IR_ICN_TO hi; others: 0) — not reset by IR_reset     */
+    void         * opaque;      /* opaque payload pointer — not reset by IR_reset (IR_ICN_EVERY child gen)  */
     DESCR_t        value;        /* current result value (live during ir_exec graph walk)       */
     int64_t        counter;      /* generative scratch: chars consumed, step position, etc.     */
     int            state;        /* executor state machine (0 = fresh)                          */
