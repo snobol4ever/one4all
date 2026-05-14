@@ -384,6 +384,27 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->value = NULVCL;
         return nd->γ;
     }
+    /*-- IR_ICN_UPTO: upto(cset, str) — generate positions where cset char appears (IJ-19-lower).
+     * state 0 = fresh (α): reset counter to 0, scan forward.
+     * state 1 = resumed (β): continue scanning from counter.
+     * nd->sval = cset; nd->value.s = hay; nd->value.slen = haylen.
+     * Returns 1-based position of next match, or ω. */
+    case IR_ICN_UPTO: {
+        if (nd->state == 0) nd->counter = 0;   /* α: start from beginning */
+        nd->state = 1;                           /* β path next time        */
+        const char *cset = nd->sval ? nd->sval : "";
+        const char *hay  = nd->value.s ? nd->value.s : "";
+        int slen = (int)nd->value.slen;
+        while (nd->counter < slen) {
+            char c = hay[nd->counter];
+            nd->counter++;
+            if (strchr(cset, c)) {
+                nd->value = INTVAL((int64_t)nd->counter);  /* 1-based */
+                return nd->γ;
+            }
+        }
+        nd->state = 0; nd->value = FAILDESCR; return nd->ω;
+    }
     /*-- All other kinds: not yet implemented — return ω explicitly. ----------------------------------------*/
     default:
         nd->value = FAILDESCR;

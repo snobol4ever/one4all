@@ -375,14 +375,14 @@ static inline void *icon_to_new(void)      { return calloc(1, sizeof(icn_to_stat
          emit_seq_port_call((uint64_t)(uintptr_t)_z, (rt_name), (uint64_t)(uintptr_t)(rt_fn_sym), 0, (s), (f)); \
          emit_label_define(b); \
          emit_seq_port_call((uint64_t)(uintptr_t)_z, (rt_name), (uint64_t)(uintptr_t)(rt_fn_sym), 1, (s), (f)); } while (0)
-void  emit_bb_icon_alt    (bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_ALT",     icon_alt_new(),          "icn_bb_alternate",  icn_bb_alternate,  icn_alternate_state_t,  s,f,b); }
-void  emit_bb_icon_bang   (bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_BANG",    icon_bang_new(),         "icn_bb_bang_binary",icn_bb_bang_binary,icn_bang_binary_state_t,s,f,b); }
-void  emit_bb_icon_every  (bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_EVERY",   icon_every_new(),        "icn_bb_every",      icn_bb_every,      icn_every_state_t,      s,f,b); }
-void  emit_bb_icon_iterate(bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_ITERATE", icon_iterate_new(),      "icn_bb_iterate",    icn_bb_iterate,    icn_iterate_state_t,    s,f,b); }
-void  emit_bb_icon_lconcat(bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_LCONCAT", icon_lconcat_new(),      "icn_bb_cat",        icn_bb_cat,        icn_cat_gen_state_t,    s,f,b); }
-void  emit_bb_icon_limit  (bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_LIMIT",   icon_limit_new(),        "icn_bb_limit",      icn_bb_limit,      icn_limit_state_t,      s,f,b); }
-void  emit_bb_icon_seq    (bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_SEQ",     icon_seq_new(),          "icn_bb_seq_expr",   icn_bb_seq_expr,   icn_seq_state_t,        s,f,b); }
-void  emit_bb_icon_to     (bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_TO",      icon_to_new(),           "icn_bb_to",         icn_bb_to,         icn_to_state_t,         s,f,b); }
+void  emit_bb_icon_alt    (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_box_banner("ICN_ALT_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void  emit_bb_icon_bang   (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_box_banner("ICN_BANG_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void  emit_bb_icon_every  (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_box_banner("ICN_EVERY_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void  emit_bb_icon_iterate(bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_box_banner("ICN_ITERATE_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void  emit_bb_icon_lconcat(bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_box_banner("ICN_LCONCAT_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void  emit_bb_icon_limit  (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_box_banner("ICN_LIMIT_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void  emit_bb_icon_seq    (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_box_banner("ICN_SEQ_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void  emit_bb_icon_to     (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_box_banner("ICN_TO_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
 static inline void *icon_to_by_new(void)       { return calloc(1, sizeof(icn_to_by_state_t)); }
 static inline void *icon_not_new(void)         { return calloc(1, sizeof(icn_not_state_t)); }
 static inline void *icon_repalt_new(void)      { return calloc(1, sizeof(icn_repalt_state_t)); }
@@ -391,21 +391,21 @@ static inline void *icon_until_gen_new(void)   { return calloc(1, sizeof(icn_unt
 static inline void *icon_repeat_gen_new(void)  { return calloc(1, sizeof(icn_repeat_state_t)); }
 static inline void *icon_case_gen_new(void)    { return calloc(1, sizeof(icn_case_state_t)); }
 static inline void *icon_compound_gen_new(void){ return calloc(1, sizeof(icn_compound_state_t)); }
-void  emit_bb_icon_to_by      (bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_TO_BY",   icon_to_by_new(),       "icn_bb_to_by",        icn_bb_to_by,        icn_to_by_state_t,       s,f,b); }
-void  emit_bb_icon_not        (bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_NOT",      icon_not_new(),         "icn_bb_not",          icn_bb_not,          icn_not_state_t,         s,f,b); }
-void  emit_bb_icon_repalt     (bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_REPALT",   icon_repalt_new(),      "icn_bb_repalt",       icn_bb_repalt,       icn_repalt_state_t,      s,f,b); }
-void  emit_bb_icon_while_gen  (bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_WHILE",    icon_while_gen_new(),   "icn_bb_while_gen",    icn_bb_while_gen,    icn_while_state_t,       s,f,b); }
-void  emit_bb_icon_until_gen  (bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_UNTIL",    icon_until_gen_new(),   "icn_bb_until_gen",    icn_bb_until_gen,    icn_until_state_t,       s,f,b); }
-void  emit_bb_icon_repeat_gen (bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_REPEAT",   icon_repeat_gen_new(),  "icn_bb_repeat_gen",   icn_bb_repeat_gen,   icn_repeat_state_t,      s,f,b); }
-void  emit_bb_icon_case_gen   (bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_CASE",     icon_case_gen_new(),    "icn_bb_case_gen",     icn_bb_case_gen,     icn_case_state_t,        s,f,b); }
-void  emit_bb_icon_compound_gen(bb_label_t *s, bb_label_t *f, bb_label_t *b){ ICN_EMIT2("ICN_COMPOUND", icon_compound_gen_new(),"icn_bb_compound_gen", icn_bb_compound_gen, icn_compound_state_t,    s,f,b); }
+void  emit_bb_icon_to_by      (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_box_banner("ICN_TO_BY_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void  emit_bb_icon_not        (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_box_banner("ICN_NOT_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void  emit_bb_icon_repalt     (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_box_banner("ICN_REPALT_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void  emit_bb_icon_while_gen  (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_box_banner("ICN_WHILE_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void  emit_bb_icon_until_gen  (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_box_banner("ICN_UNTIL_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void  emit_bb_icon_repeat_gen (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_box_banner("ICN_REPEAT_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void  emit_bb_icon_case_gen   (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_box_banner("ICN_CASE_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void  emit_bb_icon_compound_gen(bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_box_banner("ICN_COMPOUND_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
 /* IF-3: ICN_* batch C — two-path inline; _new() constructors already extern-declared above; no static inline needed. */
-void  emit_bb_icon_field_gen  (bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_FIELD_GEN", icon_field_gen_new(),   "icn_bb_field_gen",   icn_bb_field_gen,   icn_field_gen_state_t,   s,f,b); }
-void  emit_bb_icon_section_gen(bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_SECTION",   icon_section_gen_new(), "icn_bb_section_gen", icn_bb_section_gen, icn_section_gen_state_t, s,f,b); }
-void  emit_bb_icon_kw_gen     (bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_KW_GEN",    icon_kw_gen_new(),      "icn_bb_key_gen",     icn_bb_key_gen,     icn_kw_gen_state_t,      s,f,b); }
-void  emit_bb_icon_listcon_gen(bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_LISTCON",   icon_listcon_gen_new(), "icn_bb_listcon_gen", icn_bb_listcon_gen, icn_listcon_state_t,     s,f,b); }
-void  emit_bb_icon_proc_call  (bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_PROCCALL",  icon_proc_call_new(),   "icn_bb_proc_call",   icn_bb_proc_call,   icn_proc_call_state_t,   s,f,b); }
-void  emit_bb_icon_scan       (bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_SCAN",      icon_scan_gen_new(),    "icn_bb_scan_gen",    icn_bb_scan_gen,    icn_scan_gen_state_t,    s,f,b); }
+void  emit_bb_icon_field_gen  (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_box_banner("ICN_FIELD_GEN_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void  emit_bb_icon_section_gen(bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_box_banner("ICN_SECTION_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void  emit_bb_icon_kw_gen     (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_box_banner("ICN_KW_GEN_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void  emit_bb_icon_listcon_gen(bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_box_banner("ICN_LISTCON_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void  emit_bb_icon_proc_call  (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_box_banner("ICN_PROCCALL_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void  emit_bb_icon_scan       (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_box_banner("ICN_SCAN_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
 #undef ICN_NQ
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void  emit_bb_xarbn(bb_box_fn child_fn, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
@@ -1607,28 +1607,28 @@ int emit_bb_macro_library_to_path(const char *path) {
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 #define ICN_NQ(T) ((int)(((int)sizeof(T)+7)/8))
-void emit_bb_icon_noop   (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_NOOP",   icon_noop_new(),   "icn_bb_noop",   icn_bb_noop,   icn_noop_state_t,   s,f,b); }
-void emit_bb_icon_intlit (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_INTLIT", icon_intlit_new(), "icn_bb_intlit", icn_bb_intlit, icn_intlit_state_t, s,f,b); }
+void emit_bb_icon_noop   (bb_label_t *s,bb_label_t *f,bb_label_t *b) { emit_bb_box_banner("ICN_NOOP_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void emit_bb_icon_intlit (bb_label_t *s,bb_label_t *f,bb_label_t *b) { emit_bb_box_banner("ICN_INTLIT_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
 /* IF-4: ICN_* batch D — two-path inline; _new() constructors already extern-declared above. */
-void emit_bb_icon_reallit  (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_REALLIT",   icon_reallit_new(),   "icn_bb_reallit",   icn_bb_reallit,   icn_reallit_state_t,   s,f,b); }
-void emit_bb_icon_strlit   (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_STRLIT",    icon_strlit_new(),    "icn_bb_strlit",    icn_bb_strlit,    icn_strlit_state_t,    s,f,b); }
-void emit_bb_icon_csetlit  (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_CSETLIT",   icon_csetlit_new(),   "icn_bb_csetlit",   icn_bb_csetlit,   icn_csetlit_state_t,   s,f,b); }
-void emit_bb_icon_global   (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_GLOBAL",    icon_global_new(),    "icn_bb_global",    icn_bb_global,    icn_global_state_t,    s,f,b); }
-void emit_bb_icon_if       (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_IF",        icon_if_new(),        "icn_bb_if_bb",     icn_bb_if_bb,     icn_if_state_t,        s,f,b); }
-void emit_bb_icon_initial  (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_INITIAL",   icon_initial_new(),   "icn_bb_initial",   icn_bb_initial,   icn_initial_state_t,   s,f,b); }
-void emit_bb_icon_invocable(bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_INVOCABLE", icon_invocable_new(), "icn_bb_invocable", icn_bb_invocable, icn_invocable_state_t, s,f,b); }
-void emit_bb_icon_link     (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_LINK",      icon_link_new(),      "icn_bb_link",      icn_bb_link,      icn_link_state_t,      s,f,b); }
+void emit_bb_icon_reallit  (bb_label_t *s,bb_label_t *f,bb_label_t *b) { emit_bb_box_banner("ICN_REALLIT_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void emit_bb_icon_strlit   (bb_label_t *s,bb_label_t *f,bb_label_t *b) { emit_bb_box_banner("ICN_STRLIT_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void emit_bb_icon_csetlit  (bb_label_t *s,bb_label_t *f,bb_label_t *b) { emit_bb_box_banner("ICN_CSETLIT_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void emit_bb_icon_global   (bb_label_t *s,bb_label_t *f,bb_label_t *b) { emit_bb_box_banner("ICN_GLOBAL_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void emit_bb_icon_if       (bb_label_t *s,bb_label_t *f,bb_label_t *b) { emit_bb_box_banner("ICN_IF_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void emit_bb_icon_initial  (bb_label_t *s,bb_label_t *f,bb_label_t *b) { emit_bb_box_banner("ICN_INITIAL_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void emit_bb_icon_invocable(bb_label_t *s,bb_label_t *f,bb_label_t *b) { emit_bb_box_banner("ICN_INVOCABLE_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void emit_bb_icon_link     (bb_label_t *s,bb_label_t *f,bb_label_t *b) { emit_bb_box_banner("ICN_LINK_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
 /* IF-5: ICN_* batch E — two-path inline; _new() constructors already extern-declared above. */
-void emit_bb_icon_record   (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_RECORD",    icon_record_new(),    "icn_bb_record_bb", icn_bb_record_bb,  icn_record_state_t,    s,f,b); }
-void emit_bb_icon_return   (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_RETURN",    icon_return_new(),    "icn_bb_return_bb", icn_bb_return_bb,  icn_return_state_t,    s,f,b); }
-void emit_bb_icon_fail     (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_FAIL",      icon_fail_new(),      "icn_bb_fail_bb",   icn_bb_fail_bb,    icn_fail_state_t,      s,f,b); }
-void emit_bb_icon_unop     (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_UNOP",      icon_unop_new(),      "icn_bb_unop",      icn_bb_unop,       icn_unop_state_t,      s,f,b); }
-void emit_bb_icon_next     (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_NEXT",      icon_next_new(),      "icn_bb_next_bb",   icn_bb_next_bb,    icn_next_state_t,      s,f,b); }
-void emit_bb_icon_break    (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_BREAK",     icon_break_new(),     "icn_bb_break_bb",  icn_bb_break_bb,   icn_break_state_t,     s,f,b); }
-void emit_bb_icon_create   (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_CREATE",    icon_create_new(),    "icn_bb_create",    icn_bb_create,     icn_create_state_t,    s,f,b); }
-void emit_bb_icon_coexplist(bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_COEXPLIST", icon_coexplist_new(), "icn_bb_coexplist", icn_bb_coexplist,  icn_coexplist_state_t, s,f,b); }
-void emit_bb_icon_arglist  (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_ARGLIST",   icon_arglist_new(),   "icn_bb_arglist",   icn_bb_arglist,    icn_arglist_state_t,   s,f,b); }
-void emit_bb_icon_procdecl (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_PROCDECL",  icon_procdecl_new(),  "icn_bb_procdecl",  icn_bb_procdecl,   icn_procdecl_state_t,  s,f,b); }
-void emit_bb_icon_procbody (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_PROCBODY",  icon_procbody_new(),  "icn_bb_procbody",  icn_bb_procbody,   icn_procbody_state_t,  s,f,b); }
-void emit_bb_icon_proccode (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_PROCCODE",  icon_proccode_new(),  "icn_bb_proccode",  icn_bb_proccode,   icn_proccode_state_t,  s,f,b); }
+void emit_bb_icon_record   (bb_label_t *s,bb_label_t *f,bb_label_t *b) { emit_bb_box_banner("ICN_RECORD_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void emit_bb_icon_return   (bb_label_t *s,bb_label_t *f,bb_label_t *b) { emit_bb_box_banner("ICN_RETURN_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void emit_bb_icon_fail     (bb_label_t *s,bb_label_t *f,bb_label_t *b) { emit_bb_box_banner("ICN_FAIL_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void emit_bb_icon_unop     (bb_label_t *s,bb_label_t *f,bb_label_t *b) { emit_bb_box_banner("ICN_UNOP_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void emit_bb_icon_next     (bb_label_t *s,bb_label_t *f,bb_label_t *b) { emit_bb_box_banner("ICN_NEXT_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void emit_bb_icon_break    (bb_label_t *s,bb_label_t *f,bb_label_t *b) { emit_bb_box_banner("ICN_BREAK_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void emit_bb_icon_create   (bb_label_t *s,bb_label_t *f,bb_label_t *b) { emit_bb_box_banner("ICN_CREATE_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void emit_bb_icon_coexplist(bb_label_t *s,bb_label_t *f,bb_label_t *b) { emit_bb_box_banner("ICN_COEXPLIST_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void emit_bb_icon_arglist  (bb_label_t *s,bb_label_t *f,bb_label_t *b) { emit_bb_box_banner("ICN_ARGLIST_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void emit_bb_icon_procdecl (bb_label_t *s,bb_label_t *f,bb_label_t *b) { emit_bb_box_banner("ICN_PROCDECL_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void emit_bb_icon_procbody (bb_label_t *s,bb_label_t *f,bb_label_t *b) { emit_bb_box_banner("ICN_PROCBODY_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
+void emit_bb_icon_proccode (bb_label_t *s,bb_label_t *f,bb_label_t *b) { emit_bb_box_banner("ICN_PROCCODE_STUB", ""); emit_jmp(f, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
 #undef ICN_NQ

@@ -100,6 +100,9 @@ typedef enum {
     IR_PL_UNIFY,        /* unification                                                            */
     IR_PL_CUT,          /* !                                                                      */
     IR_PL_CALL,         /* call(Goal)                                                             */
+    /* ── Icon specific ────────────────────────────────────────────────────────────────────────── */
+    IR_ICN_TO,          /* i to j — integer range generator; ival=lo, ival2=hi                   */
+    IR_ICN_UPTO,        /* upto(cset,str) — positions where cset char appears; sval=cset,sval2=str */
     IR_E_COUNT       /* sentinel — number of kinds                                             */
 } IR_e;
 

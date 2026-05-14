@@ -34,6 +34,7 @@
 #include "../ast/ast.h"
 #include "ast_clone.h"
 #include "lower_pat_dcg.h"         /* LR-S1: build IR_block_t alongside pattern lowering */
+#include "lower_icn.h"             /* IJ-19-lower: Icon DCG builders */
 #include "../../runtime/interp/icn_runtime.h"
 #include "../../runtime/interp/pl_runtime.h"
 #include "../../frontend/icon/icon_lex.h"
@@ -454,6 +455,23 @@ static void lower_fnc(const tree_t *t)
         g_p->instrs[g_p->count - 1].op = SM_CALL_EXPRESSION;
         return;
     }
+
+    /* IJ-19-lower: upto(cset, str) with compile-time-constant scalar args →
+     * build DCG at lower time, emit SM_EXEC_BB(ptr). */
+    if (g_lang == LANG_ICN && t->v.sval && strcmp(t->v.sval, "upto") == 0
+            && nargs >= 2
+            && t->c[0] && t->c[0]->t == TT_QLIT
+            && t->c[1] && t->c[1]->t == TT_QLIT) {
+        const char *cset = t->c[0]->v.sval ? t->c[0]->v.sval : "";
+        const char *hay  = t->c[1]->v.sval ? t->c[1]->v.sval : "";
+        IR_block_t *cfg  = lower_icn_upto(cset, hay);
+        if (cfg) {
+            int idx = sm_emit(g_p, SM_EXEC_BB);
+            g_p->instrs[idx].a[0].ptr = cfg;
+            return;
+        }
+    }
+
     if (t->v.sval) { ICN_BB_EVAL(t); }
     /* Icon-style call: sval==NULL, children[0] is the callee name node. */
     if (!t->v.sval && nargs >= 1 && t->c[0] && t->c[0]->v.sval) {
