@@ -1932,7 +1932,12 @@ int kw_assign(const char *kw, DESCR_t val) {
     if (!strcmp(kw,"error"))  { g_icn_error  = to_int(val); return 1; }
     if (!strcmp(kw,"trace"))  { g_icn_trace  = to_int(val); return 1; }
     if (!strcmp(kw,"dump"))   { g_icn_dump   = to_int(val); return 1; }
-    if (!strcmp(kw,"random")) { g_icn_random = to_int(val); return 1; }
+    if (!strcmp(kw,"random")) {
+        g_icn_random = to_int(val);
+        /* IJ-16: sync BB/SM RNG seed so ?E after &random:=N uses the new seed */
+        bb_icn_rnd_seed = (unsigned long)g_icn_random;
+        return 1;
+    }
     /* Other keywords: silently accept (no write contract here) */
     return 1;
 }

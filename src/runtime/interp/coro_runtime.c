@@ -856,7 +856,7 @@ static DESCR_t coro_oneshot(void *zeta, int entry) {
  * rather than capturing it once at setup time.
  * β always returns FAILDESCR (scalar — one value per pump). */
 typedef struct { tree_t *expr; } icn_lazy_state_t;
-static DESCR_t icn_lazy_box(void *zeta, int entry) {
+DESCR_t icn_lazy_box(void *zeta, int entry) {
     if (entry != α) return FAILDESCR;
     icn_lazy_state_t *z = (icn_lazy_state_t *)zeta;
     DESCR_t v = bb_eval_value(z->expr);
@@ -2306,16 +2306,10 @@ bb_node_t coro_eval(tree_t *e) {
         return (bb_node_t){ icn_lazy_box, z, 0 };
     }
 
-    /* ── Fallback: lazy box — re-evaluates at pump time with frame live ──── */
-    /* Pre-computing at setup time (icn_oneshot) is wrong for expressions that
-     * read Icon frame locals (FRAME.env[]) or may fail (relational/identity ops):
-     * setup happens before the first pump, when the frame context may differ.
-     * icn_lazy_box re-evaluates bb_eval_value(e) on each α pump, so variable
-     * reads happen with the correct live frame.                              */
+    /* ── IJ-18..28: missing JCON BBs dispatched here before lazy fallback ── */
     {
-        icn_lazy_state_t *lz = calloc(1, sizeof(*lz));
-        lz->expr = e;
-        return (bb_node_t){ icn_lazy_box, lz, 0 };
+        extern bb_node_t coro_eval_missing(tree_t *e);
+        return coro_eval_missing(e);
     }
 }
 
