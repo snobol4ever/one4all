@@ -28,14 +28,13 @@
 #include <gc/gc.h>
 extern bb_node_t icn_bb_make_proc_box(tree_t *proc, DESCR_t *args, int nargs); /* IJ-CORO: replaces icn_bb_suspend */
 
-/* A0 — SCRIP_NO_AST_WALK tripwire guard.  Paste at top of every AST-walker
- * entry point.  Aborts only when SCRIP_NO_AST_WALK is set AND SM dispatch
- * is active — proving SM dispatch never reaches the AST walker.
- * Exception: g_ast_pump_active > 0 means an intentional icn_bb_build bridge
- * (SM_BB_PUMP_EVERY or similar) is on the call stack — permit icn_bb_build. */
+/* A0 — BB-only enforcement.  The header defines NO_AST_WALK_GUARD; this
+ * local copy (used before the header include pulled in the definition) is
+ * kept in sync.  Crashes unconditionally for Icon when SM dispatch is active
+ * and the AST walker is entered — no env var, no escape hatch. */
 #define NO_AST_WALK_GUARD(fn_name) \
-    do { if (g_sm_dispatch_active && !g_ast_pump_active && getenv("SCRIP_NO_AST_WALK")) { \
-        fprintf(stderr, "FATAL: " fn_name " reached from SM dispatch\n"); \
+    do { if (g_sm_dispatch_active && !g_ast_pump_active && g_lang == LANG_ICN) { \
+        fprintf(stderr, "FATAL: " fn_name " reached from SM dispatch (Icon BB incomplete)\n"); \
         abort(); \
     } } while (0)
 

@@ -169,16 +169,18 @@ int icn_kw_cset_len(const char *ptr);
 /* RS-23c: exported so icn_value.c / icn_stmt.c can use it in TT_EVERY handling. */
 tree_t *find_leaf_suspendable(tree_t *e);
 
-/* A0 — SCRIP_NO_AST_WALK tripwire.  Set to 1 while SM dispatch is active;
- * guards in icn_bb_build / interp_eval / etc. abort if the env var is set.
+/* A0 — BB-only enforcement for Icon.  When SM dispatch is active and Icon
+ * is the current language, any call into the AST walker / interp_eval is a
+ * bug — the BB graph must be complete.  Crash immediately so we fix the
+ * right thing instead of silently falling back to SM scalar evaluation.
  * g_ast_pump_active: re-entrant counter for intentional icn_bb_build bridges
- * (SM_BB_PUMP_EVERY and similar — exempts these from the tripwire). */
+ * (SM_BB_PUMP_EVERY and similar — exempts these from the check). */
 extern int g_sm_dispatch_active;
 extern int g_ast_pump_active;
 
 #define NO_AST_WALK_GUARD(fn_name) \
-    do { if (g_sm_dispatch_active && !g_ast_pump_active && getenv("SCRIP_NO_AST_WALK")) { \
-        fprintf(stderr, "FATAL: " fn_name " reached from SM dispatch\n"); \
+    do { if (g_sm_dispatch_active && !g_ast_pump_active && g_lang == LANG_ICN) { \
+        fprintf(stderr, "FATAL: " fn_name " reached from SM dispatch (Icon BB incomplete)\n"); \
         abort(); \
     } } while (0)
 
