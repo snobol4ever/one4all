@@ -296,9 +296,93 @@ void emit_bb_xstar(bb_label_t *s, bb_label_t *f, bb_label_t *b) {
     emit_label_define(b);
     emit_seq_port_call((uint64_t)(uintptr_t)bb_rem_new(), "rt_bb_rem", (uint64_t)(uintptr_t)rt_bb_rem, 1, s, f);
 }
-void  emit_bb_xlnth(long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful_int("LEN", (int)n, bb_len_new((int)n), "rt_bb_len", (uint64_t)(uintptr_t)rt_bb_len, s,f,b); }
-void  emit_bb_xrtb(long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful_int("RTAB", (int)n, bb_rtab_new((int)n), "rt_bb_rtab", (uint64_t)(uintptr_t)rt_bb_rtab, s,f,b); }
-void  emit_bb_xtb(long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful_int("TAB", (int)n, bb_tab_new((int)n), "rt_bb_tab", (uint64_t)(uintptr_t)rt_bb_tab, s,f,b); }
+/* SF-4: emit_bb_xlnth -- flat inline LEN(n) box. n baked at emit time. */
+/* α: if Δ+n > Σlen → ω; else Δ+=n → γ. β: → ω (positional, no re-entry). */
+void emit_bb_xlnth(long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
+    char nbuf[32]; snprintf(nbuf, sizeof(nbuf), "%d", (int)n);
+    emit_bb_box_banner("LEN", nbuf);
+    if (IS_TEXT) {
+        FILE *out = emit_outf();
+        bb3c_format(out, "", ".intel_syntax", "noprefix");
+        char narg[64]; snprintf(narg, sizeof(narg), "eax, dword ptr [rax]");
+        bb3c_format(out, "", "lea", "rax, [rip + Δ]");
+        bb3c_format(out, "", "mov", narg);
+        char addarg[64]; snprintf(addarg, sizeof(addarg), "eax, %d", (int)n);
+        bb3c_format(out, "", "add", addarg);
+        bb3c_format(out, "", "lea", "rcx, [rip + Σlen]");
+        bb3c_format(out, "", "cmp", "eax, dword ptr [rcx]");
+        char jmp_fail[128]; snprintf(jmp_fail, sizeof(jmp_fail), "%s", f->name);
+        bb3c_format(out, "", "jg",  jmp_fail);
+        bb3c_format(out, "", "lea", "rax, [rip + Δ]");
+        bb3c_format(out, "", "mov", "ecx, dword ptr [rax]");
+        char addarg2[64]; snprintf(addarg2, sizeof(addarg2), "ecx, %d", (int)n);
+        bb3c_format(out, "", "add", addarg2);
+        bb3c_format(out, "", "mov", "dword ptr [rax], ecx");
+        char jmp_succ[128]; snprintf(jmp_succ, sizeof(jmp_succ), "%s", s->name);
+        bb3c_format(out, "", "jmp", jmp_succ);
+        emit_label_define(b);
+        bb3c_format(out, "", "jmp", jmp_fail);
+        return;
+    }
+    emit_seq_port_call((uint64_t)(uintptr_t)bb_len_new((int)n), "rt_bb_len", (uint64_t)(uintptr_t)rt_bb_len, 0, s, f);
+    emit_label_define(b);
+    emit_seq_port_call((uint64_t)(uintptr_t)bb_len_new((int)n), "rt_bb_len", (uint64_t)(uintptr_t)rt_bb_len, 1, s, f);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* SF-4: emit_bb_xtb -- flat inline TAB(n) box. n baked at emit time. */
+/* α: if Δ > n → ω; else Δ=n → γ. β: → ω (positional, no re-entry). */
+void emit_bb_xtb(long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
+    char nbuf[32]; snprintf(nbuf, sizeof(nbuf), "%d", (int)n);
+    emit_bb_box_banner("TAB", nbuf);
+    if (IS_TEXT) {
+        FILE *out = emit_outf();
+        bb3c_format(out, "", ".intel_syntax", "noprefix");
+        bb3c_format(out, "", "lea", "rax, [rip + Δ]");
+        bb3c_format(out, "", "mov", "ecx, dword ptr [rax]");
+        char cmparg[64]; snprintf(cmparg, sizeof(cmparg), "ecx, %d", (int)n);
+        bb3c_format(out, "", "cmp", cmparg);
+        char jmp_fail[128]; snprintf(jmp_fail, sizeof(jmp_fail), "%s", f->name);
+        bb3c_format(out, "", "jg",  jmp_fail);
+        char movarg[64]; snprintf(movarg, sizeof(movarg), "dword ptr [rax], %d", (int)n);
+        bb3c_format(out, "", "mov", movarg);
+        char jmp_succ[128]; snprintf(jmp_succ, sizeof(jmp_succ), "%s", s->name);
+        bb3c_format(out, "", "jmp", jmp_succ);
+        emit_label_define(b);
+        bb3c_format(out, "", "jmp", jmp_fail);
+        return;
+    }
+    emit_seq_port_call((uint64_t)(uintptr_t)bb_tab_new((int)n), "rt_bb_tab", (uint64_t)(uintptr_t)rt_bb_tab, 0, s, f);
+    emit_label_define(b);
+    emit_seq_port_call((uint64_t)(uintptr_t)bb_tab_new((int)n), "rt_bb_tab", (uint64_t)(uintptr_t)rt_bb_tab, 1, s, f);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* SF-4: emit_bb_xrtb -- flat inline RTAB(n) box. n baked at emit time. */
+/* α: if Δ > Σlen-n → ω; else Δ=Σlen-n → γ. β: → ω (positional, no re-entry). */
+void emit_bb_xrtb(long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
+    char nbuf[32]; snprintf(nbuf, sizeof(nbuf), "%d", (int)n);
+    emit_bb_box_banner("RTAB", nbuf);
+    if (IS_TEXT) {
+        FILE *out = emit_outf();
+        bb3c_format(out, "", ".intel_syntax", "noprefix");
+        bb3c_format(out, "", "lea", "rax, [rip + Σlen]");
+        bb3c_format(out, "", "mov", "ecx, dword ptr [rax]");
+        char subarg[64]; snprintf(subarg, sizeof(subarg), "ecx, %d", (int)n);
+        bb3c_format(out, "", "sub", subarg);
+        bb3c_format(out, "", "lea", "rax, [rip + Δ]");
+        bb3c_format(out, "", "cmp", "ecx, dword ptr [rax]");
+        char jmp_fail[128]; snprintf(jmp_fail, sizeof(jmp_fail), "%s", f->name);
+        bb3c_format(out, "", "jl",  jmp_fail);
+        bb3c_format(out, "", "mov", "dword ptr [rax], ecx");
+        char jmp_succ[128]; snprintf(jmp_succ, sizeof(jmp_succ), "%s", s->name);
+        bb3c_format(out, "", "jmp", jmp_succ);
+        emit_label_define(b);
+        bb3c_format(out, "", "jmp", jmp_fail);
+        return;
+    }
+    emit_seq_port_call((uint64_t)(uintptr_t)bb_rtab_new((int)n), "rt_bb_rtab", (uint64_t)(uintptr_t)rt_bb_rtab, 0, s, f);
+    emit_label_define(b);
+    emit_seq_port_call((uint64_t)(uintptr_t)bb_rtab_new((int)n), "rt_bb_rtab", (uint64_t)(uintptr_t)rt_bb_rtab, 1, s, f);
+}
 void  emit_bb_icon_alt(bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_ALT", "", icon_alt_new(), "icn_bb_alternate", (uint64_t)(uintptr_t)icn_bb_alternate, s,f,b); }
 void  emit_bb_icon_bang(bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_BANG", "", icon_bang_new(), "icn_bb_bang_binary", (uint64_t)(uintptr_t)icn_bb_bang_binary, s,f,b); }
 void  emit_bb_icon_every(bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_EVERY", "", icon_every_new(), "icn_bb_every", (uint64_t)(uintptr_t)icn_bb_every, s,f,b); }
