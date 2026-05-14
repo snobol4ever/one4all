@@ -1027,7 +1027,7 @@ static int flat_is_eligible(PATND_t *p)
     if (!p) return 1;
     if (p->kind == XVAR) return 0;
     if (p->kind == XCAT && p->nchildren > 2) return 0;
-    if (p->kind == XNME || p->kind == XFNME || p->kind == XARBN || p->kind == XCALLCAP) return 0;
+    if (p->kind == XNME || p->kind == XFNME || p->kind == XARBN || p->kind == XCALLCAP || p->kind == XDSAR) return 0;
     for (int i = 0; i < p->nchildren; i++)
         if (!flat_is_eligible(p->children[i])) return 0;
     return 1;

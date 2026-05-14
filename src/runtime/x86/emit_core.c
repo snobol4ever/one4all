@@ -1067,7 +1067,8 @@ void emit_seq_cmp_delta_i(int n, bb_label_t *lbl_succ, bb_label_t *lbl_fail) {
 /*--------------------------------------------------------------------------------------------------------------------*/
 void emit_seq_cmp_siglen_delta(int n, uint64_t siglen_addr,
                                bb_label_t *lbl_succ, bb_label_t *lbl_fail) {
-    insn_mov_rcx_i64(siglen_addr);
+    if (IS_TEXT) emit_sym_lea_rcx("\xCE\xA3""len", siglen_addr);
+    else         insn_mov_rcx_i64(siglen_addr);
     insn_mov_eax_rcxmem();
     insn_sub_eax_i32((uint32_t)n);
     insn_mov_ecx_eax();
@@ -1079,7 +1080,8 @@ void emit_seq_cmp_siglen_delta(int n, uint64_t siglen_addr,
 /*--------------------------------------------------------------------------------------------------------------------*/
 void emit_seq_sigma_delta_rdi(uint64_t sigma_addr, uint64_t siglen_addr) {
     (void)siglen_addr;
-    insn_mov_rcx_i64(sigma_addr);
+    if (IS_TEXT) emit_sym_lea_rcx("\xCE\xA3", sigma_addr);
+    else         insn_mov_rcx_i64(sigma_addr);
     insn_mov_rax_rcxmem();
     insn_movsxd_rcx_r10mem();
     insn_lea_rax_rax_rcx();
@@ -1089,7 +1091,8 @@ void emit_seq_sigma_delta_rdi(uint64_t sigma_addr, uint64_t siglen_addr) {
 void emit_seq_bounds_len(int len, uint64_t siglen_addr, bb_label_t *lbl_fail) {
     insn_mov_eax_r10mem();
     insn_add_eax_i32((uint32_t)len);
-    insn_mov_rcx_i64(siglen_addr);
+    if (IS_TEXT) emit_sym_lea_rcx("\xCE\xA3""len", siglen_addr);
+    else         insn_mov_rcx_i64(siglen_addr);
     insn_cmp_eax_rcxmem();
     emit_jmp(lbl_fail, JMP_JG);
 }
