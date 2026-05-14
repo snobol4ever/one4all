@@ -1143,7 +1143,9 @@ bb_node_t coro_pump_proc_by_name(const char *name, DESCR_t *args, int nargs) {
     if (!name) return (bb_node_t){ NULL, NULL, 0 };
     for (int i = 0; i < proc_count; i++) {
         if (strcmp(proc_table[i].name, name) != 0) continue;
-        return icn_bb_make_proc_box(proc_table[i].proc, args, nargs);
+        icn_oneshot_state_t *oshot1 = calloc(1, sizeof(*oshot1));
+        oshot1->val = proc_table_call(i, args, nargs);
+        return (bb_node_t){ coro_oneshot, oshot1, 0 };
     }
     return (bb_node_t){ NULL, NULL, 0 };
 }
@@ -1236,7 +1238,9 @@ bb_node_t coro_eval(tree_t *e) {
                     /* RK-21: Build gather coroutine — store proc in ss->gather_proc so
                      * gather_trampoline can read it at makecontext time, bypassing
                      * the coro_stage global which may be overwritten before first α. */
-                    return icn_bb_make_proc_box(proc_table[pi].proc, NULL, 0);
+                    icn_oneshot_state_t *oshot2 = calloc(1, sizeof(*oshot2));
+                    oshot2->val = proc_table_call(pi, NULL, 0);
+                    return (bb_node_t){ coro_oneshot, oshot2, 0 };
                 }
             }
         }
@@ -1524,8 +1528,9 @@ bb_node_t coro_eval(tree_t *e) {
             DESCR_t *args = nargs > 0 ? calloc(nargs, sizeof(DESCR_t)) : NULL;
             for (int j = 0; j < nargs; j++)
                 args[j] = bb_eval_value(e->c[1+j]);
-            /* Allocate suspend state + stack */
-            return icn_bb_make_proc_box(proc_table[i].proc, args, nargs);
+            icn_oneshot_state_t *oshot3 = calloc(1, sizeof(*oshot3));
+            oshot3->val = proc_table_call(i, args, nargs);
+            return (bb_node_t){ coro_oneshot, oshot3, 0 };
         }
         /* ── TT_FNC upto(cset, scan_subject) — drive subject gen per subject ── */
         if (fn && strcmp(fn, "upto") == 0 && nargs >= 2 && is_suspendable(e->c[2])) {
