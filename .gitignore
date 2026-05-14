@@ -80,3 +80,4 @@ out/sm_phase2_sim_test
 /sm_macros.s
 # EM-7c-bb-macros: bb_macros.s is regenerated alongside each .s emit too.
 /bb_macros.s
+tmp1
