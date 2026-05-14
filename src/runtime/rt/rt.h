@@ -245,6 +245,7 @@ void rt_call(const char *name, int nargs);
  * Returns 1 if the return should execute (condition met), 0 if not (fall
  * through to next instruction). */
 int rt_do_return(int kind, int cond);
+int rt_do_nreturn(const char *fname, int cond);
 
 /* EM-7d-usercall-reentrant: native expression function pointer registry.
  *

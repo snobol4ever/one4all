@@ -697,8 +697,11 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
           macro_line(out, "", "call", ct); }
         macro_line(out, "", "test", "eax, eax");
         macro_line(out, "", "jz", ".Lretskip_\\pc");
+        macro_line(out, "", "cmp", "eax, 2");
+        macro_line(out, "", "je", ".Lchunkret_\\pc");
         macro_line(out, "", "mov", "rsp, rbp");
         macro_line(out, "", "pop", "rbp");
+        fprintf(out, ".Lchunkret_\\pc\\():\n");
         macro_line(out, "", "ret", "");
         fprintf(out, ".Lretskip_\\pc\\():\n");
         macro_line(out, "", ".endm", "");
@@ -908,6 +911,22 @@ int emit_sm_macro_library(FILE *out)
         "                        .macro           PUSH_REAL val\n"
         "                        movabs           rdi, \\val\n"
         "                        call             rt_push_real_bits@PLT\n"
+        "                        .endm\n"
+        "# NRETURN_VAR: hand-written — NRETURN with fname from NV; calls rt_do_nreturn(fname,cond)\n"
+        "# Returns: 0=don't fire, 1=fire+frame-restore, 2=fire+just-ret (inside chunk call)\n"
+        "                        .macro           NRETURN_VAR fname, cond, pc\n"
+        "                        lea              rdi, [rip + \\fname]\n"
+        "                        mov              esi, \\cond\n"
+        "                        call             rt_do_nreturn@PLT\n"
+        "                        test             eax, eax\n"
+        "                        jz               .Lretskip_\\pc\n"
+        "                        cmp              eax, 2\n"
+        "                        je               .Lchunkret_\\pc\n"
+        "                        mov              rsp, rbp\n"
+        "                        pop              rbp\n"
+        ".Lchunkret_\\pc\\():\n"
+        "                        ret\n"
+        ".Lretskip_\\pc\\():\n"
         "                        .endm\n",
         out) == EOF) return -1;
     if (fputs("# === END sm macro library ===\n", out) == EOF) return -1;
@@ -1035,6 +1054,20 @@ int emit_sm_ret_var(FILE *out, int kind, int cond, int pc, const char *anno)
     a.pc    = pc;
     a.anno  = anno;
     return emit_sm_template(out, sm_template_ret_var(), &a);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+int emit_sm_ret_nreturn(FILE *out, const char *fname_lbl, int cond, int pc, const char *anno)
+{
+    char col3[256];
+    if (anno && *anno)
+        snprintf(col3, sizeof(col3), "%s, %d, %d # %s", fname_lbl, cond, pc, anno);
+    else
+        snprintf(col3, sizeof(col3), "%s, %d, %d", fname_lbl, cond, pc);
+    {
+        const char *lbl = emit_sm_consume_pc_label();
+        bb3c_format(out, (lbl && *lbl) ? lbl : "", "NRETURN_VAR", col3);
+    }
+    return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_sm_unhandled(FILE *out, int op)
@@ -1923,6 +1956,22 @@ static int emit_sm_push_null_noflip_dispatch(FILE *out, int pc)
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static int emit_sm_neg_dispatch(FILE *out, int pc)
+{
+    (void)pc;
+    emit_mode_set(TEXT_MODE(), out);
+    emit_sm_neg();
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static int emit_sm_exp_dispatch(FILE *out, int pc)
+{
+    (void)pc;
+    emit_mode_set(TEXT_MODE(), out);
+    emit_sm_exp();
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_push_lit_f_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -1996,7 +2045,7 @@ static int emit_sm_call_legacy(FILE *out, const SM_Instr *ins, int pc)
                              lbl, nargs, anno);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_return_variant_dispatch(FILE *out, sm_opcode_t op, int pc)
+static int emit_sm_return_variant_dispatch(FILE *out, sm_opcode_t op, int pc, const SM_Program *prog)
 {
     int kind = 0;
     if (op == SM_FRETURN || op == SM_FRETURN_S || op == SM_FRETURN_F) kind = 1;
@@ -2004,6 +2053,20 @@ static int emit_sm_return_variant_dispatch(FILE *out, sm_opcode_t op, int pc)
     int cond = 0;
     if (op == SM_RETURN_S || op == SM_FRETURN_S || op == SM_NRETURN_S) cond = 1;
     if (op == SM_RETURN_F || op == SM_FRETURN_F || op == SM_NRETURN_F) cond = 2;
+    if (kind == 2 && prog) {
+        const char *fname = NULL;
+        for (int i = pc - 1; i >= 0 && !fname; i--) {
+            const SM_Instr *si = &prog->instrs[i];
+            if (si->op == SM_LABEL && si->a[2].i && si->a[0].s)
+                fname = si->a[0].s;
+        }
+        if (fname) {
+            char lbl[64];
+            strtab_label(lbl, sizeof(lbl), fname);
+            emit_mode_set(TEXT_MODE(), out);
+            return emit_sm_ret_nreturn(out, lbl, cond, pc, sm_opcode_name(op));
+        }
+    }
     return emit_sm_ret_var(out, kind, cond, pc, sm_opcode_name(op));
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -2748,6 +2811,8 @@ int emit_walk_codegen(SM_Program *prog, FILE *out, const char *src_path)
             case SM_PUSH_NULL:    rc = emit_sm_push_null_dispatch(out, pc);   break;
             case SM_PUSH_NULL_NOFLIP: rc = emit_sm_push_null_noflip_dispatch(out, pc); break;
             case SM_COERCE_NUM:   rc = emit_sm_coerce_num_dispatch(out, pc);  break;
+            case SM_NEG:          rc = emit_sm_neg_dispatch(out, pc);         break;
+            case SM_EXP:          rc = emit_sm_exp_dispatch(out, pc);         break;
             case SM_INCR:         rc = emit_sm_incr_dispatch(out, ins, pc);   break;
             case SM_DECR:         rc = emit_sm_decr_dispatch(out, ins, pc);   break;
             case SM_ACOMP:        rc = emit_sm_acomp_dispatch(out, ins, pc);  break;
@@ -2759,7 +2824,7 @@ int emit_walk_codegen(SM_Program *prog, FILE *out, const char *src_path)
             case SM_FRETURN_S:
             case SM_FRETURN_F:
             case SM_NRETURN_S:
-            case SM_NRETURN_F:    rc = emit_sm_return_variant_dispatch(out, ins->op, pc); break;
+            case SM_NRETURN_F:    rc = emit_sm_return_variant_dispatch(out, ins->op, pc, prog); break;
             case SM_STNO:         rc = emit_sm_stno_dispatch(out, ins, pc,
                                                     sl_loaded ? &sl : NULL); break;
             case SM_PAT_LIT:      rc = emit_sm_pat_lit_dispatch(out, ins, pc);     break;
