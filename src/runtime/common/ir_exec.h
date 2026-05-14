@@ -6,12 +6,12 @@
  *
  *   IR_exec_once(cfg)          — drive cfg from entry to first succ or fail.
  *                                Returns the value on succ; FAILDESCR on fail.
- *                                Used by SM_EXEC_DCG.
+ *                                Used by SM_EXEC_BB.
  *
  *   IR_exec_pump(cfg, body_fn, ctx) — drive cfg to exhaustion, calling body_fn
  *                                once per value produced.  Returns tick count
  *                                (number of values produced; 0 = always-fail).
- *                                Used by SM_PUMP_DCG.
+ *                                Used by SM_PUMP_BB.
  *
  * The executor is a pointer-chasing state machine: no label table, no symbol
  * lookup — port_succ / port_fail / port_resume are direct C pointers.

@@ -2,7 +2,7 @@
  * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6 (LR-0, 2026-05-14)
  *
  * Directed Cyclic Graph (DCG) for all goal-directed computation across all six languages.
- * Built at lower time; driven by ir_exec (ir_exec.h).  SM_EXEC_DCG(IR_prog_t*) is the
+ * Built at lower time; driven by ir_exec (ir_exec.h).  SM_EXEC_BB(IR_prog_t*) is the
  * sole SM→BB entry point.  Tree-shaped subgraphs serialise to SM arrays; cyclic subgraphs
  * (patterns, generators, choice points) route through ir_exec directly.
  *

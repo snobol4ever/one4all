@@ -1089,20 +1089,20 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             break;
         }
 
-        /* LR-2+LR-3: SM_EXEC_DCG -- drive IR_prog_t* once (GOAL-LOWER-REDESIGN).
+        /* LR-2+LR-3: SM_EXEC_BB -- drive IR_prog_t* once (GOAL-LOWER-REDESIGN).
          * a[0].ptr = IR_prog_t* (compile-time wired DCG).
          * Nothing emits this yet; handler is live for future LR-S1 emitters. */
-        case SM_EXEC_DCG: {
+        case SM_EXEC_BB: {
             IR_prog_t * cfg = (IR_t *)ins->a[0].ptr;
             DESCR_t _val = cfg ? IR_exec_once(cfg) : FAILDESCR;
             st->last_ok = !IS_FAIL_fn(_val);
             sm_push(st, _val);
             break;
         }
-        /* LR-2+LR-3: SM_PUMP_DCG -- drive IR_prog_t* to exhaustion (GOAL-LOWER-REDESIGN).
+        /* LR-2+LR-3: SM_PUMP_BB -- drive IR_prog_t* to exhaustion (GOAL-LOWER-REDESIGN).
          * a[0].ptr = IR_prog_t*, a[1].i = body entry_pc.
          * body_fn = NULL for now; tick count pushed as DT_I. */
-        case SM_PUMP_DCG: {
+        case SM_PUMP_BB: {
             IR_prog_t * cfg = (IR_t *)ins->a[0].ptr;
             int _ticks = cfg ? IR_exec_pump(cfg, NULL, NULL) : 0;
             st->last_ok = (_ticks > 0);
