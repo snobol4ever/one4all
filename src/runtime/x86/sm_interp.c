@@ -11,7 +11,7 @@
 #include "sm_interp.h"
 #include "sm_prog.h"
 #include "../../runtime/common/coerce.h"  /* shared_arith (F-1 RS-7) */
-#include "../../runtime/common/ir_exec.h"    /* ir_exec_once, ir_exec_pump (LR-2) */
+#include "../../runtime/common/ir_exec.h"    /* IR_exec_once, IR_exec_pump (LR-2) */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1089,22 +1089,22 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             break;
         }
 
-        /* LR-2+LR-3: SM_EXEC_DCG -- drive ir_graph_t* once (GOAL-LOWER-REDESIGN).
-         * a[0].ptr = ir_graph_t* (compile-time wired DCG).
+        /* LR-2+LR-3: SM_EXEC_DCG -- drive IR_t* once (GOAL-LOWER-REDESIGN).
+         * a[0].ptr = IR_t* (compile-time wired DCG).
          * Nothing emits this yet; handler is live for future LR-S1 emitters. */
         case SM_EXEC_DCG: {
-            ir_graph_t * cfg = (ir_graph_t *)ins->a[0].ptr;
-            DESCR_t _val = cfg ? ir_exec_once(cfg) : FAILDESCR;
+            IR_t * cfg = (IR_t *)ins->a[0].ptr;
+            DESCR_t _val = cfg ? IR_exec_once(cfg) : FAILDESCR;
             st->last_ok = !IS_FAIL_fn(_val);
             sm_push(st, _val);
             break;
         }
-        /* LR-2+LR-3: SM_PUMP_DCG -- drive ir_graph_t* to exhaustion (GOAL-LOWER-REDESIGN).
-         * a[0].ptr = ir_graph_t*, a[1].i = body entry_pc.
+        /* LR-2+LR-3: SM_PUMP_DCG -- drive IR_t* to exhaustion (GOAL-LOWER-REDESIGN).
+         * a[0].ptr = IR_t*, a[1].i = body entry_pc.
          * body_fn = NULL for now; tick count pushed as DT_I. */
         case SM_PUMP_DCG: {
-            ir_graph_t * cfg = (ir_graph_t *)ins->a[0].ptr;
-            int _ticks = cfg ? ir_exec_pump(cfg, NULL, NULL) : 0;
+            IR_t * cfg = (IR_t *)ins->a[0].ptr;
+            int _ticks = cfg ? IR_exec_pump(cfg, NULL, NULL) : 0;
             st->last_ok = (_ticks > 0);
             sm_push(st, INTVAL(_ticks));
             break;

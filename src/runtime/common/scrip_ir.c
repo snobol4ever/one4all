@@ -1,5 +1,5 @@
 /*
- * scrip_ir.c — Universal generator IR: ir_node_t / ir_graph_t alloc/free/reset/print (LR-0)
+ * scrip_ir.c — Universal generator IR: IR_node_t / IR_t alloc/free/reset/print (LR-0)
  * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6 (LR-0, 2026-05-14)
  */
 #include "scrip_ir.h"
@@ -20,15 +20,15 @@ static const char * kind_names[IR_KIND_COUNT] = {
     "IR_PL_CHOICE", "IR_PL_UNIFY", "IR_PL_CUT", "IR_PL_CALL"
 };
 /*------------------------------------------------------------------------------------------------------------------------------------*/
-const char * ir_kind_name(ir_kind_t k) {
+const char * IR_kind_name(IR_kind_t k) {
     if (k >= 0 && k < IR_KIND_COUNT) return kind_names[k];
     return "IR_UNKNOWN";
 }
 /*------------------------------------------------------------------------------------------------------------------------------------*/
-ir_graph_t * ir_graph_alloc(int max_nodes, int lang) {
-    ir_graph_t * cfg = calloc(1, sizeof(ir_graph_t));
+IR_t * IR_alloc(int max_nodes, int lang) {
+    IR_t * cfg = calloc(1, sizeof(IR_t));
     if (!cfg) return NULL;
-    cfg->all  = calloc((size_t)max_nodes, sizeof(ir_node_t *));
+    cfg->all  = calloc((size_t)max_nodes, sizeof(IR_node_t *));
     if (!cfg->all) { free(cfg); return NULL; }
     cfg->n    = 0;
     cfg->lang = lang;
@@ -36,8 +36,8 @@ ir_graph_t * ir_graph_alloc(int max_nodes, int lang) {
     return cfg;
 }
 /*------------------------------------------------------------------------------------------------------------------------------------*/
-ir_node_t * ir_alloc_node(ir_graph_t * cfg, ir_kind_t kind, int lang) {
-    ir_node_t * nd = calloc(1, sizeof(ir_node_t));
+IR_node_t * IR_node_alloc(IR_t * cfg, IR_kind_t kind, int lang) {
+    IR_node_t * nd = calloc(1, sizeof(IR_node_t));
     if (!nd) return NULL;
     nd->kind        = kind;
     nd->lang        = lang;
@@ -57,10 +57,10 @@ ir_node_t * ir_alloc_node(ir_graph_t * cfg, ir_kind_t kind, int lang) {
     return nd;
 }
 /*------------------------------------------------------------------------------------------------------------------------------------*/
-void ir_graph_reset(ir_graph_t * cfg) {
+void IR_reset(IR_t * cfg) {
     if (!cfg) return;
     for (int i = 0; i < cfg->n; i++) {
-        ir_node_t * nd = cfg->all[i];
+        IR_node_t * nd = cfg->all[i];
         if (!nd) continue;
         nd->value   = FAILDESCR;
         nd->counter = 0;
@@ -69,10 +69,10 @@ void ir_graph_reset(ir_graph_t * cfg) {
     }
 }
 /*------------------------------------------------------------------------------------------------------------------------------------*/
-void ir_graph_free(ir_graph_t * cfg) {
+void IR_free(IR_t * cfg) {
     if (!cfg) return;
     for (int i = 0; i < cfg->n; i++) {
-        ir_node_t * nd = cfg->all[i];
+        IR_node_t * nd = cfg->all[i];
         if (!nd) continue;
         free(nd->c);
         free(nd);
@@ -82,20 +82,20 @@ void ir_graph_free(ir_graph_t * cfg) {
 }
 /*------------------------------------------------------------------------------------------------------------------------------------*/
 /* Helper — print one port as "name=id" or "name=NULL". */
-static void print_port(FILE * fp, const char * label, const ir_node_t * nd) {
+static void print_port(FILE * fp, const char * label, const IR_node_t * nd) {
     if (nd) fprintf(fp, " %s=%d", label, nd->id);
     else    fprintf(fp, " %s=NULL", label);
 }
 /*------------------------------------------------------------------------------------------------------------------------------------*/
-void ir_graph_print(const ir_graph_t * cfg, FILE * fp) {
-    if (!cfg) { fprintf(fp, "(null ir_graph_t)\n"); return; }
+void IR_print(const IR_t * cfg, FILE * fp) {
+    if (!cfg) { fprintf(fp, "(null IR_t)\n"); return; }
     static const char * lang_names[] = { "?", "SNO", "SCO", "REB", "ICN", "PL", "RKU" };
     const char * lname = (cfg->lang >= 1 && cfg->lang <= 6) ? lang_names[cfg->lang] : "?";
-    fprintf(fp, "ir_graph_t lang=%s n=%d entry=%s\n", lname, cfg->n, cfg->entry ? "set" : "NULL");
+    fprintf(fp, "IR_t lang=%s n=%d entry=%s\n", lname, cfg->n, cfg->entry ? "set" : "NULL");
     for (int i = 0; i < cfg->n; i++) {
-        const ir_node_t * nd = cfg->all[i];
+        const IR_node_t * nd = cfg->all[i];
         if (!nd) continue;
-        fprintf(fp, "  [%d] %s gen=%d", nd->id, ir_kind_name(nd->kind), nd->generative);
+        fprintf(fp, "  [%d] %s gen=%d", nd->id, IR_kind_name(nd->kind), nd->generative);
         print_port(fp, "start",  nd->port_start);
         print_port(fp, "resume", nd->port_resume);
         print_port(fp, "succ",   nd->port_succ);
