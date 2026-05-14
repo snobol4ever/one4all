@@ -283,26 +283,20 @@ static int64_t vstack_pop_int64(void)
 static DESCR_t _rt_IDENT(DESCR_t *a, int n)
 {
     /* IDENT(x[,y]): succeed if x == y (or x is null-string when n==1).
-     * Returns NULVCL (empty string) on success — matches SPITBOL SIL ident()
-     * behaviour.  Returning a[0] was wrong: IDENT(bs,CHAR(8)) would push
-     * CHAR(8) onto the stack, corrupting downstream CONCAT results.
-     * 1-arg: use IS_NULL_fn so DATA/INTEGER/PATTERN values correctly
-     * count as non-null (mirrors DIFFER fix for tree_driver test 3). */
+     * Coerce via VARVAL_fn so integers compare by string representation.
+     * IDENT(2,1) → "2" vs "1" → fail; IDENT(2,2) → "2" vs "2" → succeed. */
     if (n == 1) return IS_NULL_fn(a[0]) ? NULVCL : FAILDESCR;
-    const char *s1 = (n >= 1 && a[0].v == DT_S) ? (a[0].s ? a[0].s : "") : "";
-    const char *s2 = (n >= 2 && a[1].v == DT_S) ? (a[1].s ? a[1].s : "") : "";
+    const char *s1 = VARVAL_fn(a[0]); if (!s1) s1 = "";
+    const char *s2 = VARVAL_fn(a[1]); if (!s2) s2 = "";
     return (strcmp(s1, s2) == 0) ? NULVCL : FAILDESCR;
 }
-
 static DESCR_t _rt_DIFFER(DESCR_t *a, int n)
 {
     /* DIFFER(x[,y]): succeed if x != y (or x is non-null when n==1).
-     * Returns NULVCL on success — same SPITBOL SIL convention as IDENT.
-     * 1-arg: use IS_NULL_fn so DATA/INTEGER/PATTERN values correctly
-     * count as non-null (tree_driver test 3: DIFFER(leaf) on a DATA node). */
+     * Coerce via VARVAL_fn so integers compare by string representation. */
     if (n == 1) return IS_NULL_fn(a[0]) ? FAILDESCR : NULVCL;
-    const char *s1 = (n >= 1 && a[0].v == DT_S) ? (a[0].s ? a[0].s : "") : "";
-    const char *s2 = (n >= 2 && a[1].v == DT_S) ? (a[1].s ? a[1].s : "") : "";
+    const char *s1 = VARVAL_fn(a[0]); if (!s1) s1 = "";
+    const char *s2 = VARVAL_fn(a[1]); if (!s2) s2 = "";
     return (strcmp(s1, s2) != 0) ? NULVCL : FAILDESCR;
 }
 
@@ -342,7 +336,20 @@ void rt_patch_cap_fn(void *cap_ptr, void *child_fn)
     void **fn_slot = (void **)cap_ptr;
     *fn_slot = child_fn;
 }
-
+extern cap_t *bb_cap_new(bb_box_fn child_fn, void *child_state, const char *varname, DESCR_t *var_ptr, int immediate);
+extern cap_t *bb_cap_new_call(bb_box_fn child_fn, void *child_state, const char *fnc_name, DESCR_t *fnc_args, int fnc_nargs, char **fnc_arg_names, int fnc_n_arg_names, int immediate);
+void rt_init_cap(void **slot_ptr, void *child_fn, const char *varname, int immediate)
+{
+    if (!slot_ptr || !child_fn) return;
+    cap_t *c = bb_cap_new((bb_box_fn)child_fn, NULL, varname, NULL, immediate);
+    *slot_ptr = c;
+}
+void rt_init_cap_call(void **slot_ptr, void *child_fn, const char *fnc_name)
+{
+    if (!slot_ptr || !child_fn) return;
+    cap_t *c = bb_cap_new_call((bb_box_fn)child_fn, NULL, fnc_name, NULL, 0, NULL, 0, 0);
+    *slot_ptr = c;
+}
 /* EM-7c-arbno: allocate a fresh arbno_t for a baked ARBNO blob.
  * bb_arbno_new is declared in bb_box.h via the opaque extern in emitter_bb_flat.c.
  * Here we call it directly since libscrip_rt.so links bb_boxes.c. */
@@ -1436,7 +1443,16 @@ typedef struct { bb_box_fn fn; void *state; int depth; int cap; rt_arbno_frame_t
 
 DESCR_t rt_bb_arbno(void *zeta, int port)
 {
-    rt_arbno_t *ζ = zeta;
+    /* In mode-4 TEXT path the .data slot holds a pointer to rt_arbno_t
+     * (set by rt_init_arbno at startup).  In binary mode zeta IS rt_arbno_t*.
+     * Detect by checking if the first word looks like a valid ptr (non-zero)
+     * whose content also looks like a valid rt_arbno_t (fn != NULL).
+     * Simpler: rt_init_arbno stores the ptr in slot[0]; check if *zeta is a
+     * non-null ptr and use double-deref. */
+    rt_arbno_t *ζ;
+    void *slot0 = *(void **)zeta;
+    if (slot0 && ((rt_arbno_t *)slot0)->stack) ζ = (rt_arbno_t *)slot0;
+    else ζ = (rt_arbno_t *)zeta;
     DESCR_t ARBNO; DESCR_t br; rt_arbno_frame_t *fr;
     if (port == 0) {
         ζ->depth = 0; fr = &ζ->stack[0];
@@ -1497,7 +1513,13 @@ static void rt_register_cap(cap_t *c);
 
 DESCR_t rt_bb_cap(void *zeta, int port)
 {
-    cap_t *ζ = zeta;
+    /* In mode-4 TEXT path the .data slot holds a cap_t* set by rt_init_cap.
+     * Detect: if the first word is a non-null pointer and looks like cap_t
+     * (fn non-null), use it as cap_t*; else treat zeta itself as cap_t*. */
+    cap_t *ζ;
+    void *slot0 = *(void **)zeta;
+    if (slot0 && ((cap_t *)slot0)->fn) ζ = (cap_t *)slot0;
+    else ζ = (cap_t *)zeta;
     DESCR_t cr;
     if (port == 0) {
         ζ->has_pending = 0;

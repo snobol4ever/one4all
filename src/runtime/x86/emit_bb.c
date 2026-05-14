@@ -326,6 +326,9 @@ void emit_bb_xrtb(long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
         bb3c_format(out, "", "jmp", jmp_fail);
     }
 }
+/* Forward declarations — defined later in this file */
+static void (*g_cap_fixup_cb)(void *cap_ptr, const char *child_α_label) = NULL;
+static const char *child_cache_get_lbl(bb_box_fn fn);
 /* IF-1: ICN_* batch A — two-path inline (emit_bb_icn_text_data + emit_seq_port_call_rip for TEXT; emit_seq_port_call for binary). */
 #define ICN_NQ(T) ((int)(((int)sizeof(T)+7)/8))
 static inline void *icon_alt_new(void)     { return calloc(1, sizeof(icn_alternate_state_t)); }
@@ -384,6 +387,8 @@ void  emit_bb_xarbn(bb_box_fn child_fn, bb_label_t *s, bb_label_t *f, bb_label_t
     emit_bb_box_banner("ARBNO", "");
     if (IS_TEXT) {
         char zlbl[80]; emit_bb_rtcall_data(6, zlbl);
+        const char *clbl = child_fn ? child_cache_get_lbl(child_fn) : NULL;
+        if (clbl && g_cap_fixup_cb) { char combo[160]; snprintf(combo, sizeof(combo), "%s|%s", zlbl, clbl); g_cap_fixup_cb((void*)2, combo); }
         emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_arbno", (uint64_t)(uintptr_t)rt_bb_arbno, 0, s, f);
         emit_label_define(b);
         emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_arbno", (uint64_t)(uintptr_t)rt_bb_arbno, 1, s, f);
@@ -497,6 +502,8 @@ void emit_bb_xcallcap(bb_box_fn child_fn, const char *fnc_name, bb_label_t *s, b
     emit_bb_box_banner("CALLCAP", fnc_name ? fnc_name : "");
     if (IS_TEXT) {
         char zlbl[80]; emit_bb_rtcall_data(6, zlbl);
+        const char *clbl = child_fn ? child_cache_get_lbl(child_fn) : NULL;
+        if (clbl && g_cap_fixup_cb) { char combo[320]; snprintf(combo, sizeof(combo), "%s|%s|%s|0|1", zlbl, clbl, fnc_name ? fnc_name : ""); g_cap_fixup_cb((void*)1, combo); }
         emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 0, s, f);
         emit_label_define(b);
         emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 1, s, f);
@@ -516,6 +523,8 @@ void emit_bb_xfnme(bb_box_fn child_fn, const char *varname, bb_label_t *s, bb_la
     emit_bb_box_banner("CAP_IMM", varname ? varname : "");
     if (IS_TEXT) {
         char zlbl[80]; emit_bb_rtcall_data(6, zlbl);
+        const char *clbl = child_fn ? child_cache_get_lbl(child_fn) : NULL;
+        if (clbl && g_cap_fixup_cb) { char combo[320]; snprintf(combo, sizeof(combo), "%s|%s|%s|1|0", zlbl, clbl, varname ? varname : ""); g_cap_fixup_cb((void*)1, combo); }
         emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 0, s, f);
         emit_label_define(b);
         emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 1, s, f);
@@ -531,6 +540,8 @@ void emit_bb_xnme(bb_box_fn child_fn, const char *varname, bb_label_t *s, bb_lab
     emit_bb_box_banner("CAP_COND", varname ? varname : "");
     if (IS_TEXT) {
         char zlbl[80]; emit_bb_rtcall_data(6, zlbl);
+        const char *clbl = child_fn ? child_cache_get_lbl(child_fn) : NULL;
+        if (clbl && g_cap_fixup_cb) { char combo[320]; snprintf(combo, sizeof(combo), "%s|%s|%s|0|0", zlbl, clbl, varname ? varname : ""); g_cap_fixup_cb((void*)1, combo); }
         emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 0, s, f);
         emit_label_define(b);
         emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 1, s, f);
@@ -679,15 +690,21 @@ static char   g_flat_data_buf[FLAT_DATA_BUF_MAX];
 static size_t g_flat_data_len    = 0;
 static int    g_flat_data_active = 0;
 #define CHILD_CACHE_MAX 64
-static struct { PATND_t *key; bb_box_fn fn; } g_child_cache[CHILD_CACHE_MAX];
+static struct { PATND_t *key; bb_box_fn fn; char text_lbl[80]; } g_child_cache[CHILD_CACHE_MAX];
 static int g_child_cache_n = 0;
 static bb_box_fn child_cache_get(PATND_t *p) {
-    for (int i = 0; i < g_child_cache_n; i++)
-        if (g_child_cache[i].key == p) return g_child_cache[i].fn;
+    for (int i = 0; i < g_child_cache_n; i++) if (g_child_cache[i].key == p) return g_child_cache[i].fn;
+    return NULL;
+}
+static const char *child_cache_get_lbl(bb_box_fn fn) {
+    for (int i = 0; i < g_child_cache_n; i++) if (g_child_cache[i].fn == fn && g_child_cache[i].text_lbl[0]) return g_child_cache[i].text_lbl;
     return NULL;
 }
 static void child_cache_put(PATND_t *p, bb_box_fn fn) {
-    if (g_child_cache_n < CHILD_CACHE_MAX) { g_child_cache[g_child_cache_n].key = p; g_child_cache[g_child_cache_n].fn = fn; g_child_cache_n++; }
+    if (g_child_cache_n < CHILD_CACHE_MAX) { g_child_cache[g_child_cache_n].key = p; g_child_cache[g_child_cache_n].fn = fn; g_child_cache[g_child_cache_n].text_lbl[0] = '\0'; g_child_cache_n++; }
+}
+static void child_cache_set_lbl(bb_box_fn fn, const char *lbl) {
+    for (int i = 0; i < g_child_cache_n; i++) if (g_child_cache[i].fn == fn) { snprintf(g_child_cache[i].text_lbl, 80, "%s", lbl ? lbl : ""); return; }
 }
 static int    g_flat_data_any    = 0;
 static int    g_flat_data_just_closed = 0;
@@ -763,7 +780,6 @@ static void data_buf_flush_pending_label(void) {
     g_flat_data_pending_lbl[0] = '\0';
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void (*g_cap_fixup_cb)(void *cap_ptr, const char *child_α_label) = NULL;
 void emit_flat_set_cap_fixup(void (*cb)(void *cap_ptr, const char *child_α_label)) { g_cap_fixup_cb = cb; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 #define SYM_SIGMA   "\xCE\xA3"
@@ -1504,6 +1520,11 @@ int emit_flat_build(PATND_t *p, FILE *out, const char *prefix) {
     emitter_end();
     bb3c_flush_pending();
     return rc;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+void emit_bb_register_child_label(PATND_t *p, const char *α_label) {
+    bb_box_fn fn = child_cache_get(p);
+    if (fn) child_cache_set_lbl(fn, α_label);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_flat_reset(void) { g_flat_slot_count = 0; g_flat_node_id = 0; }

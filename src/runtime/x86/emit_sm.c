@@ -1478,6 +1478,11 @@ static int emit_expression_registry(FILE *out, const SM_Program *prog)
 typedef struct {
     void       *cap_ptr;
     char        child_label[128];
+    char        data_label[128];
+    char        varname[128];
+    int         is_arbno;
+    int         is_callcap;
+    int         immediate;
 } cap_fixup_t;
 static cap_fixup_t g_cap_fixups[MAX_CAP_FIXUPS];
 static int         g_cap_fixups_n = 0;
@@ -1487,9 +1492,51 @@ static void cap_fixups_reset(void) { g_cap_fixups_n = 0; }
 static void cap_fixup_add(void *cap_ptr, const char *child_label)
 {
     if (g_cap_fixups_n >= MAX_CAP_FIXUPS) return;
-    g_cap_fixups[g_cap_fixups_n].cap_ptr = cap_ptr;
-    snprintf(g_cap_fixups[g_cap_fixups_n].child_label,
-             sizeof(g_cap_fixups[0].child_label), "%s", child_label);
+    cap_fixup_t *fx = &g_cap_fixups[g_cap_fixups_n];
+    fx->cap_ptr      = cap_ptr;
+    fx->data_label[0] = '\0';
+    fx->varname[0]    = '\0';
+    fx->is_arbno      = ((uintptr_t)cap_ptr == 2);
+    fx->is_callcap    = 0;
+    fx->immediate     = 0;
+    const char *pipe = child_label ? strchr(child_label, '|') : NULL;
+    if (pipe) {
+        int dlen = (int)(pipe - child_label);
+        if (dlen >= 128) dlen = 127;
+        memcpy(fx->data_label, child_label, dlen);
+        fx->data_label[dlen] = '\0';
+        const char *rest = pipe + 1;
+        const char *pipe2 = strchr(rest, '|');
+        if (pipe2) {
+            int clen = (int)(pipe2 - rest);
+            if (clen >= 128) clen = 127;
+            memcpy(fx->child_label, rest, clen);
+            fx->child_label[clen] = '\0';
+            /* remaining: "varname|immediate|is_callcap" */
+            rest = pipe2 + 1;
+            const char *pipe3 = strchr(rest, '|');
+            if (pipe3) {
+                int vlen = (int)(pipe3 - rest);
+                if (vlen >= 128) vlen = 127;
+                memcpy(fx->varname, rest, vlen);
+                fx->varname[vlen] = '\0';
+                rest = pipe3 + 1;
+                const char *pipe4 = strchr(rest, '|');
+                if (pipe4) {
+                    fx->immediate  = atoi(rest);
+                    fx->is_callcap = atoi(pipe4 + 1);
+                } else {
+                    fx->immediate = atoi(rest);
+                }
+            } else {
+                snprintf(fx->varname, sizeof(fx->varname), "%s", rest);
+            }
+        } else {
+            snprintf(fx->child_label, sizeof(fx->child_label), "%s", rest);
+        }
+    } else {
+        snprintf(fx->child_label, sizeof(fx->child_label), "%s", child_label ? child_label : "");
+    }
     g_cap_fixups_n++;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -1508,41 +1555,41 @@ static int emit_file_header(FILE *out, int count, int has_expression_registry)
         if (emit_three_column_line(out, "", "call", "rt_register_expressions@PLT", NULL) != 0) return -1;
     }
     for (int i = 0; i < g_cap_fixups_n; i++) {
-        const char *α = g_cap_fixups[i].child_label;
-        if ((uintptr_t)g_cap_fixups[i].cap_ptr == 1) {
-            char cap_lbl[128];
-            const char *p = α;
-            if (*p == '_') p++;
-            const char *underscore = strchr(p, '_');
-            int id_len = underscore ? (int)(underscore - p) : (int)strlen(p);
-            snprintf(cap_lbl, sizeof(cap_lbl), ".L%.*s_data", id_len, p);
-            char rdi_arg[128], rsi_arg[128];
-            snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", cap_lbl);
-            snprintf(rsi_arg, sizeof(rsi_arg), "rsi, [rip + %s]", α);
-            if (emit_three_column_line(out, "", "lea",  rdi_arg, NULL) != 0) return -1;
-            if (emit_three_column_line(out, "", "lea",  rsi_arg, NULL) != 0) return -1;
-            if (emit_three_column_line(out, "", "call", "rt_patch_cap_fn@PLT", NULL) != 0) return -1;
-        } else if ((uintptr_t)g_cap_fixups[i].cap_ptr == 2) {
-            char slot_lbl[128];
-            const char *p = α;
-            if (*p == '_') p++;
-            const char *underscore = strchr(p, '_');
-            int id_len = underscore ? (int)(underscore - p) : (int)strlen(p);
-            snprintf(slot_lbl, sizeof(slot_lbl), ".L%.*s_slot", id_len, p);
-            char rdi_arg[128], rsi_arg[128];
-            snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", slot_lbl);
-            snprintf(rsi_arg, sizeof(rsi_arg), "rsi, [rip + %s]", α);
-            if (emit_three_column_line(out, "", "lea",  rdi_arg, NULL) != 0) return -1;
-            if (emit_three_column_line(out, "", "lea",  rsi_arg, NULL) != 0) return -1;
+        const char *α     = g_cap_fixups[i].child_label;
+        const char *dlbl  = g_cap_fixups[i].data_label;
+        int         arbno     = g_cap_fixups[i].is_arbno;
+        int         is_call   = g_cap_fixups[i].is_callcap;
+        const char *varname   = g_cap_fixups[i].varname;
+        int         immediate = g_cap_fixups[i].immediate;
+        if (!α || !*α) continue;
+        if (!dlbl || !*dlbl) continue;
+        char rdi_arg[160], rsi_arg[160];
+        snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", dlbl);
+        snprintf(rsi_arg, sizeof(rsi_arg), "rsi, [rip + %s]", α);
+        if (emit_three_column_line(out, "", "lea",  rdi_arg, NULL) != 0) return -1;
+        if (emit_three_column_line(out, "", "lea",  rsi_arg, NULL) != 0) return -1;
+        if (arbno) {
             if (emit_three_column_line(out, "", "call", "rt_init_arbno@PLT", NULL) != 0) return -1;
+        } else if (is_call) {
+            if (varname && *varname) {
+                char vnlbl[128]; strtab_label(vnlbl, sizeof(vnlbl), varname);
+                char rdx_arg[160]; snprintf(rdx_arg, sizeof(rdx_arg), "rdx, [rip + %s]", vnlbl);
+                if (emit_three_column_line(out, "", "lea", rdx_arg, NULL) != 0) return -1;
+            } else {
+                if (emit_three_column_line(out, "", "xor", "edx, edx", NULL) != 0) return -1;
+            }
+            if (emit_three_column_line(out, "", "call", "rt_init_cap_call@PLT", NULL) != 0) return -1;
         } else {
-            char rdi_arg[64], rsi_arg[128];
-            snprintf(rdi_arg, sizeof(rdi_arg), "rdi, %llu",
-                     (unsigned long long)(uintptr_t)g_cap_fixups[i].cap_ptr);
-            snprintf(rsi_arg, sizeof(rsi_arg), "rsi, [rip + %s]", α);
-            if (emit_three_column_line(out, "", "movabs", rdi_arg, NULL) != 0) return -1;
-            if (emit_three_column_line(out, "", "lea",    rsi_arg, NULL) != 0) return -1;
-            if (emit_three_column_line(out, "", "call",   "rt_patch_cap_fn@PLT", NULL) != 0) return -1;
+            if (varname && *varname) {
+                char vnlbl[128]; strtab_label(vnlbl, sizeof(vnlbl), varname);
+                char rdx_arg[160]; snprintf(rdx_arg, sizeof(rdx_arg), "rdx, [rip + %s]", vnlbl);
+                if (emit_three_column_line(out, "", "lea", rdx_arg, NULL) != 0) return -1;
+            } else {
+                if (emit_three_column_line(out, "", "xor", "edx, edx", NULL) != 0) return -1;
+            }
+            char rcx_arg[32]; snprintf(rcx_arg, sizeof(rcx_arg), "ecx, %d", immediate);
+            if (emit_three_column_line(out, "", "mov", rcx_arg, NULL) != 0) return -1;
+            if (emit_three_column_line(out, "", "call", "rt_init_cap@PLT", NULL) != 0) return -1;
         }
     }
     if (emit_three_column_line(out, "", "call", "rt_init@PLT",
@@ -2388,8 +2435,12 @@ static int emit_pattern_blobs(FILE *out)
         char prefix[64];
         snprintf(prefix, sizeof(prefix), "pat_inv_%d", w->pat_id);
         PATND_t *p = (PATND_t *)w->root.p;
-        if (emit_flat_build(p, out, prefix) != 0)
+        if (emit_flat_build(p, out, prefix) != 0) {
             w->is_invariant = 0;
+        } else {
+            char α_lbl[80]; snprintf(α_lbl, sizeof(α_lbl), "%s_α", prefix);
+            emit_bb_register_child_label(p, α_lbl);
+        }
     }
     bb3c_flush_pending();
     return 0;

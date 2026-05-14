@@ -13,6 +13,7 @@ void emit_flat_set_intern_str(const char * (*fn)(const char *));
 void emit_flat_reset        (void);
 int  emit_bb_macro_library_to_path(const char * path);
 void emit_flat_set_cap_fixup(void (*cb)(void * cap_ptr, const char * child_alpha_label));
+void emit_bb_register_child_label(PATND_t * p, const char * alpha_label);
 void emit_flat_banner_rule  (char ch);
 void emit_flat_box_banner   (const char * kind, const char * args, const char * label_prefix);
 extern int g_flat_node_id;
