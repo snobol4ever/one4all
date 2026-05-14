@@ -103,21 +103,6 @@ static void emit_bb_icn_text_data(int nquads, char *zlbl_out) {
     bb3c_format(out, "", ".intel_syntax", "noprefix");
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void emit_bb_rtcall(const char *banner, const char *arg, void *zeta, const char *fn_name, uint64_t fn_fallback, int nquads, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_beta) {
-    emit_bb_box_banner(banner, arg ? arg : "");
-    if (IS_TEXT) {
-        char zlbl[80];
-        emit_bb_rtcall_data(nquads, zlbl);
-        emit_seq_port_call_rip((uint64_t)(uintptr_t)zeta, zlbl, fn_name, fn_fallback, 0, lbl_succ, lbl_fail);
-        emit_label_define(lbl_beta);
-        emit_seq_port_call_rip((uint64_t)(uintptr_t)zeta, zlbl, fn_name, fn_fallback, 1, lbl_succ, lbl_fail);
-        return;
-    }
-    emit_seq_port_call((uint64_t)(uintptr_t)zeta, fn_name, fn_fallback, 0, lbl_succ, lbl_fail);
-    emit_label_define(lbl_beta);
-    emit_seq_port_call((uint64_t)(uintptr_t)zeta, fn_name, fn_fallback, 1, lbl_succ, lbl_fail);
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void  emit_bb_xabrt(bb_label_t *s, bb_label_t *f, bb_label_t *b)       { emit_bb_jmp_pair("ABORT",  s, f, b, 0); }
 void  emit_bb_xcat (bb_label_t *s, bb_label_t *f, bb_label_t *b)       { emit_bb_jmp_pair("CAT",    s, f, b, 1); }
 void  emit_bb_xfail(bb_label_t *s, bb_label_t *f, bb_label_t *b)       { emit_bb_jmp_pair("FAIL",   s, f, b, 0); }
