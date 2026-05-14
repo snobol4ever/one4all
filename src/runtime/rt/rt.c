@@ -1268,6 +1268,10 @@ void rt_call(const char *name, int nargs)
         }
         return;
     }
+    if (name && strcmp(name, "SIZE") == 0 && nargs == 1 && args[0].v == DT_A) {
+        DESCR_t r = INTVAL(args[0].arr ? (args[0].arr->hi - args[0].arr->lo + 1) : 0);
+        vstack_push(r); LAST_OK_SET(1); return;
+    }
     DESCR_t result = INVOKE_fn(name ? name : "", args, nargs);
     vstack_push(result);
     LAST_OK_SET((result.v != DT_FAIL));
@@ -1511,6 +1515,14 @@ extern void reset_capture_registry(void);
 extern void clear_pending_flags(void);
 static void rt_register_cap(cap_t *c);
 
+DESCR_t rt_bb_cap_direct(void *zeta, int port)
+{
+    void *slot0_save = *(void **)zeta;
+    *(void **)zeta = NULL;
+    DESCR_t r = rt_bb_cap(zeta, port);
+    *(void **)zeta = slot0_save;
+    return r;
+}
 DESCR_t rt_bb_cap(void *zeta, int port)
 {
     /* In mode-4 TEXT path the .data slot holds a cap_t* set by rt_init_cap.

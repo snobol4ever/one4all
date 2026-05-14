@@ -796,6 +796,10 @@ static void h_call(void)
         }
     }
     DESCR_t result = FAILDESCR;
+    if (name && strcmp(name, "SIZE") == 0 && nargs == 1 && args[0].v == DT_A) {
+        result = INTVAL(args[0].arr ? (args[0].arr->hi - args[0].arr->lo + 1) : 0);
+        PUSH(result); STATE->last_ok = 1; return;
+    }
     int _data_first = (nargs >= 1 && args[0].v == DT_DATA);
     int _data_set   = (nargs >= 2 && args[1].v == DT_DATA && name &&
                        strlen(name) > 4 &&

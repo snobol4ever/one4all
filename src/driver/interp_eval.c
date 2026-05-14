@@ -1167,6 +1167,7 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         DESCR_t v = args[0];
         if (IS_FAIL_fn(v)) { *out = FAILDESCR; return 1; }
         if (v.v == DT_T)   { *out = INTVAL(v.tbl ? v.tbl->size : 0); return 1; }
+        if (v.v == DT_A)   { *out = INTVAL(v.arr ? (v.arr->hi - v.arr->lo + 1) : 0); return 1; }
         if (v.v == DT_DATA) {
             DESCR_t tag = FIELD_GET_fn(v,"icn_type");
             if (tag.v==DT_S && tag.s && strcmp(tag.s,"list")==0) {
