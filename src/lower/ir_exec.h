@@ -41,6 +41,10 @@ typedef int (*IR_body_fn)(DESCR_t value, void * ctx);
  * cfg must be a fully wired IR_block_t (all port_* set by lower). */
 DESCR_t IR_exec_once(IR_block_t * cfg);
 
+/* IR_exec_resume — same as IR_exec_once but does NOT reset state.
+ * Used by SM_EXEC_BB on subsequent calls (β path) to resume a generator. */
+DESCR_t IR_exec_resume(IR_block_t * cfg);
+
 /* Drive cfg to exhaustion: call body_fn(value, ctx) for each value produced.
  * Returns the total tick count (number of successful body_fn calls).
  * Resets node runtime state before first drive; leaves cfg exhausted after. */

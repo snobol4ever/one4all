@@ -420,7 +420,22 @@ DESCR_t IR_exec_once(IR_block_t * cfg) {
     if (!cfg || !cfg->entry) return FAILDESCR;
     IR_reset(cfg);
     IR_t * cur = cfg->entry;
-    int safety = cfg->n * 64 + 256;   /* cycle-breaker: max steps before abort */
+    int safety = cfg->n * 64 + 256;
+    while (cur && safety-- > 0) {
+        IR_t * next = IR_exec_node(cur);
+        if (!next) {
+            return IS_FAIL_fn(cur->value) ? FAILDESCR : cur->value;
+        }
+        cur = next;
+    }
+    return FAILDESCR;
+}
+
+/* IR_exec_resume — same as IR_exec_once but skips IR_reset (β path). */
+DESCR_t IR_exec_resume(IR_block_t * cfg) {
+    if (!cfg || !cfg->entry) return FAILDESCR;
+    IR_t * cur = cfg->entry;
+    int safety = cfg->n * 64 + 256;
     while (cur && safety-- > 0) {
         IR_t * next = IR_exec_node(cur);
         if (!next) {

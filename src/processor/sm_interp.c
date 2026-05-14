@@ -1098,12 +1098,18 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             break;
         }
 
-        /* LR-2+LR-3: SM_EXEC_BB -- drive IR_block_t* once (GOAL-LOWER-REDESIGN).
+        /* LR-2+LR-3: SM_EXEC_BB -- drive IR_block_t* generatively (GOAL-LOWER-REDESIGN).
          * a[0].ptr = IR_block_t* (compile-time wired DCG).
-         * Nothing emits this yet; handler is live for future LR-S1 emitters. */
+         * a[1].i   = 0 on first call (α/reset), 1 on subsequent calls (β/resume).
+         * First call: IR_exec_once (resets state, runs from α).
+         * Subsequent calls: IR_exec_resume (preserves state, runs from β). */
         case SM_EXEC_BB: {
-            IR_block_t * cfg = (IR_t *)ins->a[0].ptr;
-            DESCR_t _val = cfg ? IR_exec_once(cfg) : FAILDESCR;
+            IR_block_t * cfg = (IR_block_t *)ins->a[0].ptr;
+            DESCR_t _val;
+            if (!cfg) { _val = FAILDESCR; }
+            else if (ins->a[1].i == 0) { ins->a[1].i = 1; _val = IR_exec_once(cfg); }
+            else                        { _val = IR_exec_resume(cfg); }
+            if (IS_FAIL_fn(_val)) ins->a[1].i = 0;  /* reset for next every-loop */
             st->last_ok = !IS_FAIL_fn(_val);
             sm_push(st, _val);
             break;

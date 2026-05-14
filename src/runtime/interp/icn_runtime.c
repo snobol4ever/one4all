@@ -22,6 +22,7 @@
 #include "../../frontend/icon/icon_gen.h"
 #include "coerce.h"
 #include "scan_builtins.h"
+#include "../../lower/ir_exec.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -558,8 +559,20 @@ DESCR_t icn_lazy_box(void *zeta, int entry) {
     return IS_FAIL_fn(v) ? FAILDESCR : v;
 }
 
+/* IJ-19: DCG bridge box — drives an IR_block_t via bb_broker.
+ * α: IR_exec_once (resets state, first value).
+ * β: IR_exec_resume (continues from where we left off).
+ * This is infrastructure, not a generator implementation. */
+typedef struct { IR_block_t *cfg; int first; } icn_dcg_state_t;
+DESCR_t icn_bb_dcg(void *zeta, int entry) {
+    icn_dcg_state_t *z = (icn_dcg_state_t *)zeta;
+    if (!z || !z->cfg) return FAILDESCR;
+    if (entry == α) { z->first = 1; }
+    DESCR_t v = z->first ? (z->first=0, IR_exec_once(z->cfg)) : IR_exec_resume(z->cfg);
+    return v;
+}
 
-/*----------------------------------------------------------------------------------------------------------------------------
+/*--------------------------------------------------------------------------------------------------------------------------
  * icn_bb_fnc — composite box: pump arg-generator, call builtin with substituted arg each tick.
  *
  * Evaluates all non-generative args eagerly at setup. On each tick:
@@ -1516,6 +1529,23 @@ bb_node_t icn_bb_build(tree_t *e) {
                 z->slen       = 0;
                 z->pos        = 0;
                 return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
+            }
+        }
+        /* ── TT_FNC upto(cset, str) scalar args — IR_block_t DCG (IJ-19) ── */
+        if (fn && strcmp(fn, "upto") == 0 && nargs >= 2 && !is_suspendable(e->c[2])) {
+            DESCR_t cd = bb_eval_value(e->c[1]);
+            DESCR_t sd = bb_eval_value(e->c[2]);
+            const char *cset = VARVAL_fn(cd);
+            const char *hay  = sd.s ? sd.s : (sd.v == DT_SNUL ? "" : NULL);
+            if (cset && hay) {
+                extern IR_block_t *lower_icn_upto(const char *cset, const char *hay);
+                IR_block_t *cfg = lower_icn_upto(cset, hay);
+                if (cfg) {
+                    icn_dcg_state_t *dz = calloc(1, sizeof(*dz));
+                    dz->cfg = cfg;
+                    dz->first = 1;
+                    return (bb_node_t){ icn_bb_dcg, dz, 0 };
+                }
             }
         }
         /* ── Builtin TT_FNC with generative arg — icn_bb_fnc ─────────── */

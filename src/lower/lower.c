@@ -457,18 +457,37 @@ static void lower_fnc(const tree_t *t)
     }
 
     /* IJ-19-lower: upto(cset, str) with compile-time-constant scalar args →
-     * build DCG at lower time, emit SM_EXEC_BB(ptr). */
-    if (g_lang == LANG_ICN && t->v.sval && strcmp(t->v.sval, "upto") == 0
-            && nargs >= 2
-            && t->c[0] && t->c[0]->t == TT_QLIT
-            && t->c[1] && t->c[1]->t == TT_QLIT) {
-        const char *cset = t->c[0]->v.sval ? t->c[0]->v.sval : "";
-        const char *hay  = t->c[1]->v.sval ? t->c[1]->v.sval : "";
-        IR_block_t *cfg  = lower_icn_upto(cset, hay);
-        if (cfg) {
-            int idx = sm_emit(g_p, SM_EXEC_BB);
-            g_p->instrs[idx].a[0].ptr = cfg;
-            return;
+     * build DCG at lower time, emit SM_EXEC_BB(ptr).
+     * Icon calls: sval==NULL, c[0]->v.sval = "upto", args at c[1], c[2]. */
+    {
+        int is_upto = 0;
+        const char *cset = NULL, *hay = NULL;
+        /* SNOBOL4-style: t->v.sval = "upto" */
+        if (t->v.sval && strcmp(t->v.sval, "upto") == 0 && nargs >= 2) {
+            if (t->c[0] && (t->c[0]->t == TT_CSET || t->c[0]->t == TT_QLIT) &&
+                t->c[1] && (t->c[1]->t == TT_QLIT || t->c[1]->t == TT_CSET)) {
+                cset = t->c[0]->v.sval ? t->c[0]->v.sval : "";
+                hay  = t->c[1]->v.sval ? t->c[1]->v.sval : "";
+                is_upto = 1;
+            }
+        }
+        /* Icon-style: t->v.sval==NULL, c[0]->v.sval = "upto", args at c[1], c[2] */
+        if (!t->v.sval && nargs >= 3 && t->c[0] && t->c[0]->v.sval
+                && strcmp(t->c[0]->v.sval, "upto") == 0) {
+            if (t->c[1] && (t->c[1]->t == TT_CSET || t->c[1]->t == TT_QLIT) &&
+                t->c[2] && (t->c[2]->t == TT_QLIT || t->c[2]->t == TT_CSET)) {
+                cset = t->c[1]->v.sval ? t->c[1]->v.sval : "";
+                hay  = t->c[2]->v.sval ? t->c[2]->v.sval : "";
+                is_upto = 1;
+            }
+        }
+        if (g_lang == LANG_ICN && is_upto && cset && hay) {
+            IR_block_t *cfg = lower_icn_upto(cset, hay);
+            if (cfg) {
+                int idx = sm_emit(g_p, SM_EXEC_BB);
+                g_p->instrs[idx].a[0].ptr = cfg;
+                return;
+            }
         }
     }
 
