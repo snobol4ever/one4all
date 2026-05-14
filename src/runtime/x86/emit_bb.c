@@ -77,15 +77,13 @@ static void emit_bb_jmp_pair(const char *banner, bb_label_t *lbl_succ, bb_label_
     else            { emit_jmp(lbl_fail, JMP_JMP); emit_label_define(lbl_beta); emit_jmp(lbl_fail, JMP_JMP); }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void emit_bb_rtcall_data(int nquads, char *zlbl_out) {
+static void emit_bb_ptr_slot(char *zlbl_out) {
     int id = g_flat_node_id++;
     snprintf(zlbl_out, 80, ".Lrtc%d_z", id);
     char zlbl_def[88]; snprintf(zlbl_def, sizeof(zlbl_def), "%s:", zlbl_out);
     FILE *out = emit_outf();
     bb3c_format(out, "",       ".section", ".data");
     bb3c_format(out, zlbl_def, ".quad",    "0");
-    for (int i = 1; i < nquads; i++)
-        bb3c_format(out, "", ".quad", "0");
     bb3c_format(out, "", ".section", ".text");
     bb3c_format(out, "", ".intel_syntax", "noprefix");
 }
@@ -97,8 +95,6 @@ static void emit_bb_icn_text_data(int nquads, char *zlbl_out) {
     FILE *out = emit_outf();
     bb3c_format(out, "",       ".section", ".data");
     bb3c_format(out, zlbl_def, ".quad",    "0");
-    for (int i = 1; i < nquads; i++)
-        bb3c_format(out, "", ".quad", "0");
     bb3c_format(out, "", ".section", ".text");
     bb3c_format(out, "", ".intel_syntax", "noprefix");
 }
@@ -386,7 +382,7 @@ void  emit_bb_xarbn(bb_box_fn child_fn, bb_label_t *s, bb_label_t *f, bb_label_t
     void *z = rt_bb_arbno_new(child_fn, NULL);
     emit_bb_box_banner("ARBNO", "");
     if (IS_TEXT) {
-        char zlbl[80]; emit_bb_rtcall_data(6, zlbl);
+        char zlbl[80]; emit_bb_ptr_slot(zlbl);
         const char *clbl = child_fn ? child_cache_get_lbl(child_fn) : NULL;
         if (clbl && g_cap_fixup_cb) { char combo[160]; snprintf(combo, sizeof(combo), "%s|%s", zlbl, clbl); g_cap_fixup_cb((void*)2, combo); }
         emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_arbno", (uint64_t)(uintptr_t)rt_bb_arbno, 0, s, f);
@@ -501,7 +497,7 @@ void emit_bb_xcallcap(bb_box_fn child_fn, const char *fnc_name, bb_label_t *s, b
     void *z = bb_cap_new_call(child_fn, NULL, fnc_name, NULL, 0, NULL, 0, 0);
     emit_bb_box_banner("CALLCAP", fnc_name ? fnc_name : "");
     if (IS_TEXT) {
-        char zlbl[80]; emit_bb_rtcall_data(6, zlbl);
+        char zlbl[80]; emit_bb_ptr_slot(zlbl);
         const char *clbl = child_fn ? child_cache_get_lbl(child_fn) : NULL;
         if (clbl && g_cap_fixup_cb) { char combo[320]; snprintf(combo, sizeof(combo), "%s|%s|%s|0|1", zlbl, clbl, fnc_name ? fnc_name : ""); g_cap_fixup_cb((void*)1, combo); }
         emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 0, s, f);
@@ -522,7 +518,7 @@ void emit_bb_xfnme(bb_box_fn child_fn, const char *varname, bb_label_t *s, bb_la
     void *z = bb_cap_new(child_fn, NULL, varname, NULL, 1);
     emit_bb_box_banner("CAP_IMM", varname ? varname : "");
     if (IS_TEXT) {
-        char zlbl[80]; emit_bb_rtcall_data(6, zlbl);
+        char zlbl[80]; emit_bb_ptr_slot(zlbl);
         const char *clbl = child_fn ? child_cache_get_lbl(child_fn) : NULL;
         if (clbl && g_cap_fixup_cb) { char combo[320]; snprintf(combo, sizeof(combo), "%s|%s|%s|1|0", zlbl, clbl, varname ? varname : ""); g_cap_fixup_cb((void*)1, combo); }
         emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 0, s, f);
@@ -539,7 +535,7 @@ void emit_bb_xnme(bb_box_fn child_fn, const char *varname, bb_label_t *s, bb_lab
     void *z = bb_cap_new(child_fn, NULL, varname, NULL, 0);
     emit_bb_box_banner("CAP_COND", varname ? varname : "");
     if (IS_TEXT) {
-        char zlbl[80]; emit_bb_rtcall_data(6, zlbl);
+        char zlbl[80]; emit_bb_ptr_slot(zlbl);
         const char *clbl = child_fn ? child_cache_get_lbl(child_fn) : NULL;
         if (clbl && g_cap_fixup_cb) { char combo[320]; snprintf(combo, sizeof(combo), "%s|%s|%s|0|0", zlbl, clbl, varname ? varname : ""); g_cap_fixup_cb((void*)1, combo); }
         emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 0, s, f);
@@ -1381,24 +1377,14 @@ static void emit_flat_node(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fai
         PATND_t *ch = (p->nchildren > 0) ? p->children[0] : NULL;
         bb_box_fn cfn = ch ? child_cache_get(ch) : NULL;
         const char *vn = (p->var.v == DT_S || p->var.v == DT_SNUL || p->var.v == DT_N) ? p->var.s : VARVAL_fn(p->var);
-        void *z = bb_cap_new(cfn, NULL, vn, NULL, 1);
-        emit_bb_box_banner("CAP_IMM", vn ? vn : "");
-        if (IS_TEXT) { char zlbl[80]; emit_bb_rtcall_data(6, zlbl); emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 0, lbl_succ, lbl_fail); emit_label_define(lbl_β); emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 1, lbl_succ, lbl_fail); break; }
-        emit_seq_port_call((uint64_t)(uintptr_t)z, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 0, lbl_succ, lbl_fail);
-        emit_label_define(lbl_β);
-        emit_seq_port_call((uint64_t)(uintptr_t)z, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 1, lbl_succ, lbl_fail);
+        emit_bb_xfnme(cfn, vn, lbl_succ, lbl_fail, lbl_β);
         break;
     }
     case XNME: {
         PATND_t *ch = (p->nchildren > 0) ? p->children[0] : NULL;
         bb_box_fn cfn = ch ? child_cache_get(ch) : NULL;
         const char *vn = (p->var.v == DT_S || p->var.v == DT_SNUL || p->var.v == DT_N) ? p->var.s : VARVAL_fn(p->var);
-        void *z = bb_cap_new(cfn, NULL, vn, NULL, 0);
-        emit_bb_box_banner("CAP_COND", vn ? vn : "");
-        if (IS_TEXT) { char zlbl[80]; emit_bb_rtcall_data(6, zlbl); emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 0, lbl_succ, lbl_fail); emit_label_define(lbl_β); emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 1, lbl_succ, lbl_fail); break; }
-        emit_seq_port_call((uint64_t)(uintptr_t)z, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 0, lbl_succ, lbl_fail);
-        emit_label_define(lbl_β);
-        emit_seq_port_call((uint64_t)(uintptr_t)z, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 1, lbl_succ, lbl_fail);
+        emit_bb_xnme(cfn, vn, lbl_succ, lbl_fail, lbl_β);
         break;
     }
     case XCALLCAP: {
