@@ -21,7 +21,8 @@
 #pragma GCC diagnostic ignored "-Wmisleading-indentation"
 #define ARBNO_INIT 8
 typedef struct { DESCR_t matched; int start; } arbno_frame_t;
-typedef struct { bb_box_fn fn; void *state; int depth; int cap; arbno_frame_t *stack; } arbno_t;
+typedef struct { bb_box_fn fn; void *state; int depth; int cap; arbno_frame_t *stack; uint32_t magic; } arbno_t;
+#define ARBNO_MAGIC 0xA2B20000u
 
 arbno_t *bb_arbno_new(bb_box_fn fn, void *state)
 {
@@ -30,6 +31,7 @@ arbno_t *bb_arbno_new(bb_box_fn fn, void *state)
     ζ->state = state;
     ζ->cap   = ARBNO_INIT;
     ζ->stack = malloc(ζ->cap * sizeof(arbno_frame_t));
+    ζ->magic = ARBNO_MAGIC;
     return ζ;
 }
 

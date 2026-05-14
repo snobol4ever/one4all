@@ -1443,8 +1443,9 @@ DESCR_t rt_bb_notany(void *zeta, int port)
 /* ── arbno ────────────────────────────────────────────────────────────── */
 /* Forward decl for arbno_t — defined locally in bb_boxes.c still via typedef */
 typedef struct { DESCR_t matched; int start; } rt_arbno_frame_t;
-typedef struct { bb_box_fn fn; void *state; int depth; int cap; rt_arbno_frame_t *stack; } rt_arbno_t;
-#define RT_ARBNO_INIT 8
+typedef struct { bb_box_fn fn; void *state; int depth; int cap; rt_arbno_frame_t *stack; uint32_t magic; } rt_arbno_t;
+#define RT_ARBNO_INIT  8
+#define RT_ARBNO_MAGIC 0xA2B20000u
 
 DESCR_t rt_bb_arbno(void *zeta, int port)
 {
@@ -1456,7 +1457,7 @@ DESCR_t rt_bb_arbno(void *zeta, int port)
      * non-null ptr and use double-deref. */
     rt_arbno_t *ζ;
     void *slot0 = *(void **)zeta;
-    if (slot0 && ((rt_arbno_t *)slot0)->stack) ζ = (rt_arbno_t *)slot0;
+    if (slot0 && ((rt_arbno_t *)slot0)->magic == RT_ARBNO_MAGIC) ζ = (rt_arbno_t *)slot0;
     else ζ = (rt_arbno_t *)zeta;
     DESCR_t ARBNO; DESCR_t br; rt_arbno_frame_t *fr;
     if (port == 0) {
@@ -1491,6 +1492,7 @@ void *rt_bb_arbno_new(bb_box_fn fn, void *state)
     ζ->state = state;
     ζ->cap   = RT_ARBNO_INIT;
     ζ->stack = malloc(ζ->cap * sizeof(rt_arbno_frame_t));
+    ζ->magic = RT_ARBNO_MAGIC;
     return ζ;
 }
 

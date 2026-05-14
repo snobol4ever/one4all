@@ -1134,6 +1134,7 @@ static void emit_flat_xcat(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fai
     }
     emit_flat_node(p->children[0], &mid_γ, &xcat_ω, &left_β);
     emit_label_define_bb(&mid_γ);
+    bb_label_t *last_β = &right_β;
     if (p->nchildren == 2) {
         emit_flat_node(p->children[1], lbl_succ, &right_ω, &right_β);
     } else {
@@ -1149,9 +1150,10 @@ static void emit_flat_xcat(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fai
             emit_flat_node(p->children[i], s, &right_ω, &betas[i-1]);
             if (i < nc-1) emit_label_define_bb(&mids[i-1]);
         }
+        last_β = &betas[nc-2];
     }
     emit_label_define_bb(&right_ω); emit_jmp_label(&left_β, JMP_JMP);
-    emit_label_define_bb(lbl_β); emit_jmp_label(&right_β, JMP_JMP);
+    emit_label_define_bb(lbl_β); emit_jmp_label(last_β, JMP_JMP);
     emit_label_define_bb(&xcat_ω);  emit_jmp_label(lbl_fail, JMP_JMP);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -1498,7 +1500,8 @@ static void pre_build_children(PATND_t *p) {
     if (p->kind == XARBN || p->kind == XNME || p->kind == XFNME || p->kind == XCALLCAP) {
         PATND_t *ch = (p->nchildren > 0) ? p->children[0] : NULL;
         if (ch && !child_cache_get(ch)) {
-            bb_box_fn fn = bb_build_flat(ch);
+            pre_build_children(ch);
+            bb_box_fn fn = (p->kind == XARBN) ? bb_build_brokered(ch) : bb_build_flat(ch);
             if (!fn) fn = bb_build_brokered(ch);
             child_cache_put(ch, fn);
         }
