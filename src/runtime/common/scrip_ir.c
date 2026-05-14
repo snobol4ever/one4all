@@ -1,5 +1,5 @@
 /*
- * scrip_ir.c — Universal generator IR: IR_prog_t / IR_prog_t alloc/free/reset/print (LR-0)
+ * scrip_ir.c — Universal generator IR: IR_prog_t / IR_t alloc/free/reset/print (LR-0)
  * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6 (LR-0, 2026-05-14)
  */
 #include "scrip_ir.h"
@@ -36,23 +36,19 @@ IR_prog_t * IR_alloc(int max_nodes, int lang) {
     return cfg;
 }
 /*------------------------------------------------------------------------------------------------------------------------------------*/
-IR_t * IR_node_alloc(IR_prog_t * cfg, IR_e kind, int lang) {
+IR_t * IR_node_alloc(IR_prog_t * cfg, IR_e t) {
     IR_t * nd = calloc(1, sizeof(IR_t));
     if (!nd) return NULL;
-    nd->kind        = kind;
-    nd->lang        = lang;
-    nd->id          = cfg->n;
-    nd->α  = NULL;
-    nd->β = NULL;
-    nd->γ   = NULL;
-    nd->ω   = NULL;
-    nd->c           = NULL;
-    nd->n           = 0;
-    nd->value       = FAILDESCR;
-    nd->counter     = 0;
-    nd->state       = 0;
-    nd->generative  = 0;
-    nd->visited     = 0;
+    nd->t       = t;
+    nd->α       = NULL;
+    nd->β       = NULL;
+    nd->γ       = NULL;
+    nd->ω       = NULL;
+    nd->c       = NULL;
+    nd->n       = 0;
+    nd->value   = FAILDESCR;
+    nd->counter = 0;
+    nd->state   = 0;
     cfg->all[cfg->n++] = nd;
     return nd;
 }
@@ -65,7 +61,6 @@ void IR_reset(IR_prog_t * cfg) {
         nd->value   = FAILDESCR;
         nd->counter = 0;
         nd->state   = 0;
-        nd->visited = 0;
     }
 }
 /*------------------------------------------------------------------------------------------------------------------------------------*/
@@ -81,10 +76,8 @@ void IR_free(IR_prog_t * cfg) {
     free(cfg);
 }
 /*------------------------------------------------------------------------------------------------------------------------------------*/
-/* Helper — print one port as "name=id" or "name=NULL". */
 static void print_port(FILE * fp, const char * label, const IR_t * nd) {
-    if (nd) fprintf(fp, " %s=%d", label, nd->id);
-    else    fprintf(fp, " %s=NULL", label);
+    fprintf(fp, " %s=%s", label, nd ? "set" : "NULL");
 }
 /*------------------------------------------------------------------------------------------------------------------------------------*/
 void IR_print(const IR_prog_t * cfg, FILE * fp) {
@@ -95,22 +88,21 @@ void IR_print(const IR_prog_t * cfg, FILE * fp) {
     for (int i = 0; i < cfg->n; i++) {
         const IR_t * nd = cfg->all[i];
         if (!nd) continue;
-        fprintf(fp, "  [%d] %s gen=%d", nd->id, IR_e_name(nd->kind), nd->generative);
-        print_port(fp, "start",  nd->α);
-        print_port(fp, "resume", nd->β);
-        print_port(fp, "succ",   nd->γ);
-        print_port(fp, "fail",   nd->ω);
+        fprintf(fp, "  [%d] %s", i, IR_e_name(nd->t));
+        print_port(fp, "α", nd->α);
+        print_port(fp, "β", nd->β);
+        print_port(fp, "γ", nd->γ);
+        print_port(fp, "ω", nd->ω);
         if (nd->n > 0) {
             fprintf(fp, " children=[");
-            for (int j = 0; j < nd->n; j++) fprintf(fp, "%s%d", j ? "," : "", nd->c[j] ? nd->c[j]->id : -1);
+            for (int j = 0; j < nd->n; j++) fprintf(fp, "%s%d", j ? "," : "", nd->c[j] ? j : -1);
             fprintf(fp, "]");
         }
-        switch (nd->kind) {
-            case IR_LIT_I:  fprintf(fp, " ival=%lld", (long long)nd->ival); break;
-            case IR_LIT_F:  fprintf(fp, " dval=%g",  nd->dval);             break;
-            case IR_LIT_S:  fprintf(fp, " sval=\"%s\"", nd->sval ? nd->sval : ""); break;
-            case IR_VAR:    fprintf(fp, " var=\"%s\"",  nd->sval ? nd->sval : ""); break;
-            case IR_CALL:   fprintf(fp, " call=\"%s\" nargs=%d", nd->call.name ? nd->call.name : "", nd->call.nargs); break;
+        switch (nd->t) {
+            case IR_LIT_I: fprintf(fp, " ival=%lld", (long long)nd->ival); break;
+            case IR_LIT_F: fprintf(fp, " dval=%g",   nd->dval);             break;
+            case IR_LIT_S: fprintf(fp, " sval=\"%s\"", nd->sval ? nd->sval : ""); break;
+            case IR_VAR:   fprintf(fp, " var=\"%s\"",  nd->sval ? nd->sval : ""); break;
             default: break;
         }
         fprintf(fp, "\n");

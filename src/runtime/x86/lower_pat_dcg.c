@@ -29,45 +29,43 @@ static IR_prog_t * build_node(IR_prog_t * cfg, const tree_t * t, IR_t * sp, IR_t
     IR_t * nd = NULL;
     switch (t->t) {
     case TT_QLIT: {
-        nd = IR_node_alloc(cfg, IR_PAT_LIT, IR_LANG_SNO);
+        nd = IR_node_alloc(cfg, IR_PAT_LIT);
         nd->sval = t->v.sval ? t->v.sval : "";
         nd->α = nd; nd->β = fp; nd->γ = sp; nd->ω = fp;
         return nd;
     }
     case TT_ARB: {
-        nd = IR_node_alloc(cfg, IR_PAT_ARB, IR_LANG_SNO);
-        nd->generative = 1;
+        nd = IR_node_alloc(cfg, IR_PAT_ARB);
         nd->α = nd; nd->β = nd; nd->γ = sp; nd->ω = fp;
         return nd;
     }
     case TT_REM: {
-        nd = IR_node_alloc(cfg, IR_PAT_REM, IR_LANG_SNO);
+        nd = IR_node_alloc(cfg, IR_PAT_REM);
         nd->α = nd; nd->β = fp; nd->γ = sp; nd->ω = fp;
         return nd;
     }
     case TT_ABORT: {
-        nd = IR_node_alloc(cfg, IR_PAT_ABORT, IR_LANG_SNO);
+        nd = IR_node_alloc(cfg, IR_PAT_ABORT);
         nd->α = nd; nd->β = fp; nd->γ = fp; nd->ω = fp;
         return nd;
     }
     case TT_SPAN: {
         if (t->n < 1 || !t->c[0] || t->c[0]->t != TT_QLIT) return NULL;
-        nd = IR_node_alloc(cfg, IR_PAT_SPAN, IR_LANG_SNO);
+        nd = IR_node_alloc(cfg, IR_PAT_SPAN);
         nd->sval = t->c[0]->v.sval ? t->c[0]->v.sval : "";
-        nd->generative = 1;
         nd->α = nd; nd->β = nd; nd->γ = sp; nd->ω = fp;
         return nd;
     }
     case TT_ANY: {
         if (t->n < 1 || !t->c[0] || t->c[0]->t != TT_QLIT) return NULL;
-        nd = IR_node_alloc(cfg, IR_PAT_ANY, IR_LANG_SNO);
+        nd = IR_node_alloc(cfg, IR_PAT_ANY);
         nd->sval = t->c[0]->v.sval ? t->c[0]->v.sval : "";
         nd->α = nd; nd->β = fp; nd->γ = sp; nd->ω = fp;
         return nd;
     }
     case TT_BREAK: {
         if (t->n < 1 || !t->c[0] || t->c[0]->t != TT_QLIT) return NULL;
-        nd = IR_node_alloc(cfg, IR_PAT_BREAK, IR_LANG_SNO);
+        nd = IR_node_alloc(cfg, IR_PAT_BREAK);
         nd->sval = t->c[0]->v.sval ? t->c[0]->v.sval : "";
         nd->α = nd; nd->β = fp; nd->γ = sp; nd->ω = fp;
         return nd;
@@ -75,7 +73,7 @@ static IR_prog_t * build_node(IR_prog_t * cfg, const tree_t * t, IR_t * sp, IR_t
     case TT_FENCE: {
         IR_t * inner = (t->n > 0 && t->c[0]) ? build_node(cfg, t->c[0], sp, fp) : sp;
         if (t->n > 0 && !inner) return NULL;
-        nd = IR_node_alloc(cfg, IR_PAT_FENCE, IR_LANG_SNO);
+        nd = IR_node_alloc(cfg, IR_PAT_FENCE);
         nd->α = nd; nd->β = fp;
         nd->γ = inner ? inner : sp; nd->ω = fp;
         return nd;
@@ -96,8 +94,7 @@ static IR_prog_t * build_node(IR_prog_t * cfg, const tree_t * t, IR_t * sp, IR_t
             IR_t * a = entries[i], * b = entries[i+1];
             if (a && b) b->ω = a->β ? a->β : fp;
         }
-        nd = IR_node_alloc(cfg, IR_PAT_CAT, IR_LANG_SNO);
-        nd->generative = 1;
+        nd = IR_node_alloc(cfg, IR_PAT_CAT);
         nd->α = entries[0];
         nd->β = entries[0] ? entries[0]->β : fp;
         nd->γ = sp; nd->ω = fp;
@@ -112,8 +109,7 @@ static IR_prog_t * build_node(IR_prog_t * cfg, const tree_t * t, IR_t * sp, IR_t
             if (!e) return NULL;
             last = e; alt_fail = e;
         }
-        nd = IR_node_alloc(cfg, IR_PAT_ALT, IR_LANG_SNO);
-        nd->generative = 1;
+        nd = IR_node_alloc(cfg, IR_PAT_ALT);
         nd->α = last; nd->β = last; nd->γ = sp; nd->ω = fp;
         return nd;
     }
@@ -121,20 +117,18 @@ static IR_prog_t * build_node(IR_prog_t * cfg, const tree_t * t, IR_t * sp, IR_t
         if (t->n < 1) return NULL;
         IR_t * inner = build_node(cfg, t->c[0], sp, fp);
         if (!inner) return NULL;
-        nd = IR_node_alloc(cfg, IR_PAT_ASSIGN_COND, IR_LANG_SNO);
+        nd = IR_node_alloc(cfg, IR_PAT_ASSIGN_COND);
         nd->sval = (t->n > 1 && t->c[1] && t->c[1]->v.sval) ? t->c[1]->v.sval : NULL;
         nd->α = inner; nd->β = inner->β;
-        nd->γ = sp; nd->ω = fp; nd->generative = 1;
         return nd;
     }
     case TT_CAPT_IMMED_ASGN: {
         if (t->n < 1) return NULL;
         IR_t * inner = build_node(cfg, t->c[0], sp, fp);
         if (!inner) return NULL;
-        nd = IR_node_alloc(cfg, IR_PAT_ASSIGN_IMM, IR_LANG_SNO);
+        nd = IR_node_alloc(cfg, IR_PAT_ASSIGN_IMM);
         nd->sval = (t->n > 1 && t->c[1] && t->c[1]->v.sval) ? t->c[1]->v.sval : NULL;
         nd->α = inner; nd->β = inner->β;
-        nd->γ = sp; nd->ω = fp; nd->generative = 1;
         return nd;
     }
     default:

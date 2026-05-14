@@ -27,7 +27,7 @@ extern int         Σlen;
  * Generative kinds consult nd->state / nd->counter and update them.
  * Unimplemented kinds return ω (explicit, safe, detectable in tests). */
 IR_t * IR_exec_node(IR_t * nd) {
-    switch (nd->kind) {
+    switch (nd->t) {
     /*-- Literals: always succeed, value is the literal. ----------------------------------------------------------------*/
     case IR_LIT_I:
         nd->value = INTVAL(nd->ival);

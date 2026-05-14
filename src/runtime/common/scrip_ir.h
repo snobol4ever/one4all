@@ -105,34 +105,23 @@ typedef enum {
  * IR_t — one node in the DCG
  * Four control ports are NULL until lower wires them bottom-up.
  *================================================================================================*/
-typedef struct ir_node IR_t;
-struct ir_node {
-    IR_e      kind;
-    /* ── Four control ports (wired by lower; back-edges create cycles) ─────────────────────── */
-    IR_t    * α;   /* entry: first evaluation attempt                             */
-    IR_t    * β;  /* backtrack: try next value (NULL → scalar / non-generative)  */
-    IR_t    * γ;    /* success continuation (value in .value)                      */
-    IR_t    * ω;    /* failure continuation (no value)                             */
-    /* ── Children (pre-wiring tree; four ports wired during lower, bottom-up) ──────────────── */
-    IR_t   ** c;            /* child array                                                 */
+typedef struct IR_t IR_t;
+struct IR_t {
+    IR_e           t;
+    IR_t         * α;            /* entry: first evaluation attempt                             */
+    IR_t         * β;            /* backtrack: try next value (NULL → scalar/non-generative)    */
+    IR_t         * γ;            /* success continuation (value in .value)                      */
+    IR_t         * ω;            /* failure continuation (no value)                             */
+    IR_t        ** c;            /* child array (pre-wiring tree)                               */
     int            n;            /* child count                                                 */
-    /* ── Payload ────────────────────────────────────────────────────────────────────────────── */
     union {
-        int64_t        ival;     /* LIT_I; also op code for BINOP / UNOP                        */
+        int64_t        ival;     /* LIT_I; op code for BINOP/UNOP                               */
         double         dval;     /* LIT_F                                                       */
-        const char   * sval;     /* LIT_S, VAR name, CALL name                                 */
-        struct { IR_t * l; IR_t * r; int op; } binop;
-        struct { const char * name; int nargs; } call;
+        const char   * sval;     /* LIT_S, VAR name, CALL name, charset                        */
     };
-    /* ── Runtime execution state (live during ir_exec graph walk) ───────────────────────────── */
-    DESCR_t        value;        /* current result value                                        */
-    int64_t        counter;      /* TO_BY position, LIMIT count, etc.                           */
+    DESCR_t        value;        /* current result value (live during ir_exec graph walk)       */
+    int64_t        counter;      /* generative scratch: chars consumed, step position, etc.     */
     int            state;        /* executor state machine (0 = fresh)                          */
-    /* ── Graph bookkeeping ──────────────────────────────────────────────────────────────────── */
-    int            id;           /* unique within IR_prog_t — set by IR_node_alloc             */
-    int            generative;   /* 1 if β is meaningful                              */
-    int            visited;      /* scratch for traversal algorithms                            */
-    int            lang;         /* IR_LANG_* — which language produced this node               */
 };
 
 /*==================================================================================================
@@ -155,7 +144,7 @@ IR_prog_t * IR_alloc(int max_nodes, int lang);
 
 /* Allocate one IR_t node, append it to cfg->all, assign cfg-unique id.
  * Returns NULL if cfg->all is full (capacity = max_nodes passed to IR_alloc). */
-IR_t       * IR_node_alloc(IR_prog_t * cfg, IR_e kind, int lang);
+IR_t       * IR_node_alloc(IR_prog_t * cfg, IR_e t);
 
 /* Reset all runtime state (value, counter, state, visited) in every node of cfg.
  * Call before re-executing a graph. */
