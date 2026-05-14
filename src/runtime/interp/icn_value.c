@@ -1511,6 +1511,79 @@ DESCR_t bb_eval_value(tree_t *e)
         return (e->n > 0) ? bb_eval_value(e->c[0]) : NULVCL;
     }
 
+    case TT_INTERROGATE:
+        return bb_eval_value(e->c[0]);
+    case TT_GLOBAL:
+        return NULVCL;
+    case TT_INDIRECT: {
+        const tree_t *ch = e->c[0];
+        if (ch && ch->t == TT_NAME && ch->n == 1) {
+            const tree_t *inner = ch->c[0];
+            if (inner && inner->t == TT_IDX && inner->n >= 2
+                    && inner->c[0] && inner->c[0]->t == TT_VAR
+                    && inner->c[0]->v.sval) {
+                int nargs = inner->n;
+                if (nargs > 64) nargs = 64;
+                DESCR_t args[64];
+                for (int i = 0; i < nargs; i++) args[i] = bb_eval_value(inner->c[i]);
+                DESCR_t out = FAILDESCR;
+                icn_try_call_builtin_by_name("IDX", args, nargs, &out);
+                return out;
+            }
+        }
+        DESCR_t arg0 = bb_eval_value(ch);
+        if (IS_FAIL_fn(arg0)) return FAILDESCR;
+        DESCR_t out = FAILDESCR;
+        icn_try_call_builtin_by_name("INDIR_GET", &arg0, 1, &out);
+        return out;
+    }
+    case TT_NAME: {
+        const char *vname = (e->c[0] && e->c[0]->v.sval) ? e->c[0]->v.sval : "";
+        DESCR_t arg = BSTRVAL((char *)vname, (uint32_t)strlen(vname));
+        DESCR_t out = FAILDESCR;
+        icn_try_call_builtin_by_name("NAME_PUSH", &arg, 1, &out);
+        return out;
+    }
+    case TT_RECORD: {
+        int nfields = e->n;
+        DESCR_t *args = GC_malloc((size_t)(nfields + 1) * sizeof(DESCR_t));
+        const char *rname = e->v.sval ? e->v.sval : "";
+        args[0] = BSTRVAL((char *)rname, (uint32_t)strlen(rname));
+        for (int i = 0; i < nfields; i++) {
+            args[i + 1] = bb_eval_value(e->c[i]);
+            if (IS_FAIL_fn(args[i + 1])) return FAILDESCR;
+        }
+        DESCR_t out = FAILDESCR;
+        icn_try_call_builtin_by_name("RECORD_MAKE", args, nfields + 1, &out);
+        return out;
+    }
+    case TT_VLIST: {
+        if (e->n == 0) return NULVCL;
+        if (e->n == 1) return bb_eval_value(e->c[0]);
+        for (int i = 0; i < e->n; i++) {
+            DESCR_t v = bb_eval_value(e->c[i]);
+            if (!IS_FAIL_fn(v)) return v;
+        }
+        return FAILDESCR;
+    }
+    case TT_OPSYN: {
+        const char *raw = e->v.sval ? e->v.sval : "&";
+        char op_buf[4];
+        const char *op = raw;
+        const char *lp = strchr(raw, '(');
+        if (lp && lp[1] && lp[2] == ')') { op_buf[0] = lp[1]; op_buf[1] = '\0'; op = op_buf; }
+        else if (strcmp(raw, "BARFN")  == 0) op = "|";
+        else if (strcmp(raw, "AROWFN") == 0) op = "^";
+        int nargs = e->n;
+        DESCR_t *args = nargs > 0 ? GC_malloc((size_t)nargs * sizeof(DESCR_t)) : NULL;
+        for (int i = 0; i < nargs; i++) {
+            args[i] = bb_eval_value(e->c[i]);
+            if (IS_FAIL_fn(args[i])) return FAILDESCR;
+        }
+        DESCR_t out = FAILDESCR;
+        if (icn_try_call_builtin_by_name(op, args, nargs, &out)) return out;
+        return FAILDESCR;
+    }
     default:
         break;
     }
