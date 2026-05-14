@@ -81,9 +81,59 @@ static void emit_bb_jmp_pair(const char *banner, bb_label_t *lbl_succ, bb_label_
     else            { emit_jmp(lbl_fail, JMP_JMP); emit_label_define(lbl_beta); emit_jmp(lbl_fail, JMP_JMP); }
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
+/* emit_bb_stateful_text_data: emit a .data block with nquads zero quads, then resume .text.
+ * Returns the label string in zlbl_out (caller supplies buf of >=80 chars). */
+static void emit_bb_stateful_text_data(int nquads, char *zlbl_out) {
+    int id = g_flat_node_id++;
+    snprintf(zlbl_out, 80, ".Lstat%d_z", id);
+    char zlbl_def[88]; snprintf(zlbl_def, sizeof(zlbl_def), "%s:", zlbl_out);
+    FILE *out = emit_outf();
+    bb3c_format(out, "",       ".section", ".data");
+    bb3c_format(out, zlbl_def, ".quad",    "0");
+    for (int i = 1; i < nquads; i++)
+        bb3c_format(out, "", ".quad", "0");
+    bb3c_format(out, "", ".section", ".text");
+    bb3c_format(out, "", ".intel_syntax", "noprefix");
+}
+
 static void emit_bb_stateful(const char *banner, const char *arg, void *zeta, const char *fn_name, uint64_t fn_fallback, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_beta)
 {
     emit_bb_box_banner(banner, arg ? arg : "");
+    if (IS_TEXT) {
+        /* Text mode: emit a zeroed data block as the zeta struct (self-initializes on first call). */
+        char zlbl[80];
+        emit_bb_stateful_text_data(6, zlbl);
+        emit_seq_port_call_rip((uint64_t)(uintptr_t)zeta, zlbl, fn_name, fn_fallback, 0, lbl_succ, lbl_fail);
+        emit_label_define(lbl_beta);
+        emit_seq_port_call_rip((uint64_t)(uintptr_t)zeta, zlbl, fn_name, fn_fallback, 1, lbl_succ, lbl_fail);
+        return;
+    }
+    emit_seq_port_call((uint64_t)(uintptr_t)zeta, fn_name, fn_fallback, 0, lbl_succ, lbl_fail);
+    emit_label_define(lbl_beta);
+    emit_seq_port_call((uint64_t)(uintptr_t)zeta, fn_name, fn_fallback, 1, lbl_succ, lbl_fail);
+}
+
+/* emit_bb_stateful_int: like emit_bb_stateful but bakes int n into first field of data block (for LEN/TAB/RTAB). */
+static void emit_bb_stateful_int(const char *banner, int n, void *zeta, const char *fn_name, uint64_t fn_fallback, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_beta)
+{
+    emit_bb_box_banner(banner, "");
+    if (IS_TEXT) {
+        int id = g_flat_node_id++;
+        char zlbl[80], zlbl_def[88], nval[32];
+        snprintf(zlbl, sizeof(zlbl), ".Lstat%d_z", id);
+        snprintf(zlbl_def, sizeof(zlbl_def), "%s:", zlbl);
+        snprintf(nval, sizeof(nval), "%d", n);
+        FILE *out = emit_outf();
+        bb3c_format(out, "",       ".section", ".data");
+        bb3c_format(out, zlbl_def, ".long",    nval);
+        bb3c_format(out, "",       ".long",    "0");
+        bb3c_format(out, "",       ".section", ".text");
+        bb3c_format(out, "",       ".intel_syntax", "noprefix");
+        emit_seq_port_call_rip((uint64_t)(uintptr_t)zeta, zlbl, fn_name, fn_fallback, 0, lbl_succ, lbl_fail);
+        emit_label_define(lbl_beta);
+        emit_seq_port_call_rip((uint64_t)(uintptr_t)zeta, zlbl, fn_name, fn_fallback, 1, lbl_succ, lbl_fail);
+        return;
+    }
     emit_seq_port_call((uint64_t)(uintptr_t)zeta, fn_name, fn_fallback, 0, lbl_succ, lbl_fail);
     emit_label_define(lbl_beta);
     emit_seq_port_call((uint64_t)(uintptr_t)zeta, fn_name, fn_fallback, 1, lbl_succ, lbl_fail);
@@ -99,9 +149,9 @@ void  emit_bb_xsucf       (bb_label_t *s, bb_label_t *f, bb_label_t *b)         
 void  emit_bb_xbal        (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_stateful("BAL",  "", bb_bal_new(),         "rt_bb_bal",  (uint64_t)(uintptr_t)rt_bb_bal,  s,f,b); }
 void  emit_bb_xfarb       (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_stateful("ARB",  "", bb_arb_new(),         "rt_bb_arb",  (uint64_t)(uintptr_t)rt_bb_arb,  s,f,b); }
 void  emit_bb_xstar       (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_stateful("REM",  "", bb_rem_new(),         "rt_bb_rem",  (uint64_t)(uintptr_t)rt_bb_rem,  s,f,b); }
-void  emit_bb_xlnth       (long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b)         { emit_bb_stateful("LEN",  "", bb_len_new((int)n),  "rt_bb_len",  (uint64_t)(uintptr_t)rt_bb_len,  s,f,b); }
-void  emit_bb_xrtb        (long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b)         { emit_bb_stateful("RTAB", "", bb_rtab_new((int)n), "rt_bb_rtab", (uint64_t)(uintptr_t)rt_bb_rtab, s,f,b); }
-void  emit_bb_xtb         (long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b)         { emit_bb_stateful("TAB",  "", bb_tab_new((int)n),  "rt_bb_tab",  (uint64_t)(uintptr_t)rt_bb_tab,  s,f,b); }
+void  emit_bb_xlnth       (long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b)         { emit_bb_stateful_int("LEN",  (int)n, bb_len_new((int)n),  "rt_bb_len",  (uint64_t)(uintptr_t)rt_bb_len,  s,f,b); }
+void  emit_bb_xrtb        (long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b)         { emit_bb_stateful_int("RTAB", (int)n, bb_rtab_new((int)n), "rt_bb_rtab", (uint64_t)(uintptr_t)rt_bb_rtab, s,f,b); }
+void  emit_bb_xtb         (long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b)         { emit_bb_stateful_int("TAB",  (int)n, bb_tab_new((int)n),  "rt_bb_tab",  (uint64_t)(uintptr_t)rt_bb_tab,  s,f,b); }
 void  emit_bb_icon_alt    (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_stateful("ICN_ALT",     "", icon_alt_new(),     "coro_bb_alternate",   (uint64_t)(uintptr_t)coro_bb_alternate,   s,f,b); }
 void  emit_bb_icon_bang   (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_stateful("ICN_BANG",    "", icon_bang_new(),    "coro_bb_bang_binary", (uint64_t)(uintptr_t)coro_bb_bang_binary, s,f,b); }
 void  emit_bb_icon_every  (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_stateful("ICN_EVERY",   "", icon_every_new(),   "coro_bb_every",       (uint64_t)(uintptr_t)coro_bb_every,       s,f,b); }
@@ -127,7 +177,41 @@ void  emit_bb_icon_proc_call  (bb_label_t *s, bb_label_t *f, bb_label_t *b) { em
 void  emit_bb_icon_scan       (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_SCAN",      "", icon_scan_gen_new(),    "coro_bb_scan_gen",    (uint64_t)(uintptr_t)coro_bb_scan_gen,    s,f,b); }
 void  emit_bb_icon_suspend    (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_SUSPEND",   "", icon_suspend_new(),     "coro_bb_suspend",     (uint64_t)(uintptr_t)coro_bb_suspend,     s,f,b); }
 void  emit_bb_xarbn       (bb_box_fn child_fn, bb_label_t *s, bb_label_t *f, bb_label_t *b)  { emit_bb_stateful("ARBNO", "", rt_bb_arbno_new(child_fn, NULL), "rt_bb_arbno", (uint64_t)(uintptr_t)rt_bb_arbno, s,f,b); }
-void  emit_bb_xbrkx       (const char *chars, bb_label_t *s, bb_label_t *f, bb_label_t *b)   { emit_bb_stateful("BREAKX", chars ? chars : "", bb_breakx_new(chars), "rt_bb_breakx", (uint64_t)(uintptr_t)rt_bb_breakx, s,f,b); }
+void  emit_bb_xbrkx       (const char *chars, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
+    brkx_t *z = bb_breakx_new(chars);
+    if (IS_TEXT) {
+        emit_bb_box_banner("BREAKX", chars ? chars : "");
+        int id = g_flat_node_id++;
+        char slbl[80], zlbl[80], slbl_def[88], zlbl_def[88];
+        snprintf(slbl, sizeof(slbl), ".Lbrkx%d_chars", id);
+        snprintf(zlbl, sizeof(zlbl), ".Lbrkx%d_z",     id);
+        snprintf(slbl_def, sizeof(slbl_def), "%s:", slbl);
+        snprintf(zlbl_def, sizeof(zlbl_def), "%s:", zlbl);
+        const char *ch = chars ? chars : "";
+        char esc[1024]; size_t o = 0;
+        if (o < sizeof(esc)) esc[o++] = '"';
+        for (const char *cp = ch; *cp && o + 5 < sizeof(esc); cp++) {
+            unsigned char c = (unsigned char)*cp;
+            if (c == '"' || c == '\\') { esc[o++] = '\\'; esc[o++] = (char)c; }
+            else if (c >= 32 && c < 127) { esc[o++] = (char)c; }
+            else { o += snprintf(esc + o, sizeof(esc) - o, "\\%03o", c); }
+        }
+        if (o + 1 < sizeof(esc)) esc[o++] = '"';
+        esc[o] = '\0';
+        FILE *out = emit_outf();
+        bb3c_format(out, "",       ".section", ".data");
+        bb3c_format(out, slbl_def, ".string",  esc);
+        bb3c_format(out, zlbl_def, ".quad",    slbl);
+        bb3c_format(out, "",       ".long",    "0");
+        bb3c_format(out, "",       ".section", ".text");
+        bb3c_format(out, "",       ".intel_syntax", "noprefix");
+        emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_breakx", (uint64_t)(uintptr_t)rt_bb_breakx, 0, s, f);
+        emit_label_define(b);
+        emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_breakx", (uint64_t)(uintptr_t)rt_bb_breakx, 1, s, f);
+        return;
+    }
+    emit_bb_stateful("BREAKX", chars ? chars : "", z, "rt_bb_breakx", (uint64_t)(uintptr_t)rt_bb_breakx, s,f,b);
+}
 /*--------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xcallcap(bb_box_fn child_fn, const char *fnc_name, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
     emit_bb_stateful("CALLCAP", fnc_name ? fnc_name : "", bb_cap_new_call(child_fn, NULL, fnc_name, NULL, 0, NULL, 0, 0), "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, s,f,b);

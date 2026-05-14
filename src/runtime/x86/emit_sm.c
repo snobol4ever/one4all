@@ -574,10 +574,6 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
         macro_line(out, "", ".macro", macro_def);
         { char ct[64]; snprintf(ct, sizeof(ct), "%s@PLT", t->runtime);
           macro_line(out, "", "call", ct); }
-        if (strcmp(t->macro_name, "DEFINE_ENTRY") == 0) {
-            macro_line(out, "", "push", "rbp");
-            macro_line(out, "", "mov",  "rbp, rsp");
-        }
         macro_line(out, "", ".endm", "");
         return 0;
     case SM_TPL_RET:
