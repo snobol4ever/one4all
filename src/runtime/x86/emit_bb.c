@@ -1535,14 +1535,15 @@ int emit_bb_macro_library_to_path(const char *path) {
 #define ICN_NQ(T) ((int)(((int)sizeof(T)+7)/8))
 void emit_bb_icon_noop   (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_NOOP",   icon_noop_new(),   "icn_bb_noop",   icn_bb_noop,   icn_noop_state_t,   s,f,b); }
 void emit_bb_icon_intlit (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_INTLIT", icon_intlit_new(), "icn_bb_intlit", icn_bb_intlit, icn_intlit_state_t, s,f,b); }
-void emit_bb_icon_reallit  (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_rtcall("ICN_REALLIT",  "",icon_reallit_new(),     "icn_bb_reallit",   (uint64_t)(uintptr_t)icn_bb_reallit,   ICN_NQ(icn_reallit_state_t),   s,f,b);}
-void emit_bb_icon_strlit   (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_rtcall("ICN_STRLIT",   "",icon_strlit_new(),      "icn_bb_strlit",    (uint64_t)(uintptr_t)icn_bb_strlit,    ICN_NQ(icn_strlit_state_t),    s,f,b);}
-void emit_bb_icon_csetlit  (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_rtcall("ICN_CSETLIT",  "",icon_csetlit_new(),     "icn_bb_csetlit",   (uint64_t)(uintptr_t)icn_bb_csetlit,   ICN_NQ(icn_csetlit_state_t),   s,f,b);}
-void emit_bb_icon_global   (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_rtcall("ICN_GLOBAL",   "",icon_global_new(),      "icn_bb_global",    (uint64_t)(uintptr_t)icn_bb_global,    ICN_NQ(icn_global_state_t),    s,f,b);}
-void emit_bb_icon_if       (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_rtcall("ICN_IF",       "",icon_if_new(),          "icn_bb_if_bb",     (uint64_t)(uintptr_t)icn_bb_if_bb,     ICN_NQ(icn_if_state_t),        s,f,b);}
-void emit_bb_icon_initial  (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_rtcall("ICN_INITIAL",  "",icon_initial_new(),     "icn_bb_initial",   (uint64_t)(uintptr_t)icn_bb_initial,   ICN_NQ(icn_initial_state_t),   s,f,b);}
-void emit_bb_icon_invocable(bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_rtcall("ICN_INVOCABLE","",icon_invocable_new(),   "icn_bb_invocable", (uint64_t)(uintptr_t)icn_bb_invocable, ICN_NQ(icn_invocable_state_t), s,f,b);}
-void emit_bb_icon_link     (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_rtcall("ICN_LINK",     "",icon_link_new(),        "icn_bb_link",      (uint64_t)(uintptr_t)icn_bb_link,      ICN_NQ(icn_link_state_t),      s,f,b);}
+/* IF-4: ICN_* batch D — two-path inline; _new() constructors already extern-declared above. */
+void emit_bb_icon_reallit  (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_REALLIT",   icon_reallit_new(),   "icn_bb_reallit",   icn_bb_reallit,   icn_reallit_state_t,   s,f,b); }
+void emit_bb_icon_strlit   (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_STRLIT",    icon_strlit_new(),    "icn_bb_strlit",    icn_bb_strlit,    icn_strlit_state_t,    s,f,b); }
+void emit_bb_icon_csetlit  (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_CSETLIT",   icon_csetlit_new(),   "icn_bb_csetlit",   icn_bb_csetlit,   icn_csetlit_state_t,   s,f,b); }
+void emit_bb_icon_global   (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_GLOBAL",    icon_global_new(),    "icn_bb_global",    icn_bb_global,    icn_global_state_t,    s,f,b); }
+void emit_bb_icon_if       (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_IF",        icon_if_new(),        "icn_bb_if_bb",     icn_bb_if_bb,     icn_if_state_t,        s,f,b); }
+void emit_bb_icon_initial  (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_INITIAL",   icon_initial_new(),   "icn_bb_initial",   icn_bb_initial,   icn_initial_state_t,   s,f,b); }
+void emit_bb_icon_invocable(bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_INVOCABLE", icon_invocable_new(), "icn_bb_invocable", icn_bb_invocable, icn_invocable_state_t, s,f,b); }
+void emit_bb_icon_link     (bb_label_t *s,bb_label_t *f,bb_label_t *b) { ICN_EMIT2("ICN_LINK",      icon_link_new(),      "icn_bb_link",      icn_bb_link,      icn_link_state_t,      s,f,b); }
 void emit_bb_icon_record   (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_rtcall("ICN_RECORD",   "",icon_record_new(),      "icn_bb_record_bb", (uint64_t)(uintptr_t)icn_bb_record_bb,  ICN_NQ(icn_record_state_t),    s,f,b);}
 void emit_bb_icon_return   (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_rtcall("ICN_RETURN",   "",icon_return_new(),      "icn_bb_return_bb", (uint64_t)(uintptr_t)icn_bb_return_bb,  ICN_NQ(icn_return_state_t),    s,f,b);}
 void emit_bb_icon_fail     (bb_label_t *s,bb_label_t *f,bb_label_t *b){emit_bb_rtcall("ICN_FAIL",     "",icon_fail_new(),        "icn_bb_fail_bb",   (uint64_t)(uintptr_t)icn_bb_fail_bb,   ICN_NQ(icn_fail_state_t),      s,f,b);}
