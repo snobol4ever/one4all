@@ -265,12 +265,13 @@ IR_t * IR_exec_node(IR_t * nd) {
         Δ--; nd->state = 0; nd->value = FAILDESCR; return nd->ω;
     }
     /*-- IR_PAT_POS: zero-width cursor assert.
-     * ival = n (position argument). sval = "R" for RPOS, else POS.
+     * ival = n (position argument). n=0 → POS (from left), n=1 → RPOS (from right).
+     * nd->n is the direction flag: 0=POS, 1=RPOS. Never reset by IR_reset.
      * Non-generative. ---------------------------------------------------------------*/
     case IR_PAT_POS: {
         if (nd->state == 0) {
-            int64_t n   = nd->ival;
-            int     pos = (nd->sval && nd->sval[0] == 'R') ? (Σlen - (int)n) : (int)n;
+            int64_t arg = nd->ival;
+            int     pos = nd->n ? (Σlen - (int)arg) : (int)arg;
             if (pos < 0 || pos > Σlen || Δ != pos) { nd->value = FAILDESCR; return nd->ω; }
             nd->state = 1;
             nd->value = NULVCL;
@@ -278,15 +279,15 @@ IR_t * IR_exec_node(IR_t * nd) {
         }
         nd->state = 0; nd->value = FAILDESCR; return nd->ω;
     }
-    /*-- IR_PAT_TAB: advance cursor to position n. ival=0 → TAB (from left), ival=1 → RTAB (from right).
-     * sval reused to store n as int64 (we use nd->counter for Δ_saved).
+    /*-- IR_PAT_TAB: advance cursor to position n.
+     * ival = n (position argument). nd->n = direction flag: 0=TAB (from left), 1=RTAB (from right).
      * Non-generative (succeeds if Δ ≤ target). ---------------------------------------------------------*/
     case IR_PAT_TAB: {
         if (nd->state == 0) {
-            int64_t n      = nd->ival;   /* position argument stored in ival by build_node */
-            int     target = (nd->sval && nd->sval[0] == 'R') ? (Σlen - (int)n) : (int)n;
+            int64_t arg    = nd->ival;
+            int     target = nd->n ? (Σlen - (int)arg) : (int)arg;
             if (target < 0 || target > Σlen || Δ > target) { nd->value = FAILDESCR; return nd->ω; }
-            nd->counter = Δ;   /* save Δ_before for resume */
+            nd->counter = Δ;
             nd->state   = 1;
             nd->value   = descr_match_span(Σ + Δ, target - Δ);
             Δ = target;
@@ -367,11 +368,8 @@ DESCR_t IR_exec_once(IR_prog_t * cfg) {
     while (cur && safety-- > 0) {
         IR_t * next = IR_exec_node(cur);
         if (!next) {
-            /* terminal: succ path returned NULL → value is in cur->value */
             return IS_FAIL_fn(cur->value) ? FAILDESCR : cur->value;
         }
-        /* If next == cur we have an infinite self-loop on a non-generative node.
-         * Treat as fail to avoid spinning forever. */
         if (next == cur) return FAILDESCR;
         cur = next;
     }

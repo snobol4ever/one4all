@@ -161,8 +161,8 @@ static IR_prog_t * build_node(IR_prog_t * cfg, const tree_t * t, IR_t * sp, IR_t
     case TT_POS: {
         if (t->n < 1 || !t->c[0] || t->c[0]->t != TT_ILIT) return NULL;
         nd = IR_node_alloc(cfg, IR_PAT_POS);
-        nd->ival = t->c[0]->v.ival;   /* n; sval=NULL → POS (left) */
-        nd->sval = NULL;
+        nd->ival = t->c[0]->v.ival;
+        nd->n    = 0;   /* POS: from left */
         nd->α = nd; nd->β = fp; nd->γ = sp; nd->ω = fp;
         return nd;
     }
@@ -170,15 +170,15 @@ static IR_prog_t * build_node(IR_prog_t * cfg, const tree_t * t, IR_t * sp, IR_t
         if (t->n < 1 || !t->c[0] || t->c[0]->t != TT_ILIT) return NULL;
         nd = IR_node_alloc(cfg, IR_PAT_POS);
         nd->ival = t->c[0]->v.ival;
-        nd->sval = "R";   /* flag: RPOS */
+        nd->n    = 1;   /* RPOS: from right */
         nd->α = nd; nd->β = fp; nd->γ = sp; nd->ω = fp;
         return nd;
     }
     case TT_TAB: {
         if (t->n < 1 || !t->c[0] || t->c[0]->t != TT_ILIT) return NULL;
         nd = IR_node_alloc(cfg, IR_PAT_TAB);
-        nd->ival = t->c[0]->v.ival;   /* n; sval=NULL → TAB (left) */
-        nd->sval = NULL;
+        nd->ival = t->c[0]->v.ival;
+        nd->n    = 0;   /* TAB: from left */
         nd->α = nd; nd->β = fp; nd->γ = sp; nd->ω = fp;
         return nd;
     }
@@ -186,7 +186,7 @@ static IR_prog_t * build_node(IR_prog_t * cfg, const tree_t * t, IR_t * sp, IR_t
         if (t->n < 1 || !t->c[0] || t->c[0]->t != TT_ILIT) return NULL;
         nd = IR_node_alloc(cfg, IR_PAT_TAB);
         nd->ival = t->c[0]->v.ival;
-        nd->sval = "R";   /* flag: RTAB */
+        nd->n    = 1;   /* RTAB: from right */
         nd->α = nd; nd->β = fp; nd->γ = sp; nd->ω = fp;
         return nd;
     }
