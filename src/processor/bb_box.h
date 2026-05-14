@@ -162,6 +162,7 @@ typedef struct cap_s {
     DESCR_t      pending;   /* EST-4: dead field (never read); kept for struct ABI stability */
     int          has_pending;
     int          registered;
+    int          cap_start; /* saved Δ at α entry — used by rt_bb_cap β to compute span */
 } cap_t;
 
 /* External box-function + helper declarations — all live in bb_boxes.c

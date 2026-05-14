@@ -1170,11 +1170,11 @@ void emit_seq_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fall
         emit_jmp(lbl_fail, JMP_JMP);
         return;
     }
-    insn_push_r12();
+    insn_push_r10();
     insn_mov_rdi_i64(zeta_ptr);
     insn_mov_esi_i32(port);
     insn_call_plt(fn_name, fn_fallback);
-    insn_pop_r12();
+    insn_pop_r10();
     insn_cmp_al_i8(99);
     emit_jmp(lbl_succ, JMP_JNE);
     emit_jmp(lbl_fail, JMP_JMP);

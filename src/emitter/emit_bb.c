@@ -1501,7 +1501,7 @@ static void pre_build_children(PATND_t *p) {
         PATND_t *ch = (p->nchildren > 0) ? p->children[0] : NULL;
         if (ch && !child_cache_get(ch)) {
             pre_build_children(ch);
-            bb_box_fn fn = (p->kind == XARBN) ? bb_build_brokered(ch) : bb_build_flat(ch);
+            bb_box_fn fn = (p->kind == XARBN || p->kind == XNME || p->kind == XFNME) ? bb_build_brokered(ch) : bb_build_flat(ch);
             if (!fn) fn = bb_build_brokered(ch);
             child_cache_put(ch, fn);
         }
