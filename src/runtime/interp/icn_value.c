@@ -433,6 +433,8 @@ DESCR_t icn_proc_as_value(const char *name)
 DESCR_t bb_eval_value(tree_t *e)
 {
     if (!e) return NULVCL;
+    extern tree_t *icn_drive_node; extern DESCR_t icn_drive_val;
+    if (icn_drive_node && e == icn_drive_node) return icn_drive_val;
 
     /* Icon-frame-aware TT_VAR: slot read when inside an Icon procedure call.
      * SI-13 fix: slot is stored in e->_id (not e->v.ival) by icn_scope_patch,
@@ -1252,8 +1254,17 @@ DESCR_t bb_eval_value(tree_t *e)
             DESCR_t tick = rbox.fn(rbox.ζ, α);
             while (!IS_FAIL_fn(tick) && !FRAME.returning && !FRAME.loop_break) {
                 FRAME.loop_next = 0;
-                /* IJ-CORO: drive injection removed; eval gen directly */
+                /* Inject tick into leaf via tree surgery so RHS re-eval uses current gen value.
+                 * Saves/restores leaf->t and leaf->v; eval_node(TT_ILIT/TT_QLIT/TT_FLIT)
+                 * is purely value-returning with no side effects. */
+                tree_e saved_t = leaf->t;
+                union { char *sval; long long ival; double dval; } saved_v;
+                saved_v.sval = leaf->v.sval;
+                if (tick.v == DT_R) { leaf->t = TT_FLIT; leaf->v.dval = tick.r; }
+                else if (tick.v == DT_S || tick.v == DT_SNUL) { leaf->t = TT_QLIT; leaf->v.sval = (tick.v == DT_SNUL) ? "" : (char *)tick.s; }
+                else { leaf->t = TT_ILIT; leaf->v.ival = tick.i; }
                 (void)bb_eval_value(gen);
+                leaf->t = saved_t; leaf->v.sval = saved_v.sval;
                 if (body) bb_exec_stmt(body);
                 if (FRAME.returning || FRAME.loop_break) break;
                 tick = rbox.fn(rbox.ζ, β);
