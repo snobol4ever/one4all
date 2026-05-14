@@ -1104,6 +1104,108 @@ DESCR_t icn_bb_cat(void *zeta, int entry) {
 }
 
 /*----------------------------------------------------------------------------------------------------------------------------
+ * icn_bb_scan_gen — TT_SCAN with generative body  (str ? gen_body)  IJ-7/IJ-9
+ * Installs the subject as scan_subj, builds body generator from body tree,
+ * pumps it. Each successful tick yields the body value (side effects ran).
+ * For generative subject: advances subject on body exhaustion.
+ *--------------------------------------------------------------------------------------------------------------------------*/
+DESCR_t icn_bb_scan_gen(void *zeta, int entry) {
+    icn_scan_gen_state_t *z = (icn_scan_gen_state_t *)zeta;
+    if (!z->body) return FAILDESCR;
+    if (!z->started || entry == α) {
+        /* First pump: evaluate subject, install scan context, build body gen */
+        DESCR_t sv = z->subj_gen.fn(z->subj_gen.ζ, (z->started ? β : α));
+        if (IS_FAIL_fn(sv)) return FAILDESCR;
+        z->started = 1;
+        /* Install scan subject */
+        const char *s = sv.s ? sv.s : (sv.v == DT_SNUL ? "" : "");
+        z->body_subj = s;
+        const char *saved_subj = scan_subj;
+        int saved_pos = scan_pos;
+        scan_subj = s;
+        scan_pos  = 1;
+        /* Build body generator */
+        z->body_gen  = icn_bb_build(z->body);
+        z->body_live = 1;
+        z->body_pos  = scan_pos;
+        DESCR_t val = z->body_gen.fn(z->body_gen.ζ, α);
+        z->body_pos = scan_pos;
+        scan_subj = saved_subj;
+        scan_pos  = saved_pos;
+        if (!IS_FAIL_fn(val)) return val;
+        z->body_live = 0;
+        return FAILDESCR;
+    }
+    /* β: try to advance body gen first */
+    if (z->body_live) {
+        const char *saved_subj = scan_subj;
+        int saved_pos = scan_pos;
+        scan_subj = z->body_subj;
+        scan_pos  = z->body_pos;
+        DESCR_t val = z->body_gen.fn(z->body_gen.ζ, β);
+        z->body_pos = scan_pos;
+        scan_subj = saved_subj;
+        scan_pos  = saved_pos;
+        if (!IS_FAIL_fn(val)) return val;
+        z->body_live = 0;
+    }
+    /* Body exhausted — try next subject */
+    DESCR_t sv = z->subj_gen.fn(z->subj_gen.ζ, β);
+    if (IS_FAIL_fn(sv)) return FAILDESCR;
+    const char *s = sv.s ? sv.s : "";
+    z->body_subj = s;
+    const char *saved_subj2 = scan_subj;
+    int saved_pos2 = scan_pos;
+    scan_subj = s;
+    scan_pos  = 1;
+    z->body_gen  = icn_bb_build(z->body);
+    z->body_live = 1;
+    z->body_pos  = scan_pos;
+    DESCR_t val2 = z->body_gen.fn(z->body_gen.ζ, α);
+    z->body_pos = scan_pos;
+    scan_subj = saved_subj2;
+    scan_pos  = saved_pos2;
+    if (!IS_FAIL_fn(val2)) return val2;
+    z->body_live = 0;
+    return FAILDESCR;
+}
+
+/*----------------------------------------------------------------------------------------------------------------------------
+ * icn_bb_find — find(needle, hay) generator  B-7
+ * α: search from start; β: search from one past last hit. Returns 1-based position.
+ *--------------------------------------------------------------------------------------------------------------------------*/
+DESCR_t icn_bb_find(void *zeta, int entry) {
+    icn_find_state_t *z = (icn_find_state_t *)zeta;
+    if (entry == α) z->next = z->hay;
+    const char *hit = strstr(z->next, z->needle);
+    if (!hit) return FAILDESCR;
+    long pos1 = (long)(hit - z->hay) + 1;
+    z->next = hit + (z->nlen > 0 ? z->nlen : 1);
+    return INTVAL(pos1);
+}
+
+/*----------------------------------------------------------------------------------------------------------------------------
+ * icn_bb_bal — bal(c1,c2,c3) generator  B-8
+ * Walks scan subject, yields 1-based positions where c1 chars appear at depth 0.
+ *--------------------------------------------------------------------------------------------------------------------------*/
+DESCR_t icn_bb_bal(void *zeta, int entry) {
+    icn_bal_state_t *z = (icn_bal_state_t *)zeta;
+    if (entry == α) { /* pos already set at construction */ }
+    int p = z->pos, depth = 0;
+    while (p < z->endp && p < z->slen) {
+        char ch = z->s[p];
+        if (strchr(z->c2, ch)) depth++;
+        else if (strchr(z->c3, ch) && depth > 0) depth--;
+        else if (depth == 0 && strchr(z->c1, ch)) {
+            z->pos = p + 1;
+            return INTVAL((long)(p + 1));
+        }
+        p++;
+    }
+    return FAILDESCR;
+}
+
+/*----------------------------------------------------------------------------------------------------------------------------
  * icn_bb_idx_gen — s[gen_idx] generative subscript  IC-7
  * Holds the pre-evaluated base object and the index generator.
  * Each tick: pump idx_gen, call subscript_get(base, tick).
@@ -1572,7 +1674,7 @@ bb_node_t icn_bb_build(tree_t *e) {
                 z->hay    = s2.s ? s2.s : "";
                 z->nlen   = (int)strlen(z->needle);
                 z->next   = z->hay;
-                return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
+                return (bb_node_t){ icn_bb_find, z, 0 };
             }
         }
     }
@@ -1602,7 +1704,7 @@ bb_node_t icn_bb_build(tree_t *e) {
             icn_bal_state_t *z = calloc(1, sizeof(*z));
             z->s = s; z->c1 = c1; z->c2 = c2; z->c3 = c3;
             z->slen = slen; z->pos = p; z->endp = end;
-            return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
+            return (bb_node_t){ icn_bb_bal, z, 0 };
         }
         bal_skip:;
     }
@@ -1616,7 +1718,7 @@ bb_node_t icn_bb_build(tree_t *e) {
             z->tbl    = td.tbl;
             z->bucket = 0;
             z->entry  = NULL;
-            return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
+            return (bb_node_t){ icn_bb_tbl_key_iterate, z, 0 };
         }
     }
 
@@ -1673,15 +1775,24 @@ bb_node_t icn_bb_build(tree_t *e) {
                 return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
             }
         }
-        /* ── TT_FNC upto(cset, str) scalar args — IR_block_t DCG (IJ-19) ── */
-        if (fn && strcmp(fn, "upto") == 0 && nargs >= 2 && !is_suspendable(e->c[2])) {
+        /* ── TT_FNC upto(cset[, str]) scalar args — IR_block_t DCG (IJ-19) ── */
+        if (fn && strcmp(fn, "upto") == 0 && nargs >= 1) {
             DESCR_t cd = bb_eval_value(e->c[1]);
-            DESCR_t sd = bb_eval_value(e->c[2]);
             const char *cset = VARVAL_fn(cd);
-            const char *hay  = sd.s ? sd.s : (sd.v == DT_SNUL ? "" : NULL);
+            /* nargs==1: use scan_subj (scan context); nargs>=2: explicit string */
+            const char *hay = NULL;
+            if (nargs >= 2 && !is_suspendable(e->c[2])) {
+                DESCR_t sd = bb_eval_value(e->c[2]);
+                hay = sd.s ? sd.s : (sd.v == DT_SNUL ? "" : NULL);
+            } else if (nargs == 1) {
+                hay = scan_subj ? scan_subj : "";
+            }
             if (cset && hay) {
                 extern IR_block_t *lower_icn_upto(const char *cset, const char *hay);
-                IR_block_t *cfg = lower_icn_upto(cset, hay);
+                /* For scan context: start from scan_pos (1-based); upto from that offset */
+                const char *hay_from = (nargs == 1 && scan_pos > 1 && scan_pos <= (int)strlen(hay)+1)
+                                       ? hay + scan_pos - 1 : hay;
+                IR_block_t *cfg = lower_icn_upto(cset, hay_from);
                 if (cfg) {
                     icn_dcg_state_t *dz = calloc(1, sizeof(*dz));
                     dz->cfg = cfg;
@@ -1820,10 +1931,11 @@ bb_node_t icn_bb_build(tree_t *e) {
     if (e->t == TT_SCAN && e->n >= 1 &&
         (is_suspendable(e->c[0]) || (e->n >= 2 && is_suspendable(e->c[1])))) {
         icn_scan_gen_state_t *z = calloc(1, sizeof(*z));
+        /* For scalar subject (non-generative), wrap as oneshot so β exhausts immediately */
         z->subj_gen = icn_bb_build(e->c[0]);
         z->body     = (e->n >= 2) ? e->c[1] : NULL;
         z->started  = 0;
-        return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
+        return (bb_node_t){ icn_bb_scan_gen, z, 0 };
     }
 
     /* ── IC-7: TT_NONNULL (\E) as generator — filter: pass values, skip null ──
