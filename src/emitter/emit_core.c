@@ -1158,12 +1158,14 @@ void emit_seq_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fall
             return;
         }
         emit_text_3col(emit_outf(), "", "push", "r10");
+        emit_text_3col(emit_outf(), "", "sub",  "rsp, 8");
         { char a[80]; snprintf(a,sizeof(a),"rdi, [rip + %s]", fn_name?fn_name:"??");
           emit_text_3col(emit_outf(),"","lea",a); }
         { char a[16]; snprintf(a,sizeof(a),"esi, %d",port);
           emit_text_3col(emit_outf(),"","mov",a); }
         { char a[80]; snprintf(a,sizeof(a),"%s@PLT",fn_name?fn_name:"??");
           emit_text_3col(emit_outf(),"","call",a); }
+        emit_text_3col(emit_outf(), "", "add",  "rsp, 8");
         emit_text_3col(emit_outf(), "", "pop", "r10");
         insn_cmp_al_i8(99);
         emit_jmp(lbl_succ, JMP_JNE);
@@ -1171,9 +1173,11 @@ void emit_seq_port_call(uint64_t zeta_ptr, const char *fn_name, uint64_t fn_fall
         return;
     }
     insn_push_r10();
+    insn_sub_rsp_i8(8);
     insn_mov_rdi_i64(zeta_ptr);
     insn_mov_esi_i32(port);
     insn_call_plt(fn_name, fn_fallback);
+    insn_add_rsp_i8(8);
     insn_pop_r10();
     insn_cmp_al_i8(99);
     emit_jmp(lbl_succ, JMP_JNE);
@@ -1193,12 +1197,14 @@ void emit_seq_port_call_rip(uint64_t zeta_ptr, const char *zeta_label,
             return;
         }
         insn_push_r10();
+        emit_text_3col(emit_outf(),"","sub","rsp, 8");
         { char a[80]; snprintf(a,sizeof(a),"rdi, [rip + %s]",zeta_label?zeta_label:"??");
           emit_text_3col(emit_outf(),"","lea",a); }
         { char a[16]; snprintf(a,sizeof(a),"esi, %d",port);
           emit_text_3col(emit_outf(),"","mov",a); }
         { char a[80]; snprintf(a,sizeof(a),"%s@PLT",fn_name?fn_name:"??");
           emit_text_3col(emit_outf(),"","call",a); }
+        emit_text_3col(emit_outf(),"","add","rsp, 8");
         insn_pop_r10();
         insn_cmp_al_i8(99);
         emit_jmp(lbl_succ, JMP_JNE);
@@ -1207,9 +1213,11 @@ void emit_seq_port_call_rip(uint64_t zeta_ptr, const char *zeta_label,
     }
     (void)zeta_label;
     insn_push_r10();
+    insn_sub_rsp_i8(8);
     insn_mov_rdi_i64(zeta_ptr);
     insn_mov_esi_i32(port);
     insn_call_plt(fn_name, fn_fallback);
+    insn_add_rsp_i8(8);
     insn_pop_r10();
     insn_cmp_al_i8(99);
     emit_jmp(lbl_succ, JMP_JNE);
