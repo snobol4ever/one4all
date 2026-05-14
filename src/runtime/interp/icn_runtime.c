@@ -1171,6 +1171,22 @@ DESCR_t icn_bb_scan_gen(void *zeta, int entry) {
 }
 
 /*----------------------------------------------------------------------------------------------------------------------------
+ * icn_bb_to_by_real — (lo to hi by step) real-valued range generator
+ * Used when all three bounds are DT_R.  State kept in icn_to_by_state_t
+ * (lo/hi/step/cur as int64 reinterpreted as double via union alias).
+ *--------------------------------------------------------------------------------------------------------------------------*/
+/* icn_to_by_real_state_t declared in icon_gen.h */
+DESCR_t icn_bb_to_by_real(void *zeta, int entry) {
+    icn_to_by_real_state_t *z = (icn_to_by_real_state_t *)zeta;
+    if (entry == α) { z->cur = z->lo; }
+    else            { z->cur += z->step; }
+    int exhausted = (z->step >= 0) ? (z->cur > z->hi + 1e-12)
+                                   : (z->cur < z->hi - 1e-12);
+    if (exhausted) return FAILDESCR;
+    return REALVAL(z->cur);
+}
+
+/*----------------------------------------------------------------------------------------------------------------------------
  * icn_bb_find — find(needle, hay) generator  B-7
  * α: search from start; β: search from one past last hit. Returns 1-based position.
  *--------------------------------------------------------------------------------------------------------------------------*/
@@ -1440,7 +1456,16 @@ bb_node_t icn_bb_build(tree_t *e) {
         } } while(0)
         _TO_COERCE(lo_d); _TO_COERCE(hi_d); _TO_COERCE(step_d);
 #undef _TO_COERCE
-        /* JCON: all to-by bounds truncate to integer regardless of type (no pure-real path) */
+        /* Pure-real path: when all bounds are DT_R (no string coercion), use real generator */
+        if (!any_str && IS_REAL_fn(lo_d) && IS_REAL_fn(hi_d) && IS_REAL_fn(step_d)) {
+            icn_to_by_real_state_t *rz = calloc(1, sizeof(*rz));
+            rz->lo   = lo_d.r;
+            rz->hi   = hi_d.r;
+            rz->step = step_d.r ? step_d.r : 1.0;
+            rz->cur  = rz->lo;
+            return (bb_node_t){ icn_bb_to_by_real, rz, 0 };
+        }
+        /* JCON: otherwise truncate to integer */
 #define _TO_INT(d, def) (IS_REAL_fn(d) ? (long)(d).r : (IS_FAIL_fn(d) ? (def) : (d).i))
         int64_t to_by_lo   = _TO_INT(lo_d,   0);
         int64_t to_by_hi   = _TO_INT(hi_d,   0);
