@@ -1083,6 +1083,45 @@ static DESCR_t icn_bb_revswap(void *zeta, int entry) {
     return FAILDESCR;
 }
 /*----------------------------------------------------------------------------------------------------------------------------
+ * icn_bb_cat — generative subscript/concat driver  IC-7
+ * Used for s[gen_idx], (gen || str), (str || gen) etc.
+ * Pumps the leaf generator; for each value, injects it via icn_drive_node
+ * and re-evaluates the full cat_expr via bb_eval_value.
+ *--------------------------------------------------------------------------------------------------------------------------*/
+DESCR_t icn_bb_cat(void *zeta, int entry) {
+    icn_cat_gen_state_t *z = (icn_cat_gen_state_t *)zeta;
+    int e2 = entry;
+    for (;;) {
+        DESCR_t tick = z->gen.fn(z->gen.ζ, e2);
+        if (IS_FAIL_fn(tick)) return FAILDESCR;
+        icn_drive_node = z->leaf;
+        icn_drive_val  = tick;
+        DESCR_t result = bb_eval_value(z->cat_expr);
+        icn_drive_node = NULL;
+        if (!IS_FAIL_fn(result)) return result;
+        e2 = β;
+    }
+}
+
+/*----------------------------------------------------------------------------------------------------------------------------
+ * icn_bb_idx_gen — s[gen_idx] generative subscript  IC-7
+ * Holds the pre-evaluated base object and the index generator.
+ * Each tick: pump idx_gen, call subscript_get(base, tick).
+ *--------------------------------------------------------------------------------------------------------------------------*/
+typedef struct { DESCR_t base; bb_node_t idx_gen; } icn_idx_gen_state_t;
+static DESCR_t icn_bb_idx_gen(void *zeta, int entry) {
+    icn_idx_gen_state_t *z = (icn_idx_gen_state_t *)zeta;
+    int e2 = entry;
+    for (;;) {
+        DESCR_t tick = z->idx_gen.fn(z->idx_gen.ζ, e2);
+        if (IS_FAIL_fn(tick)) return FAILDESCR;
+        DESCR_t result = subscript_get(z->base, tick);
+        if (!IS_FAIL_fn(result)) return result;
+        e2 = β;
+    }
+}
+
+/*----------------------------------------------------------------------------------------------------------------------------
  * icn_bb_list_iterate — !L generator for DT_DATA icnlist  IC-5
  * Holds the live list object; re-reads elems/size each tick so put() mutations are visible.
  * α: reset pos=0; β: advance pos.  ω when pos >= n.
@@ -1494,21 +1533,19 @@ bb_node_t icn_bb_build(tree_t *e) {
             z->gen      = icn_bb_build(leaf);
             z->cat_expr = e;
             z->leaf     = leaf;
-            return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
+            return (bb_node_t){ icn_bb_cat, z, 0 };
         }
     }
 
-    /* ── TT_IDX: s[gen_idx] — drive index generator, re-eval subscript each tick ── */
+    /* ── TT_IDX: s[gen_idx] — drive index generator, subscript base each tick ── */
     if (e->t == TT_IDX && e->n >= 2) {
         for (int _ci = 1; _ci < e->n; _ci++) {
             if (is_suspendable(e->c[_ci])) {
-                tree_t *leaf = find_leaf_suspendable(e->c[_ci]);
-                if (!leaf) leaf = e->c[_ci];
-                icn_cat_gen_state_t *z = calloc(1, sizeof(*z));
-                z->gen      = icn_bb_build(leaf);
-                z->cat_expr = e;     /* re-eval the full TT_IDX expression per tick */
-                z->leaf     = leaf;
-                return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
+                DESCR_t base = bb_eval_value(e->c[0]);
+                icn_idx_gen_state_t *z = calloc(1, sizeof(*z));
+                z->base    = base;
+                z->idx_gen = icn_bb_build(e->c[_ci]);
+                return (bb_node_t){ icn_bb_idx_gen, z, 0 };
             }
         }
     }
