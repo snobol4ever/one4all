@@ -274,7 +274,28 @@ void emit_bb_xfarb(bb_label_t *s, bb_label_t *f, bb_label_t *b) {
     emit_label_define(b);
     emit_seq_port_call((uint64_t)(uintptr_t)bb_arb_new(), "rt_bb_arb", (uint64_t)(uintptr_t)rt_bb_arb, 1, s, f);
 }
-void  emit_bb_xstar(bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("REM", "", bb_rem_new(), "rt_bb_rem", (uint64_t)(uintptr_t)rt_bb_rem, s,f,b); }
+/* SF-3: emit_bb_xstar -- flat inline REM box. No DATA needed (stateless). */
+/* α: Δ=Σlen (match rest of string) → γ. β: → ω (no re-entry). */
+void emit_bb_xstar(bb_label_t *s, bb_label_t *f, bb_label_t *b) {
+    emit_bb_box_banner("REM", "");
+    if (IS_TEXT) {
+        FILE *out = emit_outf();
+        bb3c_format(out, "", ".intel_syntax", "noprefix");
+        bb3c_format(out, "", "lea", "rax, [rip + Σlen]");
+        bb3c_format(out, "", "mov", "ecx, dword ptr [rax]");
+        bb3c_format(out, "", "lea", "rax, [rip + Δ]");
+        bb3c_format(out, "", "mov", "dword ptr [rax], ecx");
+        char jmp_succ[128]; snprintf(jmp_succ, sizeof(jmp_succ), "%s", s->name);
+        bb3c_format(out, "", "jmp", jmp_succ);
+        emit_label_define(b);
+        char jmp_fail[128]; snprintf(jmp_fail, sizeof(jmp_fail), "%s", f->name);
+        bb3c_format(out, "", "jmp", jmp_fail);
+        return;
+    }
+    emit_seq_port_call((uint64_t)(uintptr_t)bb_rem_new(), "rt_bb_rem", (uint64_t)(uintptr_t)rt_bb_rem, 0, s, f);
+    emit_label_define(b);
+    emit_seq_port_call((uint64_t)(uintptr_t)bb_rem_new(), "rt_bb_rem", (uint64_t)(uintptr_t)rt_bb_rem, 1, s, f);
+}
 void  emit_bb_xlnth(long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful_int("LEN", (int)n, bb_len_new((int)n), "rt_bb_len", (uint64_t)(uintptr_t)rt_bb_len, s,f,b); }
 void  emit_bb_xrtb(long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful_int("RTAB", (int)n, bb_rtab_new((int)n), "rt_bb_rtab", (uint64_t)(uintptr_t)rt_bb_rtab, s,f,b); }
 void  emit_bb_xtb(long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful_int("TAB", (int)n, bb_tab_new((int)n), "rt_bb_tab", (uint64_t)(uintptr_t)rt_bb_tab, s,f,b); }
