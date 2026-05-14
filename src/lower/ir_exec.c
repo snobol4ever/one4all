@@ -23,6 +23,7 @@ extern int         Σlen;
 extern void bb_exec_stmt(void *e);
 /* descr_match_span: construct DT_S match descriptor from (base, len). */
 #include "bb_box.h"
+DESCR_t icn_binop_apply(IcnBinopKind op, DESCR_t lv, DESCR_t rv, int *rel_fail);
 /*------------------------------------------------------------------------------------------------------------------------------------*/
 /* IR_exec_node — evaluate nd in its current state; return next port.
  * Self-evaluating scalar kinds set nd->value and return γ or ω.
@@ -458,6 +459,40 @@ IR_t * IR_exec_node(IR_t * nd) {
             if (!IS_FAIL_fn(v2)) { nd->value = v2; return nd->γ; }
         }
         nd->state = 0; nd->value = FAILDESCR; return nd->ω;
+    }
+    case IR_ICN_BINOP: {
+        icn_binop_dcg_t *z = (icn_binop_dcg_t *)nd->opaque;
+        if (!z) { nd->value = FAILDESCR; return nd->ω; }
+        if (nd->state == 0) {
+            z->left_val = z->left.fn(z->left.ζ, α);
+            if (IS_FAIL_fn(z->left_val)) { nd->value = FAILDESCR; return nd->ω; }
+            z->right_val = z->right.fn(z->right.ζ, α);
+            if (IS_FAIL_fn(z->right_val)) { nd->value = FAILDESCR; return nd->ω; }
+            nd->state = 1;
+        } else {
+            for (;;) {
+                DESCR_t rv = z->right.fn(z->right.ζ, β);
+                if (!IS_FAIL_fn(rv)) { z->right_val = rv; break; }
+                DESCR_t lv = z->left.fn(z->left.ζ, β);
+                if (IS_FAIL_fn(lv)) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+                z->left_val = lv;
+                z->right_val = z->right.fn(z->right.ζ, α);
+                if (!IS_FAIL_fn(z->right_val)) break;
+            }
+        }
+        for (;;) {
+            int rel_fail = 0;
+            DESCR_t result = icn_binop_apply(z->op, z->left_val, z->right_val, &rel_fail);
+            if (!IS_FAIL_fn(result)) { nd->value = result; return nd->γ; }
+            if (!rel_fail) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+            DESCR_t rv = z->right.fn(z->right.ζ, β);
+            if (!IS_FAIL_fn(rv)) { z->right_val = rv; continue; }
+            DESCR_t lv = z->left.fn(z->left.ζ, β);
+            if (IS_FAIL_fn(lv)) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+            z->left_val = lv;
+            z->right_val = z->right.fn(z->right.ζ, α);
+            if (IS_FAIL_fn(z->right_val)) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+        }
     }
     case IR_ICN_LIMIT: {
         icn_lim_dcg_t *z = (icn_lim_dcg_t *)nd->opaque;

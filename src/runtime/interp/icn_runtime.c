@@ -1360,12 +1360,12 @@ bb_node_t icn_bb_build(tree_t *e) {
             int l_gen = is_suspendable(lc);
             int r_gen = is_suspendable(rc);
             if (!l_gen && !r_gen) break;   /* scalar — let interp_eval handle it */
-            icn_binop_gen_state_t *z = calloc(1, sizeof(*z));
-            z->left     = icn_bb_build(lc);
-            z->right    = icn_bb_build(rc);
-            z->op       = binop_map[mi].bk;
-            z->is_relop = binop_map[mi].is_rel;
-            return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
+            bb_node_t bo_left = icn_bb_build(lc);
+            bb_node_t bo_right = icn_bb_build(rc);
+            IR_block_t *bo_cfg = lower_icn_binop(bo_left, bo_right, binop_map[mi].bk, binop_map[mi].is_rel);
+            icn_dcg_state_t *bo_dz = calloc(1, sizeof(*bo_dz));
+            bo_dz->cfg = bo_cfg; bo_dz->first = 1;
+            return (bb_node_t){ icn_bb_dcg, bo_dz, 0 };
         }
     }
 
@@ -1377,13 +1377,12 @@ bb_node_t icn_bb_build(tree_t *e) {
         int l_gen = is_suspendable(e->c[0]);
         int r_gen = is_suspendable(e->c[1]);
         if (l_gen && r_gen) {
-            /* Cross-product: reuse icn_bb_binop with CONCAT op */
-            icn_binop_gen_state_t *z = calloc(1, sizeof(*z));
-            z->left     = icn_bb_build(e->c[0]);
-            z->right    = icn_bb_build(e->c[1]);
-            z->op       = ICN_BINOP_CONCAT;
-            z->is_relop = 0;
-            return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
+            bb_node_t cat_left = icn_bb_build(e->c[0]);
+            bb_node_t cat_right = icn_bb_build(e->c[1]);
+            IR_block_t *cat_cfg = lower_icn_binop(cat_left, cat_right, ICN_BINOP_CONCAT, 0);
+            icn_dcg_state_t *cat_dz = calloc(1, sizeof(*cat_dz));
+            cat_dz->cfg = cat_cfg; cat_dz->first = 1;
+            return (bb_node_t){ icn_bb_dcg, cat_dz, 0 };
         }
         if (l_gen || r_gen) {
             int gi = l_gen ? 0 : 1;
