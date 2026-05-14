@@ -750,34 +750,6 @@ tree_t *find_leaf_suspendable(tree_t *e) {
 }
 
 /*----------------------------------------------------------------------------------------------------------------------------
- * icn_bb_cat — TT_CAT with generative child  ("str" || gen_expr)
- *
- * Pumps the leaf generator child, injects each tick via icn_drive_node,
- * re-evaluates the full TT_CAT expression each tick to produce the concatenated
- * result string.  Handles the polyglot case: every write("ICN: " || (1 to 3)).
- *--------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t icn_bb_cat(void *zeta, int entry) {
-    /* IC-9 fix (2026-05-01): per-tick re-eval of cat_expr can itself fail
-     * (e.g. s[0 to 7] where s[0] is OOB).  Per Icon GDE semantics, a per-tick
-     * failure should not exhaust the box — the underlying generator may still
-     * have values that DO succeed.  Pump the leaf until either a tick produces
-     * a non-fail full-expression result, or the leaf exhausts.  Switch to β
-     * after the first inner tick at α-entry so subsequent attempts re-pump.   */
-    icn_cat_gen_state_t *z = (icn_cat_gen_state_t *)zeta;
-    int e2 = entry;
-    for (;;) {
-        DESCR_t tick = z->gen.fn(z->gen.ζ, e2);
-        if (IS_FAIL_fn(tick)) return FAILDESCR;
-        icn_drive_node = z->leaf;
-        icn_drive_val  = tick;
-        DESCR_t result = bb_eval_value(z->cat_expr);
-        icn_drive_node = NULL;
-        if (!IS_FAIL_fn(result)) return result;
-        e2 = β;  /* try next leaf value */
-    }
-}
-
-/*----------------------------------------------------------------------------------------------------------------------------
  * icn_bb_assign_gen — TT_ASSIGN with generative RHS  (x := gen_expr)
  *
  * Two variants:
@@ -1182,14 +1154,14 @@ bb_node_t icn_bb_build(tree_t *e) {
                 DESCR_t v = hb.fn(hb.ζ, α);
                 while (!IS_FAIL_fn(v) && z->nhi < ICN_TO_NESTED_MAX) { z->hi_vals[z->nhi++] = v.i; v = hb.fn(hb.ζ, β); }
             }
-            return (bb_node_t){ icn_bb_to_nested, z, 0 };
+            return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
         }
         DESCR_t lo_d = bb_eval_value(lo_expr);
         DESCR_t hi_d = bb_eval_value(hi_expr);
         icn_to_state_t *z = calloc(1, sizeof(*z));
         z->lo = IS_FAIL_fn(lo_d) ? 0 : lo_d.i;
         z->hi = IS_FAIL_fn(hi_d) ? 0 : hi_d.i;
-        return (bb_node_t){ icn_bb_to, z, 0 };
+        return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
     }
 
     /* ── TT_TO_BY: (lo to hi by step) ─────────────────────────────────────── */
@@ -1219,7 +1191,7 @@ bb_node_t icn_bb_build(tree_t *e) {
         z->hi   = _TO_INT(hi_d,   0);
         z->step = _TO_INT(step_d, 1); if (!z->step) z->step = 1;
 #undef _TO_INT
-        return (bb_node_t){ icn_bb_to_by, z, 0 };
+        return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
     }
 
     /* ── TT_ITERATE: (!str) / Raku for @arr -> $x ────────────────────────── */
@@ -1253,7 +1225,7 @@ bb_node_t icn_bb_build(tree_t *e) {
                 icn_list_iterate_state_t *lz = calloc(1, sizeof(*lz));
                 lz->list_obj = sv;  /* live DT_DATA — re-read each tick so put() mutations are visible */
                 lz->pos      = 0;
-                return (bb_node_t){ icn_bb_list_iterate, lz, 0 };
+                return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
             }
             /* IC-9 (2026-05-01): DT_DATA record — !R yields each field value.
              * Must also precede descr_to_str_icn for the same reason. */
@@ -1261,7 +1233,7 @@ bb_node_t icn_bb_build(tree_t *e) {
                 icn_record_iterate_state_t *rz = calloc(1, sizeof(*rz));
                 rz->inst = sv;
                 rz->pos  = 0;
-                return (bb_node_t){ icn_bb_record_iterate, rz, 0 };
+                return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
             }
         }
         /* IC-3: DT_T table iteration — !T yields each value.
@@ -1271,7 +1243,7 @@ bb_node_t icn_bb_build(tree_t *e) {
             z->tbl = sv.tbl;
             z->bucket = 0;
             z->entry = NULL;
-            return (bb_node_t){ icn_bb_tbl_iterate, z, 0 };
+            return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
         }
         /* IC-8: coerce numeric scalars to image-string before string-iterate path (D-1).
          * Only reached for string/numeric — DT_DATA/DT_T handled above. */
@@ -1302,7 +1274,7 @@ bb_node_t icn_bb_build(tree_t *e) {
                    : (sv.slen > 0 && sv.slen != 0xFFFFFFFFu) ? (long)sv.slen
                    : (long)strlen(sv.s);
         }
-        return (bb_node_t){ icn_bb_iterate, z, 0 };
+        return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
     }
 
     /* ── IC-8: TT_IDENTICAL  (a === b)  — goal-directed identity test ───────
@@ -1339,14 +1311,14 @@ bb_node_t icn_bb_build(tree_t *e) {
             z->gen[0] = icn_bb_build(e->c[0]);
             z->gen[1] = icn_bb_build(e->c[1]);
             z->which  = 0;
-            acc = (bb_node_t){ icn_bb_alternate, z, 0 };
+            acc = (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
         }
         for (int _ai = 2; _ai < e->n; _ai++) {
             icn_alternate_state_t *z2 = calloc(1, sizeof(*z2));
             z2->gen[0] = acc;
             z2->gen[1] = icn_bb_build(e->c[_ai]);
             z2->which  = 0;
-            acc = (bb_node_t){ icn_bb_alternate, z2, 0 };
+            acc = (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
         }
         return acc;
     }
@@ -1376,7 +1348,7 @@ bb_node_t icn_bb_build(tree_t *e) {
             z->right    = icn_bb_build(rc);
             z->op       = binop_map[mi].bk;
             z->is_relop = binop_map[mi].is_rel;
-            return (bb_node_t){ icn_bb_binop, z, 0 };
+            return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
         }
     }
 
@@ -1394,7 +1366,7 @@ bb_node_t icn_bb_build(tree_t *e) {
             z->right    = icn_bb_build(e->c[1]);
             z->op       = ICN_BINOP_CONCAT;
             z->is_relop = 0;
-            return (bb_node_t){ icn_bb_binop, z, 0 };
+            return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
         }
         if (l_gen || r_gen) {
             int gi = l_gen ? 0 : 1;
@@ -1404,7 +1376,7 @@ bb_node_t icn_bb_build(tree_t *e) {
             z->gen      = icn_bb_build(leaf);
             z->cat_expr = e;
             z->leaf     = leaf;
-            return (bb_node_t){ icn_bb_cat, z, 0 };
+            return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
         }
     }
 
@@ -1418,7 +1390,7 @@ bb_node_t icn_bb_build(tree_t *e) {
                 z->gen      = icn_bb_build(leaf);
                 z->cat_expr = e;     /* re-eval the full TT_IDX expression per tick */
                 z->leaf     = leaf;
-                return (bb_node_t){ icn_bb_cat, z, 0 };
+                return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
             }
         }
     }
@@ -1436,7 +1408,7 @@ bb_node_t icn_bb_build(tree_t *e) {
                 z->nlen       = (int)strlen(z->needle);
                 z->subj_entry = α;
                 z->hay        = NULL;
-                return (bb_node_t){ icn_bb_find_subj, z, 0 };
+                return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
             }
             DESCR_t s2 = bb_eval_value(e->c[2]);
             if (!IS_FAIL_fn(s2)) {
@@ -1445,7 +1417,7 @@ bb_node_t icn_bb_build(tree_t *e) {
                 z->hay    = s2.s ? s2.s : "";
                 z->nlen   = (int)strlen(z->needle);
                 z->next   = z->hay;
-                return (bb_node_t){ icn_bb_find, z, 0 };
+                return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
             }
         }
     }
@@ -1475,7 +1447,7 @@ bb_node_t icn_bb_build(tree_t *e) {
             icn_bal_state_t *z = calloc(1, sizeof(*z));
             z->s = s; z->c1 = c1; z->c2 = c2; z->c3 = c3;
             z->slen = slen; z->pos = p; z->endp = end;
-            return (bb_node_t){ icn_bb_bal, z, 0 };
+            return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
         }
         bal_skip:;
     }
@@ -1489,7 +1461,7 @@ bb_node_t icn_bb_build(tree_t *e) {
             z->tbl    = td.tbl;
             z->bucket = 0;
             z->entry  = NULL;
-            return (bb_node_t){ icn_bb_tbl_key_iterate, z, 0 };
+            return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
         }
     }
 
@@ -1543,7 +1515,7 @@ bb_node_t icn_bb_build(tree_t *e) {
                 z->hay        = NULL;
                 z->slen       = 0;
                 z->pos        = 0;
-                return (bb_node_t){ icn_bb_upto_subj, z, 0 };
+                return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
             }
         }
         /* ── Builtin TT_FNC with generative arg — icn_bb_fnc ─────────── */
@@ -1574,7 +1546,7 @@ bb_node_t icn_bb_build(tree_t *e) {
         z->gen = icn_bb_build(e->c[0]);
         DESCR_t nd = bb_eval_value(e->c[1]);
         z->max = IS_INT_fn(nd) ? nd.i : 0;
-        return (bb_node_t){ icn_bb_limit, z, 0 };
+        return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
     }
 
     /* ── IC-2b: TT_EVERY  (every gen [do body]) ──────────────────────────── */
@@ -1583,7 +1555,7 @@ bb_node_t icn_bb_build(tree_t *e) {
         z->gen     = icn_bb_build(e->c[0]);
         z->gen_ast = e->c[0];
         z->body    = (e->n >= 2) ? e->c[1] : NULL;
-        return (bb_node_t){ icn_bb_every, z, 0 };
+        return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
     }
 
     /* ── IC-2b: TT_BANG_BINARY  (E1 ! E2) ────────────────────────────────── */
@@ -1606,14 +1578,14 @@ bb_node_t icn_bb_build(tree_t *e) {
                     icn_list_iterate_state_t *lz = calloc(1, sizeof(*lz));
                     lz->list_obj = sv;
                     lz->pos      = 0;
-                    z->arg_box = (bb_node_t){ icn_bb_list_iterate, lz, 0 };
-                    return (bb_node_t){ icn_bb_bang_binary, z, 0 };
+                    z->arg_box = (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
+                    return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
                 }
             }
             /* Not a list — fall through to standard icn_bb_build */
         }
         z->arg_box   = icn_bb_build(e->c[1]);
-        return (bb_node_t){ icn_bb_bang_binary, z, 0 };
+        return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
     }
 
     /* ── IC-2b: TT_SEQ_EXPR  ((E1; E2; …; En)) ───────────────────────────── */
@@ -1621,7 +1593,7 @@ bb_node_t icn_bb_build(tree_t *e) {
         icn_seq_state_t *z = calloc(1, sizeof(*z));
         z->children = e->c;
         z->n        = e->n;
-        return (bb_node_t){ icn_bb_seq_expr, z, 0 };
+        return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
     }
 
     /* ── IJ-1: TT_SEQ (Icon conjunction &) as generator ────────────────────────────────
@@ -1642,20 +1614,20 @@ bb_node_t icn_bb_build(tree_t *e) {
             z->gen_a    = icn_bb_build(e->c[0]);
             z->ast_b    = e->c[1];
             z->b_started = 0;
-            return (bb_node_t){ icn_bb_mutual, z, 0 };
+            return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
         }
         icn_every_state_t *z = calloc(1, sizeof(*z));
         z->gen     = icn_bb_build(e->c[0]);
         z->gen_ast = e->c[0];
         z->body    = e->c[1];
-        return (bb_node_t){ icn_bb_every, z, 0 };
+        return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
     }
 
     /* ── TT_CSET_COMPL with generative child — ~~(A|B|C) maps complement over gen ── */
     if (e->t == TT_CSET_COMPL && e->n >= 1 && is_suspendable(e->c[0])) {
         icn_limit_state_t *z = calloc(1, sizeof(*z));
         z->gen = icn_bb_build(e->c[0]);
-        return (bb_node_t){ icn_bb_cset_compl, z, 0 };
+        return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
     }
 
     /* ── IJ-7/IJ-9: TT_SCAN with generative subject or body (gen ? gen_body) ──
@@ -1667,7 +1639,7 @@ bb_node_t icn_bb_build(tree_t *e) {
         z->subj_gen = icn_bb_build(e->c[0]);
         z->body     = (e->n >= 2) ? e->c[1] : NULL;
         z->started  = 0;
-        return (bb_node_t){ icn_bb_scan_gen, z, 0 };
+        return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
     }
 
     /* ── IC-7: TT_NONNULL (\E) as generator — filter: pass values, skip null ──
@@ -1679,7 +1651,7 @@ bb_node_t icn_bb_build(tree_t *e) {
         z->gen   = icn_bb_build(e->c[0]);
         z->max   = (long long)9e18;   /* no limit */
         z->count = 0;
-        return (bb_node_t){ icn_bb_limit, z, 0 };
+        return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
         /* Note: icn_bb_limit just pumps inner gen and counts — it doesn't filter nulls.
          * For \E semantics we need a real filter box, but for (1 to 3) all values are
          * non-null so icn_bb_limit pass-through is correct. A full null-filter box
@@ -1697,7 +1669,7 @@ bb_node_t icn_bb_build(tree_t *e) {
         z->hi   = (long long)9e18;   /* effectively infinite */
         z->step = (e->n >= 3) ? (long long)to_int(bb_eval_value(e->c[2])) : 1;
         z->cur  = z->lo;
-        return (bb_node_t){ icn_bb_to_by, z, 0 };
+        return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
     }
 
     /* ── IC-7: user proc call with generative arg — pump arg, call proc each tick ──
@@ -1830,289 +1802,4 @@ bb_node_t icn_bb_build(tree_t *e) {
         z->expr = e;
         return (bb_node_t){ icn_lazy_box, z, 0 };
     }
-}
-
-
-/*============================================================================================================================
- * IC-2b: Four missing GDE ops as BB boxes.
- * Live here (not icon_gen.c) because they need interp_eval / icn_scan_*.
- * TT_SCAN is intentionally absent: it is the same IR node as SNOBOL4 matching,
- * already handled correctly by the oneshot fallback in icn_bb_build.
- *============================================================================================================================*/
-
-/*----------------------------------------------------------------------------------------------------------------------------
- * icn_bb_limit — TT_LIMIT  (gen \ N)
- * α: pump inner gen α; count=1; return value if count<=max.
- * β: if count>=max → ω; pump inner gen β; if ω → ω; count++; return value.
- *--------------------------------------------------------------------------------------------------------------------------*/
-/*----------------------------------------------------------------------------------------------------------------------------
- * icn_bb_cset_compl — TT_CSET_COMPL with generative child  (~~gen)
- * Pumps inner generator; applies icn_cset_complement + int/real coercion to each value.
- * State: inner bb_node_t gen only — reuses icn_limit_state_t (gen field used, max/count ignored).
- *---------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t icn_bb_cset_compl(void *zeta, int entry) {
-    icn_limit_state_t *z = (icn_limit_state_t *)zeta;
-    DESCR_t v = z->gen.fn(z->gen.ζ, entry == α ? α : β);
-    if (IS_FAIL_fn(v)) return FAILDESCR;
-    /* Coerce integer/real to image string before complement */
-    if (IS_INT_fn(v) || IS_REAL_fn(v)) v = descr_to_str_icn(v);
-    const char *cs = (v.s && *v.s) ? v.s : "";
-    return STRVAL(icn_cset_complement(cs));
-}
-
-/*----------------------------------------------------------------------------------------------------------------------------
- * icn_bb_scan_gen -- TT_SCAN with generative subject or body  IJ-7/IJ-9
- *
- * Outer scan context (scan_subj/scan_pos before entry) is saved on each call and
- * restored before every return — callers always see clean globals.
- *
- * JCON semantics: each subject contributes exactly ONE body α tick.  External β
- * always advances to the next subject — never resumes the body generator.
- * (JCON JVM: scan_bfail → icn_77_β advances subject; body β is never fired externally.)
- *
- * For each subject value:
- *   - Install subject string, pos=1 as current scan context.
- *   - Build body_gen via icn_bb_build(body); fire α → first result.
- *   - On external β: set body_live=0, fall through to next subject advance.
- *   - When subject generator exhausted, return FAIL.
- *--------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t icn_bb_scan_gen(void *zeta, int entry) {
-    icn_scan_gen_state_t *z = (icn_scan_gen_state_t *)zeta;
-    /* Save outer scan context — restored before every return. */
-    const char *outer_subj = scan_subj;
-    int          outer_pos  = scan_pos;
-
-    /* β path: JCON semantics — each subject contributes exactly ONE body α tick.
-     * On external β we must advance to the NEXT subject, never resume the body.
-     * (JCON JVM: icn_76_scan_bfail → icn_77_β = advances subject on body exhaustion.)
-     * Do NOT call body_gen.fn(β) here — just mark body done and fall through. */
-    if (entry != α && z->body_live) {
-        z->body_live = 0;
-        /* fall through to subject advance */
-    }
-
-    /* Advance to next subject. */
-    int subj_tick = (!z->started) ? α : β;
-    z->started = 1;
-    for (;;) {
-        scan_subj = outer_subj; scan_pos = outer_pos;   /* keep outer clean while pumping subj */
-        DESCR_t subj_d = z->subj_gen.fn(z->subj_gen.ζ, subj_tick);
-        subj_tick = β;
-        if (IS_FAIL_fn(subj_d)) { scan_subj = outer_subj; scan_pos = outer_pos; return FAILDESCR; }
-
-        /* Install new subject. */
-        const char *subj_s;
-        if (IS_REAL_fn(subj_d)) { char _rb[64]; real_str(subj_d.r,_rb,sizeof _rb); subj_s = GC_strdup(_rb); }
-        else { subj_s = VARVAL_fn(subj_d); if (!subj_s) subj_s = ""; }
-        scan_subj = subj_s; scan_pos = 1;
-
-        if (!z->body) { scan_subj = outer_subj; scan_pos = outer_pos; return NULVCL; }
-
-        /* Build fresh body generator. */
-        z->body_subj = subj_s;
-        z->body_gen  = icn_bb_build(z->body);
-        z->body_live = 1;
-        DESCR_t r = z->body_gen.fn(z->body_gen.ζ, α);
-        /* Capture advanced pos from body's α tick. */
-        z->body_pos = scan_pos;
-        scan_subj = outer_subj; scan_pos = outer_pos;
-        if (!IS_FAIL_fn(r)) return r;
-
-        /* Body failed for this subject (no matching positions) — try next. */
-        z->body_live = 0;
-    }
-}
-
-DESCR_t icn_bb_limit(void *zeta, int entry) {
-    icn_limit_state_t *z = (icn_limit_state_t *)zeta;
-    if (z->max <= 0) return FAILDESCR;
-    DESCR_t v;
-    if (entry == α) {
-        z->count = 0;
-        v = z->gen.fn(z->gen.ζ, α);
-    } else {
-        if (z->count >= z->max) return FAILDESCR;
-        v = z->gen.fn(z->gen.ζ, β);
-    }
-    if (IS_FAIL_fn(v)) return FAILDESCR;
-    z->count++;
-    if (z->count > z->max) return FAILDESCR;
-    return v;
-}
-
-/*----------------------------------------------------------------------------------------------------------------------------
- * icn_bb_every — TT_EVERY  (every gen [do body])
- * α: pump gen α → if γ eval body → return gen value.
- * β: pump gen β → if ω → ω → if γ eval body → return gen value.
- * body may be NULL (bare "every gen" for side effects).
- *--------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t icn_bb_every(void *zeta, int entry) {
-    icn_every_state_t *z = (icn_every_state_t *)zeta;
-    DESCR_t v = (entry == α)
-        ? z->gen.fn(z->gen.ζ, α)
-        : z->gen.fn(z->gen.ζ, β);
-    if (IS_FAIL_fn(v)) return FAILDESCR;
-    if (z->body) {
-        /* Inject generator value so the body's reference to the same generator AST
-         * node (e.g. `(1 to n)` in `x := x + (1 to n)`) returns the already-produced
-         * value rather than building a fresh icn_bb_build and restarting from α. */
-        tree_t *saved_drive_node = icn_drive_node;
-        DESCR_t saved_drive_val = icn_drive_val;
-        icn_drive_node = z->gen_ast;
-        icn_drive_val  = v;
-        /* GOAL-ICON-BB-COMPLETE: clear loop_next before body so that a `next`
-         * fired in a prior iteration (which set FRAME.loop_next=1 and caused
-         * bb_exec_stmt to return early) does not bleed into this iteration's
-         * body execution.  After bb_exec_stmt returns, also clear loop_next:
-         * `next` means "advance to next generator tick", which bb_broker
-         * accomplishes by calling us again with β — the flag must not persist
-         * into the next call or the following body will also short-circuit. */
-        int saved_loop_next = FRAME.loop_next;
-        FRAME.loop_next = 0;
-        bb_exec_stmt(z->body);
-        FRAME.loop_next = saved_loop_next;  /* restore outer loop's next state */
-        icn_drive_node = saved_drive_node;
-        icn_drive_val  = saved_drive_val;
-    }
-    return v;
-}
-
-/*----------------------------------------------------------------------------------------------------------------------------
- * icn_bb_mutual — TT_SEQ (Icon A & B) mutual conjunction, both sides generative  IJ-12
- *
- * JCON ir_a_Mutual semantics (from jcon_irgen.icn ir_a_Mutual):
- *   α: pump A α → if A succeeds, pump B α → if B succeeds, yield B value.
- *      if B fails, pump A β (next A value) and restart B from α.
- *      if A exhausts, FAIL the whole conjunction.
- *   β: pump B β → if B succeeds, yield B value.
- *      if B fails (B exhausted for this A-value), pump A β → restart B α.
- *      if A exhausts, FAIL.
- *
- * A is the "outer" generator; B is the "inner" generator.  For each A-tick
- * B is driven to exhaustion before A advances.  B is reconstructed fresh
- * (icn_bb_build(ast_b)) whenever A advances, so B's coro state reflects the
- * new A-value (e.g. reversible assignments that depend on A's side effects).
- *--------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t icn_bb_mutual(void *zeta, int entry) {
-    icn_mutual_state_t *z = (icn_mutual_state_t *)zeta;
-
-    if (entry == α) {
-        /* First call: start A. */
-        DESCR_t av = z->gen_a.fn(z->gen_a.ζ, α);
-        if (IS_FAIL_fn(av)) return FAILDESCR;
-        /* A succeeded — build a fresh B generator and start it. */
-        z->gen_b    = icn_bb_build(z->ast_b);
-        z->b_started = 1;
-        DESCR_t bv = z->gen_b.fn(z->gen_b.ζ, α);
-        while (IS_FAIL_fn(bv)) {
-            /* B failed immediately — advance A, rebuild B. */
-            av = z->gen_a.fn(z->gen_a.ζ, β);
-            if (IS_FAIL_fn(av)) return FAILDESCR;
-            z->gen_b = icn_bb_build(z->ast_b);
-            bv = z->gen_b.fn(z->gen_b.ζ, α);
-        }
-        return bv;
-    } else {
-        /* β entry: try to resume B first. */
-        if (z->b_started) {
-            DESCR_t bv = z->gen_b.fn(z->gen_b.ζ, β);
-            if (!IS_FAIL_fn(bv)) return bv;
-        }
-        /* B exhausted — advance A, rebuild and restart B. */
-        for (;;) {
-            DESCR_t av = z->gen_a.fn(z->gen_a.ζ, β);
-            if (IS_FAIL_fn(av)) return FAILDESCR;
-            z->gen_b = icn_bb_build(z->ast_b);
-            z->b_started = 1;
-            DESCR_t bv = z->gen_b.fn(z->gen_b.ζ, α);
-            if (!IS_FAIL_fn(bv)) return bv;
-            /* This A-value also exhausted B immediately — keep trying A. */
-        }
-    }
-}
-
-/*----------------------------------------------------------------------------------------------------------------------------
- * icn_bb_bang_binary — TT_BANG_BINARY  (E1 ! E2)
- * Call procedure/expression E1 with each successive value from E2 generator.
- * α: pump E2 α → call E1(arg). β: pump E2 β → call E1(arg).
- * If E1 fails on an arg, skip to next (goal-directed).
- *--------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t icn_bb_bang_binary(void *zeta, int entry) {
-    extern int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR_t *out);
-    icn_bang_binary_state_t *z = (icn_bang_binary_state_t *)zeta;
-    int is_first = (entry == α);
-    for (;;) {
-        DESCR_t arg = z->arg_box.fn(z->arg_box.ζ, is_first ? α : β);
-        is_first = 0;
-        if (IS_FAIL_fn(arg)) return FAILDESCR;
-        z->cur_arg = arg;
-        if (!z->proc_expr) return FAILDESCR;
-
-        /* IJ-15: When E1 is a bare TT_VAR (or already evaluated to a proc
-         * descriptor DT_E), the drive-node injection path fails because the
-         * identifier node has no argument children to inject into.  Instead,
-         * evaluate E1 to obtain the procedure value, then dispatch directly
-         * via proc_table_call — the same path used by icn_bb_indirect_callee.
-         * This handles JCON  g![2]  where E1 = TT_VAR("g"). */
-        /* IJ-15 extended: any non-TT_FNC E1 is evaluated to get the callee
-         * value at runtime. This handles: TT_VAR("g") for g![2], and also
-         * TT_BANG_BINARY as E1 for chained f![g]![2] where the outer bang's
-         * E1 is the inner bang expression that produces a proc value. */
-        if (z->proc_expr->t != TT_FNC) {
-            DESCR_t callee = bb_eval_value(z->proc_expr);
-            if (IS_FAIL_fn(callee)) { continue; }
-            DESCR_t result = FAILDESCR;
-            if (callee.v == DT_E) {
-                for (int i = 0; i < proc_count; i++) {
-                    if (proc_table[i].entry_pc == (int)callee.i) {
-                        result = proc_table_call(i, &arg, 1);
-                        break;
-                    }
-                }
-                if (IS_FAIL_fn(result) && callee.slen < (uint32_t)proc_count)
-                    result = proc_table_call((int)callee.slen, &arg, 1);
-            } else if (callee.v == DT_S && callee.s) {
-                for (int i = 0; i < proc_count; i++) {
-                    if (proc_table[i].name && strcmp(proc_table[i].name, callee.s) == 0) {
-                        result = proc_table_call(i, &arg, 1);
-                        break;
-                    }
-                }
-                if (IS_FAIL_fn(result))
-                    (void)icn_try_call_builtin_by_name(callee.s, &arg, 1, &result);
-            }
-            if (!IS_FAIL_fn(result)) return result;
-            continue;  /* E1 failed on this arg — try next E2 value */
-        }
-
-        /* E1 is a TT_FNC call node — inject arg as the first argument child
-         * via drive passthrough (original mechanism for  f(x)!generator). */
-        if (z->proc_expr->n >= 2 && z->proc_expr->c[1]) {
-            icn_drive_node = z->proc_expr->c[1];
-            icn_drive_val  = arg;
-        }
-        DESCR_t result = bb_eval_value(z->proc_expr);
-        icn_drive_node = NULL;
-        if (!IS_FAIL_fn(result)) return result;
-        /* E1 failed — try next E2 value */
-    }
-}
-
-/*----------------------------------------------------------------------------------------------------------------------------
- * icn_bb_seq_expr — TT_SEQ_EXPR  ((E1; E2; …; En))
- * α: eval E1..E(n-1) for side effects; build last_box from En; pump last_box α.
- * β: pump last_box β.
- *--------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t icn_bb_seq_expr(void *zeta, int entry) {
-    icn_seq_state_t *z = (icn_seq_state_t *)zeta;
-    if (entry == α) {
-        for (int i = 0; i < z->n - 1; i++)
-            if (z->children[i]) bb_eval_value(z->children[i]);
-        if (z->n <= 0 || !z->children[z->n - 1]) return FAILDESCR;
-        z->last_box = icn_bb_build(z->children[z->n - 1]);
-        z->started  = 1;
-        return z->last_box.fn(z->last_box.ζ, α);
-    }
-    if (!z->started) return FAILDESCR;
-    return z->last_box.fn(z->last_box.ζ, β);
 }
