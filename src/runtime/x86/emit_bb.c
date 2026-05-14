@@ -222,7 +222,58 @@ void emit_bb_xbal(bb_label_t *s, bb_label_t *f, bb_label_t *b) {
     emit_seq_port_call((uint64_t)(uintptr_t)bb_bal_new(), "rt_bb_bal", (uint64_t)(uintptr_t)rt_bb_bal, 1, s, f);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void  emit_bb_xfarb(bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ARB", "", bb_arb_new(), "rt_bb_arb", (uint64_t)(uintptr_t)rt_bb_arb, s,f,b); }
+/* SF-2: emit_bb_xfarb -- flat inline ARB box. DATA: .long count; .long start. */
+/* α: count=0; start=Δ; advance 0 → γ. β: count++; if start+count > Σlen → ω; else Δ=start+count → γ. */
+void emit_bb_xfarb(bb_label_t *s, bb_label_t *f, bb_label_t *b) {
+    emit_bb_box_banner("ARB", "");
+    if (IS_TEXT) {
+        int id = g_flat_node_id++;
+        char zlbl[80], zlbl_def[88];
+        snprintf(zlbl,     sizeof(zlbl),     ".Larb%d_z", id);
+        snprintf(zlbl_def, sizeof(zlbl_def), "%s:", zlbl);
+        FILE *out = emit_outf();
+        bb3c_format(out, "",       ".section", ".data");
+        bb3c_format(out, zlbl_def, ".long",    "0");
+        bb3c_format(out, "",       ".long",    "0");
+        bb3c_format(out, "",       ".section", ".text");
+        bb3c_format(out, "",       ".intel_syntax", "noprefix");
+        char lcnt[80], lstart[80];
+        snprintf(lcnt,   sizeof(lcnt),   "%s + 0", zlbl);
+        snprintf(lstart, sizeof(lstart), "%s + 4", zlbl);
+        /* α-port: count=0; start=Δ; advance 0 → γ */
+        bb3c_format(out, "", "lea",  "rax, [rip + Δ]");
+        bb3c_format(out, "", "mov",  "ecx, dword ptr [rax]");
+        char cnt_store[160]; snprintf(cnt_store, sizeof(cnt_store), "dword ptr [rip + %s], 0", lcnt);
+        bb3c_format(out, "", "mov",  cnt_store);
+        char start_store[160]; snprintf(start_store, sizeof(start_store), "rax, [rip + %s]", lstart);
+        bb3c_format(out, "", "lea",  start_store);
+        bb3c_format(out, "", "mov",  "dword ptr [rax], ecx");
+        char jmp_succ[128]; snprintf(jmp_succ, sizeof(jmp_succ), "%s", s->name);
+        bb3c_format(out, "", "jmp",  jmp_succ);
+        /* β-port: count++; if start+count > Σlen → ω; else Δ=start+count → γ */
+        emit_label_define(b);
+        char cnt_ref[160]; snprintf(cnt_ref, sizeof(cnt_ref), "rax, [rip + %s]", lcnt);
+        bb3c_format(out, "", "lea",  cnt_ref);
+        bb3c_format(out, "", "mov",  "ecx, dword ptr [rax]");
+        bb3c_format(out, "", "inc",  "ecx");
+        bb3c_format(out, "", "mov",  "dword ptr [rax], ecx");
+        char sref[160]; snprintf(sref, sizeof(sref), "rax, [rip + %s]", lstart);
+        bb3c_format(out, "", "lea",  sref);
+        bb3c_format(out, "", "mov",  "edx, dword ptr [rax]");
+        bb3c_format(out, "", "add",  "edx, ecx");
+        bb3c_format(out, "", "lea",  "rax, [rip + Σlen]");
+        bb3c_format(out, "", "cmp",  "edx, dword ptr [rax]");
+        char jmp_fail[128]; snprintf(jmp_fail, sizeof(jmp_fail), "%s", f->name);
+        bb3c_format(out, "", "jg",   jmp_fail);
+        bb3c_format(out, "", "lea",  "rax, [rip + Δ]");
+        bb3c_format(out, "", "mov",  "dword ptr [rax], edx");
+        bb3c_format(out, "", "jmp",  jmp_succ);
+        return;
+    }
+    emit_seq_port_call((uint64_t)(uintptr_t)bb_arb_new(), "rt_bb_arb", (uint64_t)(uintptr_t)rt_bb_arb, 0, s, f);
+    emit_label_define(b);
+    emit_seq_port_call((uint64_t)(uintptr_t)bb_arb_new(), "rt_bb_arb", (uint64_t)(uintptr_t)rt_bb_arb, 1, s, f);
+}
 void  emit_bb_xstar(bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("REM", "", bb_rem_new(), "rt_bb_rem", (uint64_t)(uintptr_t)rt_bb_rem, s,f,b); }
 void  emit_bb_xlnth(long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful_int("LEN", (int)n, bb_len_new((int)n), "rt_bb_len", (uint64_t)(uintptr_t)rt_bb_len, s,f,b); }
 void  emit_bb_xrtb(long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful_int("RTAB", (int)n, bb_rtab_new((int)n), "rt_bb_rtab", (uint64_t)(uintptr_t)rt_bb_rtab, s,f,b); }
