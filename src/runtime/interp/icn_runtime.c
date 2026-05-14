@@ -1083,6 +1083,26 @@ static DESCR_t icn_bb_revswap(void *zeta, int entry) {
     return FAILDESCR;
 }
 /*----------------------------------------------------------------------------------------------------------------------------
+ * icn_bb_seq_expr — TT_SEQ_EXPR  (E1; E2; ...; En)  as a generator  IC-2b
+ *
+ * α: execute E1..En-1 as side effects (bb_exec_stmt), build a generator box
+ *    for En, pump it once.  β: resume the En box.
+ * started==0: α path (run preamble, build last_box).
+ * started==1: β path (resume last_box directly).
+ *--------------------------------------------------------------------------------------------------------------------------*/
+DESCR_t icn_bb_seq_expr(void *zeta, int entry) {
+    icn_seq_state_t *z = (icn_seq_state_t *)zeta;
+    if (!z || z->n < 1) return FAILDESCR;
+    if (!z->started || entry == α) {
+        for (int i = 0; i < z->n - 1; i++) bb_exec_stmt(z->children[i]);
+        z->last_box = icn_bb_build(z->children[z->n - 1]);
+        z->started  = 1;
+        return z->last_box.fn(z->last_box.ζ, α);
+    }
+    return z->last_box.fn(z->last_box.ζ, β);
+}
+
+/*----------------------------------------------------------------------------------------------------------------------------
  * icn_bb_identical_gen — TT_IDENTICAL  (a === b)  with one or both operands generative
  *
  * IC-8 fix for  if x === key(T) then ...  in tdump (rung36_jcon_table).
@@ -1630,7 +1650,8 @@ bb_node_t icn_bb_build(tree_t *e) {
         icn_seq_state_t *z = calloc(1, sizeof(*z));
         z->children = e->c;
         z->n        = e->n;
-        return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
+        z->started  = 0;
+        return (bb_node_t){ icn_bb_seq_expr, z, 0 };
     }
 
     /* ── IJ-1: TT_SEQ (Icon conjunction &) as generator ────────────────────────────────
