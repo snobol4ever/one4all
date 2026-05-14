@@ -178,27 +178,6 @@ typedef enum {
      * DT_NUL at end so the trailing VOID_POP is balanced. */
     SM_BB_PUMP_EVERY,
 
-    /* GOAL-ICON-BB-COMPLETE rung13: single-tick SM generator drive for pure-SM every.
-     * a[0].i = entry_pc  — the SM pc of the inner generator's coroutine body.
-     * a[1].i = slot_id   — index into FRAME.every_gen[] (per-call; baked at lower-time).
-     *
-     * Behaviour:
-     *   1. If FRAME.every_gen[slot_id] == NULL: create sm_gen_state_new(entry_pc), store.
-     *   2. Drive the SmGenState one tick via bb_broker_drive_sm_one().
-     *   3. On tick success: push yielded value, last_ok = 1.
-     *   4. On exhaustion:   push FAILDESCR,    last_ok = 0.
-     *
-     * The every-loop lower_every emits:
-     *   [loop_top:] SM_GEN_TICK entry_pc slot_id
-     *               SM_JUMP_F done
-     *               [lower body; SM_VOID_POP]
-     *               SM_JUMP loop_top
-     *   [done:]     SM_PUSH_NULL          ; every is void in stmt context
-     *
-     * Not a statement-level construct — no trailing VOID_POP needed on this opcode
-     * (the loop structure handles all stack balance). */
-    SM_GEN_TICK,
-
     /* CHUNKS-step17i-suspend: TT_SUSPEND `suspend E [do body]` — yield-to-caller.
      *
      * Stack discipline: pops one value (the yield value).  Pushes nothing.
@@ -259,19 +238,7 @@ typedef enum {
     SM_ACOMP,
 
 
-    /* CHUNKS-step14: generator opcodes — SM_SUSPEND / SM_RESUME.
-     * SM_SUSPEND: pop TOS as the yielded value; save pc+stack to the current
-     *   SmGenState; return SM_INTERP_SUSPENDED (1) from sm_interp_run so that
-     *   bb_broker_drive_sm can deliver the value to body_fn and later resume.
-     *   Only meaningful when the expression is driven via bb_broker_drive_sm; a
-     *   bare sm_call_expression call that reaches SM_SUSPEND yields FAILDESCR.
-     * SM_RESUME: no-op in the main dispatch loop — the resume happens implicitly
-     *   when bb_broker_drive_sm restores the SmGenState and re-enters sm_interp_run
-     *   at the saved pc (which is the instruction AFTER the SM_SUSPEND that was
-     *   reached last).  SM_RESUME is emitted at the top of a generator body as a
-     *   documentation marker / future hook point for JIT codegen. */
     SM_SUSPEND,
-    SM_RESUME,
 
     /* CHUNKS-step14b: gen-local slot access — read/write SmGenState->locals[N].
      * a[0].i = slot index (0..SM_GEN_LOCAL_MAX-1).  Only meaningful inside a

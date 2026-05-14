@@ -1088,25 +1088,6 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             break;
         }
 
-        /* GOAL-ICON-BB-COMPLETE rung13: single-tick SM generator drive for pure-SM every.
-         * a[0].i = entry_pc, a[1].i = slot_id into FRAME.every_gen[].
-         * Creates SmGenState on first call (slot==NULL), then drives one tick.
-         * Pushes yielded value + sets last_ok=1 on success; FAILDESCR + last_ok=0 on exhaustion. */
-        case SM_GEN_TICK: {
-            int entry_pc = (int)ins->a[0].i;
-            int slot_id  = (int)ins->a[1].i;
-            if (slot_id < 0 || slot_id >= EVERY_GEN_SLOT_MAX) {
-                st->last_ok = 0; sm_push(st, FAILDESCR); break;
-            }
-            if (!FRAME.every_gen[slot_id])
-                FRAME.every_gen[slot_id] = sm_gen_state_new(entry_pc);
-            DESCR_t out = FAILDESCR;
-            int ok = bb_broker_drive_sm_one(FRAME.every_gen[slot_id], &out);
-            st->last_ok = ok;
-            sm_push(st, ok ? out : FAILDESCR);
-            break;
-        }
-
         /* CHUNKS-step17i-suspend: yield primitive for `suspend E [do body]`.
          *
          * Pops one value (the yield value) from the SM stack.  If we're
@@ -2079,14 +2060,6 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             sm_push(st, FAILDESCR);
             break;
         }
-
-        /* CHUNKS-step14: SM_RESUME — no-op in the dispatch loop.
-         * Emitted as documentation at the top of a generator body so that
-         * JIT codegen has a stable hook point.  bb_broker_drive_sm restores
-         * the SmGenState and re-enters sm_interp_run at resume_pc; by the
-         * time SM_RESUME would execute on re-entry, pc is already past it. */
-        case SM_RESUME:
-            break;
 
         /* CHUNKS-step14b: SM_LOAD_GLOCAL — push gen-local slot N onto value stack.
          * Only meaningful inside a generator expression driven by bb_broker_drive_sm.

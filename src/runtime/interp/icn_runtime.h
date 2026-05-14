@@ -71,7 +71,7 @@ typedef struct {
     DESCR_t       suspend_val;  /* the value being suspended               */
     tree_t       *suspend_do;   /* do-clause to run on resumption, or NULL */
     /* GOAL-ICON-BB-COMPLETE: per-call SM generator states for pure-SM every loops.
-     * Indexed by slot id baked at lower-time (SM_GEN_TICK a[1].i).
+     * Indexed by slot id baked at lower-time.
      * NULL = not yet started; non-NULL = active or exhausted SmGenState. */
     struct SmGenState *every_gen[EVERY_GEN_SLOT_MAX];
 } IcnFrame;

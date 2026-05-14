@@ -64,9 +64,6 @@ static unsigned long long g_unhandled_kinds[LOWER_UNHANDLED_WORDS];
  * When > 0, TT_EVERY emits SM_BB_EVAL (value-context: fails as expression)
  * rather than SM_BB_PUMP_EVERY (statement: runs for side effects). */
 static int          g_in_value_ctx;
-/* GOAL-ICON-BB-COMPLETE rung13: per-compile slot counter for SM_GEN_TICK.
- * Each lower_every call claims a unique slot in FRAME.every_gen[]. Reset in sm_lower(). */
-static int          g_every_gen_slot_next = 0;
 /* GOAL-ICON-BB-COMPLETE rung13: hoisted alternate context for lower_every */
 static const tree_t *g_hoist_alt   = NULL;
 static int           g_hoist_entry = -1;
@@ -1396,7 +1393,6 @@ SM_Program *lower(const tree_t *prog)
     g_p            = sm_prog_new();
     g_in_proc_body = 0;
     g_proc_scope   = NULL;
-    g_every_gen_slot_next = 0;   /* GOAL-ICON-BB-COMPLETE rung13: reset slot counter */
     labtab_init(&g_labtab);
     for (int i = 0; i < LOWER_UNHANDLED_WORDS; i++) g_unhandled_kinds[i] = 0;
 

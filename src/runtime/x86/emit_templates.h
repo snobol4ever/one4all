@@ -44,8 +44,7 @@ void emit_sm_return_s       (int pc);   void emit_sm_return_f       (int pc);
 void emit_sm_freturn_s      (int pc);   void emit_sm_freturn_f      (int pc);
 void emit_sm_nreturn_s      (int pc);   void emit_sm_nreturn_f      (int pc);
 /*---- SM generator / coroutine templates ----------------------------------*/
-void emit_sm_suspend        ();         void emit_sm_resume         ();
-void emit_sm_suspend_value  ();         void emit_sm_gen_tick       ();
+void emit_sm_suspend        ();         void emit_sm_suspend_value  ();
 void emit_sm_bb_pump        ();         void emit_sm_bb_once        ();
 void emit_sm_bb_once_proc   ();         void emit_sm_bb_pump_proc   ();
 void emit_sm_bb_pump_case   ();         void emit_sm_bb_pump_sm     ();

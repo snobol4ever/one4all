@@ -252,7 +252,6 @@ static void test_incr_decr(void)
 
 /* ── CHUNKS-step14: generator test ──────────────────────────────────── */
 /* Hand-built SM program:
- *   SM_RESUME            ; documentation marker at top of generator body
  *   SM_PUSH_LIT_I 10     ; yield value 10
  *   SM_SUSPEND
  *   SM_PUSH_LIT_I 20     ; yield value 20
@@ -281,7 +280,6 @@ static void test_generator_suspend_resume(void)
 
     /* Build the generator SM program */
     SM_Program *p = sm_prog_new();
-    sm_emit(p, SM_RESUME);           /* documentation marker */
     sm_emit_i(p, SM_PUSH_LIT_I, 10);
     sm_emit(p, SM_SUSPEND);
     sm_emit_i(p, SM_PUSH_LIT_I, 20);
@@ -327,7 +325,6 @@ static void test_gen_locals_survive_suspend(void)
     gen_count = 0;
 
     SM_Program *p = sm_prog_new();
-    sm_emit(p, SM_RESUME);              /* landing pad */
     sm_emit_i(p, SM_PUSH_LIT_I, 100);
     sm_emit_i(p, SM_STORE_GLOCAL, 0);   /* locals[0] = 100; leaves 100 on TOS */
     sm_emit(p, SM_SUSPEND);             /* yield 100 */
@@ -372,7 +369,6 @@ static void test_gen_locals_isolated_per_invocation(void)
     nv_reset();
 
     SM_Program *p = sm_prog_new();
-    sm_emit(p, SM_RESUME);
     sm_emit_i(p, SM_PUSH_LIT_I, 100);
     sm_emit_i(p, SM_STORE_GLOCAL, 0);
     sm_emit(p, SM_SUSPEND);

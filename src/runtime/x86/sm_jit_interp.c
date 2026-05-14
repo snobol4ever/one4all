@@ -371,22 +371,6 @@ static void h_bb_pump_every(void)
     PUSH(NULVCL);
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
-/* GOAL-ICON-BB-COMPLETE rung13: JIT mirror of SM_GEN_TICK in sm_interp.c. */
-static void h_gen_tick(void)
-{
-    int entry_pc = (int)CUR_INS->a[0].i;
-    int slot_id  = (int)CUR_INS->a[1].i;
-    if (slot_id < 0 || slot_id >= EVERY_GEN_SLOT_MAX) {
-        STATE->last_ok = 0; PUSH(FAILDESCR); return;
-    }
-    if (!FRAME.every_gen[slot_id])
-        FRAME.every_gen[slot_id] = sm_gen_state_new(entry_pc);
-    DESCR_t out = FAILDESCR;
-    int ok = bb_broker_drive_sm_one(FRAME.every_gen[slot_id], &out);
-    STATE->last_ok = ok;
-    PUSH(ok ? out : FAILDESCR);
-}
-/*--------------------------------------------------------------------------------------------------------------------*/
 /* CHUNKS-step17i-suspend: JIT mirror of SM_SUSPEND_VALUE in sm_interp.c. */
 extern int sm_yield_to_caller(DESCR_t v);
 static void h_suspend_value(void)
@@ -399,6 +383,8 @@ static void h_suspend_value(void)
         STATE->last_ok = !IS_FAIL_fn(v);
     }
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
+static void h_suspend(void) { STATE->last_ok = 0; }
 /*--------------------------------------------------------------------------------------------------------------------*/
 static void h_store_var(void)
 {
@@ -886,19 +872,6 @@ static void h_call(void)
 static void  h_incr(void)  { DESCR_t v = POP(); PUSH(INTVAL(v.i + CUR_INS->a[0].i)); }
 static void  h_decr(void)  { DESCR_t v = POP(); PUSH(INTVAL(v.i - CUR_INS->a[0].i)); }
 /*--------------------------------------------------------------------------------------------------------------------*/
-/* CHUNKS-step14: SM_SUSPEND / SM_RESUME codegen stubs. */
-static void h_suspend(void) {
-    fprintf(stderr, "sm_codegen FATAL: SM_SUSPEND reached in jit-run — "
-            "generator JIT not yet implemented (CHUNKS M5/EM-10)\n");
-    STATE->last_ok = 0;
-}
-/*--------------------------------------------------------------------------------------------------------------------*/
-static void h_resume(void) {
-    fprintf(stderr, "sm_codegen FATAL: SM_RESUME reached in jit-run — "
-            "generator JIT not yet implemented (CHUNKS M5/EM-10)\n");
-    STATE->last_ok = 0;
-}
-/*--------------------------------------------------------------------------------------------------------------------*/
 /* CHUNKS-step14b: SM_LOAD_GLOCAL / SM_STORE_GLOCAL JIT mirrors. */
 static void h_load_glocal(void)
 {
@@ -1045,10 +1018,8 @@ static void init_handler_table(void)
     g_handlers[SM_BB_PUMP_CASE] = h_bb_pump_case;
     g_handlers[SM_BB_PUMP_SM]   = h_bb_pump_sm;
     g_handlers[SM_BB_PUMP_EVERY] = h_bb_pump_every;
-    g_handlers[SM_GEN_TICK]      = h_gen_tick;
     g_handlers[SM_SUSPEND_VALUE] = h_suspend_value;
     g_handlers[SM_SUSPEND]      = h_suspend;
-    g_handlers[SM_RESUME]       = h_resume;
     g_handlers[SM_LOAD_GLOCAL]  = h_load_glocal;
     g_handlers[SM_STORE_GLOCAL] = h_store_glocal;
     g_handlers[SM_ICMP_GT]      = h_icmp_gt;

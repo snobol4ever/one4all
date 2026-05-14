@@ -53,10 +53,8 @@ static const sm_nullary_entry_t g_sm_nullary[] = {
     { SM_PAT_CAT         , "PAT_CAT"         , "rt_pat_cat" },
     { SM_PAT_ALT         , "PAT_ALT"         , "rt_pat_alt" },
     { SM_PAT_DEREF       , "PAT_DEREF"       , "rt_pat_deref" },
-    { SM_RESUME          , "RESUME"          , "rt_unhandled_sm" },
     { SM_SUSPEND         , "SUSPEND"         , "rt_unhandled_sm" },
     { SM_SUSPEND_VALUE   , "SUSPEND_VALUE"   , "rt_unhandled_sm" },
-    { SM_GEN_TICK        , "GEN_TICK"        , "rt_unhandled_sm" },
     { SM_LOAD_GLOCAL     , "LOAD_GLOCAL"     , "rt_unhandled_sm" },
     { SM_STORE_GLOCAL    , "STORE_GLOCAL"    , "rt_unhandled_sm" },
     { SM_LOAD_FRAME      , "LOAD_FRAME"      , "rt_unhandled_sm" },
@@ -107,10 +105,8 @@ void  emit_sm_pat_arbno    ()  { emit_sm_op(SM_PAT_ARBNO); }
 void  emit_sm_pat_cat      ()  { emit_sm_op(SM_PAT_CAT); }
 void  emit_sm_pat_alt      ()  { emit_sm_op(SM_PAT_ALT); }
 void  emit_sm_pat_deref    ()  { emit_sm_op(SM_PAT_DEREF); }
-void  emit_sm_resume       ()  { emit_sm_op(SM_RESUME); }
 void  emit_sm_suspend      ()  { emit_sm_op(SM_SUSPEND); }
 void  emit_sm_suspend_value()  { emit_sm_op(SM_SUSPEND_VALUE); }
-void  emit_sm_gen_tick     ()  { emit_sm_op(SM_GEN_TICK); }
 void  emit_sm_load_glocal  ()  { emit_sm_op(SM_LOAD_GLOCAL); }
 void  emit_sm_store_glocal ()  { emit_sm_op(SM_STORE_GLOCAL); }
 void  emit_sm_load_frame   ()  { emit_sm_op(SM_LOAD_FRAME); }
@@ -490,9 +486,7 @@ static const sm_op_template_t g_sm_templates[] = {
     { SM_DEFINE_ENTRY    , "DEFINE_ENTRY"    , "rt_define_entry"    , SM_TPL_RTCALL, 0               , 0 },
     { SM_DEFINE          , "DEFINE"          , "rt_define"          , SM_TPL_RTCALL, 0               , 0 },
     { SM_SUSPEND         , "SUSPEND"         , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_SUSPEND      , 0 },
-    { SM_RESUME          , "RESUME"          , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_RESUME       , 0 },
     { SM_SUSPEND_VALUE   , "SUSPEND_VALUE"   , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_SUSPEND_VALUE, 0 },
-    { SM_GEN_TICK        , "GEN_TICK"        , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_GEN_TICK     , 0 },
     { SM_BB_PUMP         , "BB_PUMP"         , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_BB_PUMP      , 0 },
     { SM_BB_ONCE         , "BB_ONCE"         , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_BB_ONCE      , 0 },
     { SM_BB_EVAL         , "BB_EVAL"         , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_BB_EVAL      , 0 },
@@ -1183,7 +1177,7 @@ void emit_sm_define(void); void emit_sm_define_entry(void);
 void emit_sm_coerce_num(void); void emit_sm_concat(void);
 void emit_sm_push_null(void); void emit_sm_push_null_noflip(void);
 void emit_sm_neg(void); void emit_sm_exp(void);
-void emit_sm_resume(void); void emit_sm_suspend(void);
+void emit_sm_suspend(void); void emit_sm_suspend_value(void);
 void emit_sm_bb_pump(void); void emit_sm_bb_once(void);
 void emit_sm_bb_once_proc(void); void emit_sm_bb_pump_proc(void);
 void emit_sm_bb_pump_sm(void); void emit_sm_bb_pump_ast(void);

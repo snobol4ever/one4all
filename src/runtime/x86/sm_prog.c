@@ -192,7 +192,7 @@ static const char *opnames[SM_OPCODE_COUNT] = {
     "SM_DEFINE_ENTRY",
     "SM_DEFINE",
     "SM_INCR","SM_DECR","SM_LCOMP","SM_ACOMP",
-    "SM_SUSPEND","SM_RESUME","SM_LOAD_GLOCAL","SM_STORE_GLOCAL","SM_ICMP_GT","SM_ICMP_LT",
+    "SM_SUSPEND","SM_LOAD_GLOCAL","SM_STORE_GLOCAL","SM_ICMP_GT","SM_ICMP_LT",
     "SM_LOAD_FRAME","SM_STORE_FRAME",
 };
 
@@ -293,9 +293,6 @@ void sm_prog_print(const SM_Program *p, FILE *out)
                  * a[2].i = 1 if this label is a DEFINE'd-function entry point. */
                 if (in->a[0].s) fprintf(out, " s=\"%s\"", in->a[0].s);
                 if (in->a[2].i) fprintf(out, " define_entry=1");
-                break;
-            case SM_GEN_TICK:
-                fprintf(out, " entry_pc=%lld slot=%lld", (long long)in->a[0].i, (long long)in->a[1].i);
                 break;
             default:
                 break;
