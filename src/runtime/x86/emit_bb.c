@@ -443,9 +443,74 @@ void  emit_bb_xbrkx(const char *chars, bb_label_t *s, bb_label_t *f, bb_label_t 
         bb3c_format(out, "",       ".long",    "0");
         bb3c_format(out, "",       ".section", ".text");
         bb3c_format(out, "",       ".intel_syntax", "noprefix");
-        emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_breakx", (uint64_t)(uintptr_t)rt_bb_breakx, 0, s, f);
+        /* local labels */
+        char lloop[80], ldone[80], lfail_scan[80], linner[80], lno_match[80];
+        snprintf(lloop,      sizeof(lloop),      ".Lbrkx%d_loop",    id);
+        snprintf(ldone,      sizeof(ldone),      ".Lbrkx%d_done",    id);
+        snprintf(lfail_scan, sizeof(lfail_scan), ".Lbrkx%d_fscan",   id);
+        snprintf(linner,     sizeof(linner),     ".Lbrkx%d_inner",   id);
+        snprintf(lno_match,  sizeof(lno_match),  ".Lbrkx%d_nomatch", id);
+        char jmp_succ[128]; snprintf(jmp_succ, sizeof(jmp_succ), "%s", s->name);
+        char jmp_fail[128]; snprintf(jmp_fail, sizeof(jmp_fail), "%s", f->name);
+        /* α-port: δ=0; load Σ→rsi, Σlen→edx, Δ→ecx, chars→r8 */
+        bb3c_format(out, "", "lea",   "rsi, [rip + Σ]");
+        bb3c_format(out, "", "mov",   "rsi, qword ptr [rsi]");
+        bb3c_format(out, "", "lea",   "rax, [rip + Σlen]");
+        bb3c_format(out, "", "mov",   "edx, dword ptr [rax]");
+        bb3c_format(out, "", "lea",   "rax, [rip + Δ]");
+        bb3c_format(out, "", "mov",   "ecx, dword ptr [rax]");
+        char r8_load[160]; snprintf(r8_load,  sizeof(r8_load),  "r8, [rip + %s]", zlbl);
+        bb3c_format(out, "", "lea",   r8_load);
+        bb3c_format(out, "", "mov",   "r8, qword ptr [r8]");
+        bb3c_format(out, "", "xor",   "r9d, r9d");
+        /* outer loop: while Δ+δ < Σlen */
+        char loop_lbl[88]; snprintf(loop_lbl, sizeof(loop_lbl), "%s:", lloop);
+        bb3c_format(out, loop_lbl, "mov", "r10d, ecx");
+        bb3c_format(out, "", "add",   "r10d, r9d");
+        bb3c_format(out, "", "cmp",   "r10d, edx");
+        bb3c_format(out, "", "jge",   ldone);
+        bb3c_format(out, "", "movzx", "r11d, byte ptr [rsi + r10]");
+        /* inner strchr loop: scan chars string for r11b */
+        char inner_lbl[88]; snprintf(inner_lbl, sizeof(inner_lbl), "%s:", linner);
+        bb3c_format(out, inner_lbl, "movzx", "eax, byte ptr [r8]");
+        bb3c_format(out, "", "test",  "al, al");
+        bb3c_format(out, "", "je",    lno_match);
+        bb3c_format(out, "", "cmp",   "al, r11b");
+        bb3c_format(out, "", "je",    lfail_scan);
+        bb3c_format(out, "", "inc",   "r8");
+        bb3c_format(out, "", "jmp",   linner);
+        /* no match: advance δ, reset r8 to chars base */
+        char nomatch_lbl[88]; snprintf(nomatch_lbl, sizeof(nomatch_lbl), "%s:", lno_match);
+        bb3c_format(out, nomatch_lbl, "inc", "r9d");
+        bb3c_format(out, "", "lea",   r8_load);
+        bb3c_format(out, "", "mov",   "r8, qword ptr [r8]");
+        bb3c_format(out, "", "jmp",   lloop);
+        /* match found: fall into done check */
+        char fscan_lbl[88]; snprintf(fscan_lbl, sizeof(fscan_lbl), "%s:", lfail_scan);
+        bb3c_format(out, fscan_lbl, "nop", "");
+        /* done: if δ==0 || Δ+δ >= Σlen → fail; else save δ, Δ+=δ → γ */
+        char done_lbl[88]; snprintf(done_lbl, sizeof(done_lbl), "%s:", ldone);
+        bb3c_format(out, done_lbl, "test", "r9d, r9d");
+        bb3c_format(out, "", "je",    jmp_fail);
+        bb3c_format(out, "", "mov",   "r10d, ecx");
+        bb3c_format(out, "", "add",   "r10d, r9d");
+        bb3c_format(out, "", "cmp",   "r10d, edx");
+        bb3c_format(out, "", "jge",   jmp_fail);
+        char zdlbl[160]; snprintf(zdlbl, sizeof(zdlbl), "rax, [rip + %s + 8]", zlbl);
+        bb3c_format(out, "", "lea",   zdlbl);
+        bb3c_format(out, "", "mov",   "dword ptr [rax], r9d");
+        bb3c_format(out, "", "lea",   "rax, [rip + Δ]");
+        bb3c_format(out, "", "mov",   "dword ptr [rax], r10d");
+        bb3c_format(out, "", "jmp",   jmp_succ);
+        /* β-port: Δ -= δ → ω */
         emit_label_define(b);
-        emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_breakx", (uint64_t)(uintptr_t)rt_bb_breakx, 1, s, f);
+        bb3c_format(out, "", "lea",   zdlbl);
+        bb3c_format(out, "", "mov",   "r9d, dword ptr [rax]");
+        bb3c_format(out, "", "lea",   "rax, [rip + Δ]");
+        bb3c_format(out, "", "mov",   "ecx, dword ptr [rax]");
+        bb3c_format(out, "", "sub",   "ecx, r9d");
+        bb3c_format(out, "", "mov",   "dword ptr [rax], ecx");
+        bb3c_format(out, "", "jmp",   jmp_fail);
         return;
     }
     emit_bb_stateful("BREAKX", chars ? chars : "", z, "rt_bb_breakx", (uint64_t)(uintptr_t)rt_bb_breakx, s,f,b);
