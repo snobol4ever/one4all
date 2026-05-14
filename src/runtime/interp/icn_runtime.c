@@ -1088,6 +1088,30 @@ static DESCR_t icn_bb_revswap(void *zeta, int entry) {
  * Pumps the leaf generator; for each value, injects it via icn_drive_node
  * and re-evaluates the full cat_expr via bb_eval_value.
  *--------------------------------------------------------------------------------------------------------------------------*/
+/* icn_bb_mutual — TT_SEQ cross-product conjunction (A & B) where both are generative.
+ * Outer: gen_a. Inner: gen_b rebuilt fresh from ast_b on each gen_a advance.
+ * Yields the B value on each tick; caller (IR_ICN_EVERY body) sees each pair. */
+DESCR_t icn_bb_mutual(void *zeta, int entry) {
+    icn_mutual_state_t *z = (icn_mutual_state_t *)zeta;
+    if (!z || !z->ast_b) return FAILDESCR;
+    for (;;) {
+        if (!z->a_started) {
+            DESCR_t va = z->gen_a.fn(z->gen_a.ζ, α);
+            if (IS_FAIL_fn(va)) return FAILDESCR;
+            z->a_started = 1;
+            z->gen_b = icn_bb_build(z->ast_b);
+            z->b_started = 0;
+        }
+        int b_tick = z->b_started ? β : α;
+        z->b_started = 1;
+        DESCR_t vb = z->gen_b.fn(z->gen_b.ζ, b_tick);
+        if (!IS_FAIL_fn(vb)) return vb;
+        DESCR_t va2 = z->gen_a.fn(z->gen_a.ζ, β);
+        if (IS_FAIL_fn(va2)) return FAILDESCR;
+        z->gen_b = icn_bb_build(z->ast_b);
+        z->b_started = 0;
+    }
+}
 DESCR_t icn_bb_cat(void *zeta, int entry) {
     icn_cat_gen_state_t *z = (icn_cat_gen_state_t *)zeta;
     int e2 = entry;
@@ -1936,7 +1960,8 @@ bb_node_t icn_bb_build(tree_t *e) {
             z->gen_a    = icn_bb_build(e->c[0]);
             z->ast_b    = e->c[1];
             z->b_started = 0;
-            return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
+            z->a_started = 0;
+            return (bb_node_t){ icn_bb_mutual, z, 0 };
         }
         bb_node_t *gen = calloc(1, sizeof(*gen));
         *gen = icn_bb_build(e->c[0]);
