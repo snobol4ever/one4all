@@ -97,6 +97,7 @@ RT_PIC_SRCS := \
     $(SRC)/runtime/interp/icon_box_rt.c \
     $(SRC)/runtime/common/coerce.c \
     $(SRC)/runtime/common/ast_clone.c \
+    $(SRC)/runtime/common/scrip_ir.c \
     $(SRC)/driver/interp_globals.c \
     $(SRC)/driver/interp_label.c \
     $(SRC)/driver/interp_call.c \
@@ -266,6 +267,7 @@ scrip:
 	$(CC) $(CRT)   -c $(SRC)/runtime/interp/icon_gen.c         -o $(OBJ)/icon_gen.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/common/coerce.c      -o $(OBJ)/coerce.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/common/ast_clone.c    -o $(OBJ)/ast_clone.o
+	$(CC) $(CRT)   -c $(SRC)/runtime/common/scrip_ir.c     -o $(OBJ)/scrip_ir.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_prog.c    -o $(OBJ)/sm_prog.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_interp.c  -o $(OBJ)/sm_interp.o
 	$(CC) $(CRT)   -c $(RT)/x86/lower.c      -o $(OBJ)/lower.o
