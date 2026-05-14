@@ -323,7 +323,7 @@ DESCR_t coro_bb_field_gen(void *zeta, int entry) {
  * Call coro_eval_missing(e) from coro_eval's fallback.
  *============================================================================================================================*/
 
-bb_node_t coro_eval_missing(tree_t *e) {
+bb_node_t coro_eval_missing_base(tree_t *e) {
     if (!e) { icn_lazy_state_t *z = calloc(1, sizeof(*z)); return (bb_node_t){ icn_lazy_box, z, 0 }; }
 
     /* ir_a_Not */
@@ -607,3 +607,209 @@ bb_node_t icn_bb_make_proc_box(tree_t *proc, DESCR_t *args, int nargs) {
     for (int i = 0; i < zz->nargs; i++) zz->args[i] = args ? args[i] : NULVCL;
     return (bb_node_t){ icn_bb_proc_call, zz, 0 };
 }
+
+/*============================================================================================================================
+ * coro_bb_section_gen -- ir_a_Sectionop with generative operands
+ *
+ * JCON wiring: val (object), left (i), right (j) all potentially generative.
+ * Drive val first; on each val tick drive left; on each left tick drive right;
+ * on each right tick compute val[left:right] (or +: or -:) and yield.
+ * On right exhaustion resume left; on left exhaustion resume val.
+ *
+ * State: val_gen, left_gen, right_gen, section op kind, cached val/left values.
+ *============================================================================================================================*/
+typedef enum { ICN_SEC_RANGE, ICN_SEC_PLUS, ICN_SEC_MINUS } icn_sec_kind_t;
+typedef struct {
+    bb_node_t    val_gen;
+    bb_node_t    left_gen;
+    bb_node_t    right_gen;
+    tree_t      *val_expr;
+    tree_t      *left_expr;
+    tree_t      *right_expr;
+    icn_sec_kind_t kind;
+    DESCR_t      cur_val;
+    DESCR_t      cur_left;
+    int          val_started;
+    int          left_started;
+    int          right_started;
+} icn_section_gen_state_t;
+
+static DESCR_t icn_apply_section(DESCR_t val, DESCR_t left, DESCR_t right, icn_sec_kind_t kind) {
+    /* Mirrors bb_section in coro_value.c */
+    extern DESCR_t bb_eval_value(tree_t *e);
+    const char *s = VARVAL_fn(val); if (!s) s = "";
+    long slen = (long)strlen(s);
+    long i = IS_INT_fn(left)  ? left.i  : 0;
+    long j = IS_INT_fn(right) ? right.i : 0;
+    /* Normalize positions: 0->slen+1, negative->from end */
+    if (i == 0) i = slen + 1; else if (i < 0) i = slen + 1 + i;
+    if (kind == ICN_SEC_RANGE) {
+        if (j == 0) j = slen + 1; else if (j < 0) j = slen + 1 + j;
+    } else if (kind == ICN_SEC_PLUS)  { j = i + j; }
+      else                            { j = i - j; }
+    if (i > j) { long t = i; i = j; j = t; }
+    i--; /* 0-based start */
+    if (i < 0 || j > slen + 1 || i > j) return FAILDESCR;
+    long len = j - i;
+    char *buf = GC_malloc(len + 1);
+    memcpy(buf, s + i, len); buf[len] = '\0';
+    return STRVAL(buf);
+}
+
+DESCR_t coro_bb_section_gen(void *zeta, int entry) {
+    icn_section_gen_state_t *z = (icn_section_gen_state_t *)zeta;
+    int vport = (z->val_started   && entry == beta) ? beta : alpha;
+    int lport = (z->left_started  && entry == beta) ? beta : alpha;
+    int rport = (z->right_started && entry == beta) ? beta : alpha;
+
+    for (;;) {
+        /* Drive val */
+        if (!z->val_started || rport == alpha && lport == alpha) {
+            z->cur_val = z->val_gen.fn(z->val_gen.ζ, z->val_started ? beta : alpha);
+            z->val_started = 1;
+            if (IS_FAIL_fn(z->cur_val)) return FAILDESCR;
+            /* Reset left/right for new val */
+            z->left_gen    = coro_eval(z->left_expr);
+            z->left_started = 0;
+            z->right_started = 0;
+        }
+        /* Drive left */
+        z->cur_left = z->left_gen.fn(z->left_gen.ζ, z->left_started ? beta : alpha);
+        z->left_started = 1;
+        if (IS_FAIL_fn(z->cur_left)) {
+            /* Left exhausted: resume val */
+            z->left_started = 0; z->right_started = 0;
+            z->cur_val = z->val_gen.fn(z->val_gen.ζ, beta);
+            if (IS_FAIL_fn(z->cur_val)) return FAILDESCR;
+            z->left_gen = coro_eval(z->left_expr);
+            z->left_started = 0;
+            continue;
+        }
+        /* Drive right */
+        z->right_gen = coro_eval(z->right_expr);
+        z->right_started = 0;
+        DESCR_t rv = z->right_gen.fn(z->right_gen.ζ, alpha);
+        z->right_started = 1;
+        if (IS_FAIL_fn(rv)) continue; /* right immediately exhausted, try next left */
+        return icn_apply_section(z->cur_val, z->cur_left, rv, z->kind);
+    }
+}
+
+/*============================================================================================================================
+ * coro_bb_key_gen -- ir_a_Key for generative keywords (&features, &allocated, etc.)
+ *
+ * JCON: generative keywords emit ir_ResumeValue; one-shot keywords emit ir_Key once.
+ * Generative keywords in Icon: &features (generates feature strings), &allocated (3 ints),
+ * &collections (4 ints). For now: fallback to icn_kw_read and wrap as one-shot.
+ * Actual generators added per keyword as needed.
+ *============================================================================================================================*/
+typedef struct { const char *kw; int fired; DESCR_t val; } icn_kw_gen_state_t;
+
+DESCR_t coro_bb_key_gen(void *zeta, int entry) {
+    icn_kw_gen_state_t *z = (icn_kw_gen_state_t *)zeta;
+    if (entry == beta || z->fired) return FAILDESCR;
+    z->fired = 1;
+    extern DESCR_t icn_kw_read(const char *kw);
+    return icn_kw_read(z->kw);
+}
+
+/*============================================================================================================================
+ * coro_bb_listcon_gen -- ir_a_ListConstructor with generative elements
+ *
+ * JCON: evaluate each element (bounded); collect into a list; return it once.
+ * The ListConstructor itself is one-shot (always bounded in JCON).
+ * Generative elements are evaluated eagerly — the list gets the first value of each.
+ * State: child exprs, count.
+ *============================================================================================================================*/
+#define ICN_LISTCON_MAX 64
+typedef struct {
+    tree_t *children[ICN_LISTCON_MAX];
+    int     n;
+    int     fired;
+} icn_listcon_state_t;
+
+DESCR_t coro_bb_listcon_gen(void *zeta, int entry) {
+    icn_listcon_state_t *z = (icn_listcon_state_t *)zeta;
+    if (entry == beta || z->fired) return FAILDESCR;
+    z->fired = 1;
+    DESCR_t elems[ICN_LISTCON_MAX];
+    for (int i = 0; i < z->n; i++) {
+        elems[i] = z->children[i] ? bb_eval_value(z->children[i]) : NULVCL;
+        if (IS_FAIL_fn(elems[i])) return FAILDESCR;
+    }
+    /* Build icnlist descriptor -- mirrors MAKELIST in icn_try_call_builtin_by_name */
+    static int reg = 0;
+    if (!reg) { DEFDAT_fn("icnlist(frame_elems,frame_size,icn_type)"); reg = 1; }
+    DESCR_t *ep = GC_malloc((z->n > 0 ? z->n : 1) * sizeof(DESCR_t));
+    for (int i = 0; i < z->n; i++) ep[i] = elems[i];
+    DESCR_t eptr; eptr.v = DT_DATA; eptr.slen = 0; eptr.ptr = (void*)ep;
+    return DATCON_fn("icnlist", eptr, INTVAL(z->n), STRVAL("list"));
+}
+
+/*============================================================================================================================
+ * Wire new BBs into coro_eval_missing
+ *============================================================================================================================*/
+/* Override: replace the old coro_eval_missing with extended version */
+/* Note: we append here; the linker will use the last definition if both
+ * are non-static. Instead, we rename the old one and call from new. */
+
+/*============================================================================================================================
+ * coro_eval_missing -- top-level dispatch for all missing JCON BBs.
+ * Called from coro_eval fallback. Handles new constructs then delegates.
+ *============================================================================================================================*/
+bb_node_t coro_eval_missing(tree_t *e) {
+    if (!e) goto fallback;
+
+    /* ir_a_Sectionop with generative operands */
+    if ((e->t == TT_SECTION || e->t == TT_SECTION_PLUS || e->t == TT_SECTION_MINUS)
+        && e->n >= 3
+        && (is_suspendable(e->c[0]) || is_suspendable(e->c[1]) || is_suspendable(e->c[2]))) {
+        icn_section_gen_state_t *z = calloc(1, sizeof(*z));
+        z->val_expr   = e->c[0];
+        z->left_expr  = e->c[1];
+        z->right_expr = e->c[2];
+        z->val_gen    = coro_eval(e->c[0]);
+        z->left_gen   = coro_eval(e->c[1]);
+        z->kind       = (e->t == TT_SECTION_PLUS) ? ICN_SEC_PLUS
+                      : (e->t == TT_SECTION_MINUS) ? ICN_SEC_MINUS
+                      : ICN_SEC_RANGE;
+        return (bb_node_t){ coro_bb_section_gen, z, 0 };
+    }
+
+    /* ir_a_Key -- generative keyword */
+    if (e->t == TT_KEYWORD && e->v.sval) {
+        icn_kw_gen_state_t *z = calloc(1, sizeof(*z));
+        z->kw    = e->v.sval;
+        z->fired = 0;
+        return (bb_node_t){ coro_bb_key_gen, z, 0 };
+    }
+
+    /* ir_a_ListConstructor -- generative list [e1, e2, ...] */
+    if (e->t == TT_MAKELIST) {
+        icn_listcon_state_t *z = calloc(1, sizeof(*z));
+        z->n     = 0;
+        z->fired = 0;
+        for (int i = 0; i < e->n && z->n < ICN_LISTCON_MAX; i++)
+            z->children[z->n++] = e->c[i];
+        return (bb_node_t){ coro_bb_listcon_gen, z, 0 };
+    }
+
+    fallback:
+    return coro_eval_missing_base(e);
+}
+
+/*============================================================================================================================
+ * State allocators for emit_bb.c wiring -- one per new BB
+ *============================================================================================================================*/
+icn_not_state_t        *icon_not_new(void)          { return calloc(1, sizeof(icn_not_state_t)); }
+icn_repalt_state_t     *icon_repalt_new(void)        { return calloc(1, sizeof(icn_repalt_state_t)); }
+icn_while_state_t      *icon_while_gen_new(void)     { return calloc(1, sizeof(icn_while_state_t)); }
+icn_until_state_t      *icon_until_gen_new(void)     { return calloc(1, sizeof(icn_until_state_t)); }
+icn_repeat_state_t     *icon_repeat_gen_new(void)    { return calloc(1, sizeof(icn_repeat_state_t)); }
+icn_case_state_t       *icon_case_gen_new(void)      { return calloc(1, sizeof(icn_case_state_t)); }
+icn_compound_state_t   *icon_compound_gen_new(void)  { return calloc(1, sizeof(icn_compound_state_t)); }
+icn_field_gen_state_t  *icon_field_gen_new(void)     { return calloc(1, sizeof(icn_field_gen_state_t)); }
+icn_section_gen_state_t *icon_section_gen_new(void)  { return calloc(1, sizeof(icn_section_gen_state_t)); }
+icn_kw_gen_state_t     *icon_kw_gen_new(void)        { return calloc(1, sizeof(icn_kw_gen_state_t)); }
+icn_listcon_state_t    *icon_listcon_gen_new(void)   { return calloc(1, sizeof(icn_listcon_state_t)); }
+icn_proc_call_state_t  *icon_proc_call_new(void)     { return calloc(1, sizeof(icn_proc_call_state_t)); }

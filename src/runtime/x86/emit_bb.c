@@ -2,6 +2,7 @@
 #include "emit_form.h"
 #include "emit_templates.h"
 #include "../frontend/icon/icon_gen.h"
+#include "../interp/icon_gen_missing.h"
 #include "snobol4_patnd.h"
 #include "../rt/rt.h"
 #include <string.h>
@@ -74,6 +75,19 @@ void  emit_bb_icon_limit  (bb_label_t *s, bb_label_t *f, bb_label_t *b)         
 void  emit_bb_icon_seq    (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_stateful("ICN_SEQ",     "", icon_seq_new(),     "coro_bb_seq_expr",    (uint64_t)(uintptr_t)coro_bb_seq_expr,    s,f,b); }
 void  emit_bb_icon_to     (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_stateful("ICN_TO",      "", icon_to_new(),      "coro_bb_to",          (uint64_t)(uintptr_t)coro_bb_to,          s,f,b); }
 void  emit_bb_icon_to_by  (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_stateful("ICN_TO_BY",   "", icon_to_by_new(),   "coro_bb_to_by",       (uint64_t)(uintptr_t)coro_bb_to_by,       s,f,b); }
+/* IJ-18..28: new JCON BBs */
+void  emit_bb_icon_not        (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_NOT",       "", icon_not_new(),         "coro_bb_not",         (uint64_t)(uintptr_t)coro_bb_not,         s,f,b); }
+void  emit_bb_icon_repalt     (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_REPALT",    "", icon_repalt_new(),      "coro_bb_repalt",      (uint64_t)(uintptr_t)coro_bb_repalt,      s,f,b); }
+void  emit_bb_icon_while_gen  (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_WHILE",     "", icon_while_gen_new(),   "coro_bb_while_gen",   (uint64_t)(uintptr_t)coro_bb_while_gen,   s,f,b); }
+void  emit_bb_icon_until_gen  (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_UNTIL",     "", icon_until_gen_new(),   "coro_bb_until_gen",   (uint64_t)(uintptr_t)coro_bb_until_gen,   s,f,b); }
+void  emit_bb_icon_repeat_gen (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_REPEAT",    "", icon_repeat_gen_new(),  "coro_bb_repeat_gen",  (uint64_t)(uintptr_t)coro_bb_repeat_gen,  s,f,b); }
+void  emit_bb_icon_case_gen   (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_CASE",      "", icon_case_gen_new(),    "coro_bb_case_gen",    (uint64_t)(uintptr_t)coro_bb_case_gen,    s,f,b); }
+void  emit_bb_icon_compound_gen(bb_label_t *s, bb_label_t *f, bb_label_t *b){ emit_bb_stateful("ICN_COMPOUND",  "", icon_compound_gen_new(),"coro_bb_compound_gen",(uint64_t)(uintptr_t)coro_bb_compound_gen, s,f,b); }
+void  emit_bb_icon_field_gen  (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_FIELD_GEN", "", icon_field_gen_new(),   "coro_bb_field_gen",   (uint64_t)(uintptr_t)coro_bb_field_gen,   s,f,b); }
+void  emit_bb_icon_section_gen(bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_SECTION",   "", icon_section_gen_new(), "coro_bb_section_gen", (uint64_t)(uintptr_t)coro_bb_section_gen, s,f,b); }
+void  emit_bb_icon_kw_gen     (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_KW_GEN",    "", icon_kw_gen_new(),      "coro_bb_key_gen",     (uint64_t)(uintptr_t)coro_bb_key_gen,     s,f,b); }
+void  emit_bb_icon_listcon_gen(bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_LISTCON",   "", icon_listcon_gen_new(), "coro_bb_listcon_gen", (uint64_t)(uintptr_t)coro_bb_listcon_gen, s,f,b); }
+void  emit_bb_icon_proc_call  (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_PROCCALL",  "", icon_proc_call_new(),   "icn_bb_proc_call",    (uint64_t)(uintptr_t)icn_bb_proc_call,    s,f,b); }
 void  emit_bb_xarbn       (bb_box_fn child_fn, bb_label_t *s, bb_label_t *f, bb_label_t *b)  { emit_bb_stateful("ARBNO", "", rt_bb_arbno_new(child_fn, NULL), "rt_bb_arbno", (uint64_t)(uintptr_t)rt_bb_arbno, s,f,b); }
 void  emit_bb_xbrkx       (const char *chars, bb_label_t *s, bb_label_t *f, bb_label_t *b)   { emit_bb_stateful("BREAKX", chars ? chars : "", bb_breakx_new(chars), "rt_bb_breakx", (uint64_t)(uintptr_t)rt_bb_breakx, s,f,b); }
 /*--------------------------------------------------------------------------------------------------------------------*/
