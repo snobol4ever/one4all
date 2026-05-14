@@ -112,30 +112,6 @@ static void emit_bb_stateful(const char *banner, const char *arg, void *zeta, co
     emit_seq_port_call((uint64_t)(uintptr_t)zeta, fn_name, fn_fallback, 1, lbl_succ, lbl_fail);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void emit_bb_stateful_int(const char *banner, int n, void *zeta, const char *fn_name, uint64_t fn_fallback, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_beta) {
-    emit_bb_box_banner(banner, "");
-    if (IS_TEXT) {
-        int id = g_flat_node_id++;
-        char zlbl[80], zlbl_def[88], nval[32];
-        snprintf(zlbl, sizeof(zlbl), ".Lstat%d_z", id);
-        snprintf(zlbl_def, sizeof(zlbl_def), "%s:", zlbl);
-        snprintf(nval, sizeof(nval), "%d", n);
-        FILE *out = emit_outf();
-        bb3c_format(out, "",       ".section", ".data");
-        bb3c_format(out, zlbl_def, ".long",    nval);
-        bb3c_format(out, "",       ".long",    "0");
-        bb3c_format(out, "",       ".section", ".text");
-        bb3c_format(out, "",       ".intel_syntax", "noprefix");
-        emit_seq_port_call_rip((uint64_t)(uintptr_t)zeta, zlbl, fn_name, fn_fallback, 0, lbl_succ, lbl_fail);
-        emit_label_define(lbl_beta);
-        emit_seq_port_call_rip((uint64_t)(uintptr_t)zeta, zlbl, fn_name, fn_fallback, 1, lbl_succ, lbl_fail);
-        return;
-    }
-    emit_seq_port_call((uint64_t)(uintptr_t)zeta, fn_name, fn_fallback, 0, lbl_succ, lbl_fail);
-    emit_label_define(lbl_beta);
-    emit_seq_port_call((uint64_t)(uintptr_t)zeta, fn_name, fn_fallback, 1, lbl_succ, lbl_fail);
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void  emit_bb_xabrt(bb_label_t *s, bb_label_t *f, bb_label_t *b)       { emit_bb_jmp_pair("ABORT",  s, f, b, 0); }
 void  emit_bb_xcat (bb_label_t *s, bb_label_t *f, bb_label_t *b)       { emit_bb_jmp_pair("CAT",    s, f, b, 1); }
 void  emit_bb_xfail(bb_label_t *s, bb_label_t *f, bb_label_t *b)       { emit_bb_jmp_pair("FAIL",   s, f, b, 0); }
@@ -516,7 +492,9 @@ void  emit_bb_xbrkx(const char *chars, bb_label_t *s, bb_label_t *f, bb_label_t 
         bb3c_format(out, "", "jmp",   jmp_fail);
         return;
     }
-    emit_bb_stateful("BREAKX", chars ? chars : "", z, "rt_bb_breakx", (uint64_t)(uintptr_t)rt_bb_breakx, 6, s,f,b);
+    emit_seq_port_call((uint64_t)(uintptr_t)z, "rt_bb_breakx", (uint64_t)(uintptr_t)rt_bb_breakx, 0, s, f);
+    emit_label_define(b);
+    emit_seq_port_call((uint64_t)(uintptr_t)z, "rt_bb_breakx", (uint64_t)(uintptr_t)rt_bb_breakx, 1, s, f);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xcallcap(bb_box_fn child_fn, const char *fnc_name, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
