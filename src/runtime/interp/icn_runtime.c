@@ -3,7 +3,7 @@
  *
  * FI-4: extracted from src/driver/scrip.c.
  * IcnFrame stack, icn_gen_*, icn_scan_*, global_*, proc_table,
- * coro_call, coro_drive, icn_bb_build, icn_bb_oneshot, icn_scope_*.
+ * icn_bb_build, icn_bb_oneshot, icn_scope_*.
  *
  * RS-17a (2026-05-03): all 60 value-context interp_eval call sites in
  * this file routed through bb_eval_value (icn_value.c).

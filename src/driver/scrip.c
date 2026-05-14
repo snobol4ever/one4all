@@ -32,7 +32,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ucontext.h>
 #include <sys/stat.h>
 #include <ctype.h>
 #include <setjmp.h>

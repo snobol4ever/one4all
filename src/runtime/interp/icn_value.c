@@ -545,7 +545,7 @@ DESCR_t bb_eval_value(tree_t *e)
         return val;
     }
 
-    /* RS-22a: TT_FNC — user-proc path dispatches through proc_table → coro_call.
+    /* RS-22a: TT_FNC — user-proc path dispatches through proc_table via icn_bb_pump_proc_by_name.
      * Builtin path evaluates args through bb_eval_value then calls icn_call_builtin
      * (already IR-free).  Mirror of interp_eval.c TT_FNC case but recursion-safe. */
     case TT_FNC: {

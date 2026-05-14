@@ -205,7 +205,7 @@ void bb_exec_stmt(tree_t *e)
 
     /*========================================================================
      * RS-23b: expression kinds that arrive in statement context from
-     * Icon/Prolog procedure bodies (caller=coro_call) and recursive
+     * Icon/Prolog procedure bodies and recursive
      * statement-context evaluation (caller=bb_exec_stmt).
      *
      *   TT_ILIT, TT_NUL — pure literals, zero side effects → no-op.
