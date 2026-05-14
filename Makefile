@@ -87,6 +87,7 @@ RT_PIC_SRCS := \
     $(RT)/x86/lower_ctx.c \
     $(RT)/x86/sm_image.c \
     $(RT)/x86/emit_sm_binary.c \
+    $(SRC)/runtime/interp/icon_gen.c \
     $(SRC)/runtime/interp/icon_gen_missing.c \
     $(SRC)/runtime/interp/coro_runtime.c \
     $(SRC)/runtime/interp/coro_value.c \
@@ -112,7 +113,6 @@ RT_PIC_SRCS := \
     $(SRC)/ast/ast_print.c \
     $(SRC)/frontend/snobol4/snobol4.tab.c \
     $(SRC)/frontend/snobol4/snobol4.lex.c \
-    $(SRC)/frontend/icon/icon_gen.c \
     $(SRC)/frontend/icon/icon_runtime.c \
     $(SRC)/frontend/icon/icon_parse.c \
     $(SRC)/frontend/icon/icon_lex.c \
@@ -248,7 +248,6 @@ scrip:
 	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -c $(SRC)/frontend/icon/icon_lex.c         -o $(OBJ)/icon_lex.o
 	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -c $(SRC)/frontend/icon/icon_parse.c       -o $(OBJ)/icon_parse.o
 	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -c $(SRC)/frontend/icon/icon_runtime.c     -o $(OBJ)/icon_runtime.o
-	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -c $(SRC)/frontend/icon/icon_gen.c         -o $(OBJ)/icon_gen.o
 
 	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -c $(SRC)/frontend/icon/icon_driver.c      -o $(OBJ)/icon_driver.o
 	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -I$(SRC)/frontend/raku -c $(SRC)/frontend/raku/raku.tab.c    -o $(OBJ)/raku.tab.o
@@ -267,6 +266,7 @@ scrip:
 	$(CC) $(CRT)   -c $(SRC)/runtime/interp/scan_builtins.c -o $(OBJ)/scan_builtins.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/interp/pl_runtime.c  -o $(OBJ)/pl_runtime.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/interp/icon_box_rt.c  -o $(OBJ)/icon_box_rt.o
+	$(CC) $(CRT)   -c $(SRC)/runtime/interp/icon_gen.c         -o $(OBJ)/icon_gen.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/interp/icon_gen_missing.c -o $(OBJ)/icon_gen_missing.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/common/coerce.c      -o $(OBJ)/coerce.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/common/ast_clone.c    -o $(OBJ)/ast_clone.o

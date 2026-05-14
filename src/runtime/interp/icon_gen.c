@@ -11,7 +11,7 @@
  * Value type: DESCR_t (not spec_t).  Failure sentinel: FAILDESCR / IS_FAIL_fn().
  *============================================================================================================================*/
 
-#include "icon_gen.h"
+#include "../../frontend/icon/icon_gen.h"
 #include "../ast/ast.h"            /* tree_t, tree_e, TT_TO, TT_TO_BY, TT_ITERATE, TT_SUSPEND, TT_FNC */
 #include "../../runtime/common/coerce.h"  /* descr_to_str_icn (D-1/D-2 RS-6) */
 #include "../../runtime/interp/coro_runtime.h"  /* CORO_STACK_SZ */
