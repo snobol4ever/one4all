@@ -100,11 +100,11 @@ int main(int argc, char **argv) {
     return 0;
 }
 CEOF
-gcc -O0 -g -w -I"$ROOT/src" -I"$ROOT/src/runtime/x86" -I"$ROOT/src/runtime" \
+gcc -O0 -g -w -I"$ROOT/src" -I"$ROOT/src/emitter" -I"$ROOT/src/lower" -I"$ROOT/src/processor" -I"$ROOT/src/runtime" -I"$ROOT/src/runtime/snobol4" \
     "$TMP/unh.c" \
-    "$ROOT/src/runtime/x86/sm_codegen_x64_emit.c" \
-    "$ROOT/src/runtime/x86/sm_emit_template.c" \
-    "$ROOT/src/runtime/x86/sm_prog.c" \
+    "$ROOT/src/emitter/sm_codegen_x64_emit.c" \
+    "$ROOT/src/emitter/sm_emit_template.c" \
+    "$ROOT/src/lower/sm_prog.c" \
     -L"$ROOT/out" -lscrip_rt -lgc -lm -Wl,-rpath,"$ROOT/out" \
     -o "$TMP/unh_emitter" 2> "$TMP/unh_build.err" || {
     echo "FAIL unhandled-op harness build"; cat "$TMP/unh_build.err"; exit 1; }

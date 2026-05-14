@@ -568,10 +568,6 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
         macro_line(out, "", ".macro", macro_def);
         { char ct[64]; snprintf(ct, sizeof(ct), "%s@PLT", t->runtime);
           macro_line(out, "", "call", ct); }
-        if (strcmp(t->macro_name, "DEFINE_ENTRY") == 0) {
-            macro_line(out, "", "push", "rbp");
-            macro_line(out, "", "mov",  "rbp, rsp");
-        }
         macro_line(out, "", ".endm", "");
         return 0;
     case SM_TPL_RET:
@@ -1463,13 +1459,14 @@ static int emit_expression_registry(FILE *out, const SM_Program *prog)
         int str_idx = strtab_lookup(ins->a[0].s);
         if (str_idx < 0) continue;
         int entry_pc = i + 1;
-        char qarg[32];
-        snprintf(qarg, sizeof(qarg), ".S%d", str_idx);
-        char combined[128];
-        snprintf(combined, sizeof(combined), "%-16s ; .quad            .L%d", qarg, entry_pc);
-        if (emit_three_column_line(out, "", ".quad", combined, NULL) != 0) return -1;
+        char name_arg[32], fn_arg[32];
+        snprintf(name_arg, sizeof(name_arg), ".S%d", str_idx);
+        snprintf(fn_arg,   sizeof(fn_arg),   ".L%d", entry_pc);
+        if (emit_three_column_line(out, "", ".quad", name_arg, NULL) != 0) return -1;
+        if (emit_three_column_line(out, "", ".quad", fn_arg,   NULL) != 0) return -1;
     }
-    if (emit_three_column_line(out, "", ".quad", "0                ; .quad            0", NULL) != 0) return -1;
+    if (emit_three_column_line(out, "", ".quad", "0", NULL) != 0) return -1;
+    if (emit_three_column_line(out, "", ".quad", "0", NULL) != 0) return -1;
     if (emit_three_column_line(out, "", ".text", "",  NULL)        != 0) return -1;
     return n;
 }
