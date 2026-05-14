@@ -1387,6 +1387,55 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 break;
             }
 
+            if (name && strcmp(name, "ICN_RANDOM_SET") == 0) {
+                DESCR_t base = sm_pop(st);
+                DESCR_t val  = sm_pop(st);
+                bb_icn_rnd_seed = bb_icn_rnd_seed * 6364136223846793005UL + 1442695040888963407UL;
+                unsigned long rnd = bb_icn_rnd_seed >> 33;
+                if (base.v == DT_DATA && base.u && base.u->type && base.u->type->nfields > 0 && base.u->fields) {
+                    int fi = (int)(rnd % (unsigned long)base.u->type->nfields);
+                    base.u->fields[fi] = val;
+                } else if (base.v == DT_T && base.tbl && base.tbl->size > 0) {
+                    int target = (int)(rnd % (unsigned long)base.tbl->size), seen = 0;
+                    for (int _b = 0; _b < TABLE_BUCKETS; _b++)
+                        for (TBPAIR_t *bp = base.tbl->buckets[_b]; bp; bp = bp->next)
+                            if (seen++ == target) { bp->val = val; goto icn_random_set_done; }
+                    icn_random_set_done:;
+                }
+                sm_push(st, val);
+                st->last_ok = 1;
+                break;
+            }
+
+            if (name && strcmp(name, "ICN_ITERATE_FIRST_SET") == 0) {
+                DESCR_t varname = sm_pop(st);
+                DESCR_t base    = sm_pop(st);
+                DESCR_t val     = sm_pop(st);
+                if (base.v == DT_DATA && base.u && base.u->type && base.u->type->nfields > 0 && base.u->fields) {
+                    base.u->fields[0] = val;
+                } else if (base.v == DT_DATA) {
+                    DESCR_t tag = FIELD_GET_fn(base, "icn_type");
+                    if (tag.v == DT_S && tag.s && strcmp(tag.s, "list") == 0) {
+                        DESCR_t ea = FIELD_GET_fn(base, "frame_elems");
+                        DESCR_t *elems = (ea.v == DT_DATA) ? (DESCR_t *)ea.ptr : NULL;
+                        if (elems) elems[0] = val;
+                    }
+                } else if ((base.v == DT_S || base.v == DT_SNUL) && base.s) {
+                    const char *str = base.s;
+                    long slen = base.slen > 0 ? (long)base.slen : (long)strlen(str);
+                    if (slen > 0) {
+                        const char *ch = VARVAL_fn(val);
+                        char *ns = GC_malloc((size_t)(slen + 1));
+                        memcpy(ns, str, (size_t)slen); ns[0] = (ch && *ch) ? ch[0] : '\0'; ns[slen] = '\0';
+                        const char *vname = (varname.v == DT_S && varname.s) ? varname.s : NULL;
+                        if (vname) set_and_trace(vname, STRVAL(ns));
+                    }
+                }
+                sm_push(st, val);
+                st->last_ok = 1;
+                break;
+            }
+
             /* GOAL-ICON-BB-COMPLETE rung15: ICN_BANG_NEXT — one tick of !E iteration.
              * Called with nargs=0 (no stack args).  Reads container from GLOCAL[0],
              * position from GLOCAL[1].  Dispatches on container type:

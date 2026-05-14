@@ -3732,6 +3732,68 @@ DESCR_t interp_eval(tree_t *e)
                 NV_SET_fn(fn, val);  /* inner expr: no trace */
             }
         }
+        else if (lv && lv->t == TT_RANDOM && lv->n >= 1) {
+            DESCR_t cv = interp_eval(lv->c[0]);
+            if (!IS_FAIL_fn(cv)) {
+                bb_icn_rnd_seed = bb_icn_rnd_seed * 6364136223846793005UL + 1442695040888963407UL;
+                unsigned long _rnd = bb_icn_rnd_seed >> 33;
+                if (cv.v == DT_DATA && cv.u && cv.u->type && cv.u->type->nfields > 0 && cv.u->fields) {
+                    int n = cv.u->type->nfields;
+                    cv.u->fields[_rnd % (unsigned long)n] = val;
+                } else if (cv.v == DT_DATA) {
+                    DESCR_t tag = FIELD_GET_fn(cv, "icn_type");
+                    if (tag.v == DT_S && tag.s && strcmp(tag.s, "list") == 0) {
+                        int n = (int)FIELD_GET_fn(cv, "frame_size").i;
+                        DESCR_t ea = FIELD_GET_fn(cv, "frame_elems");
+                        DESCR_t *elems = (ea.v == DT_DATA) ? (DESCR_t *)ea.ptr : NULL;
+                        if (elems && n > 0) elems[_rnd % (unsigned long)n] = val;
+                    }
+                } else if (lv->c[0]->t == TT_VAR && lv->c[0]->v.sval) {
+                    const char *str = IS_STR_fn(cv) ? cv.s : VARVAL_fn(cv);
+                    if (str) {
+                        long slen = cv.slen > 0 ? cv.slen : (long)strlen(str);
+                        if (slen > 0) {
+                            const char *ch = VARVAL_fn(val);
+                            char c = (ch && *ch) ? ch[0] : '\0';
+                            char *ns = GC_malloc((size_t)(slen + 1));
+                            memcpy(ns, str, (size_t)slen);
+                            ns[_rnd % (unsigned long)slen] = c;
+                            ns[slen] = '\0';
+                            NV_SET_fn(lv->c[0]->v.sval, STRVAL(ns));
+                        }
+                    }
+                }
+            }
+        }
+        else if (lv && lv->t == TT_ITERATE && lv->n >= 1) {
+            DESCR_t cv = interp_eval(lv->c[0]);
+            if (!IS_FAIL_fn(cv)) {
+                if (cv.v == DT_DATA && cv.u && cv.u->type && cv.u->type->nfields > 0 && cv.u->fields) {
+                    cv.u->fields[0] = val;
+                } else if (cv.v == DT_DATA) {
+                    DESCR_t tag = FIELD_GET_fn(cv, "icn_type");
+                    if (tag.v == DT_S && tag.s && strcmp(tag.s, "list") == 0) {
+                        DESCR_t ea = FIELD_GET_fn(cv, "frame_elems");
+                        DESCR_t *elems = (ea.v == DT_DATA) ? (DESCR_t *)ea.ptr : NULL;
+                        if (elems) elems[0] = val;
+                    }
+                } else if (lv->c[0]->t == TT_VAR && lv->c[0]->v.sval) {
+                    const char *str = VARVAL_fn(cv);
+                    if (str) {
+                        long slen = cv.slen > 0 ? cv.slen : (long)strlen(str);
+                        if (slen > 0) {
+                            const char *ch = VARVAL_fn(val);
+                            char c = (ch && *ch) ? ch[0] : '\0';
+                            char *ns = GC_malloc((size_t)(slen + 1));
+                            memcpy(ns, str, (size_t)slen);
+                            ns[0] = c;
+                            ns[slen] = '\0';
+                            NV_SET_fn(lv->c[0]->v.sval, STRVAL(ns));
+                        }
+                    }
+                }
+            }
+        }
         return val;
     }
 

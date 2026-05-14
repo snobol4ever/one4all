@@ -542,6 +542,19 @@ static void emit_lhs_store(const tree_t *lhs)
         sm_emit_s(g_p, SM_PUSH_LIT_S, lhs->v.sval ? lhs->v.sval : "");
         sm_emit_si(g_p, SM_CALL_FN, "FIELD_SET", 3); return;
     }
+    if (lhs->t == TT_RANDOM && lhs->n >= 1) {
+        lower_expr(T0(lhs));
+        sm_emit_si(g_p, SM_CALL_FN, "ICN_RANDOM_SET", 2); return;
+    }
+    if (lhs->t == TT_ITERATE && lhs->n >= 1) {
+        tree_t *inner = T0(lhs);
+        lower_expr(inner);
+        if (inner->t == TT_VAR && inner->v.sval)
+            sm_emit_s(g_p, SM_PUSH_LIT_S, inner->v.sval);
+        else
+            sm_emit(g_p, SM_PUSH_NULL);
+        sm_emit_si(g_p, SM_CALL_FN, "ICN_ITERATE_FIRST_SET", 3); return;
+    }
     lower_expr(lhs);
     sm_emit_si(g_p, SM_CALL_FN, "ASGN", 2);
 }

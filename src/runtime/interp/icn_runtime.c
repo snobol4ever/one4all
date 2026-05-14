@@ -498,8 +498,10 @@ int is_suspendable(tree_t *e) {
             for (int i = 1; i < e->n; i++)
                 if (is_suspendable(e->c[i])) return 1;
             return 0;
-        /* TT_ASSIGN is generative if its RHS is generative — e.g. x := (1|2|3) */
+        /* TT_ASSIGN is generative if its RHS is generative — e.g. x := (1|2|3)
+         * or if its LHS is TT_ITERATE — e.g. every !s := "Y" */
         case TT_ASSIGN:
+            if (e->n >= 2 && e->c[0] && e->c[0]->t == TT_ITERATE) return 1;
             return (e->n >= 2 && is_suspendable(e->c[1])) ? 1 : 0;
         /* TT_REVASSIGN is always generative — Byrd box succeeds once, then on β
          * reverts the cell and fails.  This is what makes `every x[3] <- 19`
@@ -778,6 +780,36 @@ tree_t *find_leaf_suspendable(tree_t *e) {
  *     Re-evaluates full RHS each tick via icn_drive_node so `total` is fresh.
  *--------------------------------------------------------------------------------------------------------------------------*/
 typedef struct { bb_node_t rhs_gen; tree_t *lhs; } icn_assign_gen_state_t;
+typedef struct { tree_t *str_var; tree_t *rhs_expr; int pos; int len; char *buf; DESCR_t rec; int is_rec; } icn_assign_lhs_iter_state_t;
+static DESCR_t icn_bb_assign_lhs_iter(void *zeta, int entry) {
+    icn_assign_lhs_iter_state_t *z = (icn_assign_lhs_iter_state_t *)zeta;
+    if (entry == α) {
+        DESCR_t cv = bb_eval_value(z->str_var);
+        if (cv.v == DT_DATA && cv.u && cv.u->type && cv.u->type->nfields > 0 && cv.u->fields) {
+            z->is_rec = 1; z->rec = cv; z->pos = 0; z->len = cv.u->type->nfields;
+        } else {
+            z->is_rec = 0;
+            const char *s = VARVAL_fn(cv);
+            if (!s) return FAILDESCR;
+            z->len = (int)strlen(s);
+            if (z->len <= 0) return FAILDESCR;
+            z->buf = (char *)GC_malloc((size_t)(z->len + 1));
+            memcpy(z->buf, s, (size_t)(z->len + 1));
+            z->pos = 0;
+        }
+    }
+    if (z->pos >= z->len) return FAILDESCR;
+    DESCR_t val = bb_eval_value(z->rhs_expr);
+    if (IS_FAIL_fn(val)) return FAILDESCR;
+    if (z->is_rec) {
+        z->rec.u->fields[z->pos++] = val;
+    } else {
+        const char *ch = VARVAL_fn(val);
+        z->buf[z->pos++] = (ch && *ch) ? ch[0] : '\0';
+        if (z->str_var->t == TT_VAR && z->str_var->v.sval) NV_SET_fn(z->str_var->v.sval, STRVAL(z->buf));
+    }
+    return val;
+}
 static DESCR_t icn_assign_write(tree_t *lhs, DESCR_t val) {
     if (lhs && lhs->t == TT_VAR) {
         int slot = lhs->_id;   /* SI-13: slot in _id */
@@ -2060,6 +2092,18 @@ bb_node_t icn_bb_build(tree_t *e) {
         }
     }
 
+    /* ── TT_ASSIGN with TT_ITERATE LHS — !str := val  (every !s := "Y") ─────────
+     * LHS is the generator: iterate each character position and write val there. */
+    if (e->t == TT_ASSIGN && e->n >= 2 && e->c[0] && e->c[0]->t == TT_ITERATE && e->c[0]->n >= 1) {
+        tree_t *iter_child = e->c[0]->c[0];
+        if (iter_child && (iter_child->t == TT_VAR || iter_child->t == TT_QLIT || iter_child->t == TT_ILIT)) {
+            icn_assign_lhs_iter_state_t *z = calloc(1, sizeof(*z));
+            z->str_var  = iter_child;
+            z->rhs_expr = e->c[1];
+            z->pos = 0; z->len = 0; z->buf = NULL;
+            return (bb_node_t){ icn_bb_assign_lhs_iter, z, 0 };
+        }
+    }
     /* ── TT_ASSIGN with generative RHS — IC-6 / mutable-scalar fix ─────────────
      * Two variants selected at icn_bb_build time:
      *   cat: RHS has an TT_VAR sibling of the leaf generator — re-eval full RHS
