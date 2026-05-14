@@ -1645,8 +1645,14 @@ bb_node_t icn_bb_build(tree_t *e) {
     if (e->t == TT_SEQ && e->n >= 2 && is_suspendable(e->c[0])) {
         /* IJ-12: if B (c[1]) is also suspendable, use the mutual conjunction box
          * (cross-product: A outer, B inner, B rebuilt on each A advance).
-         * If B is one-shot, fall through to icn_bb_every (filter conjunction). */
-        if (is_suspendable(e->c[1])) {
+         * If B is one-shot, fall through to icn_bb_every (filter conjunction).
+         * IJ-19-remaining fix: TT_FNC builtins (write, writes, etc.) report
+         * is_suspendable==1 because user procs can suspend — but in the B slot
+         * of a filter conjunction they act as one-shot side-effect bodies, never
+         * cross-product generators.  Exclude TT_FNC from the suspendable-B test
+         * so `every (x:=gen) > 2 & write(x)` takes the filter path, not the
+         * mutual-conjunction (icn_lazy_box) path that only fires once. */
+        if (is_suspendable(e->c[1]) && e->c[1]->t != TT_FNC) {
             icn_mutual_state_t *z = calloc(1, sizeof(*z));
             z->gen_a    = icn_bb_build(e->c[0]);
             z->ast_b    = e->c[1];
