@@ -31,23 +31,23 @@ static IR_prog_t * build_node(IR_prog_t * cfg, const tree_t * t, IR_t * sp, IR_t
     case TT_QLIT: {
         nd = IR_node_alloc(cfg, IR_PAT_LIT, IR_LANG_SNO);
         nd->sval = t->v.sval ? t->v.sval : "";
-        nd->port_start = nd; nd->port_resume = fp; nd->port_succ = sp; nd->port_fail = fp;
+        nd->α = nd; nd->β = fp; nd->γ = sp; nd->ω = fp;
         return nd;
     }
     case TT_ARB: {
         nd = IR_node_alloc(cfg, IR_PAT_ARB, IR_LANG_SNO);
         nd->generative = 1;
-        nd->port_start = nd; nd->port_resume = nd; nd->port_succ = sp; nd->port_fail = fp;
+        nd->α = nd; nd->β = nd; nd->γ = sp; nd->ω = fp;
         return nd;
     }
     case TT_REM: {
         nd = IR_node_alloc(cfg, IR_PAT_REM, IR_LANG_SNO);
-        nd->port_start = nd; nd->port_resume = fp; nd->port_succ = sp; nd->port_fail = fp;
+        nd->α = nd; nd->β = fp; nd->γ = sp; nd->ω = fp;
         return nd;
     }
     case TT_ABORT: {
         nd = IR_node_alloc(cfg, IR_PAT_ABORT, IR_LANG_SNO);
-        nd->port_start = nd; nd->port_resume = fp; nd->port_succ = fp; nd->port_fail = fp;
+        nd->α = nd; nd->β = fp; nd->γ = fp; nd->ω = fp;
         return nd;
     }
     case TT_SPAN: {
@@ -55,29 +55,29 @@ static IR_prog_t * build_node(IR_prog_t * cfg, const tree_t * t, IR_t * sp, IR_t
         nd = IR_node_alloc(cfg, IR_PAT_SPAN, IR_LANG_SNO);
         nd->sval = t->c[0]->v.sval ? t->c[0]->v.sval : "";
         nd->generative = 1;
-        nd->port_start = nd; nd->port_resume = nd; nd->port_succ = sp; nd->port_fail = fp;
+        nd->α = nd; nd->β = nd; nd->γ = sp; nd->ω = fp;
         return nd;
     }
     case TT_ANY: {
         if (t->n < 1 || !t->c[0] || t->c[0]->t != TT_QLIT) return NULL;
         nd = IR_node_alloc(cfg, IR_PAT_ANY, IR_LANG_SNO);
         nd->sval = t->c[0]->v.sval ? t->c[0]->v.sval : "";
-        nd->port_start = nd; nd->port_resume = fp; nd->port_succ = sp; nd->port_fail = fp;
+        nd->α = nd; nd->β = fp; nd->γ = sp; nd->ω = fp;
         return nd;
     }
     case TT_BREAK: {
         if (t->n < 1 || !t->c[0] || t->c[0]->t != TT_QLIT) return NULL;
         nd = IR_node_alloc(cfg, IR_PAT_BREAK, IR_LANG_SNO);
         nd->sval = t->c[0]->v.sval ? t->c[0]->v.sval : "";
-        nd->port_start = nd; nd->port_resume = fp; nd->port_succ = sp; nd->port_fail = fp;
+        nd->α = nd; nd->β = fp; nd->γ = sp; nd->ω = fp;
         return nd;
     }
     case TT_FENCE: {
         IR_t * inner = (t->n > 0 && t->c[0]) ? build_node(cfg, t->c[0], sp, fp) : sp;
         if (t->n > 0 && !inner) return NULL;
         nd = IR_node_alloc(cfg, IR_PAT_FENCE, IR_LANG_SNO);
-        nd->port_start = nd; nd->port_resume = fp;
-        nd->port_succ = inner ? inner : sp; nd->port_fail = fp;
+        nd->α = nd; nd->β = fp;
+        nd->γ = inner ? inner : sp; nd->ω = fp;
         return nd;
     }
     case TT_SEQ:
@@ -94,13 +94,13 @@ static IR_prog_t * build_node(IR_prog_t * cfg, const tree_t * t, IR_t * sp, IR_t
         /* wire back-edges: child[i+1].fail -> child[i].resume */
         for (int i = 0; i < t->n - 1; i++) {
             IR_t * a = entries[i], * b = entries[i+1];
-            if (a && b) b->port_fail = a->port_resume ? a->port_resume : fp;
+            if (a && b) b->ω = a->β ? a->β : fp;
         }
         nd = IR_node_alloc(cfg, IR_PAT_CAT, IR_LANG_SNO);
         nd->generative = 1;
-        nd->port_start = entries[0];
-        nd->port_resume = entries[0] ? entries[0]->port_resume : fp;
-        nd->port_succ = sp; nd->port_fail = fp;
+        nd->α = entries[0];
+        nd->β = entries[0] ? entries[0]->β : fp;
+        nd->γ = sp; nd->ω = fp;
         return nd;
     }
     case TT_ALT: {
@@ -114,7 +114,7 @@ static IR_prog_t * build_node(IR_prog_t * cfg, const tree_t * t, IR_t * sp, IR_t
         }
         nd = IR_node_alloc(cfg, IR_PAT_ALT, IR_LANG_SNO);
         nd->generative = 1;
-        nd->port_start = last; nd->port_resume = last; nd->port_succ = sp; nd->port_fail = fp;
+        nd->α = last; nd->β = last; nd->γ = sp; nd->ω = fp;
         return nd;
     }
     case TT_CAPT_COND_ASGN: {
@@ -123,8 +123,8 @@ static IR_prog_t * build_node(IR_prog_t * cfg, const tree_t * t, IR_t * sp, IR_t
         if (!inner) return NULL;
         nd = IR_node_alloc(cfg, IR_PAT_ASSIGN_COND, IR_LANG_SNO);
         nd->sval = (t->n > 1 && t->c[1] && t->c[1]->v.sval) ? t->c[1]->v.sval : NULL;
-        nd->port_start = inner; nd->port_resume = inner->port_resume;
-        nd->port_succ = sp; nd->port_fail = fp; nd->generative = 1;
+        nd->α = inner; nd->β = inner->β;
+        nd->γ = sp; nd->ω = fp; nd->generative = 1;
         return nd;
     }
     case TT_CAPT_IMMED_ASGN: {
@@ -133,8 +133,8 @@ static IR_prog_t * build_node(IR_prog_t * cfg, const tree_t * t, IR_t * sp, IR_t
         if (!inner) return NULL;
         nd = IR_node_alloc(cfg, IR_PAT_ASSIGN_IMM, IR_LANG_SNO);
         nd->sval = (t->n > 1 && t->c[1] && t->c[1]->v.sval) ? t->c[1]->v.sval : NULL;
-        nd->port_start = inner; nd->port_resume = inner->port_resume;
-        nd->port_succ = sp; nd->port_fail = fp; nd->generative = 1;
+        nd->α = inner; nd->β = inner->β;
+        nd->γ = sp; nd->ω = fp; nd->generative = 1;
         return nd;
     }
     default:

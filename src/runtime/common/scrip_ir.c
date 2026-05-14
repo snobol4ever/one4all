@@ -42,10 +42,10 @@ IR_t * IR_node_alloc(IR_prog_t * cfg, IR_e kind, int lang) {
     nd->kind        = kind;
     nd->lang        = lang;
     nd->id          = cfg->n;
-    nd->port_start  = NULL;
-    nd->port_resume = NULL;
-    nd->port_succ   = NULL;
-    nd->port_fail   = NULL;
+    nd->α  = NULL;
+    nd->β = NULL;
+    nd->γ   = NULL;
+    nd->ω   = NULL;
     nd->c           = NULL;
     nd->n           = 0;
     nd->value       = FAILDESCR;
@@ -96,10 +96,10 @@ void IR_print(const IR_prog_t * cfg, FILE * fp) {
         const IR_t * nd = cfg->all[i];
         if (!nd) continue;
         fprintf(fp, "  [%d] %s gen=%d", nd->id, IR_e_name(nd->kind), nd->generative);
-        print_port(fp, "start",  nd->port_start);
-        print_port(fp, "resume", nd->port_resume);
-        print_port(fp, "succ",   nd->port_succ);
-        print_port(fp, "fail",   nd->port_fail);
+        print_port(fp, "start",  nd->α);
+        print_port(fp, "resume", nd->β);
+        print_port(fp, "succ",   nd->γ);
+        print_port(fp, "fail",   nd->ω);
         if (nd->n > 0) {
             fprintf(fp, " children=[");
             for (int j = 0; j < nd->n; j++) fprintf(fp, "%s%d", j ? "," : "", nd->c[j] ? nd->c[j]->id : -1);

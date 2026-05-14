@@ -109,10 +109,10 @@ typedef struct ir_node IR_t;
 struct ir_node {
     IR_e      kind;
     /* ── Four control ports (wired by lower; back-edges create cycles) ─────────────────────── */
-    IR_t    * port_start;   /* entry: first evaluation attempt                             */
-    IR_t    * port_resume;  /* backtrack: try next value (NULL → scalar / non-generative)  */
-    IR_t    * port_succ;    /* success continuation (value in .value)                      */
-    IR_t    * port_fail;    /* failure continuation (no value)                             */
+    IR_t    * α;   /* entry: first evaluation attempt                             */
+    IR_t    * β;  /* backtrack: try next value (NULL → scalar / non-generative)  */
+    IR_t    * γ;    /* success continuation (value in .value)                      */
+    IR_t    * ω;    /* failure continuation (no value)                             */
     /* ── Children (pre-wiring tree; four ports wired during lower, bottom-up) ──────────────── */
     IR_t   ** c;            /* child array                                                 */
     int            n;            /* child count                                                 */
@@ -130,7 +130,7 @@ struct ir_node {
     int            state;        /* executor state machine (0 = fresh)                          */
     /* ── Graph bookkeeping ──────────────────────────────────────────────────────────────────── */
     int            id;           /* unique within IR_prog_t — set by IR_node_alloc             */
-    int            generative;   /* 1 if port_resume is meaningful                              */
+    int            generative;   /* 1 if β is meaningful                              */
     int            visited;      /* scratch for traversal algorithms                            */
     int            lang;         /* IR_LANG_* — which language produced this node               */
 };
@@ -139,7 +139,7 @@ struct ir_node {
  * IR_prog_t — a complete wired generator DCG for one procedure or pattern
  *================================================================================================*/
 typedef struct {
-    IR_t    * entry;        /* == root node's port_start                      */
+    IR_t    * entry;        /* == root node's α                      */
     IR_t   ** all;          /* flat array of all nodes (for reset / GC / print) */
     int            n;       /* count of nodes in .all                           */
     int            lang;    /* IR_LANG_* — language that produced this graph    */

@@ -14,12 +14,12 @@
  *                                Used by SM_PUMP_BB.
  *
  * The executor is a pointer-chasing state machine: no label table, no symbol
- * lookup — port_succ / port_fail / port_resume are direct C pointers.
+ * lookup — γ / ω / β are direct C pointers.
  * Back-edges (cycles) terminate via generator exhaustion: resume → fail.
  *
  * Per-kind evaluation lives in IR_exec_node() in ir_exec.c.
- * Scalar kinds (LIT_*, VAR, BINOP, UNOP) self-evaluate and route to port_succ
- * or port_fail.  Generative kinds (EVERY, WHILE, PAT_ARB, etc.) use nd->state
+ * Scalar kinds (LIT_*, VAR, BINOP, UNOP) self-evaluate and route to γ
+ * or ω.  Generative kinds (EVERY, WHILE, PAT_ARB, etc.) use nd->state
  * and nd->counter to track position across resume calls.
  *
  * LR-2: infrastructure only.  All per-kind cases that are not yet implemented
@@ -36,8 +36,8 @@
  * Return 0 to continue pumping; non-zero to stop early. */
 typedef int (*IR_body_fn)(DESCR_t value, void * ctx);
 
-/* Drive cfg once from entry: follow port_start → ... → port_succ (return value)
- * or port_fail (return FAILDESCR).  Resets node runtime state before driving.
+/* Drive cfg once from entry: follow α → ... → γ (return value)
+ * or ω (return FAILDESCR).  Resets node runtime state before driving.
  * cfg must be a fully wired IR_prog_t (all port_* set by lower). */
 DESCR_t IR_exec_once(IR_prog_t * cfg);
 
@@ -46,8 +46,8 @@ DESCR_t IR_exec_once(IR_prog_t * cfg);
  * Resets node runtime state before first drive; leaves cfg exhausted after. */
 int IR_exec_pump(IR_prog_t * cfg, IR_body_fn body_fn, void * ctx);
 
-/* Evaluate one node in isolation: compute nd->value, return port_succ or
- * port_fail.  Called by the graph walker for self-evaluating kinds.
+/* Evaluate one node in isolation: compute nd->value, return γ or
+ * ω.  Called by the graph walker for self-evaluating kinds.
  * For generative kinds (state machine), updates nd->state / nd->counter.
  * Exported so the unit test can drive individual nodes directly. */
 IR_t * IR_exec_node(IR_t * nd);
