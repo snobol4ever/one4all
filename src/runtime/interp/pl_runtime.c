@@ -8,7 +8,7 @@
  * g_pl_trail / g_pl_cut_flag remain non-static (used by pl_broker.c).
  *
  * RS-18 (2026-05-03): the 3 user-predicate clause-body invocation sites
- * route through bb_eval_value (coro_value.c), the shared Icon/Prolog
+ * route through bb_eval_value (icn_value.c), the shared Icon/Prolog
  * value-context evaluator introduced by RS-17.  No direct interp_eval
  * call site or extern declaration remains here.  bb_eval_value falls
  * through to interp_eval for the IR shapes a Prolog clause body
@@ -36,7 +36,7 @@
 extern tree_t *pl_assert_term(Term *t, int *functor_out, int *arity_out);
 #include "../../frontend/prolog/pl_broker.h"
 #include "../../runtime/x86/bb_broker.h"
-#include "coro_value.h"   /* RS-18: bb_eval_value — shared Icon/Prolog value-context evaluator */
+#include "icn_value.h"   /* RS-18: bb_eval_value — shared Icon/Prolog value-context evaluator */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -7,7 +7,7 @@
 #include "../ast/ast.h"
 #include "../../frontend/snobol4/scrip_cc.h"
 #include "bb_broker.h"
-#include "../../runtime/interp/coro_runtime.h"
+#include "../../runtime/interp/icn_runtime.h"
 #include "emit_templates.h"
 #include "emit.h"
 #include "emit.h"
@@ -213,7 +213,7 @@ static void h_call_chunk(void)
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
 /* SN-9b: Byrd-box broker opcodes — Icon (SM_BB_PUMP) / Prolog (SM_BB_ONCE). */
-extern bb_node_t coro_eval(tree_t *e);
+extern bb_node_t icn_bb_build(tree_t *e);
 static void jit_pump_print(DESCR_t val, void *arg)
 {
     (void)arg;
@@ -226,7 +226,7 @@ static void h_bb_pump(void)
     DESCR_t expr_d = POP();
     tree_t *expr   = (tree_t *)expr_d.ptr;
     if (!expr) { STATE->last_ok = 0; return; }
-    bb_node_t node = coro_eval(expr);
+    bb_node_t node = icn_bb_build(expr);
     int ticks = bb_broker(node, BB_PUMP, jit_pump_print, NULL);
     STATE->last_ok = (ticks > 0);
 }
@@ -236,7 +236,7 @@ static void h_bb_once(void)
     DESCR_t expr_d = POP();
     tree_t *expr   = (tree_t *)expr_d.ptr;
     if (!expr) { STATE->last_ok = 0; return; }
-    bb_node_t node = coro_eval(expr);
+    bb_node_t node = icn_bb_build(expr);
     int ticks = bb_broker(node, BB_ONCE, NULL, NULL);
     STATE->last_ok = (ticks > 0);
 }
@@ -255,7 +255,7 @@ static void h_bb_once_proc(void)
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
 /* CHUNKS-step12: name-driven Icon proc BB pump — mirror of SM_BB_PUMP_PROC */
-extern bb_node_t coro_pump_proc_by_name(const char *name, DESCR_t *args, int nargs);
+extern bb_node_t icn_bb_pump_proc_by_name(const char *name, DESCR_t *args, int nargs);
 static void h_bb_pump_proc(void)
 {
     const char *name  = CUR_INS->a[0].s;
@@ -265,7 +265,7 @@ static void h_bb_pump_proc(void)
         args = calloc(nargs, sizeof(DESCR_t));
         for (int k = nargs - 1; k >= 0; k--) args[k] = POP();
     }
-    bb_node_t node = coro_pump_proc_by_name(name, args, nargs);
+    bb_node_t node = icn_bb_pump_proc_by_name(name, args, nargs);
     if (!node.fn) {
         if (args) free(args);
         STATE->last_ok = 0;
@@ -364,7 +364,7 @@ static void h_bb_pump_every(void)
         return;
     }
     g_ast_pump_active++;
-    bb_node_t node = coro_eval(every_ast);
+    bb_node_t node = icn_bb_build(every_ast);
     int ticks = bb_broker(node, BB_PUMP, NULL, NULL);
     g_ast_pump_active--;
     STATE->last_ok = (ticks > 0);

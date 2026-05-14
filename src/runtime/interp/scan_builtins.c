@@ -37,17 +37,17 @@
  *   the icn_call_builtin / bb_eval_value calling convention and avoids
  *   double-evaluation.
  * - `find` uses `icn_frame_lookup(call, &pos)` to honour outer-pump
- *   iteration.  That symbol is exported from coro_runtime.h.
+ *   iteration.  That symbol is exported from icn_runtime.h.
  * - These ARE the scalar fast paths; the generator (Byrd-box) variants
- *   for upto/find/bal etc. live in coro_runtime.c (icn_bb_upto, etc.)
- *   and are reached only via coro_eval, not via this dispatcher.
+ *   for upto/find/bal etc. live in icn_runtime.c (icn_bb_upto, etc.)
+ *   and are reached only via icn_bb_build, not via this dispatcher.
  *
  * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet
  * SPRINT:  RS-23-extra-prep (2026-05-04)
  *==========================================================================================================================*/
 
 #include "scan_builtins.h"
-#include "coro_runtime.h"          /* scan_pos, scan_subj, icn_frame_lookup */
+#include "icn_runtime.h"          /* scan_pos, scan_subj, icn_frame_lookup */
 #include "snobol4.h"               /* DESCR_t, FAILDESCR, NULVCL, INTVAL, STRVAL, IS_FAIL_fn, VARVAL_fn */
 #include <gc/gc.h>
 #include <string.h>

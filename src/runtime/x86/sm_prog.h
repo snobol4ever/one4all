@@ -120,7 +120,7 @@ typedef enum {
     SM_BB_EVAL,
     /* CH-17f: Prolog goal dispatch identified by predicate key + arity.
      * Replaces the legacy lower_expr(TT_CHOICE) + SM_BB_ONCE wrapper that
-     * pushed a raw tree_t* and called coro_eval(TT_CHOICE) at runtime.
+     * pushed a raw tree_t* and called icn_bb_build(TT_CHOICE) at runtime.
      * a[0].s = predicate key ("name/arity"), a[1].i = arity.
      * Handler: pl_pred_entry_lookup(key) → if entry_pc >= 0 use
      * pl_box_choice_pc; else fall back to pl_box_choice(IR).
@@ -167,12 +167,12 @@ typedef enum {
      * a[0].i = every_id  (index into g_every_table; populated by sm_lower
      *                     when TT_EVERY is encountered in expression-body
      *                     lowering; NEVER an tree_t* in SM bytecode).
-     * Runtime handler does: g_every_table[id] → coro_eval → bb_broker(BB_PUMP).
+     * Runtime handler does: g_every_table[id] → icn_bb_build → bb_broker(BB_PUMP).
      * Net stack delta: pushes one DT_NUL (every is void in stmt context;
      * the trailing SM_VOID_POP from the proc-body loop discards it).
      *
      * The legacy `emit_push_expr + SM_BB_PUMP` shape (which pushed a raw
-     * tree_t* on the SM stack and called coro_eval at runtime) underflowed
+     * tree_t* on the SM stack and called icn_bb_build at runtime) underflowed
      * the stack when reached via sm_call_proc (CH-17g) — net push 0,
      * trailing SM_VOID_POP fires, underflow.  This opcode pushes a single
      * DT_NUL at end so the trailing VOID_POP is balanced. */
@@ -223,9 +223,9 @@ typedef enum {
      * (top-level suspend, semantically rare and not in current corpus),
      * push v back as a fallback — the outer SM_VOID_POP will discard it.
      *
-     * Why this shape rather than CH-17i-every's g_table+coro_eval+broker
+     * Why this shape rather than CH-17i-every's g_table+icn_bb_build+broker
      * pattern: TT_SUSPEND-as-statement's existing semantics
-     * (coro_stmt.c:88) are entirely in-frame state mutation
+     * (icn_stmt.c:88) are entirely in-frame state mutation
      * (FRAME.suspending=1 + suspend_val) followed by an outer-loop
      * swapcontext.  No bb_node_t is constructed, no broker is driven.
      * The SM-side equivalent is a direct yield primitive.  This matches
@@ -280,7 +280,7 @@ typedef enum {
      * and SM_STORE_GLOCAL is a no-op (with last_ok cleared).  These slots
      * survive SUSPEND/RESUME because the SmGenState is the persistent
      * envelope — they are the per-invocation equivalent of the closure-state
-     * struct that icn_bb_to et al. allocate fresh per coro_eval call. */
+     * struct that icn_bb_to et al. allocate fresh per icn_bb_build call. */
     SM_LOAD_GLOCAL,
     SM_STORE_GLOCAL,
 
@@ -308,7 +308,7 @@ typedef enum {
      * code, forward-jumped over by their enclosing SM_JUMP.
      *
      * The slot index is baked at lower-time by sm_lower's per-proc scope
-     * construction (mirrors coro_runtime.c's icn_scope_patch but without
+     * construction (mirrors icn_runtime.c's icn_scope_patch but without
      * mutating tree_t.v.ival in place).  See lower.c expression-body emission. */
     SM_LOAD_FRAME,
     SM_STORE_FRAME,

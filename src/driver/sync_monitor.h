@@ -11,7 +11,7 @@
 #define SYNC_MONITOR_H
 
 #include "runtime/x86/snobol4.h"          /* NvPair, DESCR_t */
-#include "runtime/interp/coro_runtime.h"   /* IcnFrame, frame_depth */
+#include "runtime/interp/icn_runtime.h"   /* IcnFrame, frame_depth */
 #include "runtime/interp/pl_runtime.h"    /* Trail, trail_mark */
 
 /*------------------------------------------------------------------------

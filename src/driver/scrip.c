@@ -98,7 +98,7 @@ extern const char *Σ;
 extern int         Ω;
 extern int         Δ;
 
-#include "../runtime/interp/coro_runtime.h"
+#include "../runtime/interp/icn_runtime.h"
 #include "../runtime/interp/pl_runtime.h"
 #include "interp.h"   /* FI-6: interp loop extracted to interp.c */
 

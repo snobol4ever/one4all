@@ -57,7 +57,7 @@ extern void ir_print_node_nl(const tree_t *e, FILE *f);
 
 extern DESCR_t pat_at_cursor(const char *varname);
 
-#include "runtime/interp/coro_runtime.h"
+#include "runtime/interp/icn_runtime.h"
 #include "runtime/interp/pl_runtime.h"
 
 extern DESCR_t      eval_expr(const char *src);

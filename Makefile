@@ -88,9 +88,9 @@ RT_PIC_SRCS := \
     $(RT)/x86/sm_image.c \
     $(RT)/x86/sm_jit_interp.c \
     $(SRC)/runtime/interp/icon_gen.c \
-    $(SRC)/runtime/interp/coro_runtime.c \
-    $(SRC)/runtime/interp/coro_value.c \
-    $(SRC)/runtime/interp/coro_stmt.c \
+    $(SRC)/runtime/interp/icn_runtime.c \
+    $(SRC)/runtime/interp/icn_value.c \
+    $(SRC)/runtime/interp/icn_stmt.c \
     $(SRC)/runtime/interp/scan_builtins.c \
     $(SRC)/runtime/interp/raku_builtins.c \
     $(SRC)/runtime/interp/pl_runtime.c \
@@ -258,9 +258,9 @@ scrip:
 	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -c $(SRC)/frontend/rebus/rebus_lower.c  -o $(OBJ)/rebus_lower.o
 	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -c $(SRC)/frontend/rebus/rebus_emit.c   -o $(OBJ)/rebus_emit.o
 	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -c $(SRC)/frontend/rebus/rebus_print.c  -o $(OBJ)/rebus_print.o
-	$(CC) $(CRT)   -c $(SRC)/runtime/interp/coro_runtime.c -o $(OBJ)/coro_runtime.o
-	$(CC) $(CRT)   -c $(SRC)/runtime/interp/coro_value.c   -o $(OBJ)/coro_value.o
-	$(CC) $(CRT)   -c $(SRC)/runtime/interp/coro_stmt.c    -o $(OBJ)/coro_stmt.o
+	$(CC) $(CRT)   -c $(SRC)/runtime/interp/icn_runtime.c -o $(OBJ)/icn_runtime.o
+	$(CC) $(CRT)   -c $(SRC)/runtime/interp/icn_value.c   -o $(OBJ)/icn_value.o
+	$(CC) $(CRT)   -c $(SRC)/runtime/interp/icn_stmt.c    -o $(OBJ)/icn_stmt.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/interp/raku_builtins.c -o $(OBJ)/raku_builtins.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/interp/scan_builtins.c -o $(OBJ)/scan_builtins.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/interp/pl_runtime.c  -o $(OBJ)/pl_runtime.o

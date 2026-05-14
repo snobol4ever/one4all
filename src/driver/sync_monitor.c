@@ -12,7 +12,7 @@
 
 #include "sync_monitor.h"
 #include "runtime/x86/snobol4.h"
-#include "runtime/interp/coro_runtime.h"
+#include "runtime/interp/icn_runtime.h"
 #include "runtime/interp/pl_runtime.h"
 #include "runtime/x86/lower.h"
 #include "runtime/x86/sm_prog.h"

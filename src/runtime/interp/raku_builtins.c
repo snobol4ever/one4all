@@ -40,7 +40,7 @@
  *   `res` heavily).
  * - Symbols this file references are all already declared in either
  *   `interp_private.h` (g_raku_*, raku_fh_*, sc_dat_*, exec_stmt),
- *   `coro_runtime.h` (FRAME, frame_depth, proc_table, proc_count, coro_call,
+ *   `icn_runtime.h` (FRAME, frame_depth, proc_table, proc_count, coro_call,
  *   NV_SET_fn via snobol4.h), or `frontend/raku/raku_re.h` (Raku_nfa,
  *   raku_nfa_*).  No new declarations were added.
  *
@@ -49,8 +49,8 @@
  *==========================================================================================================================*/
 
 #include "raku_builtins.h"
-#include "coro_value.h"            /* bb_eval_value */
-#include "coro_runtime.h"          /* FRAME, frame_depth, proc_table, proc_count, coro_call */
+#include "icn_value.h"            /* bb_eval_value */
+#include "icn_runtime.h"          /* FRAME, frame_depth, proc_table, proc_count, coro_call */
 #include "../../driver/interp_private.h"  /* g_raku_*, raku_fh_*, sc_dat_*, exec_stmt, ScDatType, DATINST_t via snobol4.h */
 #include "../../frontend/raku/raku_re.h"  /* Raku_nfa, raku_nfa_build/exec/free, Raku_match */
 #include "snobol4.h"               /* NV_SET_fn, STRVAL, INTVAL, REALVAL, DESCR_t, FAILDESCR, NULVCL, IS_*_fn, VARVAL_fn */

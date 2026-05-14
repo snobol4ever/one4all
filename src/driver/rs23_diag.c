@@ -4,7 +4,7 @@
  * Linked into scrip via `-Wl,--wrap=interp_eval`.  Every interp_eval call
  * goes through __wrap_interp_eval first.  We use backtrace(3) to inspect
  * the call chain; if any ancestor frame is a BB-adapter symbol
- * (bb_eval_value, bb_exec_stmt, coro_call, coro_eval, coro_drive,
+ * (bb_eval_value, bb_exec_stmt, coro_call, icn_bb_build, coro_drive,
  * coro_drive_fnc, icn_bb_every) we log the (kind, immediate-caller) pair
  * once and then defer to __real_interp_eval.
  *
@@ -71,7 +71,7 @@ static int has_bb_ancestor(char *out_caller, size_t cap,
         if (strstr(s, "bb_eval_value") ||
             strstr(s, "bb_exec_stmt")  ||
             strstr(s, "coro_call")     ||
-            strstr(s, "coro_eval")     ||
+            strstr(s, "icn_bb_build")     ||
             strstr(s, "coro_drive")    ||
             strstr(s, "icn_bb_every")) {
             if (!found) { strncpy(out_bb, s, bb_cap - 1); out_bb[bb_cap - 1] = '\0'; found = 1; }

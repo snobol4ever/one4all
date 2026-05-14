@@ -149,7 +149,7 @@ extern SmGenState *g_current_gen_state;
  * Mirrors CH-17f's g_pl_pred_table pattern (Prolog) for Icon `every`.
  * The SM bytecode contains only the integer id; no tree_t* in any
  * SM_Program::instrs[] payload.  The runtime handler (SM_BB_PUMP_EVERY)
- * looks up by id and constructs the box via coro_eval — same boundary
+ * looks up by id and constructs the box via icn_bb_build — same boundary
  * CH-17f draws for SM_BB_ONCE_PROC (broker constructs the box from IR;
  * the SM dispatch layer never sees a raw IR pointer).
  *

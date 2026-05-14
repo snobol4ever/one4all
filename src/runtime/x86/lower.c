@@ -33,7 +33,7 @@
 #include "../../frontend/snobol4/scrip_cc.h"
 #include "../ast/ast.h"
 #include "../../runtime/common/ast_clone.h"
-#include "../../runtime/interp/coro_runtime.h"
+#include "../../runtime/interp/icn_runtime.h"
 #include "../../runtime/interp/pl_runtime.h"
 #include "../../frontend/icon/icon_lex.h"
 #include <stdio.h>
@@ -73,7 +73,7 @@ static int           g_hoist_entry = -1;
 static int           g_hoist_slot  = -1;
 
 /* GOAL-ICON-BB-COMPLETE rung13: Icon-aware suspendable check that includes TT_SEQ.
- * is_suspendable() (coro_runtime.c) intentionally excludes TT_SEQ to avoid breaking
+ * is_suspendable() (icn_runtime.c) intentionally excludes TT_SEQ to avoid breaking
  * the interp_eval TT_EVERY augop path. We need TT_SEQ here in the lowering layer only. */
 static int lower_is_suspendable_icn(const tree_t *e)
 {
@@ -914,7 +914,7 @@ static const tree_t *find_first_alternate(const tree_t *t)
  * coroutine implementation (SM_RESUME / SM_STORE_GLOCAL / SM_SUSPEND_VALUE
  * etc) was the WRONG approach — see GOAL-ICON-BB-NATIVE.md "Why
  * GOAL-ICON-BB-COMPLETE was wrong".  All Icon TT_LIMIT-as-every gen-exprs
- * now route through SM_BB_PUMP_EVERY → coro_eval → bb_broker, the
+ * now route through SM_BB_PUMP_EVERY → icn_bb_build → bb_broker, the
  * statement-level dispatch that IB-1..IB-8 left in place as the correct
  * fallback while flat-BB templates land for individual constructs. */
 static void lower_limit_every(const tree_t *limit_node, const tree_t *body)
@@ -950,7 +950,7 @@ static void lower_every(const tree_t *t)
 
     /* IB-10 (2026-05-12): SM coroutine path purged.  Was: hoisted-alt rung13
      * pure-SM every loop emitting SM_RESUME / SM_GEN_TICK / SM_SUSPEND.
-     * Route every Icon `every` statement through SM_BB_PUMP_EVERY → coro_eval
+     * Route every Icon `every` statement through SM_BB_PUMP_EVERY → icn_bb_build
      * → bb_broker, the statement-level dispatch that is the correct fallback
      * until flat-BB templates (emit_bb_icn_every from IB-4) supersede it for
      * the specific shapes they cover. */
@@ -1130,7 +1130,7 @@ void lower_stmt(const tree_t *s)
         }
         else if (subject && subject->t == TT_FNC && subject->v.sval) {
             /* Other Prolog directive (assertz, asserta, etc.) —
-             * drive via PL_BUILTIN to avoid coro_eval. PB-4. */
+             * drive via PL_BUILTIN to avoid icn_bb_build. PB-4. */
             emit_push_expr(subject);
             sm_emit_si(g_p, SM_CALL_FN, "PL_BUILTIN", 0);
         }
@@ -1252,7 +1252,7 @@ static void lower_expr_inner(const tree_t *t)
     case TT_CSET_COMPL: lower_expr(T0(t));                    sm_emit_si(g_p, SM_CALL_FN, "~", 1); return;
     /* IJ-15: above cases replace emit_push_expr fallback so sm_interp handles cset ops
      * via icn_try_call_builtin_by_name (++/--/**) and IJ-7 ~~.  Generative cset children
-     * (e.g. ~~(A|B|C)) are rare and still handled by coro_runtime when they arise via BB. */
+     * (e.g. ~~(A|B|C)) are rare and still handled by icn_runtime when they arise via BB. */
     case TT_LCONCAT:                          lower_lconcat(t);       return;
     /* unary Icon */
     case TT_NONNULL:                          lower_nonnull(t);       return;

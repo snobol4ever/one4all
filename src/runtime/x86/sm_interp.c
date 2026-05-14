@@ -18,8 +18,8 @@
 #include <math.h>
 #include <gc/gc.h>
 
-#include "../interp/coro_runtime.h"   /* A0: g_sm_dispatch_active */
-#include "../interp/coro_value.h"     /* A3-seed-fix: bb_icn_rnd_seed shared RNG */
+#include "../interp/icn_runtime.h"   /* A0: g_sm_dispatch_active */
+#include "../interp/icn_value.h"     /* A3-seed-fix: bb_icn_rnd_seed shared RNG */
 
 /* ── Pattern runtime (M-SCRIP-U4) ──────────────────────────────────────── */
 #include "snobol4.h"   /* DESCR_t, PATND_t, DT_* */
@@ -67,7 +67,7 @@ extern char    *VARVAL_fn(DESCR_t d);
 extern DESCR_t  NV_GET_fn(const char *name);
 
 /* CHUNKS-step17b'' (CH-17b''): forwarders to the active Icon frame's env slots.
- * Defined in coro_runtime.c for production builds, stubbed in sm_interp_test.c
+ * Defined in icn_runtime.c for production builds, stubbed in sm_interp_test.c
  * for the unit-test world.  Returns FAILDESCR / no-op when frame_depth == 0
  * — expressions emitted with frame-slot opcodes are dead code today (CH-17c flips
  * the consumer that reaches them).  Pure-DESCR_t signatures: no tree_t leakage
@@ -79,13 +79,13 @@ extern int      icn_frame_env_active(void);   /* 1 if frame_depth > 0 */
 /* OE-10: Icon/Prolog BB opcode support */
 #include "bb_broker.h"
 #include <setjmp.h>
-extern bb_node_t coro_eval(tree_t *e);   /* scrip.c — builds a drivable bb_node_t */
-extern bb_node_t coro_pump_proc_by_name(const char *name, DESCR_t *args, int nargs);
+extern bb_node_t icn_bb_build(tree_t *e);   /* scrip.c — builds a drivable bb_node_t */
+extern bb_node_t icn_bb_pump_proc_by_name(const char *name, DESCR_t *args, int nargs);
                                           /* CHUNKS-step12: name-driven Icon proc pump */
 
 /* CHUNKS-step17i-suspend: yield-to-caller helper.
  *
- * Defined in coro_runtime.c (which already owns ucontext machinery for
+ * Defined in icn_runtime.c (which already owns ucontext machinery for
  * coro_t / proc_trampoline).  Called from the SM_SUSPEND_VALUE handler
  * to implement Icon's `suspend E [do body]` yield protocol without
  * pulling icon_gen.h transitive baggage into sm_interp.c.
@@ -841,11 +841,11 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
         /* ── OE-10/11: Byrd box broker opcodes — Icon/Prolog SM-run support ── */
         case SM_BB_PUMP: {
             /* Pop DT_E descriptor whose .ptr is the tree_t* of the Icon statement subject.
-             * Build a drivable bb_node_t via coro_eval, pump all values via bb_broker. */
+             * Build a drivable bb_node_t via icn_bb_build, pump all values via bb_broker. */
             DESCR_t expr_d = sm_pop(st);
             tree_t *expr   = (tree_t *)expr_d.ptr;
             if (!expr) { st->last_ok = 0; break; }
-            bb_node_t node = coro_eval(expr);
+            bb_node_t node = icn_bb_build(expr);
             int ticks = bb_broker(node, BB_PUMP, pump_print, NULL);
             st->last_ok = (ticks > 0);
             break;
@@ -853,12 +853,12 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
 
         case SM_BB_ONCE: {
             /* Pop DT_E descriptor whose .ptr is the tree_t* of the Prolog statement subject.
-             * Build a bb_node_t via coro_eval (shared builder handles TT_CHOICE/TT_CLAUSE),
+             * Build a bb_node_t via icn_bb_build (shared builder handles TT_CHOICE/TT_CLAUSE),
              * drive once via bb_broker(BB_ONCE). */
             DESCR_t expr_d = sm_pop(st);
             tree_t *expr   = (tree_t *)expr_d.ptr;
             if (!expr) { st->last_ok = 0; break; }
-            bb_node_t node = coro_eval(expr);
+            bb_node_t node = icn_bb_build(expr);
             int ticks = bb_broker(node, BB_ONCE, NULL, NULL);
             st->last_ok = (ticks > 0);
             break;
@@ -867,7 +867,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
         case SM_BB_EVAL: {
             /* SM_BB_EVAL — Icon A|B (TT_ALTERNATE) in value context.
              * a[0].i = every_table id; look up tree_t*, call bb_eval_value.
-             * bb_eval_value handles TT_ALTERNATE via coro_eval(e)+α with correct frame.
+             * bb_eval_value handles TT_ALTERNATE via icn_bb_build(e)+α with correct frame.
              * Integer id avoids ast_gc_clone (which triggers GC mid-lowering). */
             int eval_id    = (int)ins->a[0].i;
             tree_t *expr   = every_table_lookup(eval_id);
@@ -915,7 +915,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 args = calloc(nargs, sizeof(DESCR_t));
                 for (int k = nargs - 1; k >= 0; k--) args[k] = sm_pop(st);
             }
-            bb_node_t node = coro_pump_proc_by_name(name, args, nargs);
+            bb_node_t node = icn_bb_pump_proc_by_name(name, args, nargs);
             if (!node.fn) {
                 /* proc not found in proc_table — treat as failed pump */
                 if (args) free(args);
@@ -944,11 +944,11 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
          * The matched body's value (or NULVCL) is left on the stack —
          * even though TT_CASE is currently used in stmt-context (raku
          * given_stmt), keeping the value-context discipline consistent
-         * with the underlying coro_value.c TT_CASE evaluator means
+         * with the underlying icn_value.c TT_CASE evaluator means
          * future value-context use is symmetric. The trailing SM_VOID_POP
          * the lower_stmt expression-stmt path emits for TT_CASE balances
          * the stack. Mirrors the comparison logic in
-         * coro_value.c:947 — string compare on TT_LEQ, integer-or-string
+         * icn_value.c:947 — string compare on TT_LEQ, integer-or-string
          * compare on TT_EQ — but operates entirely on expression-call results,
          * never on tree_t. */
         case SM_BB_PUMP_CASE: {
@@ -1052,7 +1052,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
          * Mirrors SM_BB_ONCE_PROC for Prolog.  a[0].i = every_id;
          * every_table_lookup(id) returns the borrowed tree_t* registered
          * by sm_lower at expression-body lowering time.  Runtime delegates
-         * to the existing IR broker (coro_eval(TT_EVERY) builds an
+         * to the existing IR broker (icn_bb_build(TT_EVERY) builds an
          * icn_every_state_t whose body field is e->c[1]; icn_bb_every
          * pumps gen and calls bb_exec_stmt(body) per tick — this is the
          * "boxes stay; graph-construction moves to lower-time" boundary
@@ -1080,7 +1080,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 break;
             }
             g_ast_pump_active++;
-            bb_node_t node = coro_eval(every_ast);
+            bb_node_t node = icn_bb_build(every_ast);
             int ticks = bb_broker(node, BB_PUMP, NULL, NULL);
             g_ast_pump_active--;
             st->last_ok = (ticks > 0);
@@ -1121,7 +1121,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
          * Outside a coroutine (top-level suspend, semantically rare and
          * not exercised by the corpus today), push the value back so the
          * outer SM_VOID_POP balances.  This treats top-level suspend as
-         * a no-op yield, matching the existing coro_stmt.c:88 semantics
+         * a no-op yield, matching the existing icn_stmt.c:88 semantics
          * where FRAME.suspending=1 has no observer when active_coro is
          * NULL. */
         case SM_SUSPEND_VALUE: {
@@ -1146,7 +1146,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                  * stack-effect +2 instead of the +1 that the proc-body
                  * loop expects.  This is acceptable for now — top-level
                  * TT_SUSPEND is not exercised by the rung03/04 corpus
-                 * and the existing AST-walker fallback (coro_stmt.c:88)
+                 * and the existing AST-walker fallback (icn_stmt.c:88)
                  * has the same "no-op" behaviour outside a coroutine. */
                 sm_push(st, v);
                 st->last_ok = !IS_FAIL_fn(v);
@@ -1315,8 +1315,8 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             }
 
             /* GOAL-ICON-BB-COMPLETE A3: ICN_RANDOM — ?E one-shot random selection.
-             * Mirrors bb_eval_value's TT_RANDOM arm in coro_value.c:698-746.
-             * A3-seed-fix: uses canonical bb_icn_rnd_seed (defined in coro_value.c)
+             * Mirrors bb_eval_value's TT_RANDOM arm in icn_value.c:698-746.
+             * A3-seed-fix: uses canonical bb_icn_rnd_seed (defined in icn_value.c)
              * so --ir-run and --sm-run produce identical sequences for random programs.
              * NOTE: inner early-exits use goto (not break) to avoid breaking
              * nested for-loops instead of the outer switch case. */
@@ -1433,7 +1433,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
 
             /* GOAL-ICON-BB-COMPLETE A2: ICN_SECTION_RANGE/PLUS/MINUS
              * Stack (pushed by sm_lower in order): string, lo, hi → TOS=hi
-             * Mirrors bb_section() in coro_value.c exactly.
+             * Mirrors bb_section() in icn_value.c exactly.
              * Uses the same Icon position rules: p>0 → 1-based; p==0 → slen+1; p<0 → slen+1+p. */
             if (name && (strcmp(name, "ICN_SECTION_RANGE") == 0 ||
                          strcmp(name, "ICN_SECTION_PLUS")  == 0 ||
@@ -1587,7 +1587,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 st->last_ok = 1;
                 break;
             }
-            /* PB-1: PL_UNIFY — honest TT_UNIFY lowering (no coro_eval).
+            /* PB-1: PL_UNIFY — honest TT_UNIFY lowering (no icn_bb_build).
              * emit_push_expr(TT_UNIFY node) + SM_CALL_FN "PL_UNIFY" 0.
              * Pops the DT_E descriptor, extracts tree_t*, calls pl_unified_term_from_expr
              * on both children with g_pl_env, then unify().  Trail mark/unwind is
@@ -1602,7 +1602,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 break;
             }
 
-            /* PB-2: PL_CUT — honest TT_CUT lowering (no coro_eval).
+            /* PB-2: PL_CUT — honest TT_CUT lowering (no icn_bb_build).
              * emit_push_expr(TT_CUT node) + SM_CALL_FN "PL_CUT" 0.
              * Pops DT_E (ignored), sets g_pl_cut_flag=1, succeeds. */
             if (name && strcmp(name, "PL_CUT") == 0 && nargs == 0) {
@@ -1631,7 +1631,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 break;
             }
 
-            /* PB-4: PL_BUILTIN — drive a Prolog builtin directive from SM (no coro_eval).
+            /* PB-4: PL_BUILTIN — drive a Prolog builtin directive from SM (no icn_bb_build).
              * emit_push_expr(TT_FNC goal node) + SM_CALL_FN "PL_BUILTIN" 0.
              * Covers assertz/asserta/retract/abolish and other builtins used in directives. */
             if (name && strcmp(name, "PL_BUILTIN") == 0 && nargs == 0) {
@@ -2145,7 +2145,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
          * with frame-slot ops are dead code until CH-17c flips the consumer
          * that reaches them, so the FAIL fallback never fires on real programs.
          * Mirrors the slot-resolution logic that bb_eval_value does for TT_VAR
-         * when frame_depth > 0 (coro_value.c:382–399). */
+         * when frame_depth > 0 (icn_value.c:382–399). */
         case SM_LOAD_FRAME: {
             int slot = (int)ins->a[0].i;
             if (icn_frame_env_active() && slot >= 0) {

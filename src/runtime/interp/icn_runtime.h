@@ -6,8 +6,8 @@
  *
  * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6 (FI-4, 2026-04-14)
  */
-#ifndef CORO_RUNTIME_H
-#define CORO_RUNTIME_H
+#ifndef ICN_RUNTIME_H
+#define ICN_RUNTIME_H
 
 #include "../ast/ast.h"
 #include "../../frontend/snobol4/scrip_cc.h"
@@ -182,4 +182,4 @@ extern int g_ast_pump_active;
         abort(); \
     } } while (0)
 
-#endif /* CORO_RUNTIME_H */
+#endif /* ICN_RUNTIME_H */

@@ -16,7 +16,7 @@
 #include "sm_prog.h"
 #include "../../frontend/snobol4/scrip_cc.h"
 #include "../ast/ast.h"
-#include "../../runtime/interp/coro_runtime.h"
+#include "../../runtime/interp/icn_runtime.h"
 
 /* ── Label resolution table ─────────────────────────────────────────────── */
 

@@ -14,7 +14,7 @@
 #include "../../frontend/icon/icon_gen.h"
 #include "../ast/ast.h"            /* tree_t, tree_e, TT_TO, TT_TO_BY, TT_ITERATE, TT_SUSPEND, TT_FNC */
 #include "../../runtime/common/coerce.h"  /* descr_to_str_icn (D-1/D-2 RS-6) */
-#include "../../runtime/interp/coro_runtime.h"  /* CORO_STACK_SZ */
+#include "../../runtime/interp/icn_runtime.h"  /* CORO_STACK_SZ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -44,7 +44,7 @@ DESCR_t icn_bb_to(void *zeta, int entry) {
  * pre-collect all values from each, then iterate outer lo × hi pairs,
  * yielding each inner lo_val..hi_val range in sequence.
  *
- * State pre-populated by coro_eval before returning this box.
+ * State pre-populated by icn_bb_build before returning this box.
  * α: li=0, hi2=0, cur=lo_vals[0]; step through inner range.
  * β: cur++; if cur > hi_vals[hi2]: hi2++; if hi2 >= nhi: li++, hi2=0; reset cur.
  * ω: li >= nlo.
@@ -433,7 +433,7 @@ DESCR_t icn_bb_alternate(void *zeta, int entry) {
     return FAILDESCR;
 }
 
-/* coro_eval — implemented in scrip.c where interp_eval and proc tables are visible. */
+/* icn_bb_build — implemented in scrip.c where interp_eval and proc tables are visible. */
 
 /*============================================================================================================================
  * Unit tests: B-2 constant box, B-3 icn_bb_to, B-4 icn_bb_to_by, B-5 icn_bb_iterate, B-7 icn_bb_find
@@ -531,11 +531,11 @@ int main(void) {
 #endif /* ICON_GEN_UNIT_TEST */
 
 icn_scan_gen_state_t *icon_scan_gen_new(void) { return calloc(1, sizeof(icn_scan_gen_state_t)); }
-#include "../../runtime/interp/coro_value.h"
-#include "../../runtime/interp/coro_stmt.h"
+#include "../../runtime/interp/icn_value.h"
+#include "../../runtime/interp/icn_stmt.h"
 #include "../../runtime/x86/snobol4.h"
 
-/* Forward declarations from coro_runtime.c */
+/* Forward declarations from icn_runtime.c */
 typedef struct { tree_t *expr; } icn_lazy_state_t;
 extern DESCR_t icn_lazy_box(void *zeta, int entry);
 extern int is_suspendable(tree_t *e);
@@ -586,7 +586,7 @@ DESCR_t icn_bb_repalt(void *zeta, int entry) {
     for (;;) {
         int port = (z->started) ? 1 : 0;
         if (!z->started) {
-            z->inner   = coro_eval(z->expr);
+            z->inner   = icn_bb_build(z->expr);
             z->started = 1;
         }
         DESCR_t v = z->inner.fn(z->inner.ζ, port);
@@ -594,7 +594,7 @@ DESCR_t icn_bb_repalt(void *zeta, int entry) {
         /* inner exhausted */
         if (!z->ever_succeeded) return FAILDESCR;  /* never succeeded -> omega */
         /* restart inner from alpha */
-        z->inner   = coro_eval(z->expr);
+        z->inner   = icn_bb_build(z->expr);
         z->started = 1;  /* but pump with alpha next iteration */
         /* rebuild and pump alpha */
         v = z->inner.fn(z->inner.ζ, 0);
@@ -710,7 +710,7 @@ DESCR_t icn_bb_case_gen(void *zeta, int entry) {
         /* Match -- pump body */
         tree_t *cb = z->clause_bodies[z->cur_clause];
         if (!cb) return NULVCL;
-        z->body_box     = coro_eval(cb);
+        z->body_box     = icn_bb_build(cb);
         z->body_started = 1;
         DESCR_t v = z->body_box.fn(z->body_box.ζ, 0);
         if (!IS_FAIL_fn(v)) return v;
@@ -720,7 +720,7 @@ DESCR_t icn_bb_case_gen(void *zeta, int entry) {
     /* default */
     if (z->dflt) {
         if (!z->body_started) {
-            z->body_box     = coro_eval(z->dflt);
+            z->body_box     = icn_bb_build(z->dflt);
             z->body_started = 1;
             DESCR_t v = z->body_box.fn(z->body_box.ζ, 0);
             if (!IS_FAIL_fn(v)) return v;
@@ -751,7 +751,7 @@ DESCR_t icn_bb_case_gen(void *zeta, int entry) {
  *--------------------------------------------------------------------------------------------------------------------------*/
 /* Note: non-generative list constructor is already handled in bb_eval_value
  * (TT_MAKELIST case). This BB is wired for when is_suspendable detects a
- * generative child -- we drive the cross-product via existing coro_eval
+ * generative child -- we drive the cross-product via existing icn_bb_build
  * machinery by pumping the generative elements. For now: eager eval, one list. */
 
 /*----------------------------------------------------------------------------------------------------------------------------
@@ -773,7 +773,7 @@ DESCR_t icn_bb_compound_gen(void *zeta, int entry) {
         for (int i = 0; i < z->n - 1; i++)
             if (z->children[i]) bb_eval_value(z->children[i]);
         if (z->n <= 0 || !z->children[z->n - 1]) return FAILDESCR;
-        z->last_box = coro_eval(z->children[z->n - 1]);
+        z->last_box = icn_bb_build(z->children[z->n - 1]);
         z->started  = 1;
         return z->last_box.fn(z->last_box.ζ, 0);
     }
@@ -796,11 +796,11 @@ DESCR_t icn_bb_field_gen(void *zeta, int entry) {
 }
 
 /*============================================================================================================================
- * coro_eval additions -- wire new BBs into the dispatch.
- * Call coro_eval_missing(e) from coro_eval's fallback.
+ * icn_bb_build additions -- wire new BBs into the dispatch.
+ * Call icn_bb_build_missing(e) from icn_bb_build's fallback.
  *============================================================================================================================*/
 
-bb_node_t coro_eval_missing_base(tree_t *e) {
+bb_node_t icn_bb_build_missing_base(tree_t *e) {
     if (!e) { icn_lazy_state_t *z = calloc(1, sizeof(*z)); return (bb_node_t){ icn_lazy_box, z, 0 }; }
 
     /* ir_a_Not */
@@ -863,7 +863,7 @@ bb_node_t coro_eval_missing_base(tree_t *e) {
     /* ir_a_Field with generative object */
     if (e->t == TT_FIELD && e->n >= 1 && is_suspendable(e->c[0])) {
         icn_field_gen_state_t *z = calloc(1, sizeof(*z));
-        z->obj_gen = coro_eval(e->c[0]);
+        z->obj_gen = icn_bb_build(e->c[0]);
         z->field   = e->v.sval;
         return (bb_node_t){ icn_bb_field_gen, z, 0 };
     }
@@ -908,7 +908,7 @@ bb_node_t coro_eval_missing_base(tree_t *e) {
 /* Forward: frame push/pop -- same as coro_call */
 extern int frame_depth;
 extern IcnFrame frame_stack[];
-/* extern declarations from coro_runtime.h */
+/* extern declarations from icn_runtime.h */
 
 static void icn_bb_proc_push_frame(tree_t *proc, DESCR_t *args, int nargs,
                                     IcnScope *sc_out, int *nslots_out) {
@@ -1026,7 +1026,7 @@ DESCR_t icn_bb_proc_call(void *zeta, int entry) {
                 tree_t *expr_node = (st->n >= 1) ? st->c[0] : NULL;
                 tree_t *body_node = (st->n >= 2) ? st->c[1] : NULL;
                 if (!expr_node) { z->stmt_idx++; continue; }
-                z->expr_box    = coro_eval(expr_node);
+                z->expr_box    = icn_bb_build(expr_node);
                 z->suspend_body = body_node;
                 z->in_suspend   = 1;
                 DESCR_t v = z->expr_box.fn(z->expr_box.ζ, 0);
@@ -1059,7 +1059,7 @@ DESCR_t icn_bb_proc_call(void *zeta, int entry) {
 
 /*----------------------------------------------------------------------------------------------------------------------------
  * icn_bb_make_proc_box -- build an icn_bb_proc_call box for a proc node.
- * Called from coro_eval TT_FNC user-proc path to replace icn_bb_suspend.
+ * Called from icn_bb_build TT_FNC user-proc path to replace icn_bb_suspend.
  *--------------------------------------------------------------------------------------------------------------------------*/
 bb_node_t icn_bb_make_proc_box(tree_t *proc, DESCR_t *args, int nargs) {
     icn_proc_call_state_t *zz = calloc(1, sizeof(*zz));
@@ -1085,7 +1085,7 @@ bb_node_t icn_bb_make_proc_box(tree_t *proc, DESCR_t *args, int nargs) {
  *============================================================================================================================*/
 
 static DESCR_t icn_apply_section(DESCR_t val, DESCR_t left, DESCR_t right, icn_sec_kind_t kind) {
-    /* Mirrors bb_section in coro_value.c */
+    /* Mirrors bb_section in icn_value.c */
     extern DESCR_t bb_eval_value(tree_t *e);
     const char *s = VARVAL_fn(val); if (!s) s = "";
     long slen = (long)strlen(s);
@@ -1119,7 +1119,7 @@ DESCR_t icn_bb_section_gen(void *zeta, int entry) {
             z->val_started = 1;
             if (IS_FAIL_fn(z->cur_val)) return FAILDESCR;
             /* Reset left/right for new val */
-            z->left_gen    = coro_eval(z->left_expr);
+            z->left_gen    = icn_bb_build(z->left_expr);
             z->left_started = 0;
             z->right_started = 0;
         }
@@ -1131,12 +1131,12 @@ DESCR_t icn_bb_section_gen(void *zeta, int entry) {
             z->left_started = 0; z->right_started = 0;
             z->cur_val = z->val_gen.fn(z->val_gen.ζ, 1);
             if (IS_FAIL_fn(z->cur_val)) return FAILDESCR;
-            z->left_gen = coro_eval(z->left_expr);
+            z->left_gen = icn_bb_build(z->left_expr);
             z->left_started = 0;
             continue;
         }
         /* Drive right */
-        z->right_gen = coro_eval(z->right_expr);
+        z->right_gen = icn_bb_build(z->right_expr);
         z->right_started = 0;
         DESCR_t rv = z->right_gen.fn(z->right_gen.ζ, 0);
         z->right_started = 1;
@@ -1190,17 +1190,17 @@ DESCR_t icn_bb_listcon_gen(void *zeta, int entry) {
 }
 
 /*============================================================================================================================
- * Wire new BBs into coro_eval_missing
+ * Wire new BBs into icn_bb_build_missing
  *============================================================================================================================*/
-/* Override: replace the old coro_eval_missing with extended version */
+/* Override: replace the old icn_bb_build_missing with extended version */
 /* Note: we append here; the linker will use the last definition if both
  * are non-static. Instead, we rename the old one and call from new. */
 
 /*============================================================================================================================
- * coro_eval_missing -- top-level dispatch for all missing JCON BBs.
- * Called from coro_eval fallback. Handles new constructs then delegates.
+ * icn_bb_build_missing -- top-level dispatch for all missing JCON BBs.
+ * Called from icn_bb_build fallback. Handles new constructs then delegates.
  *============================================================================================================================*/
-bb_node_t coro_eval_missing(tree_t *e) {
+bb_node_t icn_bb_build_missing(tree_t *e) {
     if (!e) goto fallback;
 
     /* ir_a_Sectionop with generative operands */
@@ -1211,8 +1211,8 @@ bb_node_t coro_eval_missing(tree_t *e) {
         z->val_expr   = e->c[0];
         z->left_expr  = e->c[1];
         z->right_expr = e->c[2];
-        z->val_gen    = coro_eval(e->c[0]);
-        z->left_gen   = coro_eval(e->c[1]);
+        z->val_gen    = icn_bb_build(e->c[0]);
+        z->left_gen   = icn_bb_build(e->c[1]);
         z->kind       = (e->t == TT_SECTION_PLUS) ? ICN_SEC_PLUS
                       : (e->t == TT_SECTION_MINUS) ? ICN_SEC_MINUS
                       : ICN_SEC_RANGE;
@@ -1238,7 +1238,7 @@ bb_node_t coro_eval_missing(tree_t *e) {
     }
 
     fallback:
-    return coro_eval_missing_base(e);
+    return icn_bb_build_missing_base(e);
 }
 
 /*============================================================================================================================

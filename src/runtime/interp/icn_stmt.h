@@ -27,8 +27,8 @@
  * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet
  *==========================================================================================================================*/
 
-#ifndef CORO_STMT_H
-#define CORO_STMT_H
+#ifndef ICN_STMT_H
+#define ICN_STMT_H
 
 #include "../ast/ast.h"
 #include "snobol4.h"      /* DESCR_t */
@@ -39,4 +39,4 @@
  * the 13 call sites this replaces in icn_runtime.c. */
 void bb_exec_stmt(tree_t *e);
 
-#endif /* CORO_STMT_H */
+#endif /* ICN_STMT_H */

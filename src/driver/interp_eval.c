@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <unistd.h>     /* getpid */
 #include "../ast/ast.h"   /* TT_KIND_COUNT */
-#include "../runtime/interp/coro_value.h"  /* A3-seed-fix: bb_icn_rnd_seed shared RNG */
+#include "../runtime/interp/icn_value.h"  /* A3-seed-fix: bb_icn_rnd_seed shared RNG */
 
 /* RS-24 diag: per-kind hit counter for the Icon-frame switch in
  * interp_eval().  See the env-gated init block inside that function for
@@ -261,9 +261,9 @@ int icn_string_section_assign(tree_t *lhs, DESCR_t val) {
  * the generator and inject via coro_drive_node, letting interp_eval re-read
  * mutable variables (e.g. frame locals) fresh each tick.
  *
- * RS-23c: definition lifted to coro_runtime.c (declared in coro_runtime.h)
- * so coro_value.c / coro_stmt.c can share the single copy. */
-#include "../runtime/interp/coro_runtime.h"
+ * RS-23c: definition lifted to icn_runtime.c (declared in icn_runtime.h)
+ * so icn_value.c / icn_stmt.c can share the single copy. */
+#include "../runtime/interp/icn_runtime.h"
 
 /* real_str — format a real for Icon output using shortest round-trip representation.
  * Tries precisions 15..17 and picks the shortest that parses back to the same double. */
@@ -1157,10 +1157,10 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
 
     /* CH-17g-builtin-batch (2026-05-11): SM-mode Icon builtins missing from
      * icn_try_call_builtin_by_name.  All are verbatim ports of the AST-walk
-     * paths in interp_eval.c / coro_value.c with interp_eval(e->c[i])
+     * paths in interp_eval.c / icn_value.c with interp_eval(e->c[i])
      * replaced by args[i] (pre-evaluated by SM_CALL_FN). No tree_t access. */
 
-    /* SIZE (*E) — string/list/table size.  Mirrors coro_value.c:TT_SIZE. */
+    /* SIZE (*E) — string/list/table size.  Mirrors icn_value.c:TT_SIZE. */
     if (!strcmp(fn,"SIZE") && nargs == 1) {
         DESCR_t v = args[0];
         if (IS_FAIL_fn(v)) { *out = FAILDESCR; return 1; }
@@ -1188,7 +1188,7 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
     }
 
     /* NONNULL (\E) — succeed with E if E != null, else fail.
-     * Mirrors coro_value.c:TT_NONNULL. */
+     * Mirrors icn_value.c:TT_NONNULL. */
     if (!strcmp(fn,"NONNULL") && nargs == 1) {
         DESCR_t v = args[0];
         if (IS_FAIL_fn(v))  { *out = FAILDESCR; return 1; }
@@ -1234,7 +1234,7 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
     }
 
     /* ICN_NULL (/E) — succeed with &null iff E is null, else fail.
-     * Mirrors coro_value.c:TT_NULL. */
+     * Mirrors icn_value.c:TT_NULL. */
     if (!strcmp(fn,"ICN_NULL") && nargs == 1) {
         DESCR_t v = args[0];
         if (IS_FAIL_fn(v))  { *out = FAILDESCR; return 1; }
@@ -2360,7 +2360,7 @@ DESCR_t interp_eval(tree_t *e)
             if (!strcmp(fn,"bal") && nargs>=1) {
                 /* bal(c1, c2, c3, s, i1, i2) — find first position where c1-chars appear
                    at nesting depth 0 w.r.t. c2/c3 open/close delimiters.
-                   Scalar path; generator path is in coro_eval via icn_bb_bal. */
+                   Scalar path; generator path is in icn_bb_build via icn_bb_bal. */
                 DESCR_t cd=interp_eval(e->c[1]);
                 const char *c1=VARVAL_fn(cd); if(!c1) return FAILDESCR;
                 const char *c2="(", *c3=")";
@@ -3253,7 +3253,7 @@ DESCR_t interp_eval(tree_t *e)
                 return REALVAL(sqrt(v));
             }
             /* seq(i) / seq(i,j) — generator: i, i+1, i+2, ... (up to j if given).
-             * Returns first value here; coro_eval handles TT_FNC "seq" as a box. */
+             * Returns first value here; icn_bb_build handles TT_FNC "seq" as a box. */
             if (!strcmp(fn,"seq") && nargs >= 1) {
                 DESCR_t start = interp_eval(e->c[1]);
                 return IS_INT_fn(start) ? start : INTVAL(1);
@@ -4380,7 +4380,7 @@ DESCR_t interp_eval(tree_t *e)
 #undef STRREL
 
     /* ── IC-8: Icon `===` deep-identity (non-generator path) ─────────────────
-     * The icon-frame TT_IF at L2607 routes to coro_eval when is_suspendable(test)
+     * The icon-frame TT_IF at L2607 routes to icn_bb_build when is_suspendable(test)
      * is true (e.g. `if x === key(T)` where key(T) is a generator). The path
      * here handles plain `a === b` and `&null === x` evaluation in any context.
      * Returns rhs on identity (Icon goal-directed convention), FAILDESCR else. */
@@ -4444,20 +4444,20 @@ DESCR_t interp_eval(tree_t *e)
         if (e->n < 1) return NULVCL;
         tree_t *gen  = e->c[0];
         tree_t *body = (e->n > 1) ? e->c[1] : NULL;
-        /* IC-2a: coro_eval + BB_PUMP — all goal-directed ops through Byrd boxes.
+        /* IC-2a: icn_bb_build + BB_PUMP — all goal-directed ops through Byrd boxes.
          * Special case: if gen is TT_ASSIGN or TT_AUGOP with a generative RHS,
          * drive the LEAF generator inside the RHS and re-evaluate gen each tick so
          * that mutable frame locals (e.g. `total`) are read fresh.  e.g.:
          *   every total := total + (1 to n)   -- TT_ASSIGN(TT_VAR(total), TT_ADD(TT_VAR(total), TT_TO(1,n)))
          *   every total +:= (1 to n)           -- TT_AUGOP with TT_TO rhs
-         * We find the leaf generator node (e.g. TT_TO), drive only that via coro_eval,
+         * We find the leaf generator node (e.g. TT_TO), drive only that via icn_bb_build,
          * and inject each raw tick value via coro_drive_node passthrough.  interp_eval(gen)
          * then re-reads the current value of `total` from the frame slot each iteration. */
         if ((gen->t == TT_ASSIGN) &&
             gen->n >= 2 && is_suspendable(gen->c[1])) {
             tree_t *leaf = find_leaf_suspendable(gen->c[1]);
             if (!leaf) leaf = gen->c[1];   /* fallback: treat whole RHS as gen */
-            bb_node_t rbox = coro_eval(leaf);
+            bb_node_t rbox = icn_bb_build(leaf);
             DESCR_t tick = rbox.fn(rbox.ζ, α);
             while (!IS_FAIL_fn(tick) && !FRAME.returning && !FRAME.loop_break) {
                 /* Inject the raw generator tick value via drive passthrough,
@@ -4473,7 +4473,7 @@ DESCR_t interp_eval(tree_t *e)
             return NULVCL;
         }
         tree_t *do_expr = body ? body : gen;
-        bb_node_t box = coro_eval(gen);
+        bb_node_t box = icn_bb_build(gen);
         DESCR_t val = box.fn(box.ζ, α);
         while (!IS_FAIL_fn(val) && !FRAME.returning && !FRAME.loop_break) {
             frame_push(gen, val.v == DT_I ? val.i : 0, val.v == DT_I ? NULL : val.s);
@@ -4635,7 +4635,7 @@ DESCR_t interp_eval(tree_t *e)
          * &null rather than failing — surfaced in rung36_jcon_table line
          * `should fail &null` and rung36_jcon_evalx `?table() ----> &null`.
          *
-         * RNG: shared canonical bb_icn_rnd_seed (defined in coro_value.c)
+         * RNG: shared canonical bb_icn_rnd_seed (defined in icn_value.c)
          * — GOAL-ICON-BB-COMPLETE A3-seed-fix unifies ir-run / sm-run /
          * interp_eval fallback RNG state so all three advance one sequence. */
         if (e->n < 1) return FAILDESCR;
@@ -4822,7 +4822,7 @@ DESCR_t interp_eval(tree_t *e)
                 #undef AUGOP_CELL
             }
         } else if (rhs && is_suspendable(rhs)) {
-            bb_node_t rbox = coro_eval(rhs);
+            bb_node_t rbox = icn_bb_build(rhs);
             DESCR_t tick = rbox.fn(rbox.ζ, α);
             while (!IS_FAIL_fn(tick) && !FRAME.loop_break && !FRAME.returning) {
                 DESCR_t cur_lv = interp_eval(lhs);   /* re-read lhs each tick */
@@ -4906,7 +4906,7 @@ DESCR_t interp_eval(tree_t *e)
                 /* IC-9 (2026-05-01): DT_DATA record — !R returns first field value.
                  * Mirrors the icnlist branch above: scalar context yields child 0,
                  * every-context drives the rest via icn_bb_record_iterate.  See
-                 * coro_eval TT_ITERATE for the box. */
+                 * icn_bb_build TT_ITERATE for the box. */
                 if (sv.u && sv.u->type && sv.u->type->nfields > 0 && sv.u->fields) {
                     return sv.u->fields[0];
                 }
@@ -4974,7 +4974,7 @@ DESCR_t interp_eval(tree_t *e)
 
     /* ── IC-9 session #26: TT_REVSWAP — x <-> y  reversible value swap ────
      * Outside `every`, no driver backtracks; behaves identically to
-     * left-to-right halt-on-fail TT_SWAP.  Inside `every`, coro_eval
+     * left-to-right halt-on-fail TT_SWAP.  Inside `every`, icn_bb_build
      * routes to icn_bb_revswap for snapshot + revert on β.                */
     case TT_REVSWAP: {
         if (e->n < 2 || frame_depth <= 0) return NULVCL;

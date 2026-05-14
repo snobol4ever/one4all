@@ -2141,7 +2141,7 @@ yyreduce:
           /* RK-21: gather { block } → anonymous coroutine sub + call.
            * 1. Build TT_FNC def with SUB_TAG (like sub_decl) named __gather_N.
            * 2. add_proc() so it lands in the proc table.
-           * 3. Return a call TT_FNC (no SUB_TAG) so coro_eval wraps it as
+           * 3. Return a call TT_FNC (no SUB_TAG) so icn_bb_build wraps it as
            *    icn_bb_suspend — a BB_PUMP coroutine collecting TT_SUSPEND (take) values. */
           static int gather_seq = 0;
           char gname[32]; snprintf(gname, sizeof gname, "__gather_%d", gather_seq++);

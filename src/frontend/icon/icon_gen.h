@@ -42,7 +42,7 @@ static inline void *icn_gen_enter(void **pp, size_t size) {
 #define ICN_ENTER(ref, T)  ((T *)icn_gen_enter((void **)(ref), sizeof(T)))
 
 /*----------------------------------------------------------------------------------------------------------------------------
- * Box state types — allocated by coro_eval (in scrip.c) and passed as zeta
+ * Box state types — allocated by icn_bb_build (in scrip.c) and passed as zeta
  *--------------------------------------------------------------------------------------------------------------------------*/
 typedef struct { long lo; long hi; long cur; }                                        icn_to_state_t;
 /*----------------------------------------------------------------------------------------------------------------------------
@@ -174,7 +174,7 @@ typedef struct {
     tree_t    *body;          /* scan body (c[1]) */
     int        started;
     /* IJ-9: body generator state — valid when body_live=1 */
-    bb_node_t  body_gen;      /* generator built from body via coro_eval */
+    bb_node_t  body_gen;      /* generator built from body via icn_bb_build */
     int        body_live;     /* 1 = body_gen has been started and may still produce */
     /* body_subj/body_pos: the scan context for THIS subject's body run.
      * body_pos advances as the body consumes characters; restored between β ticks. */
@@ -248,7 +248,7 @@ DESCR_t icn_bb_seq_expr(void *zeta, int entry);
 
 typedef struct { bb_node_t gen; struct tree_t *cat_expr; struct tree_t *leaf; } icn_cat_gen_state_t;
 DESCR_t icn_bb_cat(void *zeta, int entry);
-bb_node_t coro_eval(tree_t *e);
+bb_node_t icn_bb_build(tree_t *e);
 
 /* RK-21: gather coroutine trampoline — defined in icn_runtime.c, referenced in icon_gen.c */
 extern void gather_trampoline(void);

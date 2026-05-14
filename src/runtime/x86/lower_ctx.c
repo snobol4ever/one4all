@@ -14,7 +14,7 @@
 
 #include "lower_ctx.h"
 #include "sm_prog.h"
-#include "../../runtime/interp/coro_runtime.h"
+#include "../../runtime/interp/icn_runtime.h"
 #include "../ast/ast.h"
 #include <stdio.h>
 #include <string.h>

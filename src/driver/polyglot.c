@@ -24,7 +24,7 @@ extern int64_t kw_case;   /* &CASE: 0=fold, 1=sensitive; default 1 matches SPITB
 #include "frontend/icon/icon_driver.h"
 #include "frontend/raku/raku_driver.h"
 #include "frontend/rebus/rebus_lower.h"
-#include "runtime/interp/coro_runtime.h"
+#include "runtime/interp/icn_runtime.h"
 #include "runtime/interp/pl_runtime.h"
 #include "driver/interp.h"
 #include "driver/polyglot.h"
