@@ -146,7 +146,125 @@ void  emit_bb_xor         (bb_label_t *s, bb_label_t *f, bb_label_t *b)         
 void  emit_bb_xvar        (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_jmp_pair("VAR",    s, f, b, 1); }
 void  emit_bb_xeps        (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_box_banner("EPS",""); emit_jmp(s, JMP_JMP); emit_label_define(b); emit_jmp(f, JMP_JMP); }
 void  emit_bb_xsucf       (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_box_banner("SUCCEED",""); emit_jmp(s, JMP_JMP); emit_label_define(b); emit_jmp(s, JMP_JMP); }
-void  emit_bb_xbal        (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_stateful("BAL",  "", bb_bal_new(),         "rt_bb_bal",  (uint64_t)(uintptr_t)rt_bb_bal,  s,f,b); }
+/* SF-1: emit_bb_xbal — flat inline BAL box.
+ * DATA block: .long δ; .long 0  (bal_t layout: { int δ; })
+ * α: scan Σ from Δ counting balanced parens (no strchr — only '('/')'
+ *    byte compares), save span into δ slot, advance Δ → γ (always succeeds).
+ * β: load δ from slot, subtract from Δ → ω.
+ * Binary path: heap zeta via rt_bb_bal (unchanged — r10 = &Δ, not per-box).
+ * Text path:   inline loop using RIP-relative Σ / Σlen / Δ symbols + .data slot. */
+void emit_bb_xbal(bb_label_t *s, bb_label_t *f, bb_label_t *b)
+{
+    emit_bb_box_banner("BAL", "");
+    if (IS_TEXT) {
+        int id = g_flat_node_id++;
+        char zlbl[80], zlbl_def[88];
+        snprintf(zlbl,     sizeof(zlbl),     ".Lbal%d_z", id);
+        snprintf(zlbl_def, sizeof(zlbl_def), "%s:", zlbl);
+        FILE *out = emit_outf();
+        /* .data block: δ slot (int) + pad */
+        bb3c_format(out, "",       ".section", ".data");
+        bb3c_format(out, zlbl_def, ".long",    "0");   /* δ */
+        bb3c_format(out, "",       ".long",    "0");   /* pad */
+        bb3c_format(out, "",       ".section", ".text");
+        bb3c_format(out, "",       ".intel_syntax", "noprefix");
+
+        /* α port ---------------------------------------------------------- */
+        /* rsi = Σ (char*);  ecx = Δ (pos, int);  edx = Σlen;  eax = depth */
+        char lloop[80], ldone[80], lparen_open[80], lparen_close[80], ldepth0[80];
+        snprintf(lloop,        sizeof(lloop),        ".Lbal%d_loop",  id);
+        snprintf(ldone,        sizeof(ldone),        ".Lbal%d_done",  id);
+        snprintf(lparen_open,  sizeof(lparen_open),  ".Lbal%d_open",  id);
+        snprintf(lparen_close, sizeof(lparen_close), ".Lbal%d_clos",  id);
+        snprintf(ldepth0,      sizeof(ldepth0),      ".Lbal%d_dep0",  id);
+
+        /* load Σ → rsi */
+        bb3c_format(out, "", "lea", "rsi, [rip + \xCE\xA3]");
+        bb3c_format(out, "", "mov", "rsi, qword ptr [rsi]");
+        /* load Δ → ecx (pos) */
+        bb3c_format(out, "", "lea", "rax, [rip + \xCE\x94]");
+        bb3c_format(out, "", "mov", "ecx, dword ptr [rax]");
+        /* load Σlen → edx */
+        bb3c_format(out, "", "lea", "rax, [rip + \xCE\xA3len]");
+        bb3c_format(out, "", "mov", "edx, dword ptr [rax]");
+        /* depth = 0 → eax */
+        bb3c_format(out, "", "xor", "eax, eax");
+        /* save Δ in r11d for δ = pos − Δ_initial */
+        bb3c_format(out, "", "mov", "r11d, ecx");
+
+        /* loop: while pos < Σlen */
+        char loop_lbl[88]; snprintf(loop_lbl, sizeof(loop_lbl), "%s:", lloop);
+        bb3c_format(out, loop_lbl, "cmp", "ecx, edx");
+        char jge_done[128]; snprintf(jge_done, sizeof(jge_done), "%s", ldone);
+        bb3c_format(out, "", "jge", jge_done);
+        /* al = Σ[pos] */
+        bb3c_format(out, "", "movzx", "r8d, byte ptr [rsi + rcx]");
+        /* if al == '(' → open */
+        bb3c_format(out, "", "cmp",  "r8b, 40");   /* '(' = 0x28 */
+        char je_open[128]; snprintf(je_open, sizeof(je_open), "%s", lparen_open);
+        bb3c_format(out, "", "je",   je_open);
+        /* if al == ')' → close */
+        bb3c_format(out, "", "cmp",  "r8b, 41");   /* ')' = 0x29 */
+        char je_clos[128]; snprintf(je_clos, sizeof(je_clos), "%s", lparen_close);
+        bb3c_format(out, "", "je",   je_clos);
+        /* else: pos++, loop */
+        bb3c_format(out, "", "inc",  "ecx");
+        char jmp_loop[128]; snprintf(jmp_loop, sizeof(jmp_loop), "%s", lloop);
+        bb3c_format(out, "", "jmp",  jmp_loop);
+
+        /* lparen_open: depth++; pos++; loop */
+        char open_lbl[88]; snprintf(open_lbl, sizeof(open_lbl), "%s:", lparen_open);
+        bb3c_format(out, open_lbl, "inc", "eax");
+        bb3c_format(out, "",       "inc", "ecx");
+        bb3c_format(out, "",       "jmp", jmp_loop);
+
+        /* lparen_close: if depth==0 → done; else depth--; pos++;
+         *               if depth==0 after dec → done (one balanced group consumed) */
+        char clos_lbl[88]; snprintf(clos_lbl, sizeof(clos_lbl), "%s:", lparen_close);
+        bb3c_format(out, clos_lbl, "test", "eax, eax");
+        bb3c_format(out, "",       "je",   jge_done); /* depth==0 before → stop */
+        bb3c_format(out, "",       "dec",  "eax");
+        bb3c_format(out, "",       "inc",  "ecx");
+        bb3c_format(out, "",       "test", "eax, eax");
+        bb3c_format(out, "",       "je",   jge_done); /* depth hit 0 after dec → stop */
+        bb3c_format(out, "",       "jmp",  jmp_loop);
+
+        /* done: δ = pos − Δ_initial (ecx − r11d) → store in slot; Δ = pos */
+        char done_lbl[88]; snprintf(done_lbl, sizeof(done_lbl), "%s:", ldone);
+        bb3c_format(out, done_lbl, "mov", "eax, ecx");
+        bb3c_format(out, "",       "sub", "eax, r11d");          /* eax = δ */
+        /* store δ into .data slot */
+        bb3c_format(out, "",       "lea", "r8, [rip + " "\xCE\x94" "]"); /* reuse r8 as temp ptr */
+        char store_slot[160]; snprintf(store_slot, sizeof(store_slot),
+                                       "r9, [rip + %s]", zlbl);
+        bb3c_format(out, "",       "lea", store_slot);
+        bb3c_format(out, "",       "mov", "dword ptr [r9], eax");
+        /* store new Δ = pos (ecx) */
+        bb3c_format(out, "",       "lea", "r8, [rip + \xCE\x94]");
+        bb3c_format(out, "",       "mov", "dword ptr [r8], ecx");
+        /* → γ (successor) */
+        char jmp_succ[128]; snprintf(jmp_succ, sizeof(jmp_succ), "%s", s->name);
+        bb3c_format(out, "",       "jmp", jmp_succ);
+
+        /* β port ---------------------------------------------------------- */
+        emit_label_define(b);
+        /* load δ from slot; subtract from Δ */
+        bb3c_format(out, "",       "lea", store_slot);  /* r9 → slot */
+        bb3c_format(out, "",       "mov", "eax, dword ptr [r9]");
+        bb3c_format(out, "",       "lea", "r8, [rip + \xCE\x94]");
+        bb3c_format(out, "",       "sub", "dword ptr [r8], eax");
+        /* → ω (fail) */
+        char jmp_fail[128]; snprintf(jmp_fail, sizeof(jmp_fail), "%s", f->name);
+        bb3c_format(out, "",       "jmp", jmp_fail);
+        return;
+    }
+    /* Binary path: heap zeta, call rt_bb_bal (r10=&Δ, not per-box data) */
+    emit_seq_port_call((uint64_t)(uintptr_t)bb_bal_new(), "rt_bb_bal",
+                       (uint64_t)(uintptr_t)rt_bb_bal, 0, s, f);
+    emit_label_define(b);
+    emit_seq_port_call((uint64_t)(uintptr_t)bb_bal_new(), "rt_bb_bal",
+                       (uint64_t)(uintptr_t)rt_bb_bal, 1, s, f);
+}
 void  emit_bb_xfarb       (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_stateful("ARB",  "", bb_arb_new(),         "rt_bb_arb",  (uint64_t)(uintptr_t)rt_bb_arb,  s,f,b); }
 void  emit_bb_xstar       (bb_label_t *s, bb_label_t *f, bb_label_t *b)                      { emit_bb_stateful("REM",  "", bb_rem_new(),         "rt_bb_rem",  (uint64_t)(uintptr_t)rt_bb_rem,  s,f,b); }
 void  emit_bb_xlnth       (long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b)         { emit_bb_stateful_int("LEN",  (int)n, bb_len_new((int)n),  "rt_bb_len",  (uint64_t)(uintptr_t)rt_bb_len,  s,f,b); }
