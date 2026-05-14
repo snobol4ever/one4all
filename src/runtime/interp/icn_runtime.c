@@ -1424,7 +1424,10 @@ bb_node_t icn_bb_build(tree_t *e) {
                 DESCR_t v = hb.fn(hb.ζ, α);
                 while (!IS_FAIL_fn(v) && z->nhi < ICN_TO_NESTED_MAX) { z->hi_vals[z->nhi++] = v.i; v = hb.fn(hb.ζ, β); }
             }
-            return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
+            IR_block_t *ncfg = lower_icn_to_nested(z);
+            icn_dcg_state_t *ndz = calloc(1, sizeof(*ndz));
+            ndz->cfg = ncfg; ndz->first = 1;
+            return (bb_node_t){ icn_bb_dcg, ndz, 0 };
         }
         DESCR_t lo_d = bb_eval_value(lo_expr);
         DESCR_t hi_d = bb_eval_value(hi_expr);

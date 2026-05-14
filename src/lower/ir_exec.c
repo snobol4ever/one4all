@@ -494,6 +494,20 @@ IR_t * IR_exec_node(IR_t * nd) {
             if (IS_FAIL_fn(z->right_val)) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
         }
     }
+    case IR_ICN_TO_NESTED: {
+        icn_to_nested_state_t *z = (icn_to_nested_state_t *)nd->opaque;
+        if (!z || z->nlo == 0 || z->nhi == 0) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+        if (nd->state == 0) { z->li = 0; z->hi2 = 0; z->cur = z->lo_vals[0]; nd->state = 1; }
+        else z->cur++;
+        while (z->cur > z->hi_vals[z->hi2]) {
+            z->hi2++;
+            if (z->hi2 >= z->nhi) { z->hi2 = 0; z->li++; }
+            if (z->li >= z->nlo) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+            z->cur = z->lo_vals[z->li];
+        }
+        nd->value = INTVAL(z->cur);
+        return nd->γ;
+    }
     case IR_ICN_LIMIT: {
         icn_lim_dcg_t *z = (icn_lim_dcg_t *)nd->opaque;
         if (!z) { nd->value = FAILDESCR; return nd->ω; }

@@ -60,6 +60,23 @@ IR_block_t *lower_icn_to(int64_t lo, int64_t hi) {
     return cfg;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* lower_icn_to_nested — DCG for (lo_gen to hi_gen) cross-product range generator.
+ * opaque=icn_to_nested_state_t* (pre-populated with lo_vals/hi_vals arrays). */
+IR_block_t *lower_icn_to_nested(icn_to_nested_state_t *z) {
+    if (!z) return NULL;
+    IR_block_t *cfg = IR_alloc(4, IR_LANG_ICN);
+    if (!cfg) return NULL;
+    IR_t *nd = IR_node_alloc(cfg, IR_ICN_TO_NESTED);
+    if (!nd) return NULL;
+    nd->opaque = (void *)z;
+    nd->α = nd;
+    nd->β = nd;
+    nd->γ = NULL;
+    nd->ω = NULL;
+    cfg->entry = nd;
+    return cfg;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* lower_icn_every — DCG for (every gen [do body]).
  * Single node; opaque=bb_node_t* gen box; sval2=tree_t* body (may be NULL).
  * state 0=α(pump gen fresh), 1=β(pump gen next). */

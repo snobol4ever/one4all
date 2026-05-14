@@ -9,6 +9,7 @@ typedef struct { bb_node_t left; bb_node_t right; IcnBinopKind op; int is_relop;
 /* Build compile-time DCG for Icon upto(cset, str) with scalar args. */
 IR_block_t *lower_icn_upto(const char *cset, const char *hay);
 IR_block_t *lower_icn_to(int64_t lo, int64_t hi);
+IR_block_t *lower_icn_to_nested(icn_to_nested_state_t *z);
 IR_block_t *lower_icn_every(bb_node_t *gen, void *body);
 IR_block_t *lower_icn_to_by(int64_t lo, int64_t hi, int64_t step);
 IR_block_t *lower_icn_iterate(const char *str, int64_t len);
