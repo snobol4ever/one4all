@@ -1,10 +1,10 @@
 /*
- * lower_pat_dcg.c -- build IR_t (DCG) from SNOBOL4 pattern tree_t (LR-S1)
+ * lower_pat_dcg.c -- build IR_prog_t (DCG) from SNOBOL4 pattern tree_t (LR-S1)
  * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6 (LR-S1, 2026-05-14)
  *
  * Additive: called from lower.c after lower_pat_expr() to also build the DCG.
  * Existing SM_PAT_* / bb_node_t path is UNCHANGED -- this is a parallel compile-time
- * wiring pass from tree_t*. On success, caller stores IR_t* in SM_EXEC_STMT a[2].ptr.
+ * wiring pass from tree_t*. On success, caller stores IR_prog_t* in SM_EXEC_STMT a[2].ptr.
  * exec_stmt() checks a[2].ptr and routes through IR_exec_once() when set.
  *
  * Phase 1 (LR-S1): TT_QLIT, TT_CAT, TT_ALT, TT_ARB, TT_SPAN, TT_ANY,
@@ -23,10 +23,10 @@ static int count_tree(const tree_t * t) {
     for (int i = 0; i < t->n; i++) n += count_tree(t->c[i]);
     return n;
 }
-static IR_node_t * build_node(IR_t * cfg, const tree_t * t, IR_node_t * sp, IR_node_t * fp);
-static IR_node_t * build_node(IR_t * cfg, const tree_t * t, IR_node_t * sp, IR_node_t * fp) {
+static IR_prog_t * build_node(IR_prog_t * cfg, const tree_t * t, IR_t * sp, IR_t * fp);
+static IR_prog_t * build_node(IR_prog_t * cfg, const tree_t * t, IR_t * sp, IR_t * fp) {
     if (!t) return sp;
-    IR_node_t * nd = NULL;
+    IR_t * nd = NULL;
     switch (t->t) {
     case TT_QLIT: {
         nd = IR_node_alloc(cfg, IR_PAT_LIT, IR_LANG_SNO);
@@ -73,7 +73,7 @@ static IR_node_t * build_node(IR_t * cfg, const tree_t * t, IR_node_t * sp, IR_n
         return nd;
     }
     case TT_FENCE: {
-        IR_node_t * inner = (t->n > 0 && t->c[0]) ? build_node(cfg, t->c[0], sp, fp) : sp;
+        IR_t * inner = (t->n > 0 && t->c[0]) ? build_node(cfg, t->c[0], sp, fp) : sp;
         if (t->n > 0 && !inner) return NULL;
         nd = IR_node_alloc(cfg, IR_PAT_FENCE, IR_LANG_SNO);
         nd->port_start = nd; nd->port_resume = fp;
@@ -83,17 +83,17 @@ static IR_node_t * build_node(IR_t * cfg, const tree_t * t, IR_node_t * sp, IR_n
     case TT_SEQ:
     case TT_CAT: {
         if (t->n == 0) return sp;
-        IR_node_t * chain = sp;
-        IR_node_t ** entries = GC_malloc(t->n * sizeof(IR_node_t *));
+        IR_t * chain = sp;
+        IR_t ** entries = GC_malloc(t->n * sizeof(IR_t *));
         for (int i = t->n - 1; i >= 0; i--) {
-            IR_node_t * e = build_node(cfg, t->c[i], chain, fp);
+            IR_t * e = build_node(cfg, t->c[i], chain, fp);
             if (!e) return NULL;
             entries[i] = e;
             chain = e;
         }
         /* wire back-edges: child[i+1].fail -> child[i].resume */
         for (int i = 0; i < t->n - 1; i++) {
-            IR_node_t * a = entries[i], * b = entries[i+1];
+            IR_t * a = entries[i], * b = entries[i+1];
             if (a && b) b->port_fail = a->port_resume ? a->port_resume : fp;
         }
         nd = IR_node_alloc(cfg, IR_PAT_CAT, IR_LANG_SNO);
@@ -105,10 +105,10 @@ static IR_node_t * build_node(IR_t * cfg, const tree_t * t, IR_node_t * sp, IR_n
     }
     case TT_ALT: {
         if (t->n == 0) return fp;
-        IR_node_t * alt_fail = fp;
-        IR_node_t * last = NULL;
+        IR_t * alt_fail = fp;
+        IR_t * last = NULL;
         for (int i = t->n - 1; i >= 0; i--) {
-            IR_node_t * e = build_node(cfg, t->c[i], sp, alt_fail);
+            IR_t * e = build_node(cfg, t->c[i], sp, alt_fail);
             if (!e) return NULL;
             last = e; alt_fail = e;
         }
@@ -119,7 +119,7 @@ static IR_node_t * build_node(IR_t * cfg, const tree_t * t, IR_node_t * sp, IR_n
     }
     case TT_CAPT_COND_ASGN: {
         if (t->n < 1) return NULL;
-        IR_node_t * inner = build_node(cfg, t->c[0], sp, fp);
+        IR_t * inner = build_node(cfg, t->c[0], sp, fp);
         if (!inner) return NULL;
         nd = IR_node_alloc(cfg, IR_PAT_ASSIGN_COND, IR_LANG_SNO);
         nd->sval = (t->n > 1 && t->c[1] && t->c[1]->v.sval) ? t->c[1]->v.sval : NULL;
@@ -129,7 +129,7 @@ static IR_node_t * build_node(IR_t * cfg, const tree_t * t, IR_node_t * sp, IR_n
     }
     case TT_CAPT_IMMED_ASGN: {
         if (t->n < 1) return NULL;
-        IR_node_t * inner = build_node(cfg, t->c[0], sp, fp);
+        IR_t * inner = build_node(cfg, t->c[0], sp, fp);
         if (!inner) return NULL;
         nd = IR_node_alloc(cfg, IR_PAT_ASSIGN_IMM, IR_LANG_SNO);
         nd->sval = (t->n > 1 && t->c[1] && t->c[1]->v.sval) ? t->c[1]->v.sval : NULL;
@@ -141,12 +141,12 @@ static IR_node_t * build_node(IR_t * cfg, const tree_t * t, IR_node_t * sp, IR_n
         return NULL;   /* unsupported -- fall back to bb_node_t path */
     }
 }
-IR_t * IR_lower_pat(const tree_t * pat_tree) {
+IR_prog_t * IR_lower_pat(const tree_t * pat_tree) {
     if (!pat_tree) return NULL;
     int cap = count_tree(pat_tree) * 8 + 32;
-    IR_t * cfg = IR_alloc(cap, IR_LANG_SNO);
+    IR_prog_t * cfg = IR_alloc(cap, IR_LANG_SNO);
     if (!cfg) return NULL;
-    IR_node_t * entry = build_node(cfg, pat_tree, NULL, NULL);
+    IR_t * entry = build_node(cfg, pat_tree, NULL, NULL);
     if (!entry) { IR_free(cfg); return NULL; }
     cfg->entry = entry;
     return cfg;

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # test_ir_exec_unit.sh — standalone unit test for IR_exec_once / IR_exec_pump (LR-2)
-# Builds a small C driver that constructs IR_t instances by hand,
+# Builds a small C driver that constructs IR_prog_t instances by hand,
 # wires ports directly, and drives them through IR_exec_once / IR_exec_pump.
 # No scrip binary, no corpus, no oracle required.
 # PASS/FAIL printed per case; exits 0 if all pass, 1 otherwise.
@@ -32,9 +32,9 @@ static void check(const char * name, int ok) {
 }
 
 /* ── helper: wire a single self-evaluating node as a trivial graph ── */
-static IR_t * single_node(IR_kind_t kind, int lang) {
-    IR_t * cfg = IR_alloc(4, lang);
-    IR_node_t  * nd  = IR_node_alloc(cfg, kind, lang);
+static IR_prog_t * single_node(IR_kind_t kind, int lang) {
+    IR_prog_t * cfg = IR_alloc(4, lang);
+    IR_t  * nd  = IR_node_alloc(cfg, kind, lang);
     /* terminal: port_succ = NULL means "done, value is in nd->value" */
     nd->port_start  = nd;   /* entry drives eval_node directly */
     nd->port_succ   = NULL; /* terminal success */
@@ -58,7 +58,7 @@ int main(void) {
 
     /* ── Test 1: IR_LIT_I — integer literal ── */
     {
-        IR_t * cfg = single_node(IR_LIT_I, IR_LANG_SNO);
+        IR_prog_t * cfg = single_node(IR_LIT_I, IR_LANG_SNO);
         cfg->entry->ival = 42;
         DESCR_t v = IR_exec_once(cfg);
         check("IR_LIT_I value=42", v.v == DT_I && v.i == 42);
@@ -67,7 +67,7 @@ int main(void) {
 
     /* ── Test 2: IR_LIT_S — string literal ── */
     {
-        IR_t * cfg = single_node(IR_LIT_S, IR_LANG_SNO);
+        IR_prog_t * cfg = single_node(IR_LIT_S, IR_LANG_SNO);
         cfg->entry->sval = "hello";
         DESCR_t v = IR_exec_once(cfg);
         check("IR_LIT_S value=hello", v.v == DT_S && strcmp(v.s, "hello") == 0);
@@ -76,7 +76,7 @@ int main(void) {
 
     /* ── Test 3: IR_LIT_NUL — null ── */
     {
-        IR_t * cfg = single_node(IR_LIT_NUL, IR_LANG_SNO);
+        IR_prog_t * cfg = single_node(IR_LIT_NUL, IR_LANG_SNO);
         DESCR_t v = IR_exec_once(cfg);
         check("IR_LIT_NUL value=null", v.v == DT_SNUL);
         IR_free(cfg);
@@ -84,8 +84,8 @@ int main(void) {
 
     /* ── Test 4: IR_FAIL — always fails ── */
     {
-        IR_t * cfg = IR_alloc(4, IR_LANG_SNO);
-        IR_node_t  * nd  = IR_node_alloc(cfg, IR_FAIL, IR_LANG_SNO);
+        IR_prog_t * cfg = IR_alloc(4, IR_LANG_SNO);
+        IR_t  * nd  = IR_node_alloc(cfg, IR_FAIL, IR_LANG_SNO);
         nd->port_start  = nd;
         nd->port_fail   = NULL;
         nd->port_succ   = NULL;
@@ -98,7 +98,7 @@ int main(void) {
 
     /* ── Test 5: IR_SUCCEED — always succeeds with null ── */
     {
-        IR_t * cfg = single_node(IR_SUCCEED, IR_LANG_SNO);
+        IR_prog_t * cfg = single_node(IR_SUCCEED, IR_LANG_SNO);
         DESCR_t v = IR_exec_once(cfg);
         check("IR_SUCCEED value=null", v.v == DT_SNUL);
         IR_free(cfg);
@@ -106,9 +106,9 @@ int main(void) {
 
     /* ── Test 6: two-node chain — LIT_I → SUCCEED (port_succ wired) ── */
     {
-        IR_t * cfg = IR_alloc(8, IR_LANG_ICN);
-        IR_node_t * lit  = IR_node_alloc(cfg, IR_LIT_I, IR_LANG_ICN);
-        IR_node_t * succ = IR_node_alloc(cfg, IR_SUCCEED, IR_LANG_ICN);
+        IR_prog_t * cfg = IR_alloc(8, IR_LANG_ICN);
+        IR_t * lit  = IR_node_alloc(cfg, IR_LIT_I, IR_LANG_ICN);
+        IR_t * succ = IR_node_alloc(cfg, IR_SUCCEED, IR_LANG_ICN);
         lit->ival        = 99;
         lit->port_start  = lit;
         lit->port_succ   = succ;
@@ -127,17 +127,17 @@ int main(void) {
 
     /* ── Test 7: IR_TO_BY range 1..3 via IR_exec_pump ── */
     {
-        IR_t * cfg  = IR_alloc(16, IR_LANG_ICN);
-        IR_node_t * from  = IR_node_alloc(cfg, IR_LIT_I, IR_LANG_ICN);
-        IR_node_t * to    = IR_node_alloc(cfg, IR_LIT_I, IR_LANG_ICN);
-        IR_node_t * toby  = IR_node_alloc(cfg, IR_TO_BY, IR_LANG_ICN);
+        IR_prog_t * cfg  = IR_alloc(16, IR_LANG_ICN);
+        IR_t * from  = IR_node_alloc(cfg, IR_LIT_I, IR_LANG_ICN);
+        IR_t * to    = IR_node_alloc(cfg, IR_LIT_I, IR_LANG_ICN);
+        IR_t * toby  = IR_node_alloc(cfg, IR_TO_BY, IR_LANG_ICN);
         from->ival = 1; from->port_start = from; from->port_succ = NULL;
         to->ival   = 3; to->port_start   = to;   to->port_succ   = NULL;
         /* pre-set values directly so TO_BY can read them */
         from->value = INTVAL(1);
         to->value   = INTVAL(3);
         /* wire TO_BY children */
-        toby->c = malloc(2 * sizeof(IR_node_t *));
+        toby->c = malloc(2 * sizeof(IR_t *));
         toby->c[0] = from; toby->c[1] = to; toby->n = 2;
         toby->port_start  = toby;
         toby->port_succ   = NULL;  /* terminal per value */
@@ -155,7 +155,7 @@ int main(void) {
 
     /* ── Test 8: IR_reset clears state ── */
     {
-        IR_t * cfg = single_node(IR_LIT_I, IR_LANG_SNO);
+        IR_prog_t * cfg = single_node(IR_LIT_I, IR_LANG_SNO);
         cfg->entry->ival = 7;
         IR_exec_once(cfg);
         cfg->entry->state   = 5;
@@ -169,7 +169,7 @@ int main(void) {
 
     /* ── Test 9: IR_print does not crash ── */
     {
-        IR_t * cfg = single_node(IR_LIT_S, IR_LANG_SNO);
+        IR_prog_t * cfg = single_node(IR_LIT_S, IR_LANG_SNO);
         cfg->entry->sval = "test";
         IR_print(cfg, stdout);
         check("IR_print no crash", 1);

@@ -11,7 +11,7 @@
  * Self-evaluating scalar kinds set nd->value and return port_succ or port_fail.
  * Generative kinds consult nd->state / nd->counter and update them.
  * Unimplemented kinds return port_fail (explicit, safe, detectable in tests). */
-IR_node_t * IR_exec_node(IR_node_t * nd) {
+IR_t * IR_exec_node(IR_t * nd) {
     switch (nd->kind) {
     /*-- Literals: always succeed, value is the literal. ----------------------------------------------------------------*/
     case IR_LIT_I:
@@ -82,13 +82,13 @@ IR_node_t * IR_exec_node(IR_node_t * nd) {
  * Graph walker: pointer-chase from entry through port_succ/port_fail.
  * Back-edges (cycles) are traversed by the pointer chain; exhaustion is
  * when a node routes to port_fail with no further resume path. */
-DESCR_t IR_exec_once(IR_t * cfg) {
+DESCR_t IR_exec_once(IR_prog_t * cfg) {
     if (!cfg || !cfg->entry) return FAILDESCR;
     IR_reset(cfg);
-    IR_node_t * cur = cfg->entry;
+    IR_t * cur = cfg->entry;
     int safety = cfg->n * 64 + 256;   /* cycle-breaker: max steps before abort */
     while (cur && safety-- > 0) {
-        IR_node_t * next = IR_exec_node(cur);
+        IR_t * next = IR_exec_node(cur);
         if (!next) {
             /* terminal: succ path returned NULL → value is in cur->value */
             return IS_FAIL_fn(cur->value) ? FAILDESCR : cur->value;
@@ -105,14 +105,14 @@ DESCR_t IR_exec_once(IR_t * cfg) {
  * After IR_exec_once returns a value, resume by following port_resume of the
  * deepest node that has one.  Implementation: simple retry loop using
  * IR_exec_once_resume which starts from port_resume of the last-succ node. */
-int IR_exec_pump(IR_t * cfg, IR_body_fn body_fn, void * ctx) {
+int IR_exec_pump(IR_prog_t * cfg, IR_body_fn body_fn, void * ctx) {
     if (!cfg || !cfg->entry) return 0;
     IR_reset(cfg);
     int ticks  = 0;
     int safety = cfg->n * 256 + 1024;
-    IR_node_t * cur = cfg->entry;
+    IR_t * cur = cfg->entry;
     while (cur && safety-- > 0) {
-        IR_node_t * next = IR_exec_node(cur);
+        IR_t * next = IR_exec_node(cur);
         if (!next) {
             /* terminal node: check value */
             if (!IS_FAIL_fn(cur->value)) {

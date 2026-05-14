@@ -1,8 +1,8 @@
-/* scrip_ir.h — Universal generator IR: IR_node_t / IR_t / IR_kind_t (LR-0)
+/* scrip_ir.h — Universal generator IR: IR_t (node) / IR_prog_t (graph) / IR_kind_t (LR-0)
  * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6 (LR-0, 2026-05-14)
  *
  * Directed Cyclic Graph (DCG) for all goal-directed computation across all six languages.
- * Built at lower time; driven by ir_exec (ir_exec.h).  SM_EXEC_DCG(IR_t*) is the
+ * Built at lower time; driven by ir_exec (ir_exec.h).  SM_EXEC_DCG(IR_prog_t*) is the
  * sole SM→BB entry point.  Tree-shaped subgraphs serialise to SM arrays; cyclic subgraphs
  * (patterns, generators, choice points) route through ir_exec directly.
  *
@@ -35,7 +35,7 @@
 #endif
 
 /*==================================================================================================
- * Language tags — stored in IR_node_t.lang and IR_t.lang
+ * Language tags — stored in IR_t.lang and IR_prog_t.lang
  *================================================================================================*/
 #define IR_LANG_SNO  1   /* SNOBOL4  */
 #define IR_LANG_SCO  2   /* Snocone  */
@@ -45,7 +45,7 @@
 #define IR_LANG_RKU  6   /* Raku     */
 
 /*==================================================================================================
- * IR_kind_t — kind of every IR_node_t
+ * IR_kind_t — kind of every IR_t node
  *================================================================================================*/
 typedef enum {
     /* ── Universal scalar ─────────────────────────────────────────────────────────────────────── */
@@ -102,26 +102,26 @@ typedef enum {
 } IR_kind_t;
 
 /*==================================================================================================
- * IR_node_t — one node in the DCG
+ * IR_t — one node in the DCG
  * Four control ports are NULL until lower wires them bottom-up.
  *================================================================================================*/
-typedef struct ir_node IR_node_t;
+typedef struct ir_node IR_t;
 struct ir_node {
     IR_kind_t      kind;
     /* ── Four control ports (wired by lower; back-edges create cycles) ─────────────────────── */
-    IR_node_t    * port_start;   /* entry: first evaluation attempt                             */
-    IR_node_t    * port_resume;  /* backtrack: try next value (NULL → scalar / non-generative)  */
-    IR_node_t    * port_succ;    /* success continuation (value in .value)                      */
-    IR_node_t    * port_fail;    /* failure continuation (no value)                             */
+    IR_t    * port_start;   /* entry: first evaluation attempt                             */
+    IR_t    * port_resume;  /* backtrack: try next value (NULL → scalar / non-generative)  */
+    IR_t    * port_succ;    /* success continuation (value in .value)                      */
+    IR_t    * port_fail;    /* failure continuation (no value)                             */
     /* ── Children (pre-wiring tree; four ports wired during lower, bottom-up) ──────────────── */
-    IR_node_t   ** c;            /* child array                                                 */
+    IR_t   ** c;            /* child array                                                 */
     int            n;            /* child count                                                 */
     /* ── Payload ────────────────────────────────────────────────────────────────────────────── */
     union {
         int64_t        ival;     /* LIT_I; also op code for BINOP / UNOP                        */
         double         dval;     /* LIT_F                                                       */
         const char   * sval;     /* LIT_S, VAR name, CALL name                                 */
-        struct { IR_node_t * l; IR_node_t * r; int op; } binop;
+        struct { IR_t * l; IR_t * r; int op; } binop;
         struct { const char * name; int nargs; } call;
     };
     /* ── Runtime execution state (live during ir_exec graph walk) ───────────────────────────── */
@@ -129,43 +129,43 @@ struct ir_node {
     int64_t        counter;      /* TO_BY position, LIMIT count, etc.                           */
     int            state;        /* executor state machine (0 = fresh)                          */
     /* ── Graph bookkeeping ──────────────────────────────────────────────────────────────────── */
-    int            id;           /* unique within IR_t — set by IR_node_alloc             */
+    int            id;           /* unique within IR_prog_t — set by IR_node_alloc             */
     int            generative;   /* 1 if port_resume is meaningful                              */
     int            visited;      /* scratch for traversal algorithms                            */
     int            lang;         /* IR_LANG_* — which language produced this node               */
 };
 
 /*==================================================================================================
- * IR_t — a complete wired generator DCG for one procedure or pattern
+ * IR_prog_t — a complete wired generator DCG for one procedure or pattern
  *================================================================================================*/
 typedef struct {
-    IR_node_t    * entry;   /* == root node's port_start                      */
-    IR_node_t   ** all;     /* flat array of all nodes (for reset / GC / print) */
+    IR_t    * entry;        /* == root node's port_start                      */
+    IR_t   ** all;          /* flat array of all nodes (for reset / GC / print) */
     int            n;       /* count of nodes in .all                           */
     int            lang;    /* IR_LANG_* — language that produced this graph    */
-} IR_t;
+} IR_prog_t;
 
 /*==================================================================================================
  * API — alloc / free / reset / print
  *================================================================================================*/
 
-/* Allocate a fresh IR_t with capacity for max_nodes nodes.
+/* Allocate a fresh IR_prog_t with capacity for max_nodes nodes.
  * All node slots are NULL.  Returns NULL on OOM. */
-IR_t * IR_alloc(int max_nodes, int lang);
+IR_prog_t * IR_alloc(int max_nodes, int lang);
 
-/* Allocate one IR_node_t, append it to cfg->all, assign cfg-unique id.
+/* Allocate one IR_t node, append it to cfg->all, assign cfg-unique id.
  * Returns NULL if cfg->all is full (capacity = max_nodes passed to IR_alloc). */
-IR_node_t  * IR_node_alloc(IR_t * cfg, IR_kind_t kind, int lang);
+IR_t       * IR_node_alloc(IR_prog_t * cfg, IR_kind_t kind, int lang);
 
 /* Reset all runtime state (value, counter, state, visited) in every node of cfg.
  * Call before re-executing a graph. */
-void         IR_reset(IR_t * cfg);
+void         IR_reset(IR_prog_t * cfg);
 
 /* Free cfg and all its nodes.  After return cfg is invalid. */
-void         IR_free(IR_t * cfg);
+void         IR_free(IR_prog_t * cfg);
 
 /* Print a human-readable dump of cfg to fp (for debugging / --dump-ir). */
-void         IR_print(const IR_t * cfg, FILE * fp);
+void         IR_print(const IR_prog_t * cfg, FILE * fp);
 
 /* Return the canonical name string for a kind (e.g. "IR_PAT_ARB"). */
 const char * IR_kind_name(IR_kind_t k);
