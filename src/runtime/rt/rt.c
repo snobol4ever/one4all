@@ -1526,17 +1526,22 @@ DESCR_t rt_bb_cap(void *zeta, int port)
     if (slot0 && !bb_in_pool(slot0) && ((cap_t *)slot0)->fn) ζ = (cap_t *)slot0;
     else ζ = (cap_t *)zeta;
     DESCR_t cr;
+    int pre_δ;
     if (port == 0) {
         ζ->has_pending = 0;
         if (!ζ->immediate) rt_register_cap(ζ);
+        pre_δ = Δ;
         cr = ζ->fn(ζ->state, 0);
         if (IS_FAIL_fn(cr)) goto cap_fail;
+        cr = descr_match_span(Σ + pre_δ, Δ - pre_δ);
         goto cap_commit;
     }
     /* port == 1: β */
     if (!ζ->immediate && ζ->has_pending) { NAME_pop(); ζ->has_pending = 0; }
+    pre_δ = Δ;
     cr = ζ->fn(ζ->state, 1);
     if (IS_FAIL_fn(cr)) goto cap_fail;
+    cr = descr_match_span(Σ + pre_δ, Δ - pre_δ);
 cap_commit:
     /* EXVAL-3: guard .s/.slen access — only valid when child returned DT_S span.
      * Non-DT_S returns (Prolog DT_SNUL success) capture the zero-length current
