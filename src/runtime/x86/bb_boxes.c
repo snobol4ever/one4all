@@ -209,12 +209,7 @@ succeed_t *bb_succeed_new(void)
 { return calloc(1,sizeof(succeed_t)); }
 
 /* ───── Icon range (to / to-by) ───── */
-/* Allocators — zeta is a pointer, allocation site doesn't matter to the box. */
-
 #include "../../frontend/icon/icon_gen.h"
-
-icn_to_by_state_t *icon_to_by_new(void)
-{ return calloc(1, sizeof(icn_to_by_state_t)); }
 
 /* ───── Icon iterate (!E) ───── */
 icn_list_iterate_state_t *icon_list_iterate_new(void)  { return calloc(1, sizeof(icn_list_iterate_state_t)); }
