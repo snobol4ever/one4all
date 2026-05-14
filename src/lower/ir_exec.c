@@ -9,6 +9,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <gc/gc.h>
+extern void icn_every_body_pre(void);
+extern int  icn_every_body_broke(void);
 /* ── Cursor globals from stmt_exec.c ───────────────────────────────────────
  * Σ = subject string base, Δ = current cursor, Ω = anchor limit,
  * Σlen = true subject length (Ω may be clamped by &ANCHOR).
@@ -528,7 +530,9 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->state = 1;
         DESCR_t v = gen->fn(gen->ζ, tick);
         if (IS_FAIL_fn(v)) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+        icn_every_body_pre();
         if (nd->sval2) bb_exec_stmt((void *)nd->sval2);
+        if (icn_every_body_broke()) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
         nd->value = v;
         return nd->γ;
     }

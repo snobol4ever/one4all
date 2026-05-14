@@ -565,6 +565,8 @@ DESCR_t icn_lazy_box(void *zeta, int entry) {
  * β: IR_exec_resume (continues from where we left off).
  * This is infrastructure, not a generator implementation. */
 typedef struct { IR_block_t *cfg; int first; } icn_dcg_state_t;
+void icn_every_body_pre(void) { if (frame_depth > 0) { FRAME.loop_next = 0; } }
+int  icn_every_body_broke(void) { if (frame_depth <= 0) return 0; int b = FRAME.loop_break; FRAME.loop_next = 0; FRAME.loop_break = 0; return b; }
 DESCR_t icn_bb_dcg(void *zeta, int entry) {
     icn_dcg_state_t *z = (icn_dcg_state_t *)zeta;
     if (!z || !z->cfg) return FAILDESCR;
