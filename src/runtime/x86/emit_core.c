@@ -1,5 +1,5 @@
 #include "emit_core.h"
-#include "emit_sm_binary.h"
+#include "sm_jit_interp.h"
 #include "emit_form.h"
 #include <string.h>
 #include <stdlib.h>

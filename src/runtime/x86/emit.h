@@ -3,7 +3,7 @@
 #include "emit_core.h"
 #include "emit_bb.h"
 #include "emit_sm.h"
-#include "emit_sm_binary.h"
+#include "sm_jit_interp.h"
 #include "bb_pool.h"
 #include <stdio.h>
 #include <stdint.h>

@@ -17,7 +17,7 @@
 #include "runtime/x86/lower.h"
 #include "runtime/x86/sm_prog.h"
 #include "runtime/x86/sm_interp.h"
-#include "runtime/x86/emit_sm_binary.h"
+#include "runtime/x86/sm_jit_interp.h"
 #include "runtime/x86/sm_image.h"
 #include "interp.h"
 #include "frontend/snobol4/scrip_cc.h"  /* tree_t, stmt_attr_* */

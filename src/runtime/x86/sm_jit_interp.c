@@ -1,4 +1,4 @@
-#include "emit_sm_binary.h"
+#include "sm_jit_interp.h"
 #include "sm_image.h"
 #include "sm_prog.h"
 #include "sm_interp.h"

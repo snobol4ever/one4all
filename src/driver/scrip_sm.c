@@ -15,7 +15,7 @@
 #include "../runtime/x86/lower.h"
 #include "../frontend/snobol4/scrip_cc.h"  /* tree_t types */
 #include "../runtime/x86/sm_prog.h"           /* CH-17a: sm_label_pc_lookup */
-#include "../runtime/x86/emit_sm_binary.h"  /* sm_codegen, sm_jit_run */
+#include "../runtime/x86/sm_jit_interp.h"  /* sm_codegen, sm_jit_run */
 #include "../runtime/interp/coro_runtime.h"   /* CH-17a: proc_table */
 #include "../runtime/interp/pl_runtime.h"     /* CH-17a: g_pl_pred_table */
 #include "interp_private.h"   /* label_table_build, prescan_defines, label_table_clear_stmts */
