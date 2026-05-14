@@ -7,7 +7,7 @@
  *   scrip [mode] [bb] [target] [options] <file> [-- program-args...]
  *
  * Execution modes (default: --sm-run):
- *   --ir-run         interpret via IR tree-walk (correctness reference)
+ *   --ast-run        interpret via AST tree-walk (correctness reference)
  *   --sm-run         interpret SM_Program via dispatch loop  [DEFAULT]
  *   --jit-run        lower SM_Program to x86 bytes -> mmap slab -> jump in
  *
@@ -109,7 +109,7 @@ int main(int argc, char **argv)
     /* ── flag parsing ─────────────────────────────────────────────────── */
 
     /* Execution modes — mutually exclusive (default: --sm-run) */
-    int mode_ir_run        = 0;  /* --ir-run   : interpret via IR tree-walk (correctness ref) */
+    int mode_ir_run        = 0;  /* --ast-run (canonical) / --ir-run (deprecated alias): AST tree-walk */
     int mode_sm_run        = 0;  /* --sm-run   : interpret SM_Program via dispatch loop [DEFAULT] */
     int mode_jit_run       = 0;  /* --jit-run  : SM_Program -> x86 bytes -> mmap slab -> jump in */
     int mode_monitor       = 0;  /* --monitor  : in-process sync comparator (IR vs SM vs JIT) */
@@ -132,8 +132,8 @@ int main(int argc, char **argv)
     /* Diagnostic options */
     int dump_parse         = 0;  /* --dump-parse      */
     int dump_parse_flat    = 0;  /* --dump-parse-flat */
-    int dump_ir            = 0;  /* --dump-ir   : print IR after frontend */
-    int dump_ir_bison      = 0;  /* --dump-ir-bison : IR via old Bison/Flex parser */
+    int dump_ir            = 0;  /* --dump-ast (canonical) / --dump-ir (deprecated alias): print AST after frontend */
+    int dump_ir_bison      = 0;  /* --dump-ast-bison (canonical) / --dump-ir-bison (deprecated alias) */
     int dump_sm            = 0;  /* --dump-sm   : print SM_Program after lowering */
     int dump_bb            = 0;  /* --dump-bb   : print BB-GRAPH per statement */
     int opt_trace          = 0;  /* --trace     : MONITOR trace output */
@@ -151,7 +151,8 @@ int main(int argc, char **argv)
     int argi = 1;
     while (argi < argc && argv[argi][0] == '-' && argv[argi][1] == '-') {
         /* execution modes */
-        if      (strcmp(argv[argi], "--ir-run")        == 0) { mode_ir_run        = 1; argi++; }
+        if      (strcmp(argv[argi], "--ast-run")         == 0) { mode_ir_run        = 1; argi++; }
+        else if (strcmp(argv[argi], "--ir-run")          == 0) { mode_ir_run        = 1; argi++; } /* deprecated: use --ast-run */
         else if (strcmp(argv[argi], "--sm-run")        == 0) { mode_sm_run        = 1; argi++; }
         else if (strcmp(argv[argi], "--jit-run")       == 0) { mode_jit_run       = 1; argi++; }
         else if (strcmp(argv[argi], "--monitor")       == 0) { mode_monitor       = 1; argi++; }
@@ -166,8 +167,10 @@ int main(int argc, char **argv)
         /* diagnostic */
         else if (strcmp(argv[argi], "--dump-parse")      == 0) { dump_parse      = 1; argi++; }
         else if (strcmp(argv[argi], "--dump-parse-flat") == 0) { dump_parse_flat = 1; argi++; }
-        else if (strcmp(argv[argi], "--dump-ir")         == 0) { dump_ir         = 1; argi++; }
-        else if (strcmp(argv[argi], "--dump-ir-bison")   == 0) { dump_ir_bison   = 1; argi++; }
+        else if (strcmp(argv[argi], "--dump-ast")        == 0) { dump_ir         = 1; argi++; }
+        else if (strcmp(argv[argi], "--dump-ir")         == 0) { dump_ir         = 1; argi++; } /* deprecated: use --dump-ast */
+        else if (strcmp(argv[argi], "--dump-ast-bison")  == 0) { dump_ir_bison   = 1; argi++; }
+        else if (strcmp(argv[argi], "--dump-ir-bison")   == 0) { dump_ir_bison   = 1; argi++; } /* deprecated: use --dump-ast-bison */
         else if (strcmp(argv[argi], "--dump-sm")         == 0) { dump_sm         = 1; argi++; }
         else if (strcmp(argv[argi], "--dump-bb")         == 0) { dump_bb         = 1; argi++; }
         else if (strcmp(argv[argi], "--trace")           == 0) { opt_trace       = 1; argi++; }
@@ -200,7 +203,7 @@ int main(int argc, char **argv)
         (mode_ir_run || mode_sm_run || mode_jit_run || mode_monitor)) {
         fprintf(stderr,
             "scrip: --jit-emit --x64 is mutually exclusive with "
-            "--ir-run / --sm-run / --jit-run / --monitor\n");
+            "--ast-run / --sm-run / --jit-run / --monitor\n");
         return 1;
     }
 
@@ -231,25 +234,30 @@ int main(int argc, char **argv)
             "usage: scrip [mode] [bb] [options] <file> [-- program-args...]\n"
             "\n"
             "Execution modes (default: --sm-run):\n"
-            "  --ir-run         interpret via IR tree-walk (correctness reference)\n"
+            "  --ast-run        interpret via AST tree-walk (correctness reference)\n"
             "  --sm-run         interpret SM_Program via dispatch loop  [DEFAULT]\n"
             "  --jit-run        SM_Program -> x86 bytes -> mmap slab -> jump in\n"
             "  --jit-emit --x64 emit standalone x86-64 asm to stdout (links libscrip_rt.so)\n"
-            "  --monitor        in-process sync comparator (IR vs SM vs JIT)\n"
+            "  --monitor        in-process sync comparator (AST vs SM vs JIT)\n"
             "\n"
             "Byrd Box pattern mode (default: --bb-driver):\n"
             "  --bb-driver      pattern matching via driver/broker\n"
             "  --bb-live        live-wired BB blobs in exec memory (requires M-DYN-B* blobs)\n"
             "\n"
             "Diagnostic options:\n"
-            "  --dump-ir        print IR after frontend\n"
+            "  --dump-ast       print AST after frontend\n"
             "  --dump-sm        print SM_Program after lowering\n"
             "  --dump-bb        print BB-GRAPH for each statement\n"
             "  --trace          MONITOR trace output (diff vs CSNOBOL4)\n"
             "  --bench          print wall-clock time after execution\n"
             "  --dump-parse     dump CMPILE parse tree\n"
             "  --dump-parse-flat  dump CMPILE parse tree (one line)\n"
-            "  --dump-ir-bison  dump IR via old Bison/Flex parser\n"
+            "  --dump-ast-bison dump AST via old Bison/Flex parser\n"
+            "\n"
+            "Deprecated aliases (still accepted):\n"
+            "  --ir-run         alias for --ast-run\n"
+            "  --dump-ir        alias for --dump-ast\n"
+            "  --dump-ir-bison  alias for --dump-ast-bison\n"
             "\n"
             "SNOBOL4 dialect options:\n"
             "  --case-sensitive preserve identifier spelling (default; SN-31)\n"
@@ -263,9 +271,9 @@ int main(int argc, char **argv)
      * All remaining argv entries are input files.  Each is compiled with the
      * appropriate frontend (by extension) and merged into one TT_PROGRAM in
      * source order.  This enables:
-     *   scrip --ir-run lib.pl main.pl
-     *   scrip --ir-run shim.pl test_arith.pl
-     *   scrip --ir-run base.sno ext.icn main.pl   (polyglot multi-file)
+     *   scrip --ast-run lib.pl main.pl
+     *   scrip --ast-run shim.pl test_arith.pl
+     *   scrip --ast-run base.sno ext.icn main.pl   (polyglot multi-file)
      * A single .scrip/.md file is still handled via parse_scrip_polyglot.
      * --dump-parse/--dump-ir only act on the first file (unchanged). */
 
