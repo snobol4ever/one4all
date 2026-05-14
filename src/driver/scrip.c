@@ -71,6 +71,7 @@ extern void ir_print_node_nl(const tree_t *e, FILE *f);
 #include "../runtime/x86/sm_jit_interp.h"  /* mode 3: sm_codegen, sm_jit_run */
 #include "../runtime/x86/emit_sm.h"    /* mode 4: sm_codegen_text */
 #include "../runtime/x86/emit.h"              /* EM-BB-FORMAT: g_bb_emit_format */
+#include "../runtime/x86/emit_bb.h"           /* g_bb_inline_limit: --bb-inline-limit */
 #include "scrip_sm.h"                   /* RS-14: sm_preamble, sm_run_with_recovery */
 #include "sync_monitor.h"               /* IM-7: --monitor in-process comparator */
 #include "../runtime/x86/sm_image.h"    /* M-JIT-RUN: sm_image_init */
@@ -159,6 +160,7 @@ int main(int argc, char **argv)
         else if (strcmp(argv[argi], "--x64")           == 0) { opt_emit_x64       = 1; argi++; }
         else if (strcmp(argv[argi], "--jit-emit-inline") == 0) { opt_jit_emit_inline = 1; opt_jit_emit = 1; argi++; }
         else if (strcmp(argv[argi], "--bb-format")       == 0) { opt_bb_format       = 1; argi++; }
+        else if (strncmp(argv[argi], "--bb-inline-limit=", 18) == 0) { g_bb_inline_limit = atoi(argv[argi] + 18); argi++; }
         /* BB pattern mode */
         else if (strcmp(argv[argi], "--bb-driver")     == 0) { bb_driver          = 1; argi++; }
         else if (strcmp(argv[argi], "--bb-live")       == 0) { bb_live            = 1; argi++; }

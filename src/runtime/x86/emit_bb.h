@@ -16,6 +16,7 @@ void emit_flat_set_cap_fixup(void (*cb)(void * cap_ptr, const char * child_alpha
 void emit_flat_banner_rule  (char ch);
 void emit_flat_box_banner   (const char * kind, const char * args, const char * label_prefix);
 extern int g_flat_node_id;
+extern int g_bb_inline_limit;
 /*---- section / data emitters ---------------------------------------------*/
 void emit_flat_label        (const char * name);
 void emit_flat_data_section (void);           void emit_flat_text_section (void);
