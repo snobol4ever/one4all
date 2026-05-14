@@ -14,17 +14,17 @@ extern const char * Σ;
 extern int          Σlen;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t    bb_deferred_var_exported  (void *zeta, int entry);
-extern DESCR_t    icn_bb_alternate         (void *zeta, int entry);    extern icn_alternate_state_t       * icon_alt_new(void);
-extern DESCR_t    icn_bb_bang_binary       (void *zeta, int entry);    extern icn_bang_binary_state_t     * icon_bang_new(void);
-extern DESCR_t    icn_bb_every             (void *zeta, int entry);    extern icn_every_state_t           * icon_every_new(void);
-extern DESCR_t    icn_bb_iterate           (void *zeta, int entry);    extern icn_iterate_state_t         * icon_iterate_new(void);
+extern DESCR_t    icn_bb_alternate         (void *zeta, int entry);
+extern DESCR_t    icn_bb_bang_binary       (void *zeta, int entry);
+extern DESCR_t    icn_bb_every             (void *zeta, int entry);
+extern DESCR_t    icn_bb_iterate           (void *zeta, int entry);
 extern DESCR_t    icn_bb_list_iterate      (void *zeta, int entry);    extern icn_list_iterate_state_t    * icon_list_iterate_new(void);
 extern DESCR_t    icn_bb_tbl_iterate       (void *zeta, int entry);    extern icn_tbl_iterate_state_t     * icon_tbl_iterate_new(void);
 extern DESCR_t    icn_bb_record_iterate    (void *zeta, int entry);    extern icn_record_iterate_state_t  * icon_record_iterate_new(void);
-extern DESCR_t    icn_bb_cat               (void *zeta, int entry);    extern icn_cat_gen_state_t         * icon_lconcat_new(void);
-extern DESCR_t    icn_bb_limit             (void *zeta, int entry);    extern icn_limit_state_t           * icon_limit_new(void);
-extern DESCR_t    icn_bb_seq_expr          (void *zeta, int entry);    extern icn_seq_state_t             * icon_seq_new(void);
-extern DESCR_t    icn_bb_to                (void *zeta, int entry);    extern icn_to_state_t              * icon_to_new(void);
+extern DESCR_t    icn_bb_cat               (void *zeta, int entry);
+extern DESCR_t    icn_bb_limit             (void *zeta, int entry);
+extern DESCR_t    icn_bb_seq_expr          (void *zeta, int entry);
+extern DESCR_t    icn_bb_to                (void *zeta, int entry);
 extern DESCR_t    icn_bb_to_by             (void *zeta, int entry);    extern icn_to_by_state_t           * icon_to_by_new(void);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t icn_bb_not(void*,int);          extern icn_not_state_t         *icon_not_new(void);
@@ -341,16 +341,34 @@ void emit_bb_xrtb(long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
         bb3c_format(out, "", "jmp", jmp_fail);
     }
 }
-/* SF-6: ICN_* boxes — DATA block sized to actual state struct (zeroed on α-entry). */
+/* IF-1: ICN_* batch A — two-path inline (emit_bb_icn_text_data + emit_seq_port_call_rip for TEXT; emit_seq_port_call for binary). */
 #define ICN_NQ(T) ((int)(((int)sizeof(T)+7)/8))
-void  emit_bb_icon_alt(bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_rtcall("ICN_ALT", "", icon_alt_new(), "icn_bb_alternate", (uint64_t)(uintptr_t)icn_bb_alternate, ICN_NQ(icn_alternate_state_t), s,f,b); }
-void  emit_bb_icon_bang(bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_rtcall("ICN_BANG", "", icon_bang_new(), "icn_bb_bang_binary", (uint64_t)(uintptr_t)icn_bb_bang_binary, ICN_NQ(icn_bang_binary_state_t), s,f,b); }
-void  emit_bb_icon_every(bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_rtcall("ICN_EVERY", "", icon_every_new(), "icn_bb_every", (uint64_t)(uintptr_t)icn_bb_every, ICN_NQ(icn_every_state_t), s,f,b); }
-void  emit_bb_icon_iterate(bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_rtcall("ICN_ITERATE", "", icon_iterate_new(), "icn_bb_iterate", (uint64_t)(uintptr_t)icn_bb_iterate, ICN_NQ(icn_iterate_state_t), s,f,b); }
-void  emit_bb_icon_lconcat(bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_rtcall("ICN_LCONCAT", "", icon_lconcat_new(), "icn_bb_cat", (uint64_t)(uintptr_t)icn_bb_cat, ICN_NQ(icn_cat_gen_state_t), s,f,b); }
-void  emit_bb_icon_limit(bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_rtcall("ICN_LIMIT", "", icon_limit_new(), "icn_bb_limit", (uint64_t)(uintptr_t)icn_bb_limit, ICN_NQ(icn_limit_state_t), s,f,b); }
-void  emit_bb_icon_seq(bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_rtcall("ICN_SEQ", "", icon_seq_new(), "icn_bb_seq_expr", (uint64_t)(uintptr_t)icn_bb_seq_expr, ICN_NQ(icn_seq_state_t), s,f,b); }
-void  emit_bb_icon_to(bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_rtcall("ICN_TO", "", icon_to_new(), "icn_bb_to", (uint64_t)(uintptr_t)icn_bb_to, ICN_NQ(icn_to_state_t), s,f,b); }
+static inline void *icon_alt_new(void)     { return calloc(1, sizeof(icn_alternate_state_t)); }
+static inline void *icon_bang_new(void)    { return calloc(1, sizeof(icn_bang_binary_state_t)); }
+static inline void *icon_every_new(void)   { return calloc(1, sizeof(icn_every_state_t)); }
+static inline void *icon_iterate_new(void) { return calloc(1, sizeof(icn_iterate_state_t)); }
+static inline void *icon_lconcat_new(void) { return calloc(1, sizeof(icn_cat_gen_state_t)); }
+static inline void *icon_limit_new(void)   { return calloc(1, sizeof(icn_limit_state_t)); }
+static inline void *icon_seq_new(void)     { return calloc(1, sizeof(icn_seq_state_t)); }
+static inline void *icon_to_new(void)      { return calloc(1, sizeof(icn_to_state_t)); }
+#define ICN_EMIT2(banner, new_fn, rt_name, rt_fn_sym, state_t, s, f, b) \
+    do { void *_z = (new_fn); emit_bb_box_banner((banner), ""); \
+         if (IS_TEXT) { char _zl[80]; emit_bb_icn_text_data(ICN_NQ(state_t), _zl); \
+             emit_seq_port_call_rip((uint64_t)(uintptr_t)_z, _zl, (rt_name), (uint64_t)(uintptr_t)(rt_fn_sym), 0, (s), (f)); \
+             emit_label_define(b); \
+             emit_seq_port_call_rip((uint64_t)(uintptr_t)_z, _zl, (rt_name), (uint64_t)(uintptr_t)(rt_fn_sym), 1, (s), (f)); \
+             return; } \
+         emit_seq_port_call((uint64_t)(uintptr_t)_z, (rt_name), (uint64_t)(uintptr_t)(rt_fn_sym), 0, (s), (f)); \
+         emit_label_define(b); \
+         emit_seq_port_call((uint64_t)(uintptr_t)_z, (rt_name), (uint64_t)(uintptr_t)(rt_fn_sym), 1, (s), (f)); } while (0)
+void  emit_bb_icon_alt    (bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_ALT",     icon_alt_new(),          "icn_bb_alternate",  icn_bb_alternate,  icn_alternate_state_t,  s,f,b); }
+void  emit_bb_icon_bang   (bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_BANG",    icon_bang_new(),         "icn_bb_bang_binary",icn_bb_bang_binary,icn_bang_binary_state_t,s,f,b); }
+void  emit_bb_icon_every  (bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_EVERY",   icon_every_new(),        "icn_bb_every",      icn_bb_every,      icn_every_state_t,      s,f,b); }
+void  emit_bb_icon_iterate(bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_ITERATE", icon_iterate_new(),      "icn_bb_iterate",    icn_bb_iterate,    icn_iterate_state_t,    s,f,b); }
+void  emit_bb_icon_lconcat(bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_LCONCAT", icon_lconcat_new(),      "icn_bb_cat",        icn_bb_cat,        icn_cat_gen_state_t,    s,f,b); }
+void  emit_bb_icon_limit  (bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_LIMIT",   icon_limit_new(),        "icn_bb_limit",      icn_bb_limit,      icn_limit_state_t,      s,f,b); }
+void  emit_bb_icon_seq    (bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_SEQ",     icon_seq_new(),          "icn_bb_seq_expr",   icn_bb_seq_expr,   icn_seq_state_t,        s,f,b); }
+void  emit_bb_icon_to     (bb_label_t *s, bb_label_t *f, bb_label_t *b) { ICN_EMIT2("ICN_TO",      icon_to_new(),           "icn_bb_to",         icn_bb_to,         icn_to_state_t,         s,f,b); }
 void  emit_bb_icon_to_by(bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_rtcall("ICN_TO_BY", "", icon_to_by_new(), "icn_bb_to_by", (uint64_t)(uintptr_t)icn_bb_to_by, ICN_NQ(icn_to_by_state_t), s,f,b); }
 void  emit_bb_icon_not(bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_rtcall("ICN_NOT", "", icon_not_new(), "icn_bb_not", (uint64_t)(uintptr_t)icn_bb_not, ICN_NQ(icn_not_state_t), s,f,b); }
 void  emit_bb_icon_repalt(bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_rtcall("ICN_REPALT", "", icon_repalt_new(), "icn_bb_repalt", (uint64_t)(uintptr_t)icn_bb_repalt, ICN_NQ(icn_repalt_state_t), s,f,b); }
