@@ -618,9 +618,9 @@ static void emit_augop_store(int lslot, int is_kw, const char *lname)
 
 static void lower_augop(const tree_t *t)
 {
+    ICN_BB_EVAL(t);
     const tree_t *lhs = T0(t), *rhs = T1(t);
     int op = (int)t->v.ival;
-    /* Fast path: simple variable or keyword lhs — inline load/op/store. */
     const char *lname = NULL; int lslot = -1, is_kw = 0;
     if (lhs && lhs->t == TT_VAR && lhs->v.sval) {
         lname = lhs->v.sval;
