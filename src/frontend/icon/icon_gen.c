@@ -581,3 +581,6 @@ int main(void) {
 }
 
 #endif /* ICON_GEN_UNIT_TEST */
+
+icn_scan_gen_state_t *icon_scan_gen_new(void) { return calloc(1, sizeof(icn_scan_gen_state_t)); }
+coro_t               *icon_suspend_new(void)  { return calloc(1, sizeof(coro_t)); }

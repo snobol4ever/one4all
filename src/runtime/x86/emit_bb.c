@@ -25,6 +25,8 @@ extern DESCR_t    coro_bb_limit             (void *zeta, int entry);    extern i
 extern DESCR_t    coro_bb_seq_expr          (void *zeta, int entry);    extern icn_seq_state_t             * icon_seq_new(void);
 extern DESCR_t    coro_bb_to                (void *zeta, int entry);    extern icn_to_state_t              * icon_to_new(void);
 extern DESCR_t    coro_bb_to_by             (void *zeta, int entry);    extern icn_to_by_state_t           * icon_to_by_new(void);
+extern DESCR_t    coro_bb_scan_gen          (void *zeta, int entry);    extern icn_scan_gen_state_t        * icon_scan_gen_new(void);
+extern DESCR_t    coro_bb_suspend           (void *zeta, int entry);    extern void                        * icon_suspend_new(void);
 extern atp_t    * bb_atp_new                (const char *varname);
 extern bal_t    * bb_bal_new                (void);
 extern brkx_t   * bb_breakx_new             (const char *chars);
@@ -88,6 +90,8 @@ void  emit_bb_icon_section_gen(bb_label_t *s, bb_label_t *f, bb_label_t *b) { em
 void  emit_bb_icon_kw_gen     (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_KW_GEN",    "", icon_kw_gen_new(),      "coro_bb_key_gen",     (uint64_t)(uintptr_t)coro_bb_key_gen,     s,f,b); }
 void  emit_bb_icon_listcon_gen(bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_LISTCON",   "", icon_listcon_gen_new(), "coro_bb_listcon_gen", (uint64_t)(uintptr_t)coro_bb_listcon_gen, s,f,b); }
 void  emit_bb_icon_proc_call  (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_PROCCALL",  "", icon_proc_call_new(),   "icn_bb_proc_call",    (uint64_t)(uintptr_t)icn_bb_proc_call,    s,f,b); }
+void  emit_bb_icon_scan       (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_SCAN",      "", icon_scan_gen_new(),    "coro_bb_scan_gen",    (uint64_t)(uintptr_t)coro_bb_scan_gen,    s,f,b); }
+void  emit_bb_icon_suspend    (bb_label_t *s, bb_label_t *f, bb_label_t *b) { emit_bb_stateful("ICN_SUSPEND",   "", icon_suspend_new(),     "coro_bb_suspend",     (uint64_t)(uintptr_t)coro_bb_suspend,     s,f,b); }
 void  emit_bb_xarbn       (bb_box_fn child_fn, bb_label_t *s, bb_label_t *f, bb_label_t *b)  { emit_bb_stateful("ARBNO", "", rt_bb_arbno_new(child_fn, NULL), "rt_bb_arbno", (uint64_t)(uintptr_t)rt_bb_arbno, s,f,b); }
 void  emit_bb_xbrkx       (const char *chars, bb_label_t *s, bb_label_t *f, bb_label_t *b)   { emit_bb_stateful("BREAKX", chars ? chars : "", bb_breakx_new(chars), "rt_bb_breakx", (uint64_t)(uintptr_t)rt_bb_breakx, s,f,b); }
 /*--------------------------------------------------------------------------------------------------------------------*/

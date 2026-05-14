@@ -100,5 +100,7 @@ void emit_bb_icon_section_gen(bb_label_t *s, bb_label_t *f, bb_label_t *b);
 void emit_bb_icon_kw_gen     (bb_label_t *s, bb_label_t *f, bb_label_t *b);
 void emit_bb_icon_listcon_gen(bb_label_t *s, bb_label_t *f, bb_label_t *b);
 void emit_bb_icon_proc_call  (bb_label_t *s, bb_label_t *f, bb_label_t *b);
+void emit_bb_icon_scan        (bb_label_t *s, bb_label_t *f, bb_label_t *b);
+void emit_bb_icon_suspend     (bb_label_t *s, bb_label_t *f, bb_label_t *b);
 
 #endif /* ICON_GEN_MISSING_H */
