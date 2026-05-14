@@ -697,11 +697,8 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
           macro_line(out, "", "call", ct); }
         macro_line(out, "", "test", "eax, eax");
         macro_line(out, "", "jz", ".Lretskip_\\pc");
-        macro_line(out, "", "cmp", "eax, 2");
-        macro_line(out, "", "je", ".Lchunkret_\\pc");
         macro_line(out, "", "mov", "rsp, rbp");
         macro_line(out, "", "pop", "rbp");
-        fprintf(out, ".Lchunkret_\\pc\\():\n");
         macro_line(out, "", "ret", "");
         fprintf(out, ".Lretskip_\\pc\\():\n");
         macro_line(out, "", ".endm", "");
@@ -920,11 +917,8 @@ int emit_sm_macro_library(FILE *out)
         "                        call             rt_do_nreturn@PLT\n"
         "                        test             eax, eax\n"
         "                        jz               .Lretskip_\\pc\n"
-        "                        cmp              eax, 2\n"
-        "                        je               .Lchunkret_\\pc\n"
         "                        mov              rsp, rbp\n"
         "                        pop              rbp\n"
-        ".Lchunkret_\\pc\\():\n"
         "                        ret\n"
         ".Lretskip_\\pc\\():\n"
         "                        .endm\n",
@@ -1215,6 +1209,7 @@ const sm_op_template_t *sm_template_lookup(int op);
 const char *emit_sm_consume_pc_label(void);
 void emit_sm_set_pc_label(const char *lbl);
 int g_emit_inline = 0;
+static int g_in_define_body = 0;
 #define TEXT_MODE() (g_emit_inline ? EMIT_TEXT_INLINE : EMIT_TEXT)
 typedef struct {
     char       *buf;
@@ -1891,6 +1886,7 @@ static int emit_sm_call_expression_dispatch(FILE *out, const SM_Instr *ins, int 
 static int emit_sm_return_dispatch(FILE *out, int pc)
 {
     (void)pc;
+    if (g_in_define_body) { emit_mode_set(TEXT_MODE(), out); insn_pop_rbp(); }
     return emit_sm_ret(out, sm_template_lookup(SM_RETURN), NULL);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -2082,7 +2078,11 @@ static int emit_sm_define_entry_dispatch(FILE *out, const SM_Instr *ins, int pc,
     (void)ins;
     const char *name = (pc > 0 && prog->instrs[pc-1].a[0].s) ? prog->instrs[pc-1].a[0].s : "";
     char anno[80]; snprintf(anno, sizeof(anno), "# %s", name);
-    return emit_sm_noop(out, sm_template_lookup(SM_DEFINE_ENTRY), anno);
+    emit_sm_noop(out, sm_template_lookup(SM_DEFINE_ENTRY), anno);
+    emit_mode_set(TEXT_MODE(), out);
+    insn_push_rbp(); insn_mov_rbp_rsp();
+    g_in_define_body = 1;
+    return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_define_dispatch(FILE *out, const SM_Instr *ins, int pc) {

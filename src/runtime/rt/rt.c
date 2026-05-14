@@ -571,6 +571,7 @@ void rt_arith(int op)
 {
     DESCR_t r = vstack_pop();
     DESCR_t l = vstack_pop();
+    if (l.v == DT_FAIL || r.v == DT_FAIL) { vstack_push(FAILDESCR); LAST_OK_SET(0); return; }
     int64_t lv = (l.v == DT_I) ? l.i : to_int(l);
     int64_t rv = (r.v == DT_I) ? r.i : to_int(r);
     int64_t result;
@@ -964,6 +965,7 @@ void rt_coerce_num(void)
 {
     /* SM_COERCE_NUM: unary +; coerce string to int (or real if not integer). */
     DESCR_t v = vstack_pop();
+    if (v.v == DT_FAIL) { vstack_push(FAILDESCR); LAST_OK_SET(0); return; }
     if (v.v == DT_S) {
         int64_t iv = to_int(v);
         if (iv != 0 || (v.s && v.s[0] == '0')) {
@@ -1261,7 +1263,10 @@ void rt_call(const char *name, int nargs)
             vstack_push(FAILDESCR);
             LAST_OK_SET(0);
         } else if (strcmp(kw_rtntype, "NRETURN") == 0) {
-            vstack_push(result);
+            DESCR_t deref = result;
+            if (IS_NAMEPTR(deref))      deref = NAME_DEREF_PTR(deref);
+            else if (IS_NAMEVAL(deref)) deref = NV_GET_fn(deref.s);
+            vstack_push(deref);
             LAST_OK_SET(1);
         } else {
             vstack_push(result);
