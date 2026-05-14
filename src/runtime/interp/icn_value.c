@@ -804,7 +804,6 @@ DESCR_t bb_eval_value(tree_t *e)
         DESCR_t v = bb_eval_value(e->c[0]);
         if (IS_FAIL_fn(v)) return FAILDESCR;
         if (v.v == DT_SNUL) return FAILDESCR;
-        if (v.v == DT_S && (!v.s || v.s[0] == '\0')) return FAILDESCR;
         return v;
     }
 

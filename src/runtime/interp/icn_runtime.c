@@ -1360,7 +1360,7 @@ static DESCR_t icn_bb_nonnull_filter(void *zeta, int entry) {
     for (;;) {
         DESCR_t v = z->gen.fn(z->gen.ζ, e2);
         if (IS_FAIL_fn(v)) return FAILDESCR;
-        if (IS_NULL_fn(v)) { e2 = β; continue; }
+        if (v.v == DT_SNUL) { e2 = β; continue; }
         return v;
     }
 }
