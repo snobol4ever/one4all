@@ -244,6 +244,7 @@ static void lower_pow(const tree_t *t) { ICN_BB_EVAL(t); LOWER2(SM_EXP); }
 
 static void lower_vlist(const tree_t *t)
 {
+    ICN_BB_EVAL(t);
     if (t->n == 0) { sm_emit(g_p, SM_PUSH_NULL); return; }
     if (t->n == 1) { lower_expr(t->c[0]); return; }
     int n = t->n - 1;
@@ -289,6 +290,7 @@ static void lower_cat_seq(const tree_t *t)
 
 static void lower_opsyn(const tree_t *t)
 {
+    ICN_BB_EVAL(t);
     const char *raw = t->v.sval ? t->v.sval : "&";
     char op_buf[4];   /* local — lower_expr is re-entrant; static would be clobbered */
     const char *op = raw;
@@ -451,6 +453,7 @@ static void lower_fnc(const tree_t *t)
         g_p->instrs[g_p->count - 1].op = SM_CALL_EXPRESSION;
         return;
     }
+    if (t->v.sval) { ICN_BB_EVAL(t); }
     /* Icon-style call: sval==NULL, children[0] is the callee name node. */
     if (!t->v.sval && nargs >= 1 && t->c[0] && t->c[0]->v.sval) {
         const char *fn = t->c[0]->v.sval;
@@ -796,12 +799,14 @@ static void lower_case(const tree_t *t)
 
 static void lower_makelist(const tree_t *t)
 {
+    ICN_BB_EVAL(t);
     for (int i = 0; i < t->n; i++) lower_expr(t->c[i]);
     sm_emit_si(g_p, SM_CALL_FN, "MAKELIST", (int64_t)t->n);
 }
 
 static void lower_record(const tree_t *t)
 {
+    ICN_BB_EVAL(t);
     sm_emit_s(g_p, SM_PUSH_LIT_S, t->v.sval ? t->v.sval : "");
     for (int i = 0; i < t->n; i++) lower_expr(t->c[i]);
     sm_emit_si(g_p, SM_CALL_FN, "RECORD_MAKE", (int64_t)t->n + 1);
