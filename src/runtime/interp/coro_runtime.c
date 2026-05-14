@@ -1591,8 +1591,8 @@ bb_node_t coro_pump_proc_by_name(const char *name, DESCR_t *args, int nargs) {
         coro_stage.proc     = proc_table[i].proc;
         coro_stage.args     = args;
         coro_stage.nargs    = nargs;
-        coro_stage.entry_pc = proc_table[i].entry_pc;  /* CH-17c */
-        coro_stage.nparams  = proc_table[i].nparams;   /* CH-17c */
+        coro_stage.entry_pc = proc_table[i].entry_pc;
+        coro_stage.nparams  = proc_table[i].nparams;
         return (bb_node_t){ coro_bb_suspend, ss, 0 };
     }
     return (bb_node_t){ NULL, NULL, 0 };
@@ -2003,14 +2003,13 @@ bb_node_t coro_eval(tree_t *e) {
                 args[j] = bb_eval_value(e->c[1+j]);
             /* Allocate suspend state + stack */
             coro_t *ss = coro_alloc(proc_trampoline);
-            ss->trampoline_arg = NULL;   /* unused — trampoline reads coro_stage */
-            /* Stage the call parameters before makecontext */
+            ss->trampoline_arg = NULL;
             coro_stage.ss       = ss;
             coro_stage.proc     = proc_table[i].proc;
             coro_stage.args     = args;
             coro_stage.nargs    = nargs;
-            coro_stage.entry_pc = proc_table[i].entry_pc;  /* CH-17c */
-            coro_stage.nparams  = proc_table[i].nparams;   /* CH-17c */
+            coro_stage.entry_pc = proc_table[i].entry_pc;
+            coro_stage.nparams  = proc_table[i].nparams;
             return (bb_node_t){ coro_bb_suspend, ss, 0 };
         }
         /* ── TT_FNC upto(cset, scan_subject) — drive subject gen per subject ── */

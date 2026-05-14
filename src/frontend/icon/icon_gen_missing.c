@@ -408,3 +408,202 @@ bb_node_t coro_eval_missing(tree_t *e) {
     z->expr = e;
     return (bb_node_t){ icn_lazy_box, z, 0 };
 }
+
+/*============================================================================================================================
+ * icn_bb_proc_call -- pure BB Icon procedure executor (replaces coro_bb_suspend + swapcontext)
+ *
+ * ir_a_Suspend wiring (JCON):
+ *   start  → expr.start   (pump the expr generator α)
+ *   expr.γ → yield value; β comes back → expr.β (resume generator)
+ *   expr.ω → proc failure (no more values from this suspend)
+ *
+ * For a proc body with N statements:
+ *   - Non-suspend statements: execute eagerly via bb_exec_stmt, advance to next.
+ *   - Suspend statements: build bb_node_t from expr; pump α/β until ω; advance.
+ *   - Return E: evaluate E, set return_val, stop.
+ *   - Fall off end: proc fails.
+ *
+ * State: stmt index, current expr_box (if pumping a suspend), proc tree_t*.
+ *============================================================================================================================*/
+
+#define ICN_PROC_STMT_MAX 256
+
+typedef struct {
+    tree_t   *proc;           /* TT_FNC proc node */
+    int       body_start;     /* index of first body stmt in proc->c[] */
+    int       nbody;          /* number of body statements */
+    int       stmt_idx;       /* current statement index */
+    bb_node_t expr_box;       /* current suspend expr generator */
+    int       in_suspend;     /* 1 if currently pumping a suspend expr */
+    tree_t   *suspend_body;   /* do-clause of current suspend (may be NULL) */
+} icn_proc_state_t;
+
+/* Forward: frame push/pop -- same as coro_call */
+extern int frame_depth;
+extern IcnFrame frame_stack[];
+/* extern declarations from coro_runtime.h */
+
+static void icn_bb_proc_push_frame(tree_t *proc, DESCR_t *args, int nargs,
+                                    IcnScope *sc_out, int *nslots_out) {
+    int nparams    = proc->_id;
+    int body_start = 1 + nparams;
+    int nbody      = proc->n - body_start;
+    IcnScope sc;  sc.n = 0;
+    for (int i = 0; i < nparams && i < FRAME_SLOT_MAX; i++) {
+        tree_t *pn = proc->c[1+i];
+        if (pn && pn->v.sval) scope_add(&sc, pn->v.sval);
+    }
+    for (int i = 0; i < nbody; i++) {
+        tree_t *st = proc->c[body_start+i];
+        if (st && st->t == TT_GLOBAL)
+            for (int j = 0; j < st->n; j++)
+                if (st->c[j] && st->c[j]->v.sval)
+                    scope_add(&sc, st->c[j]->v.sval);
+    }
+    for (int i = 0; i < nbody; i++)
+        icn_scope_patch(&sc, proc->c[body_start+i]);
+    int nslots = sc.n > 0 ? sc.n : (nparams > 0 ? nparams : FRAME_SLOT_MAX);
+    if (nslots > FRAME_SLOT_MAX) nslots = FRAME_SLOT_MAX;
+    IcnFrame *f = &frame_stack[frame_depth++];
+    memset(f, 0, sizeof *f);
+    f->env_n = nslots;
+    f->sc    = sc;
+    for (int i = 0; i < nparams && i < nargs && i < FRAME_SLOT_MAX; i++)
+        f->env[i] = args[i];
+    /* restore statics */
+    for (int i = 0; i < nbody; i++) {
+        tree_t *st = proc->c[body_start+i];
+        if (!st || st->t != TT_GLOBAL || st->v.ival != 1) continue;
+        for (int j = 0; j < st->n; j++) {
+            tree_t *vn = st->c[j];
+            if (!vn || !vn->v.sval) continue;
+            int slot = scope_get(&sc, vn->v.sval);
+            if (slot < 0 || slot >= nslots) continue;
+            DESCR_t saved;
+            if (static_get(proc, vn->v.sval, &saved)) f->env[slot] = saved;
+        }
+    }
+    if (sc_out)      *sc_out      = sc;
+    if (nslots_out)  *nslots_out  = nslots;
+}
+
+static void icn_bb_proc_pop_frame(tree_t *proc) {
+    int nparams    = proc->_id;
+    int body_start = 1 + nparams;
+    int nbody      = proc->n - body_start;
+    IcnScope *sc   = &FRAME.sc;
+    int nslots     = FRAME.env_n;
+    for (int i = 0; i < nbody; i++) {
+        tree_t *st = proc->c[body_start+i];
+        if (!st || st->t != TT_GLOBAL || st->v.ival != 1) continue;
+        for (int j = 0; j < st->n; j++) {
+            tree_t *vn = st->c[j];
+            if (!vn || !vn->v.sval) continue;
+            int slot = scope_get(sc, vn->v.sval);
+            if (slot < 0 || slot >= nslots) continue;
+            static_set(proc, vn->v.sval, FRAME.env[slot]);
+        }
+    }
+    icn_init_save_frame();
+    frame_depth--;
+}
+
+/* Extended state: carries args for alpha-time frame push */
+typedef struct { icn_proc_state_t base; DESCR_t args[16]; int nargs; } icn_proc_call_state_t;
+
+DESCR_t icn_bb_proc_call(void *zeta, int entry) {
+    icn_proc_state_t *z = (icn_proc_state_t *)zeta;
+    tree_t *proc       = z->proc;
+    int body_start     = z->body_start;
+    int nbody          = z->nbody;
+
+    /* alpha: push fresh frame with args from extended state */
+    if (entry == alpha) {
+        if (frame_depth >= FRAME_STACK_MAX) return FAILDESCR;
+        icn_proc_call_state_t *zz = (icn_proc_call_state_t *)zeta;
+        icn_bb_proc_push_frame(proc, zz->args, zz->nargs, NULL, NULL);
+        z->stmt_idx  = 0;
+        z->in_suspend = 0;
+    }
+
+    /* Drive statements */
+    for (;;) {
+        /* If currently pumping a suspend expr, pump beta */
+        if (z->in_suspend) {
+            DESCR_t v = z->expr_box.fn(z->expr_box.ζ, beta);
+            if (!IS_FAIL_fn(v)) {
+                if (z->suspend_body) bb_eval_value(z->suspend_body);
+                return v;  /* yield next value */
+            }
+            /* expr exhausted -- advance past this suspend stmt */
+            z->in_suspend = 0;
+            z->stmt_idx++;
+        }
+
+        /* Advance through statements */
+        while (z->stmt_idx < nbody) {
+            tree_t *st = proc->c[body_start + z->stmt_idx];
+            if (!st || st->t == TT_GLOBAL) { z->stmt_idx++; continue; }
+
+            /* TT_RETURN or TT_PROC_FAIL: evaluate, pop frame, done */
+            if (st->t == TT_RETURN) {
+                DESCR_t rv = (st->n >= 1 && st->c[0]) ? bb_eval_value(st->c[0]) : NULVCL;
+                icn_bb_proc_pop_frame(proc);
+                return rv;  /* one value, then omega on next beta */
+            }
+            if (st->t == TT_PROC_FAIL) {
+                icn_bb_proc_pop_frame(proc);
+                return FAILDESCR;
+            }
+
+            /* TT_SUSPEND: build expr generator, pump alpha for first value */
+            if (st->t == TT_SUSPEND) {
+                tree_t *expr_node = (st->n >= 1) ? st->c[0] : NULL;
+                tree_t *body_node = (st->n >= 2) ? st->c[1] : NULL;
+                if (!expr_node) { z->stmt_idx++; continue; }
+                z->expr_box    = coro_eval(expr_node);
+                z->suspend_body = body_node;
+                z->in_suspend   = 1;
+                DESCR_t v = z->expr_box.fn(z->expr_box.ζ, alpha);
+                if (!IS_FAIL_fn(v)) {
+                    if (body_node) bb_eval_value(body_node);
+                    return v;  /* first yield */
+                }
+                /* expr immediately exhausted */
+                z->in_suspend = 0;
+                z->stmt_idx++;
+                continue;
+            }
+
+            /* All other statements: execute for side effects, advance */
+            bb_exec_stmt(st);
+            if (FRAME.returning) {
+                DESCR_t rv = FRAME.return_val;
+                icn_bb_proc_pop_frame(proc);
+                return rv;
+            }
+            if (FRAME.loop_break) { z->stmt_idx++; continue; }
+            z->stmt_idx++;
+        }
+
+        /* Fell off end of body -- proc fails */
+        icn_bb_proc_pop_frame(proc);
+        return FAILDESCR;
+    }
+}
+
+/*----------------------------------------------------------------------------------------------------------------------------
+ * icn_bb_make_proc_box -- build an icn_bb_proc_call box for a proc node.
+ * Called from coro_eval TT_FNC user-proc path to replace coro_bb_suspend.
+ *--------------------------------------------------------------------------------------------------------------------------*/
+bb_node_t icn_bb_make_proc_box(tree_t *proc, DESCR_t *args, int nargs) {
+    icn_proc_call_state_t *zz = calloc(1, sizeof(*zz));
+    zz->base.proc       = proc;
+    zz->base.body_start = 1 + proc->_id;
+    zz->base.nbody      = proc->n - zz->base.body_start;
+    zz->base.stmt_idx   = 0;
+    zz->base.in_suspend = 0;
+    zz->nargs = nargs < 16 ? nargs : 16;
+    for (int i = 0; i < zz->nargs; i++) zz->args[i] = args ? args[i] : NULVCL;
+    return (bb_node_t){ icn_bb_proc_call, zz, 0 };
+}
