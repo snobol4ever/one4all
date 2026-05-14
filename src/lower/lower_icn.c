@@ -96,3 +96,22 @@ IR_block_t *lower_icn_to_by(int64_t lo, int64_t hi, int64_t step) {
     cfg->entry = nd;
     return cfg;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* lower_icn_iterate — DCG for (!str) char-by-char iteration.
+ * Single node; sval2=str (stable), ival=len; counter=pos; state 0=α, 1=β. */
+IR_block_t *lower_icn_iterate(const char *str, int64_t len) {
+    if (!str) return NULL;
+    IR_block_t *cfg = IR_alloc(4, IR_LANG_ICN);
+    if (!cfg) return NULL;
+    IR_t *nd = IR_node_alloc(cfg, IR_ICN_ITERATE);
+    if (!nd) return NULL;
+    nd->sval2   = str;
+    nd->ival    = len;
+    nd->counter = 0;
+    nd->α = nd;
+    nd->β = nd;
+    nd->γ = NULL;
+    nd->ω = NULL;
+    cfg->entry = nd;
+    return cfg;
+}

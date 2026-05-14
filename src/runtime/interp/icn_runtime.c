@@ -1279,15 +1279,16 @@ bb_node_t icn_bb_build(tree_t *e) {
             }
             return (bb_node_t){ icn_bb_raku_array, z, 0 };
         }
-        /* Icon char mode */
-        icn_iterate_state_t *z = calloc(1, sizeof(*z));
+        /* Icon char mode — IR_ICN_ITERATE DCG */
         if (!IS_FAIL_fn(sv) && sv.s) {
-            z->str = sv.s;
-            /* IJ-15: CSETVAL uses slen=0xFFFFFFFF as sentinel — use strlen.
-             * Plain DT_S with explicit slen>0 uses that length. */
-            z->len = IS_CSET_fn(sv) ? (long)strlen(sv.s)
-                   : (sv.slen > 0 && sv.slen != 0xFFFFFFFFu) ? (long)sv.slen
-                   : (long)strlen(sv.s);
+            const char *istr = sv.s;
+            int64_t ilen = IS_CSET_fn(sv) ? (int64_t)strlen(sv.s)
+                         : (sv.slen > 0 && sv.slen != 0xFFFFFFFFu) ? (int64_t)sv.slen
+                         : (int64_t)strlen(sv.s);
+            IR_block_t *icfg = lower_icn_iterate(istr, ilen);
+            icn_dcg_state_t *idz = calloc(1, sizeof(*idz));
+            idz->cfg = icfg; idz->first = 1;
+            return (bb_node_t){ icn_bb_dcg, idz, 0 };
         }
         return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
     }

@@ -424,6 +424,19 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->value = INTVAL(nd->counter);
         return nd->γ;
     }
+    case IR_ICN_ITERATE: {
+        if (nd->state == 0) nd->counter = 0;
+        else nd->counter++;
+        nd->state = 1;
+        int64_t len = nd->ival;
+        const char *str = nd->sval2 ? nd->sval2 : "";
+        if (nd->counter >= len) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+        char *ch = GC_malloc(2);
+        ch[0] = str[nd->counter];
+        ch[1] = '\0';
+        nd->value = (DESCR_t){ .v = DT_S, .slen = 1, .s = ch };
+        return nd->γ;
+    }
     case IR_ICN_EVERY: {
         bb_node_t *gen = (bb_node_t *)nd->opaque;
         if (!gen) { nd->value = FAILDESCR; return nd->ω; }

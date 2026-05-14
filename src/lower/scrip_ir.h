@@ -105,6 +105,7 @@ typedef enum {
     IR_ICN_UPTO,        /* upto(cset,str) — positions where cset char appears; sval=cset,sval2=str */
     IR_ICN_EVERY,       /* every gen [do body] — drives child bb_node_t via opaque; body in sval2 */
     IR_ICN_TO_BY,       /* i to j by k — integer range with step; ival=lo, ival2=hi, ival3=step      */
+    IR_ICN_ITERATE,     /* !str — char-by-char iteration; sval2=str, ival=len, counter=pos               */
     IR_E_COUNT       /* sentinel — number of kinds                                             */
 } IR_e;
 
