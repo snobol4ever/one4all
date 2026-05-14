@@ -510,7 +510,6 @@ static void lower_assign(const tree_t *t)
     lower_expr(T1(t));   /* rhs first */
     emit_lhs_store(T0(t));
 }
-
 static void lower_scan(const tree_t *t)
 {
     if (t->n < 1) { sm_emit(g_p, SM_PUSH_NULL); return; }
@@ -520,16 +519,8 @@ static void lower_scan(const tree_t *t)
     if (t->n > 1) lower_expr(t->c[1]); else sm_emit(g_p, SM_PUSH_NULL);
     sm_emit_si(g_p, SM_CALL_FN, "ICN_SCAN_POP", 1);
 }
-
 static void lower_swap(const tree_t *t)
 {
-    /* Inline fast path for two plain variables: save→copy→restore.
-     * Uses SM_PUSH_VAR / SM_STORE_VAR (not emit_var_load/store) intentionally —
-     * __icn_swap_tmp__ is a synthetic global scratch and must never land in a frame slot.
-     * IJ-10: When one operand is a keyword (&pos, &subject, etc.), keyword assignment
-     * can fail (OOB); write order is left-to-right with halt on first OOB.
-     * Emit ICN_KW_SWAP with kw_is_lhs flag so the handler applies the probe at the
-     * correct write step (first write if kw is lhs, second if kw is rhs). */
     if (t->n >= 2 && T0(t) && T1(t)
             && T0(t)->t == TT_VAR && T1(t)->t == TT_VAR) {
         const char *ln = T0(t)->v.sval ? T0(t)->v.sval : "";
