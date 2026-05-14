@@ -1103,6 +1103,23 @@ DESCR_t icn_bb_seq_expr(void *zeta, int entry) {
 }
 
 /*----------------------------------------------------------------------------------------------------------------------------
+ * icn_bb_nonnull_filter — TT_NONNULL  (\E)  with generative child  IC-7
+ *
+ * Pumps the inner generator, passes through non-null non-fail values,
+ * skips null (DT_NUL / empty string) values.  Exhausts when inner gen exhausts.
+ *--------------------------------------------------------------------------------------------------------------------------*/
+static DESCR_t icn_bb_nonnull_filter(void *zeta, int entry) {
+    icn_limit_state_t *z = (icn_limit_state_t *)zeta;
+    int e2 = entry;
+    for (;;) {
+        DESCR_t v = z->gen.fn(z->gen.ζ, e2);
+        if (IS_FAIL_fn(v)) return FAILDESCR;
+        if (IS_NULL_fn(v)) { e2 = β; continue; }
+        return v;
+    }
+}
+
+/*----------------------------------------------------------------------------------------------------------------------------
  * icn_bb_identical_gen — TT_IDENTICAL  (a === b)  with one or both operands generative
  *
  * IC-8 fix for  if x === key(T) then ...  in tdump (rung36_jcon_table).
@@ -1710,17 +1727,9 @@ bb_node_t icn_bb_build(tree_t *e) {
     /* ── IC-7: TT_NONNULL (\E) as generator — filter: pass values, skip null ──
      * every write(\(1 to 3)) — drive inner gen, yield each non-null value.   */
     if (e->t == TT_NONNULL && e->n >= 1 && is_suspendable(e->c[0])) {
-        /* Wrap inner gen in a filter: pump inner, skip null (empty string / DT_NUL).
-         * Reuse icn_bb_limit state struct as a thin wrapper — just store inner gen. */
         icn_limit_state_t *z = calloc(1, sizeof(*z));
-        z->gen   = icn_bb_build(e->c[0]);
-        z->max   = (long long)9e18;   /* no limit */
-        z->count = 0;
-        return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
-        /* Note: icn_bb_limit just pumps inner gen and counts — it doesn't filter nulls.
-         * For \E semantics we need a real filter box, but for (1 to 3) all values are
-         * non-null so icn_bb_limit pass-through is correct. A full null-filter box
-         * can be added when a failing test requires it. */
+        z->gen = icn_bb_build(e->c[0]);
+        return (bb_node_t){ icn_bb_nonnull_filter, z, 0 };
     }
 
     /* ── IC-7: seq(start) / seq(start, step) — infinite integer sequence ───
