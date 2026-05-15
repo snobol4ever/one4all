@@ -74,21 +74,17 @@ function _str(v) {
     if (v === _FAIL) return '';
     if (typeof v === 'number') {
         if (Number.isInteger(v)) return String(v);
-        /* SNOBOL4 real format: always has decimal point; 1.0→"1.", 0.5→".5", 0.0→"0." */
+        /* SNOBOL4 real format: always has decimal point; 1.0→"1.", 0.001→"0.001" */
         let s = String(v);
         if (s.indexOf('.') < 0 && s.indexOf('e') < 0) s += '.';
         s = s.replace(/(\.\d*?)0+$/, '$1');
-        s = s.replace(/^0\.(\d)/, '.$1');    /* 0.5 → .5 but 0. stays 0. */
-        s = s.replace(/^-0\.(\d)/, '-.$1');  /* -0.5 → -.5 but -0. stays -0. */
         return s;
     }
     if (_is_real(v)) {
-        /* tagged real — format as SNOBOL4 real: 1.0→"1.", 0.5→".5" */
+        /* tagged real — format as SNOBOL4 real: 1.0→"1.", 0.001→"0.001" */
         let s = String(v.v);
         if (s.indexOf('.') < 0 && s.indexOf('e') < 0) s += '.';
         s = s.replace(/(\.\d*?)0+$/, '$1');
-        s = s.replace(/^0\.(\d)/, '.$1');
-        s = s.replace(/^-0\.(\d)/, '-.$1');
         return s;
     }
     if (typeof v === 'object') return '';  /* DATA/ARRAY/TABLE objects stringify as '' */
@@ -369,7 +365,16 @@ function exp_op() {
 
 function coerce_num() {
     const v = _stack.pop();
-    _stack.push(_num(v));
+    if (_is_real(v)) {
+        _stack.push(v);  /* Already a real; keep it */
+    } else {
+        const n = _num(v);
+        if (!Number.isInteger(n)) {
+            _stack.push(_mkreal(n));  /* Non-integer numeric → real */
+        } else {
+            _stack.push(n);  /* Integer stays as plain number */
+        }
+    }
 }
 
 function arith(op) {
