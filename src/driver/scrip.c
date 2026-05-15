@@ -93,6 +93,7 @@ int main(int argc, char **argv)
         else if (strcmp(argv[argi], "--jit-run")       == 0) { mode_jit_run       = 1; argi++; }
         else if (strcmp(argv[argi], "--monitor")       == 0) { mode_monitor       = 1; argi++; }
         else if (strcmp(argv[argi], "--jit-emit")      == 0) { opt_jit_emit       = 1; argi++; }
+        else if (strcmp(argv[argi], "--sm-emit")       == 0) { opt_jit_emit       = 1; argi++; }
         else if (strcmp(argv[argi], "--x64")           == 0) { opt_emit_x64 = 1; target_name = "x86"; argi++; }
         else if (strncmp(argv[argi], "--target=", 9)   == 0) { target_name = argv[argi] + 9; opt_jit_emit = 1; argi++; }
         else if (strcmp(argv[argi], "--jit-emit-inline") == 0) { opt_jit_emit_inline = 1; opt_jit_emit = 1; argi++; }

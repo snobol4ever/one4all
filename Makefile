@@ -80,8 +80,8 @@ RT_PIC_SRCS := \
     $(SRC)/emitter/emit_sm.c \
     $(SRC)/emitter/emit_ir.c \
     $(SRC)/emitter/emit_ir_targets.c \
+$(SRC)/emitter/emit_jvm.c \
     $(SRC)/emitter/emit_js.c \
-    $(SRC)/emitter/emit_jvm.c \
     \
     $(SRC)/processor/bb_boxes.c \
     $(SRC)/processor/bb_broker.c \
@@ -286,8 +286,8 @@ scrip:
 	$(CC) $(CRT)   -c $(SRC)/emitter/emit_bb.c -o $(OBJ)/emit_bb.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/emit_ir.c -o $(OBJ)/emit_ir.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/emit_ir_targets.c -o $(OBJ)/emit_ir_targets.o
-	$(CC) $(CRT)   -c $(SRC)/emitter/emit_js.c -o $(OBJ)/emit_js.o
-	$(CC) $(CRT)   -c $(SRC)/emitter/emit_jvm.c -o $(OBJ)/emit_jvm.o
+$(CC) $(CRT)   -c $(SRC)/emitter/emit_jvm.c -o $(OBJ)/emit_jvm.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/emit_js.c  -o $(OBJ)/emit_js.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/rt/rt.c   -o $(OBJ)/rt.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_globals.c -o $(OBJ)/interp_globals.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_label.c   -o $(OBJ)/interp_label.o
