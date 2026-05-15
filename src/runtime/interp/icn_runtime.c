@@ -1191,8 +1191,9 @@ DESCR_t icn_bb_scan_gen(void *zeta, int entry) {
         DESCR_t sv = z->subj_gen.fn(z->subj_gen.ζ, (z->started ? β : α));
         if (IS_FAIL_fn(sv)) return FAILDESCR;
         z->started = 1;
-        /* Install scan subject */
-        const char *s = sv.s ? sv.s : (sv.v == DT_SNUL ? "" : "");
+        /* Install scan subject — coerce int/real to string first so sv.s is valid */
+        if (sv.v == DT_I || sv.v == DT_R) sv = descr_to_str_icn(sv);
+        const char *s = (sv.v == DT_S && sv.s) ? sv.s : (sv.v == DT_SNUL ? "" : "");
         z->body_subj = s;
         const char *saved_subj = scan_subj;
         int saved_pos = scan_pos;
@@ -1226,7 +1227,9 @@ DESCR_t icn_bb_scan_gen(void *zeta, int entry) {
     /* Body exhausted — try next subject */
     DESCR_t sv = z->subj_gen.fn(z->subj_gen.ζ, β);
     if (IS_FAIL_fn(sv)) return FAILDESCR;
-    const char *s = sv.s ? sv.s : "";
+    /* Coerce int/real to string before extracting .s */
+    if (sv.v == DT_I || sv.v == DT_R) sv = descr_to_str_icn(sv);
+    const char *s = (sv.v == DT_S && sv.s) ? sv.s : "";
     z->body_subj = s;
     const char *saved_subj2 = scan_subj;
     int saved_pos2 = scan_pos;
