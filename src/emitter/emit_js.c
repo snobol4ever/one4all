@@ -1,0 +1,288 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include "emit_ir.h"
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* JS Emitter for IR_t → JavaScript code generation.
+   Each IR_PAT_* node kind gets an emit_js_bb_NODE function that generates a JavaScript factory function.
+   Scalar nodes (IR_LIT_I, IR_VAR, etc.) are emitted into the switch/dispatch loop by emit_js_scalar.
+   Generator nodes (IR_PAT_*) are emitted as factory functions by emit_js_generator. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* Helper: escape a string for JS string literal — double-quote → \", backslash → \\, etc. */
+static void js_escape_string(FILE * out, const char * s) {
+    fprintf(out, "\"");
+    for (; s && *s; s++) {
+        unsigned char c = (unsigned char)*s;
+        if      (c == '"')  fprintf(out, "\\\"");
+        else if (c == '\\') fprintf(out, "\\\\");
+        else if (c == '\n') fprintf(out, "\\n");
+        else if (c == '\r') fprintf(out, "\\r");
+        else if (c == '\t') fprintf(out, "\\t");
+        else if (c < 0x20 || c > 0x7e) fprintf(out, "\\x%02x", c);
+        else fprintf(out, "%c", c);
+    }
+    fprintf(out, "\"");
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* IR_PAT_LIT — literal string match. Parameters: nd->sval = literal text. */
+static int emit_js_bb_lit(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd);
+    fprintf(out, "function make_pat_%d_%d(ms) { const lit = ", nd->ival, nid);
+    js_escape_string(out, nd->sval);
+    fprintf(out, "; const len = lit.length; let self = { succ: null, fail: null,\n");
+    fprintf(out, "alpha() { if (ms.delta + len > ms.omega || ms.sigma.slice(ms.delta, ms.delta + len) !== lit) { self.fail.alpha(); return; } ms.delta += len; self.succ.alpha(); },\n");
+    fprintf(out, "beta() { ms.delta -= len; self.fail.alpha(); }\n");
+    fprintf(out, "}; return self; }\n");
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* IR_PAT_SPAN — match one or more chars in charset. Parameters: nd->sval = charset. */
+static int emit_js_bb_span(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd);
+    fprintf(out, "function make_pat_%d_%d(ms) { const chars = ", nd->ival, nid);
+    js_escape_string(out, nd->sval);
+    fprintf(out, "; let delta = 0; let self = { succ: null, fail: null,\n");
+    fprintf(out, "alpha() { delta = 0; while (ms.delta + delta < ms.omega && chars.indexOf(ms.sigma[ms.delta + delta]) >= 0) delta++; if (delta <= 0) { self.fail.alpha(); return; } const r = ms.sigma.slice(ms.delta, ms.delta + delta); ms.delta += delta; self.succ.alpha(); return r; },\n");
+    fprintf(out, "beta() { ms.delta -= delta; self.fail.alpha(); }\n");
+    fprintf(out, "}; return self; }\n");
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* IR_PAT_BREAK — match until char in charset. Parameters: nd->sval = charset. */
+static int emit_js_bb_break(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd);
+    fprintf(out, "function make_pat_%d_%d(ms) { const chars = ", nd->ival, nid);
+    js_escape_string(out, nd->sval);
+    fprintf(out, "; let delta = 0; let self = { succ: null, fail: null,\n");
+    fprintf(out, "alpha() { delta = 0; while (ms.delta + delta < ms.omega && chars.indexOf(ms.sigma[ms.delta + delta]) < 0) delta++; const r = ms.sigma.slice(ms.delta, ms.delta + delta); ms.delta += delta; self.succ.alpha(); return r; },\n");
+    fprintf(out, "beta() { ms.delta -= delta; self.fail.alpha(); }\n");
+    fprintf(out, "}; return self; }\n");
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* IR_PAT_ANY — match one char if in charset. Parameters: nd->sval = charset. */
+static int emit_js_bb_any(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd);
+    fprintf(out, "function make_pat_%d_%d(ms) { const chars = ", nd->ival, nid);
+    js_escape_string(out, nd->sval);
+    fprintf(out, "; let self = { succ: null, fail: null,\n");
+    fprintf(out, "alpha() { if (ms.delta >= ms.omega || chars.indexOf(ms.sigma[ms.delta]) < 0) { self.fail.alpha(); return; } const r = ms.sigma.slice(ms.delta, ms.delta + 1); ms.delta++; self.succ.alpha(); return r; },\n");
+    fprintf(out, "beta() { ms.delta--; self.fail.alpha(); }\n");
+    fprintf(out, "}; return self; }\n");
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* IR_PAT_NOTANY — match one char NOT in charset. Parameters: nd->sval = charset. */
+static int emit_js_bb_notany(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd);
+    fprintf(out, "function make_pat_%d_%d(ms) { const chars = ", nd->ival, nid);
+    js_escape_string(out, nd->sval);
+    fprintf(out, "; let self = { succ: null, fail: null,\n");
+    fprintf(out, "alpha() { if (ms.delta >= ms.omega || chars.indexOf(ms.sigma[ms.delta]) >= 0) { self.fail.alpha(); return; } const r = ms.sigma.slice(ms.delta, ms.delta + 1); ms.delta++; self.succ.alpha(); return r; },\n");
+    fprintf(out, "beta() { ms.delta--; self.fail.alpha(); }\n");
+    fprintf(out, "}; return self; }\n");
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* IR_PAT_LEN — match exactly N characters. Parameters: nd->ival = N. */
+static int emit_js_bb_len(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd);
+    int64_t n = nd->ival;
+    fprintf(out, "function make_pat_%d_%d(ms) { const n = %ld; let self = { succ: null, fail: null,\n", nd->ival, nid, n);
+    fprintf(out, "alpha() { if (ms.delta + n > ms.omega) { self.fail.alpha(); return; } const r = ms.sigma.slice(ms.delta, ms.delta + n); ms.delta += n; self.succ.alpha(); return r; },\n");
+    fprintf(out, "beta() { ms.delta -= n; self.fail.alpha(); }\n");
+    fprintf(out, "}; return self; }\n");
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* IR_PAT_POS — match at absolute or relative position (variant in nd->n: 0=abs, 1=rel). */
+static int emit_js_bb_pos(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd);
+    int64_t n = nd->ival;
+    if (nd->n == 1) {
+        fprintf(out, "function make_pat_%d_%d(ms) { const n = %ld; let self = { succ: null, fail: null,\n", nd->ival, nid, n);
+        fprintf(out, "alpha() { if (ms.delta !== ms.omega - n) { self.fail.alpha(); return; } self.succ.alpha(); return ''; },\n");
+        fprintf(out, "beta() { self.fail.alpha(); }\n");
+    } else {
+        fprintf(out, "function make_pat_%d_%d(ms) { const n = %ld; let self = { succ: null, fail: null,\n", nd->ival, nid, n);
+        fprintf(out, "alpha() { if (ms.delta !== n) { self.fail.alpha(); return; } self.succ.alpha(); return ''; },\n");
+        fprintf(out, "beta() { self.fail.alpha(); }\n");
+    }
+    fprintf(out, "}; return self; }\n");
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* IR_PAT_TAB — match up to absolute or relative position (variant in nd->n: 0=abs, 1=rel). */
+static int emit_js_bb_tab(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd);
+    int64_t n = nd->ival;
+    if (nd->n == 1) {
+        fprintf(out, "function make_pat_%d_%d(ms) { const n = %ld; let delta = 0; let self = { succ: null, fail: null,\n", nd->ival, nid, n);
+        fprintf(out, "alpha() { const tgt = ms.omega - n; if (ms.delta > tgt) { self.fail.alpha(); return; } delta = tgt - ms.delta; const r = ms.sigma.slice(ms.delta, ms.delta + delta); ms.delta += delta; self.succ.alpha(); return r; },\n");
+        fprintf(out, "beta() { ms.delta -= delta; self.fail.alpha(); }\n");
+    } else {
+        fprintf(out, "function make_pat_%d_%d(ms) { const n = %ld; let delta = 0; let self = { succ: null, fail: null,\n", nd->ival, nid, n);
+        fprintf(out, "alpha() { if (ms.delta > n || ms.delta > ms.omega) { self.fail.alpha(); return; } delta = n - ms.delta; if (ms.delta + delta > ms.omega) delta = ms.omega - ms.delta; const r = ms.sigma.slice(ms.delta, ms.delta + delta); ms.delta += delta; self.succ.alpha(); return r; },\n");
+        fprintf(out, "beta() { ms.delta -= delta; self.fail.alpha(); }\n");
+    }
+    fprintf(out, "}; return self; }\n");
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* IR_PAT_REM — match remainder (from cursor to end). No parameters. */
+static int emit_js_bb_rem(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd);
+    fprintf(out, "function make_pat_%d_%d(ms) { let delta = 0; let self = { succ: null, fail: null,\n", nd->ival, nid);
+    fprintf(out, "alpha() { delta = ms.omega - ms.delta; const r = ms.sigma.slice(ms.delta, ms.delta + delta); ms.delta += delta; self.succ.alpha(); return r; },\n");
+    fprintf(out, "beta() { ms.delta -= delta; self.fail.alpha(); }\n");
+    fprintf(out, "}; return self; }\n");
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* IR_PAT_ARB — arbitrary length match (greedy). No parameters. */
+static int emit_js_bb_arb(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd);
+    fprintf(out, "function make_pat_%d_%d(ms) { let delta = 0; let self = { succ: null, fail: null,\n", nd->ival, nid);
+    fprintf(out, "alpha() { delta = ms.omega - ms.delta; const r = ms.sigma.slice(ms.delta, ms.delta + delta); ms.delta += delta; self.succ.alpha(); return r; },\n");
+    fprintf(out, "beta() { if (delta <= 0) { self.fail.alpha(); return; } delta--; ms.delta--; const r = ms.sigma.slice(ms.delta, ms.delta + delta + 1); return r; }\n");
+    fprintf(out, "}; return self; }\n");
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* IR_PAT_ARBNO — zero or more repetitions. Parameters: nd->c[0] = body node. */
+static int emit_js_bb_arbno(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd);
+    fprintf(out, "function make_pat_%d_%d(ms) { const stack = []; let self = { succ: null, fail: null,\n", nd->ival, nid);
+    fprintf(out, "alpha() { stack.length = 0; stack.push({ start: ms.delta }); while (true) { const frame = stack[stack.length - 1]; const br = self.body.alpha();\n");
+    fprintf(out, "if (br === null) { return ms.sigma.slice(stack[0].start, ms.delta - stack[0].start); }\n");
+    fprintf(out, "if (ms.delta === frame.start) { return ms.sigma.slice(stack[0].start, ms.delta - stack[0].start); }\n");
+    fprintf(out, "stack.push({ start: ms.delta }); } },\n");
+    fprintf(out, "beta() { if (stack.length <= 1) { self.fail.alpha(); return; } stack.pop(); const frame = stack[stack.length - 1]; ms.delta = frame.start; return ms.sigma.slice(stack[0].start, ms.delta - stack[0].start); }\n");
+    fprintf(out, "}; return self; }\n");
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* IR_PAT_CAT — concatenation (sequence). Parameters: nd->c[0] = left, nd->c[1] = right. */
+static int emit_js_bb_cat(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd);
+    fprintf(out, "function make_pat_%d_%d(ms) { let self = { succ: null, fail: null,\n", nd->ival, nid);
+    fprintf(out, "alpha() { const lr = self.left.alpha(); if (lr === null) { self.fail.alpha(); return; }\n");
+    fprintf(out, "let rr = self.right.alpha(); while (rr === null) { const lr2 = self.left.beta(); if (lr2 === null) { self.fail.alpha(); return; } rr = self.right.alpha(); }\n");
+    fprintf(out, "self.succ.alpha(); return rr; },\n");
+    fprintf(out, "beta() { let rr = self.right.beta(); while (rr === null) { const lr = self.left.beta(); if (lr === null) { self.fail.alpha(); return; } rr = self.right.alpha(); }\n");
+    fprintf(out, "return rr; }\n");
+    fprintf(out, "}; return self; }\n");
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* IR_PAT_ALT — alternation (choice). Parameters: nd->c[0..n-1] = children. */
+static int emit_js_bb_alt(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd);
+    fprintf(out, "function make_pat_%d_%d(ms) { const children = self.children || []; let idx = 0; let self = { succ: null, fail: null,\n", nd->ival, nid);
+    fprintf(out, "alpha() { idx = 0; while (idx < children.length) { const r = children[idx].alpha(); if (r !== null) { self.succ.alpha(); return r; } idx++; } self.fail.alpha(); return null; },\n");
+    fprintf(out, "beta() { idx--; if (idx >= 0 && idx < children.length) { const r = children[idx].beta(); if (r !== null) { return r; } return self.beta(); } self.fail.alpha(); return null; }\n");
+    fprintf(out, "}; return self; }\n");
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* IR_PAT_ASSIGN_IMM — immediate capture. Parameters: nd->sval = varname, nd->ival2 = immediate flag. */
+static int emit_js_bb_assign_imm(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd);
+    fprintf(out, "function make_pat_%d_%d(ms) { const varname = ", nd->ival, nid);
+    js_escape_string(out, nd->sval);
+    fprintf(out, "; let self = { succ: null, fail: null,\n");
+    fprintf(out, "alpha() { const cr = self.child.alpha(); if (cr === null) { self.fail.alpha(); return; } ms._do_capture(cr, varname, 1); self.succ.alpha(); return cr; },\n");
+    fprintf(out, "beta() { const cr = self.child.beta(); if (cr === null) { self.fail.alpha(); return; } ms._do_capture(cr, varname, 1); return cr; }\n");
+    fprintf(out, "}; return self; }\n");
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* IR_PAT_ASSIGN_COND — conditional capture. Parameters: nd->sval = varname. */
+static int emit_js_bb_assign_cond(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd);
+    fprintf(out, "function make_pat_%d_%d(ms) { const varname = ", nd->ival, nid);
+    js_escape_string(out, nd->sval);
+    fprintf(out, "; let self = { succ: null, fail: null,\n");
+    fprintf(out, "alpha() { const cr = self.child.alpha(); if (cr === null) { self.fail.alpha(); return; } ms._do_capture(cr, varname, 0); self.succ.alpha(); return cr; },\n");
+    fprintf(out, "beta() { const cr = self.child.beta(); if (cr === null) { self.fail.alpha(); return; } ms._do_capture(cr, varname, 0); return cr; }\n");
+    fprintf(out, "}; return self; }\n");
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* IR_PAT_FENCE — fence (cut). No parameters. */
+static int emit_js_bb_fence(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd);
+    fprintf(out, "function make_pat_%d_%d(ms) { let self = { succ: null, fail: null,\n", nd->ival, nid);
+    fprintf(out, "alpha() { self.succ.alpha(); return ''; },\n");
+    fprintf(out, "beta() { self.fail.alpha(); return null; }\n");
+    fprintf(out, "}; return self; }\n");
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* IR_PAT_ABORT — abort (forced failure). No parameters. */
+static int emit_js_bb_abort(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd);
+    fprintf(out, "function make_pat_%d_%d(ms) { let self = { succ: null, fail: null,\n", nd->ival, nid);
+    fprintf(out, "alpha() { self.fail.alpha(); return null; },\n");
+    fprintf(out, "beta() { self.fail.alpha(); return null; }\n");
+    fprintf(out, "}; return self; }\n");
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* Dispatch table for generator nodes — maps IR_e to emitter function. */
+typedef int (*emit_js_gen_fn)(IR_t * nd, FILE * out);
+static const struct { IR_e kind; emit_js_gen_fn fn; } g_js_gen_emitters[] = {
+    { IR_PAT_LIT,         emit_js_bb_lit },
+    { IR_PAT_SPAN,        emit_js_bb_span },
+    { IR_PAT_BREAK,       emit_js_bb_break },
+    { IR_PAT_ANY,         emit_js_bb_any },
+    { IR_PAT_NOTANY,      emit_js_bb_notany },
+    { IR_PAT_LEN,         emit_js_bb_len },
+    { IR_PAT_POS,         emit_js_bb_pos },
+    { IR_PAT_TAB,         emit_js_bb_tab },
+    { IR_PAT_REM,         emit_js_bb_rem },
+    { IR_PAT_ARB,         emit_js_bb_arb },
+    { IR_PAT_ARBNO,       emit_js_bb_arbno },
+    { IR_PAT_CAT,         emit_js_bb_cat },
+    { IR_PAT_ALT,         emit_js_bb_alt },
+    { IR_PAT_ASSIGN_IMM,  emit_js_bb_assign_imm },
+    { IR_PAT_ASSIGN_COND, emit_js_bb_assign_cond },
+    { IR_PAT_FENCE,       emit_js_bb_fence },
+    { IR_PAT_ABORT,       emit_js_bb_abort },
+    { -1, NULL }
+};
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* emit_js_generator — dispatcher for pattern/generator nodes. */
+int emit_js_generator(IR_t * nd, FILE * out) {
+    for (int i = 0; g_js_gen_emitters[i].fn; i++) {
+        if (g_js_gen_emitters[i].kind == nd->t) {
+            return g_js_gen_emitters[i].fn(nd, out);
+        }
+    }
+    fprintf(stderr, "emit_js_generator: unhandled IR kind %d\n", nd->t);
+    return 1;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* emit_js_scalar — stub for scalar nodes (TODO: SJ4-JS-2). */
+int emit_js_scalar(IR_t * nd, FILE * out) {
+    (void)nd; (void)out;
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* emit_js_prologue — emit JS file header and runtime setup. */
+int emit_js_prologue(IR_block_t * cfg, FILE * out) {
+    (void)cfg;
+    fprintf(out, "'use strict';\n");
+    fprintf(out, "const rt = require('./sno_runtime.js');\n");
+    fprintf(out, "rt._init();\n");
+    fprintf(out, "\n");
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* emit_js_epilogue — emit JS file footer and finalization. */
+int emit_js_epilogue(IR_block_t * cfg, FILE * out) {
+    (void)cfg;
+    fprintf(out, "\nrt._finalize();\n");
+    return 0;
+}
