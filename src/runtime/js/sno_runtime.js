@@ -483,11 +483,13 @@ const {
     PAT_arbno, PAT_capt_imm, PAT_capt_cond,
 } = _engine;
 
+function _peek() { return _stack.length > 0 ? _stack[_stack.length - 1] : null; }
+
 module.exports = {
     /* Core runtime */
     _vars, _FAIL, _is_fail, _str, _num, _cat,
     _add, _sub, _mul, _div, _pow, _apply, _kw, _is_int, _is_real, _real_result,
-    _match, _match_anchored, _user_fns,
+    _match, _match_anchored, _user_fns, _peek,
     /* Pattern builders */
     PAT_lit, PAT_alt, PAT_seq, PAT_any, PAT_notany,
     PAT_span, PAT_break, PAT_arb, PAT_rem,

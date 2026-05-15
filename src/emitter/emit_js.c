@@ -280,17 +280,18 @@ int emit_js_program(const tree_t * ast_prog, FILE * out) {
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* emit_js_from_sm — walk SM_Program and emit JS for scalar statements. */
+/* emit_js_from_sm — walk SM_Program and emit JS for scalar statements. Use instruction index as case label. */
 int emit_js_from_sm(SM_Program * sm, FILE * out) {
     if (!sm || !out || sm->count == 0) return 0;
-    int last_stno = -1;
     for (int i = 0; i < sm->count; i++) {
         SM_Instr * instr = &sm->instrs[i];
+        fprintf(out, "case %d: ", i);
+        int has_continue = 0;
         switch (instr->op) {
         case SM_STNO:
-            if (last_stno >= 0) fprintf(out, "_pc = %d; continue; ", last_stno + 1);
-            fprintf(out, "case %lld: ", instr->a[0].i);
-            last_stno = instr->a[0].i;
+            fprintf(out, "rt.set_stno(%lld); ", instr->a[0].i);
+            break;
+        case SM_LABEL:
             break;
         case SM_PUSH_LIT_I:
             fprintf(out, "rt.push_int(%lld); ", instr->a[0].i);
@@ -345,18 +346,63 @@ int emit_js_from_sm(SM_Program * sm, FILE * out) {
             break;
         case SM_HALT:
             fprintf(out, "break loop; ");
+            has_continue = 1;
             break;
         case SM_JUMP:
             fprintf(out, "_pc = %lld; continue; ", instr->a[0].i);
+            has_continue = 1;
             break;
         case SM_JUMP_S:
             fprintf(out, "if (rt.last_ok()) _pc = %lld; else _pc = %d; continue; ", instr->a[0].i, i + 1);
+            has_continue = 1;
             break;
         case SM_JUMP_F:
             fprintf(out, "if (!rt.last_ok()) _pc = %lld; else _pc = %d; continue; ", instr->a[0].i, i + 1);
+            has_continue = 1;
+            break;
+        case SM_SUSPEND_VALUE:
+            fprintf(out, "rt.call(\"%s\", %lld); ", instr->a[0].s ? instr->a[0].s : "", instr->a[1].i);
+            fprintf(out, "rt.set_last_ok(!rt._is_fail(rt._peek())); ");
+            break;
+        case SM_CALL_FN:
+            fprintf(out, "rt.call(\"%s\", %lld); ", instr->a[0].s ? instr->a[0].s : "", instr->a[1].i);
+            break;
+        case SM_NRETURN:
+        case SM_NRETURN_F:
+        case SM_FRETURN:
+        case SM_FRETURN_S:
+        case SM_RETURN:
+            fprintf(out, "/* function return stub */ ");
+            break;
+        case SM_EXEC_STMT:
+        case SM_PUSH_EXPRESSION:
+        case SM_PAT_LIT:
+        case SM_PAT_SPAN:
+        case SM_PAT_BREAK:
+        case SM_PAT_ANY:
+        case SM_PAT_NOTANY:
+        case SM_PAT_LEN:
+        case SM_PAT_POS:
+        case SM_PAT_RPOS:
+        case SM_PAT_TAB:
+        case SM_PAT_RTAB:
+        case SM_PAT_REM:
+        case SM_PAT_ARB:
+        case SM_PAT_ARBNO:
+        case SM_PAT_CAT:
+        case SM_PAT_ALT:
+        case SM_PAT_CAPTURE:
+        case SM_PAT_CAPTURE_FN:
+        case SM_PAT_CAPTURE_FN_ARGS:
+        case SM_PAT_USERCALL:
+        case SM_PAT_USERCALL_ARGS:
+            fprintf(out, "rt.call(\"%s\", %lld); rt.set_last_ok(!rt._is_fail(rt._peek())); ", instr->a[0].s ? instr->a[0].s : "", instr->a[1].i);
             break;
         default:
             break;
+        }
+        if (!has_continue) {
+            fprintf(out, "_pc = %d; continue; ", i + 1);
         }
     }
     return 0;
