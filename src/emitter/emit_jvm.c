@@ -618,9 +618,16 @@ static int emit_jvm_generator(IR_t * nd, FILE * out) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_jvm_from_sm(SM_Program * sm, FILE * out) {
     if (!sm || !out) return 0;
+    if (sm->count == 0) {
+        fprintf(out, "    invokestatic rt/SnoRt/halt_tos()V\n");
+        return 0;
+    }
+    fprintf(out, "    ; ── SM Program instructions ──\n");
     for (int i = 0; i < sm->count; i++) {
         SM_Instr * instr = &sm->instrs[i];
         switch (instr->op) {
+        case SM_LABEL:
+            break;
         case SM_STNO:
             jvm_push_int(out, instr->a[0].i);
             fprintf(out, "    i2l\n");
@@ -688,6 +695,20 @@ static int emit_jvm_from_sm(SM_Program * sm, FILE * out) {
         case SM_LCOMP:
             jvm_push_int(out, instr->a[0].i);
             fprintf(out, "    invokestatic rt/SnoRt/lcomp(I)V\n");
+            break;
+        case SM_JUMP:
+            fprintf(out, "    ; SM_JUMP to %lld (not implemented in JVM; would require state machine)\n", instr->a[0].i);
+            break;
+        case SM_JUMP_S:
+            fprintf(out, "    ; SM_JUMP_S to %lld (not implemented in JVM; would require state machine)\n", instr->a[0].i);
+            break;
+        case SM_JUMP_F:
+            fprintf(out, "    ; SM_JUMP_F to %lld (not implemented in JVM; would require state machine)\n", instr->a[0].i);
+            break;
+        case SM_CALL_FN:
+            jvm_emit_ldc_string(out, instr->a[0].s ? instr->a[0].s : "");
+            jvm_push_int(out, instr->a[1].i);
+            fprintf(out, "    invokestatic rt/SnoRt/call(Ljava/lang/String;I)V\n");
             break;
         case SM_HALT:
             fprintf(out, "    invokestatic rt/SnoRt/halt_tos()V\n");

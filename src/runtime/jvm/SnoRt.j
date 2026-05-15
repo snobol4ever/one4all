@@ -75,7 +75,13 @@
 ; pop an Object from TOS (returns null if empty)
 .method private static pop_obj()Ljava/lang/Object;
     .limit stack 2
-    .limit locals 0
+    .limit locals 1
+    getstatic rt/SnoRt/vstack Ljava/util/ArrayDeque;
+    invokevirtual java/util/ArrayDeque/isEmpty()Z
+    ifeq pop_obj_not_empty
+    aconst_null
+    areturn
+pop_obj_not_empty:
     getstatic rt/SnoRt/vstack Ljava/util/ArrayDeque;
     invokevirtual java/util/ArrayDeque/pop()Ljava/lang/Object;
     areturn
