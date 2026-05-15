@@ -163,19 +163,19 @@
   //    concat   pop two strings, concatenate, push result                      
   .method public static void concat() cil managed
   {
-    .maxstack 2
-    .locals init (string V_b, string V_a)
+    .maxstack 3
+    .locals init (string V_0, string V_1)
     ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
     callvirt   instance !0 class [mscorlib]System.Collections.Generic.Stack`1<object>::Pop()
     call       string SnoRt::_obj_to_str(object)
-    stloc      V_b
+    stloc.0
     ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
     callvirt   instance !0 class [mscorlib]System.Collections.Generic.Stack`1<object>::Pop()
     call       string SnoRt::_obj_to_str(object)
-    stloc      V_a
+    stloc.1
     ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
-    ldloc      V_a
-    ldloc      V_b
+    ldloc.1
+    ldloc.0
     call       string [mscorlib]System.String::Concat(string, string)
     callvirt   instance void class [mscorlib]System.Collections.Generic.Stack`1<object>::Push(!0)
     ret
@@ -500,14 +500,19 @@
   //    halt_tos   pop TOS and print to stdout (final OUTPUT)                  
   .method public static void halt_tos() cil managed
   {
-    .maxstack 1
+    .maxstack 2
     .locals init (object V_v)
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    callvirt   instance int32 class [mscorlib]System.Collections.Generic.Stack`1<object>::get_Count()
+    ldc.i4.0
+    ble        HALT_EMPTY
     ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
     callvirt   instance !0 class [mscorlib]System.Collections.Generic.Stack`1<object>::Pop()
     stloc      V_v
     ldloc      V_v
     call       string SnoRt::_obj_to_str(object)
     call       void [mscorlib]System.Console::WriteLine(string)
+  HALT_EMPTY:
     ret
   }
 

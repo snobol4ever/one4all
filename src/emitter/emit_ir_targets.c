@@ -19,7 +19,7 @@ IR_emit_vtable_t g_emit_vtable_x86  = { "x86",  NULL, NULL, stub_prologue, stub_
 /* js: populated by GOAL-SN4-JS-EMIT. */
 IR_emit_vtable_t g_emit_vtable_js   = { "js",   emit_js_scalar, emit_js_generator, emit_js_prologue, emit_js_epilogue };
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* wasm, net, c: future GOALs. wasm vtable is now defined in emit_wasm.c (GOAL-SN4-WASM-EMIT). */
-/* g_emit_vtable_wasm is defined in emit_wasm.c — extern declared in emit_ir.h */
-IR_emit_vtable_t g_emit_vtable_net  = { "net",  NULL, NULL, stub_prologue, stub_epilogue };
+/* wasm, net, c: future GOALs. */
+IR_emit_vtable_t g_emit_vtable_wasm = { "wasm", NULL, NULL, stub_prologue, stub_epilogue };
+/* g_emit_vtable_net defined in emit_net.c */
 IR_emit_vtable_t g_emit_vtable_c    = { "c",    NULL, NULL, stub_prologue, stub_epilogue };
