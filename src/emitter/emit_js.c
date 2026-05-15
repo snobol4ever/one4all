@@ -500,7 +500,6 @@ int emit_js_prologue(IR_block_t * cfg, FILE * out) {
     fprintf(out, "rt._init();\n");
     fprintf(out, "let _pc = 0;\n");
     fprintf(out, "loop: while (true) { switch (_pc) {\n");
-    fprintf(out, "case 0:\n");
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
