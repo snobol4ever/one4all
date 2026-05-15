@@ -3140,7 +3140,10 @@ DESCR_t interp_eval(tree_t *e)
                             memcpy(ns, str, (size_t)slen);
                             ns[0] = c;
                             ns[slen] = '\0';
-                            NV_SET_fn(lv->c[0]->v.sval, STRVAL(ns));
+                            DESCR_t sv = STRVAL(ns);
+                            int _slot = lv->c[0]->_id;
+                            if (_slot >= 0 && _slot < FRAME.env_n) FRAME.env[_slot] = sv;
+                            else NV_SET_fn(lv->c[0]->v.sval, sv);
                         }
                     }
                 }

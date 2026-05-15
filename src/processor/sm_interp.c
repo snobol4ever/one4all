@@ -1050,9 +1050,18 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                         const char *ch = VARVAL_fn(val);
                         char *ns = GC_malloc((size_t)(slen + 1));
                         memcpy(ns, str, (size_t)slen); ns[0] = (ch && *ch) ? ch[0] : '\0'; ns[slen] = '\0';
+                        DESCR_t sv = STRVAL(ns);
                         const char *vname = (varname.v == DT_S && varname.s) ? varname.s : NULL;
-                        if (vname) set_and_trace(vname, STRVAL(ns));
+                        if (vname && icn_frame_env_active()) {
+                            int _sl = scope_get(&FRAME.sc, vname);
+                            if (_sl >= 0) { icn_frame_env_store(_sl, sv); }
+                            else set_and_trace(vname, sv);
+                        } else if (vname) set_and_trace(vname, sv);
                     }
+                } else if (base.v == DT_T && base.tbl) {
+                    for (int _b = 0; _b < TABLE_BUCKETS; _b++)
+                        for (TBPAIR_t *_bp = base.tbl->buckets[_b]; _bp; _bp = _bp->next)
+                            _bp->val = val;
                 }
                 sm_push(st, val);
                 st->last_ok = 1;

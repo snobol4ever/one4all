@@ -280,7 +280,7 @@ DESCR_t bb_eval_value(tree_t *e)
         return r;
     }
     case TT_ASSIGN: {
-        if (e->n < 2) return NULVCL;
+if (e->n < 2) return NULVCL;
         DESCR_t val = bb_eval_value(e->c[1]);
         if (IS_FAIL_fn(val)) return FAILDESCR;
         tree_t *lhs = e->c[0];
@@ -315,12 +315,27 @@ DESCR_t bb_eval_value(tree_t *e)
                 if (cell) *cell = val;
             }
         } else if (lhs && lhs->t == TT_ITERATE && lhs->n >= 1) {
-            DESCR_t cv = bb_eval_value(lhs->c[0]);
+DESCR_t cv = bb_eval_value(lhs->c[0]);
             if (!IS_FAIL_fn(cv)) {
                 if (cv.v == DT_T && cv.tbl) {
                     for (int b = 0; b < TABLE_BUCKETS; b++)
                         for (TBPAIR_t *p = cv.tbl->buckets[b]; p; p = p->next)
                             p->val = val;
+                } else if (IS_STR_fn(cv)) {
+        const char *s = VARVAL_fn(cv);
+                    int slen = s ? (int)strlen(s) : 0;
+                    if (slen > 0) {
+                        const char *ch = VARVAL_fn(val);
+                        char *buf = (char *)GC_malloc((size_t)(slen + 1));
+                        memcpy(buf, s, (size_t)(slen + 1));
+                        buf[0] = (ch && *ch) ? ch[0] : '\0';
+                        tree_t *lv = lhs->c[0];
+                        if (lv && lv->t == TT_VAR) {
+                            DESCR_t sv = STRVAL(buf);
+                            if (lv->_id >= 0 && lv->_id < FRAME.env_n) FRAME.env[lv->_id] = sv;
+                            else if (lv->_id < 0 && lv->v.sval && lv->v.sval[0] != '&') NV_SET_fn(lv->v.sval, sv);
+                        }
+                    }
                 } else if (cv.v == DT_DATA) {
                     DESCR_t tag = FIELD_GET_fn(cv, "icn_type");
                     if (tag.v == DT_S && tag.s && strcmp(tag.s, "list") == 0) {
