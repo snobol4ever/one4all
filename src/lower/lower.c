@@ -453,8 +453,9 @@ static void emit_lhs_store(const tree_t *lhs)
     }
     if (lhs->t == TT_FNC && lhs->v.sval) {
         if (lhs->n == 0) {
-            sm_emit_si(g_p, SM_CALL_FN, "NRETURN_ASGN", 1);
-            g_p->instrs[g_p->count - 1].a[1].s = GC_strdup(lhs->v.sval);
+            char call_fn[256];
+            snprintf(call_fn, sizeof(call_fn), "NRETURN_ASGN_%s", lhs->v.sval ? lhs->v.sval : "");
+            sm_emit_si(g_p, SM_CALL_FN, call_fn, 1);
         } else if (strcasecmp(lhs->v.sval, "ITEM") == 0) {
             for (int i = 0; i < lhs->n; i++) lower_expr(lhs->c[i]);
             sm_emit_si(g_p, SM_CALL_FN, "ITEM_SET", (int64_t)(lhs->n + 1));

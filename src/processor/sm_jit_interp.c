@@ -738,8 +738,8 @@ static void h_call(void)
         }
         PUSH(val); STATE->last_ok = ok; return;
     }
-    if (name && strcmp(name, "NRETURN_ASGN") == 0) {
-        const char *fname = CUR_INS->a[1].s;
+    if (name && strncmp(name, "NRETURN_ASGN_", 13) == 0) {
+        const char *fname = name + 13;
         DESCR_t rhs = POP();
         DESCR_t fres = INVOKE_fn(fname, NULL, 0);
         int ok = 0;
