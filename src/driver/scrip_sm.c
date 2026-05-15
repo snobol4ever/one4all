@@ -56,7 +56,7 @@ SM_Program *sm_preamble(const tree_t *ast_prog){
         fprintf(stderr, "scrip: sm_lower failed\n");
         return NULL;
     }
-    if (lang_mask == (1u << LANG_ICN)) {
+    if (lang_mask & (1u << LANG_ICN)) {
         extern int g_lang;
         g_lang = LANG_ICN;
     }
