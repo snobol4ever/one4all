@@ -1,6 +1,6 @@
 ;; sno_runtime.wat — SNOBOL4 WASM scalar stack-machine runtime
 ;; Implements SM-level operations called from emitted $main functions.
-;; Memory layout (8 pages = 512KB):
+;; Memory layout (32 pages = 2MB):
 ;;   [0x00000..0x0FFFF]  value stack    (16-byte slots, STACK_BASE=0)
 ;;   [0x10000..0x1FFFF]  string heap    (bump alloc, STR_HEAP_BASE=0x10000)
 ;;   [0x20000..0x2FFFF]  variable table (hash table, VAR_BASE=0x20000)
@@ -16,7 +16,7 @@
   (import "host" "write_line" (func $host_write_line (param i32 i32)))
   (import "host" "read_line"  (func $host_read_line  (param i32) (result i32)))
 
-  (memory (export "memory") 16)
+  (memory (export "memory") 32)
 
   ;; constants
   (global $TAG_INT   i32 (i32.const 0))
@@ -30,7 +30,7 @@
 
   ;; mutable globals
   (global $sp       (mut i32) (i32.const 0))        ;; stack pointer (byte offset, STACK_BASE=0)
-  (global $str_ptr  (mut i32) (i32.const 0x40000))  ;; string heap bump ptr (above 0x30000 data)
+  (global $str_ptr  (mut i32) (i32.const 0x60000))  ;; string heap bump ptr (above 0x50000 program data)
   (global $last_ok  (mut i32) (i32.const 1))        ;; last match result
   (global $stno     (mut i32) (i32.const 0))        ;; statement number
   (global $pop_tag  (mut i32) (i32.const 0))        ;; pop result staging
@@ -188,7 +188,7 @@
     (local.set $h (call $var_hash (local.get $name_ptr) (local.get $name_len)))
     (local.set $idx (local.get $h))
     (block $found (loop $probe
-      (local.set $saddr (i32.add (i32.const 0x80000) (i32.mul (local.get $idx) (i32.const 32))))
+      (local.set $saddr (i32.add (i32.const 0xA0000) (i32.mul (local.get $idx) (i32.const 32))))
       (local.set $snl (i32.load (i32.add (local.get $saddr) (i32.const 4))))
       (br_if $found (i32.eqz (local.get $snl)))
       (local.set $snp (i32.load (local.get $saddr)))
@@ -197,13 +197,13 @@
       (local.set $idx (i32.rem_u (i32.add (local.get $idx) (i32.const 1)) (i32.const 512)))
       (br_if $probe (i32.ne (local.get $idx) (local.get $h)))
     ))
-    (i32.add (i32.const 0x80000) (i32.mul (local.get $idx) (i32.const 32)))
+    (i32.add (i32.const 0xA0000) (i32.mul (local.get $idx) (i32.const 32)))
   )
 
   ;; ── exported runtime functions ────────────────────────────────────────────
   (func $sno_init (export "sno_init")
     (global.set $sp (i32.const 0))
-    (global.set $str_ptr (i32.const 0x40000))
+    (global.set $str_ptr (i32.const 0x60000))
     (global.set $last_ok (i32.const 1))
     (global.set $stno (i32.const 0))
   )

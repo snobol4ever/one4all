@@ -17,10 +17,10 @@
 extern SM_Program * sm_preamble(const tree_t * ast_prog);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* String table — deduplicate literal strings into (data ...) segments.
-   Strings are placed starting at STR_DATA_BASE = 0x30000, growing upward.
+   Strings are placed starting at STR_DATA_BASE = 0x50000 (above runtime fixed data at 0x31010).
    We keep a flat list of (sval, address, length) triples. */
 #define STRTAB_MAX 1024
-#define STR_DATA_BASE 0x30000
+#define STR_DATA_BASE 0x50000
 typedef struct { const char * s; int addr; int len; } StrEntry;
 static StrEntry g_strtab[STRTAB_MAX];
 static int g_strtab_n   = 0;
