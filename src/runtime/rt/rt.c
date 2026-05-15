@@ -858,19 +858,21 @@ void rt_call(const char *name, int nargs)
         const char *fname = name + 13;
         DESCR_t rhs = args[0];
         void *cfn = chunk_reg_lookup(fname);
-        DESCR_t fres = call_native_chunk(fname, cfn, NULL, 0);
+        DESCR_t fres = cfn ? call_native_chunk(fname, cfn, NULL, 0) : FAILDESCR;
         int ok = 0;
-        if (IS_NAMEPTR(fres))      { NAME_DEREF_PTR(fres) = rhs; ok = 1; }
-        else if (IS_NAMEVAL(fres)) {
-            char *fn = GC_strdup(fres.s); sno_fold_name(fn);
-            NV_SET_fn(fn, rhs); ok = 1;
-        }
-        else {
-            char setname[256];
-            snprintf(setname, sizeof(setname), "%s_SET", fname ? fname : "");
-            vstack_push(rhs); vstack_push(fres);
-            rt_call(setname, 2);
-            ok = LAST_OK_GET();
+        if (!IS_FAIL_fn(fres)) {
+            if (IS_NAMEPTR(fres))      { NAME_DEREF_PTR(fres) = rhs; ok = 1; }
+            else if (IS_NAMEVAL(fres)) {
+                char *fn = GC_strdup(fres.s); sno_fold_name(fn);
+                NV_SET_fn(fn, rhs); ok = 1;
+            }
+            else {
+                char setname[256];
+                snprintf(setname, sizeof(setname), "%s_SET", fname ? fname : "");
+                vstack_push(rhs); vstack_push(fres);
+                rt_call(setname, 2);
+                ok = LAST_OK_GET();
+            }
         }
         vstack_push(rhs);
         LAST_OK_SET(ok);
