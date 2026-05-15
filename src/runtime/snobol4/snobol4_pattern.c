@@ -428,7 +428,7 @@ DESCR_t subscript_get(DESCR_t arr, DESCR_t idx) {
             DESCR_t ea = FIELD_GET_fn(arr,"frame_elems");
             DESCR_t *elems = (ea.v==DT_DATA) ? (DESCR_t*)ea.ptr : NULL;
             int i = (int)to_int(idx);
-            if (i < 0) i = n + 1 + i + 1;
+            if (i < 0) i = n + i + 1;
             if (!elems || i < 1 || i > n) return FAILDESCR;
             return elems[i-1];
         }
@@ -534,8 +534,8 @@ DESCR_t subscript_get2(DESCR_t arr, DESCR_t i, DESCR_t j) {
         const char *s = arr.s ? arr.s : "";
         int slen = (int)strlen(s);
         int ii = (int)to_int(i), jj = (int)to_int(j);
-        if (ii < 0) ii = slen + 1 + ii + 1;
-        if (jj < 0) jj = slen + 1 + jj + 1;
+        if (ii < 0) ii = slen + 1 + ii;
+        if (jj < 0) jj = slen + 1 + jj;
         if (ii < 1) ii = 1; if (jj > slen+1) jj = slen+1;
         if (ii > jj) { char *e=GC_malloc(1); e[0]='\0'; return STRVAL(e); }
         int len = jj - ii;
