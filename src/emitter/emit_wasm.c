@@ -225,125 +225,113 @@ int emit_wasm_generator(IR_t * nd, FILE * out) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* ── Scalar SM walker ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── */
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* emit_wasm_from_sm: walk SM_Program; emit one WAT case per instruction inside the $main dispatch loop.
-   The loop uses a mutable $pc local + br_table dispatch (one block per instruction, outer loop $dispatch). */
+/* emit_wasm_from_sm: walk SM_Program; emit a flat if-else dispatch loop.
+   Each instruction i is guarded by (if (i32.eq $pc i) ...).
+   This avoids deeply-nested blocks that exceed WASM validator limits.
+   Jump targets set $pc directly and br $lp to re-dispatch. */
 int emit_wasm_from_sm(SM_Program * sm, FILE * out) {
     if (!sm || !out || sm->count == 0) return 0;
     int n = sm->count;
-    /* open nested blocks */
     fprintf(out, "    (block $done\n");
-    fprintf(out, "      (loop $dispatch\n");
-    /* emit br_table targets: one $Ci block per instruction + $done as default */
-    for (int i = n - 1; i >= 0; i--)
-        fprintf(out, "        (block $C%d\n", i);
-    fprintf(out, "          (local.get $pc)\n");
-    /* br_table: index 0→$C0, 1→$C1, ..., n-1→$C(n-1), default→$done */
-    fprintf(out, "          (br_table");
-    for (int i = 0; i < n; i++) fprintf(out, " $C%d", i);
-    fprintf(out, " $done)\n");
-    /* close the innermost block immediately after br_table — br_table is a terminator */
-    /* Each case is: close its block, emit code, set $pc to next, br $dispatch */
+    fprintf(out, "      (loop $lp\n");
     for (int i = 0; i < n; i++) {
-        fprintf(out, "        ) ;; end $C%d\n", i);
         SM_Instr * ins = &sm->instrs[i];
         int has_jump = 0;
+        /* guard: only execute instruction i when $pc == i */
+        fprintf(out, "        (if (i32.eq (local.get $pc) (i32.const %d)) (then\n", i);
         switch (ins->op) {
         case SM_STNO:
-            fprintf(out, "        (call $sno_set_stno (i32.const %lld))\n", ins->a[0].i);
+            fprintf(out, "          (call $sno_set_stno (i32.const %lld))\n", ins->a[0].i);
             break;
         case SM_LABEL:
             break;
         case SM_PUSH_LIT_I:
-            fprintf(out, "        (call $sno_push_int (i32.const %lld))\n", ins->a[0].i);
+            fprintf(out, "          (call $sno_push_int (i32.const %lld))\n", ins->a[0].i);
             break;
         case SM_PUSH_LIT_S: {
             int addr = intern_str(ins->a[0].s);
             int len  = ins->a[0].s ? (int)strlen(ins->a[0].s) : 0;
-            fprintf(out, "        (call $sno_push_str (i32.const 0x%x) (i32.const %d))\n", addr, len);
+            fprintf(out, "          (call $sno_push_str (i32.const 0x%x) (i32.const %d))\n", addr, len);
+            break;
+        }
+        case SM_PUSH_LIT_CS: {
+            int addr = intern_str(ins->a[0].s);
+            int len  = ins->a[0].s ? (int)strlen(ins->a[0].s) : 0;
+            fprintf(out, "          (call $sno_push_str (i32.const 0x%x) (i32.const %d))\n", addr, len);
             break;
         }
         case SM_PUSH_LIT_F:
-            fprintf(out, "        (call $sno_push_real (f64.const %.17g))\n", ins->a[0].f);
+            fprintf(out, "          (call $sno_push_real (f64.const %.17g))\n", ins->a[0].f);
             break;
         case SM_PUSH_NULL:
         case SM_PUSH_NULL_NOFLIP:
-            fprintf(out, "        (call $sno_push_null)\n");
+            fprintf(out, "          (call $sno_push_null)\n");
             break;
         case SM_PUSH_VAR: {
             int addr = intern_str(ins->a[0].s);
             int len  = ins->a[0].s ? (int)strlen(ins->a[0].s) : 0;
-            fprintf(out, "        (call $sno_push_var (i32.const 0x%x) (i32.const %d))\n", addr, len);
+            fprintf(out, "          (call $sno_push_var (i32.const 0x%x) (i32.const %d))\n", addr, len);
             break;
         }
         case SM_STORE_VAR: {
             int addr = intern_str(ins->a[0].s);
             int len  = ins->a[0].s ? (int)strlen(ins->a[0].s) : 0;
-            fprintf(out, "        (call $sno_store_var (i32.const 0x%x) (i32.const %d))\n", addr, len);
+            fprintf(out, "          (call $sno_store_var (i32.const 0x%x) (i32.const %d))\n", addr, len);
             break;
         }
         case SM_VOID_POP:
-            fprintf(out, "        (call $sno_pop_void)\n");
+            fprintf(out, "          (call $sno_pop_void)\n");
             break;
         case SM_CONCAT:
-            fprintf(out, "        (call $sno_concat)\n");
+            fprintf(out, "          (call $sno_concat)\n");
             break;
         case SM_NEG:
-            fprintf(out, "        (call $sno_neg)\n");
+            fprintf(out, "          (call $sno_neg)\n");
             break;
         case SM_COERCE_NUM:
-            fprintf(out, "        (call $sno_coerce_num)\n");
+            fprintf(out, "          (call $sno_coerce_num)\n");
             break;
         case SM_EXP:
-            fprintf(out, "        (call $sno_exp_op)\n");
+            fprintf(out, "          (call $sno_exp_op)\n");
             break;
-        case SM_ADD:
-            fprintf(out, "        (call $sno_arith (i32.const 0))\n");
-            break;
-        case SM_SUB:
-            fprintf(out, "        (call $sno_arith (i32.const 1))\n");
-            break;
-        case SM_MUL:
-            fprintf(out, "        (call $sno_arith (i32.const 2))\n");
-            break;
-        case SM_DIV:
-            fprintf(out, "        (call $sno_arith (i32.const 3))\n");
-            break;
-        case SM_MOD:
-            fprintf(out, "        (call $sno_arith (i32.const 4))\n");
-            break;
+        case SM_ADD:  fprintf(out, "          (call $sno_arith (i32.const 0))\n"); break;
+        case SM_SUB:  fprintf(out, "          (call $sno_arith (i32.const 1))\n"); break;
+        case SM_MUL:  fprintf(out, "          (call $sno_arith (i32.const 2))\n"); break;
+        case SM_DIV:  fprintf(out, "          (call $sno_arith (i32.const 3))\n"); break;
+        case SM_MOD:  fprintf(out, "          (call $sno_arith (i32.const 4))\n"); break;
         case SM_LCOMP:
-            fprintf(out, "        (call $sno_lcomp (i32.const %lld))\n", ins->a[0].i);
+            fprintf(out, "          (call $sno_lcomp (i32.const %lld))\n", ins->a[0].i);
             break;
         case SM_ACOMP:
-            fprintf(out, "        (call $sno_acomp (i32.const %lld))\n", ins->a[0].i);
+            fprintf(out, "          (call $sno_acomp (i32.const %lld))\n", ins->a[0].i);
             break;
         case SM_HALT:
-            fprintf(out, "        (call $sno_halt_tos)\n");
-            fprintf(out, "        (br $done)\n");
+            fprintf(out, "          (call $sno_halt_tos)\n");
+            fprintf(out, "          (br $done)\n");
             has_jump = 1;
             break;
         case SM_JUMP:
-            fprintf(out, "        (i32.const %lld) (local.set $pc) (br $dispatch)\n", ins->a[0].i);
+            fprintf(out, "          (i32.const %lld) (local.set $pc) (br $lp)\n", ins->a[0].i);
             has_jump = 1;
             break;
         case SM_JUMP_S:
-            fprintf(out, "        (if (call $sno_last_ok)\n");
-            fprintf(out, "          (then (i32.const %lld) (local.set $pc))\n", ins->a[0].i);
-            fprintf(out, "          (else (i32.const %d) (local.set $pc)))\n", i + 1);
-            fprintf(out, "        (br $dispatch)\n");
+            fprintf(out, "          (if (call $sno_last_ok)\n");
+            fprintf(out, "            (then (i32.const %lld) (local.set $pc))\n", ins->a[0].i);
+            fprintf(out, "            (else (i32.const %d)   (local.set $pc)))\n", i + 1);
+            fprintf(out, "          (br $lp)\n");
             has_jump = 1;
             break;
         case SM_JUMP_F:
-            fprintf(out, "        (if (i32.eqz (call $sno_last_ok))\n");
-            fprintf(out, "          (then (i32.const %lld) (local.set $pc))\n", ins->a[0].i);
-            fprintf(out, "          (else (i32.const %d) (local.set $pc)))\n", i + 1);
-            fprintf(out, "        (br $dispatch)\n");
+            fprintf(out, "          (if (i32.eqz (call $sno_last_ok))\n");
+            fprintf(out, "            (then (i32.const %lld) (local.set $pc))\n", ins->a[0].i);
+            fprintf(out, "            (else (i32.const %d)   (local.set $pc)))\n", i + 1);
+            fprintf(out, "          (br $lp)\n");
             has_jump = 1;
             break;
         case SM_CALL_FN: {
             int addr = intern_str(ins->a[0].s);
             int len  = ins->a[0].s ? (int)strlen(ins->a[0].s) : 0;
-            fprintf(out, "        (call $sno_call (i32.const 0x%x) (i32.const %d) (i32.const %lld))\n",
+            fprintf(out, "          (call $sno_call (i32.const 0x%x) (i32.const %d) (i32.const %lld))\n",
                     addr, len, ins->a[1].i);
             break;
         }
@@ -356,23 +344,28 @@ int emit_wasm_from_sm(SM_Program * sm, FILE * out) {
         case SM_FRETURN_F:
         case SM_NRETURN_S:
         case SM_NRETURN_F:
-            fprintf(out, "        (call $sno_do_return (i32.const 0) (i32.const 0))\n");
+            fprintf(out, "          (call $sno_do_return (i32.const 0) (i32.const 0))\n");
+            break;
+        case SM_INCR:
+        case SM_DECR:
+            fprintf(out, "          (call $sno_arith (i32.const %d))\n", ins->op == SM_INCR ? 0 : 1);
             break;
         default:
-            fprintf(out, "        ;; unhandled SM opcode %d\n", ins->op);
+            fprintf(out, "          ;; unhandled SM opcode %d\n", ins->op);
             break;
         }
-        if (!has_jump && i < n - 1) {
-            fprintf(out, "        (i32.const %d) (local.set $pc) (br $dispatch)\n", i + 1);
-        } else if (!has_jump) {
-            fprintf(out, "        (br $done)\n");
+        if (!has_jump) {
+            fprintf(out, "          (i32.const %d) (local.set $pc) (br $lp)\n", i + 1);
         }
+        fprintf(out, "        ))\n");  /* close (if ...) (then ...) */
     }
-    /* close all open $C blocks that haven't been closed yet (none — all closed above) */
-    fprintf(out, "      ) ;; end loop $dispatch\n");
+    /* If $pc falls off end (no instruction matched), exit */
+    fprintf(out, "        (br $done)\n");
+    fprintf(out, "      ) ;; end loop $lp\n");
     fprintf(out, "    ) ;; end block $done\n");
     return 0;
 }
+
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* emit_wasm_prologue: emit WAT module header, imports, and open $main. */
 static int emit_wasm_prologue(FILE * out, SM_Program * sm) {

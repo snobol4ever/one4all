@@ -16,7 +16,7 @@
   (import "host" "write_line" (func $host_write_line (param i32 i32)))
   (import "host" "read_line"  (func $host_read_line  (param i32) (result i32)))
 
-  (memory (export "memory") 8)
+  (memory (export "memory") 16)
 
   ;; constants
   (global $TAG_INT   i32 (i32.const 0))
@@ -25,12 +25,12 @@
   (global $TAG_NULL  i32 (i32.const 3))
   (global $TAG_FAIL  i32 (i32.const 4))
   (global $SLOT      i32 (i32.const 16))
-  (global $VAR_SLOTS i32 (i32.const 256))
+  (global $VAR_SLOTS i32 (i32.const 512))
   (global $VAR_SZ    i32 (i32.const 32))
 
   ;; mutable globals
   (global $sp       (mut i32) (i32.const 0))        ;; stack pointer (byte offset, STACK_BASE=0)
-  (global $str_ptr  (mut i32) (i32.const 0x10000))  ;; string heap bump ptr
+  (global $str_ptr  (mut i32) (i32.const 0x40000))  ;; string heap bump ptr (above 0x30000 data)
   (global $last_ok  (mut i32) (i32.const 1))        ;; last match result
   (global $stno     (mut i32) (i32.const 0))        ;; statement number
   (global $pop_tag  (mut i32) (i32.const 0))        ;; pop result staging
@@ -180,7 +180,7 @@
       (local.set $i (i32.add (local.get $i) (i32.const 1)))
       (br $L)
     ))
-    (i32.rem_u (i32.and (local.get $h) (i32.const 0x7fffffff)) (i32.const 256))
+    (i32.rem_u (i32.and (local.get $h) (i32.const 0x7fffffff)) (i32.const 512))
   )
 
   (func $var_slot_addr (param $name_ptr i32) (param $name_len i32) (result i32)
@@ -188,22 +188,22 @@
     (local.set $h (call $var_hash (local.get $name_ptr) (local.get $name_len)))
     (local.set $idx (local.get $h))
     (block $found (loop $probe
-      (local.set $saddr (i32.add (i32.const 0x20000) (i32.mul (local.get $idx) (i32.const 32))))
+      (local.set $saddr (i32.add (i32.const 0x80000) (i32.mul (local.get $idx) (i32.const 32))))
       (local.set $snl (i32.load (i32.add (local.get $saddr) (i32.const 4))))
       (br_if $found (i32.eqz (local.get $snl)))
       (local.set $snp (i32.load (local.get $saddr)))
       (br_if $found (call $str_eq
         (local.get $name_ptr) (local.get $name_len) (local.get $snp) (local.get $snl)))
-      (local.set $idx (i32.rem_u (i32.add (local.get $idx) (i32.const 1)) (i32.const 256)))
+      (local.set $idx (i32.rem_u (i32.add (local.get $idx) (i32.const 1)) (i32.const 512)))
       (br_if $probe (i32.ne (local.get $idx) (local.get $h)))
     ))
-    (i32.add (i32.const 0x20000) (i32.mul (local.get $idx) (i32.const 32)))
+    (i32.add (i32.const 0x80000) (i32.mul (local.get $idx) (i32.const 32)))
   )
 
   ;; ── exported runtime functions ────────────────────────────────────────────
   (func $sno_init (export "sno_init")
     (global.set $sp (i32.const 0))
-    (global.set $str_ptr (i32.const 0x10000))
+    (global.set $str_ptr (i32.const 0x40000))
     (global.set $last_ok (i32.const 1))
     (global.set $stno (i32.const 0))
   )
