@@ -954,6 +954,10 @@ void rt_concat(void)
     LAST_OK_SET((result.v != DT_FAIL));
 }
 
+void rt_set_stno(int64_t stno)
+{
+    kw_stno = stno;
+}
 void rt_push_null(void)
 {
     /* SM_PUSH_NULL: push null (empty-string) descriptor; null is non-fail. */

@@ -228,7 +228,18 @@ void emit_sm_jump_f(int pc)
   bb_label_t t; make_pc_label(&t,pc); emit_jmp(&t,JMP_JE); }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void  emit_sm_label()                                       { emit_seq_noop_macro("LABEL"); }
-void  emit_sm_stno (int stno, int lineno, const char *src)  { emit_text_stno_banner(stno,lineno,src); emit_seq_noop_macro("STNO"); }
+void  emit_sm_stno (int stno, int lineno, const char *src)
+{
+    emit_text_stno_banner(stno, lineno, src);
+    if (IS_TEXT) {
+        char movarg[32]; snprintf(movarg, sizeof(movarg), "edi, %d", stno);
+        emit_text_3col(emit_outf(), "", "mov", movarg);
+        emit_text_3col(emit_outf(), "", "call", "rt_set_stno@PLT");
+    } else {
+        insn_mov_edi_i32((uint32_t)(int32_t)stno);
+        emit_call_sym_plt("rt_set_stno", (uint64_t)(uintptr_t)rt_set_stno);
+    }
+}
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_push_lit_i(int64_t val)
 {

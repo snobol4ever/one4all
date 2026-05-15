@@ -206,6 +206,7 @@ void rt_match_variant(const char *subj_name, int has_repl);
 void rt_concat(void);
 
 /* SM_PUSH_NULL: push null (empty-string) descriptor, set last_ok=1. */
+void rt_set_stno(int64_t stno);
 void rt_push_null(void);
 
 /* SM_COERCE_NUM: pop TOS, coerce string→int/real if needed, push result. */
