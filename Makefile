@@ -78,6 +78,7 @@ RT_PIC_SRCS := \
     $(SRC)/emitter/emit_core.c \
     $(SRC)/emitter/emit_bb.c \
     $(SRC)/emitter/emit_sm.c \
+    $(SRC)/emitter/emit_ir.c \
     \
     $(SRC)/processor/bb_boxes.c \
     $(SRC)/processor/bb_broker.c \
