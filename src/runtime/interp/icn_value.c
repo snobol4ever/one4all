@@ -453,7 +453,10 @@ DESCR_t cv = bb_eval_value(lhs->c[0]);
         for (int i = 0; i < proc_count; i++) {
             if (strcmp(proc_table[i].name, fn) != 0) continue;
             DESCR_t *args = nargs > 0 ? GC_malloc((size_t)nargs * sizeof(DESCR_t)) : NULL;
-            for (int j = 0; j < nargs; j++) args[j] = bb_eval_value(e->c[1+j]);
+            for (int j = 0; j < nargs; j++) {
+                args[j] = bb_eval_value(e->c[1+j]);
+                if (IS_FAIL_fn(args[j])) return FAILDESCR;
+            }
             DESCR_t result = proc_table_call(i, args, nargs);
             return result;
         }

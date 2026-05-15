@@ -1441,7 +1441,16 @@ bb_node_t icn_bb_build(tree_t *e) {
                 }
             }
             DESCR_t *args = nargs > 0 ? calloc(nargs, sizeof(DESCR_t)) : NULL;
-            for (int j = 0; j < nargs; j++) args[j] = bb_eval_value(e->c[1+j]);
+            int arg_failed = 0;
+            for (int j = 0; j < nargs; j++) {
+                args[j] = bb_eval_value(e->c[1+j]);
+                if (IS_FAIL_fn(args[j])) { arg_failed = 1; break; }
+            }
+            if (arg_failed) {
+                icn_bb_oneshot_state_t *oshot_fail = calloc(1, sizeof(*oshot_fail));
+                oshot_fail->val = FAILDESCR;
+                return (bb_node_t){ icn_bb_oneshot, oshot_fail, 0 };
+            }
             if (proc_has_suspend(proc_table[i].proc) && proc_table[i].entry_pc >= 0 && g_current_sm_prog) {
                 GeneratorState *pgs = generator_state_new_proc(i, args, nargs);
                 if (pgs) {
