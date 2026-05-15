@@ -482,6 +482,15 @@ static void emit_lhs_store(const tree_t *lhs)
             sm_emit(g_p, SM_PUSH_NULL);
         sm_emit_si(g_p, SM_CALL_FN, "ICN_ITERATE_FIRST_SET", 3); return;
     }
+    if ((lhs->t == TT_SECTION || lhs->t == TT_SECTION_PLUS || lhs->t == TT_SECTION_MINUS) && lhs->n >= 3) {
+        const char *fn = (lhs->t == TT_SECTION) ? "ICN_SECTION_RANGE_SET"
+                       : (lhs->t == TT_SECTION_PLUS) ? "ICN_SECTION_PLUS_SET" : "ICN_SECTION_MINUS_SET";
+        for (int i = 0; i < lhs->n; i++) lower_expr(lhs->c[i]);
+        tree_t *_sb = lhs->c[0];
+        if (_sb && _sb->t == TT_VAR && _sb->v.sval) sm_emit_s(g_p, SM_PUSH_LIT_S, _sb->v.sval);
+        else sm_emit(g_p, SM_PUSH_NULL);
+        sm_emit_si(g_p, SM_CALL_FN, fn, (int64_t)(lhs->n + 2)); return;
+    }
     lower_expr(lhs);
     sm_emit_si(g_p, SM_CALL_FN, "ASGN", 2);
 }

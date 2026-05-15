@@ -1150,6 +1150,53 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 sm_push(st, r); st->last_ok = 1;
                 break;
             }
+            if (name && (strcmp(name, "ICN_SECTION_RANGE_SET") == 0 ||
+                         strcmp(name, "ICN_SECTION_PLUS_SET")  == 0 ||
+                         strcmp(name, "ICN_SECTION_MINUS_SET") == 0)) {
+                DESCR_t hi_d = sm_pop(st); DESCR_t lo_d = sm_pop(st);
+                DESCR_t base = sm_pop(st); DESCR_t val  = sm_pop(st);
+                if (IS_FAIL_fn(base) || IS_FAIL_fn(lo_d) || IS_FAIL_fn(hi_d)) {
+                    sm_push(st, FAILDESCR); st->last_ok = 0; break;
+                }
+                if (base.v != DT_S && base.v != DT_SNUL) { sm_push(st, FAILDESCR); st->last_ok = 0; break; }
+                const char *s = base.s ? base.s : "";
+                int slen = (int)strlen(s);
+                int i = (int)to_int(lo_d), x = (int)to_int(hi_d);
+                if (i == 0) i = slen + 1; else if (i < 0) i = slen + 1 + i;
+                int lo, hi;
+                if (strcmp(name, "ICN_SECTION_RANGE_SET") == 0) {
+                    if (x == 0) x = slen + 1; else if (x < 0) x = slen + 1 + x;
+                    if (i < 1 || i > slen+1 || x < 1 || x > slen+1) { sm_push(st, FAILDESCR); st->last_ok = 0; break; }
+                    lo = i < x ? i : x; hi = i < x ? x : i;
+                } else if (strcmp(name, "ICN_SECTION_PLUS_SET") == 0) {
+                    if (i < 1 || i > slen+1) { sm_push(st, FAILDESCR); st->last_ok = 0; break; }
+                    if (x >= 0) { lo = i; hi = i + x; } else { lo = i + x; hi = i; }
+                    if (lo < 1 || hi > slen+1) { sm_push(st, FAILDESCR); st->last_ok = 0; break; }
+                } else {
+                    if (i < 1 || i > slen+1) { sm_push(st, FAILDESCR); st->last_ok = 0; break; }
+                    if (x >= 0) { lo = i - x; hi = i; } else { lo = i; hi = i - x; }
+                    if (lo < 1 || hi > slen+1) { sm_push(st, FAILDESCR); st->last_ok = 0; break; }
+                }
+                const char *vs = VARVAL_fn(val); if (!vs) vs = "";
+                int vlen = (int)strlen(vs);
+                int prefix = lo - 1, suffix = slen - (hi - 1);
+                int newlen = prefix + vlen + suffix;
+                char *buf = GC_malloc(newlen + 1);
+                if (prefix > 0) memcpy(buf, s, prefix);
+                if (vlen > 0)   memcpy(buf + prefix, vs, vlen);
+                if (suffix > 0) memcpy(buf + prefix + vlen, s + hi - 1, suffix);
+                buf[newlen] = ' ';
+                DESCR_t sv = STRVAL(buf);
+                DESCR_t varname = sm_pop(st);
+                const char *vname = (varname.v == DT_S && varname.s) ? varname.s : NULL;
+                if (vname && icn_frame_env_active()) {
+                    int _sl = scope_get(&FRAME.sc, vname);
+                    if (_sl >= 0) icn_frame_env_store(_sl, sv);
+                    else set_and_trace(vname, sv);
+                } else if (vname) set_and_trace(vname, sv);
+                sm_push(st, sv); st->last_ok = 1;
+                break;
+            }
             DESCR_t args[32];
             for (int k = nargs - 1; k >= 0; k--)
                 args[k] = sm_pop(st);

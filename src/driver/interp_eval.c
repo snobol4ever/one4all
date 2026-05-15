@@ -95,6 +95,7 @@ DESCR_t *data_field_ptr(const char *fname, DESCR_t inst) {
             return &inst.u->fields[i];
     return NULL;
 }
+#include "../runtime/interp/icn_runtime.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int icn_string_section_assign(tree_t *lhs, DESCR_t val) {
     if (!lhs) return 0;
@@ -103,10 +104,22 @@ int icn_string_section_assign(tree_t *lhs, DESCR_t val) {
         kind != TT_SECTION_MINUS && kind != TT_IDX) return 0;
     if (lhs->n < 2) return 0;
     if (kind == TT_SECTION && lhs->n < 3) return 0;
+    extern int     icn_frame_env_active(void);
+    extern DESCR_t icn_frame_env_load(int slot);
+    extern void    icn_frame_env_store(int slot, DESCR_t val);
     tree_t *bch = lhs->c[0];
     DESCR_t *cell = NULL;
-    if (bch && bch->t == TT_VAR && frame_depth > 0) {
-        int sl = (int)bch->v.ival;
+    DESCR_t _icn_base_storage;
+    int _icn_bb_var_slot = -1;
+    if (bch && bch->t == TT_VAR && g_lang == LANG_ICN && icn_frame_env_active()) {
+        _icn_bb_var_slot = (bch->v.sval) ? scope_get(&FRAME.sc, bch->v.sval) : -1;
+        if (_icn_bb_var_slot >= 0) {
+            _icn_base_storage = icn_frame_env_load(_icn_bb_var_slot);
+            cell = &_icn_base_storage;
+        }
+    }
+    if (!cell && bch && bch->t == TT_VAR && frame_depth > 0) {
+        int sl = bch->_id;
         if (sl >= 0 && sl < FRAME.env_n) cell = &FRAME.env[sl];
     }
     if (!cell) cell = interp_eval_ref(bch);
@@ -120,30 +133,35 @@ int icn_string_section_assign(tree_t *lhs, DESCR_t val) {
     int slen = (int)strlen(s);
     int lo = 0, hi = 0;
     if (kind == TT_SECTION) {
-        int i = (int)to_int(interp_eval(lhs->c[1]));
-        int j = (int)to_int(interp_eval(lhs->c[2]));
+        DESCR_t _i1=(g_lang==LANG_ICN)?bb_eval_value(lhs->c[1]):interp_eval(lhs->c[1]);
+        DESCR_t _i2=(g_lang==LANG_ICN)?bb_eval_value(lhs->c[2]):interp_eval(lhs->c[2]);
+        int i=(int)to_int(_i1), j=(int)to_int(_i2);
         if (i == 0) i = slen + 1; else if (i < 0) i = slen + 1 + i;
         if (j == 0) j = slen + 1; else if (j < 0) j = slen + 1 + j;
         if (i < 1 || i > slen+1 || j < 1 || j > slen+1) return 0;
         lo = i < j ? i : j; hi = i < j ? j : i;
     } else if (kind == TT_SECTION_PLUS) {
-        int i = (int)to_int(interp_eval(lhs->c[1]));
-        int n = (int)to_int(interp_eval(lhs->c[2]));
+        DESCR_t _sp1=(g_lang==LANG_ICN)?bb_eval_value(lhs->c[1]):interp_eval(lhs->c[1]);
+        DESCR_t _sp2=(g_lang==LANG_ICN)?bb_eval_value(lhs->c[2]):interp_eval(lhs->c[2]);
+        int i=(int)to_int(_sp1), n=(int)to_int(_sp2);
         if (i == 0) i = slen + 1; else if (i < 0) i = slen + 1 + i;
         if (i < 1 || i > slen+1) return 0;
         if (n < 0) return 0;
         if (i + n > slen + 1) return 0;
         lo = i; hi = i + n;
     } else if (kind == TT_SECTION_MINUS) {
-        int i = (int)to_int(interp_eval(lhs->c[1]));
-        int n = (int)to_int(interp_eval(lhs->c[2]));
+        DESCR_t _sm1=(g_lang==LANG_ICN)?bb_eval_value(lhs->c[1]):interp_eval(lhs->c[1]);
+        DESCR_t _sm2=(g_lang==LANG_ICN)?bb_eval_value(lhs->c[2]):interp_eval(lhs->c[2]);
+        int i=(int)to_int(_sm1), n=(int)to_int(_sm2);
         if (i == 0) i = slen + 1; else if (i < 0) i = slen + 1 + i;
         if (i < 1 || i > slen+1) return 0;
         if (n < 0) return 0;
         if (i - n < 1) return 0;
         lo = i - n; hi = i;
     } else {
-        int i = (int)to_int(interp_eval(lhs->c[1]));
+        extern DESCR_t bb_eval_value(tree_t *e);
+        DESCR_t _idx_d = (g_lang == LANG_ICN) ? bb_eval_value(lhs->c[1]) : interp_eval(lhs->c[1]);
+        int i = (int)to_int(_idx_d);
         if (i == 0) return 0;
         if (i < 0) i = slen + 1 + i;
         if (i < 1 || i > slen) return 0;
@@ -160,17 +178,18 @@ int icn_string_section_assign(tree_t *lhs, DESCR_t val) {
     if (suffix > 0) memcpy(buf + prefix + vlen, s + hi - 1, (size_t)suffix);
     buf[newlen] = '\0';
     tree_t *base_expr = lhs->c[0];
-    if (base_expr && base_expr->t == TT_VAR && base_expr->v.sval &&
-        base_expr->v.sval[0] != '&' &&
-        !(frame_depth > 0 && base_expr->v.ival >= 0 && base_expr->v.ival < FRAME.env_n))
-    {
+    if (_icn_bb_var_slot >= 0) {
+        icn_frame_env_store(_icn_bb_var_slot, STRVAL(buf));
+    } else if (base_expr && base_expr->t == TT_VAR && base_expr->v.sval &&
+               base_expr->v.sval[0] != '&' &&
+               !(frame_depth > 0 && base_expr->_id >= 0 && base_expr->_id < FRAME.env_n)) {
         set_and_trace(base_expr->v.sval, STRVAL(buf));
     } else {
         *cell = STRVAL(buf);
     }
     return 1;
 }
-#include "../runtime/interp/icn_runtime.h"
+
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 const char *real_str(double r, char *buf, int bufsz) {
     for (int p = 15; p <= 17; p++) {
