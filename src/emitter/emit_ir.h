@@ -5,21 +5,24 @@
 #include "scrip_ir.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* emit_ir_block — single entry point for all IR_t-based emitters.
-   cfg:    IR_block_t produced by IR_alloc / IR_lower_pat (the DCG).
-   out:    destination FILE* for text output.
-   target: one of "x86", "jvm", "js", "wasm", "net", "c".
+   cfg: IR_block_t from lower. out: destination FILE*. target: "x86","jvm","js","wasm","net","c".
    Returns 0 on success, non-zero on error. */
-int emit_ir_block(IR_block_t * cfg, FILE * out, const char * target);
+int  emit_ir_block(IR_block_t * cfg, FILE * out, const char * target);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* ir_node_id — stable integer identity for a DCG node.
-   Uses pointer address mod 100000 as surrogate (IR_t has no id field). */
-int ir_node_id(IR_t * nd);
+/* ir_node_id — stable integer identity for a DCG node (pointer mod 100000). */
+int  ir_node_id(IR_t * nd);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* Per-target stubs — each target implements its own file; stubs return 0. */
-int emit_ir_block_jvm(IR_block_t * cfg, FILE * out);
-int emit_ir_block_js (IR_block_t * cfg, FILE * out);
-int emit_ir_block_x86(IR_block_t * cfg, FILE * out);
-int emit_ir_block_net(IR_block_t * cfg, FILE * out);
+/* ir_is_generator — 1 for all generator node kinds (IR_PAT_*, IR_ICN_*, IR_PL_*, IR_SCAN etc), 0 for scalar. */
+int  ir_is_generator(IR_e k);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* ir_walk — DFS pre-order over all reachable IR_t nodes from cfg->entry, visiting each exactly once. */
+void ir_walk(IR_block_t * cfg, void (*visit)(IR_t * nd, void * ctx), void * ctx);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* Per-target entry points — x86 wraps sm_codegen_text; jvm/js are stubs until their GOALs complete. */
+int emit_ir_block_jvm (IR_block_t * cfg, FILE * out);
+int emit_ir_block_js  (IR_block_t * cfg, FILE * out);
+int emit_ir_block_x86 (IR_block_t * cfg, FILE * out);
+int emit_ir_block_net (IR_block_t * cfg, FILE * out);
 int emit_ir_block_wasm(IR_block_t * cfg, FILE * out);
-int emit_ir_block_c  (IR_block_t * cfg, FILE * out);
+int emit_ir_block_c   (IR_block_t * cfg, FILE * out);
 #endif
