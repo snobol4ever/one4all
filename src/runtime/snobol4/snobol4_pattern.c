@@ -530,6 +530,31 @@ int subscript_set(DESCR_t arr, DESCR_t idx, DESCR_t val) {
 DESCR_t subscript_get2(DESCR_t arr, DESCR_t i, DESCR_t j) {
     if (arr.v == DT_A)
         return array_get2(arr.arr, (int)to_int(i), (int)to_int(j));
+    if (arr.v == DT_DATA) {
+        DESCR_t tag = FIELD_GET_fn(arr, "icn_type");
+        if (tag.v == DT_S && tag.s && strcmp(tag.s,"list")==0) {
+            int n = (int)FIELD_GET_fn(arr,"frame_size").i;
+            DESCR_t ea = FIELD_GET_fn(arr,"frame_elems");
+            DESCR_t *elems = (ea.v==DT_DATA) ? (DESCR_t*)ea.ptr : NULL;
+            int ii = (int)to_int(i), jj = (int)to_int(j);
+            if (ii < 0) ii = n + 1 + ii + 1;
+            if (jj < 0) jj = n + 1 + jj + 1;
+            if (ii < 1) ii = 1; if (jj > n) jj = n;
+            if (ii > jj) {
+                static int icnlist_empty_reg = 0;
+                if (!icnlist_empty_reg) { DEFDAT_fn("icnlist(frame_elems,frame_size,icn_type)"); icnlist_empty_reg=1; }
+                DESCR_t empty_ptr; empty_ptr.v=DT_DATA; empty_ptr.slen=0; empty_ptr.ptr=NULL;
+                return DATCON_fn("icnlist", empty_ptr, INTVAL(0), STRVAL("list"));
+            }
+            int rlen = jj - ii + 1;
+            DESCR_t *rbuf = GC_malloc(rlen * sizeof(DESCR_t));
+            for (int k = 0; k < rlen; k++) rbuf[k] = (elems && ii+k-1 >= 0 && ii+k-1 < n) ? elems[ii+k-1] : NULVCL;
+            DESCR_t rptr; rptr.v=DT_DATA; rptr.slen=0; rptr.ptr=(void*)rbuf;
+            static int icnlist_slice_reg = 0;
+            if (!icnlist_slice_reg) { DEFDAT_fn("icnlist(frame_elems,frame_size,icn_type)"); icnlist_slice_reg=1; }
+            return DATCON_fn("icnlist", rptr, INTVAL(rlen), STRVAL("list"));
+        }
+    }
     if (arr.v == DT_S || arr.v == DT_SNUL) {
         const char *s = arr.s ? arr.s : "";
         int slen = (int)strlen(s);
