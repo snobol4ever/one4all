@@ -318,6 +318,159 @@ function _match_anchored(subject, pat_node) {
 }
 
 /* -----------------------------------------------------------------------
+ * Stack machine state (for scalar IR emission — SJ4-JS-2)
+ * ----------------------------------------------------------------------- */
+
+let _stack = [];              /* Value stack for scalar operations */
+let _last_ok = true;          /* Last pattern match success flag */
+let _stno = 0;                /* Statement number for debugging */
+
+function _init() {
+    _stack = [];
+    _last_ok = true;
+    _stno = 0;
+}
+
+function _finalize() {
+    _stack = [];
+    _last_ok = true;
+}
+
+/* Stack operations */
+function push_int(n)         { _stack.push(n); }
+function push_str(s, len)    { _stack.push(_str(s)); }
+function push_real_bits(bits){ _stack.push(_mkreal(bits)); }
+function push_null()         { _stack.push(null); }
+function push_var(name)      { _stack.push(_vars[name]); }
+function pop_void()          { _stack.pop(); }
+
+function store_var(name) {
+    const v = _stack[_stack.length - 1];
+    _vars[name] = v;
+}
+
+function concat() {
+    if (_stack.length < 2) throw new Error('SNOBOL4: concat underflow');
+    const b = _stack.pop();
+    const a = _stack.pop();
+    _stack.push(_cat(a, b));
+}
+
+function neg() {
+    const v = _stack.pop();
+    _stack.push(_num(v) * -1);
+}
+
+function exp_op() {
+    const e = _stack.pop();
+    const b = _stack.pop();
+    _stack.push(_pow(b, e));
+}
+
+function coerce_num() {
+    const v = _stack.pop();
+    _stack.push(_num(v));
+}
+
+function arith(op) {
+    if (_stack.length < 2) throw new Error('SNOBOL4: arith underflow');
+    const b = _stack.pop();
+    const a = _stack.pop();
+    let r;
+    switch(op) {
+        case 'add': r = _add(a, b); break;
+        case 'sub': r = _sub(a, b); break;
+        case 'mul': r = _mul(a, b); break;
+        case 'div': r = _div(a, b); break;
+        case 'mod': r = _num(a) % _num(b); break;
+        default: throw new Error('SNOBOL4: unknown arith op: ' + op);
+    }
+    _stack.push(r);
+}
+
+function acomp(op) {
+    if (_stack.length < 2) throw new Error('SNOBOL4: acomp underflow');
+    const b = _stack.pop();
+    const a = _stack.pop();
+    let r;
+    switch(op) {
+        case 'lt': r = _num(a) < _num(b); break;
+        case 'le': r = _num(a) <= _num(b); break;
+        case 'eq': r = _num(a) === _num(b); break;
+        case 'ne': r = _num(a) !== _num(b); break;
+        case 'ge': r = _num(a) >= _num(b); break;
+        case 'gt': r = _num(a) > _num(b); break;
+        default: throw new Error('SNOBOL4: unknown acomp op: ' + op);
+    }
+    _last_ok = r ? true : false;
+}
+
+function lcomp(op) {
+    if (_stack.length < 2) throw new Error('SNOBOL4: lcomp underflow');
+    const b = _stack.pop();
+    const a = _stack.pop();
+    let r;
+    switch(op) {
+        case 'lt': r = _str(a) < _str(b); break;
+        case 'le': r = _str(a) <= _str(b); break;
+        case 'eq': r = _str(a) === _str(b); break;
+        case 'ne': r = _str(a) !== _str(b); break;
+        case 'ge': r = _str(a) >= _str(b); break;
+        case 'gt': r = _str(a) > _str(b); break;
+        default: throw new Error('SNOBOL4: unknown lcomp op: ' + op);
+    }
+    _last_ok = r ? true : false;
+}
+
+function last_ok()    { return _last_ok; }
+function set_last_ok(v) { _last_ok = v ? true : false; }
+function set_stno(n)  { _stno = n; }
+function halt_tos()   { if (_stack.length > 0) { const v = _stack.pop(); if (v !== _FAIL) process.stdout.write(_str(v) + '\n'); } }
+
+function call(name, nargs) {
+    if (_stack.length < nargs) throw new Error('SNOBOL4: call underflow');
+    const args = _stack.splice(_stack.length - nargs, nargs);
+    const result = _apply(name, args);
+    _stack.push(result);
+}
+
+function do_return(kind, cond) {
+    /* Stub — full return semantics deferred to SJ4-JS-3 */
+}
+
+/* -----------------------------------------------------------------------
+ * MatchState factory for pattern matching (for emitted pattern factories)
+ * ----------------------------------------------------------------------- */
+
+function MatchState(subject) {
+    return {
+        sigma: subject,
+        delta: 0,
+        omega: subject.length,
+        _do_capture(varname, text, immediate) {
+            if (immediate) {
+                _vars[varname] = text;
+            } else {
+                if (!this._pending) this._pending = [];
+                this._pending.push({ varname, text });
+            }
+        },
+        _commit_caps() {
+            if (this._pending) {
+                for (const cap of this._pending) {
+                    _vars[cap.varname] = cap.text;
+                }
+                this._pending = [];
+            }
+        },
+        _discard_caps() {
+            if (this._pending) this._pending = [];
+        },
+        _pending: []
+    };
+}
+
+/* -----------------------------------------------------------------------
  * Exports
  * ----------------------------------------------------------------------- */
 
@@ -331,12 +484,21 @@ const {
 } = _engine;
 
 module.exports = {
+    /* Core runtime */
     _vars, _FAIL, _is_fail, _str, _num, _cat,
     _add, _sub, _mul, _div, _pow, _apply, _kw, _is_int, _is_real, _real_result,
     _match, _match_anchored, _user_fns,
+    /* Pattern builders */
     PAT_lit, PAT_alt, PAT_seq, PAT_any, PAT_notany,
     PAT_span, PAT_break, PAT_arb, PAT_rem,
     PAT_len, PAT_pos, PAT_rpos, PAT_tab, PAT_rtab,
     PAT_fence, PAT_succeed, PAT_fail, PAT_abort, PAT_bal,
     PAT_arbno, PAT_capt_imm, PAT_capt_cond,
+    /* Stack machine API (SJ4-JS-2) */
+    _init, _finalize,
+    push_int, push_str, push_real_bits, push_null, push_var,
+    store_var, concat, neg, exp_op, coerce_num,
+    arith, acomp, lcomp, last_ok, set_last_ok, set_stno,
+    halt_tos, call, do_return,
+    MatchState,
 };
