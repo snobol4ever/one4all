@@ -122,7 +122,7 @@ static tree_t *lower_term(Term *t) {
             }
             struct { const char *name; tree_e kind; } arith[] = {
                 { "+", TT_ADD }, { "-", TT_SUB }, { "*", TT_MUL },
-                { "/", TT_DIV }, { "
+                { "/", TT_DIV }, { "//", TT_DIV }, { NULL, 0 }
             };
             if (arity == 2) {
                 for (int i = 0; arith[i].name; i++) {

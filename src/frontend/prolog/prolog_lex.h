@@ -18,9 +18,7 @@ typedef enum {
     TK_LBRACE,
     TK_RBRACE,
     TK_DOTDOT,
-    TK_OP,          /* :- | ?- | :  | =.. | = | \= | == | \== |
-                       is | < | > | =< | >= | =:= | =\= |
-                       + | - | * |
+    TK_OP,
     TK_NECK,
     TK_QUERY,
     TK_CUT,

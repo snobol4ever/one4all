@@ -17,7 +17,6 @@ void emit_bb_register_child_label(PATND_t * p, const char * alpha_label);
 void emit_flat_banner_rule  (char ch);
 void emit_flat_box_banner   (const char * kind, const char * args, const char * label_prefix);
 extern int g_flat_node_id;
-
 /*---- section / data emitters ---------------------------------------------*/
 void emit_flat_label        (const char * name);
 void emit_flat_data_section (void);           void emit_flat_text_section (void);

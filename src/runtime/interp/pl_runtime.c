@@ -375,8 +375,12 @@ static Term *pl_unified_eval_arith_term(tree_t *e, Term **env) {
                 }
                 return term_new_float(pow(_ED(e->c[0]),_ED(e->c[1])));
             }
-            if (strcmp(fn,"max")==0&&e->n==2) { Term *la=pl_unified_eval_arith_term(e->c[0],env),*lb=pl_unified_eval_arith_term(e->c[1],env); int fl=(la&&la->tag==TERM_FLOAT)||(lb&&lb->tag==TERM_FLOAT); return fl?(_ED(e->c[0])>=_ED(e->c[1])?la:lb):(_EI(e->c[0])>=_EI(e->c[1])?la:lb); }
-            if (strcmp(fn,"min")==0&&e->n==2) { Term *la=pl_unified_eval_arith_term(e->c[0],env),*lb=pl_unified_eval_arith_term(e->c[1],env); int fl=(la&&la->tag==TERM_FLOAT)||(lb&&lb->tag==TERM_FLOAT); return fl?(_ED(e->c[0])<=_ED(e->c[1])?la:lb):(_EI(e->c[0])<=_EI(e->c[1])?la:lb); }
+            if (strcmp(fn,"max")==0&&e->n==2) {
+                Term *la=pl_unified_eval_arith_term(e->c[0],env),*lb=pl_unified_eval_arith_term(e->c[1],env); int fl=(la&&la->tag==TERM_FLOAT)||(lb&&lb->tag==TERM_FLOAT);
+                return fl?(_ED(e->c[0])>=_ED(e->c[1])?la:lb):(_EI(e->c[0])>=_EI(e->c[1])?la:lb); }
+            if (strcmp(fn,"min")==0&&e->n==2) {
+                Term *la=pl_unified_eval_arith_term(e->c[0],env),*lb=pl_unified_eval_arith_term(e->c[1],env); int fl=(la&&la->tag==TERM_FLOAT)||(lb&&lb->tag==TERM_FLOAT);
+                return fl?(_ED(e->c[0])<=_ED(e->c[1])?la:lb):(_EI(e->c[0])<=_EI(e->c[1])?la:lb); }
             if (strcmp(fn,"gcd")==0&&e->n==2) { long a=labs(_EI(e->c[0])),b=labs(_EI(e->c[1])); while(b){long r=a%b;a=b;b=r;} return term_new_int(a); }
             if (e->n==1) {
                 double d = _ED(e->c[0]);
@@ -748,7 +752,8 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 if(strcmp(fn,"callable")==0)return  t&&(t->tag==TERM_ATOM||t->tag==TERM_COMPOUND);
                 if(strcmp(fn,"is_list" )==0){
                     int nil=prolog_atom_intern("[]"),dot=prolog_atom_intern(".");
-                    for(Term *c=t;;){c=term_deref(c);if(!c)return 0;if(c->tag==TERM_ATOM&&c->atom_id==nil)return 1;if(c->tag!=TERM_COMPOUND||c->compound.arity!=2||c->compound.functor!=dot)return 0;c=c->compound.args[1];}
+                    for(Term *c=t;;){c=term_deref(c);if(!c)return 0;if(c->tag==TERM_ATOM&&c->atom_id==nil)return 1;if(c->tag!=TERM_COMPOUND||c->compound.arity!=2||c->compound.functor!=dot)return 0;
+                        c=c->compound.args[1];}
                 }
             }
             if (strcmp(fn,",")==0){
