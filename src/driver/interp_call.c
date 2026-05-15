@@ -116,13 +116,15 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
         lnames[i] = l ? GC_strdup(l) : GC_strdup("");
     }
 
-    /* fname as uppercase (NV store is case-insensitive but uppercase is canonical) */
+    /* ufname: case-folded variant of fname, used only as fallback lookup key.
+     * In case-sensitive mode (default) ufname == fname — no folding.
+     * In case-insensitive mode sno_fold_name uppercases in place. */
     char ufname[128];
     {
         size_t flen = strlen(fname);
         if (flen >= sizeof(ufname)) flen = sizeof(ufname)-1;
-        for (size_t i = 0; i <= flen; i++)
-            ufname[i] = (char)toupper((unsigned char)fname[i]);
+        for (size_t i = 0; i <= flen; i++) ufname[i] = fname[i];
+        sno_fold_name(ufname);
     }
 
     /* ── Determine retname: the NV variable the body writes its return value into.
