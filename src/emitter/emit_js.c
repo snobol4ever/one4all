@@ -264,25 +264,106 @@ int emit_js_generator(IR_t * nd, FILE * out) {
     return 1;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* emit_js_scalar — stub for scalar nodes (TODO: SJ4-JS-2). */
+/* emit_js_scalar — emit stack machine operations for scalar IR nodes. */
 int emit_js_scalar(IR_t * nd, FILE * out) {
-    (void)nd; (void)out;
+    if (!nd || !out) return 0;
+    switch (nd->t) {
+    case IR_LIT_I:
+        fprintf(out, "rt.push_int(%lld); ", nd->ival);
+        break;
+    case IR_LIT_S: {
+        fprintf(out, "rt.push_str(");
+        js_escape_string(out, nd->sval);
+        fprintf(out, ", %d); ", (int)strlen(nd->sval ? nd->sval : ""));
+        break;
+    }
+    case IR_LIT_F:
+        fprintf(out, "rt.push_real_bits(%.17g); ", nd->dval);
+        break;
+    case IR_LIT_NUL:
+        fprintf(out, "rt.push_null(); ");
+        break;
+    case IR_VAR:
+        fprintf(out, "rt.push_var(\"");
+        if (nd->sval) fprintf(out, "%s", nd->sval);
+        fprintf(out, "\"); ");
+        break;
+    case IR_ASSIGN:
+        fprintf(out, "rt.store_var(\"");
+        if (nd->sval) fprintf(out, "%s", nd->sval);
+        fprintf(out, "\"); ");
+        break;
+    case IR_UNOP:
+        if (nd->ival == 1) fprintf(out, "rt.neg(); ");  /* NEG */
+        else fprintf(out, "/* unop %lld */ ", nd->ival);
+        break;
+    case IR_BINOP:
+        switch (nd->ival) {
+        case 1: fprintf(out, "rt.arith('add'); "); break;  /* ADD */
+        case 2: fprintf(out, "rt.arith('sub'); "); break;  /* SUB */
+        case 3: fprintf(out, "rt.arith('mul'); "); break;  /* MUL */
+        case 4: fprintf(out, "rt.arith('div'); "); break;  /* DIV */
+        case 5: fprintf(out, "rt.concat(); "); break;      /* CAT */
+        case 10: fprintf(out, "rt.acomp('eq'); "); break;  /* EQ */
+        case 11: fprintf(out, "rt.acomp('ne'); "); break;  /* NE */
+        case 12: fprintf(out, "rt.acomp('lt'); "); break;  /* LT */
+        case 13: fprintf(out, "rt.acomp('le'); "); break;  /* LE */
+        case 14: fprintf(out, "rt.acomp('gt'); "); break;  /* GT */
+        case 15: fprintf(out, "rt.acomp('ge'); "); break;  /* GE */
+        case 20: fprintf(out, "rt.lcomp('eq'); "); break;  /* LEQ */
+        case 21: fprintf(out, "rt.lcomp('ne'); "); break;  /* LNE */
+        case 22: fprintf(out, "rt.lcomp('lt'); "); break;  /* LLT */
+        case 23: fprintf(out, "rt.lcomp('le'); "); break;  /* LLE */
+        case 24: fprintf(out, "rt.lcomp('gt'); "); break;  /* LGT */
+        case 25: fprintf(out, "rt.lcomp('ge'); "); break;  /* LGE */
+        default: fprintf(out, "/* binop %lld */ ", nd->ival);
+        }
+        break;
+    case IR_CALL:
+        fprintf(out, "rt.call(\"");
+        if (nd->sval) fprintf(out, "%s", nd->sval);
+        fprintf(out, "\", %lld); ", nd->ival);
+        break;
+    case IR_SUCCEED:
+        fprintf(out, "rt.set_last_ok(1); ");
+        break;
+    case IR_FAIL:
+        fprintf(out, "rt.set_last_ok(0); ");
+        break;
+    case IR_SEQ:
+        /* No-op — sequencing handled by statement order */
+        break;
+    case IR_SCAN:
+        /* Pattern matching — implemented via factories */
+        if (nd->c && nd->c[0]) emit_js_generator(nd->c[0], out);
+        break;
+    case IR_GOTO:
+        fprintf(out, "_pc=%lld; continue; ", nd->ival);
+        break;
+    case IR_RETURN:
+        fprintf(out, "rt.do_return(%lld, %lld); ", nd->ival, nd->ival2);
+        break;
+    default:
+        fprintf(out, "/* scalar stub kind=%d */ ", nd->t);
+    }
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* emit_js_prologue — emit JS file header and runtime setup. */
+/* emit_js_prologue — emit JS file header, runtime setup, and switch loop entry. */
 int emit_js_prologue(IR_block_t * cfg, FILE * out) {
-    (void)cfg;
     fprintf(out, "'use strict';\n");
     fprintf(out, "const rt = require('./sno_runtime.js');\n");
     fprintf(out, "rt._init();\n");
-    fprintf(out, "\n");
+    fprintf(out, "let _pc = 0;\n");
+    fprintf(out, "loop: while (true) { switch (_pc) {\n");
+    fprintf(out, "case 0:\n");
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* emit_js_epilogue — emit JS file footer and finalization. */
+/* emit_js_epilogue — close switch loop, finalize runtime. */
 int emit_js_epilogue(IR_block_t * cfg, FILE * out) {
     (void)cfg;
-    fprintf(out, "\nrt._finalize();\n");
+    fprintf(out, "default: break loop;\n");
+    fprintf(out, "}} rt._finalize();\n");
     return 0;
 }
