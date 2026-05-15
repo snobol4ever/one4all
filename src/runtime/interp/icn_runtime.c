@@ -966,6 +966,39 @@ DESCR_t icn_bb_record_iterate(void *zeta, int entry) {
     return z->inst.u->fields[z->pos];
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+DESCR_t icn_bb_bang_binary(void *zeta, int entry) {
+    icn_bang_binary_state_t *z = (icn_bang_binary_state_t *)zeta;
+    if (!z || !z->proc_expr) return FAILDESCR;
+    for (;;) {
+        DESCR_t arg = z->arg_box.fn(z->arg_box.ζ, entry);
+        if (IS_FAIL_fn(arg)) return FAILDESCR;
+        entry = β;
+        const char *fname = z->proc_expr->v.sval;
+        if (fname) {
+            for (int pi = 0; pi < proc_count; pi++) {
+                if (strcmp(proc_table[pi].name, fname) != 0) continue;
+                DESCR_t args1[1]; args1[0] = arg;
+                DESCR_t result = proc_table_call(pi, args1, 1);
+                if (!IS_FAIL_fn(result)) return result;
+                goto next_arg;
+            }
+        }
+        {
+            DESCR_t fv = bb_eval_value(z->proc_expr);
+            if (!IS_FAIL_fn(fv) && fv.v == DT_E) {
+                for (int pi = 0; pi < proc_count; pi++) {
+                    if (proc_table[pi].entry_pc != (int)fv.i) continue;
+                    DESCR_t args1[1]; args1[0] = arg;
+                    DESCR_t result = proc_table_call(pi, args1, 1);
+                    if (!IS_FAIL_fn(result)) return result;
+                    goto next_arg;
+                }
+            }
+        }
+        next_arg:;
+    }
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t icn_bb_seq_expr(void *zeta, int entry) {
     icn_seq_state_t *z = (icn_seq_state_t *)zeta;
     if (!z || z->n < 1) return FAILDESCR;
@@ -1427,23 +1460,16 @@ bb_node_t icn_bb_build(tree_t *e) {
     if (e->t == TT_BANG_BINARY && e->n >= 2) {
         icn_bang_binary_state_t *z = calloc(1, sizeof(*z));
         z->proc_expr = e->c[0];
-        if (e->c[1] && (e->c[1]->t == TT_MAKELIST ||
-                        e->c[1]->t == TT_VAR ||
-                        e->c[1]->t == TT_IDX)) {
-            DESCR_t sv = bb_eval_value(e->c[1]);
-            if (sv.v == DT_DATA) {
-                DESCR_t tag = FIELD_GET_fn(sv, "icn_type");
-                if (tag.v == DT_S && tag.s && strcmp(tag.s, "list") == 0) {
-                    icn_list_iterate_state_t *lz = calloc(1, sizeof(*lz));
-                    lz->list_obj = sv;
-                    lz->pos      = 0;
-                    z->arg_box = (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
-                    return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
-                }
-            }
+        DESCR_t listval = bb_eval_value(e->c[1]);
+        if (!IS_FAIL_fn(listval)) {
+            icn_list_iterate_state_t *lz = calloc(1, sizeof(*lz));
+            lz->list_obj = listval;
+            lz->pos      = 0;
+            z->arg_box   = (bb_node_t){ icn_bb_list_iterate, lz, 0 };
+        } else {
+            z->arg_box = icn_bb_build(e->c[1]);
         }
-        z->arg_box   = icn_bb_build(e->c[1]);
-        return (bb_node_t){ icn_lazy_box, (icn_lazy_state_t*)calloc(1,sizeof(icn_lazy_state_t)), 0 };
+        return (bb_node_t){ icn_bb_bang_binary, z, 0 };
     }
     if (e->t == TT_SEQ_EXPR && e->n >= 1) {
         icn_seq_state_t *z = calloc(1, sizeof(*z));
