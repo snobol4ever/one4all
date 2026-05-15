@@ -639,6 +639,44 @@ typedef struct {
     DESCR_t    saved;
     int        have_saved;
 } icn_revassign_lhs_gen_state_t;
+typedef struct {
+    bb_node_t  gen_idx;
+    tree_t    *lhs_base_expr;
+    tree_t    *rhs_expr;
+    DESCR_t   *cell;
+    DESCR_t    base_d;
+    DESCR_t    idx_d;
+    int        have_subscript;
+    DESCR_t    saved;
+    int        have_saved;
+} icn_assign_lhs_gen_state_t;
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static DESCR_t icn_bb_assign_lhs_gen(void *zeta, int entry) {
+    icn_assign_lhs_gen_state_t *z = (icn_assign_lhs_gen_state_t *)zeta;
+    if (entry != α && z->have_saved) {
+        if (z->cell) *z->cell = z->saved;
+        else if (z->have_subscript) subscript_set(z->base_d, z->idx_d, z->saved);
+        z->have_saved = 0; z->cell = NULL; z->have_subscript = 0;
+    }
+    DESCR_t idx = (entry == α) ? z->gen_idx.fn(z->gen_idx.ζ, α) : z->gen_idx.fn(z->gen_idx.ζ, β);
+    if (IS_FAIL_fn(idx)) return FAILDESCR;
+    DESCR_t base = bb_eval_value(z->lhs_base_expr);
+    if (IS_FAIL_fn(base)) return FAILDESCR;
+    DESCR_t rv = bb_eval_value(z->rhs_expr);
+    if (IS_FAIL_fn(rv)) return FAILDESCR;
+    z->base_d = base; z->idx_d = idx; z->saved = subscript_get(base, idx); z->have_saved = 1;
+    if (base.v == DT_A) {
+        DESCR_t *cell = array_ptr(base.arr, (int)to_int(idx));
+        if (cell) { z->cell = cell; *cell = rv; } else { z->have_subscript = 1; subscript_set(base, idx, rv); }
+    } else if (base.v == DT_T) {
+        z->have_subscript = 1; subscript_set(base, idx, rv);
+    } else if (base.v == DT_DATA) {
+        z->have_subscript = 1; subscript_set(base, idx, rv);
+    } else {
+        z->have_subscript = 1; subscript_set(base, idx, rv);
+    }
+    return rv;
+}
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static DESCR_t icn_bb_revassign_lhs_gen(void *zeta, int entry) {
     icn_revassign_lhs_gen_state_t *z = (icn_revassign_lhs_gen_state_t *)zeta;
@@ -1591,6 +1629,16 @@ bb_node_t icn_bb_build(tree_t *e) {
             z->rhs_expr = e->c[1];
             z->pos = 0; z->len = 0; z->buf = NULL;
             return (bb_node_t){ icn_bb_assign_lhs_iter, z, 0 };
+        }
+    }
+    if (e->t == TT_ASSIGN && e->n >= 2 && e->c[0] && e->c[0]->t == TT_IDX && e->c[0]->n >= 2) {
+        tree_t *lhs = e->c[0];
+        if (is_suspendable(lhs->c[1])) {
+            icn_assign_lhs_gen_state_t *z = calloc(1, sizeof(*z));
+            z->gen_idx       = icn_bb_build(lhs->c[1]);
+            z->lhs_base_expr = lhs->c[0];
+            z->rhs_expr      = e->c[1];
+            return (bb_node_t){ icn_bb_assign_lhs_gen, z, 0 };
         }
     }
     if (e->t == TT_ASSIGN && e->n >= 2 && is_suspendable(e->c[1])) {
