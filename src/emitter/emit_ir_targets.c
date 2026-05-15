@@ -16,9 +16,6 @@ static int stub_epilogue(IR_block_t * cfg, FILE * out) { (void)cfg; return 0; }
    Populated by GOAL-IR-EMITTER-PREREQ follow-on work wiring sm_codegen_text here. */
 IR_emit_vtable_t g_emit_vtable_x86  = { "x86",  NULL, NULL, stub_prologue, stub_epilogue };
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* jvm: populated by GOAL-SN4-JVM-EMIT. */
-IR_emit_vtable_t g_emit_vtable_jvm  = { "jvm",  NULL, NULL, stub_prologue, stub_epilogue };
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* js: populated by GOAL-SN4-JS-EMIT. */
 IR_emit_vtable_t g_emit_vtable_js   = { "js",   emit_js_scalar, emit_js_generator, emit_js_prologue, emit_js_epilogue };
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
