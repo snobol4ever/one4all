@@ -1016,18 +1016,29 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 DESCR_t val  = sm_pop(st);
                 bb_icn_rnd_seed = bb_icn_rnd_seed * 6364136223846793005UL + 1442695040888963407UL;
                 unsigned long rnd = bb_icn_rnd_seed >> 33;
-                if (base.v == DT_DATA && base.u && base.u->type && base.u->type->nfields > 0 && base.u->fields) {
-                    int fi = (int)(rnd % (unsigned long)base.u->type->nfields);
-                    base.u->fields[fi] = val;
+                int ok = 0;
+                if (base.v == DT_DATA) {
+                    DESCR_t tag = FIELD_GET_fn(base, "icn_type");
+                    if (tag.v == DT_S && tag.s && strcmp(tag.s, "list") == 0) {
+                        int n = (int)FIELD_GET_fn(base, "frame_size").i;
+                        if (n > 0) {
+                            int fi = (int)(rnd % (unsigned long)n);
+                            ok = subscript_set(base, INTVAL(fi + 1), val);
+                        }
+                    } else if (base.u && base.u->type && base.u->type->nfields > 0 && base.u->fields) {
+                        int fi = (int)(rnd % (unsigned long)base.u->type->nfields);
+                        base.u->fields[fi] = val;
+                        ok = 1;
+                    }
                 } else if (base.v == DT_T && base.tbl && base.tbl->size > 0) {
                     int target = (int)(rnd % (unsigned long)base.tbl->size), seen = 0;
                     for (int _b = 0; _b < TABLE_BUCKETS; _b++)
                         for (TBPAIR_t *bp = base.tbl->buckets[_b]; bp; bp = bp->next)
-                            if (seen++ == target) { bp->val = val; goto icn_random_set_done; }
+                            if (seen++ == target) { bp->val = val; ok = 1; goto icn_random_set_done; }
                     icn_random_set_done:;
                 }
                 sm_push(st, val);
-                st->last_ok = 1;
+                st->last_ok = ok;
                 break;
             }
             if (name && strcmp(name, "ICN_ITERATE_FIRST_SET") == 0) {
