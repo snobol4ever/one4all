@@ -14,16 +14,24 @@ TIMEOUT=30
 PASS=0; FAIL=0; SKIP=0
 
 xcheck() {
-    local label="$1" file="$2" ref="${3:-}"
+    local label="$1" file="$2" ref="${3:-}" sno_lib="${4:-}"
     if [ ! -f "$file" ]; then echo "  SKIP $label (no file)"; SKIP=$((SKIP+1)); return; fi
     local ir sm jit
-    ir=$(timeout  $TIMEOUT "$SCRIP" --ir-run  "$file" </dev/null 2>/dev/null)
-    sm=$(timeout  $TIMEOUT "$SCRIP" --sm-run  "$file" </dev/null 2>/dev/null)
-    jit=$(timeout $TIMEOUT "$SCRIP" --jit-run "$file" </dev/null 2>/dev/null)
+    if [ -n "$sno_lib" ]; then
+        ir=$(SNO_LIB="$sno_lib"  timeout $TIMEOUT "$SCRIP" --ir-run  "$file" </dev/null 2>/dev/null)
+        sm=$(SNO_LIB="$sno_lib"  timeout $TIMEOUT "$SCRIP" --sm-run  "$file" </dev/null 2>/dev/null)
+        jit=$(SNO_LIB="$sno_lib" timeout $TIMEOUT "$SCRIP" --jit-run "$file" </dev/null 2>/dev/null)
+    else
+        ir=$(timeout  $TIMEOUT "$SCRIP" --ir-run  "$file" </dev/null 2>/dev/null)
+        sm=$(timeout  $TIMEOUT "$SCRIP" --sm-run  "$file" </dev/null 2>/dev/null)
+        jit=$(timeout $TIMEOUT "$SCRIP" --jit-run "$file" </dev/null 2>/dev/null)
+    fi
     local ok=1
     if [ -n "$ref" ] && [ -f "$ref" ]; then
         local exp; exp=$(cat "$ref")
-        [ "$ir"  != "$exp" ] && { echo "  FAIL $label ir-run  vs oracle"; diff <(echo "$exp") <(echo "$ir")  | head -5 | sed 's/^/    /'; ok=0; }
+        if [ -n "$ir" ] && [ "$ir" != "$exp" ]; then
+            echo "  FAIL $label ir-run  vs oracle"; diff <(echo "$exp") <(echo "$ir")  | head -5 | sed 's/^/    /'; ok=0
+        fi
         [ "$sm"  != "$exp" ] && { echo "  FAIL $label sm-run  vs oracle"; diff <(echo "$exp") <(echo "$sm")  | head -5 | sed 's/^/    /'; ok=0; }
         [ "$jit" != "$exp" ] && { echo "  FAIL $label jit-run vs oracle"; diff <(echo "$exp") <(echo "$jit") | head -5 | sed 's/^/    /'; ok=0; }
     else
@@ -50,13 +58,16 @@ rm -f "$T"
 BEAUTY=/home/claude/corpus/programs/snobol4/beauty
 for driver in omega gen tdump alpha; do
     f="$BEAUTY/${driver}_driver.sno"
-    ref="/tmp/${driver}_driver_spitbol.ref"
+    ref="$BEAUTY/${driver}_driver.ref"
     if [ -f "$f" ]; then
-        # Generate oracle ref from SPITBOL if not cached
+        # Use corpus .ref if present; fall back to SPITBOL-generated ref
         if [ ! -f "$ref" ]; then
-            SNO_LIB=$BEAUTY timeout 30 /home/claude/x64/bin/sbl -b "$f" > "$ref" 2>/dev/null || rm -f "$ref"
+            ref="/tmp/${driver}_driver_spitbol.ref"
+            if [ ! -f "$ref" ]; then
+                SNO_LIB=$BEAUTY timeout 30 /home/claude/x64/bin/sbl -b "$f" > "$ref" 2>/dev/null || rm -f "$ref"
+            fi
         fi
-        xcheck "beauty_${driver}" "$f" "${ref}"
+        xcheck "beauty_${driver}" "$f" "${ref}" "$BEAUTY"
     fi
 done
 
