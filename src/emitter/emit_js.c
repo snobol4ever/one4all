@@ -352,7 +352,7 @@ int emit_js_scalar(IR_t * nd, FILE * out) {
 /* emit_js_prologue — emit JS file header, runtime setup, and switch loop entry. */
 int emit_js_prologue(IR_block_t * cfg, FILE * out) {
     fprintf(out, "'use strict';\n");
-    fprintf(out, "const rt = require('./sno_runtime.js');\n");
+    fprintf(out, "const rt = require('/home/claude/one4all/src/runtime/js/sno_runtime.js');\n");
     fprintf(out, "rt._init();\n");
     fprintf(out, "let _pc = 0;\n");
     fprintf(out, "loop: while (true) { switch (_pc) {\n");
