@@ -497,7 +497,7 @@ module.exports = {
     /* Stack machine API (SJ4-JS-2) */
     _init, _finalize,
     push_int, push_str, push_real_bits, push_null, push_var,
-    store_var, concat, neg, exp_op, coerce_num,
+    store_var, pop_void, concat, neg, exp_op, coerce_num,
     arith, acomp, lcomp, last_ok, set_last_ok, set_stno,
     halt_tos, call, do_return,
     MatchState,

@@ -355,9 +355,16 @@ int main(int argc, char **argv)
         return 0;
     }
     if (opt_jit_emit && target_name && strcmp(target_name, "x86") != 0) {
-        if (emit_ir_block(NULL, stdout, target_name) != 0) {
-            fprintf(stderr, "scrip: emit_ir_block failed for target '%s'\n", target_name);
-            return 1;
+        if (strcmp(target_name, "js") == 0) {
+            if (emit_js_program(ast_prog, stdout) != 0) {
+                fprintf(stderr, "scrip: emit_js_program failed\n");
+                return 1;
+            }
+        } else {
+            if (emit_ir_block(NULL, stdout, target_name) != 0) {
+                fprintf(stderr, "scrip: emit_ir_block failed for target '%s'\n", target_name);
+                return 1;
+            }
         }
         return 0;
     }

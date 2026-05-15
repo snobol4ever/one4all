@@ -3,6 +3,7 @@
 #define EMIT_IR_H
 #include <stdio.h>
 #include "IR.h"
+#include "../ast/ast.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* emit_ir_block — ONE entry point for ALL 6 backends × ALL 6 frontends.
    cfg:    IR_block_t produced by lower from any frontend (SNOBOL4, Snocone, Rebus, Icon, Prolog, Raku).
@@ -44,4 +45,9 @@ extern IR_emit_vtable_t g_emit_vtable_js;
 extern IR_emit_vtable_t g_emit_vtable_wasm;
 extern IR_emit_vtable_t g_emit_vtable_net;
 extern IR_emit_vtable_t g_emit_vtable_c;
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* emit_js_program — JS-specific entry point. Builds SM_Program from AST, emits JS directly.
+   This bypasses the IR walk path for pattern-only treatment.
+   Designed for --target=js: handles scalars via SM_Program walk + patterns via IR factories. */
+int emit_js_program(const tree_t * ast_prog, FILE * out);
 #endif

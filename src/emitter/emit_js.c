@@ -3,6 +3,10 @@
 #include <string.h>
 #include <ctype.h>
 #include "emit_ir.h"
+#include "sm_prog.h"
+#include "../ast/ast.h"
+/*Forward declaration for sm_preamble (defined in scrip_sm.h) */
+extern SM_Program *sm_preamble(const tree_t *ast_prog);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* JS Emitter for IR_t → JavaScript code generation.
    Each IR_PAT_* node kind gets an emit_js_bb_NODE function that generates a JavaScript factory function.
@@ -262,6 +266,100 @@ int emit_js_generator(IR_t * nd, FILE * out) {
     }
     fprintf(stderr, "emit_js_generator: unhandled IR kind %d\n", nd->t);
     return 1;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* emit_js_program — public entry point for JS emission from tree_t AST. */
+int emit_js_program(const tree_t * ast_prog, FILE * out) {
+    if (!ast_prog || !out) return 1;
+    SM_Program *sm = sm_preamble(ast_prog);
+    if (!sm) return 1;
+    emit_js_prologue(NULL, out);
+    emit_js_from_sm(sm, out);
+    emit_js_epilogue(NULL, out);
+    sm_prog_free(sm);
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* emit_js_from_sm — walk SM_Program and emit JS for scalar statements. */
+int emit_js_from_sm(SM_Program * sm, FILE * out) {
+    if (!sm || !out || sm->count == 0) return 0;
+    int last_stno = -1;
+    for (int i = 0; i < sm->count; i++) {
+        SM_Instr * instr = &sm->instrs[i];
+        switch (instr->op) {
+        case SM_STNO:
+            if (last_stno >= 0) fprintf(out, "_pc = %d; continue; ", last_stno + 1);
+            fprintf(out, "case %lld: ", instr->a[0].i);
+            last_stno = instr->a[0].i;
+            break;
+        case SM_PUSH_LIT_I:
+            fprintf(out, "rt.push_int(%lld); ", instr->a[0].i);
+            break;
+        case SM_PUSH_LIT_S:
+            fprintf(out, "rt.push_str(");
+            js_escape_string(out, instr->a[0].s);
+            fprintf(out, ", %d); ", (int)(instr->a[0].s ? strlen(instr->a[0].s) : 0));
+            break;
+        case SM_PUSH_LIT_F:
+            fprintf(out, "rt.push_real_bits(%.17g); ", instr->a[0].f);
+            break;
+        case SM_PUSH_NULL:
+        case SM_PUSH_NULL_NOFLIP:
+            fprintf(out, "rt.push_null(); ");
+            break;
+        case SM_PUSH_VAR:
+            fprintf(out, "rt.push_var(\"%s\"); ", instr->a[0].s ? instr->a[0].s : "");
+            break;
+        case SM_STORE_VAR:
+            fprintf(out, "rt.store_var(\"%s\"); ", instr->a[0].s ? instr->a[0].s : "");
+            break;
+        case SM_VOID_POP:
+            fprintf(out, "rt.pop_void(); ");
+            break;
+        case SM_ADD:
+            fprintf(out, "rt.arith('add'); ");
+            break;
+        case SM_SUB:
+            fprintf(out, "rt.arith('sub'); ");
+            break;
+        case SM_MUL:
+            fprintf(out, "rt.arith('mul'); ");
+            break;
+        case SM_DIV:
+            fprintf(out, "rt.arith('div'); ");
+            break;
+        case SM_MOD:
+            fprintf(out, "rt.arith('mod'); ");
+            break;
+        case SM_CONCAT:
+            fprintf(out, "rt.concat(); ");
+            break;
+        case SM_NEG:
+            fprintf(out, "rt.neg(); ");
+            break;
+        case SM_COERCE_NUM:
+            fprintf(out, "rt.coerce_num(); ");
+            break;
+        case SM_EXP:
+            fprintf(out, "rt.exp_op(); ");
+            break;
+        case SM_HALT:
+            fprintf(out, "break loop; ");
+            break;
+        case SM_JUMP:
+            fprintf(out, "_pc = %lld; continue; ", instr->a[0].i);
+            break;
+        case SM_JUMP_S:
+            fprintf(out, "if (rt.last_ok()) _pc = %lld; else _pc = %d; continue; ", instr->a[0].i, i + 1);
+            break;
+        case SM_JUMP_F:
+            fprintf(out, "if (!rt.last_ok()) _pc = %lld; else _pc = %d; continue; ", instr->a[0].i, i + 1);
+            break;
+        default:
+            break;
+        }
+    }
+    return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* emit_js_scalar — emit stack machine operations for scalar IR nodes. */
