@@ -1,47 +1,18 @@
-/*
- * icn_main.c — Tiny-ICON compiler driver
- *
- * Originally a standalone binary.  Now integrated into scrip-cc:
- *   - icn_main() is the old main(), kept for reference / standalone use.
- *   - icn_prescan_imports() pre-scans raw source for $import/-IMPORT control lines
- *     and returns an ImportEntry* list (same type as SNOBOL4 lex uses).
- *     Called by scrip-cc main.c before icn_lex_init(), mirrors pj_linker_prescan().
- *
- * Usage (standalone):  scrip-cc [-jvm] [-o out] file.icn
- * Usage (via scrip-cc):   scrip-cc -icn [-jvm] [-o out] file.icn
- */
-
 #include "icon_lex.h"
 #include "icon_parse.h"
 #include "icon_emit.h"
-#include "scrip_cc.h"          /* ExportEntry, ImportEntry */
+#include "scrip_cc.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-
-/* Forward declaration removed — emit_jvm_icon_file archived with emitters */
-
-/* =========================================================================
- * icn_prescan_imports — scan raw Icon source for $import / -IMPORT lines.
- *
- * Icon control line forms accepted:
- *   $import assembly.METHOD
- *   -IMPORT assembly.METHOD      (SNOBOL4-style, also accepted for symmetry)
- *
- * Returns a singly-linked ImportEntry* list (caller owns; never freed in
- * practice — lives for the duration of compilation).
- * ======================================================================= */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 ImportEntry *icn_prescan_imports(const char *src) {
     ImportEntry *head = NULL;
     const char *p = src;
     while (*p) {
-        /* skip to start of line */
-        /* scan for $import or -IMPORT at column 0 */
-        /* skip leading whitespace on line */
         const char *line = p;
         while (*p && *p != '\n') p++;
-        /* process [line, p) */
         const char *lp = line;
         while (*lp == ' ' || *lp == '\t') lp++;
         int is_import = 0;
@@ -53,14 +24,12 @@ ImportEntry *icn_prescan_imports(const char *src) {
             { is_import = 1; lp += 7; }
         if (is_import) {
             while (*lp == ' ' || *lp == '\t') lp++;
-            /* collect token up to whitespace/newline/end */
             char tok[256]; int ti = 0;
             while (*lp && *lp != ' ' && *lp != '\t' && *lp != '\n' && ti < 255)
                 tok[ti++] = *lp++;
             tok[ti] = '\0';
             if (ti > 0) {
                 ImportEntry *e = calloc(1, sizeof *e);
-                /* tok is "assembly.METHOD" */
                 char *dot = strchr(tok, '.');
                 if (dot) {
                     int alen = (int)(dot - tok);
@@ -81,7 +50,7 @@ ImportEntry *icn_prescan_imports(const char *src) {
     }
     return head;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static char *read_file(const char *path) {
     FILE *f = fopen(path, "r");
     if (!f) { perror(path); return NULL; }
@@ -94,14 +63,12 @@ static char *read_file(const char *path) {
     fclose(f);
     return buf;
 }
-
-/* icn_main — standalone entry point; not called by scrip-cc; not called by scrip-cc */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int icn_main(int argc, char **argv) {
     const char *input  = NULL;
     const char *output = NULL;
     int do_run = 0;
     int do_jvm = 0;
-
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-o") == 0 && i+1 < argc) output = argv[++i];
         else if (strcmp(argv[i], "-run") == 0) do_run = 1;
@@ -109,15 +76,10 @@ int icn_main(int argc, char **argv) {
         else input = argv[i];
     }
     if (!input) { fprintf(stderr, "usage: scrip-cc [-jvm] [-o out.j/.asm] [-run] file.icn\n"); return 1; }
-
     char *src = read_file(input);
     if (!src) return 1;
-
-    /* Lex */
     IcnLexer lx;
     icn_lex_init(&lx, src);
-
-    /* Parse (FI-2: direct IR, no IcnNode) */
     IcnParser parser;
     icn_parse_init(&parser, &lx);
     CODE_t *prog = icn_parse_file(&parser, NULL);
@@ -126,8 +88,6 @@ int icn_main(int argc, char **argv) {
         free(src); return 1;
     }
     (void)prog;
-
-    /* Emit */
     if (do_jvm) {
         fprintf(stderr, "scrip: --jvm emit archived; use --sm-run or --jit-run\n");
         return 1;
@@ -135,10 +95,7 @@ int icn_main(int argc, char **argv) {
         fprintf(stderr, "scrip: icn emit archived; use --sm-run or --jit-run\n");
         return 1;
     }
-
     free(src);
-
-    /* Assemble and run */
     if (do_run && output) {
         char obj[256], bin[256], cmd[1024];
         snprintf(obj, sizeof obj, "%s.o", output);

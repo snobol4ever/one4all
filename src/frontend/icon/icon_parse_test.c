@@ -1,23 +1,13 @@
-/*
- * icon_parse_test.c — Unit tests for icon_parse.c
- *
- * M-ICON-PARSE-LIT acceptance criteria:
- *   Parser produces correct AST for all Proebsting §2 paper examples.
- */
-
 #include "icon_lex.h"
 #include "icon_ast.h"
 #include "icon_parse.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 static int tests_run = 0, tests_pass = 0, tests_fail = 0;
-
 #define PASS(name) do { tests_run++; tests_pass++; printf("  PASS  %s\n", name); } while(0)
 #define FAIL(name, ...) do { tests_run++; tests_fail++; printf("  FAIL  %s: ", name); printf(__VA_ARGS__); printf("\n"); } while(0)
-
-/* Parse a single expression from src */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static IcnNode *parse_one_expr(const char *src) {
     IcnLexer lx; icn_lex_init(&lx, src);
     IcnParser p;  icn_parse_init(&p, &lx);
@@ -25,8 +15,7 @@ static IcnNode *parse_one_expr(const char *src) {
     if (p.had_error) { fprintf(stderr, "    parse error: %s\n", p.errmsg); }
     return n;
 }
-
-/* Parse a full file, return first procedure's first statement */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static IcnNode *parse_file_first_stmt(const char *src) {
     IcnLexer lx; icn_lex_init(&lx, src);
     IcnParser p;  icn_parse_init(&p, &lx);
@@ -38,30 +27,24 @@ static IcnNode *parse_file_first_stmt(const char *src) {
     }
     IcnNode *proc = procs[0];
     if (proc->n < 2) return NULL;
-    return proc->c[1]; /* first stmt (child 0 is proc name) */
+    return proc->c[1];
 }
-
-/* =========================================================================
- * AST shape checks
- * ======================================================================= */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int is_kind(IcnNode *n, IcnKind k) { return n && n->t == k; }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int is_int(IcnNode *n, long v) { return n && n->t == ICN_INT && n->val.v.ival == v; }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int is_var(IcnNode *n, const char *name) {
     return n && n->t == ICN_VAR && strcmp(n->val.v.sval, name) == 0;
 }
-
-/* =========================================================================
- * Tests
- * ======================================================================= */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void test_literal_int(void) {
     printf("--- literal int ---\n");
     IcnNode *n = parse_one_expr("42");
     if (is_int(n, 42)) PASS("42"); else FAIL("42", "kind=%s", n ? icn_kind_name(n->t) : "null");
     icn_node_free(n);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void test_literal_real(void) {
     printf("--- literal real ---\n");
     IcnNode *n = parse_one_expr("3.14");
@@ -69,7 +52,7 @@ static void test_literal_real(void) {
     else FAIL("3.14", "kind=%s", n ? icn_kind_name(n->t) : "null");
     icn_node_free(n);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void test_literal_string(void) {
     printf("--- literal string ---\n");
     IcnNode *n = parse_one_expr("\"hello\"");
@@ -77,7 +60,7 @@ static void test_literal_string(void) {
     else FAIL("\"hello\"", "kind=%s", n ? icn_kind_name(n->t) : "null");
     icn_node_free(n);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void test_var(void) {
     printf("--- variable ---\n");
     IcnNode *n = parse_one_expr("x");
@@ -85,7 +68,7 @@ static void test_var(void) {
     else FAIL("x", "kind=%s", n ? icn_kind_name(n->t) : "null");
     icn_node_free(n);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void test_binop(void) {
     printf("--- binary ops ---\n");
     {
@@ -101,25 +84,22 @@ static void test_binop(void) {
         icn_node_free(n);
     }
     {
-        /* Left-associativity: 1 + 2 + 3 = (1+2)+3 */
         IcnNode *n = parse_one_expr("1 + 2 + 3");
         if (is_kind(n, ICN_ADD) && is_kind(n->c[0], ICN_ADD)) PASS("left-assoc add");
         else FAIL("left-assoc add", "bad");
         icn_node_free(n);
     }
     {
-        /* Precedence: 1 + 2 * 3 = 1 + (2*3) */
         IcnNode *n = parse_one_expr("1 + 2 * 3");
         if (is_kind(n, ICN_ADD) && is_kind(n->c[1], ICN_MUL)) PASS("prec * over +");
         else FAIL("prec * over +", "bad");
         icn_node_free(n);
     }
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void test_to_generator(void) {
     printf("--- to generator ---\n");
     {
-        /* 1 to 5 → ICN_TO(INT(1), INT(5)) */
         IcnNode *n = parse_one_expr("1 to 5");
         if (is_kind(n, ICN_TO) && n->n == 2 &&
             is_int(n->c[0], 1) && is_int(n->c[1], 5))
@@ -128,14 +108,13 @@ static void test_to_generator(void) {
         icn_node_free(n);
     }
     {
-        /* 1 to 10 by 2 → ICN_TO_BY */
         IcnNode *n = parse_one_expr("1 to 10 by 2");
         if (is_kind(n, ICN_TO_BY) && n->n == 3) PASS("1 to 10 by 2");
         else FAIL("1 to 10 by 2", "kind=%s", n ? icn_kind_name(n->t) : "null");
         icn_node_free(n);
     }
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void test_relational(void) {
     printf("--- relational ---\n");
     {
@@ -145,18 +124,16 @@ static void test_relational(void) {
         icn_node_free(n);
     }
     {
-        /* goal-directed: 2 < (1 to 4) */
         IcnNode *n = parse_one_expr("2 < (1 to 4)");
         if (is_kind(n, ICN_LT) && is_kind(n->c[1], ICN_TO)) PASS("2 < (1 to 4)");
         else FAIL("2 < (1 to 4)", "bad");
         icn_node_free(n);
     }
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void test_call(void) {
     printf("--- function call ---\n");
     {
-        /* write(42) → PROC_CALL(VAR(write), INT(42)) */
         IcnNode *n = parse_one_expr("write(42)");
         if (is_kind(n, PROC_CALL) && n->n == 2 &&
             is_var(n->c[0], "write") && is_int(n->c[1], 42))
@@ -165,17 +142,15 @@ static void test_call(void) {
         icn_node_free(n);
     }
     {
-        /* write(1 to 5) — arg is ICN_TO */
         IcnNode *n = parse_one_expr("write(1 to 5)");
         if (is_kind(n, PROC_CALL) && n->n == 2 && is_kind(n->c[1], ICN_TO)) PASS("write(1 to 5)");
         else FAIL("write(1 to 5)", "bad");
         icn_node_free(n);
     }
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void test_every(void) {
     printf("--- every ---\n");
-    /* every write(1 to 5); → ICN_EVERY(PROC_CALL(...)) */
     const char *src = "procedure main();\n  every write(1 to 5);\nend";
     IcnNode *stmt = parse_file_first_stmt(src);
     if (stmt && is_kind(stmt, ICN_EVERY) && stmt->n == 1 &&
@@ -184,18 +159,13 @@ static void test_every(void) {
     else
         FAIL("every write(1 to 5)", "stmt=%s", stmt ? icn_kind_name(stmt->t) : "null");
 }
-
-/* =========================================================================
- * Rung 1 corpus parse tests — verify shape of AST for all 6 programs
- * ======================================================================= */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static IcnNode **parse_corpus_file(const char *path, int *count) {
     FILE *f = fopen(path, "r");
     if (!f) { *count = 0; return NULL; }
     fseek(f, 0, SEEK_END); long sz = ftell(f); rewind(f);
     char *src = malloc(sz + 1);
     fread(src, 1, sz, f); src[sz] = '\0'; fclose(f);
-
     IcnLexer lx; icn_lex_init(&lx, src);
     IcnParser p;  icn_parse_init(&p, &lx);
     IcnNode **procs = icn_parse_file(&p, count);
@@ -203,22 +173,16 @@ static IcnNode **parse_corpus_file(const char *path, int *count) {
     free(src);
     return procs;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void test_rung1_parse(void) {
     printf("--- rung1 corpus parse ---\n");
     const char *corpus = "test/frontend/icon/corpus/rung01_paper";
     struct { const char *file; IcnKind stmt_kind; IcnKind arg_kind; } cases[] = {
-        /* t01: every write(1 to 5)  → EVERY(CALL(...TO...)) */
         {"t01_to5.icn",        ICN_EVERY, PROC_CALL},
-        /* t02: every write((1 to 3) * (1 to 2)) → EVERY(CALL(...MUL...)) */
         {"t02_mult.icn",       ICN_EVERY, PROC_CALL},
-        /* t03: every write((1 to 2) to (2 to 3)) → EVERY(CALL(...TO...)) */
         {"t03_nested_to.icn",  ICN_EVERY, PROC_CALL},
-        /* t04: every write(2 < (1 to 4)) → EVERY(CALL(...LT...)) */
         {"t04_lt.icn",         ICN_EVERY, PROC_CALL},
-        /* t05: every write(3 < ((1 to 3)*(1 to 2))) → EVERY(CALL(...LT...)) */
         {"t05_compound.icn",   ICN_EVERY, PROC_CALL},
-        /* t06: every write(5 > (...)) → EVERY(CALL(...)) + write("done") */
         {"t06_paper_expr.icn", ICN_EVERY, PROC_CALL},
         {NULL, 0, 0}
     };
@@ -243,16 +207,11 @@ static void test_rung1_parse(void) {
             continue;
         }
         PASS(name);
-        /* free */
         for (int j = 0; j < count; j++) icn_node_free(procs[j]);
         free(procs);
     }
 }
-
-/* =========================================================================
- * main
- * ======================================================================= */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int main(void) {
     printf("=== icon_parse_test ===\n");
     test_literal_int();
@@ -265,7 +224,6 @@ int main(void) {
     test_call();
     test_every();
     test_rung1_parse();
-
     printf("\n=== RESULTS: %d/%d PASS ===\n", tests_pass, tests_run);
     return tests_fail > 0 ? 1 : 0;
 }

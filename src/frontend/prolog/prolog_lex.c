@@ -1,45 +1,25 @@
-/*
- * pl_lex.c — Prolog lexer for scrip-cc Prolog frontend
- *
- * Handles Edinburgh/ISO Prolog surface syntax:
- *   - % line comments
- *   - /* block comments  * /
- *   - Quoted atoms:  'foo bar'  ('' escape for embedded quote)
- *   - Double-quoted strings: "hello"  (\n \t \\ \" escapes)
- *   - Variables: uppercase or _ prefix, e.g. X, Foo, _Bar
- *   - Anonymous: bare _
- *   - Integers: decimal, 0'<char>, 0b<bin>, 0x<hex>
- *   - Floats: digits . digits (optional e/E exponent)
- *   - Operators: returned as TK_OP with text
- *   - Clause terminator: . followed by whitespace or EOF
- */
-
 #include "prolog_lex.h"
-
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
-
-/* =========================================================================
- * Helpers
- * ======================================================================= */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static char cur(Lexer *lx) {
     return lx->src[lx->pos];
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static char peek1(Lexer *lx) {
     if (lx->src[lx->pos] == '\0') return '\0';
     return lx->src[lx->pos + 1];
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static char advance(Lexer *lx) {
     char c = lx->src[lx->pos];
     if (c == '\n') lx->line++;
     if (c) lx->pos++;
     return c;
 }
-
-/* Append c to a heap buffer; buf/cap passed by pointer. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void buf_push(char **buf, int *len, int *cap, char c) {
     if (*len + 2 > *cap) {
         *cap = (*cap) ? (*cap) * 2 : 32;
@@ -48,29 +28,24 @@ static void buf_push(char **buf, int *len, int *cap, char c) {
     (*buf)[(*len)++] = c;
     (*buf)[*len] = '\0';
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static Token make_tok(TkKind kind, char *text, int line) {
     Token t; t.kind = kind; t.text = text; t.ival = 0; t.fval = 0.0; t.line = line;
     return t;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static Token make_err(int line, const char *msg) {
     Token t; t.kind = TK_ERROR; t.text = strdup(msg); t.ival = 0; t.fval = 0.0; t.line = line;
     return t;
 }
-
-/* =========================================================================
- * Skip whitespace and comments
- * ======================================================================= */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void skip_ws(Lexer *lx) {
     for (;;) {
-        /* whitespace */
         while (cur(lx) && isspace((unsigned char)cur(lx))) advance(lx);
-        /* % line comment */
         if (cur(lx) == '%') {
             while (cur(lx) && cur(lx) != '\n') advance(lx);
             continue;
         }
-        /* /* block comment */
         if (cur(lx) == '/' && peek1(lx) == '*') {
             advance(lx); advance(lx);
             while (cur(lx)) {
@@ -84,20 +59,17 @@ static void skip_ws(Lexer *lx) {
         break;
     }
 }
-
-/* =========================================================================
- * Scan quoted atom  'text'
- * ======================================================================= */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static Token scan_quoted_atom(Lexer *lx) {
     int line = lx->line;
-    advance(lx); /* consume opening ' */
+    advance(lx);
     char *buf = NULL; int len = 0, cap = 0;
     for (;;) {
         char c = cur(lx);
         if (c == '\0') return make_err(line, "unterminated quoted atom");
         if (c == '\'') {
             advance(lx);
-            if (cur(lx) == '\'') { /* '' escape */
+            if (cur(lx) == '\'') {
                 buf_push(&buf, &len, &cap, '\''); advance(lx);
             } else break;
         } else if (c == '\\') {
@@ -119,13 +91,10 @@ static Token scan_quoted_atom(Lexer *lx) {
     Token t = make_tok(TK_ATOM, buf, line);
     return t;
 }
-
-/* =========================================================================
- * Scan double-quoted string  "text"
- * ======================================================================= */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static Token scan_string(Lexer *lx) {
     int line = lx->line;
-    advance(lx); /* consume opening " */
+    advance(lx);
     char *buf = NULL; int len = 0, cap = 0;
     for (;;) {
         char c = cur(lx);
@@ -150,16 +119,11 @@ static Token scan_string(Lexer *lx) {
     Token t = make_tok(TK_STRING, buf, line);
     return t;
 }
-
-/* =========================================================================
- * Scan number (integer or float)
- * ======================================================================= */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static Token scan_number(Lexer *lx) {
     int line = lx->line;
     char *buf = NULL; int len = 0, cap = 0;
     int is_float = 0;
-
-    /* 0' char-code, 0b binary, 0x hex */
     if (cur(lx) == '0' && peek1(lx) == '\'') {
         advance(lx); advance(lx);
         char c = advance(lx);
@@ -177,7 +141,6 @@ static Token scan_number(Lexer *lx) {
                 if (cur(lx) != '_') buf_push(&buf, &len, &cap, advance(lx));
                 else advance(lx);
             } else if (cur(lx) == ' ' && isxdigit((unsigned char)peek1(lx))) {
-                /* spaced numeric literal: skip space, continue scanning */
                 advance(lx);
             } else {
                 break;
@@ -187,20 +150,16 @@ static Token scan_number(Lexer *lx) {
         t.ival = (long)(unsigned long long)strtoull(buf+2, NULL, radix);
         return t;
     }
-
     while (isdigit((unsigned char)cur(lx)))
         buf_push(&buf, &len, &cap, advance(lx));
-    /* spaced decimal literal: absorb space + digits (e.g. 9 223 372 036...) */
     while (cur(lx) == ' ' && isdigit((unsigned char)peek1(lx))) {
-        advance(lx); /* skip space */
+        advance(lx);
         while (isdigit((unsigned char)cur(lx)))
             buf_push(&buf, &len, &cap, advance(lx));
     }
-
-    /* float: digits '.' digits  OR  digits 'e'/'E' exponent */
     if (cur(lx) == '.' && isdigit((unsigned char)peek1(lx))) {
         is_float = 1;
-        buf_push(&buf, &len, &cap, advance(lx)); /* . */
+        buf_push(&buf, &len, &cap, advance(lx));
         while (isdigit((unsigned char)cur(lx)))
             buf_push(&buf, &len, &cap, advance(lx));
         if (cur(lx) == 'e' || cur(lx) == 'E') {
@@ -210,25 +169,20 @@ static Token scan_number(Lexer *lx) {
             while (isdigit((unsigned char)cur(lx)))
                 buf_push(&buf, &len, &cap, advance(lx));
         }
-        /* SWI extension: float suffix NaN or Inf (e.g. 1.5NaN, 0.0Inf) */
         if ((cur(lx)=='N' && lx->src[lx->pos+1]=='a' && lx->src[lx->pos+2]=='N') ||
             (cur(lx)=='I' && lx->src[lx->pos+1]=='n' && lx->src[lx->pos+2]=='f')) {
-            advance(lx); advance(lx); advance(lx); /* consume NaN or Inf */
-            /* represent as NaN/Inf double */
+            advance(lx); advance(lx); advance(lx);
             if (!buf) buf = strdup("nan");
         }
     } else if (cur(lx) == 'e' || cur(lx) == 'E') {
-        /* digits 'e' exponent — no decimal point (e.g. 10e300) */
         is_float = 1;
-        buf_push(&buf, &len, &cap, advance(lx)); /* e or E */
+        buf_push(&buf, &len, &cap, advance(lx));
         if (cur(lx) == '+' || cur(lx) == '-')
             buf_push(&buf, &len, &cap, advance(lx));
         while (isdigit((unsigned char)cur(lx)))
             buf_push(&buf, &len, &cap, advance(lx));
     }
-
     if (!buf) buf = strdup("0");
-
     if (is_float) {
         Token t = make_tok(TK_FLOAT, buf, line);
         t.fval = atof(buf);
@@ -239,17 +193,14 @@ static Token scan_number(Lexer *lx) {
         return t;
     }
 }
-
-/* =========================================================================
- * Scan atom or keyword (lowercase start or special graphic)
- * ======================================================================= */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int is_atom_start(char c) {
     return islower((unsigned char)c) || c == '+' || c == '-' || c == '*' ||
            c == '/' || c == '\\' || c == '^' || c == '<' || c == '>' ||
            c == '=' || c == '~' || c == '?' || c == '@' || c == '#' ||
            c == '&';
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static Token scan_word(Lexer *lx) {
     int line = lx->line;
     char *buf = NULL; int len = 0, cap = 0;
@@ -258,53 +209,36 @@ static Token scan_word(Lexer *lx) {
     if (!buf) buf = strdup("");
     return make_tok(TK_ATOM, buf, line);
 }
-
-/* =========================================================================
- * Scan operator sequence (graphic chars)
- * ======================================================================= */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int is_graphic(char c) {
     return c == '+' || c == '-' || c == '*' || c == '/' || c == '\\' ||
            c == '^' || c == '<' || c == '>' || c == '=' || c == '~' ||
            c == '?' || c == '@' || c == '#' || c == '&' || c == ':' ||
            c == '.' || c == '!';
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static Token scan_graphic(Lexer *lx) {
     int line = lx->line;
     char *buf = NULL; int len = 0, cap = 0;
     while (is_graphic(cur(lx)) && cur(lx) != ',' && cur(lx) != '|')
         buf_push(&buf, &len, &cap, advance(lx));
     if (!buf) buf = strdup("");
-
-    /* Classify known multi-char operators */
     if (strcmp(buf, ":-") == 0) { Token t = make_tok(TK_NECK, buf, line); return t; }
     if (strcmp(buf, "?-") == 0) { Token t = make_tok(TK_QUERY, buf, line); return t; }
-    /* Everything else is TK_OP */
     return make_tok(TK_OP, buf, line);
 }
-
-/* =========================================================================
- * lexer_next — main scan function
- * ======================================================================= */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 Token lexer_next(Lexer *lx) {
     if (lx->has_peek) {
         lx->has_peek = 0;
         return lx->peek;
     }
-
     skip_ws(lx);
     int line = lx->line;
     char c = cur(lx);
-
     if (c == '\0') return make_tok(TK_EOF, strdup(""), line);
-
-    /* Quoted atom */
     if (c == '\'') return scan_quoted_atom(lx);
-
-    /* Double-quoted string */
     if (c == '"') return scan_string(lx);
-
-    /* Variable or anonymous */
     if (isupper((unsigned char)c)) {
         char *buf = NULL; int len = 0, cap = 0;
         while (isalnum((unsigned char)cur(lx)) || cur(lx) == '_')
@@ -316,21 +250,14 @@ Token lexer_next(Lexer *lx) {
         advance(lx);
         if (!isalnum((unsigned char)cur(lx)) && cur(lx) != '_')
             return make_tok(TK_ANON, strdup("_"), line);
-        /* _Foo — named var */
         char *buf = NULL; int len = 0, cap = 0;
         buf_push(&buf, &len, &cap, '_');
         while (isalnum((unsigned char)cur(lx)) || cur(lx) == '_')
             buf_push(&buf, &len, &cap, advance(lx));
         return make_tok(TK_VAR, buf, line);
     }
-
-    /* Number */
     if (isdigit((unsigned char)c)) return scan_number(lx);
-
-    /* Lowercase atom */
     if (islower((unsigned char)c)) return scan_word(lx);
-
-    /* Punctuation */
     advance(lx);
     switch (c) {
         case '(': return make_tok(TK_LPAREN,   strdup("("), line);
@@ -346,24 +273,18 @@ Token lexer_next(Lexer *lx) {
         case '{': return make_tok(TK_LBRACE,   strdup("{"), line);
         case '}': return make_tok(TK_RBRACE,   strdup("}"), line);
         case '.':
-            /* Clause terminator: . followed by whitespace or EOF */
             if (cur(lx) == '\0' || isspace((unsigned char)cur(lx)))
                 return make_tok(TK_DOT, strdup("."), line);
-            /* Otherwise a graphic operator starting with . */
-            lx->pos--; /* put back the . */
+            lx->pos--;
             return scan_graphic(lx);
         default:
-            /* Graphic operator */
-            lx->pos--; /* put back */
+            lx->pos--;
             if (is_graphic(cur(lx))) return scan_graphic(lx);
             { char msg[32]; snprintf(msg,sizeof msg,"unexpected '%c'",c);
               return make_err(line, msg); }
     }
 }
-
-/* =========================================================================
- * lexer_peek / lexer_expect
- * ======================================================================= */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 Token lexer_peek(Lexer *lx) {
     if (!lx->has_peek) {
         lx->peek     = lexer_next(lx);
@@ -371,22 +292,21 @@ Token lexer_peek(Lexer *lx) {
     }
     return lx->peek;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 Token lexer_expect(Lexer *lx, TkKind kind, const char *context) {
     Token t = lexer_next(lx);
     if (t.kind != kind) {
         fprintf(stderr, "parse error at line %d in %s: expected %s, got '%s'\n",
                 t.line, context, tk_name(kind), t.text ? t.text : "?");
-        /* return error token so caller can propagate */
         Token err; err.kind = TK_ERROR; err.text = strdup("expected");
         err.ival = 0; err.fval = 0; err.line = t.line;
         return err;
     }
     return t;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void token_free(Token *t) { free(t->text); t->text = NULL; }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void lexer_init(Lexer *lx, const char *src) {
     lx->src      = src ? src : "";
     lx->pos      = 0;
@@ -394,7 +314,7 @@ void lexer_init(Lexer *lx, const char *src) {
     lx->has_peek = 0;
     memset(&lx->peek, 0, sizeof lx->peek);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 const char *tk_name(TkKind kind) {
     switch (kind) {
         case TK_EOF:      return "EOF";

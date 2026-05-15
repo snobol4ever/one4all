@@ -1,8 +1,4 @@
 %{
-/*
- * rebus.l  —  Flex lexer for the Rebus language (Griswold TR 84-9)
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,10 +7,9 @@
 #include "rebus.tab.h"
 #define yylval rebus_yylval
 #define yylineno rebus_yylineno
-
 int   rebus_nerrors  = 0;
 char *rebus_filename = (char *)"<stdin>";
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rebus_error(int lineno, const char *fmt, ...) {
     va_list ap;
     fprintf(stderr, "%s:%d: error: ", rebus_filename, lineno);
@@ -22,13 +17,12 @@ void rebus_error(int lineno, const char *fmt, ...) {
     fputc('\n', stderr);
     rebus_nerrors++;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static char *upcase(const char *s) {
     char *p = strdup(s);
     for (int i = 0; p[i]; i++) p[i] = (char)toupper((unsigned char)p[i]);
     return p;
 }
-
 typedef struct { const char *word; int tok; } KW;
 static KW kwtab[] = {
     {"CASE",T_CASE},{"DEFAULT",T_DEFAULT},{"DO",T_DO},{"ELSE",T_ELSE},
@@ -39,22 +33,21 @@ static KW kwtab[] = {
     {"RETURN",T_RETURN},{"STOP",T_STOP},{"THEN",T_THEN},{"TO",T_TO},
     {"UNLESS",T_UNLESS},{"UNTIL",T_UNTIL},{"WHILE",T_WHILE},{NULL,0}
 };
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int lookup_kw(const char *u) {
     for (int i=0; kwtab[i].word; i++)
         if (strcmp(kwtab[i].word,u)==0) return kwtab[i].tok;
     return 0;
 }
-
 #define RBUF_MAX (4<<20)
 static char  *rbuf = NULL;
 static size_t rlen = 0;
 static size_t rpos = 0;
-
 #define YY_INPUT(buf,result,max_size) \
     do { size_t _n=(rlen-rpos<(size_t)(max_size))?(rlen-rpos):(size_t)(max_size); \
          if(!_n){(result)=YY_NULL;} \
          else{memcpy((buf),rbuf+rpos,_n);rpos+=_n;(result)=(int)_n;} } while(0)
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void load_file(FILE *fp) {
     char line[65536];
     while (fgets(line,sizeof line,fp)) {
@@ -63,22 +56,16 @@ static void load_file(FILE *fp) {
     }
     rbuf[rlen]='\0';
 }
-
-/* next_is_continuation: scan rbuf for the start of line (yylineno+1)
- * and check if it begins with a continuation keyword (else/do/then).
- * We can't use rpos because flex may have pre-buffered the whole file. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int next_is_continuation(void) {
-    /* Find the start of yylineno+1 by counting newlines in rbuf */
-    int target = yylineno;  /* yylineno is already incremented past \n */
+    int target = yylineno;
     size_t p = 0;
     int line = 1;
     while (p < rlen && line < target) {
         if (rbuf[p] == '\n') line++;
         p++;
     }
-    /* p now at start of target line; skip whitespace */
     while (p < rlen && (rbuf[p] == ' ' || rbuf[p] == '\t')) p++;
-    /* skip comment lines */
     while (p < rlen && rbuf[p] == '#') {
         while (p < rlen && rbuf[p] != '\n') p++;
         if (p < rlen) p++;
@@ -94,8 +81,8 @@ static int next_is_continuation(void) {
     }
     return 0;
 }
-
 static int last_tok=0;
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int needs_semi(int tok) {
     switch(tok) {
         case T_IDENT: case T_STR: case T_INT: case T_REAL: case T_KEYWORD:
@@ -107,34 +94,25 @@ static int needs_semi(int tok) {
     }
 }
 %}
-
 %option noyywrap never-interactive yylineno prefix="rebus_yy"
-
 ALPHA   [A-Za-z_\x80-\xff]
 IDENT   {ALPHA}([A-Za-z0-9_.\x80-\xff])*
 DIGIT   [0-9]
 WS      [ \t]+
-
 %%
-
 {WS}            { }
 "#"[^\n]*       { }
 \n              { if(needs_semi(last_tok)&&!next_is_continuation()){last_tok=';';return ';';} }
-
 \'[^\']*\'      { yylval.sval=rebus_intern_n(yytext+1,yyleng-2); last_tok=T_STR; return T_STR; }
 \"[^\"]*\"      { yylval.sval=rebus_intern_n(yytext+1,yyleng-2); last_tok=T_STR; return T_STR; }
-
 {DIGIT}+"."{DIGIT}*([eE][+-]?{DIGIT}+)?  { yylval.dval=atof(yytext); last_tok=T_REAL; return T_REAL; }
 {DIGIT}+[eE][+-]?{DIGIT}+                { yylval.dval=atof(yytext); last_tok=T_REAL; return T_REAL; }
 {DIGIT}+        { yylval.ival=atol(yytext); last_tok=T_INT; return T_INT; }
-
 "&"{IDENT}      { yylval.sval=upcase(yytext+1); last_tok=T_KEYWORD; return T_KEYWORD; }
 "&"             { last_tok='&'; return '&'; }
-
 {IDENT}         { char *up=upcase(yytext); int kw=lookup_kw(up);
                   if(kw){free(up);last_tok=kw;return kw;}
                   yylval.sval=up; last_tok=T_IDENT; return T_IDENT; }
-
 ":=:"           { last_tok=T_EXCHANGE;   return T_EXCHANGE;  }
 "||:="          { last_tok=T_CATASSIGN;  return T_CATASSIGN; }
 "+:="           { last_tok=T_ADDASSIGN;  return T_ADDASSIGN; }
@@ -154,7 +132,6 @@ WS      [ \t]+
 "<="            { last_tok=T_LE;         return T_LE;        }
 "=="            { last_tok=T_SEQ;        return T_SEQ;       }
 "+:"            { last_tok=T_PLUSCOLON;  return T_PLUSCOLON; }
-
 "("  { last_tok='('; return '('; }
 ")"  { last_tok=')'; return ')'; }
 "["  { last_tok='['; return '['; }
@@ -181,17 +158,16 @@ WS      [ \t]+
 ">"  { last_tok='>'; return '>'; }
 "!"  { last_tok='!'; return '!'; }
 "\\" { last_tok='\\'; return '\\'; }
-
 .    { rebus_error(yylineno,"unexpected character '%s'",yytext); }
-
 %%
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rebus_yyerror(const char *msg) { rebus_error(yylineno,"%s",msg); }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern int   rebus_yyparse(void);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void  rebus_parse_init(void);
 RProgram    *rebus_parsed_program = NULL;
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 RProgram *rebus_parse(FILE *f, const char *filename) {
     rebus_filename=(char *)filename;
     last_tok=0;

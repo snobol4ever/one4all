@@ -1,51 +1,30 @@
-/*
- * prolog_atom.c — atom interning table for the Prolog frontend
- *
- * Uses a simple open-addressing hash table for O(1) average lookup,
- * plus a flat id→name array for O(1) reverse lookup.
- */
-
 #include "prolog_atom.h"
 #include "term.h"
-
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <gc.h>
-
-/* -------------------------------------------------------------------------
- * Well-known atom IDs (definitions — declared extern in term.h)
- * ---------------------------------------------------------------------- */
 int ATOM_DOT  = -1;
 int ATOM_NIL  = -1;
 int ATOM_TRUE = -1;
 int ATOM_FAIL = -1;
 int ATOM_CUT  = -1;
-
-/* -------------------------------------------------------------------------
- * Internal storage
- * ---------------------------------------------------------------------- */
 #define ATOM_INIT_CAP  256
-
-static char  **atom_names = NULL;   /* id -> heap-allocated name string */
-static int     atom_len   = 0;      /* number of interned atoms          */
-static int     atom_cap   = 0;      /* capacity of atom_names[]          */
-
-/* Hash table: maps string -> id.  Open addressing, linear probe. */
-#define HT_INIT_SIZE  512           /* must be power of two              */
-
+static char  **atom_names = NULL;
+static int     atom_len   = 0;
+static int     atom_cap   = 0;
+#define HT_INIT_SIZE  512
 typedef struct { char *key; int id; } HEntry;
 static HEntry *ht      = NULL;
 static int     ht_size = 0;
 static int     ht_used = 0;
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static unsigned int ht_hash(const char *s) {
     unsigned int h = 2166136261u;
     while (*s) { h ^= (unsigned char)*s++; h *= 16777619u; }
     return h;
 }
-
-/* Grow hash table to new_size (must be power of two). */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void ht_grow(int new_size) {
     HEntry *old = ht;
     int     old_size = ht_size;
@@ -60,16 +39,10 @@ static void ht_grow(int new_size) {
         ht[h] = old[i];
         ht_used++;
     }
-    /* old is GC-managed, no free needed */
 }
-
-/* -------------------------------------------------------------------------
- * prolog_atom_intern
- * ---------------------------------------------------------------------- */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int prolog_atom_intern(const char *name) {
     if (!name) name = "";
-
-    /* Lazy init */
     if (!ht) {
         ht_size = HT_INIT_SIZE;
         ht = GC_malloc(ht_size * sizeof(HEntry));
@@ -80,29 +53,22 @@ int prolog_atom_intern(const char *name) {
         atom_names = GC_malloc(atom_cap * sizeof(char *));
         memset(atom_names, 0, atom_cap * sizeof(char *));
     }
-
-    /* Lookup */
     unsigned int h = ht_hash(name) & (ht_size - 1);
     while (ht[h].key) {
         if (strcmp(ht[h].key, name) == 0) return ht[h].id;
         h = (h + 1) & (ht_size - 1);
     }
-
-    /* Insert */
     if (ht_used * 2 >= ht_size) {
         ht_grow(ht_size * 2);
-        /* Recompute probe position after rehash */
         h = ht_hash(name) & (ht_size - 1);
         while (ht[h].key) h = (h + 1) & (ht_size - 1);
     }
-
     if (atom_len >= atom_cap) {
         int old_cap = atom_cap;
         atom_cap *= 2;
         atom_names = GC_realloc(atom_names, atom_cap * sizeof(char *));
         memset(atom_names + old_cap, 0, (atom_cap - old_cap) * sizeof(char *));
     }
-
     char *copy = GC_strdup(name);
     int   id   = atom_len++;
     atom_names[id] = copy;
@@ -111,23 +77,14 @@ int prolog_atom_intern(const char *name) {
     ht_used++;
     return id;
 }
-
-/* -------------------------------------------------------------------------
- * prolog_atom_name
- * ---------------------------------------------------------------------- */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 const char *prolog_atom_name(int id) {
     if (id < 0 || id >= atom_len) return NULL;
     return atom_names[id];
 }
-
-/* -------------------------------------------------------------------------
- * prolog_atom_count
- * ---------------------------------------------------------------------- */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int prolog_atom_count(void) { return atom_len; }
-
-/* -------------------------------------------------------------------------
- * prolog_atom_init — intern well-known atoms and populate globals
- * ---------------------------------------------------------------------- */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void prolog_atom_init(void) {
     ATOM_DOT  = prolog_atom_intern(".");
     ATOM_NIL  = prolog_atom_intern("[]");
@@ -135,13 +92,8 @@ void prolog_atom_init(void) {
     ATOM_FAIL = prolog_atom_intern("fail");
     ATOM_CUT  = prolog_atom_intern("!");
 }
-
-/* -------------------------------------------------------------------------
- * Term constructors (live here because they need atom_* internals only
- * for the compound args allocation; no atom lookups required)
- * ---------------------------------------------------------------------- */
 #include <stddef.h>
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 Term *term_new_atom(int atom_id) {
     Term *t = GC_malloc(sizeof(Term));
     memset(t, 0, sizeof(Term));
@@ -149,16 +101,16 @@ Term *term_new_atom(int atom_id) {
     t->atom_id = atom_id;
     return t;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 Term *term_new_var(int var_slot) {
     Term *t = GC_malloc(sizeof(Term));
     memset(t, 0, sizeof(Term));
     t->tag        = TERM_VAR;
     t->var_slot   = var_slot;
-    t->saved_slot = var_slot;   /* preserved across bind() / trail_unwind() */
+    t->saved_slot = var_slot;
     return t;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 Term *term_new_compound(int functor, int arity, Term **args) {
     Term *t = GC_malloc(sizeof(Term));
     memset(t, 0, sizeof(Term));
@@ -173,7 +125,7 @@ Term *term_new_compound(int functor, int arity, Term **args) {
     }
     return t;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 Term *term_new_int(long ival) {
     Term *t = GC_malloc(sizeof(Term));
     memset(t, 0, sizeof(Term));
@@ -181,7 +133,7 @@ Term *term_new_int(long ival) {
     t->ival = ival;
     return t;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 Term *term_new_float(double fval) {
     Term *t = GC_malloc(sizeof(Term));
     memset(t, 0, sizeof(Term));

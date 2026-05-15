@@ -1,31 +1,13 @@
-/*
- * icon_lex_test.c — Unit tests for icon_lex.c
- *
- * M-ICON-LEX acceptance criteria:
- *  1. All keywords tokenized correctly
- *  2. All operators tokenized correctly
- *  3. Integer / real / string / cset literals parsed correctly
- *  4. Identifiers recognized
- *  5. EOF produced at end
- *  6. Every token in the 6 Rung 1 corpus programs tokenized
- *  7. No auto-semicolon insertion
- */
-
 #include "icon_lex.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 static int tests_run = 0;
 static int tests_pass = 0;
 static int tests_fail = 0;
-
 #define PASS(name) do { tests_run++; tests_pass++; printf("  PASS  %s\n", name); } while(0)
 #define FAIL(name, ...) do { tests_run++; tests_fail++; printf("  FAIL  %s: ", name); printf(__VA_ARGS__); printf("\n"); } while(0)
-
-/* -------------------------------------------------------------------------
- * Helper: tokenize src, fill toks[max], return count
- * -------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int tokenize_all(const char *src, IcnToken *toks, int max) {
     IcnLexer lx;
     icn_lex_init(&lx, src);
@@ -37,8 +19,7 @@ static int tokenize_all(const char *src, IcnToken *toks, int max) {
     }
     return n;
 }
-
-/* Expect exactly one non-EOF token of given kind */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int expect1(const char *src, IcnTkKind expected, const char *test_name) {
     IcnToken toks[4];
     int n = tokenize_all(src, toks, 4);
@@ -50,11 +31,7 @@ static int expect1(const char *src, IcnTkKind expected, const char *test_name) {
     PASS(test_name);
     return 1;
 }
-
-/* =========================================================================
- * Test groups
- * ======================================================================= */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void test_keywords(void) {
     printf("--- keywords ---\n");
     struct { const char *src; IcnTkKind kind; } cases[] = {
@@ -88,7 +65,7 @@ static void test_keywords(void) {
     for (int i = 0; cases[i].src; i++)
         expect1(cases[i].src, cases[i].t, cases[i].src);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void test_operators(void) {
     printf("--- operators ---\n");
     struct { const char *src; IcnTkKind kind; } cases[] = {
@@ -134,7 +111,7 @@ static void test_operators(void) {
     for (int i = 0; cases[i].src; i++)
         expect1(cases[i].src, cases[i].t, cases[i].src);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void test_punctuation(void) {
     printf("--- punctuation ---\n");
     struct { const char *src; IcnTkKind kind; } cases[] = {
@@ -152,7 +129,7 @@ static void test_punctuation(void) {
     for (int i = 0; cases[i].src; i++)
         expect1(cases[i].src, cases[i].t, cases[i].src);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void test_integer_literals(void) {
     printf("--- integer literals ---\n");
     struct { const char *src; long expected; } cases[] = {
@@ -177,7 +154,7 @@ static void test_integer_literals(void) {
         PASS(name);
     }
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void test_real_literals(void) {
     printf("--- real literals ---\n");
     struct { const char *src; double expected; } cases[] = {
@@ -202,11 +179,9 @@ static void test_real_literals(void) {
         PASS(name);
     }
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void test_string_literals(void) {
     printf("--- string literals ---\n");
-
-    /* Basic string */
     {
         IcnToken toks[4];
         tokenize_all("\"hello\"", toks, 4);
@@ -214,16 +189,12 @@ static void test_string_literals(void) {
         else FAIL("\"hello\"", "got kind=%s val=%s", icn_tk_name(toks[0].t),
                   toks[0].t == TK_STRING ? toks[0].val.v.sval.data : "?");
     }
-
-    /* Escape sequences */
     {
         IcnToken toks[4];
         tokenize_all("\"a\\nb\"", toks, 4);
         if (toks[0].t == TK_STRING && toks[0].val.v.sval.data[1] == '\n') PASS("escape \\n");
         else FAIL("escape \\n", "bad escape");
     }
-
-    /* Empty string */
     {
         IcnToken toks[4];
         tokenize_all("\"\"", toks, 4);
@@ -231,8 +202,6 @@ static void test_string_literals(void) {
         else FAIL("empty string", "kind=%s len=%zu", icn_tk_name(toks[0].t),
                   toks[0].t == TK_STRING ? toks[0].val.v.sval.len : 999);
     }
-
-    /* "done" — appears in corpus */
     {
         IcnToken toks[4];
         tokenize_all("\"done\"", toks, 4);
@@ -240,7 +209,7 @@ static void test_string_literals(void) {
         else FAIL("\"done\"", "bad");
     }
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void test_cset_literals(void) {
     printf("--- cset literals ---\n");
     {
@@ -256,7 +225,7 @@ static void test_cset_literals(void) {
         else FAIL("empty cset", "bad");
     }
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void test_identifiers(void) {
     printf("--- identifiers ---\n");
     struct { const char *src; } cases[] = {
@@ -273,7 +242,7 @@ static void test_identifiers(void) {
             FAIL(name, "got kind=%s", icn_tk_name(toks[0].t));
     }
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void test_eof(void) {
     printf("--- EOF ---\n");
     {
@@ -282,7 +251,6 @@ static void test_eof(void) {
         if (n >= 1 && toks[0].t == TK_EOF) PASS("empty source → EOF");
         else FAIL("empty source → EOF", "n=%d kind=%s", n, n>0 ? icn_tk_name(toks[0].t) : "?");
     }
-    /* Multiple calls after EOF still return EOF */
     {
         IcnLexer lx; icn_lex_init(&lx, "");
         IcnToken a = icn_lex_next(&lx);
@@ -291,7 +259,7 @@ static void test_eof(void) {
         else FAIL("repeated EOF", "a=%s b=%s", icn_tk_name(a.t), icn_tk_name(b.t));
     }
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void test_comments(void) {
     printf("--- comments ---\n");
     {
@@ -301,12 +269,7 @@ static void test_comments(void) {
         else FAIL("# comment skipped", "n=%d kind=%s", n, n>0 ? icn_tk_name(toks[0].t) : "?");
     }
 }
-
-/* =========================================================================
- * Rung 1 corpus tokenization tests
- * Verify every token in each corpus file tokenizes without error.
- * ======================================================================= */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void test_corpus_file(const char *path) {
     FILE *f = fopen(path, "r");
     if (!f) {
@@ -321,7 +284,6 @@ static void test_corpus_file(const char *path) {
     fread(src, 1, sz, f);
     src[sz] = '\0';
     fclose(f);
-
     IcnLexer lx;
     icn_lex_init(&lx, src);
     int errors = 0;
@@ -331,15 +293,13 @@ static void test_corpus_file(const char *path) {
         if (t.t == TK_EOF) break;
     }
     free(src);
-
-    /* Extract short filename for label */
     const char *slash = strrchr(path, '/');
     const char *label = slash ? slash + 1 : path;
     char name[128]; snprintf(name, sizeof(name), "corpus %s", label);
     if (errors == 0) PASS(name);
     else FAIL(name, "%d lex error(s)", errors);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void test_rung1_corpus(void) {
     printf("--- rung1 corpus lex ---\n");
     const char *corpus = "test/frontend/icon/corpus/rung01_paper";
@@ -354,15 +314,10 @@ static void test_rung1_corpus(void) {
         test_corpus_file(path);
     }
 }
-
-/* =========================================================================
- * Sequence test — tokenize full expression and verify token stream
- * ======================================================================= */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void test_sequence(const char *src, IcnTkKind *expected, int n, const char *name) {
     IcnToken toks[64];
     int got = tokenize_all(src, toks, 64);
-    /* Last expected is TK_EOF */
     int ok = 1;
     if (got < n) { FAIL(name, "only %d tokens, want %d", got, n); return; }
     for (int i = 0; i < n; i++) {
@@ -374,29 +329,21 @@ static void test_sequence(const char *src, IcnTkKind *expected, int n, const cha
     }
     if (ok) PASS(name);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void test_sequences(void) {
     printf("--- multi-token sequences ---\n");
-
-    /* every write(1 to 5); */
     {
         IcnTkKind exp[] = {TK_EVERY, TK_IDENT, TK_LPAREN, TK_INT, TK_TO, TK_INT, TK_RPAREN, TK_SEMICOL, TK_EOF};
         test_sequence("every write(1 to 5);", exp, 9, "every write(1 to 5);");
     }
-
-    /* procedure main(); */
     {
         IcnTkKind exp[] = {TK_PROCEDURE, TK_IDENT, TK_LPAREN, TK_RPAREN, TK_SEMICOL, TK_EOF};
         test_sequence("procedure main();", exp, 6, "procedure main();");
     }
-
-    /* 2 < (1 to 4) */
     {
         IcnTkKind exp[] = {TK_INT, TK_LT, TK_LPAREN, TK_INT, TK_TO, TK_INT, TK_RPAREN, TK_EOF};
         test_sequence("2 < (1 to 4)", exp, 8, "2 < (1 to 4)");
     }
-
-    /* No auto-semicolon: newline does NOT generate TK_SEMICOL */
     {
         IcnToken toks[8];
         int n = tokenize_all("1\n2", toks, 8);
@@ -407,11 +354,7 @@ static void test_sequences(void) {
         else FAIL("no auto-semicolon on newline", "found spurious semicolon");
     }
 }
-
-/* =========================================================================
- * main
- * ======================================================================= */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int main(void) {
     printf("=== icon_lex_test ===\n");
     test_keywords();
@@ -426,7 +369,6 @@ int main(void) {
     test_comments();
     test_sequences();
     test_rung1_corpus();
-
     printf("\n=== RESULTS: %d/%d PASS ===\n", tests_pass, tests_run);
     return tests_fail > 0 ? 1 : 0;
 }

@@ -8,12 +8,16 @@
 #include <string.h>
 #include <ctype.h>
 typedef struct { CODE_t *prog; AST_t **result; AST_t *ast_prog; } PP;
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sno4_stmt_commit_go(void*,Token,AST_t*,AST_t*,int,AST_t*,AST_t*,AST_t*,AST_t*);
 static Lex     *g_lx;
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     fixup_val(AST_t*);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int      is_pat(AST_t*);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static AST_t  *parse_expr(Lex*);
-/* pat_prim_kind: map pattern primitive name → typed IR kind; AST_VAR = not a prim */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static AST_e pat_prim_kind(const char *s) {
     if (!s) return AST_VAR;
     static const struct { const char *n; AST_e k; } m[] = {
@@ -30,33 +34,25 @@ static AST_e pat_prim_kind(const char *s) {
 %define api.pure full
 %parse-param { void *yyparse_param }
 %union { AST_t *expr; Token tok; }
-
-/* Atoms */
 %token <tok> T_IDENT T_FUNCTION T_KEYWORD T_END T_INT T_REAL T_STR
-/* Statement structure */
 %token <tok> T_LABEL T_GOTO_S T_GOTO_F T_GOTO_LPAREN T_GOTO_RPAREN T_STMT_END
-/* Binary operators (WHITE op WHITE) */
 %token T_2EQUAL T_2QUEST T_2PIPE T_2PLUS T_2MINUS
 %token T_2STAR T_2SLASH T_2CARET
 %token T_2DOLLAR T_2DOT
 %token T_2AMP T_2AT T_2POUND T_2PERCENT T_2TILDE
-/* Unary operators (no leading space) — named per SPITBOL Chapter 15 */
 %token T_1AT T_1TILDE T_1QUEST T_1AMP
 %token T_1PLUS T_1MINUS T_1STAR T_1DOLLAR T_1DOT
 %token T_1BANG T_1PERCENT T_1SLASH T_1POUND
 %token T_1EQUAL T_1PIPE
-/* Structural */
 %token T_CONCAT T_COMMA T_LPAREN T_RPAREN T_LBRACK T_RBRACK T_LANGLE T_RANGLE
-
 %type <expr> expr0 expr2 expr3 expr4 expr5 expr6 expr7 expr8
 %type <expr> expr9 expr10 expr11 expr12 expr13 expr14 expr15 expr17
 %type <expr> exprlist exprlist_ne opt_subject opt_pattern opt_repl
 %type <expr> goto_label_expr
 %type <expr> goto_expr goto_atom
-
 %%
 top        : program                                                                                { }
-           | /* empty */                                                                            { }
+           |                                                                            { }
            ;
 program    : program stmt | stmt                                                                    ;
 stmt
@@ -89,19 +85,15 @@ unlabeled_stmt
            | expr2 T_2QUEST opt_pattern opt_repl T_GOTO_F goto_label_expr T_GOTO_S goto_label_expr T_STMT_END { sno4_stmt_commit_go(yyparse_param,((Token){NULL,0,0,0}),expr_binary(AST_SCAN,$1,$3),NULL,($4!=NULL),$4,NULL,$8,$6); }
            ;
 opt_subject: expr3                                                                                { $$=$1; }
-           | /* empty */                                                                           { $$=NULL; }
+           |                                                                           { $$=NULL; }
            ;
 opt_pattern: expr3                                                                                 { $$=$1; }
-           | /* empty */                                                                           { $$=NULL; }
+           |                                                                           { $$=NULL; }
            ;
 opt_repl   : T_2EQUAL expr0                                                                   { $$=$2; }
            | T_2EQUAL                                                                          { AST_t*e=expr_new(AST_QLIT);e->sval=strdup("");$$=e; }
-           | /* empty */                                                                           { $$=NULL; }
+           |                                                                           { $$=NULL; }
            ;
-
-/* goto_atom / goto_expr: mini expression inside $(…) in a goto field.
- * Only atoms that GT state can lex: T_STR, T_IDENT, T_FUNCTION, T_END.
- * Implicit concat via T_CONCAT (whitespace between atoms). */
 goto_atom  : T_STR   { AST_t*e=expr_new(AST_QLIT);  e->sval=(char*)$1.sval; $$=e; }
            | T_IDENT  { AST_t*e=expr_new(AST_VAR);   e->sval=(char*)$1.sval; $$=e; }
            | T_FUNCTION { AST_t*e=expr_new(AST_VAR); e->sval=(char*)$1.sval; $$=e; }
@@ -110,9 +102,6 @@ goto_atom  : T_STR   { AST_t*e=expr_new(AST_QLIT);  e->sval=(char*)$1.sval; $$=e
 goto_expr  : goto_atom                          { $$=$1; }
            | goto_expr T_CONCAT goto_atom       { if($1->kind==AST_SEQ){expr_add_child($1,$3);$$=$1;}else{AST_t*s=expr_new(AST_SEQ);expr_add_child(s,$1);expr_add_child(s,$3);$$=s;} }
            ;
-
-/* goto_label_expr: returns AST_t* — AST_QLIT(sval=label) for a plain label,
- * or the computed AST_t* directly for $(expr) targets. No struct. */
 goto_label_expr
            : T_GOTO_LPAREN T_IDENT T_GOTO_RPAREN                                             { AST_t*e=expr_new(AST_QLIT);e->sval=strdup($2.sval);$$=e; }
            | T_GOTO_LPAREN T_END T_GOTO_RPAREN                                               { AST_t*e=expr_new(AST_QLIT);e->sval=strdup($2.sval);$$=e; }
@@ -121,8 +110,6 @@ goto_label_expr
            | T_GOTO_LPAREN T_1DOLLAR T_GOTO_LPAREN goto_expr T_GOTO_RPAREN T_GOTO_RPAREN    { $$=$4; }
            | T_GOTO_LPAREN T_1DOLLAR T_STR T_GOTO_RPAREN                                     { AST_t*e=expr_new(AST_QLIT);e->sval=strdup($3.sval);$$=e; }
            ;
-
-/* Expression grammar — levels match beauty.sno Expr0–Expr17 and SPITBOL manual priorities */
 expr0      : expr2 T_2EQUAL expr0                                                             { $$=expr_binary(AST_ASSIGN,          $1,$3); }
            | expr2 T_2QUEST      expr0                                                             { $$=expr_binary(AST_SCAN,            $1,$3); }
            | expr2                                                                                 { $$=$1; }
@@ -174,12 +161,12 @@ expr14     : T_1AT      expr14                                                  
            | T_1STAR     expr14                                                             { $$=expr_unary(AST_DEFER,           $2); }
            | T_1DOLLAR  expr14                                                             { $$=expr_unary(AST_INDIRECT,        $2); }
            | T_1DOT       expr14                                                             { $$=expr_unary(AST_NAME,            $2); }
-           | T_1BANG  expr14                                                             { $$=expr_unary(AST_POW,             $2); }  /* user-definable */
-           | T_1PERCENT      expr14                                                             { $$=expr_unary(AST_DIV,             $2); }  /* user-definable */
-           | T_1SLASH        expr14                                                             { $$=expr_unary(AST_DIV,             $2); }  /* user-definable */
-           | T_1POUND        expr14                                                             { $$=expr_unary(AST_MUL,             $2); }  /* user-definable */
-           | T_1EQUAL        expr14                                                             { $$=expr_unary(AST_ASSIGN,          $2); }  /* user-definable */
-           | T_1PIPE expr14                                                             { AST_t*_e=expr_unary(AST_OPSYN,$2); _e->sval=strdup("|"); $$=_e; }  /* user-definable */
+           | T_1BANG  expr14                                                             { $$=expr_unary(AST_POW,             $2); }
+           | T_1PERCENT      expr14                                                             { $$=expr_unary(AST_DIV,             $2); }
+           | T_1SLASH        expr14                                                             { $$=expr_unary(AST_DIV,             $2); }
+           | T_1POUND        expr14                                                             { $$=expr_unary(AST_MUL,             $2); }
+           | T_1EQUAL        expr14                                                             { $$=expr_unary(AST_ASSIGN,          $2); }
+           | T_1PIPE expr14                                                             { AST_t*_e=expr_unary(AST_OPSYN,$2); _e->sval=strdup("|"); $$=_e; }
            | expr15                                                                                { $$=$1; }
            ;
 expr15     : expr15 T_LBRACK exprlist T_RBRACK                                                  { AST_t*i=expr_new(AST_IDX);expr_add_child(i,$1);for(int j=0;j<$3->nchildren;j++)expr_add_child(i,$3->children[j]);free($3->children);free($3);$$=i; }
@@ -187,7 +174,7 @@ expr15     : expr15 T_LBRACK exprlist T_RBRACK                                  
            | expr17                                                                                { $$=$1; }
            ;
 exprlist   : exprlist_ne                                                                           { $$=$1; }
-           | /* empty */                                                                           { $$=expr_new(AST_NUL); }
+           |                                                                           { $$=expr_new(AST_NUL); }
            ;
 exprlist_ne: exprlist_ne T_COMMA expr0                                                            { expr_add_child($1,$3);$$=$1; }
            | exprlist_ne T_COMMA                                                                  { expr_add_child($1,expr_new(AST_NUL));$$=$1; }
@@ -205,23 +192,25 @@ expr17     : T_LPAREN expr0 T_RPAREN                                            
            | T_REAL                                                                               { AST_t*e=expr_new(AST_FLIT);   e->dval=$1.dval;$$=e; }
            ;
 %%
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int snobol4_lex(YYSTYPE *yylval_param, void *yyparse_param) {
     (void)yyparse_param; Token t=lex_next(g_lx); yylval_param->tok=t;
     if (getenv("SNO_TOK_TRACE"))
         fprintf(stderr,"[TOK %d sval=%s ival=%ld]\n",t.kind,t.sval?t.sval:"",t.ival);
     return t.kind;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void snobol4_error(void *p,const char *msg){(void)p;sno_error(g_lx?g_lx->lineno:0,"parse error: %s",msg);}
-static void fixup_val(AST_t *e){ (void)e; /* SNOBOL4: no-op — AST_SEQ never converted to AST_CAT; runtime handles both */ }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static void fixup_val(AST_t *e){ (void)e; }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int is_pat(AST_t *e){
     if(!e) return 0;
     switch(e->kind){case AST_ARB:case AST_ARBNO:case AST_CAPT_COND_ASGN:case AST_CAPT_IMMED_ASGN:case AST_CAPT_CURSOR:case AST_DEFER:return 1;default:break;}
     for(int i=0;i<e->nchildren;i++) if(is_pat(e->children[i])) return 1;
     return 0;
 }
-/* sno4_stmt_commit_go: go is AST_t* AST_SEQ encoding S/F/U goto parts (RS-1) */
-/* sno4_stmt_commit_go: gu/gs/gf are AST_t* from goto_label_expr —
- * AST_QLIT(sval=label) for a plain label, any other kind for a computed target. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void sno4_stmt_commit_go(void *param,Token lbl,AST_t *subj,AST_t *pat,int has_eq,AST_t *repl,AST_t *gu,AST_t *gs,AST_t *gf){
     PP *pp=(PP*)param;
     if(lbl.sval&&strcasecmp(lbl.sval,"EXPORT")==0){
@@ -241,25 +230,14 @@ static void sno4_stmt_commit_go(void *param,Token lbl,AST_t *subj,AST_t *pat,int
         e->next=pp->prog->imports;pp->prog->imports=e;return;
     }
     STMT_t *s=stmt_new();
-    /* EM-BANNER-FIDELITY: lbl.lineno is set only for labeled statements
-     * (unlabeled stmts pass a zero-init Token).  Fall back to
-     * snobol4_get_stmt_lineno(), which the lexer sets when entering
-     * BODY_START — the correct source line of the unlabeled stmt. */
     s->lineno = lbl.lineno ? lbl.lineno : snobol4_get_stmt_lineno();
-    /* SN-26-bridge-coverage-j: assign source stno at parse time so backward
-     * gotos report the correct stno (not a linear execution counter). 1-based.
-     * Increment nstmts FIRST, then read it — counts blank statements too
-     * (they go through this same commit_go path with empty subj/pat/repl). */
     s->stno = ++pp->prog->nstmts;
     if(lbl.sval){s->label=strdup(lbl.sval);s->is_end=lbl.ival||(strcmp(lbl.sval,"END")==0);}
-    /* S=PR split: AST_SCAN(subj, pat) from "X ? PAT" binary match operator */
     if(!pat && subj && subj->kind==AST_SCAN && subj->nchildren==2) {
         AST_t *orig = subj;
         subj = orig->children[0];
         pat  = orig->children[1];
     }
-    /* S=PR split: if subj is AST_SEQ with first child a bare name, split into
-     * subject=first_child, pattern=rest. Grammar puts everything in opt_subject. */
     if(!pat && subj && (subj->kind==AST_SEQ) && subj->nchildren>=2) {
         AST_t *first = subj->children[0];
         if(first->kind==AST_VAR || first->kind==AST_KEYWORD || first->kind==AST_QLIT || first->kind==AST_INDIRECT) {
@@ -278,18 +256,10 @@ static void sno4_stmt_commit_go(void *param,Token lbl,AST_t *subj,AST_t *pat,int
     s->subject=subj; s->pattern=pat;
     if(s->subject) fixup_val(s->subject);
     if(has_eq){s->has_eq=1;s->replacement=repl;if(repl&&!is_pat(repl))fixup_val(repl);}
-    /* goto fields: gu/gs/gf are AST_QLIT(sval=label) for plain labels, else computed. */
     if(gu){ if(gu->kind==AST_QLIT) s->goto_u=gu->sval; else s->goto_u_expr=gu; }
     if(gs){ if(gs->kind==AST_QLIT) s->goto_s=gs->sval; else s->goto_s_expr=gs; }
     if(gf){ if(gf->kind==AST_QLIT) s->goto_f=gf->sval; else s->goto_f_expr=gf; }
     if(!pp->prog->head) pp->prog->head=pp->prog->tail=s; else{pp->prog->tail->next=s;pp->prog->tail=s;}
-    /* nstmts already incremented above when assigning s->stno (SN-26-bridge-coverage-j) */
-    /* SI-4: also emit AST_STMT/AST_END directly into ast_prog when the caller
-     * wants a pure-AST result (sno_parse_ast path). This mirrors stmt_to_ast()
-     * exactly — both paths must produce byte-identical lowering output. */
-    /* SI-4: emit AST_STMT/AST_END into ast_prog for the sno_parse_ast path.
-     * Delegate to stmt_to_ast(s) so the encoding is byte-identical to the
-     * code_to_ast shim path — one canonical builder, not two. */
     if (pp->ast_prog) {
         AST_t *anode = stmt_to_ast(s);
         if (pp->ast_prog->nchildren >= pp->ast_prog->nalloc) {
@@ -300,16 +270,16 @@ static void sno4_stmt_commit_go(void *param,Token lbl,AST_t *subj,AST_t *pat,int
         pp->ast_prog->children[pp->ast_prog->nchildren++] = anode;
     }
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static AST_t *parse_expr(Lex *lx){
     CODE_t *prog=calloc(1,sizeof*prog);PP p={prog,NULL,NULL};g_lx=lx;snobol4_parse(&p);
     return prog->head?prog->head->subject:NULL;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 CODE_t *parse_program_tokens(Lex *stream){
     CODE_t *prog=calloc(1,sizeof*prog);PP p={prog,NULL,NULL};g_lx=stream;snobol4_parse(&p);return prog;
 }
-/* parse_program_tokens_ast — SI-4: parse into CODE_t (for existing consumers)
- * AND into a parallel AST_PROGRAM (for the lower() call path).
- * Returns the CODE_t; sets *ast_out to the AST_PROGRAM. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 CODE_t *parse_program_tokens_ast(Lex *stream, AST_t **ast_out){
     CODE_t *prog=calloc(1,sizeof*prog);
     AST_t *ast=calloc(1,sizeof*ast); ast->kind=AST_PROGRAM;
@@ -317,13 +287,13 @@ CODE_t *parse_program_tokens_ast(Lex *stream, AST_t **ast_out){
     *ast_out=ast;
     return prog;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 CODE_t *parse_program(LineArray *lines){(void)lines;return calloc(1,sizeof(CODE_t));}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 AST_t *parse_expr_from_str(const char *src){
     if(!src||!*src) return NULL;Lex lx={0};lex_open_str(&lx,src,(int)strlen(src),0);return parse_expr(&lx);
 }
-/* parse_expr_pat_from_str — parse a bare expression string using the bison
- * parser in BODY start state (lex_open_str). Returns s->pattern if the
- * scan-split fired, else s->subject. Used by _eval_str_impl_fn and snobol4_pattern.c. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 AST_t *parse_expr_pat_from_str(const char *src) {
     if (!src || !*src) return NULL;
     int slen = (int)strlen(src);
@@ -339,7 +309,6 @@ AST_t *parse_expr_pat_from_str(const char *src) {
     g_lx = &lx;
     snobol4_parse(&p);
     free(buf);
-    /* SI-6: read from AST_PROGRAM if available, else fall back to CODE_t */
     if (p.ast_prog && p.ast_prog->nchildren > 0) {
         const AST_t *s = p.ast_prog->children[0];
         if (s) {
@@ -354,10 +323,7 @@ AST_t *parse_expr_pat_from_str(const char *src) {
     free(prog);
     return res;
 }
-/* sno_parse_string — parse a multi-statement SNOBOL4 string via bison.
- * Uses lex_open_str_initial (INITIAL/col-1 start) so indented and labelled
- * statements are handled correctly.  lex_open_str pushes BODY — correct for
- * single-expression parsing only. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 CODE_t *sno_parse_string(const char *src) {
     if (!src) return calloc(1, sizeof(CODE_t));
     int slen = (int)strlen(src);
@@ -375,10 +341,7 @@ CODE_t *sno_parse_string(const char *src) {
     free(buf);
     return prog;
 }
-
-/* SI-6: sno_parse_string_ast — parse a SNOBOL4 string and return AST_PROGRAM.
- * Mirrors sno_parse_string but also builds the ast_prog tree.
- * If code_out is non-NULL, the CODE_t* is also returned there. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 AST_t *sno_parse_string_ast(const char *src, CODE_t **code_out) {
     if (!src) { if (code_out) *code_out = calloc(1, sizeof(CODE_t)); return NULL; }
     int slen = (int)strlen(src);

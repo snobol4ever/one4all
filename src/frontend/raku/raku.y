@@ -1,45 +1,35 @@
 %define api.prefix {raku_yy}
-
 %code requires {
-/*
- * raku.y — Tiny-Raku Bison grammar
- *
- * FI-3: builds AST_t/STMT_t directly — no intermediate RakuNode AST.
- *
- * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6
- */
 #include "../../ast/ast.h"
 #include "../snobol4/scrip_cc.h"
-
 typedef struct ExprList {
     AST_t **items;
     int      count;
     int      cap;
 } ExprList;
 }
-
 %{
 #include "../../ast/ast.h"
 #include "../snobol4/scrip_cc.h"
-#include "raku.tab.h"   /* pulls in ExprList from %code requires */
+#include "raku.tab.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern int  raku_yylex(void);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern int  raku_get_lineno(void);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void raku_yyerror(const char *msg) {
     fprintf(stderr, "raku parse error line %d: %s\n", raku_get_lineno(), msg);
 }
-
-/*--------------------------------------------------------------------
- * ExprList helpers
- *--------------------------------------------------------------------*/
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static ExprList *exprlist_new(void) {
     ExprList *l = calloc(1, sizeof *l);
     if (!l) { fprintf(stderr, "raku: OOM\n"); exit(1); }
     return l;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static ExprList *exprlist_append(ExprList *l, AST_t *e) {
     if (l->count >= l->cap) {
         l->cap = l->cap ? l->cap * 2 : 8;
@@ -49,29 +39,29 @@ static ExprList *exprlist_append(ExprList *l, AST_t *e) {
     l->items[l->count++] = e;
     return l;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void exprlist_free(ExprList *l) { if (l) { free(l->items); free(l); } }
-
-/*--------------------------------------------------------------------
- * Build helpers (logic from raku_lower.c, inlined for direct IR)
- *--------------------------------------------------------------------*/
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static const char *strip_sigil(const char *s) {
     if (s && (s[0]=='$'||s[0]=='@'||s[0]=='%')) return s+1;
     return s;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static AST_t *leaf_sval(AST_e k, const char *s) {
     AST_t *e = expr_new(k); e->sval = intern(s); return e;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static AST_t *var_node(const char *name) {
     return leaf_sval(AST_VAR, strip_sigil(name));
 }
-/* make_call: AST_FNC + children[0]=AST_VAR(name) for icn_interp_eval layout */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static AST_t *make_call(const char *name) {
     AST_t *e = leaf_sval(AST_FNC, name);
     AST_t *n = expr_new(AST_VAR); n->sval = intern(name);
     expr_add_child(e, n);
     return e;
 }
-/* make_seq: ExprList → AST_SEQ_EXPR, frees list */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static AST_t *make_seq(ExprList *stmts) {
     AST_t *seq = expr_new(AST_SEQ_EXPR);
     if (stmts) {
@@ -80,7 +70,7 @@ static AST_t *make_seq(ExprList *stmts) {
     }
     return seq;
 }
-/* lower_interp_str: "hello $var" → left-associative AST_CAT chain */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static AST_t *lower_interp_str(const char *s) {
     int len = s ? (int)strlen(s) : 0;
     AST_t *result = NULL;
@@ -105,7 +95,7 @@ static AST_t *lower_interp_str(const char *s) {
         result=result?expr_binary(AST_CAT,result,lit):lit; }
     return result ? result : leaf_sval(AST_QLIT,"");
 }
-/* make_for_range: for lo..hi -> $v body → explicit while-loop */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static AST_t *make_for_range(AST_t *lo, AST_t *hi, const char *vname, AST_t *body_seq) {
     AST_t *init = expr_binary(AST_ASSIGN, leaf_sval(AST_VAR,vname), lo);
     AST_t *cond = expr_binary(AST_LE, leaf_sval(AST_VAR,vname), hi);
@@ -117,12 +107,8 @@ static AST_t *make_for_range(AST_t *lo, AST_t *hi, const char *vname, AST_t *bod
     expr_add_child(seq, init); expr_add_child(seq, wloop);
     return seq;
 }
-
-/*--------------------------------------------------------------------
- * CODE_t output
- *--------------------------------------------------------------------*/
 CODE_t *raku_prog_result = NULL;
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void add_proc(AST_t *e) {
     if (!e) return;
     if (!raku_prog_result) raku_prog_result = calloc(1, sizeof(CODE_t));
@@ -132,24 +118,19 @@ static void add_proc(AST_t *e) {
     else { raku_prog_result->tail->next = st; raku_prog_result->tail = st; }
     raku_prog_result->nstmts++;
 }
-
-/* SUB_TAG: sentinel bit to distinguish sub defs from body stmts in stmt_list */
 #define SUB_TAG 0x40000000
-
-/* RK-26: Raku method table — maps "ClassName::method" → AST_FNC proc name */
 #define RAKU_METH_MAX 256
 typedef struct { char key[128]; char procname[128]; } RakuMethEntry;
 static RakuMethEntry raku_meth_table[RAKU_METH_MAX];
 static int           raku_meth_ntypes = 0;
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void raku_meth_register(const char *classname, const char *methname, const char *procname) {
     if (raku_meth_ntypes >= RAKU_METH_MAX) return;
     RakuMethEntry *e = &raku_meth_table[raku_meth_ntypes++];
     snprintf(e->key,      sizeof e->key,      "%s::%s", classname, methname);
     snprintf(e->procname, sizeof e->procname,  "%s",     procname);
 }
-
-/* Emit the extern declaration so interp.c can call raku_meth_lookup */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 const char *raku_meth_lookup(const char *classname, const char *methname) {
     char key[128];
     snprintf(key, sizeof key, "%s::%s", classname, methname);
@@ -158,10 +139,7 @@ const char *raku_meth_lookup(const char *classname, const char *methname) {
             return raku_meth_table[i].procname;
     return NULL;
 }
-
-
 %}
-
 %union {
     long      ival;
     double    dval;
@@ -169,14 +147,12 @@ const char *raku_meth_lookup(const char *classname, const char *methname) {
     AST_t   *node;
     ExprList *list;
 }
-
 %token <ival> LIT_INT
 %token <dval> LIT_FLOAT
 %token <sval> LIT_STR LIT_INTERP_STR LIT_REGEX LIT_MATCH_GLOBAL LIT_SUBST
 %token <sval> VAR_SCALAR VAR_ARRAY VAR_HASH VAR_TWIGIL IDENT
 %token <ival> VAR_CAPTURE
 %token <sval> VAR_NAMED_CAPTURE
-
 %token KW_MY KW_SAY KW_PRINT KW_IF KW_ELSE KW_ELSIF KW_WHILE KW_FOR
 %token KW_SUB KW_GATHER KW_TAKE KW_RETURN
 %token KW_GIVEN KW_WHEN KW_DEFAULT
@@ -185,7 +161,6 @@ const char *raku_meth_lookup(const char *classname, const char *methname) {
 %token KW_TRY KW_CATCH KW_DIE
 %token KW_CLASS KW_METHOD KW_HAS KW_NEW
 %token OP_FATARROW
-
 %token OP_RANGE OP_RANGE_EX
 %token OP_ARROW
 %token OP_EQ OP_NE OP_LE OP_GE
@@ -194,13 +169,11 @@ const char *raku_meth_lookup(const char *classname, const char *methname) {
 %token OP_BIND
 %token OP_SMATCH
 %token OP_DIV
-
 %type <node> stmt expr atom range_expr cmp_expr add_expr closure
 %type <node> mul_expr unary_expr postfix_expr call_expr block
 %type <node> if_stmt while_stmt for_stmt sub_decl given_stmt
 %type <node> unless_stmt until_stmt repeat_stmt class_decl
 %type <list> stmt_list arg_list param_list when_list named_arg_list class_body_list
-
 %right '=' OP_BIND
 %left  OP_OR
 %left  OP_AND
@@ -212,24 +185,19 @@ const char *raku_meth_lookup(const char *classname, const char *methname) {
 %left  '*' '/' '%' OP_DIV
 %right UMINUS
 %left  '.'
-
 %%
-
 program
     : stmt_list
         {
             ExprList *all = $1;
-            /* Partition: subs (ival & SUB_TAG) vs body stmts */
             if (all) {
-                /* Pass 1: emit sub defs */
                 for (int i = 0; i < all->count; i++) {
                     AST_t *e = all->items[i];
                     if (!e || !(e->kind==AST_FNC && (e->ival & SUB_TAG))) continue;
-                    e->ival &= ~SUB_TAG;   /* restore real nparams */
+                    e->ival &= ~SUB_TAG;
                     add_proc(e);
-                    all->items[i] = NULL;  /* mark consumed */
+                    all->items[i] = NULL;
                 }
-                /* Pass 2: wrap remaining body stmts in synthetic "main" AST_FNC */
                 int has_body = 0;
                 for (int i = 0; i < all->count; i++) if (all->items[i]) { has_body=1; break; }
                 if (has_body) {
@@ -244,12 +212,10 @@ program
             }
         }
     ;
-
 stmt_list
-    : /* empty */    { $$ = exprlist_new(); }
+    :    { $$ = exprlist_new(); }
     | stmt_list stmt { $$ = exprlist_append($1, $2); }
     ;
-
 stmt
     : KW_MY VAR_SCALAR '=' expr ';'
         { $$ = expr_binary(AST_ASSIGN, var_node($2), $4); }
@@ -257,7 +223,6 @@ stmt
         { $$ = expr_binary(AST_ASSIGN, var_node($2), $4); }
     | KW_MY VAR_HASH '=' expr ';'
         { $$ = expr_binary(AST_ASSIGN, var_node($2), $4); }
-    /* RK-19: typed variable declarations — type annotation (IDENT) silently discarded */
     | KW_MY IDENT VAR_SCALAR '=' expr ';'
         { free($2); $$ = expr_binary(AST_ASSIGN, var_node($3), $5); }
     | KW_MY IDENT VAR_ARRAY '=' expr ';'
@@ -273,12 +238,12 @@ stmt
     | KW_SAY expr ';'
         { AST_t *c=make_call("write"); expr_add_child(c,$2); $$=c; }
     | KW_SAY '(' expr ',' expr ')' ';'
-        { /* RK-39: say($fh, str) */
+        {
           AST_t *c=make_call("raku_say_fh"); expr_add_child(c,$3); expr_add_child(c,$5); $$=c; }
     | KW_PRINT expr ';'
         { AST_t *c=make_call("writes"); expr_add_child(c,$2); $$=c; }
     | KW_PRINT '(' expr ',' expr ')' ';'
-        { /* RK-39: print($fh, str) */
+        {
           AST_t *c=make_call("raku_print_fh"); expr_add_child(c,$3); expr_add_child(c,$5); $$=c; }
     | KW_TAKE expr ';'
         { $$=expr_unary(AST_SUSPEND,$2); }
@@ -288,7 +253,6 @@ stmt
         { $$=expr_new(AST_RETURN); }
     | VAR_SCALAR '=' expr ';'
         { $$=expr_binary(AST_ASSIGN,var_node($1),$3); }
-    /* RK-26: $obj.field = expr — field write */
     | VAR_SCALAR '.' IDENT '=' expr ';'
         { AST_t *fe=expr_new(AST_FIELD);
           fe->sval=(char*)intern($3); free($3);
@@ -314,7 +278,6 @@ stmt
     | while_stmt        { $$=$1; }
     | for_stmt          { $$=$1; }
     | given_stmt        { $$=$1; }
-    /* RK-25: try/CATCH as block-level stmts (no trailing semicolon) */
     | KW_TRY block
         { AST_t *c=make_call("raku_try");
           expr_add_child(c,$2); $$=c; }
@@ -327,7 +290,6 @@ stmt
     | sub_decl          { $$=$1; }
     | class_decl        { $$=$1; }
     ;
-
 if_stmt
     : KW_IF '(' expr ')' block
         { AST_t *e=expr_new(AST_IF); expr_add_child(e,$3); expr_add_child(e,$5); $$=e; }
@@ -336,42 +298,30 @@ if_stmt
     | KW_IF '(' expr ')' block KW_ELSE if_stmt
         { AST_t *e=expr_new(AST_IF); expr_add_child(e,$3); expr_add_child(e,$5); expr_add_child(e,$7); $$=e; }
     ;
-
 while_stmt
     : KW_WHILE '(' expr ')' block
         { $$=expr_binary(AST_WHILE,$3,$5); }
     ;
-
-/* RK-20: unless — if !cond */
 unless_stmt
     : KW_UNLESS '(' expr ')' block
         { AST_t *e=expr_new(AST_IF); expr_add_child(e,expr_unary(AST_NOT,$3)); expr_add_child(e,$5); $$=e; }
     | KW_UNLESS '(' expr ')' block KW_ELSE block
         { AST_t *e=expr_new(AST_IF); expr_add_child(e,expr_unary(AST_NOT,$3)); expr_add_child(e,$5); expr_add_child(e,$7); $$=e; }
     ;
-
-/* RK-20: until — loop while cond is falsy */
 until_stmt
     : KW_UNTIL '(' expr ')' block
         { AST_t *e=expr_new(AST_UNTIL); expr_add_child(e,$3); expr_add_child(e,$5); $$=e; }
     ;
-
-/* RK-20: repeat — unconditional loop (use last to break) */
 repeat_stmt
     : KW_REPEAT block
         { AST_t *e=expr_new(AST_REPEAT); expr_add_child(e,$2); $$=e; }
     ;
-
 for_stmt
-    /* for expr -> $v body: if expr is AST_TO (range), use while-loop lowering */
     : KW_FOR expr OP_ARROW VAR_SCALAR block
         { AST_t *iter=$2; const char *vname=strip_sigil($4);
           if (iter->kind==AST_TO) {
-              /* range case: lo=children[0], hi=children[1] */
               $$ = make_for_range(iter->children[0], iter->children[1], vname, $5);
           } else {
-              /* Always wrap in AST_ITERATE so loopvar goes on the wrapper node.
-               * RK-16/RK-21: gen->sval = loopvar name for coro_drive / AST_EVERY binding. */
               const char *vn = intern(strip_sigil($4));
               AST_t *gen = expr_unary(AST_ITERATE, iter);
               gen->sval = (char *)vn;
@@ -381,7 +331,6 @@ for_stmt
         { AST_t *gen=($2->kind==AST_VAR)?expr_unary(AST_ITERATE,$2):$2;
           $$=expr_binary(AST_EVERY,gen,$3); }
     ;
-
 given_stmt
     : KW_GIVEN expr '{' when_list '}'
         { /* RK-18d: AST_CASE[ topic, cmpnode0, val0, body0, cmpnode1, val1, body1, ... ]
@@ -399,7 +348,7 @@ given_stmt
           exprlist_free(whens);
           $$=ec; }
     | KW_GIVEN expr '{' when_list KW_DEFAULT block '}'
-        { /* RK-18d: AST_CASE with default: AST_NUL cmpnode + AST_NUL val + body at end. */
+        {
           AST_t *ec=expr_new(AST_CASE);
           expr_add_child(ec,$2);
           ExprList *whens=$4;
@@ -414,9 +363,8 @@ given_stmt
           expr_add_child(ec,expr_new(AST_NUL)); expr_add_child(ec,expr_new(AST_NUL)); expr_add_child(ec,$6);
           $$=ec; }
     ;
-
 when_list
-    : /* empty */  { $$=exprlist_new(); }
+    :  { $$=exprlist_new(); }
     | when_list KW_WHEN expr block
         { AST_e cmp=($3->kind==AST_QLIT)?AST_LEQ:AST_EQ;
           AST_t *pair=expr_new(AST_SEQ_EXPR);
@@ -424,7 +372,6 @@ when_list
           expr_add_child(pair,$3); expr_add_child(pair,$4);
           $$=exprlist_append($1,pair); }
     ;
-
 sub_decl
     : KW_SUB IDENT '(' param_list ')' block
         { ExprList *params=$4; int np=params?params->count:0;
@@ -441,10 +388,6 @@ sub_decl
           for(int i=0;i<body->nchildren;i++) expr_add_child(e,body->children[i]);
           $$=e; }
     ;
-
-/* ── RK-26: class declaration ─────────────────────────────────────────────
- * class Name { has $.f1; has $.f2; method m($p) { ... } }
- * ──────────────────────────────────────────────────────────────────────── */
 class_decl
     : KW_CLASS IDENT '{' class_body_list '}'
         {
@@ -477,9 +420,8 @@ class_decl
             $$ = expr_new(AST_NUL);
         }
     ;
-
 class_body_list
-    : /* empty */  { $$ = exprlist_new(); }
+    :  { $$ = exprlist_new(); }
     | class_body_list KW_HAS VAR_TWIGIL ';'
         { AST_t *fv = leaf_sval(AST_VAR, $3); free($3);
           $$ = exprlist_append($1, fv); }
@@ -507,7 +449,6 @@ class_body_list
           free($3);
           $$ = exprlist_append($1, e); }
     ;
-
 named_arg_list
     : IDENT OP_FATARROW expr
         { $$ = exprlist_new();
@@ -518,41 +459,28 @@ named_arg_list
           exprlist_append($1, $5);
           $$ = $1; }
     ;
-
 param_list
     : VAR_SCALAR             { $$=exprlist_append(exprlist_new(),var_node($1)); }
     | param_list ',' VAR_SCALAR { $$=exprlist_append($1,var_node($3)); }
     ;
-
 block
     : '{' stmt_list '}'  { $$=make_seq($2); }
     ;
-
-/* closure: '{' expr '}' — for map/grep/sort bodies; $_ is bound by caller */
 closure
     : '{' expr '}'  { $$=$2; }
     ;
-
 expr
     : VAR_SCALAR '=' expr  { $$=expr_binary(AST_ASSIGN,var_node($1),$3); }
     | KW_GATHER block      {
-          /* RK-21: gather { block } → anonymous coroutine sub + call.
-           * 1. Build AST_FNC def with SUB_TAG (like sub_decl) named __gather_N.
-           * 2. add_proc() so it lands in the proc table.
-           * 3. Return a call AST_FNC (no SUB_TAG) so coro_eval wraps it as
-           *    coro_bb_suspend — a BB_PUMP coroutine collecting AST_SUSPEND (take) values. */
           static int gather_seq = 0;
           char gname[32]; snprintf(gname, sizeof gname, "__gather_%d", gather_seq++);
-          /* Build the def node */
           AST_t *def = leaf_sval(AST_FNC, gname); def->ival = (long)0 | SUB_TAG;
           AST_t *dn  = expr_new(AST_VAR); dn->sval = intern(gname);
           expr_add_child(def, dn);
-          /* Splice block children into def */
           AST_t *blk = $2;
           for (int i = 0; i < blk->nchildren; i++) expr_add_child(def, blk->children[i]);
-          def->ival &= ~SUB_TAG;   /* strip sentinel — restore real nparams (0) for coro_call */
+          def->ival &= ~SUB_TAG;
           add_proc(def);
-          /* Build the call node (no SUB_TAG) */
           AST_t *call = leaf_sval(AST_FNC, gname);
           AST_t *cn   = expr_new(AST_VAR); cn->sval = intern(gname);
           expr_add_child(call, cn);
@@ -560,7 +488,6 @@ expr
       }
     | cmp_expr             { $$=$1; }
     ;
-
 cmp_expr
     : cmp_expr OP_AND add_expr  { $$=expr_binary(AST_SEQ,$1,$3); }
     | cmp_expr OP_OR  add_expr  { $$=expr_binary(AST_ALT,$1,$3); }
@@ -573,39 +500,36 @@ cmp_expr
     | add_expr OP_SEQ add_expr  { $$=expr_binary(AST_LEQ,$1,$3); }
     | add_expr OP_SNE add_expr  { $$=expr_binary(AST_LNE,$1,$3); }
     | add_expr OP_SMATCH LIT_REGEX
-        { /* RK-23: $s ~~ /pattern/ */
+        {
           AST_t *c = make_call("raku_match");
           expr_add_child(c, $1);
           expr_add_child(c, leaf_sval(AST_QLIT, $3));
           $$ = c; }
     | add_expr OP_SMATCH LIT_MATCH_GLOBAL
-        { /* RK-37: $s ~~ m:g/pat/ — global match, returns SOH-sep match list */
+        {
           AST_t *c = make_call("raku_match_global");
           expr_add_child(c, $1);
           expr_add_child(c, leaf_sval(AST_QLIT, $3));
           $$ = c; }
     | add_expr OP_SMATCH LIT_SUBST
-        { /* RK-37: $s ~~ s/pat/repl/[g] — substitution */
+        {
           AST_t *c = make_call("raku_subst");
           expr_add_child(c, $1);
           expr_add_child(c, leaf_sval(AST_QLIT, $3));
           $$ = c; }
     | range_expr               { $$=$1; }
     ;
-
 range_expr
     : add_expr OP_RANGE    add_expr { $$=expr_binary(AST_TO,$1,$3); }
     | add_expr OP_RANGE_EX add_expr { $$=expr_binary(AST_TO,$1,$3); }
     | add_expr                      { $$=$1; }
     ;
-
 add_expr
     : add_expr '+' mul_expr  { $$=expr_binary(AST_ADD,$1,$3); }
     | add_expr '-' mul_expr  { $$=expr_binary(AST_SUB,$1,$3); }
     | add_expr '~' mul_expr  { $$=expr_binary(AST_CAT,$1,$3); }
     | mul_expr               { $$=$1; }
     ;
-
 mul_expr
     : mul_expr '*'    unary_expr  { $$=expr_binary(AST_MUL,$1,$3); }
     | mul_expr '/'    unary_expr  { $$=expr_binary(AST_DIV,$1,$3); }
@@ -613,15 +537,12 @@ mul_expr
     | mul_expr OP_DIV unary_expr  { $$=expr_binary(AST_DIV,$1,$3); }
     | unary_expr                  { $$=$1; }
     ;
-
 unary_expr
     : '-' unary_expr %prec UMINUS  { $$=expr_unary(AST_MNS,$2); }
     | '!' unary_expr               { $$=expr_unary(AST_NOT,$2); }
     | postfix_expr                 { $$=$1; }
     ;
-
 postfix_expr : call_expr { $$=$1; } ;
-
 call_expr
     : IDENT '(' arg_list ')'
         { AST_t *e=make_call($1);
@@ -629,7 +550,6 @@ call_expr
           if(args){ for(int i=0;i<args->count;i++) expr_add_child(e,args->items[i]); exprlist_free(args); }
           $$=e; }
     | IDENT '(' ')'  { $$=make_call($1); }
-    /* RK-26: ClassName.new(named_args) */
     | IDENT '.' KW_NEW '(' named_arg_list ')'
         { AST_t *c=make_call("raku_new");
           expr_add_child(c,leaf_sval(AST_QLIT,$1)); free($1);
@@ -640,7 +560,6 @@ call_expr
         { AST_t *c=make_call("raku_new");
           expr_add_child(c,leaf_sval(AST_QLIT,$1)); free($1);
           $$=c; }
-    /* RK-26: $obj.method(args) */
     | atom '.' IDENT '(' arg_list ')'
         { AST_t *c=make_call("raku_mcall");
           expr_add_child(c,$1);
@@ -653,14 +572,11 @@ call_expr
           expr_add_child(c,$1);
           expr_add_child(c,leaf_sval(AST_QLIT,$3)); free($3);
           $$=c; }
-    /* RK-26: $obj.field (field read) */
     | atom '.' IDENT
         { AST_t *fe=expr_new(AST_FIELD);
           fe->sval=(char*)intern($3); free($3);
           expr_add_child(fe,$1);
           $$=fe; }
-    /* RK-24: map/grep/sort higher-order list ops */
-    /* RK-25: die as expr (try/CATCH are stmt-level) */
     | KW_DIE expr
         { AST_t *c=make_call("raku_die");
           expr_add_child(c,$2); $$=c; }
@@ -678,12 +594,10 @@ call_expr
           expr_add_child(c,$2); expr_add_child(c,$3); $$=c; }
     | atom           { $$=$1; }
     ;
-
 arg_list
     : expr              { $$=exprlist_append(exprlist_new(),$1); }
     | arg_list ',' expr { $$=exprlist_append($1,$3); }
     ;
-
 atom
     : LIT_INT         { AST_t *e=expr_new(AST_ILIT); e->ival=$1; $$=e; }
     | LIT_FLOAT       { AST_t *e=expr_new(AST_FLIT); e->dval=$1; $$=e; }
@@ -693,12 +607,12 @@ atom
     | VAR_ARRAY       { $$=var_node($1); }
     | VAR_HASH        { $$=var_node($1); }
     | VAR_CAPTURE
-        { /* RK-34: $0/$1 positional capture */
+        {
           AST_t *c=make_call("raku_capture");
           AST_t *idx=expr_new(AST_ILIT); idx->ival=$1;
           expr_add_child(c,idx); $$=c; }
     | VAR_NAMED_CAPTURE
-        { /* RK-35: $<name> named capture */
+        {
           AST_t *c=make_call("raku_named_capture");
           expr_add_child(c,leaf_sval(AST_QLIT,$1)); $$=c; }
     | VAR_ARRAY '[' expr ']'
@@ -712,7 +626,6 @@ atom
     | KW_EXISTS VAR_HASH '{' expr '}'
         { AST_t *c=make_call("hash_exists"); expr_add_child(c,var_node($2)); expr_add_child(c,$4); $$=c; }
     | IDENT           { $$=var_node($1); }
-    /* RK-26: $.field / $!field inside a method → AST_FIELD(self, fieldname) */
     | VAR_TWIGIL
         { AST_t *fe=expr_new(AST_FIELD);
           fe->sval=(char*)intern($1); free($1);
@@ -720,13 +633,12 @@ atom
           $$=fe; }
     | '(' expr ')'    { $$=$2; }
     ;
-
 %%
-
-/* ── Parse entry (sets up flex buffer and calls yyparse) ─────────────── */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void *raku_yy_scan_string(const char *);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void  raku_yy_delete_buffer(void *);
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 CODE_t *raku_parse_string(const char *src) {
     raku_prog_result = NULL;
     void *buf = raku_yy_scan_string(src);
