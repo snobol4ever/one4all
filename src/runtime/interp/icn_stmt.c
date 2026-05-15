@@ -98,7 +98,15 @@ void bb_exec_stmt(tree_t *e)
         FRAME.loop_next  = saved_nxt;
         return;
     }
-    case TT_SEQ:
+    case TT_SEQ: {
+        for (int i = 0; i < e->n; i++) {
+            DESCR_t r = bb_eval_value(e->c[i]);
+            if (IS_FAIL_fn(r)) return;
+            if (FRAME.returning || FRAME.loop_break || FRAME.loop_next ||
+                FRAME.suspending) return;
+        }
+        return;
+    }
     case TT_SEQ_EXPR: {
         for (int i = 0; i < e->n; i++) {
             bb_exec_stmt(e->c[i]);
