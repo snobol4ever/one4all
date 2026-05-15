@@ -181,6 +181,7 @@ const _kw_store = {
     STCOUNT: 0,
     STLIMIT: -1,
     ALPHABET: (function() { let s=''; for(let i=0;i<256;i++) s+=String.fromCharCode(i); return s; })(),
+    DIGITS: '0123456789',
     MAXLNGTH: 5000,
     TRIM: 0,
     RTNTYPE: '',
@@ -337,7 +338,14 @@ function push_int(n)         { _stack.push(n); }
 function push_str(s, len)    { _stack.push(_str(s)); }
 function push_real_bits(bits){ _stack.push(_mkreal(bits)); }
 function push_null()         { _stack.push(null); }
-function push_var(name)      { _stack.push(_vars[name]); }
+function push_var(name) {
+    const uname = name.toUpperCase();
+    if (uname in _kw_store) {
+        _stack.push(_kw(uname));
+    } else {
+        _stack.push(_vars[name]);
+    }
+}
 function pop_void()          { _stack.pop(); }
 
 function store_var(name) {
