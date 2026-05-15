@@ -678,6 +678,7 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
     for (int i = 0; i < n; i++) {
         SM_Instr * instr = &sm->instrs[i];
         fprintf(out, "  NET_L%d:\n", i);
+        int has_continue = 0;
         switch (instr->op) {
         case SM_STNO:
             net_push_i4(out, (int)instr->a[0].i);
@@ -750,17 +751,112 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
             break;
         case SM_HALT:
             fprintf(out, "    call       void SnoRt::halt_tos()\n");
+            fprintf(out, "    br         NET_DONE\n");
+            has_continue = 1;
             break;
         case SM_LABEL:
+            break;
         case SM_JUMP:
+            fprintf(out, "    ldc.i4     %lld\n    stloc      _pc\n    br         NET_DISPATCH\n", instr->a[0].i);
+            has_continue = 1;
+            break;
         case SM_JUMP_S:
+            fprintf(out, "    call       bool SnoRt::last_ok()\n");
+            fprintf(out, "    brfalse    NET_L%d\n", i + 1);
+            fprintf(out, "    ldc.i4     %lld\n    stloc      _pc\n    br         NET_DISPATCH\n", instr->a[0].i);
+            has_continue = 1;
+            break;
         case SM_JUMP_F:
+            fprintf(out, "    call       bool SnoRt::last_ok()\n");
+            fprintf(out, "    brtrue     NET_L%d\n", i + 1);
+            fprintf(out, "    ldc.i4     %lld\n    stloc      _pc\n    br         NET_DISPATCH\n", instr->a[0].i);
+            has_continue = 1;
+            break;
+        case SM_CALL_FN:
+            net_escape_ldstr(out, instr->a[0].s ? instr->a[0].s : "");
+            net_push_i4(out, (int)instr->a[1].i);
+            fprintf(out, "    call       void SnoRt::sno_call(string, int32)\n");
+            break;
+        case SM_RETURN:
+        case SM_RETURN_S:
+        case SM_RETURN_F:
+            net_push_i4(out, 0);
+            net_push_i4(out, 1);
+            fprintf(out, "    call       void SnoRt::do_return(int32, bool)\n");
+            break;
+        case SM_FRETURN:
+        case SM_FRETURN_S:
+        case SM_FRETURN_F:
+            net_push_i4(out, 1);
+            net_push_i4(out, 0);
+            fprintf(out, "    call       void SnoRt::do_return(int32, bool)\n");
+            break;
+        case SM_NRETURN:
+        case SM_NRETURN_S:
+        case SM_NRETURN_F:
+            net_push_i4(out, 2);
+            net_push_i4(out, 0);
+            fprintf(out, "    call       void SnoRt::do_return(int32, bool)\n");
+            break;
+        case SM_DEFINE_ENTRY:
+        case SM_DEFINE:
+        case SM_EXEC_STMT:
+        case SM_PUSH_EXPRESSION:
+        case SM_CALL_EXPRESSION:
+        case SM_PUSH_EXPR:
+        case SM_INCR:
+        case SM_DECR:
+        case SM_LOAD_FRAME:
+        case SM_STORE_FRAME:
+        case SM_LOAD_GLOCAL:
+        case SM_STORE_GLOCAL:
+        case SM_SUSPEND_VALUE:
+        case SM_SUSPEND:
+        case SM_PAT_LIT:
+        case SM_PAT_ANY:
+        case SM_PAT_NOTANY:
+        case SM_PAT_SPAN:
+        case SM_PAT_BREAK:
+        case SM_PAT_LEN:
+        case SM_PAT_POS:
+        case SM_PAT_RPOS:
+        case SM_PAT_TAB:
+        case SM_PAT_RTAB:
+        case SM_PAT_REM:
+        case SM_PAT_BAL:
+        case SM_PAT_FENCE0:
+        case SM_PAT_FENCE1:
+        case SM_PAT_ABORT:
+        case SM_PAT_FAIL:
+        case SM_PAT_SUCCEED:
+        case SM_PAT_EPS:
+        case SM_PAT_ALT:
+        case SM_PAT_CAT:
+        case SM_PAT_DEREF:
+        case SM_PAT_REFNAME:
+        case SM_PAT_CAPTURE:
+        case SM_PAT_CAPTURE_FN:
+        case SM_PAT_CAPTURE_FN_ARGS:
+        case SM_PAT_USERCALL:
+        case SM_PAT_USERCALL_ARGS:
+        case SM_BB_PUMP:
+        case SM_BB_ONCE:
+        case SM_BB_EVAL:
+        case SM_BB_ONCE_PROC:
+        case SM_BB_PUMP_PROC:
+        case SM_BB_PUMP_CASE:
+        case SM_BB_PUMP_SM:
+        case SM_BB_PUMP_EVERY:
+        case SM_EXEC_BB:
+        case SM_PUMP_BB:
+        case SM_ICMP_GT:
+        case SM_ICMP_LT:
             break;
         default:
-            fprintf(out, "    ; [net SM op %d unimplemented]\n", (int)instr->op);
+            fprintf(out, "    // [net SM op %d unimplemented]\n", (int)instr->op);
             break;
         }
-        if (i + 1 < n) { net_push_i4(out, i + 1); fprintf(out, "    stloc      _pc\n    br         NET_DISPATCH\n"); }
+        if (!has_continue && i + 1 < n) { net_push_i4(out, i + 1); fprintf(out, "    stloc      _pc\n    br         NET_DISPATCH\n"); }
     }
     fprintf(out, "  NET_DONE:\n");
     return 0;

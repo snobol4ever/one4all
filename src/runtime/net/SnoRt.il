@@ -238,18 +238,21 @@
   //    coerce_num   if TOS is string, parse as double and replace              
   .method public static void coerce_num() cil managed
   {
-    .maxstack 2
-    .locals init (object V_v, float64 V_d)
+    .maxstack 3
+    .locals init (object V_v, float64 V_d, bool V_ok)
     ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
     callvirt   instance !0 class [mscorlib]System.Collections.Generic.Stack`1<object>::Pop()
     stloc      V_v
     ldloc      V_v
     isinst     [mscorlib]System.String
     brfalse    COERCE_DONE
+    ldc.r8     0.0
+    stloc      V_d
     ldloc      V_v
     castclass  [mscorlib]System.String
-    call       float64 [mscorlib]System.Double::Parse(string)
-    stloc      V_d
+    ldloca     V_d
+    call       bool [mscorlib]System.Double::TryParse(string, float64&)
+    pop
     ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
     ldloc      V_d
     box        [mscorlib]System.Double
@@ -516,17 +519,397 @@
     ret
   }
 
-  //    call   invoke named SNOBOL4 function with nargs arguments              
+  //    sno_call   invoke named SNOBOL4 built-in (8 minimal built-ins)
+  //   Unknown names: set last_ok=false, pop nargs, push "".
   .method public static void sno_call(string name, int32 nargs) cil managed
   {
-    .maxstack 1
+    .maxstack 3
+    .locals init (int32 V_i)
+    ldarg.0
+    ldstr      "SIZE"
+    call       bool [mscorlib]System.String::op_Equality(string, string)
+    brfalse    CALL_NOT_SIZE
+    call       void SnoRt::builtin_SIZE()
+    ldc.i4.1
+    stsfld     bool SnoRt::_last_ok
+    ret
+  CALL_NOT_SIZE:
+    ldarg.0
+    ldstr      "TRIM"
+    call       bool [mscorlib]System.String::op_Equality(string, string)
+    brfalse    CALL_NOT_TRIM
+    call       void SnoRt::builtin_TRIM()
+    ldc.i4.1
+    stsfld     bool SnoRt::_last_ok
+    ret
+  CALL_NOT_TRIM:
+    ldarg.0
+    ldstr      "DUPL"
+    call       bool [mscorlib]System.String::op_Equality(string, string)
+    brfalse    CALL_NOT_DUPL
+    call       void SnoRt::builtin_DUPL()
+    ldc.i4.1
+    stsfld     bool SnoRt::_last_ok
+    ret
+  CALL_NOT_DUPL:
+    ldarg.0
+    ldstr      "SUBSTR"
+    call       bool [mscorlib]System.String::op_Equality(string, string)
+    brfalse    CALL_NOT_SUBSTR
+    call       void SnoRt::builtin_SUBSTR()
+    ldc.i4.1
+    stsfld     bool SnoRt::_last_ok
+    ret
+  CALL_NOT_SUBSTR:
+    ldarg.0
+    ldstr      "IDENT"
+    call       bool [mscorlib]System.String::op_Equality(string, string)
+    brfalse    CALL_NOT_IDENT
+    call       void SnoRt::builtin_IDENT()
+    ret
+  CALL_NOT_IDENT:
+    ldarg.0
+    ldstr      "DIFFER"
+    call       bool [mscorlib]System.String::op_Equality(string, string)
+    brfalse    CALL_NOT_DIFFER
+    call       void SnoRt::builtin_DIFFER()
+    ret
+  CALL_NOT_DIFFER:
+    ldarg.0
+    ldstr      "INTEGER"
+    call       bool [mscorlib]System.String::op_Equality(string, string)
+    brfalse    CALL_NOT_INTEGER
+    call       void SnoRt::builtin_INTEGER()
+    ret
+  CALL_NOT_INTEGER:
+    ldarg.0
+    ldstr      "DATATYPE"
+    call       bool [mscorlib]System.String::op_Equality(string, string)
+    brfalse    CALL_NOT_DATATYPE
+    call       void SnoRt::builtin_DATATYPE()
+    ldc.i4.1
+    stsfld     bool SnoRt::_last_ok
+    ret
+  CALL_NOT_DATATYPE:
+    ldc.i4.0
+    stloc      V_i
+  CALL_POP_LOOP:
+    ldloc      V_i
+    ldarg.1
+    bge        CALL_POP_DONE
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    callvirt   instance int32 class [mscorlib]System.Collections.Generic.Stack`1<object>::get_Count()
+    ldc.i4.0
+    ble        CALL_POP_NEXT
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    callvirt   instance !0 class [mscorlib]System.Collections.Generic.Stack`1<object>::Pop()
+    pop
+  CALL_POP_NEXT:
+    ldloc      V_i
+    ldc.i4.1
+    add
+    stloc      V_i
+    br         CALL_POP_LOOP
+  CALL_POP_DONE:
+    ldc.i4.0
+    stsfld     bool SnoRt::_last_ok
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    ldstr      ""
+    callvirt   instance void class [mscorlib]System.Collections.Generic.Stack`1<object>::Push(!0)
     ret
   }
 
-  //    do_return   function return                                             
+  //    do_return   function return (kind: 0=RETURN 1=FRETURN 2=NRETURN)
+  //   kind==1 (FRETURN) sets last_ok=false; otherwise last_ok=true.
   .method public static void do_return(int32 kind, bool has_val) cil managed
   {
-    .maxstack 1
+    .maxstack 2
+    ldarg.0
+    ldc.i4.1
+    bne.un     DO_RET_OK
+    ldc.i4.0
+    stsfld     bool SnoRt::_last_ok
+    ret
+  DO_RET_OK:
+    ldc.i4.1
+    stsfld     bool SnoRt::_last_ok
+    ret
+  }
+
+  //    SIZE(s) -> length of string                                              
+  .method private static void builtin_SIZE() cil managed
+  {
+    .maxstack 2
+    .locals init (string V_s)
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    callvirt   instance !0 class [mscorlib]System.Collections.Generic.Stack`1<object>::Pop()
+    call       string SnoRt::_obj_to_str(object)
+    stloc      V_s
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    ldloc      V_s
+    callvirt   instance int32 [mscorlib]System.String::get_Length()
+    box        [mscorlib]System.Int32
+    callvirt   instance void class [mscorlib]System.Collections.Generic.Stack`1<object>::Push(!0)
+    ret
+  }
+
+  //    TRIM(s) -> trailing-space trimmed string                                 
+  .method private static void builtin_TRIM() cil managed
+  {
+    .maxstack 3
+    .locals init (string V_s, int32 V_i)
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    callvirt   instance !0 class [mscorlib]System.Collections.Generic.Stack`1<object>::Pop()
+    call       string SnoRt::_obj_to_str(object)
+    stloc      V_s
+    ldloc      V_s
+    callvirt   instance int32 [mscorlib]System.String::get_Length()
+    stloc      V_i
+  TRIM_LOOP:
+    ldloc      V_i
+    ldc.i4.0
+    ble        TRIM_DONE
+    ldloc      V_s
+    ldloc      V_i
+    ldc.i4.1
+    sub
+    callvirt   instance char [mscorlib]System.String::get_Chars(int32)
+    ldc.i4.s   32
+    bne.un     TRIM_DONE
+    ldloc      V_i
+    ldc.i4.1
+    sub
+    stloc      V_i
+    br         TRIM_LOOP
+  TRIM_DONE:
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    ldloc      V_s
+    ldc.i4.0
+    ldloc      V_i
+    callvirt   instance string [mscorlib]System.String::Substring(int32, int32)
+    callvirt   instance void class [mscorlib]System.Collections.Generic.Stack`1<object>::Push(!0)
+    ret
+  }
+
+  //    DUPL(s, n) -> s repeated n times                                         
+  .method private static void builtin_DUPL() cil managed
+  {
+    .maxstack 3
+    .locals init (object V_n, string V_s, int32 V_count, class [mscorlib]System.Text.StringBuilder V_sb)
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    callvirt   instance !0 class [mscorlib]System.Collections.Generic.Stack`1<object>::Pop()
+    stloc      V_n
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    callvirt   instance !0 class [mscorlib]System.Collections.Generic.Stack`1<object>::Pop()
+    call       string SnoRt::_obj_to_str(object)
+    stloc      V_s
+    ldloc      V_n
+    call       float64 SnoRt::_obj_to_dbl(object)
+    conv.i4
+    stloc      V_count
+    newobj     instance void [mscorlib]System.Text.StringBuilder::.ctor()
+    stloc      V_sb
+  DUPL_LOOP:
+    ldloc      V_count
+    ldc.i4.0
+    ble        DUPL_DONE
+    ldloc      V_sb
+    ldloc      V_s
+    callvirt   instance class [mscorlib]System.Text.StringBuilder [mscorlib]System.Text.StringBuilder::Append(string)
+    pop
+    ldloc      V_count
+    ldc.i4.1
+    sub
+    stloc      V_count
+    br         DUPL_LOOP
+  DUPL_DONE:
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    ldloc      V_sb
+    callvirt   instance string [mscorlib]System.Object::ToString()
+    callvirt   instance void class [mscorlib]System.Collections.Generic.Stack`1<object>::Push(!0)
+    ret
+  }
+
+  //    SUBSTR(s, i, n) -> substring (1-based, SNOBOL4 convention)              
+  .method private static void builtin_SUBSTR() cil managed
+  {
+    .maxstack 3
+    .locals init (object V_n, object V_i, string V_s, int32 V_start, int32 V_len, int32 V_slen)
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    callvirt   instance !0 class [mscorlib]System.Collections.Generic.Stack`1<object>::Pop()
+    stloc      V_n
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    callvirt   instance !0 class [mscorlib]System.Collections.Generic.Stack`1<object>::Pop()
+    stloc      V_i
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    callvirt   instance !0 class [mscorlib]System.Collections.Generic.Stack`1<object>::Pop()
+    call       string SnoRt::_obj_to_str(object)
+    stloc      V_s
+    ldloc      V_i
+    call       float64 SnoRt::_obj_to_dbl(object)
+    conv.i4
+    ldc.i4.1
+    sub
+    stloc      V_start
+    ldloc      V_n
+    call       float64 SnoRt::_obj_to_dbl(object)
+    conv.i4
+    stloc      V_len
+    ldloc      V_s
+    callvirt   instance int32 [mscorlib]System.String::get_Length()
+    stloc      V_slen
+    ldloc      V_start
+    ldc.i4.0
+    bge        SUBSTR_CHK_LEN
+    ldc.i4.0
+    stloc      V_start
+  SUBSTR_CHK_LEN:
+    ldloc      V_start
+    ldloc      V_len
+    add
+    ldloc      V_slen
+    ble        SUBSTR_OK
+    ldloc      V_slen
+    ldloc      V_start
+    sub
+    stloc      V_len
+  SUBSTR_OK:
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    ldloc      V_len
+    ldc.i4.0
+    bge        SUBSTR_PUSH
+    ldstr      ""
+    callvirt   instance void class [mscorlib]System.Collections.Generic.Stack`1<object>::Push(!0)
+    ret
+  SUBSTR_PUSH:
+    ldloc      V_s
+    ldloc      V_start
+    ldloc      V_len
+    callvirt   instance string [mscorlib]System.String::Substring(int32, int32)
+    callvirt   instance void class [mscorlib]System.Collections.Generic.Stack`1<object>::Push(!0)
+    ret
+  }
+
+  //    IDENT(a, b) -> last_ok = (a string-equals b); pops 2 with no push        
+  .method private static void builtin_IDENT() cil managed
+  {
+    .maxstack 2
+    .locals init (string V_a, string V_b)
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    callvirt   instance !0 class [mscorlib]System.Collections.Generic.Stack`1<object>::Pop()
+    call       string SnoRt::_obj_to_str(object)
+    stloc      V_b
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    callvirt   instance !0 class [mscorlib]System.Collections.Generic.Stack`1<object>::Pop()
+    call       string SnoRt::_obj_to_str(object)
+    stloc      V_a
+    ldloc      V_a
+    ldloc      V_b
+    call       bool [mscorlib]System.String::op_Equality(string, string)
+    stsfld     bool SnoRt::_last_ok
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    ldstr      ""
+    callvirt   instance void class [mscorlib]System.Collections.Generic.Stack`1<object>::Push(!0)
+    ret
+  }
+
+  //    DIFFER(a, b) -> last_ok = (a string-not-equals b)                        
+  .method private static void builtin_DIFFER() cil managed
+  {
+    .maxstack 2
+    .locals init (string V_a, string V_b, bool V_eq)
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    callvirt   instance !0 class [mscorlib]System.Collections.Generic.Stack`1<object>::Pop()
+    call       string SnoRt::_obj_to_str(object)
+    stloc      V_b
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    callvirt   instance !0 class [mscorlib]System.Collections.Generic.Stack`1<object>::Pop()
+    call       string SnoRt::_obj_to_str(object)
+    stloc      V_a
+    ldloc      V_a
+    ldloc      V_b
+    call       bool [mscorlib]System.String::op_Equality(string, string)
+    stloc      V_eq
+    ldloc      V_eq
+    ldc.i4.0
+    ceq
+    stsfld     bool SnoRt::_last_ok
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    ldstr      ""
+    callvirt   instance void class [mscorlib]System.Collections.Generic.Stack`1<object>::Push(!0)
+    ret
+  }
+
+  //    INTEGER(x) -> last_ok = (x is integer or parseable as integer)          
+  .method private static void builtin_INTEGER() cil managed
+  {
+    .maxstack 3
+    .locals init (object V_v, int32 V_i, bool V_ok)
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    callvirt   instance !0 class [mscorlib]System.Collections.Generic.Stack`1<object>::Pop()
+    stloc      V_v
+    ldloc      V_v
+    isinst     [mscorlib]System.Int32
+    brfalse    INT_CHK_STR
+    ldc.i4.1
+    stsfld     bool SnoRt::_last_ok
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    ldstr      ""
+    callvirt   instance void class [mscorlib]System.Collections.Generic.Stack`1<object>::Push(!0)
+    ret
+  INT_CHK_STR:
+    ldloc      V_v
+    isinst     [mscorlib]System.String
+    brfalse    INT_FAIL
+    ldc.i4.0
+    stloc      V_i
+    ldloc      V_v
+    castclass  [mscorlib]System.String
+    ldloca     V_i
+    call       bool [mscorlib]System.Int32::TryParse(string, int32&)
+    stloc      V_ok
+    ldloc      V_ok
+    stsfld     bool SnoRt::_last_ok
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    ldstr      ""
+    callvirt   instance void class [mscorlib]System.Collections.Generic.Stack`1<object>::Push(!0)
+    ret
+  INT_FAIL:
+    ldc.i4.0
+    stsfld     bool SnoRt::_last_ok
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    ldstr      ""
+    callvirt   instance void class [mscorlib]System.Collections.Generic.Stack`1<object>::Push(!0)
+    ret
+  }
+
+  //    DATATYPE(x) -> uppercase name of x's type (one4all convention)          
+  .method private static void builtin_DATATYPE() cil managed
+  {
+    .maxstack 2
+    .locals init (object V_v)
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    callvirt   instance !0 class [mscorlib]System.Collections.Generic.Stack`1<object>::Pop()
+    stloc      V_v
+    ldloc      V_v
+    isinst     [mscorlib]System.Int32
+    brfalse    DT_NOT_INT
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    ldstr      "INTEGER"
+    callvirt   instance void class [mscorlib]System.Collections.Generic.Stack`1<object>::Push(!0)
+    ret
+  DT_NOT_INT:
+    ldloc      V_v
+    isinst     [mscorlib]System.Double
+    brfalse    DT_NOT_DBL
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    ldstr      "REAL"
+    callvirt   instance void class [mscorlib]System.Collections.Generic.Stack`1<object>::Push(!0)
+    ret
+  DT_NOT_DBL:
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    ldstr      "STRING"
+    callvirt   instance void class [mscorlib]System.Collections.Generic.Stack`1<object>::Push(!0)
     ret
   }
 
@@ -622,7 +1005,8 @@
   // _obj_to_dbl: convert boxed value to double for arithmetic
   .method private static float64 _obj_to_dbl(object v) cil managed
   {
-    .maxstack 1
+    .maxstack 3
+    .locals init (float64 V_d, bool V_ok)
     ldarg.0
     isinst     [mscorlib]System.Int32
     brfalse    OTD_NOT_INT
@@ -641,9 +1025,14 @@
     ldarg.0
     isinst     [mscorlib]System.String
     brfalse    OTD_ZERO
+    ldc.r8     0.0
+    stloc      V_d
     ldarg.0
     castclass  [mscorlib]System.String
-    call       float64 [mscorlib]System.Double::Parse(string)
+    ldloca     V_d
+    call       bool [mscorlib]System.Double::TryParse(string, float64&)
+    pop
+    ldloc      V_d
     ret
   OTD_ZERO:
     ldc.r8     0.0
