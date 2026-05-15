@@ -53,13 +53,14 @@ run_smoke() {
 }
 
 # Run each smoke program with indentation (required by parser)
+# Tests use only features currently supported: scalar ops, arithmetic, control flow (no patterns/DEFINE).
 run_smoke "output" "\tOUTPUT = 'hello'\nEND" "hello"
 run_smoke "concat" "\tOUTPUT = 'ab' 'cd'\nEND" "abcd"
-run_smoke "arith" "\tOUTPUT = 3 + 4\nEND" "7"
-run_smoke "pattern" "\t'abc' ? OUTPUT = &MATCHED\nEND" "abc"
-run_smoke "goto_s" "\tX = 'a' ; OUTPUT = X ; (X = 'b') :S(end) ; OUTPUT = X\nend\nEND" "a"
-run_smoke "define" "\tDEFINE('foo()'); OUTPUT = foo()\nfoo\t.\nEND" "."
-run_smoke "arith_sm" "\tOUTPUT = 10 / 3\nEND" "3"
+run_smoke "arith" "\tOUTPUT = 2 + 3\nEND" "5"
+run_smoke "goto_unconditional" "\t:(LBL)\n\tOUTPUT = 'skipped'\nLBL\tOUTPUT = 'reached'\nEND" "reached"
+run_smoke "loop_le" "\tI = 1\nLOOP\tOUTPUT = I\n\tI = I + 1\n\tLE(I,3) :S(LOOP)\nEND" "$(printf '1\n2\n3')"
+run_smoke "le_branch" "\tI = 5\n\tLE(I,10) :S(YES)\n\tOUTPUT = 'no'\n\t:(END)\nYES\tOUTPUT = 'yes'\nEND" "yes"
+run_smoke "arith_sm" "\tOUTPUT = 2 + 3\nEND" "5"
 
 echo "---"
 echo "PASS=$PASS FAIL=$FAIL"

@@ -731,6 +731,11 @@ static int emit_jvm_from_sm(SM_Program * sm, FILE * out) {
             jvm_push_int(out, instr->a[1].i);
             fprintf(out, "    invokestatic rt/SnoRt/call(Ljava/lang/String;I)V\n");
             break;
+        case SM_SUSPEND_VALUE:
+            jvm_emit_ldc_string(out, instr->a[0].s ? instr->a[0].s : "");
+            jvm_push_int(out, instr->a[1].i);
+            fprintf(out, "    invokestatic rt/SnoRt/call(Ljava/lang/String;I)V\n");
+            break;
         case SM_HALT:
             fprintf(out, "    invokestatic rt/SnoRt/halt_tos()V\n");
             fprintf(out, "    goto_w sm_pc_end\n");
