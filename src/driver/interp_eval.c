@@ -914,15 +914,16 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         }
         *out = best; return 1;
     }
-    if (!strcmp(fn,"sqrt") && nargs == 1) {
+    /* IJ-4: trig/exp/math builtins — coerce arg to numeric */
+#define ICN_TONUM(av) (IS_REAL_fn(av) ? (av).r : IS_INT_fn(av) ? (double)(av).i : ((av).v==DT_S && (av).s ? strtod((av).s,NULL) : 0.0))
+    if (!strcmp(fn,"sqrt") && nargs >= 1) {
         DESCR_t av = args[0];
-        double v = IS_REAL_fn(av) ? av.r : (double)av.i;
+        double v = ICN_TONUM(av);
         *out = REALVAL(sqrt(v)); return 1;
     }
     /* IJ-4: trig/exp/log/bitwise — coerce arg to numeric */
-#define ICN_TONUM(av) (IS_REAL_fn(av) ? (av).r : IS_INT_fn(av) ? (double)(av).i : ((av).v==DT_S && (av).s ? strtod((av).s,NULL) : 0.0))
 #define ICN_MATH1(fname, cfn) \
-    if (!strcmp(fn, fname) && nargs == 1) { double _v = ICN_TONUM(args[0]); *out = REALVAL(cfn(_v)); return 1; }
+    if (!strcmp(fn, fname) && nargs >= 1) { double _v = ICN_TONUM(args[0]); *out = REALVAL(cfn(_v)); return 1; }
     ICN_MATH1("sin",  sin)
     ICN_MATH1("cos",  cos)
     ICN_MATH1("tan",  tan)
@@ -942,8 +943,8 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         else *out = REALVAL(log(v));
         return 1;
     }
-    if (!strcmp(fn,"dtor") && nargs == 1) { double v=ICN_TONUM(args[0]); *out=REALVAL(v*3.14159265358979323846/180.0); return 1; }
-    if (!strcmp(fn,"rtod") && nargs == 1) { double v=ICN_TONUM(args[0]); *out=REALVAL(v*180.0/3.14159265358979323846); return 1; }
+    if (!strcmp(fn,"dtor") && nargs >= 1) { double v=ICN_TONUM(args[0]); *out=REALVAL(v*3.14159265358979323846/180.0); return 1; }
+    if (!strcmp(fn,"rtod") && nargs >= 1) { double v=ICN_TONUM(args[0]); *out=REALVAL(v*180.0/3.14159265358979323846); return 1; }
     if (!strcmp(fn,"iand")  && nargs==2) { int64_t a=IS_INT_fn(args[0])?args[0].i:(int64_t)args[0].r, b=IS_INT_fn(args[1])?args[1].i:(int64_t)args[1].r; *out=INTVAL(a&b); return 1; }
     if (!strcmp(fn,"ior")   && nargs==2) { int64_t a=IS_INT_fn(args[0])?args[0].i:(int64_t)args[0].r, b=IS_INT_fn(args[1])?args[1].i:(int64_t)args[1].r; *out=INTVAL(a|b); return 1; }
     if (!strcmp(fn,"ixor")  && nargs==2) { int64_t a=IS_INT_fn(args[0])?args[0].i:(int64_t)args[0].r, b=IS_INT_fn(args[1])?args[1].i:(int64_t)args[1].r; *out=INTVAL(a^b); return 1; }
@@ -982,7 +983,7 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         *out = src; return 1;
     }
     /* list([n], [init]) — Icon list constructor.  n elements, all init. */
-    if (!strcmp(fn,"list") && nargs >= 0 && nargs <= 2) {
+    if (!strcmp(fn,"list") && nargs >= 0) {
         int n = 0;
         DESCR_t init = NULVCL;
         if (nargs >= 1) {
@@ -5055,11 +5056,35 @@ DESCR_t interp_eval(tree_t *e)
         return rv;
     }
 
-    /* ── IC-5: TT_LCONCAT — s1 ||| s2  (list concatenation = string concat alias) */
+    /* ── IC-5: TT_LCONCAT — s1 ||| s2  (list concatenation or string concat) */
     case TT_LCONCAT: {
         if (e->n < 2) return NULVCL;
         DESCR_t a = interp_eval(e->c[0]);
         DESCR_t b = interp_eval(e->c[1]);
+        /* List concat: if both operands are icnlist DT_DATA, merge them */
+        if (a.v == DT_DATA && b.v == DT_DATA) {
+            DESCR_t atag = FIELD_GET_fn(a, "icn_type");
+            DESCR_t btag = FIELD_GET_fn(b, "icn_type");
+            if (atag.v == DT_S && atag.s && strcmp(atag.s,"list")==0 &&
+                btag.v == DT_S && btag.s && strcmp(btag.s,"list")==0) {
+                DESCR_t asz_d = FIELD_GET_fn(a, "frame_size");
+                DESCR_t bsz_d = FIELD_GET_fn(b, "frame_size");
+                int an = (int)(IS_INT_fn(asz_d)?asz_d.i:0);
+                int bn = (int)(IS_INT_fn(bsz_d)?bsz_d.i:0);
+                int cn = an + bn;
+                DESCR_t *celems = GC_malloc((cn>0?cn:1)*sizeof(DESCR_t));
+                DESCR_t aptr = FIELD_GET_fn(a, "frame_elems");
+                DESCR_t bptr = FIELD_GET_fn(b, "frame_elems");
+                DESCR_t *ae = (aptr.v == DT_DATA) ? (DESCR_t*)aptr.ptr : NULL;
+                DESCR_t *be = (bptr.v == DT_DATA) ? (DESCR_t*)bptr.ptr : NULL;
+                for (int i=0;i<an;i++) celems[i] = ae ? ae[i] : NULVCL;
+                for (int i=0;i<bn;i++) celems[an+i] = be ? be[i] : NULVCL;
+                DESCR_t eptr; eptr.v=DT_DATA; eptr.slen=0; eptr.ptr=(void*)celems;
+                static int icnlist_lcat = 0;
+                if (!icnlist_lcat) { DEFDAT_fn("icnlist(frame_elems,frame_size,icn_type)"); icnlist_lcat=1; }
+                return DATCON_fn("icnlist", eptr, INTVAL(cn), STRVAL("list"));
+            }
+        }
         /* For string operands, behave like string concat */
         char ab[64], bb[64];
         const char *as = IS_INT_fn(a)?(snprintf(ab,64,"%lld",(long long)a.i),ab):IS_REAL_fn(a)?(real_str(a.r,ab,64),ab):VARVAL_fn(a);

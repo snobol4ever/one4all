@@ -68,7 +68,7 @@ int scan_try_call_builtin(tree_t *call, DESCR_t *args, int nargs, DESCR_t *out)
         if (nargs >= 2) {
             s = VARVAL_fn(args[1]); if (!s) s = "";
             slen = (int)strlen(s);
-            int i1 = (nargs >= 3) ? (int)args[2].i : scan_pos;
+            int i1 = (nargs >= 3) ? (int)args[2].i : (scan_pos > 0 ? scan_pos : 1);
             int i2 = (nargs >= 4) ? (int)args[3].i : slen + 1;
             if (i1 <= 0 || i1 > slen) { *out = FAILDESCR; return 1; }
             if (i2 <= 0) i2 = slen + 1;
@@ -91,7 +91,7 @@ int scan_try_call_builtin(tree_t *call, DESCR_t *args, int nargs, DESCR_t *out)
         if (nargs >= 2) {
             s = VARVAL_fn(args[1]); if (!s) s = "";
             slen = (int)strlen(s);
-            int i1 = (nargs >= 3) ? (int)args[2].i : scan_pos;
+            int i1 = (nargs >= 3) ? (int)args[2].i : (scan_pos > 0 ? scan_pos : 1);
             int i2 = (nargs >= 4) ? (int)args[3].i : slen + 1;
             if (i1 <= 0 || i1 > slen) { *out = FAILDESCR; return 1; }
             if (i2 <= 0) i2 = slen + 1;
@@ -114,7 +114,7 @@ int scan_try_call_builtin(tree_t *call, DESCR_t *args, int nargs, DESCR_t *out)
         if (nargs >= 2) {
             s = VARVAL_fn(args[1]); if (!s) s = "";
             slen = (int)strlen(s);
-            int i1 = (nargs >= 3) ? (int)args[2].i : scan_pos;
+            int i1 = (nargs >= 3) ? (int)args[2].i : (scan_pos > 0 ? scan_pos : 1);
             int i2 = (nargs >= 4) ? (int)args[3].i : slen + 1;
             if (i1 <= 0) i1 = 1;
             if (i2 <= 0) i2 = slen + 1;

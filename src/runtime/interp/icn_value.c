@@ -419,7 +419,8 @@ DESCR_t icn_proc_as_value(const char *name)
         "string","integer","real","numeric","ord","char","reverse","sort","sortf",
         "find","match","many","any","upto","bal","move","tab","pos",
         "map","repl","trim","left","right","center","detab","entab",
-        "abs","sqrt","sin","cos","tan","atan","exp","log",
+        "abs","sqrt","sin","cos","tan","asin","acos","atan","exp","log",
+        "dtor","rtod",
         "iand","ior","ixor","ishift","icom",
         "table","key","insert","delete","member","args","level",
         "collect","stop","exit","runerr","name","variable","seq",
@@ -715,13 +716,37 @@ DESCR_t bb_eval_value(tree_t *e)
     case TT_LNE: return bb_strrel(e, BBS_LNE);
 
     /* RS-22c: string concat — Icon `||` (TT_CAT) and `|||` (TT_LCONCAT)
-     * share bb_str_concat.  In Icon BB context neither produces patterns,
-     * so the simple coerce-and-concat path is correct (mirrors IR-mode
-     * TT_LCONCAT at interp_eval.c:4037).  SNOBOL4 TT_CAT in pattern context
-     * does not arrive here — that path is interp_eval_pat-only. */
+     * For `|||`, detect list operands and perform list concatenation. */
     case TT_CAT:
-    case TT_LCONCAT:
         return bb_str_concat(e);
+    case TT_LCONCAT: {
+        DESCR_t a = bb_eval_value(e->c[0]);
+        DESCR_t b = bb_eval_value(e->c[1]);
+        if (a.v == DT_DATA && b.v == DT_DATA) {
+            DESCR_t atag = FIELD_GET_fn(a, "icn_type");
+            DESCR_t btag = FIELD_GET_fn(b, "icn_type");
+            if (atag.v == DT_S && atag.s && strcmp(atag.s,"list")==0 &&
+                btag.v == DT_S && btag.s && strcmp(btag.s,"list")==0) {
+                DESCR_t asz_d = FIELD_GET_fn(a, "frame_size");
+                DESCR_t bsz_d = FIELD_GET_fn(b, "frame_size");
+                int an = (int)(IS_INT_fn(asz_d)?asz_d.i:0);
+                int bn = (int)(IS_INT_fn(bsz_d)?bsz_d.i:0);
+                int cn = an + bn;
+                DESCR_t *celems = GC_malloc((cn>0?cn:1)*sizeof(DESCR_t));
+                DESCR_t aptr = FIELD_GET_fn(a, "frame_elems");
+                DESCR_t bptr = FIELD_GET_fn(b, "frame_elems");
+                DESCR_t *ae = (aptr.v == DT_DATA) ? (DESCR_t*)aptr.ptr : NULL;
+                DESCR_t *be = (bptr.v == DT_DATA) ? (DESCR_t*)bptr.ptr : NULL;
+                for (int i=0;i<an;i++) celems[i] = ae ? ae[i] : NULVCL;
+                for (int i=0;i<bn;i++) celems[an+i] = be ? be[i] : NULVCL;
+                DESCR_t eptr; eptr.v=DT_DATA; eptr.slen=0; eptr.ptr=(void*)celems;
+                static int icnlist_lcat_bb = 0;
+                if (!icnlist_lcat_bb) { DEFDAT_fn("icnlist(frame_elems,frame_size,icn_type)"); icnlist_lcat_bb=1; }
+                return DATCON_fn("icnlist", eptr, INTVAL(cn), STRVAL("list"));
+            }
+        }
+        return bb_str_concat(e);
+    }
 
     /* RS-22c: subscript read — table/list/record/string index.
      * Two-arg form → subscript_get; three-arg form (s[i:j] lowered as
