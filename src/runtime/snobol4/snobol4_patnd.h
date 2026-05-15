@@ -1,82 +1,58 @@
 #ifndef PATND_H
 #define PATND_H
-/* patnd.h — canonical PATND_t / XKIND_t definitions.
- * Single source of truth for the pattern node tree.
- * Included by snobol4.h after DESCR_t is defined. Do NOT include directly —
- * always include snobol4.h which pulls this in at the right point.
- */
-
 #include <stdint.h>
-
 typedef enum {
-    XCHR,          /* literal string                          */
-    XSPNC,         /* SPAN(chars)                             */
-    XBRKC,         /* BREAK(chars)                            */
-    XANYC,         /* ANY(chars)                              */
-    XNNYC,         /* NOTANY(chars)                           */
-    XLNTH,         /* LEN(n)                                  */
-    XPOSI,         /* POS(n)                                  */
-    XRPSI,         /* RPOS(n)                                 */
-    XTB,           /* TAB(n)                                  */
-    XRTB,          /* RTAB(n)                                 */
-    XFARB,         /* ARB                                     */
-    XARBN,         /* ARBNO(p)                                */
-    XSTAR,         /* REM                                     */
-    XFNCE,         /* FENCE or FENCE(p)                       */
-    XFAIL,         /* FAIL                                    */
-    XABRT,         /* ABORT                                   */
-    XSUCF,         /* SUCCEED                                 */
-    XBAL,          /* BAL                                     */
-    XEPS,          /* epsilon — always succeeds, no advance   */
-    XCAT,          /* concatenation: left right               */
-    XOR,           /* alternation:   left | right             */
+    XCHR,
+    XSPNC,
+    XBRKC,
+    XANYC,
+    XNNYC,
+    XLNTH,
+    XPOSI,
+    XRPSI,
+    XTB,
+    XRTB,
+    XFARB,
+    XARBN,
+    XSTAR,
+    XFNCE,
+    XFAIL,
+    XABRT,
+    XSUCF,
+    XBAL,
+    XEPS,
+    XCAT,
+    XOR,
     XDSAR,         /* deferred var ref: *name                 */
-    XFNME,         /* immediate capture: pat $ var            */
-    XNME,          /* conditional capture: pat . var          */
+    XFNME,
+    XNME,
     XCALLCAP,      /* conditional capture: pat . *func()      */
-    XVAR,          /* variable holding a pattern              */
-    XATP,          /* user-defined pattern function call      */
-    XBRKX,         /* BREAKX(chars)                           */
+    XVAR,
+    XATP,
+    XBRKX,
 } XKIND_t;
-
 struct _PATND_t;
 typedef struct _PATND_t PATND_t;
-
-/* NOTE: DESCR_t must be defined before this point (via snobol4.h). */
 struct _PATND_t {
     XKIND_t      kind;
-    int          materialising;  /* cycle-detection flag */
-    const char  *STRVAL_fn;      /* XCHR/XSPNC/XBRKC/XANYC/XNNYC/XDSAR/XATP */
-    int64_t      num;            /* XLNTH/XPOSI/XRPSI/XTB/XRTB */
-    /* DYN-64: n-ary children replace binary left/right.
-     * XCAT/XOR: 2+ children (flat, no spine-chaining needed).
-     * XARBN/XFNCE/XFNME/XNME: exactly 1 child (children[0]).
-     * Leaf nodes (XCHR, XLNTH, XPOSI, ...): nchildren=0. */
-    PATND_t    **children;       /* heap-allocated array, NULL if nchildren==0 */
+    int          materialising;
+    const char  *STRVAL_fn;
+    int64_t      num;
+    PATND_t    **children;
     int          nchildren;
-    DESCR_t      var;            /* XFNME/XNME capture target; XVAR value */
-    DESCR_t     *args;           /* XATP args */
-    int          nargs;          /* XATP nargs */
-    /* TL-2: for XCALLCAP *fn(var) captures, arg *names* captured at pattern-build
-     * time, to be resolved at flush time (NAME_commit / CC_γ_core immediate branch)
-     * after in-order prior . captures have written the variable.  Only populated
-     * when every arg of the *fn() call is a plain TT_VAR.  If arg_names==NULL the
-     * args/nargs fields above carry pre-evaluated DESCR_t snapshots (legacy path).
-     */
-    char       **arg_names;      /* XCALLCAP: GC-allocated array of arg var names */
-    int          n_arg_names;    /* XCALLCAP: count of arg_names; 0 means unused  */
-    int          imm;            /* XCALLCAP: 1 = immediate ($) semantics, 0 = conditional (.) */
+    DESCR_t      var;
+    DESCR_t     *args;
+    int          nargs;
+    char       **arg_names;
+    int          n_arg_names;
+    int          imm;
 };
-
-/* Convenience: single-child access for XARBN/XFNCE/XFNME/XNME */
 #define PATND_CHILD0(p)  ((p)->c ? (p)->c[0] : NULL)
-
 #include <stdio.h>
-void patnd_print(const PATND_t *p, FILE *out);  /* diagnostic: --dump-bb */
-
-/* EM-RAW-PURGE-1: single-node PATND_t constructors.
- * Use with bb_build_flat / bb_build_brokered instead of raw-byte emitters. */
-PATND_t *patnd_make_xchr(const char *lit);  /* XCHR leaf — literal string */
-PATND_t *patnd_make_eps(void);              /* XEPS leaf — epsilon        */
-
-#endif /* PATND_H */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+void patnd_print(const PATND_t *p, FILE *out);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+PATND_t *patnd_make_xchr(const char *lit);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+PATND_t *patnd_make_eps(void);
+#endif

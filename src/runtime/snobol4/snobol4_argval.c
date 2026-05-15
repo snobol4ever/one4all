@@ -1,48 +1,20 @@
-/*
- * argval.c — SIL-faithful typed argument evaluators
- *
- * SIL procs: VARVAL (line 2836), INTVAL (line 2774), PATVAL (line 2800),
- *            VARVUP (line 2867)
- *
- * These replace the ad-hoc coercions scattered through interp_eval().
- * Gate: PASS >= 177, no regressions.
- *
- * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6
- * SPRINT:  RT-2
- * DATE:    2026-04-05
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include <gc.h>
-
 #include "snobol4.h"
-#include "sil_macros.h"   /* SIL macro translations — RT + SM axes */
-
-/* ── VARVAL_fn (DESCR_t form) ─────────────────────────────────────────────
- *
- * SIL VARVAL (line 2836): evaluate argument as STRING.
- * ARGVAL → get value → coerce to string:
- *   DT_I  → integer string via INTSP
- *   DT_R  → real string via REALST
- *   DT_S / DT_SNUL → already string
- *   others → FAIL
- *
- * Named VARVAL_d_fn to avoid collision with the existing char*-returning
- * VARVAL_fn in snobol4.c. TODO RT-2 follow-up: unify to single form.
- * ─────────────────────────────────────────────────────────────────────── */
+#include "sil_macros.h"
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t VARVAL_d_fn(DESCR_t d)
 {
-    /* ARGVAL first */
     if (d.v == DT_FAIL) return FAILDESCR;
     if (d.v == DT_N) {
         if (d.slen == 0 && d.s && *d.s) d = NV_GET_fn(d.s);
         else if (d.slen == 1 && d.ptr)  d = *(DESCR_t *)d.ptr;
         else return NULVCL;
     }
-    if (d.v == DT_K && d.s) d = NV_GET_fn(d.s);  /* keyword → value */
+    if (d.v == DT_K && d.s) d = NV_GET_fn(d.s);
     if (d.v == DT_FAIL) return FAILDESCR;
     if (d.v == DT_S || d.v == DT_SNUL) return d;
     if (d.v == DT_I) {
@@ -57,16 +29,7 @@ DESCR_t VARVAL_d_fn(DESCR_t d)
     }
     return FAILDESCR;
 }
-
-/* ── INTVAL_fn ────────────────────────────────────────────────────────────
- *
- * SIL INTVAL (line 2774): evaluate argument as INTEGER.
- * ARGVAL → coerce:
- *   DT_I              → already integer
- *   DT_R              → RLINT (truncate real to integer)
- *   DT_S / DT_SNUL   → SPCINT (parse integer from string, FAIL if not numeric)
- *   others            → FAIL
- * ─────────────────────────────────────────────────────────────────────── */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t INTVAL_fn(DESCR_t d)
 {
     if (d.v == DT_FAIL) return FAILDESCR;
@@ -75,10 +38,10 @@ DESCR_t INTVAL_fn(DESCR_t d)
         else if (d.slen == 1 && d.ptr)  d = *(DESCR_t *)d.ptr;
         else return FAILDESCR;
     }
-    if (d.v == DT_K && d.s) d = NV_GET_fn(d.s);  /* keyword → value */
+    if (d.v == DT_K && d.s) d = NV_GET_fn(d.s);
     if (d.v == DT_FAIL) return FAILDESCR;
     if (d.v == DT_I)   return d;
-    if (d.v == DT_R)   return INTVAL((int64_t)d.r);   /* RLINT */
+    if (d.v == DT_R)   return INTVAL((int64_t)d.r);
     if (d.v == DT_S || d.v == DT_SNUL) {
         const char *s = d.s ? d.s : "";
         if (!*s) return FAILDESCR;
@@ -90,17 +53,7 @@ DESCR_t INTVAL_fn(DESCR_t d)
     }
     return FAILDESCR;
 }
-
-/* ── PATVAL_fn ────────────────────────────────────────────────────────────
- *
- * SIL PATVAL (line 2800): evaluate argument as PATTERN.
- * ARGVAL → coerce:
- *   DT_P              → already pattern
- *   DT_S / DT_SNUL   → bb_lit (string literal pattern)
- *   DT_I / DT_R      → coerce to string, then bb_lit
- *   DT_E              → EXPVAL stub (RT-6)
- *   others            → FAIL
- * ─────────────────────────────────────────────────────────────────────── */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t PATVAL_fn(DESCR_t d)
 {
     if (d.v == DT_FAIL) return FAILDESCR;
@@ -109,21 +62,16 @@ DESCR_t PATVAL_fn(DESCR_t d)
         else if (d.slen == 1 && d.ptr)  d = *(DESCR_t *)d.ptr;
         else return FAILDESCR;
     }
-    if (d.v == DT_K && d.s) d = NV_GET_fn(d.s);  /* keyword → value */
+    if (d.v == DT_K && d.s) d = NV_GET_fn(d.s);
     if (d.v == DT_FAIL) return FAILDESCR;
     if (d.v == DT_P) return d;
     if (d.v == DT_E) {
-        /* EXPVAL: thaw EXPRESSION by calling EVAL_fn, then coerce to pattern.
-         * EVAL_fn on DT_E calls eval_node(ptr) which walks the frozen tree_t*. */
         extern DESCR_t EVAL_fn(DESCR_t);
         DESCR_t val = EVAL_fn(d);
         if (IS_FAIL_fn(val)) return FAILDESCR;
         if (val.v == DT_P) return val;
-        /* Result is a value — coerce to literal pattern */
         d = val;
-        /* fall through to string coerce below */
     }
-    /* Coerce to string then build literal pattern */
     DESCR_t s = VARVAL_d_fn(d);
     if (s.v == DT_FAIL) return FAILDESCR;
     {
@@ -132,19 +80,13 @@ DESCR_t PATVAL_fn(DESCR_t d)
         return pat_lit(sp);
     }
 }
-
-/* ── VARVUP_fn ────────────────────────────────────────────────────────────
- *
- * SIL VARVUP (line 2867): evaluate argument as uppercase STRING.
- * VARVAL_d_fn + case-fold if &CASE == 0 (default: fold to upper).
- * ─────────────────────────────────────────────────────────────────────── */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t VARVUP_fn(DESCR_t d)
 {
     d = VARVAL_d_fn(d);
     if (d.v == DT_FAIL) return FAILDESCR;
-    /* &CASE: 0 = case-fold (default), non-zero = case-sensitive */
     extern int64_t kw_case;
-    if (kw_case != 0) return d;   /* case-sensitive — no fold */
+    if (kw_case != 0) return d;
     const char *s = (d.v == DT_SNUL || !d.s) ? "" : d.s;
     size_t len = strlen(s);
     char *up = GC_malloc(len + 1);

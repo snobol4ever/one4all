@@ -1,50 +1,19 @@
-/*
- * snobol4_pattern.c — SNOBOL4 pattern constructor and matching bridge
- *
- * Connects the pat_*() API (called from beautiful.c) to the existing
- * Byrd Box engine in engine.c.
- *
- * Architecture:
- *   - DESCR_t with type P holds a PATND_t* (GC-managed)
- *   - PATND_t wraps a lazy tree of pattern constructors
- *   - At MATCH_fn time, match_pattern() materialises the pattern into
- *     engine Pattern* nodes and calls engine_match()
- *   - Deferred refs (*name) are resolved from the variable table at MATCH_fn time
- *   - Capture assignments ($ and .) write into the variable table on MATCH_fn
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include "snobol4.h"
-#include "../ast/ast.h"         /* ir.h first — sets EXPR_T_DEFINED so scrip_cc.h skips its own tree_t */
+#include "../ast/ast.h"
 #include "../../frontend/snobol4/scrip_cc.h"
-/* CMPILE.c removed — bison/flex path via scrip_cc.h (GOAL-REMOVE-CMPILE S-4) */
-
-/* Hook for scrip.c to route EVAL(string) through interp_eval_pat.
- * When set, EVAL_fn calls this instead of CONVE_fn→EXPVAL_fn for string args.
- * This handles TT_DEFER (*func), $ (cursor-assign), and all other operators
- * that eval_node in eval_code.c does not support. */
 DESCR_t (*g_eval_str_hook)(const char *s) = NULL;
-
-/* =========================================================================
- * PATND_t — lazy pattern node
- * ===================================================================== */
-
-
-/* Forward decl */
-
-/* GC-allocate a PATND_t */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static PATND_t *spat_new(XKIND_t kind) {
     PATND_t *p = (PATND_t *)GC_MALLOC(sizeof(PATND_t));
     memset(p, 0, sizeof(PATND_t));
     p->kind = kind;
     return p;
 }
-
-/* Set children array — allocates GC'd array and copies pointers in.
- * Filters out NULL entries; if all are NULL, children stays NULL/nchildren=0. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void patnd_set_children(PATND_t *p, PATND_t **ch, int n) {
     int count = 0;
     for (int i = 0; i < n; i++) if (ch[i]) count++;
@@ -54,109 +23,101 @@ static void patnd_set_children(PATND_t *p, PATND_t **ch, int n) {
     for (int i = 0; i < n; i++) if (ch[i]) p->children[j++] = ch[i];
     p->nchildren = count;
 }
-
-/* Append a child to an XCAT or XOR node (used when flattening at build time). */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void patnd_append_child(PATND_t *p, PATND_t *ch) {
     if (!ch) return;
     p->children = (PATND_t **)GC_REALLOC(p->children,
                       (size_t)(p->nchildren + 1) * sizeof(PATND_t *));
     p->children[p->nchildren++] = ch;
 }
-
-/* Wrap a PATND_t in a DESCR_t */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static inline DESCR_t spat_val(PATND_t *p) {
     DESCR_t v;
     v.v = DT_P;
     v.p    = (struct _PATND_t *)p;
     return v;
 }
-
-/* Extract PATND_t from DESCR_t */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static inline PATND_t *spat_of(DESCR_t v) {
     if (v.v != DT_P) return NULL;
     return (PATND_t *)v.p;
 }
-
-/* =========================================================================
- * Pattern constructors
- * ===================================================================== */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_lit(const char *s) {
     PATND_t *p = spat_new(XCHR);
     p->STRVAL_fn = s ? GC_strdup(s) : "";
     return spat_val(p);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_span(const char *chars) {
     PATND_t *p = spat_new(XSPNC);
     p->STRVAL_fn = chars ? GC_strdup(chars) : "";
     return spat_val(p);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_break_(const char *chars) {
     PATND_t *p = spat_new(XBRKC);
     p->STRVAL_fn = chars ? GC_strdup(chars) : "";
     return spat_val(p);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_breakx(const char *chars) {
     PATND_t *p = spat_new(XBRKX);
     p->STRVAL_fn = chars ? GC_strdup(chars) : "";
     return spat_val(p);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_any_cs(const char *chars) {
     PATND_t *p = spat_new(XANYC);
     p->STRVAL_fn = chars ? GC_strdup(chars) : "";
     return spat_val(p);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_notany(const char *chars) {
     PATND_t *p = spat_new(XNNYC);
     p->STRVAL_fn = chars ? GC_strdup(chars) : "";
     return spat_val(p);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_len(int64_t n) {
-    /* SIL SCLENR/LENERR: ERRTYP,14 — negative number in illegal context */
     if (n < 0) { sno_runtime_error(14, NULL); return FAILDESCR; }
     PATND_t *p = spat_new(XLNTH);
     p->num = n;
     return spat_val(p);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_pos(int64_t n) {
     if (n < 0) { sno_runtime_error(14, NULL); return FAILDESCR; }
     PATND_t *p = spat_new(XPOSI);
     p->num = n;
     return spat_val(p);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_rpos(int64_t n) {
     if (n < 0) { sno_runtime_error(14, NULL); return FAILDESCR; }
     PATND_t *p = spat_new(XRPSI);
     p->num = n;
     return spat_val(p);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_tab(int64_t n) {
     if (n < 0) { sno_runtime_error(14, NULL); return FAILDESCR; }
     PATND_t *p = spat_new(XTB);
     p->num = n;
     return spat_val(p);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_rtab(int64_t n) {
     if (n < 0) { sno_runtime_error(14, NULL); return FAILDESCR; }
     PATND_t *p = spat_new(XRTB);
     p->num = n;
     return spat_val(p);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_arb(void) {
     return spat_val(spat_new(XFARB));
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_arbno(DESCR_t inner) {
     PATND_t *p = spat_new(XARBN);
     PATND_t *ch = spat_of(inner);
@@ -165,11 +126,11 @@ DESCR_t pat_arbno(DESCR_t inner) {
     patnd_set_children(p, arr, 1);
     return spat_val(p);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_rem(void) {
     return spat_val(spat_new(XSTAR));
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_fence_p(DESCR_t inner) {
     PATND_t *p = spat_new(XFNCE);
     PATND_t *ch = spat_of(inner);
@@ -181,32 +142,31 @@ DESCR_t pat_fence_p(DESCR_t inner) {
     patnd_set_children(p, arr, 1);
     return spat_val(p);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_fence(void) {
     return spat_val(spat_new(XFNCE));
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_fail(void) {
     return spat_val(spat_new(XFAIL));
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_abort(void) {
     return spat_val(spat_new(XABRT));
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_succeed(void) {
     return spat_val(spat_new(XSUCF));
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_bal(void) {
     return spat_val(spat_new(XBAL));
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_epsilon(void) {
     return spat_val(spat_new(XEPS));
 }
-
-/* EM-RAW-PURGE-1: public constructors returning raw PATND_t* for bb_build_flat. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 PATND_t *patnd_make_xchr(const char *lit) {
     PATND_t *p = (PATND_t *)GC_MALLOC(sizeof(PATND_t));
     memset(p, 0, sizeof(PATND_t));
@@ -214,37 +174,25 @@ PATND_t *patnd_make_xchr(const char *lit) {
     p->STRVAL_fn = lit ? GC_strdup(lit) : "";
     return p;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 PATND_t *patnd_make_eps(void) {
     PATND_t *p = (PATND_t *)GC_MALLOC(sizeof(PATND_t));
     memset(p, 0, sizeof(PATND_t));
     p->kind = XEPS;
     return p;
 }
-
-/* Forward declaration — eval_node is defined in eval_code.c (separate TU) */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t eval_node(tree_t *e);
-
-/* pat_to_patnd: coerce a DESCR_t to a PATND_t*, handling string literals.
- * Returns NULL if the value cannot be represented as a pattern.
- *
- * DT_E split:
- *   TT_FNC child  → *func()  side-effect pattern: build XATP via pat_user_call.
- *                  The function fires at MATCH_fn time (T_FUNC node), NOT now.
- *   anything else → PATVAL_fn: thaw the expression to a pattern value.
- */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static PATND_t *pat_to_patnd(DESCR_t v) {
     if (v.v == DT_E) {
-        /* CHUNKS-step02: chunk DT_E (slen==1) — dispatch via EXPVAL_fn which
-         * routes to sm_call_expression.  Legacy tree_t* path (slen==0) follows below. */
         if (v.slen == 1) {
             v = EXPVAL_fn(v);
-            /* Fall through to coerce result as pattern value */
             goto coerce;
         }
         tree_t *frozen = (tree_t *)v.ptr;
-        if (!frozen) return NULL;   /* null DT_E — propagate failure (do not epsilon) */
+        if (!frozen) return NULL;
         if (frozen->t == TT_FNC) {
-            /* *func(args...) — side-effect call deferred to match time via XATP */
             int nargs = frozen->n;
             DESCR_t *args = NULL;
             if (nargs > 0) {
@@ -255,29 +203,22 @@ static PATND_t *pat_to_patnd(DESCR_t v) {
             const char *fname = frozen->v.sval ? frozen->v.sval : "";
             DESCR_t pv = pat_user_call(fname, args, nargs);
             if (IS_FAIL_fn(pv)) return NULL;
-            /* If function returned a real pattern, use it directly */
             PATND_t *pp = spat_of(pv);
             if (pp) return pp;
-            /* Otherwise coerce non-pattern result to literal string pattern */
-            v = pv;  /* fall through to coercion below */
+            v = pv;
         }
         if (frozen->t == TT_VAR && frozen->v.sval) {
-            /* *varname — deferred variable reference, resolved at match time via XVAR.
-             * This is the recursive grammar case: factor = ... *factor ...
-             * The variable may not exist yet at construction time. */
             DESCR_t name_d = STRVAL(frozen->v.sval);
             DESCR_t pv = var_as_pattern(name_d);
             return spat_of(pv);
         }
-        /* Other frozen expression: thaw via PATVAL_fn → pattern value */
         v = PATVAL_fn(v);
         if (v.v == DT_FAIL) return NULL;
     }
-    coerce:  /* CHUNKS-step02: chunk result lands here for coercion */
-    /* DT_N (NAME) — deref to actual value, then fall through to coercion */
+    coerce:
     if (v.v == DT_N) {
-        if (v.slen == 1 && v.ptr) v = *(DESCR_t *)v.ptr;          /* NAMEPTR */
-        else if (v.slen == 0 && v.s) v = NV_GET_fn(v.s);           /* NAMEVAL */
+        if (v.slen == 1 && v.ptr) v = *(DESCR_t *)v.ptr;
+        else if (v.slen == 0 && v.s) v = NV_GET_fn(v.s);
         else v = NULVCL;
     }
     PATND_t *p = spat_of(v);
@@ -287,15 +228,10 @@ static PATND_t *pat_to_patnd(DESCR_t v) {
     if (!p && v.v == DT_SNUL) p = spat_of(pat_lit(""));
     return p;
 }
-
-/* pat_cat: n-ary concatenation.
- * If either child is already an XCAT node, flatten its children in.
- * Degenerate cases (NULL child) are dropped with an assertion to catch
- * type errors early rather than silently producing wrong trees. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_cat(DESCR_t left, DESCR_t right) {
     PATND_t *l = pat_to_patnd(left);
     PATND_t *r = pat_to_patnd(right);
-    /* DYN-64: assert instead of silent drop — caller must supply valid patterns */
     if (!l && left.v  != DT_SNUL) {
         fprintf(stderr, "pat_cat: left is not a pattern (DT=%d) — dropping\n", left.v);
     }
@@ -304,9 +240,7 @@ DESCR_t pat_cat(DESCR_t left, DESCR_t right) {
     }
     if (!l) return r ? spat_val(r) : pat_epsilon();
     if (!r) return spat_val(l);
-
     PATND_t *p = spat_new(XCAT);
-    /* Flatten: if left is already XCAT, steal its children */
     if (l->kind == XCAT) {
         for (int i = 0; i < l->nchildren; i++) patnd_append_child(p, l->children[i]);
     } else {
@@ -319,8 +253,7 @@ DESCR_t pat_cat(DESCR_t left, DESCR_t right) {
     }
     return spat_val(p);
 }
-
-/* pat_alt: n-ary alternation, flat XOR node. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_alt(DESCR_t left, DESCR_t right) {
     PATND_t *l = pat_to_patnd(left);
     PATND_t *r = pat_to_patnd(right);
@@ -328,9 +261,7 @@ DESCR_t pat_alt(DESCR_t left, DESCR_t right) {
     if (!r && right.v == DT_SNUL) r = spat_of(pat_epsilon());
     if (!l) return r ? spat_val(r) : pat_epsilon();
     if (!r) return spat_val(l);
-
     PATND_t *p = spat_new(XOR);
-    /* Flatten: if left is already XOR, steal its children */
     if (l->kind == XOR) {
         for (int i = 0; i < l->nchildren; i++) patnd_append_child(p, l->children[i]);
     } else {
@@ -343,17 +274,17 @@ DESCR_t pat_alt(DESCR_t left, DESCR_t right) {
     }
     return spat_val(p);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_ref(const char *name) {
     PATND_t *p = spat_new(XDSAR);
     p->STRVAL_fn = name ? GC_strdup(name) : "";
     return spat_val(p);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_ref_val(DESCR_t nameVal) {
     return pat_ref(VARVAL_fn(nameVal));
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_assign_imm(DESCR_t child, DESCR_t var) {
     PATND_t *p = spat_new(XFNME);
     PATND_t *ch = pat_to_patnd(child);
@@ -362,7 +293,7 @@ DESCR_t pat_assign_imm(DESCR_t child, DESCR_t var) {
     p->var  = var;
     return spat_val(p);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_assign_cond(DESCR_t child, DESCR_t var) {
     PATND_t *p = spat_new(XNME);
     PATND_t *ch = pat_to_patnd(child);
@@ -371,20 +302,11 @@ DESCR_t pat_assign_cond(DESCR_t child, DESCR_t var) {
     p->var  = var;
     return spat_val(p);
 }
-
-/* pat_assign_callcap — builds XCALLCAP node for "pat . *func(args)" patterns.
- * The function is called at match time (not build time) to get the DT_N lvalue.
- * fnc_name/args/nargs stored in STRVAL_fn/args/nargs fields of PATND_t.
- *
- * TL-2: also records arg *names* for flush-time resolution when every arg is a
- * plain variable.  If arg_names==NULL the legacy snapshot path (args/nargs)
- * applies; if arg_names is non-NULL the resolver at NAME_commit (or CC_γ_core
- * immediate branch) does NV_GET_fn(name) per arg to get the value that was
- * written by an earlier in-order . capture in the same pattern. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_assign_callcap(DESCR_t child, const char *fnc_name, DESCR_t *args, int nargs) {
     return pat_assign_callcap_named(child, fnc_name, args, nargs, NULL, 0);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_assign_callcap_named(DESCR_t child, const char *fnc_name,
                                   DESCR_t *args, int nargs,
                                   char **arg_names, int n_arg_names) {
@@ -400,10 +322,7 @@ DESCR_t pat_assign_callcap_named(DESCR_t child, const char *fnc_name,
     p->imm = 0;
     return spat_val(p);
 }
-
-/* SN-26c-parseerr-f: "pat $ *fn(args)" — same as XCALLCAP but immediate ($) assign.
- * Function called at match time with deferred args; result used as lvalue,
- * matched text written immediately (not buffered for statement-success flush). */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_assign_callcap_named_imm(DESCR_t child, const char *fnc_name,
                                       DESCR_t *args, int nargs,
                                       char **arg_names, int n_arg_names) {
@@ -419,20 +338,17 @@ DESCR_t pat_assign_callcap_named_imm(DESCR_t child, const char *fnc_name,
     p->imm = 1;
     return spat_val(p);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t var_as_pattern(DESCR_t v) {
-    /* If v is already a pattern, return it */
     if (v.v == DT_P) return v;
-    /* If v is a string, treat as a literal pattern */
     if (v.v == DT_S || v.v == DT_SNUL) {
         return pat_lit(VARVAL_fn(v));
     }
-    /* Otherwise wrap as a variable lookup */
     PATND_t *p = spat_new(XVAR);
     p->var = v;
     return spat_val(p);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_user_call(const char *name, DESCR_t *args, int nargs) {
     PATND_t *p = spat_new(XATP);
     p->STRVAL_fn   = name ? GC_strdup(name) : "";
@@ -443,10 +359,7 @@ DESCR_t pat_user_call(const char *name, DESCR_t *args, int nargs) {
     }
     return spat_val(p);
 }
-
-/* pat_at_cursor — build XATP("@", varname) node for the @ cursor-capture operator.
- * Called from emit_pat_to_descr (DYN path).  In bb_build the "@" name is
- * intercepted and a bb_atp box is built that writes Δ (cursor) as DT_I into varname. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_at_cursor(const char *varname) {
     PATND_t *p = spat_new(XATP);
     p->STRVAL_fn = "@";
@@ -457,12 +370,7 @@ DESCR_t pat_at_cursor(const char *varname) {
     p->args[0].slen = varname ? (uint32_t)strlen(varname) : 0;
     return spat_val(p);
 }
-
-/* =========================================================================
- * New functions needed by snobol4.c / beautiful.c
- * ===================================================================== */
-
-/* array_create("lo:hi" or "n") — create array from spec string */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t array_create(DESCR_t spec) {
     const char *s = VARVAL_fn(spec);
     int lo = 1, hi = 1;
@@ -483,11 +391,10 @@ DESCR_t array_create(DESCR_t spec) {
     v.arr    = a;
     return v;
 }
-
-/* subscript_get — get arr[idx] */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t subscript_get(DESCR_t arr, DESCR_t idx) {
     if (arr.v == DT_A) {
-        return array_get(arr.arr, (int)to_int(idx));  /* returns DT_FAIL if OOB */
+        return array_get(arr.arr, (int)to_int(idx));
     }
     if (arr.v == DT_T) {
         char kb[64]; const char *ks;
@@ -495,33 +402,26 @@ DESCR_t subscript_get(DESCR_t arr, DESCR_t idx) {
         else if (IS_REAL_fn(idx)) { snprintf(kb,sizeof kb,"%g",idx.r); ks=kb; }
         else                      { ks = VARVAL_fn(idx); if (!ks) ks=""; }
         if (!table_has(arr.tbl, ks)) {
-            /* IC-5: return table default value if not &null */
             if (arr.tbl->dflt.v != DT_FAIL && arr.tbl->dflt.v != 0)
                 return arr.tbl->dflt;
-            return NULVCL;   /* unset slot → null string (SNOBOL4 semantics) */
+            return NULVCL;
         }
         return table_get(arr.tbl, ks);
     }
-    /* IJ-7: DT_I integer subscript — coerce integer to string, then subscript.
-     * Icon: 2[1] -> "2"[1] -> "2".  Matches JCON rung36_jcon_coerce binop("[]"). */
     if (arr.v == DT_I) {
         char ibuf[32]; snprintf(ibuf, sizeof ibuf, "%lld", (long long)arr.i);
         arr = STRVAL(GC_strdup(ibuf));
-        /* fall through to DT_S case below */
     }
-    /* IC-5: DT_S string subscript — Icon 1-based, negative wraps from end */
     if (arr.v == DT_S || arr.v == DT_SNUL) {
         const char *s = arr.s ? arr.s : "";
         int slen = (int)strlen(s);
         int i = (int)to_int(idx);
-        if (i < 0) i = slen + i + 1;   /* Icon: s[-1] → last char (1-based) */
+        if (i < 0) i = slen + i + 1;
         if (i < 1 || i > slen) return FAILDESCR;
         char *buf = GC_malloc(2); buf[0] = s[i-1]; buf[1] = '\0';
         return STRVAL(buf);
     }
-    /* IC-5: DT_DATA icnlist subscript */
     if (arr.v == DT_DATA) {
-        /* check if it's an icnlist */
         DESCR_t tag = FIELD_GET_fn(arr, "icn_type");
         if (tag.v == DT_S && tag.s && strcmp(tag.s,"list")==0) {
             int n = (int)FIELD_GET_fn(arr,"frame_size").i;
@@ -532,12 +432,6 @@ DESCR_t subscript_get(DESCR_t arr, DESCR_t idx) {
             if (!elems || i < 1 || i > n) return FAILDESCR;
             return elems[i-1];
         }
-        /* IC-9 (2026-05-01): DT_DATA record subscript — record(N) and record("fN").
-         * Mirrors session #24's `!record` shape contract: a real DATINST_t with type
-         * carrying nfields and a fields[] array.  Two key shapes:
-         *   integer N → fields[N-1]   (1-based, fail OOB; matches Icon list convention)
-         *   string  K → fields[i] where type->fields[i] == K   (case-sensitive strcmp)
-         * Falls through to the tree-child-access fallback when type is absent. */
         if (arr.u && arr.u->type && arr.u->type->nfields > 0 && arr.u->fields) {
             DATBLK_t *blk = arr.u->type;
             if (IS_INT_fn(idx)) {
@@ -552,40 +446,30 @@ DESCR_t subscript_get(DESCR_t arr, DESCR_t idx) {
                         return arr.u->fields[i];
                 return FAILDESCR;
             }
-            /* other idx types: defer to legacy tree-child path below */
         }
-        /* tree/record child access: c(x)[i] */
         int i = (int)to_int(idx);
         DESCR_t children = FIELD_GET_fn(arr, "c");
         if (children.v == DT_A && children.arr)
             return array_get(children.arr, i);
         return FAILDESCR;
     }
-    /* SIL NONARY → ERRTYP,3 → FTLTST: subscript on non-array/non-table is soft error */
     sno_runtime_error(3, NULL);
     return FAILDESCR;
 }
-
-/* subscript_set — arr[idx] = val; returns 1 on success, 0 on OOB/type-error */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int subscript_set(DESCR_t arr, DESCR_t idx, DESCR_t val) {
     if (arr.v == DT_A) {
         int i = (int)to_int(idx);
-        if (i < arr.arr->lo || i > arr.arr->hi) return 0;  /* OOB → fail stmt */
+        if (i < arr.arr->lo || i > arr.arr->hi) return 0;
         array_set(arr.arr, i, val);
         return 1;
     }
     if (arr.v == DT_T) {
-        /* C5-4: preserve the original key descriptor (DT_I vs DT_S) so SORT()
-         * sees typed keys and applies algebraic-vs-lex ordering per SPITBOL
-         * manual pp.240–241. VARVAL_fn(idx) stringifies for hash lookup only;
-         * the live descriptor `idx` carries the type and is passed through. */
         const char *k = VARVAL_fn(idx);
         table_set_descr(arr.tbl, k ? k : "", idx, val);
         return 1;
     }
-    /* IC-5 / CH-17g-builtin-batch: DT_DATA list or record subscript assign. */
     if (arr.v == DT_DATA) {
-        /* Icon list: L[i] := v — mutate in-place. */
         DESCR_t tag = FIELD_GET_fn(arr, "icn_type");
         if (tag.v == DT_S && tag.s && strcmp(tag.s, "list") == 0) {
             int n = (int)FIELD_GET_fn(arr, "frame_size").i;
@@ -597,7 +481,6 @@ int subscript_set(DESCR_t arr, DESCR_t idx, DESCR_t val) {
             elems[i - 1] = val;
             return 1;
         }
-        /* Icon record: r[i] := v or r["field"] := v — mutate field in-place. */
         if (arr.u && arr.u->type && arr.u->fields) {
             DATBLK_t *blk = arr.u->type;
             if (IS_INT_fn(idx)) {
@@ -618,9 +501,6 @@ int subscript_set(DESCR_t arr, DESCR_t idx, DESCR_t val) {
         }
         return 0;
     }
-    /* IC-9 / IJ-12: DT_S string — single-char section replacement.
-     * s[i] <- val  replaces character i (1-based) with the string value of val.
-     * Mutates the string buffer in-place (GC-strdup if needed). */
     if (arr.v == DT_S && arr.s) {
         int slen = (int)strlen(arr.s);
         int i = (int)to_int(idx);
@@ -628,43 +508,28 @@ int subscript_set(DESCR_t arr, DESCR_t idx, DESCR_t val) {
         if (i < 1 || i > slen) { sno_runtime_error(3, NULL); return 0; }
         const char *vs = VARVAL_fn(val);
         if (!vs) vs = "";
-        /* Replace s[i] with vs: build new string s[0..i-2] + vs + s[i..end] */
         int vlen = (int)strlen(vs);
         int newlen = slen - 1 + vlen;
         char *ns = GC_malloc(newlen + 1);
         memcpy(ns, arr.s, i - 1);
         memcpy(ns + i - 1, vs, vlen);
-        memcpy(ns + i - 1 + vlen, arr.s + i, slen - i + 1);  /* +1 for NUL */
-        /* Mutate the string pointer in-place via the DESCR's s field.
-         * arr is passed by value so we must write through the original.
-         * subscript_set receives arr by value — caller must hold the
-         * container reference; we can only mutate the buffer contents.
-         * Icon's <- on string sections works by treating the string as
-         * a mutable buffer; we do the same here. */
-        /* Since arr.s is the live pointer, overwrite it via direct cast */
+        memcpy(ns + i - 1 + vlen, arr.s + i, slen - i + 1);
         char *live = (char *)arr.s;
         if (vlen == 1) {
-            /* Fast path: same length, overwrite in place */
             live[i - 1] = vs[0];
         } else {
-            /* Length changed — can't mutate in-place; need caller to see ns.
-             * This path is uncommon (multi-char replacement); for now do
-             * in-place overwrite of first char only and truncate/extend. */
             memmove(live + i - 1 + vlen, live + i, slen - i + 1);
             memcpy(live + i - 1, vs, vlen);
         }
         return 1;
     }
-    /* SIL NONARY → ERRTYP,3 → FTLTST */
     sno_runtime_error(3, NULL);
     return 0;
 }
-
-/* subscript_get2 / subscript_set2 — 2D */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t subscript_get2(DESCR_t arr, DESCR_t i, DESCR_t j) {
     if (arr.v == DT_A)
         return array_get2(arr.arr, (int)to_int(i), (int)to_int(j));
-    /* IC-5: DT_S string section s[i:j] */
     if (arr.v == DT_S || arr.v == DT_SNUL) {
         const char *s = arr.s ? arr.s : "";
         int slen = (int)strlen(s);
@@ -677,10 +542,9 @@ DESCR_t subscript_get2(DESCR_t arr, DESCR_t i, DESCR_t j) {
         char *buf = GC_malloc(len+1); memcpy(buf, s+ii-1, len); buf[len]='\0';
         return STRVAL(buf);
     }
-    return FAILDESCR;  /* P002: not an array — fail the statement */
+    return FAILDESCR;
 }
-
-/* subscript_set2 — arr[i,j] = val; returns 1 on success, 0 on OOB */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int subscript_set2(DESCR_t arr, DESCR_t i, DESCR_t j, DESCR_t val) {
     if (arr.v == DT_A) {
         int ii = (int)to_int(i), jj = (int)to_int(j);
@@ -689,75 +553,45 @@ int subscript_set2(DESCR_t arr, DESCR_t i, DESCR_t j, DESCR_t val) {
         array_set2(arr.arr, ii, jj, val);
         return 1;
     }
-    return 0;  /* not an array — fail */
+    return 0;
 }
-
-/* ast_node_new — 4-arg version: creates a DT_DATA('tree(t,v,n,c)') instance */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t MAKE_TREE_fn(DESCR_t tag, DESCR_t val, DESCR_t n_children, DESCR_t children) {
-    /* tree type registered in SNO_INIT_fn — DEFDAT_fn + _b_tree_* override done there */
     return DATCON_fn("tree", tag, val, n_children, children, (DESCR_t){0});
 }
-
-/* push_val / pop_val / top_val — aliases for PUSH_fn/POP_fn/TOP_fn */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t push_val(DESCR_t x) {
     PUSH_fn(x);
     return NULVCL;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pop_val(void) {
     return POP_fn();
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t top_val(void) {
     return TOP_fn();
 }
-
-/* register_fn — register a C function in the global function table */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void register_fn(const char *name, DESCR_t (*fn)(DESCR_t*, int), int min_args, int max_args) {
     (void)min_args; (void)max_args;
     DEFINE_fn(name, fn);
 }
-
-/* define_spec — DEFINE_fn('name(args)locals') */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void define_spec(DESCR_t spec) {
     DEFINE_fn(VARVAL_fn(spec), NULL);
 }
-
-/* apply_val — APPLY(fnval, args...) */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t apply_val(DESCR_t fnval, DESCR_t *args, int nargs) {
     const char *name = VARVAL_fn(fnval);
     return APPLY_fn(name, args, nargs);
 }
-
-/* =========================================================================
- * EVAL_fn — EVAL(expr)
- *
- * Hand-rolled recursive descent over the subset of SNOBOL4 pattern
- * expressions that beauty.sno produces:
- *
- *   expr : term ('.' term)*
- *   term : '*' ident ['(' args ')']   deferred ref / user_call node
- *        | ident '(' args ')'          function call — evaluate now
- *        | '\'' STRVAL_fn '\''               string literal → pat_lit
- *        | ident                       plain name → S sentinel
- *   args : val (',' val)*
- *   val  : ident '(' args ')'          function call → value
- *        | '\'' STRVAL_fn '\''               string value
- *        | ident                       var lookup
- *        | integer
- *
- * Key semantic: plain IDENT in term position returns STRVAL(name).
- * Dot handler checks right operand type:
- *   S     → assign_cond(left, right)   capture into named var
- *   P → pat_cat(left, right)        pattern CONCAT_fn
- * ========================================================================= */
-
 typedef struct { const char *s; int pos; } SnoEvalCtx;
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void _ev_skip(SnoEvalCtx *e) {
     while (e->s[e->pos] == ' ' || e->s[e->pos] == '\t') e->pos++;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static char *_ev_ident(SnoEvalCtx *e) {
     int start = e->pos;
     while (isalnum((unsigned char)e->s[e->pos]) || e->s[e->pos] == '_') e->pos++;
@@ -768,7 +602,7 @@ static char *_ev_ident(SnoEvalCtx *e) {
     nm[len] = '\0';
     return nm;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static char *_ev_strlit(SnoEvalCtx *e) {
     char delim = e->s[e->pos]; e->pos++;
     int start = e->pos;
@@ -780,11 +614,13 @@ static char *_ev_strlit(SnoEvalCtx *e) {
     if (e->s[e->pos] == delim) e->pos++;
     return lit;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static DESCR_t _ev_val(SnoEvalCtx *e);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static DESCR_t _ev_term(SnoEvalCtx *e);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static DESCR_t _ev_expr(SnoEvalCtx *e);
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int _ev_args(SnoEvalCtx *e, DESCR_t *args, int maxargs) {
     int na = 0;
     _ev_skip(e);
@@ -794,12 +630,12 @@ static int _ev_args(SnoEvalCtx *e, DESCR_t *args, int maxargs) {
         if (na < maxargs) args[na++] = _ev_val(e);
         else _ev_val(e);
         _ev_skip(e);
-        if (e->pos == pos_before) break; /* no progress — avoid infinite loop */
+        if (e->pos == pos_before) break;
     }
     if (e->s[e->pos] == ')') e->pos++;
     return na;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static DESCR_t _ev_val(SnoEvalCtx *e) {
     _ev_skip(e);
     char c = e->s[e->pos];
@@ -822,7 +658,7 @@ static DESCR_t _ev_val(SnoEvalCtx *e) {
     }
     return NULVCL;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static DESCR_t _ev_term(SnoEvalCtx *e) {
     _ev_skip(e);
     char c = e->s[e->pos];
@@ -854,7 +690,7 @@ static DESCR_t _ev_term(SnoEvalCtx *e) {
     }
     return pat_epsilon();
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static DESCR_t _ev_expr(SnoEvalCtx *e) {
     DESCR_t left = _ev_term(e);
     if (left.v == DT_S) {
@@ -880,146 +716,89 @@ static DESCR_t _ev_expr(SnoEvalCtx *e) {
     }
     return left;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t EVAL_fn(DESCR_t expr) {
-    /* RT-8: SIL EVAL — full type dispatch matching SIL EVAL/EVAL1.
-    fprintf(stderr, "EVAL_fn: v=%d s=%s\n", (int)expr.v,
-            (expr.v==5||expr.v==0) && expr.s ? expr.s : "(non-str)");
-     *
-     * DT_E  → EXPVAL_fn (execute frozen tree_t* with save/restore)
-     * DT_I  → idempotent (return as-is)
-     * DT_R  → idempotent (return as-is)
-     * DT_P  → run pattern hook (existing behaviour)
-     * DT_S/DT_SNUL:
-     *   empty  → idempotent (NULVCL)
-     *   numeric string → DT_I if integer, DT_R if real (SIL SPCINT/SPREAL)
-     *   else → CONVE_fn (compile to DT_E) → EXPVAL_fn (execute)
-     */
-
-    /* DT_E: frozen expression — execute via EXPVAL_fn (RT-6) */
     if (expr.v == DT_E) {
         return EXPVAL_fn(expr);
     }
-
-    /* DT_I / DT_R: idempotent (SIL EVAL1 path) */
     if (expr.v == DT_I) return expr;
     if (expr.v == DT_R) return expr;
-
-    /* DT_P: pattern — run via hook (unchanged) */
     if (expr.v == DT_P) {
         if (g_eval_pat_hook) return g_eval_pat_hook(expr);
         return expr;
     }
-
-    /* DT_S / DT_SNUL / anything else: evaluate as string */
     const char *s = VARVAL_fn(expr);
-
-    /* Empty string → idempotent null */
     if (!s || !*s) return NULVCL;
-
-    /* Numeric-string shortcut (SIL SPCINT): pure integer? */
     {
         char *endp = NULL;
         int64_t iv = (int64_t)strtoll(s, &endp, 10);
         if (endp && *endp == '\0') return INTVAL(iv);
     }
-
-    /* Numeric-string shortcut (SIL SPREAL): real number? */
     {
         char *endp = NULL;
         double rv = strtod(s, &endp);
         if (endp && *endp == '\0') return REALVAL(rv);
     }
-
-    /* Quoted string literal ('...' or "..."): do NOT short-circuit.
-     * EVAL('BREAK(nl)') must evaluate as SNOBOL4 source → PATTERN, not STRING.
-     * Fall through to CONVE_fn to parse and execute the full expression. */
-
-    /* String hook: if scrip.c has wired interp_eval_pat for string->pattern routing,
-     * use it -- handles TT_DEFER (*func), $ (cursor-assign), and all operators
-     * that eval_node in eval_code.c does not support (e.g. EVAL(ω) where
-     * ω contains *T8Trace(...) or $ tz). */
     if (g_eval_str_hook) return g_eval_str_hook(s);
-
-    /* General string: compile to DT_E (RT-7 CONVE_fn) then execute (RT-6) */
     DESCR_t compiled = CONVE_fn(expr);
-
     if (IS_FAIL_fn(compiled)) { fprintf(stderr, "DBG IS_FAIL true!\n"); return FAILDESCR; }
     DESCR_t _ev2 = EXPVAL_fn(compiled);
     return _ev2;
 }
-
-/* opsyn — OPSYN(new, old, type)
- * Register 'new' as an alias for the function named 'old'.
- * type arg selects arity context (unary=1, binary=2, function=0) but
- * runtime dispatch is name-based so we just copy the FNCBLK entry. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t opsyn(DESCR_t newname, DESCR_t oldname, DESCR_t type) {
     (void)type;
     const char *nm  = VARVAL_fn(newname);
-    /* oldname is typically .dupl — a NAMEPTR (DT_N, slen=1, ptr→NV cell).
-     * VARVAL_fn dereferences to the cell's value, not the name. Extract name: */
     const char *old = NULL;
     if (oldname.v == DT_N) {
         if (oldname.slen == 0 && oldname.s && *oldname.s)
-            old = oldname.s;                          /* NAMEVAL: name is in .s */
+            old = oldname.s;
         else if (oldname.slen == 1 && oldname.ptr)
-            old = NV_name_from_ptr((const DESCR_t *)oldname.ptr); /* NAMEPTR */
+            old = NV_name_from_ptr((const DESCR_t *)oldname.ptr);
     }
-    if (!old) old = VARVAL_fn(oldname);               /* fallback: string value */
+    if (!old) old = VARVAL_fn(oldname);
     if (!nm || !old || !*old) return FAILDESCR;
     register_fn_alias(nm, old);
     return NULVCL;
 }
-
-/* sort_fn — SORT(table_or_array) -> 2D array[1..n,1..2] */
-/* C5-4: typed compare — follows SPITBOL manual semantics:
- *   int-int: algebraic;  str-str: lexical;  different types: by type-name order
- *   (array, code, expression, integer, keyword, name, pattern, real, string, table)
- * Preserves original key descriptor in col 1 of the result array. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int _sort_type_rank(DESCR_t d) {
     switch (d.v) {
-        case DT_A: return 0;   /* array */
-        case DT_C: return 1;   /* code */
-        case DT_E: return 2;   /* expression */
-        case DT_I: return 3;   /* integer */
-        /* keyword — no DT_K rank exposed here; treat as name */
-        case DT_P: return 6;   /* pattern */
-        case DT_R: return 7;   /* real */
-        case DT_S: return 8;   /* string */
+        case DT_A: return 0;
+        case DT_C: return 1;
+        case DT_E: return 2;
+        case DT_I: return 3;
+        case DT_P: return 6;
+        case DT_R: return 7;
+        case DT_S: return 8;
         case DT_SNUL: return 8;
-        case DT_T: return 9;   /* table */
-        default:   return 5;   /* name/other */
+        case DT_T: return 9;
+        default:   return 5;
     }
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int _sort_cmp_descr(DESCR_t a, DESCR_t b, const char *sa, const char *sb) {
-    /* int-int: algebraic */
     if (a.v == DT_I && b.v == DT_I) {
         if (a.i < b.i) return -1;
         if (a.i > b.i) return  1;
         return 0;
     }
-    /* same string-ish (DT_S / DT_SNUL): lexical */
     if ((a.v == DT_S || a.v == DT_SNUL) && (b.v == DT_S || b.v == DT_SNUL)) {
         return strcmp(sa ? sa : "", sb ? sb : "");
     }
-    /* different types (or other same-type): by type rank */
     int ra = _sort_type_rank(a), rb = _sort_type_rank(b);
     if (ra != rb) return ra - rb;
-    /* same rank but not handled above — fall back to stringified compare */
     return strcmp(sa ? sa : "", sb ? sb : "");
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t sort_fn(DESCR_t arr) {
-    if (arr.v != DT_T) return arr;  /* pass-through for non-table */
+    if (arr.v != DT_T) return arr;
     TBBLK_t *tbl = arr.tbl;
     if (!tbl) return FAILDESCR;
-
-    /* Count entries */
     int n = 0;
     for (int h = 0; h < TABLE_BUCKETS; h++)
         for (TBPAIR_t *e = tbl->buckets[h]; e; e = e->next) n++;
     if (n == 0) return FAILDESCR;
-
-    /* Collect all (key, key_descr, value) pairs */
     const char **keys = GC_malloc(n * sizeof(char *));
     DESCR_t *key_descrs = GC_malloc(n * sizeof(DESCR_t));
     DESCR_t *vals = GC_malloc(n * sizeof(DESCR_t));
@@ -1031,8 +810,6 @@ DESCR_t sort_fn(DESCR_t arr) {
             vals[idx] = e->val;
             idx++;
         }
-
-    /* C5-4: typed insertion sort using key_descr for comparisons */
     int *order = GC_malloc(n * sizeof(int));
     for (int i = 0; i < n; i++) order[i] = i;
     for (int i = 1; i < n; i++) {
@@ -1045,18 +822,16 @@ DESCR_t sort_fn(DESCR_t arr) {
         }
         order[j+1] = tmp;
     }
-
-    /* Build 2D array[1..n, 1..2]: col1=key_descr (preserves type), col2=val */
     ARBLK_t *a = GC_malloc(sizeof(ARBLK_t));
     a->lo         = 1;
     a->hi         = n;
-    a->ndim       = 2;   /* 2 columns */
+    a->ndim       = 2;
     a->lo2        = 1;
-    a->hi2        = 2;   /* cols 1..2 */
-    a->proto_bare = 1;   /* SORT yields "N,2" bare form per SPITBOL */
+    a->hi2        = 2;
+    a->proto_bare = 1;
     a->data = GC_malloc(n * 2 * sizeof(DESCR_t));
     for (int i = 0; i < n; i++) {
-        a->data[i * 2 + 0] = key_descrs[order[i]];  /* preserve integer/string type */
+        a->data[i * 2 + 0] = key_descrs[order[i]];
         a->data[i * 2 + 1] = vals[order[i]];
     }
     DESCR_t result = {0};
@@ -1064,41 +839,31 @@ DESCR_t sort_fn(DESCR_t arr) {
     result.arr    = a;
     return result;
 }
-
-/* pat_call — call a user-defined function with one arg and use result as pattern value.
- * Used when a pattern expression contains a user-defined function call, e.g. *t(y) in pattern. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_call(const char *name, DESCR_t arg) {
     DESCR_t args[1] = { arg };
     DESCR_t result = APPLY_fn(name, args, 1);
     if (IS_FAIL_fn(result)) return pat_fail();
-    /* Wrap result as a pattern: if it's already a pattern, return it;
-     * otherwise treat it as a literal string pattern. */
     return var_as_pattern(result);
 }
-
-/* compile_to_expression — SIL CONVE path: parse string → freeze as DT_E.
- * Used by CONVERT(s,"EXPRESSION"). Does NOT evaluate — stores tree_t* as DT_E
- * for later thaw by EVAL_fn. Returns FAILDESCR if parse fails. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t compile_to_expression(const char *src) {
     if (!src || !*src) return FAILDESCR;
     tree_t *tree = parse_expr_pat_from_str(src);
     if (!tree) return FAILDESCR;
-
     DESCR_t d;
     d.v    = DT_E;
     d.slen = 0;
-    d.s    = NULL;   /* clear union first... */
-    d.ptr  = tree;   /* ...then store ptr last (ptr and s share union) */
+    d.s    = NULL;
+    d.ptr  = tree;
     return d;
 }
-
-/* rsort_fn — RSORT(table) -> 2D array[1..n,1..2] in reverse key order */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t rsort_fn(DESCR_t arr) {
     DESCR_t sorted = sort_fn(arr);
     if (sorted.v != DT_A || !sorted.arr) return sorted;
     ARBLK_t *a = sorted.arr;
     int n = a->hi - a->lo + 1;
-    /* Reverse the row order in-place (2 cols per row) */
     for (int lo = 0, hi = n - 1; lo < hi; lo++, hi--) {
         DESCR_t tmp0 = a->data[lo*2+0], tmp1 = a->data[lo*2+1];
         a->data[lo*2+0] = a->data[hi*2+0];
@@ -1108,12 +873,8 @@ DESCR_t rsort_fn(DESCR_t arr) {
     }
     return sorted;
 }
-
-/* ── patnd_print — --dump-bb diagnostic ──────────────────────────────────
- * Recursive pretty-printer for PATND_t trees. Indent is 2 spaces per level.
- * Writes to 'out'; suitable for stderr or stdout. */
 #include <stdio.h>
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static const char *xkind_name(XKIND_t k) {
     switch (k) {
         case XCHR:     return "CHR";
@@ -1147,7 +908,7 @@ static const char *xkind_name(XKIND_t k) {
         default:       return "?";
     }
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void patnd_print_r(const PATND_t *p, FILE *out, int depth) {
     if (!p) { fprintf(out, "%*s(null)\n", depth*2, ""); return; }
     fprintf(out, "%*s(%s", depth*2, "", xkind_name(p->kind));
@@ -1162,7 +923,7 @@ static void patnd_print_r(const PATND_t *p, FILE *out, int depth) {
         fprintf(out, "%*s)\n", depth*2, "");
     }
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void patnd_print(const PATND_t *p, FILE *out) {
     patnd_print_r(p, out, 0);
 }

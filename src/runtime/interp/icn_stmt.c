@@ -1,76 +1,21 @@
-/*============================================================================================================================
- * icn_stmt.c — RS-17b/RS-21: pure-BB statement-context evaluator for Icon Byrd boxes.
- *
- * See icn_stmt.h for the contract.
- *
- * RS-21 (2026-05-03): native dispatch for Icon statement-level kinds.
- *   TT_WHILE, TT_UNTIL, TT_REPEAT, TT_IF, TT_SEQ, TT_SEQ_EXPR, TT_LOOP_NEXT,
- *   TT_LOOP_BREAK, TT_RETURN, TT_PROC_FAIL, TT_SUSPEND.
- *
- * These kinds previously fell through to `interp_eval` (the IR-mode tree
- * walker).  RS-21 lifts each one into an explicit case here, with internal
- * value-context recursions going through `bb_eval_value` and internal
- * statement-context body recursions going back through `bb_exec_stmt`.
- *
- * After RS-21, the only kinds reaching the trailing fallthrough should be
- * TT_FNC (Icon proc/builtin call as statement), TT_ASSIGN (slot store), and
- * a handful of expression-kind escapees that mode-1 was happy to swallow
- * with its DESCR_t-discarding contract.  RS-22 absorbs TT_FNC + TT_ASSIGN.
- *
- * The 13 statement-context call sites in icn_runtime.c (proc bodies,
- * loop bodies, do-clauses, every-bodies, do-clause re-entry after suspend)
- * route here via bb_exec_stmt(...).
- *
- * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet
- * SPRINT:  RS-17b (2026-05-03), extended by RS-21 (2026-05-03)
- *==========================================================================================================================*/
-
 #include "icn_stmt.h"
 #include "icn_value.h"
-#include "icn_runtime.h"   /* FRAME, frame_depth, IcnFrame */
-#include "snobol4.h"        /* DESCR_t, IS_FAIL_fn, FAILDESCR, NULVCL */
-
-/* RS-23e (closes RS-23 arc): the `interp_eval` extern is gone.  Diag
- * verified zero IR fallthrough from any BB-adapter ancestor across smoke
- * + unified_broker + full Icon corpus 263.  Any kind not handled by an
- * explicit case below is a four-mode isolation violation and aborts via
- * `bb_exec_stmt`'s diagnostic at the end of the function. */
-
-/*------------------------------------------------------------------------------------------------------------------------------
- * bb_exec_stmt — execute e in statement context.
- *
- * Statement context means: side effects only.  Control-flow effects propagate
- * through IcnFrame state (FRAME.returning, FRAME.loop_break, FRAME.loop_next,
- * FRAME.suspending) which the caller observes after this returns.
- *
- * The dispatch mirrors the icon-frame switch in interp_eval.c (lines ~2300-
- * 2416) and the shared switch (lines ~3475-3567), with two changes:
- *  (a) value-context children are evaluated via `bb_eval_value` instead of
- *      `interp_eval`, keeping the call graph IR-free.
- *  (b) statement-context body children recurse via `bb_exec_stmt`, again
- *      avoiding interp_eval.
- *----------------------------------------------------------------------------------------------------------------------------*/
+#include "icn_runtime.h"
+#include "snobol4.h"
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void bb_exec_stmt(tree_t *e)
 {
     if (!e) return;
-
     switch (e->t) {
-
-    /*========================================================================
-     * Trivial control-flow markers — set FRAME state, no children.
-     *======================================================================*/
     case TT_LOOP_NEXT: {
-        /* `next` — abort body, ask enclosing loop to advance. */
         FRAME.loop_next = 1;
         return;
     }
     case TT_LOOP_BREAK: {
-        /* `break` — exit enclosing loop. */
         FRAME.loop_break = 1;
         return;
     }
     case TT_PROC_FAIL: {
-        /* `fail` — procedure-level fail return. */
         FRAME.returning  = 1;
         FRAME.return_val = FAILDESCR;
         return;
@@ -81,10 +26,6 @@ void bb_exec_stmt(tree_t *e)
         FRAME.return_val = rv;
         return;
     }
-
-    /*========================================================================
-     * TT_SUSPEND — yield a value to coro_drive_fnc loop.
-     *======================================================================*/
     case TT_SUSPEND: {
         DESCR_t val = (e->n > 0) ? bb_eval_value(e->c[0]) : NULVCL;
         if (!IS_FAIL_fn(val)) {
@@ -94,13 +35,6 @@ void bb_exec_stmt(tree_t *e)
         }
         return;
     }
-
-    /*========================================================================
-     * Conditional — TT_IF.
-     * Goal-directed test (IC-8): if the condition is suspendable, pump it
-     * via icn_bb_build; first non-fail value fires then-branch, exhaustion fires
-     * else-branch.  Otherwise classic single-shot evaluation.
-     *======================================================================*/
     case TT_IF: {
         if (e->n < 1) return;
         tree_t *test = e->c[0];
@@ -122,13 +56,6 @@ void bb_exec_stmt(tree_t *e)
         }
         return;
     }
-
-    /*========================================================================
-     * Loops — TT_WHILE, TT_UNTIL, TT_REPEAT.
-     * Each saves/restores loop_break and loop_next around the loop, exits
-     * on returning / loop_break / suspending, and re-runs the body via
-     * bb_exec_stmt.
-     *======================================================================*/
     case TT_WHILE: {
         int saved_brk = FRAME.loop_break; FRAME.loop_break = 0;
         int saved_nxt = FRAME.loop_next;  FRAME.loop_next  = 0;
@@ -171,15 +98,6 @@ void bb_exec_stmt(tree_t *e)
         FRAME.loop_next  = saved_nxt;
         return;
     }
-
-    /*========================================================================
-     * Sequences — TT_SEQ, TT_SEQ_EXPR.
-     * Statement-context: discard each child's value.  Honour returning /
-     * loop_break / loop_next as exit conditions.
-     * TT_SEQ honours the IC-9 "& conjunction" semantics (fail on any
-     * sub-failure), but in statement context the caller doesn't observe the
-     * fail — the child stmt's side effects already happened.
-     *======================================================================*/
     case TT_SEQ:
     case TT_SEQ_EXPR: {
         for (int i = 0; i < e->n; i++) {
@@ -189,41 +107,15 @@ void bb_exec_stmt(tree_t *e)
         }
         return;
     }
-
-    /*========================================================================
-     * RS-23a-route: high-volume expression kinds in statement context.
-     * Contract: evaluate for side effects, discard the result.
-     * bb_eval_value already handles TT_FNC (including raku_try_call_builtin
-     * at the top, via RS-23a-raku), TT_ASSIGN, and TT_AUGOP natively.
-     *======================================================================*/
     case TT_FNC:
     case TT_ASSIGN:
     case TT_AUGOP: {
         (void)bb_eval_value(e);
         return;
     }
-
-    /*========================================================================
-     * RS-23b: expression kinds that arrive in statement context from
-     * Icon/Prolog procedure bodies and recursive
-     * statement-context evaluation (caller=bb_exec_stmt).
-     *
-     *   TT_ILIT, TT_NUL — pure literals, zero side effects → no-op.
-     *   TT_NOT         — evaluates child for side effects, discards boolean.
-     *   TT_ALTERNATE   — generator combinator; first-success branch runs its
-     *                   side effects via bb_eval_value, result discarded.
-     *   TT_SCAN        — `subj ? body`; bb_eval_value handles scan-stack
-     *                   push/pop and body evaluation.
-     *   TT_CASE        — bb_eval_value evaluates topic, dispatches, runs
-     *                   matching body for side effects.
-     *
-     * bb_eval_value already handles all five non-trivial kinds (TT_NOT,
-     * TT_ALTERNATE, TT_SCAN, TT_CASE, plus TT_ILIT/TT_NUL via eval_node).
-     *======================================================================*/
     case TT_ILIT:
     case TT_NUL:
         return;
-
     case TT_NOT:
     case TT_ALTERNATE:
     case TT_SCAN:
@@ -231,37 +123,16 @@ void bb_exec_stmt(tree_t *e)
         (void)bb_eval_value(e);
         return;
     }
-
-    /*========================================================================
-     * RS-23c: TT_EVERY, TT_INITIAL, TT_SWAP — missing from both adapters.
-     * Statement context: evaluate for side effects, discard result.
-     * bb_eval_value carries the full native implementation for all three
-     * kinds (added in this rung to icn_value.c).
-     *======================================================================*/
     case TT_EVERY:
     case TT_INITIAL:
     case TT_SWAP: {
         (void)bb_eval_value(e);
         return;
     }
-
-    /*========================================================================
-     * RS-23-extra (session 2026-05-05): TT_REVASSIGN stmt-context.
-     * Statement context: perform the reversible assign and discard the
-     * returned value.  bb_eval_value carries the full native implementation
-     * (added in this rung to icn_value.c).  The revert semantics for
-     * every/alt-driven contexts are unaffected — those reach icn_bb_revassign
-     * via icn_bb_build, not via this path.
-     *======================================================================*/
     case TT_REVASSIGN: {
         (void)bb_eval_value(e);
         return;
     }
-
-    /* IJ-15: expression kinds at statement level -- delegate to bb_eval_value,
-     * discard result.  Covers cset ops, all relops, and any other expression
-     * kind that bb_eval_value handles.  RS-23e abort replaced: new Icon
-     * programs (mindfa/mffsol) exercise kinds not in the original corpus-263. */
     default: {
         (void)bb_eval_value(e);
         return;

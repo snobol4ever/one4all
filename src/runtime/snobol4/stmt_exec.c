@@ -1,54 +1,10 @@
-/*
- * stmt_exec.c — Dynamic Byrd Box Statement Executor (M-DYN-3)
- *
- * Five-phase SNOBOL4 statement executor using the live dynamic Byrd box
- * graph built from a PATND_t tree.  This is the C-text path described in
- * ARCH-byrd-dynamic.md — no NASM, no static emitter, pure C goto model.
- *
- * PHASES
- * ------
- *   Phase 1: build_subject  — extract string from DESCR_t, set Σ/Δ/Ω
- *   Phase 2: build_pattern  — walk PATND_t tree → live bb box graph
- *   Phase 3: run_match      — drive root box α/β, collect captures
- *   Phase 4: build_repl     — replacement value already as DESCR_t
- *   Phase 5: perform_repl   — splice into subject, NV_SET_fn, :S/:F
- *
- * PUBLIC API
- * ----------
- *   int exec_stmt(DESCR_t *subj_var,
- *                     DESCR_t  pat,
- *                     DESCR_t *repl,      // NULL → no replacement
- *                     int      has_repl)
- *   Returns 1 → :S branch, 0 → :F branch.
- *
- * CAPTURE HANDLING
- * ----------------
- *   XFNME (pat $ var) and XNME (pat . var) capture nodes wrap their child
- *   box in a bb_capture box that on γ writes the matched spec_t into the
- *   named variable via NV_SET_fn.
- *
- * RELATION TO STATIC PATH
- * -----------------------
- *   The static emitter (emit_x64.c + snobol4_asm.mac) is untouched.
- *   This file is additive — called only when the dynamic path is chosen.
- *   Gates: emit-diff 981/4 and snobol4_x86 106/106 must hold throughout.
- *
- * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6
- * DATE:    2026-04-01
- * SPRINT:  DYN-3
- */
-
 #pragma GCC diagnostic ignored "-Wmisleading-indentation"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #ifdef STMT_EXEC_STANDALONE
-/* ── Standalone build: define the types that snobol4.h would provide ─── */
 #include <stdint.h>
-#include "bb_box.h"   /* spec_t, spec_empty, α, β, spec_is_empty, bb_box_fn */
-
-/* Minimal DESCR_t for standalone use */
+#include "bb_box.h"
 typedef enum { DT_SNUL=0, DT_S=1, DT_P=3, DT_I=6, DT_FAIL=99 } DTYPE_t;
 typedef struct DESCR_t {
     DTYPE_t  v;
@@ -60,193 +16,100 @@ typedef struct DESCR_t {
         void   *p;
     };
 } DESCR_t;
-
-/* Stubs supplied by test driver */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t NV_GET_fn(const char *name);
-extern DESCR_t  NV_SET_fn(const char *name, DESCR_t val);  /* RT-5 */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+extern DESCR_t  NV_SET_fn(const char *name, DESCR_t val);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern char   *VARVAL_fn(DESCR_t d);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t (*g_user_call_hook)(const char *name, DESCR_t *args, int nargs);
-
-/* No GC in standalone — use plain malloc */
 #define GC_MALLOC(n)  malloc(n)
-
-#else /* full runtime build */
+#else
 #include <gc/gc.h>
-/* snobol4.h defines DESCR_t, DT_*, NV_GET_fn, NV_SET_fn, VARVAL_fn.
- * It also transitively includes engine/runtime.h which defines its own spec_t.
- * We must NOT include bb_box.h after snobol4.h (spec_t conflict).
- * Instead we redeclare bb_box.h's types manually here. */
 #include "snobol4.h"
-/* bb_convert.h removed EST-4: spec_from_descr / descr_from_spec no longer used */
-#include "bb_broker.h"  /* bb_broker, BB_SCAN — U-9 */
-#include "sil_macros.h"   /* SIL macro translations — RT + SM axes */
+#include "bb_broker.h"
+#include "sil_macros.h"
 #include "bb_build.h"
-#include "bb_pool.h"              /* bb_pool_reset (EM-7d) */
-#include "emit_bb.h"         /* bb_build_flat / bb_build_brokered — EM-RAW-PURGE-1 */
-/* rt_in_native_chunk lives in libscrip_rt.so (mode-4 only).  In the scrip
- * binary (mode-1/2/3) it is never set — provide a weak fallback that returns
- * 0 so the call resolves cleanly even when libscrip_rt is not linked. */
+#include "bb_pool.h"
+#include "emit_bb.h"
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int rt_in_native_chunk(void) __attribute__((weak));
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int rt_in_native_chunk(void) { return 0; }
-
-/* SN-6b: DT_E thaw in bb_deferred_var needs tree_t + TT_FNC/TT_VAR kinds and
- * eval_node() for argument evaluation. Mirrors snobol4_pattern.c's pat_to_patnd. */
 #include "../ast/ast.h"
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t eval_node(tree_t *e);
-
-/* In the full-runtime build, include bb_box.h after snobol4.h.
- * bb_box.h now uses spec_t (not spec_t) so no collision with engine. */
 #include "bb_box.h"
-/* bb_box.h already defines α/β — only define here if not already defined */
 #ifndef BB_ALPHA_DEFINED
 static const int α = 0;
 static const int β = 1;
 #endif
-
-#endif /* STMT_EXEC_STANDALONE */
-
-
-/* ── global match state ─────────────────────────────────────────────────── */
-/* Defined by the test driver or the generated main. Declared extern here. */
-/* M-DYN-S1: defined here, referenced as extern in bb_*.c via bb_box.h.
- * Non-static so they get external linkage for separate compilation of bb_*.c.
- * Set by exec_stmt Phase 1; read by all box functions during Phase 3. */
+#endif
 const char *Σ = NULL;
 int         Δ = 0;
 int         Ω = 0;
-int         g_scan_pre_delta = 0;  /* EM-RAW-PURGE-1: Δ before box call, for scan_body_fn_u9 */
-int         Σlen = 0;  /* true subject length — boxes use this for bounds; Ω clamped by kw_anchor */
-
-/* Subject globals — defined here, extern'd in snobol4_stmt_rt.c.
- * Were previously in the archived x86_stubs_interp.c asm harness. */
+int         g_scan_pre_delta = 0;
+int         Σlen = 0;
 uint64_t cursor          = 0;
 uint64_t subject_len_val = 0;
 char     subject_data[65536] = {0};
-
-/* ══════════════════════════════════════════════════════════════════════════
- * PRIMITIVE BOX IMPLEMENTATIONS
- * (used by bb_build below; the dyn/ box files are the canonical forms)
- * ══════════════════════════════════════════════════════════════════════════ */
-
-/* ── EDP-9: C box externs deleted; all paths use bb_build_brokered / bb_*_emit_binary ── */
-
-/* ── Complex boxes — defined below (need bb_node_t / bb_build / DESCR_t) ─ */
-/* bb_capture, bb_atp, bb_deferred_var remain here until MILESTONE-BOX-UNIFY */
-/* deferred_var_t needs bb_node_t which is defined later in this file */
 typedef struct { const char *name; bb_box_fn child_fn; void *child_state; size_t child_size; int in_progress; } deferred_var_t;
-static int g_dvar_depth = 0;  /* global recursion depth — caps mutual recursion */
+static int g_dvar_depth = 0;
 #define DVAR_MAX_DEPTH 4096
-/* bb_deferred_var() defined after bb_build (needs bb_node_t) */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static DESCR_t bb_deferred_var(void *zeta, int entry);
-
-/* ── CAPTURE box (wraps child; on γ writes capture to named variable) ───── */
-/*
- * DYN-4: XNME (pat . var) is a CONDITIONAL capture — only committed when
- * the entire enclosing pattern succeeds (Phase 5 gate).  XFNME (pat $ var)
- * is IMMEDIATE — written on every γ, even during backtracking.
- *
- * Implementation: both kinds write via NV_SET_fn on γ.  For XNME
- * (immediate=0) the caller (exec_stmt) must pass the capture list
- * and commit only on overall success.  For DYN-4 we buffer XNME captures
- * in a small pending-capture list and flush it in Phase 5.
- */
-/* capture_t / bb_capture / bb_capture_new / register_capture /
- * flush_pending_captures all unified into bb_boxes.c (2026-04-19 session 17).
- * Declarations visible here via bb_box.h. Single source across all three modes. */
-
-
-/* ══════════════════════════════════════════════════════════════════════════
- * Phase 2: pattern build — bb_build_brokered (EM-BB-PURGE-3)
- * bb_build() deleted in EDP-8; brokered blob path via bb_flat.c.
- * ══════════════════════════════════════════════════════════════════════════ */
-
-/* flush_pending_captures now external, declared in bb_box.h */
-
-/* ══════════════════════════════════════════════════════════════════════════
- * M-DYN-OPT — Invariance detection and node cache
- *
- * A PATND_t subtree is INVARIANT if it contains no node whose built graph
- * depends on runtime variable state:
- *   XDSAR — *var (indirect pattern reference — value read at match time)
- *   XVAR  — var holding a pattern (value may change between builds)
- *   XATP  — @ (cursor-position function — has side effects)
- *   XFNME — pat $ var (immediate capture — writes NV at match time)
- *   XNME  — pat . var (conditional capture — writes NV on success)
- *
- * Invariant subtrees produce the SAME bb_node_t on every call to bb_build.
- * We cache the result (keyed on PATND_t* pointer) and on a cache hit return
- * a FRESH ζ copy (memcpy of the pristine template) so match state is clean
- * each time, while avoiding the O(depth) tree walk and calloc chain.
- *
- * Cache is a simple open-addressed hash table.  Capacity is intentionally
- * modest (512 slots) — a typical program has far fewer distinct pattern nodes.
- * ══════════════════════════════════════════════════════════════════════════ */
-
-/* ── Invariance predicate ─────────────────────────────────────────────── */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int patnd_is_invariant(PATND_t *p)
 {
-    if (!p)                                           return 1;  /* null → epsilon, invariant */
+    if (!p)                                           return 1;
     switch (p->kind) {
     case XDSAR:
     case XVAR:
     case XATP:
     case XFNME:
-    case XNME:                                       return 0;  /* always variant */
-    case XFARB:                                      return 0;  /* ARB: mutable count/start in arb_t */
-    case XSTAR:                                      return 0;  /* REM: mutable ζ state */
+    case XNME:                                       return 0;
+    case XFARB:                                      return 0;
+    case XSTAR:                                      return 0;
     default:                                          break;
     }
-    /* Recurse into children */
     for (int i = 0; i < p->nchildren; i++)
         if (p->children[i] && !patnd_is_invariant(p->children[i])) return 0;
     return 1;
 }
-
-/* ── Node cache ───────────────────────────────────────────────────────── */
 #define DYNC_CACHE_CAP 512
-
 typedef struct {
-    PATND_t   *key;          /* NULL = empty slot */
-    bb_node_t template;     /* pristine bb_node_t with fresh ζ as template */
+    PATND_t   *key;
+    bb_node_t template;
 } cache_slot_t;
-
 static cache_slot_t g_node_cache[DYNC_CACHE_CAP];
 static int          g_cache_hits   = 0;
 static int          g_cache_misses = 0;
-
-/* M-BB-LIVE-WIRE: Byrd Box mode — set by scrip.c before execute_program(). */
 bb_mode_t           g_bb_mode      = BB_MODE_DRIVER;
-
-/* M-DYN-B6: binary box coverage audit — printed when SNO_BINARY_BOXES set */
-static int          g_bin_hits     = 0;  /* bb_build_binary() returned non-NULL */
-static int          g_bin_misses   = 0;  /* bb_build_binary() returned NULL (C path) */
-static int          g_bin_str_hits = 0;  /* DT_S literal path took binary */
-
+static int          g_bin_hits     = 0;
+static int          g_bin_misses   = 0;
+static int          g_bin_str_hits = 0;
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static cache_slot_t *cache_find(PATND_t *key)
 {
     if (!key) return NULL;
     uintptr_t h = ((uintptr_t)key >> 4) & (DYNC_CACHE_CAP - 1);
     for (int i = 0; i < DYNC_CACHE_CAP; i++) {
         uintptr_t idx = (h + (uintptr_t)i) & (DYNC_CACHE_CAP - 1);
-        if (g_node_cache[idx].key == key)    return &g_node_cache[idx];  /* hit */
-        if (g_node_cache[idx].key == NULL)   return &g_node_cache[idx];  /* empty */
+        if (g_node_cache[idx].key == key)    return &g_node_cache[idx];
+        if (g_node_cache[idx].key == NULL)   return &g_node_cache[idx];
     }
-    return NULL;  /* full — unlikely, treated as miss */
+    return NULL;
 }
-
-/* Insert a newly built bb_node_t into the cache for key p.
- * The template ζ is the pristine calloc'd block; we keep it and will
- * memcpy from it on future hits. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void cache_insert(PATND_t *key, bb_node_t node)
 {
     cache_slot_t *slot = cache_find(key);
-    if (!slot || slot->key != NULL) return;  /* full or key already in */
+    if (!slot || slot->key != NULL) return;
     slot->key      = key;
     slot->template = node;
 }
-
-/* On cache hit, return bb_node_t with a FRESH ζ copy so match state
- * is clean each time.  fn is shared (stateless); ζ is per-match. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static bb_node_t cache_get_fresh(cache_slot_t *slot)
 {
     bb_node_t n = slot->template;
@@ -257,34 +120,25 @@ static bb_node_t cache_get_fresh(cache_slot_t *slot)
     }
     return n;
 }
-
-/* Public: reset the node cache (called between programs / test runs) */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void cache_reset(void)
 {
     for (int i = 0; i < DYNC_CACHE_CAP; i++) g_node_cache[i].key = NULL;
     g_cache_hits = g_cache_misses = 0;
 }
-
-/* EM-7d: reclaim bb_pool and flush the node cache together.
- * Cached fn pointers live in bb_pool RX pages; reset without cache flush
- * leaves dangling pointers.  Safe in BB_MODE_BROKERED (mode-4 rt_match_variant)
- * where there is no cross-statement blob cache.  Do NOT call from sm_interp
- * SM_EXEC_STMT — the BB_MODE_LIVE blob cache spans nested sm_interp_run calls
- * and resetting it mid-execution corrupts in-flight pattern blobs. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void exec_stmt_pool_reset(void)
 {
     bb_pool_reset();
     cache_reset();
 }
-
-/* Public: report cache stats */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void cache_stats(int *hits, int *misses)
 {
     if (hits)   *hits   = g_cache_hits;
     if (misses) *misses = g_cache_misses;
 }
-
-/* M-DYN-B13: symbolic XKIND name for BIN_MISS logging */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static const char *xkind_name(int k)
 {
     switch (k) {
@@ -305,14 +159,7 @@ static const char *xkind_name(int k)
     default: return "XUNKNOWN";
     }
 }
-
-/* M-DYN-B13: print binary coverage audit to stderr.
- * Triggered by BINARY_AUDIT=1 or SNO_BINARY_BOXES=1 at program end.
- * Known fallbacks (always C path, not in 50-file corpus):
- *   XABRT — ABORT primitive      (rare in real programs)
- *   XSUCF — SUCCEED primitive    (rare in real programs)
- *   XBAL  — BAL primitive        (rare in real programs)
- *   XVAR  — *var dynamic pattern (deferred re-resolve needs C path) */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void bin_audit_print(void)
 {
     int pat_total = g_bin_hits + g_bin_misses;
@@ -329,67 +176,22 @@ void bin_audit_print(void)
         fprintf(stderr,
             "BINARY_AUDIT: known fallbacks: XABRT XSUCF XBAL XVAR (not in 50-file corpus)\n");
 }
-
-/* ── ATP box (@var) — cursor-position capture ───────────────────────────────
- * bb_atp unified into bb_boxes.c (2026-04-19 session 17). Single source.
- * atp_t defined in bb_box.h; bb_atp + bb_atp_new declared there too. */
-
-/* ── USERCALL box — *fn() bare pattern side-effect call ──────────────────────
- * Bug #1d fix: defer via NAME_push_callcap so the call fires at NAME_commit
- * (overall pattern success) rather than at match-time α.  Failed ARBNO
- * trials / ALT arms that include *fn() no longer fire the function — the NAM
- * rollback on backtrack discards the pending callcap entry before commit.
- * On α: record deferred call (epsilon match); succeed.
- * On β: fail — no re-try semantics for side-effect calls. */
 typedef struct {
     const char *name;
     DESCR_t    *args;
     int         nargs;
     int         done;
-    int         consumed;     /* SN-26c-parseerr-e: chars consumed by fn-result match (for β retract) */
+    int         consumed;
 } usercall_t;
-
-/* SN-17d (Porter FAIL-propagation fix):
- *
- * Before SN-17d, bb_usercall at α pushed a deferred NM_CALL onto the NAM stack
- * and returned epsilon — the function's real return value was ignored until
- * name_commit_value(NM_CALL) fired at overall-pattern commit time, which is
- * AFTER the pattern has already succeeded.  A failing guard like
- *   'abate' *g_m_gt_0() ...
- * would match at every position because the guard's FAIL couldn't propagate
- * back into the match engine.
- *
- * Fix: for bare *fn() (no leading `.` / `$` — those take a different path via
- * XCALLCAP / NM_CALL), invoke g_user_call_hook eagerly at α and check the
- * return.  If it's FAIL (or a DT_P XFAIL pattern — the "g_fn = FAIL" shape
- * noted in the goal file), the box fails at α.  Otherwise it matches epsilon.
- * No NAM push needed — there's nothing to defer.
- *
- * The earlier SN-20 NAM-push/pop bookkeeping is redundant for this path:
- * NAME_push_callcap existed to carry the call across backtracking so the
- * call would fire at commit.  Now the call has already fired; no further
- * deferral is needed.  The `.` / `$` capture forms still use NM_CALL via
- * bb_cap (which calls NAME_push directly with a locally-built NAME_t) —
- * that path is untouched.
- *
- * (The earlier SN-17 spec_t-vs-DESCR_t layout fix for the bb_box_fn return
- * type is preserved — we still return via descr_from_spec / FAILDESCR.)
- */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static DESCR_t bb_usercall(void *zeta, int entry)
 {
     usercall_t *ζ = zeta;
     DESCR_t UC;
-
     if (entry == α) goto UC_α;
                     goto UC_β;
-
     UC_α:  ζ->done = 1;
            if (g_user_call_hook && ζ->name && ζ->name[0]) {
-               /* SN-26c-parseerr-c: thaw DT_E args at match time.
-                * Args that came in as DT_E were deferred by interp_eval_pat /
-                * sm_lower at pattern-build time so a match-time-sensitive
-                * value (e.g. nTop() after ARBNO has advanced the counter)
-                * resolves correctly.  EVAL_fn is idempotent for non-DT_E. */
                DESCR_t *eff_args = ζ->args;
                DESCR_t  thaw_buf[8];
                DESCR_t *thawed   = NULL;
@@ -408,7 +210,6 @@ static DESCR_t bb_usercall(void *zeta, int entry)
                    }
                    eff_args = thawed;
                }
-               /* SN-26c-parseerr-d trace: dump pre-thaw and post-thaw arg shapes */
                if (getenv("ONE4ALL_USERCALL_TRACE")) {
                    fprintf(stderr, "BB_USERCALL name=%s nargs=%d\n", ζ->name ? ζ->name : "(null)", n);
                    for (int i = 0; i < n; i++) {
@@ -430,57 +231,14 @@ static DESCR_t bb_usercall(void *zeta, int entry)
                    }
                }
                DESCR_t r = g_user_call_hook(ζ->name, eff_args, n);
-               /* SN-26c-parseerr-h: detect NRETURN via &RTNTYPE.  When a user
-                * function returns via NRETURN, the descriptor `r` carries the
-                * fn's value (typically the same as RETURN would yield), but
-                * SPITBOL semantics for `*fn()` in pattern context treat an
-                * NRETURN-returning call as a side-effect-only EPSILON MATCH —
-                * success at the current cursor with zero characters consumed,
-                * REGARDLESS of the value's type or the subject contents.
-                *
-                * Beauty's parser is the canonical victim: every Push(...) call
-                * ends with `:(NRETURN)`.  Without this branch, the second and
-                * later Push() calls in `*Push(tok) *Push(tag) ...` cause an
-                * anchored-string-match against the cursor, which usually fails,
-                * which backtracks the alternation and discards Push's
-                * already-committed side effects on the parser-stack global.
-                *
-                * Failure shapes (FRETURN, fn = FAIL) still apply and are
-                * checked first.
-                *
-                * Note: kw_rtntype is set by call_user_function on every exit
-                * path and is read here BEFORE any nested call could clobber it
-                * (no allocation or function call between hook return and this
-                * check). */
                extern char kw_rtntype[16];
                int via_nreturn = (strcmp(kw_rtntype, "NRETURN") == 0);
-               /* Two failure shapes to handle:
-                *   DT_FAIL (99)                        — FRETURN / explicit FAIL
-                *   DT_P wrapping XFAIL PATND node     — user wrote `fn = FAIL`
-                *                                        and PATND_t for FAIL leaked
-                *                                        through (spec guard-idiom).
-                * Anything else MUST be used as a pattern primitive — matching the
-                * function's return value against the subject at the current cursor.
-                * SN-17d previously made bare *fn() match epsilon unconditionally on
-                * non-FAIL; that was wrong (cf. SN-26c-parseerr-e).  SPITBOL semantics:
-                * `*fn()` evaluates the function at match time and uses the result as
-                * a pattern at the current cursor.  String returns become anchored
-                * literal-string matches; pattern returns are matched as patterns. */
                if (IS_FAIL_fn(r))                         goto UC_ω;
                if (r.v == DT_P && r.p && r.p->kind == XFAIL) goto UC_ω;
-
-               /* SN-26c-parseerr-h: NRETURN → epsilon-match.  Side effects on
-                * globals already committed during the body's execution are
-                * preserved (bb_usercall has no rollback path that touches NV).
-                * The string-match branch below is ONLY for value-returning
-                * functions whose RTNTYPE is "RETURN" (or "FRETURN" handled
-                * above as failure). */
                if (via_nreturn) {
                    ζ->consumed = 0;
                    UC = descr_match(Σ + Δ, 0);                  goto UC_γ;
                }
-
-               /* SN-26c-parseerr-e: match the return value against subject @ Δ. */
                if (r.v == DT_S || r.v == DT_SNUL) {
                    const char *rs = r.s ? r.s : "";
                    int         rl = (int)strlen(rs);
@@ -491,109 +249,35 @@ static DESCR_t bb_usercall(void *zeta, int entry)
                    Δ += rl;
                                                                   goto UC_γ;
                }
-               /* DT_P (pattern), DT_I (integer), DT_R (real), DT_N (name) ...
-                * not yet supported as bb_usercall return-as-pattern.  Fall through
-                * to epsilon match for backward-compat with the SN-17d guard idiom
-                * (`*g_m_gt_0()` returns DT_I 0 or 1; FAIL handled above; success
-                * was previously epsilon and corpus relies on that). */
                ζ->consumed = 0;
            }
            UC = descr_match(Σ + Δ, 0);        goto UC_γ;
     UC_β:  Δ -= ζ->consumed;
            ζ->consumed = 0;                goto UC_ω;
-
     UC_γ:                                  return UC;
     UC_ω:                                  return FAILDESCR;
 }
-
-/* ── CALLCAP (pat . *fn() / pat $ *fn()) — DELETED in SN-21e.
- *
- * SN-21d collapsed the CALLCAP state machine into the unified bb_cap box with
- * NAME_t { kind = NM_CALL }.  XCALLCAP now lowers through bb_cap_new_call in
- * both bb_build.c trampolines and stmt_exec.c's pattern dispatcher; the
- * deferred (.) commit fires from name_commit_value's NM_CALL branch.
- *
- * The legacy implementation — callcap_t, cc_event_t, bb_callcap / _exported /
- * _new / _new_named, dedup_callcaps, flush_pending_callcaps, and the
- * g_callcap_list / g_cc_events registries — lived here unreached between
- * SN-21d and SN-21e.  SN-21e removes them entirely; the git history is the
- * permanent record.
- *
- * The per-firing event queue (g_cc_events) was DYN-79 machinery that
- * predated SN-20's self-unwinding NAM stack; with NAME_push / NAME_pop
- * handling backtrack bookkeeping on every box, no event queue is needed.
- */
-
-
-/* ── bb_deferred_var — defined here, after bb_build (needs bb_node_t) ───── */
-/*
- * DYN-4 CORRECTED: *name resolved on EVERY α entry, not just the first.
- *
- * SNOBOL4 spec: *VAR looks up VAR's current value at the moment each match
- * attempt begins (each α call).  If VAR changes between statement executions
- * the new pattern must be used.  Caching the child graph across α calls is
- * only valid when the variable's value is provably constant — that optimisation
- * belongs in M-DYN-OPT's invariance layer, not here.
- *
- * Correctness path (this function):
- *   1. On every α: call NV_GET_fn(name) to get the live value.
- *   2. If value is a DT_P pattern node pointer same as last time, reuse
- *      the existing child graph (avoid rebuild for the common stable case).
- *   3. If value changed: build a new child graph, store it.
- *   4. Reset child match state (fresh ζ copy via memset to 0) so the new
- *      α sees a clean box regardless of prior match state.
- *
- * β path: delegate to child_fn if built, else ω (can't backtrack a
- * not-yet-matched box).
- */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static DESCR_t bb_deferred_var(void *zeta, int entry)
 {
     deferred_var_t *ζ = zeta;
-
     if (entry == α)                                     goto DVAR_α;
     if (entry == β)                                     goto DVAR_β;
-
     DESCR_t         DVAR;
-
     DVAR_α:         {
-                        /* Recursion guard: global depth cap only. */
                         if (g_dvar_depth >= DVAR_MAX_DEPTH)
                                                               goto DVAR_ω;
                         g_dvar_depth++;
-
-                        /* Re-resolve on every α: live NV lookup */
                         DESCR_t val = NV_GET_fn(ζ->name);
                         int rebuilt = 0;
-
 #ifndef STMT_EXEC_STANDALONE
-                        /* ── SN-6b: DT_E thaw ─────────────────────────────
-                         * If the variable holds a frozen expression (DT_E),
-                         * coerce it to a pattern value (DT_P) HERE, so the
-                         * DT_P branch below can build the child box graph.
-                         *
-                         * Without this thaw, DT_E falls into the final else
-                         * and becomes bb_eps — silently matching epsilon and
-                         * dropping all nested *fn() side effects.  That's
-                         * the expr_eval `(1+2)*3 → 3` / `-3+10 → 10` bug.
-                         *
-                         * Template lifted verbatim from pat_to_patnd in
-                         * snobol4_pattern.c:220-253.  TT_FNC → pat_user_call
-                         * builds an XATP that fires at match time (deferred
-                         * side-effect call).  TT_VAR → var_as_pattern builds
-                         * an XVAR that re-resolves at match time (recursive
-                         * grammar case: expr0 = *constant).  Anything else
-                         * falls back to PATVAL_fn (strict thaw), which is
-                         * equivalent to SPITBOL's PATVAL semantics.
-                         * ──────────────────────────────────────────────── */
                         if (val.v == DT_E) {
                             tree_t *frozen = (tree_t *)val.ptr;
                             if (!frozen) {
-                                /* null DT_E — propagate failure (do not epsilon) */
                                 g_dvar_depth--;
                                 goto DVAR_ω;
                             }
                             if (frozen->t == TT_FNC) {
-                                /* *func(args...) — build XATP via pat_user_call */
                                 int nargs = frozen->n;
                                 DESCR_t *args = NULL;
                                 if (nargs > 0) {
@@ -604,41 +288,24 @@ static DESCR_t bb_deferred_var(void *zeta, int entry)
                                 const char *fname = frozen->v.sval ? frozen->v.sval : "";
                                 val = pat_user_call(fname, args, nargs);
                             } else if (frozen->t == TT_VAR && frozen->v.sval) {
-                                /* *varname — re-resolve directly via NV_GET_fn.
-                                 * Going through var_as_pattern→XVAR would add
-                                 * another layer of indirection (a nested
-                                 * bb_deferred_var) whose child match was
-                                 * observed to FAIL at α during probing.  Since
-                                 * bb_deferred_var IS the deferred re-resolve
-                                 * box, we skip the indirection and fetch the
-                                 * underlying value directly. */
                                 val = NV_GET_fn(frozen->v.sval);
                             } else {
-                                /* Other frozen expression: strict thaw via PATVAL_fn */
                                 val = PATVAL_fn(val);
                             }
                             if (val.v == DT_FAIL) {
                                 g_dvar_depth--;
                                 goto DVAR_ω;
                             }
-                            /* val is now DT_P (or DT_S if PATVAL_fn coerced
-                             * a non-pattern result to a literal).  Fall
-                             * through to the existing dispatch. */
                         }
 #endif
-
                         if (val.v == DT_P && val.p) {
                             if (val.p != ζ->child_state || !ζ->child_fn) {
-                                /* Value changed (or first call): rebuild via brokered path.
-                                 * EDP-8: bb_build() deleted; use bb_build_brokered with
-                                 * eps fallback for non-flat-eligible patterns. */
                                 bb_box_fn bfn = bb_build_brokered((PATND_t *)val.p);
                                 if (bfn) {
                                     ζ->child_fn    = bfn;
                                     ζ->child_state = NULL;
                                     ζ->child_size  = 0;
                                 } else {
-                                    /* EM-RAW-PURGE-1: eps via brokered blob */
                                     PATND_t *ep = patnd_make_eps();
                                     bb_box_fn efn = bb_build_brokered(ep);
                                     ζ->child_fn    = efn;
@@ -648,8 +315,6 @@ static DESCR_t bb_deferred_var(void *zeta, int entry)
                                 rebuilt = 1;
                             }
                         } else if (val.v == DT_S && val.s) {
-                            /* String value: always treat as fresh literal.
-                             * EM-RAW-PURGE-1: brokered blob (flat ABI incompatible with scan_body_fn_u9) */
                             PATND_t *lp = patnd_make_xchr(val.s);
                             bb_box_fn lfn = bb_build_brokered(lp);
                             if (lfn && lfn != ζ->child_fn) {
@@ -660,7 +325,6 @@ static DESCR_t bb_deferred_var(void *zeta, int entry)
                             }
                         } else {
                             if (!ζ->child_fn) {
-                                /* EM-RAW-PURGE-1: eps via brokered blob */
                                 PATND_t *ep = patnd_make_eps();
                                 bb_box_fn efn = bb_build_brokered(ep);
                                 ζ->child_fn    = efn;
@@ -669,47 +333,25 @@ static DESCR_t bb_deferred_var(void *zeta, int entry)
                                 rebuilt = 1;
                             }
                         }
-
-                        /* DYN-12 extended: do NOT memset config-only boxes.
-                         * EDP-9: C boxes gone; brokered/binary blobs have no
-                         * mutable ζ_state (child_state=NULL), so memset is
-                         * a no-op — _config_only guard simplified. */
                         int _config_only = (ζ->child_state == NULL);
                         if (!rebuilt && ζ->child_state && ζ->child_size && !_config_only)
                             memset(ζ->child_state, 0, ζ->child_size);
                     }
                     if (!ζ->child_fn) { g_dvar_depth--; goto DVAR_ω; }
-                    /* SN-21e: no legacy callcap registry snapshot/restore
-                     * dance needed — the whole g_callcap_list / g_cc_events
-                     * scaffolding is deleted.  Every capture (. and $, var
-                     * and *fn() alike) flows through the single bb_cap box:
-                     * γ pushes into the flat NAME stack, β/ω self-unwind
-                     * via NAME_pop.  NAME_commit walks the stack on outer
-                     * match success; nothing else mediates the transaction.
-                     *
-                     * Same-box β symmetry (lvalue-kind agnostic): PAT . var
-                     * and PAT . *fn() are now literally the same state
-                     * machine with different NameKind_t dispatch at commit
-                     * time.  bb_deferred_var is an ordinary combinator
-                     * that forwards α to its child — no special
-                     * bookkeeping required. */
                     DVAR = ζ->child_fn(ζ->child_state, α);
                     g_dvar_depth--;
                     if (IS_FAIL_fn(DVAR))                    goto DVAR_ω;
                     goto DVAR_γ;
-
     DVAR_β:         if (!ζ->child_fn)                         goto DVAR_ω;
                     DVAR = ζ->child_fn(ζ->child_state, β);
                     if (IS_FAIL_fn(DVAR))                    goto DVAR_ω;
                                                               goto DVAR_γ;
-
     DVAR_γ:                                                   return DVAR;
     DVAR_ω:                                                   return FAILDESCR;
 }
-
-/* M-DYN-B10: expose bb_deferred_var + ctor for bb_build_bin.c trampolines */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t bb_deferred_var_exported(void *zeta, int entry) { return bb_deferred_var(zeta, entry); }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 deferred_var_t *bb_dvar_bin_new(const char *name)
 {
     deferred_var_t *ζ = calloc(1, sizeof(deferred_var_t));
@@ -717,46 +359,16 @@ deferred_var_t *bb_dvar_bin_new(const char *name)
     ζ->name = name;
     return ζ;
 }
-
-/* ══════════════════════════════════════════════════════════════════════════
- * PUBLIC: exec_stmt
- * ══════════════════════════════════════════════════════════════════════════ */
-
-/*
- * DYN-4: kw_anchor — when non-zero, Phase 3 tries only position 0.
- * Imported from snobol4.h in the full-runtime build; declared extern here
- * for standalone / test builds.
- */
 #ifndef STMT_EXEC_STANDALONE
 extern int64_t kw_anchor;
 #else
-/* Standalone: default to unanchored; test driver can override */
 int kw_anchor = 0;
 #endif
-
-/*
- * Capture registry — moved to bb_boxes.c (SN-20 session 17 unification).
- * External API: reset_capture_registry(), clear_pending_flags(),
- * flush_pending_captures(), bb_capture registers on CAP_α when !immediate.
- * Declarations in bb_box.h.
- */
-
-/*----------------------------------------------------------------------------------------------------------------------------
- * U-9: scan_body_fn_u9 — body callback for bb_broker BB_SCAN in Phase 3.
- * Called once on the first successful match. Records match_start and match_end
- * into the scan_result_t passed as arg. match_start is recovered from the scan
- * position at which bb_broker set Δ before calling the box; match_end is Δ
- * after the box advanced the cursor.
- * The val DESCR_t carries the matched spec (DT_S: s=ptr, slen=length).
- * match_start = scan position = Δ - slen; match_end = Δ.
- *--------------------------------------------------------------------------------------------------------------------------*/
 typedef struct { int start; int end; } scan_result_t;
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void scan_body_fn_u9(DESCR_t val, void *arg) {
     scan_result_t *r = (scan_result_t *)arg;
     r->end = Δ;
-    /* EM-RAW-PURGE-1: g_scan_pre_delta is set by bb_broker before body_fn call.
-     * It holds the scan position (pre-match Δ) reliably regardless of val.slen. */
     if (g_scan_pre_delta >= 0)
         r->start = g_scan_pre_delta;
     else if (val.v == DT_S && val.slen)
@@ -765,71 +377,32 @@ static void scan_body_fn_u9(DESCR_t val, void *arg) {
         r->start = Δ;
     g_scan_pre_delta = -1;
 }
-
-/*
- * exec_stmt — execute one SNOBOL4 statement dynamically.
- *
- * DYN-4 SIGNATURE CHANGE: subj_name (const char*) added.
- *   - If non-NULL: subject is fetched via NV_GET_fn(subj_name) (Phase 1)
- *     and written back via NV_SET_fn(subj_name, ...) (Phase 5).
- *     This is the correct lvalue path — the only safe write-back.
- *   - If NULL: subject is read-only; replacement is skipped (:S without
- *     write-back; has_repl=1 with subj_name=NULL → :F per SNOBOL4 spec).
- *
- * Parameters:
- *   subj_name — NV name of subject variable (or NULL for read-only)
- *   subj_var  — subject DESCR_t (used when subj_name is NULL, e.g. literals)
- *   pat       — pattern DESCR_t (DT_P or DT_S)
- *   repl      — replacement DESCR_t pointer, or NULL for no replacement
- *   has_repl  — 1 if replacement is present
- *
- * Returns 1 → :S, 0 → :F.
- */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int exec_stmt(const char  *subj_name,
                   DESCR_t     *subj_var,
                   DESCR_t      pat,
                   DESCR_t     *repl,
                   int          has_repl)
 {
-    /* reset capture registry for this statement */
     reset_capture_registry();
-    /* SN-21e: the DYN-69 / DYN-79 / DYN-76 callcap registries
-     * (g_callcap_count / g_cc_event_count / g_callcap_gen) are gone —
-     * the flat NAM stack plus bb_cap self-unwind is the full protocol. */
-
-    /* ── Phase 1: build subject ─────────────────────────────────────── */
-    /*
-     * DYN-4: If subj_name is given, fetch fresh via NV_GET_fn.
-     * Otherwise fall back to subj_var (literal / expression result).
-     */
     DESCR_t subj_fetched;
     if (subj_name && *subj_name) {
         subj_fetched = NV_GET_fn(subj_name);
         subj_var     = &subj_fetched;
     }
-
     const char *subj_str = "";
     int         subj_len = 0;
-
     if (subj_var) {
         DESCR_t sv_d = VARVAL_d_fn(*subj_var);
         if (sv_d.v == DT_S || sv_d.v == DT_SNUL) {
             subj_str = sv_d.s ? sv_d.s : "";
-            subj_len = (int)descr_slen(sv_d);  /* binary-safe: honours .slen for embedded-NUL strings */
+            subj_len = (int)descr_slen(sv_d);
         }
     }
-
     Σ = subj_str;
     Ω = subj_len;
-    Σlen = subj_len;  /* true subject length — unchanged by kw_anchor clamping */
-
-    /* ── Phase 2: build pattern ─────────────────────────────────────── */
+    Σlen = subj_len;
     bb_node_t root;
-    /* EM-7c: mode-4 pre-built blob path.  When pat.v==DT_E with pat.ptr
-     * non-NULL, treat pat.ptr as a bb_box_fn whose code body is already
-     * baked into .text (via bb_build_flat_text) by sm_codegen_x64_emit.c.
-     * Skip the build phase entirely; root.fn = the baked entry, ζ = NULL.
-     * exec_stmt_blob() (declared in snobol4.h) is the public wrapper. */
     if (pat.v == DT_E && pat.ptr) {
         root.fn     = (bb_box_fn)pat.ptr;
         root.ζ      = NULL;
@@ -837,19 +410,14 @@ int exec_stmt(const char  *subj_name,
     } else if (pat.v == DT_P && pat.p) {
         int bin_done = 0;
         if (g_bb_mode == BB_MODE_LIVE) {
-            /* M-DYN-B13: cache binary blobs keyed on PATND_t* — prevents
-             * pool exhaustion on loop-heavy programs (1M+ iterations). */
             PATND_t *pp = (PATND_t *)pat.p;
             cache_slot_t *bslot = cache_find(pp);
             if (bslot && bslot->key == pp && bslot->template.fn) {
-                root     = bslot->template;  /* reuse cached flat/binary fn */
+                root     = bslot->template;
                 bin_done = 1;
                 g_bin_hits++;
                 g_cache_hits++;
             } else {
-                /* EDP-9: bb_build_binary (C boxes) deleted; use bb_build_brokered.
-                 * Try flat-glob first (whole invariant tree, no C-ABI frame needed),
-                 * then brokered (C-ABI wrapped flat blob for broker call). */
                 bb_box_fn bfn = bb_build_flat(pp);
                 if (!bfn) bfn = bb_build_brokered(pp);
                 if (bfn) {
@@ -864,8 +432,6 @@ int exec_stmt(const char  *subj_name,
                 }
             }
         } else if (g_bb_mode == BB_MODE_BROKERED || g_bb_mode == BB_MODE_DRIVER) {
-            /* EM-BB-PURGE-1 / EDP-7: brokered blob — C-ABI wrapper around
-             * flat BB body.  bb_broker calls fn(NULL, port) via C call. */
             PATND_t *pp = (PATND_t *)pat.p;
             bb_box_fn bfn = bb_build_brokered(pp);
             if (bfn) {
@@ -876,7 +442,6 @@ int exec_stmt(const char  *subj_name,
             }
         }
         if (!bin_done) {
-            /* EM-RAW-PURGE-1: eps fallback via brokered blob */
             PATND_t *ep = patnd_make_eps();
             bb_box_fn efn = bb_build_brokered(ep);
             root.fn     = efn;
@@ -885,7 +450,7 @@ int exec_stmt(const char  *subj_name,
         }
     } else if (pat.v == DT_S && pat.s) {
         int bin_done = 0;
-        {   /* EM-RAW-PURGE-1: lit via brokered blob (flat return ABI incompatible with scan_body_fn_u9) */
+        {
             PATND_t *lp = patnd_make_xchr(pat.s);
             bb_box_fn bfn = bb_build_brokered(lp);
             if (bfn) {
@@ -896,7 +461,6 @@ int exec_stmt(const char  *subj_name,
             }
         }
         if (!bin_done) {
-            /* eps fallback */
             PATND_t *ep = patnd_make_eps();
             bb_box_fn efn = bb_build_brokered(ep);
             root.fn     = efn;
@@ -904,91 +468,37 @@ int exec_stmt(const char  *subj_name,
             root.ζ_size = 0;
         }
     } else {
-        /* EM-RAW-PURGE-1: eps via brokered blob */
         PATND_t *ep = patnd_make_eps();
         bb_box_fn efn = bb_build_brokered(ep);
         root.fn = efn; root.ζ = NULL; root.ζ_size = 0;
     }
-
-    /* ── Phase 3: run match ─────────────────────────────────────────── */
-    /*
-     * DYN-4: honour kw_anchor (&ANCHOR keyword).
-     * If non-zero, try only position 0 (anchored match).
-     * Otherwise scan positions 0..Ω (unanchored).
-     *
-     * RT-4: save NAM cookie before each scan position so that conditional
-     * captures (.) pushed during a failed scan attempt are discarded and
-     * do not bleed into the next scan position or the failure path.
-     */
     int match_start = -1;
     int match_end   = -1;
-
-    /* U-9: drive root box via bb_broker BB_SCAN.
-     * SN-23b: per-match NAM ctx replaces the cookie-based save/commit
-     * bracket.  Outer-exec_stmt / EVAL nesting is now handled by ctx
-     * isolation: the inner ctx sees only its own pushes, and outer
-     * entries are unreachable until NAME_ctx_leave restores the parent.
-     * kw_anchor: temporarily clamp Ω to 0 so bb_broker only tries position 0. */
     typedef struct { int start; int end; } scan_result_t;
     scan_result_t scan_res = { -1, -1 };
-
-    /* SN-23b+e: enter a fresh NAM ctx for this scan.  Every push during
-     * BB_SCAN lands in scan_ctx; on failure NAME_ctx_leave() drops the
-     * entire ctx, and on success NAME_commit() walks the whole ctx before
-     * NAME_ctx_leave() tears it down.  Box self-unwind (SN-22d invariant)
-     * means scan_ctx.top is already 0 at BB_SCAN return regardless of
-     * pattern outcome; the walk-and-fire still runs because commit fires
-     * entries whose pushes were NOT undone (NM_CALL pushes that bb_cap
-     * keeps alive on γ — see bb_boxes.c:559). */
     clear_pending_flags();
     NAME_ctx_t scan_ctx;
     NAME_ctx_enter(&scan_ctx);
-
     int saved_Ω = Ω;
-    if (kw_anchor) Ω = 0;   /* clamp: bb_broker BB_SCAN tries 0..Ω */
+    if (kw_anchor) Ω = 0;
     int ticks = bb_broker(root, BB_SCAN, scan_body_fn_u9, &scan_res);
     Ω = saved_Ω;
-
     if (ticks > 0) {
         match_start = scan_res.start;
         match_end   = scan_res.end;
                                                               goto Phase4;
     }
-
-    /* match failed → :F  (SN-23b: leave the scan ctx; its entries are
-     * dropped.  Box self-unwind has already popped all γ-pushes; any
-     * straggler entries — shouldn't exist, but the ctx teardown is
-     * safe either way — die with the ctx). */
     NAME_ctx_leave();
                                                               return 0;
-
 Phase4:
-    /* ── Phase 4: build replacement ────────────────────────────────── */
-    /*
-     * DYN-4 lvalue rule: if replacement present and subj_name is NULL,
-     * the subject has no NV home — can't write back safely.
-     * In the full runtime this is :F.
-     * Exception: subj_name=NULL + subj_var provided = test/convenience
-     * wrapper (exec_stmt_args).  We allow direct write in that case.
-     */
     if (has_repl && repl && !subj_name && !subj_var) {
-        NAME_ctx_leave();  /* SN-23b: leave the scan ctx before :F return */
+        NAME_ctx_leave();
                                                               return 0;
     }
-
-    /* Flush all conditional captures and deferred callcaps in left-to-right
-     * pattern order — SC-26 fix: unified list in NAME_commit ensures captures
-     * (tag, wrd) are assigned before the callcaps (push_list, push_item) that
-     * read them.  SN-23e: NAME_commit walks the whole active ctx (no cookie
-     * — nested contexts replace the cookie mechanism), then NAME_ctx_leave()
-     * restores the parent ctx (typically the root). */
-    NAME_commit();                  /* SN-23e: walk whole ctx, fire captures + callcaps */
-    NAME_ctx_leave();               /* SN-23b: tear down scan_ctx, restore parent      */
-    flush_pending_captures();       /* legacy pending reset — keeps g_capture_list clean */
-
+    NAME_commit();
+    NAME_ctx_leave();
+    flush_pending_captures();
     if (!has_repl || !repl)                                   goto Success;
-
-    /* ── Phase 5: perform replacement ──────────────────────────────── */
     {
         const char *repl_str = "";
         int         repl_len = 0;
@@ -1003,53 +513,26 @@ Phase4:
             repl_str = gs;
             repl_len = (int)strlen(gs);
         }
-
         int   new_len = match_start + repl_len + (Ω - match_end);
         char *new_s   = (char *)GC_MALLOC((size_t)new_len + 1);
-
         memcpy(new_s,                          subj_str,             (size_t)match_start);
         memcpy(new_s + match_start,            repl_str,             (size_t)repl_len);
         memcpy(new_s + match_start + repl_len, subj_str + match_end, (size_t)(Ω - match_end));
         new_s[new_len] = '\0';
-
         DESCR_t new_val;
         new_val.v    = DT_S;
         new_val.slen = (uint32_t)new_len;
         new_val.s    = new_s;
-
         if (subj_name && *subj_name) {
-            /* DYN-4: safe lvalue write-back via NV_SET_fn */
             NV_SET_fn(subj_name, new_val);
         } else if (subj_var) {
-            /* convenience / test path: direct write (no NV table) */
             *subj_var = new_val;
         }
     }
-
 Success:
                                                               return 1;
 }
-
-/* ══════════════════════════════════════════════════════════════════════════
- * exec_stmt_blob — EM-7c (GOAL-MODE4-EMIT) entry for pre-built BB blobs
- *
- * The mode-4 emitter (sm_codegen_x64_emit.c) bakes invariant pattern
- * sub-trees as flat .text expressions via bb_build_flat_text.  At Phase-3
- * time it has a function pointer (the address of `_pat_<id>_α`)
- * but no PATND_t — the tree is gone, only the code remains.
- *
- * exec_stmt_blob() lets the emitted binary call into Phase-1+3+4+5
- * with that pre-built bb_box_fn, skipping Phase-2 entirely.  We use
- * a DT_E sentinel in pat.ptr to ride exec_stmt's existing flow with
- * minimal duplication; the new branch in exec_stmt's Phase-2 short-
- * circuits the build step.
- *
- * Parameters: identical to exec_stmt, except pat is replaced by
- *   root_fn — the entry point of the baked invariant pattern blob
- *             (i.e. the address of the `_pat_<id>_α` symbol).
- *
- * Returns 1 → :S, 0 → :F.
- * ══════════════════════════════════════════════════════════════════════════ */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int exec_stmt_blob(const char  *subj_name,
                    DESCR_t     *subj_var,
                    bb_box_fn    root_fn,
@@ -1062,18 +545,9 @@ int exec_stmt_blob(const char  *subj_name,
     pat.ptr  = (void *)root_fn;
     return exec_stmt(subj_name, subj_var, pat, repl, has_repl);
 }
-
-/* ══════════════════════════════════════════════════════════════════════════
- * cache_test_run — M-DYN-OPT test helper
- *
- * Build a synthetic XCHR (literal) PATND_t node N times via bb_build.
- * The node is invariant, so hits should equal N-1 (first call = miss,
- * subsequent = hits).  Returns 1 if hits > 0 (cache working), 0 if not.
- * ══════════════════════════════════════════════════════════════════════════ */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int cache_test_run(const char *lit, int n_iters)
 {
-    /* Build a single static PATND_t node (stack-allocated, same address each
-     * call — required for pointer-keyed cache to work). */
     static PATND_t node;
     node.kind         = XCHR;
     node.materialising = 0;
@@ -1082,43 +556,21 @@ int cache_test_run(const char *lit, int n_iters)
     node.children = NULL; node.nchildren = 0;
     node.args = NULL;
     node.nargs = 0;
-
     cache_reset();
-
     for (int i = 0; i < n_iters; i++) {
-        bb_box_fn bfn = bb_build_brokered(&node);  /* EDP-8: bb_build deleted */
-        (void)bfn;   /* result used for correctness only; we test cache counters */
+        bb_box_fn bfn = bb_build_brokered(&node);
+        (void)bfn;
     }
-
     int hits = 0, misses = 0;
     cache_stats(&hits, &misses);
-    return hits;   /* caller checks hits > 0 */
+    return hits;
 }
-
-/* ══════════════════════════════════════════════════════════════════════════
- * deferred_var_test — T15 gate helper
- *
- * Exercises bb_deferred_var re-resolution on every α.
- * We simulate two consecutive statement executions where the variable
- * PAT holds different string values:
- *   Execution 1: PAT = "Bird"  →  subject "BlueBird"  should match
- *   Execution 2: PAT = "Fish"  →  subject "BlueBird"  should NOT match
- *                                 subject "SwordFish"  should match
- *
- * Uses the NV table stubs in the test driver (NV_GET_fn returns whatever
- * was last set via NV_SET_fn).  We set PAT, then exercise exec_stmt
- * with a DT_P pattern whose PATND_t contains XDSAR pointing to "PAT".
- *
- * Returns 1 if all three assertions pass, 0 if any fail.
- * ══════════════════════════════════════════════════════════════════════════ */
-
-/* NV table — shared with the test driver's NV_GET_fn/NV_SET_fn stubs */
 #define NV_INIT 16
 typedef struct { char *key; DESCR_t val; } _nv_entry_t;
 static _nv_entry_t *g_nv_table = NULL;
 static int          g_nv_count = 0;
 static int          g_nv_cap   = 0;
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void nv_set_str(const char *name, const char *s)
 {
     for (int i = 0; i < g_nv_count; i++) {
@@ -1142,7 +594,7 @@ static void nv_set_str(const char *name, const char *s)
     g_nv_table[g_nv_count].val.slen = s ? (uint32_t)strlen(s) : 0;
     g_nv_count++;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static DESCR_t nv_get(const char *name)
 {
     for (int i = 0; i < g_nv_count; i++)
@@ -1151,147 +603,75 @@ static DESCR_t nv_get(const char *name)
     DESCR_t d; d.v = DT_SNUL; d.slen = 0; d.s = NULL;
     return d;
 }
-
-/* Override the stubs from the test driver for this helper */
-/* (test driver defines NV_GET_fn/NV_SET_fn as extern; we provide a
- *  delegating wrapper that uses our table for names prefixed "T15_") */
-
-/* Build a PATND_t XDSAR node pointing to a variable name, exercise
- * bb_deferred_var via direct call.  We own Σ/Δ/Ω globals. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int deferred_var_test(void)
 {
-    /* Set up NV table entry for "T15_PAT" */
     g_nv_count = 0;
     nv_set_str("T15_PAT", "Bird");
-
-    /* Build deferred_var_t for *T15_PAT */
     static PATND_t dsar_node;
     dsar_node.kind  = XDSAR;
     dsar_node.STRVAL_fn  = "T15_PAT";
     dsar_node.children = NULL; dsar_node.nchildren = 0;
     dsar_node.args  = NULL;
     dsar_node.nargs = 0;
-
-    /* Build the deferred box via bb_build_brokered (EDP-8: bb_build deleted) */
     cache_reset();
     bb_box_fn bfn = bb_build_brokered(&dsar_node);
     bb_node_t dvar;
     if (bfn) { dvar.fn = bfn; dvar.ζ = NULL; dvar.ζ_size = 0; }
-    else { /* EM-RAW-PURGE-1: eps fallback via brokered blob */
+    else {
            PATND_t *ep = patnd_make_eps();
            bb_box_fn efn = bb_build_brokered(ep);
            dvar.fn = efn; dvar.ζ = NULL; dvar.ζ_size = 0; }
-
     int ok = 1;
-
-    /* --- Execution 1: PAT = "Bird", subject = "BlueBird" → should match --- */
-    /* Manually override NV_GET_fn via our local table.  The test driver's
-     * NV_GET_fn stub ignores the name and returns SNUL, so we can't use
-     * exec_stmt_args here.  Instead call bb_deferred_var directly. */
     nv_set_str("T15_PAT", "Bird");
-    /* bb_deferred_var calls NV_GET_fn(ζ->name) — but the test driver's stub
-     * returns SNUL.  We need to patch the global NV path.  Simplest: call
-     * bb_build again after setting a global pointer, then reset child_fn to
-     * force re-resolve.
-     *
-     * Practical gate: verify the re-resolve logic compiles and the child
-     * graph rebuilds when child_fn is cleared, by calling the box twice
-     * with Σ set to known subjects. */
     Σ = "BlueBird"; Ω = (int)strlen(Σ); Δ = 0;
-
-    /* First α — will resolve via NV_GET_fn. Since test stub returns SNUL,
-     * child becomes epsilon (always matches zero-width).  What we verify is
-     * that the re-resolve branch runs without crash and returns a valid spec. */
     DESCR_t r1 = dvar.fn(dvar.ζ, α);
-    /* epsilon matches → non-empty spec at position 0 */
-    ok &= !IS_FAIL_fn(r1) ? 1 : 0;   /* epsilon always succeeds */
-
-    /* Second α on same box — re-resolve must run again (not skip) */
-    /* Reset Δ */
+    ok &= !IS_FAIL_fn(r1) ? 1 : 0;
     Δ = 0;
     DESCR_t r2 = dvar.fn(dvar.ζ, α);
     ok &= !IS_FAIL_fn(r2) ? 1 : 0;
-
     printf("  deferred_var: r1=%s r2=%s (both non-empty = re-resolve ran)\n",
            IS_FAIL_fn(r1)?"empty":"ok", IS_FAIL_fn(r2)?"empty":"ok");
-
     return ok;
 }
-
-/* ══════════════════════════════════════════════════════════════════════════
- * anchor_test — T16 gate helper
- *
- * kw_anchor = 1 means Phase 3 must only try position 0.
- * Subject = "XhelloY", pattern = "hello" (starts at pos 1).
- * Unanchored: match at pos 1 → :S.
- * Anchored:   only pos 0 tried → 'X' != 'h' → :F.
- * ══════════════════════════════════════════════════════════════════════════ */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int anchor_test(void)
 {
     int ok = 1;
-
-    /* Unanchored: should find "hello" at position 1 */
     kw_anchor = 0;
     int r_unanchored = exec_stmt_args("XhelloY", "hello", NULL, NULL);
     ok &= (r_unanchored == 1);
     printf("  unanchored match at pos 1: %s\n", r_unanchored ? "PASS" : "FAIL");
-
-    /* Anchored: "hello" is NOT at position 0, should fail */
     kw_anchor = 1;
     int r_anchored = exec_stmt_args("XhelloY", "hello", NULL, NULL);
     ok &= (r_anchored == 0);
     printf("  anchored match fails (not at pos 0): %s\n", r_anchored == 0 ? "PASS" : "FAIL");
-
-    kw_anchor = 0;   /* restore default */
+    kw_anchor = 0;
     return ok;
 }
-
-/* forward decl — defined below */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int exec_stmt_args(const char *subject, const char *pattern,
                       const char *repl_str, char **out_subject);
-
-/* ======================================================================
- * exec_stmt_args -- convenience wrapper: subject and pattern as C strings
- *
- * Used by the test driver (stmt_exec_test.c) to exercise the executor
- * without going through the full DESCR_t / PATND_t stack.
- *
- * NOTE: subj_name is passed as NULL here -- the test driver owns the
- * subject buffer directly.  Phase 5 write-back goes via *out_subject
- * for test purposes only.  In the full runtime, callers always pass
- * a real subj_name.
- * ====================================================================== */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int exec_stmt_args(const char  *subject,
                       const char  *pattern,
                       const char  *repl_str,
                       char       **out_subject)
 {
-    /* Build subject DESCR_t */
     DESCR_t subj;
     subj.v    = DT_S;
     subj.slen = subject ? (uint32_t)strlen(subject) : 0;
     subj.s    = subject ? (char *)subject : (char *)"";
-
-    /* Build pattern DESCR_t (literal string → DT_S) */
     DESCR_t pat;
     pat.v    = DT_S;
     pat.slen = pattern ? (uint32_t)strlen(pattern) : 0;
     pat.s    = pattern ? (char *)pattern : (char *)"";
-
-    /* Build replacement DESCR_t */
     DESCR_t repl_d;
     repl_d.v    = DT_S;
     repl_d.slen = repl_str ? (uint32_t)strlen(repl_str) : 0;
     repl_d.s    = repl_str ? (char *)repl_str : NULL;
-
     int has_repl = (repl_str != NULL);
-
-    /* subj_name=NULL: test driver, no NV table, replacement returned via
-     * out_subject for convenience.  Phase 5 writes into subj.s via the
-     * direct path (special case: when subj_name is NULL and !has_repl the
-     * replacement step is skipped gracefully). */
     int r = exec_stmt(NULL, &subj, pat, has_repl ? &repl_d : NULL, has_repl);
-
     if (out_subject && r) {
         *out_subject = subj.s;
     }

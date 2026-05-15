@@ -1,165 +1,108 @@
-/*
- * rt.c — libscrip_rt.so implementation (M-JITEM-X64 / EM-1..EM-7-pre)
- *
- * Authors: Lon Jones Cherryholmes · Claude Sonnet
- * Date: 2026-05-06; EM-7-revert 2026-05-07
- *
- * EM-1: init / finalize skeleton.
- * EM-2: push_int / pop_int / halt / unhandled_op.
- * EM-3: push_str / pop_descr / arith / nv_get(stub) / nv_set(stub) / pop_void.
- * EM-4: last_ok flag.
- * EM-5: push_expression_descr.
- * EM-6: [REVERTED in EM-7-revert, session #72] The full pattern-builder
- *   ABI (rt_pat_*, rt_exec_stmt) and the runtime pat-stack
- *   (g_pat_stack[], g_pat_sp) are removed.  Lon's correction: this
- *   brokered descriptor-tree-then-broker model was the wrong architecture
- *   for emitted code.  See GOAL-MODE4-EMIT.md "Design Discoveries"
- *   section.  EM-7a/b/c will reintroduce pattern emit using the proven
- *   dual-mode bb_emit infrastructure (bb_flat in EMIT_TEXT mode for
- *   invariant sub-trees baked as flat .text expressions; bb_emit BINARY mode
- *   for variant nodes built into bb_pool RX memory at runtime).
- *   The full SNOBOL4 runtime stays linked in (bb_pool, snobol4_pattern,
- *   stmt_exec, etc.) — those objects will be called by EM-7c via the
- *   bb_build_flat / bb_build_binary entries already proven in mode-3.
- * EM-7-pre keepers: rt_concat / rt_push_null /
- *   rt_coerce_num / rt_call / rt_do_return.  These are
- *   Phase 1/4/5 concerns, orthogonal to BB / pattern matching.
- *
- * Value type throughout: DESCR_t (snobol4.h / descr.h).
- *
- * State:
- *   g_vstack[]   — DESCR_t value stack (cap = VSTACK_CAP).
- *   g_vtop       — next free slot (0 = empty).
- *   g_halt_rc    — rc from most recent rt_halt().
- *   g_halt_set   — nonzero once halt has been called.
- *   g_last_ok    — success flag for SM_JUMP_S / SM_JUMP_F.
- */
-
 #include "rt.h"
-
-/* Full SNOBOL4 runtime headers — .so links all runtime objects -fPIC. */
 #include "snobol4.h"
 #include "descr.h"
-#include "sil_macros.h"   /* EM-7: IS_NAMEPTR / IS_NAMEVAL / NAME_DEREF_PTR */
+#include "sil_macros.h"
 #include "bb_pool.h"
 #include "bb_box.h"
-#include "../../processor/bb_pool.h"       /* EM-7c: bb_box_fn + exec_stmt_blob */
-#include "bb_build.h"     /* EM-7c-variant: g_bb_mode + BB_MODE_LIVE */
+#include "../../processor/bb_pool.h"
+#include "bb_build.h"
 #include "../../ast/ast.h"                  /* TT_EQ/TT_NE/TT_LT/TT_LE/TT_GT/TT_GE/TT_L* for rt_acomp/rt_lcomp */
-
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-
-/*==============================================================================
- * Forward declarations — symbols in snobol4.c / stmt_exec.c / snobol4_pattern.c
- *============================================================================*/
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void    SNO_INIT_fn(void);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern int     exec_stmt(const char *subj_name, DESCR_t *subj_var,
                          DESCR_t pat, DESCR_t *repl, int has_repl);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t NV_GET_fn(const char *name);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t NV_SET_fn(const char *name, DESCR_t val);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t NAME_fn(const char *varname);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern char   *VARVAL_fn(DESCR_t v);
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void    register_fn(const char *name,
                            DESCR_t (*fn)(DESCR_t *, int),
                            int min_args, int max_args);
-
-/* pat_*() constructors — snobol4_pattern.c */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_lit(const char *s);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_span(const char *chars);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_break_(const char *chars);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_any_cs(const char *chars);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_notany(const char *chars);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_len(int64_t n);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_pos(int64_t n);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_rpos(int64_t n);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_tab(int64_t n);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_rtab(int64_t n);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_arb(void);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_arbno(DESCR_t inner);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_rem(void);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_fence(void);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_fence_p(DESCR_t inner);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_fail(void);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_abort(void);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_succeed(void);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_bal(void);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_epsilon(void);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_cat(DESCR_t left, DESCR_t right);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_alt(DESCR_t left, DESCR_t right);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_ref(const char *name);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_assign_imm(DESCR_t child, DESCR_t var);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_assign_cond(DESCR_t child, DESCR_t var);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_at_cursor(const char *varname);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_user_call(const char *name, DESCR_t *args, int nargs);
-
-/* User-call hook for *func() in pattern position (snobol4.c extern) */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t (*g_user_call_hook)(const char *, DESCR_t *, int);
-
-/*==============================================================================
- * Internal state
- *============================================================================*/
-
-#define VSTACK_CAP   65536  /* EM-7: beauty.sno self-host needs deep stack (256 was insufficient) */
-
+#define VSTACK_CAP   65536
 static DESCR_t g_vstack[VSTACK_CAP];
 static int     g_vtop    = 0;
-
-/* ── GOAL-MODE3-EMIT ME-4: pluggable vstack / last_ok backend ─────────────
- *
- * Mode 3 (--jit-run) and mode 4 (--sm-emit --target=x64) both reach into
- * libscrip_rt for SM-level operations (rt_arith, rt_concat, rt_nv_get/set,
- * rt_push_null, rt_coerce_num, rt_pop_void).  But the two modes own different
- * value-stack instances:
- *
- *   Mode 3 → SM_State.stack (heap-realloc'd, anchored at r12 inside emitted
- *            blob land per ARCH-x86 / GOAL-MODE3-EMIT register convention).
- *   Mode 4 → libscrip_rt's static g_vstack[] (this file).
- *
- * Same goes for the "last operation succeeded" flag: SM_State.last_ok in
- * mode 3, g_last_ok in mode 4.
- *
- * Without unification, ME-4's blob shape (`call rt_<op>@PLT`) cannot work
- * in mode 3 — rt_arith would pop/push the wrong stack.  Two options exist:
- *   (a) bypass rt_* in mode 3 and inline everything against r12;
- *   (b) make rt_* dispatch through a pluggable backend, installable per
- *       execution mode.
- * Option (b) is the architecture this rung adopts, per Lon's direction.
- *
- * Default backend = the static g_vstack[]/g_last_ok pair (mode 4 unchanged).
- * Mode 3 installs an SM_State*-aware backend at sm_jit_run entry, restores
- * the default at exit.  Backend swap is process-global; mode 3 holds it for
- * the duration of one sm_jit_run() invocation; nested sm_jit_run calls
- * (e.g. sm_call_expression) are not currently expected but would re-install
- * the same backend harmlessly.
- *
- * Scope: only the value-stack and last_ok flag are pluggable in this rung.
- * The pat-stack (g_pat_stack[]) is left alone — it is a libscrip_rt-internal
- * scratch area for variant-pattern construction, never observed by mode 3
- * (which constructs patterns directly on the value stack since ME-1).
- * A future rung may unify it too (libscrip_rt completion of ME-1).
- */
-
-/* rt_vstack_ops_t is defined in rt.h (publicly) so mode 3 can build a
- * backend struct.  This file owns the default backend instance. */
-
-static int     g_last_ok  = 1;  /* default success at process start */
-
-/* Default (mode-4) backend implementations — talk to g_vstack[] / g_vtop /
- * g_last_ok directly.  Pointer-form ABI per rt.h. */
+static int     g_last_ok  = 1;
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void    _default_push     (const DESCR_t *d);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void    _default_pop      (DESCR_t *out);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void    _default_peek     (DESCR_t *out);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int     _default_depth    (void)       { return g_vtop; }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void    _default_set_depth(int n)      { g_vtop = n; }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int     _default_get_last_ok(void)     { return g_last_ok; }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void    _default_set_last_ok(int ok)   { g_last_ok = ok ? 1 : 0; }
-
 static const rt_vstack_ops_t g_default_ops = {
     .push        = _default_push,
     .pop         = _default_pop,
@@ -169,50 +112,23 @@ static const rt_vstack_ops_t g_default_ops = {
     .get_last_ok = _default_get_last_ok,
     .set_last_ok = _default_set_last_ok,
 };
-
 static const rt_vstack_ops_t *g_ops = &g_default_ops;
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_set_vstack_backend(const void *ops)
 {
     g_ops = ops ? (const rt_vstack_ops_t *)ops : &g_default_ops;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 const void *rt_get_default_vstack_backend(void)
 {
     return &g_default_ops;
 }
-
-/* EM-7c-variant (session #80, 2026-05-07): g_pat_stack[] reintroduced for
- * the variant-pattern path.  The architecture distinction from EM-7-pre
- * (session #71) is *not* the existence of a runtime pat-stack — that was
- * always going to be needed for variant patterns whose tree is built at
- * runtime (the alternative is a per-variant-node bb_pool emit walker, which
- * is the destination architecture but a much larger rung).  The distinction
- * is the *Phase-3 routing*: EM-7-pre routed through bb_broker (descriptor
- * walker) by relying on the default g_bb_mode == BB_MODE_DRIVER; EM-7c-variant
- * sets g_bb_mode = BB_MODE_LIVE in rt_init so exec_stmt routes through
- * bb_build_flat / bb_build_binary and a direct call to the resulting bb_box_fn,
- * matching the proven mode-3 pipeline that the goal file calls "mode-4's
- * existence proof".
- *
- * Future rung (EM-7c-variant-bb-pool-emit, the architectural ideal): replace
- * the runtime PATND_t build with per-variant-node bb_pool emit driven by an
- * emit-time partition, so invariant subtrees of partly-variant patterns
- * resolve via linker-baked _pat_<pid>_<sid>_α labels rather than being
- * rebuilt into bb_pool at runtime. */
-
 static int     g_halt_rc  = 0;
 static int     g_halt_set = 0;
-static int     g_native_chunk_depth = 0;  /* re-entrancy depth for call_native_chunk */
-
+static int     g_native_chunk_depth = 0;
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int rt_in_native_chunk(void) { return g_native_chunk_depth > 0; }
-/* g_last_ok moved above into backend section; default backend reads/writes
- * it via _default_get_last_ok / _default_set_last_ok. */
-
-/*==============================================================================
- * Default-backend implementations (used by g_default_ops above)
- *============================================================================*/
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void _default_push(const DESCR_t *d)
 {
     if (g_vtop >= VSTACK_CAP) {
@@ -221,7 +137,7 @@ static void _default_push(const DESCR_t *d)
     }
     g_vstack[g_vtop++] = *d;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void _default_pop(DESCR_t *out)
 {
     if (g_vtop <= 0) {
@@ -230,7 +146,7 @@ static void _default_pop(DESCR_t *out)
     }
     *out = g_vstack[--g_vtop];
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void _default_peek(DESCR_t *out)
 {
     if (g_vtop <= 0) {
@@ -239,28 +155,15 @@ static void _default_peek(DESCR_t *out)
     }
     *out = g_vstack[g_vtop - 1];
 }
-
-/*==============================================================================
- * Backend-routed stack helpers (used by every rt_* SM-level entry)
- *
- * These look identical to the pre-ME-4 vstack_push/vstack_pop but dispatch
- * through g_ops so mode 3 can swap in an SM_State*-aware backend.
- *============================================================================*/
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void vstack_push(DESCR_t d) { g_ops->push(&d); }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static DESCR_t vstack_pop(void)    { DESCR_t out; g_ops->pop(&out); return out; }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static DESCR_t vstack_peek(void)   { DESCR_t out; g_ops->peek(&out); return out; }
-
-/* last_ok read/write — route through backend so mode 3 hits SM_State.last_ok
- * while mode 4 hits g_last_ok.  Used throughout this file in place of bare
- * `g_last_ok` references (ME-4). */
 #define LAST_OK_GET()   (g_ops->get_last_ok())
 #define LAST_OK_SET(x)  (g_ops->set_last_ok(x))
-
-
-/* EM-7c-variant: vstack coerce helpers — pop TOS as string or int with
- * the coercions the SM_PAT_*-takes-charset-or-int contract expects.
- * Mirror sm_interp.c's pop-then-VARVAL_fn / pop-then-(arg.v==DT_I?...). */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static const char *vstack_pop_str(void)
 {
     DESCR_t d = vstack_pop();
@@ -268,56 +171,34 @@ static const char *vstack_pop_str(void)
     char *s = VARVAL_fn(d);
     return s ? s : "";
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int64_t vstack_pop_int64(void)
 {
     DESCR_t d = vstack_pop();
     if (d.v == DT_I) return d.i;
     return to_int(d);
 }
-
-/*==============================================================================
- * EM-6 builtin shims — registered with register_fn so exec_stmt can
- * dispatch *IDENT / *DIFFER in pattern position.
- *============================================================================*/
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static DESCR_t _rt_IDENT(DESCR_t *a, int n)
 {
-    /* IDENT(x[,y]): succeed if x == y (or x is null-string when n==1).
-     * Coerce via VARVAL_fn so integers compare by string representation.
-     * IDENT(2,1) → "2" vs "1" → fail; IDENT(2,2) → "2" vs "2" → succeed. */
     if (n == 1) return IS_NULL_fn(a[0]) ? NULVCL : FAILDESCR;
     const char *s1 = VARVAL_fn(a[0]); if (!s1) s1 = "";
     const char *s2 = VARVAL_fn(a[1]); if (!s2) s2 = "";
     return (strcmp(s1, s2) == 0) ? NULVCL : FAILDESCR;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static DESCR_t _rt_DIFFER(DESCR_t *a, int n)
 {
-    /* DIFFER(x[,y]): succeed if x != y (or x is non-null when n==1).
-     * Coerce via VARVAL_fn so integers compare by string representation. */
     if (n == 1) return IS_NULL_fn(a[0]) ? FAILDESCR : NULVCL;
     const char *s1 = VARVAL_fn(a[0]); if (!s1) s1 = "";
     const char *s2 = VARVAL_fn(a[1]); if (!s2) s2 = "";
     return (strcmp(s1, s2) != 0) ? NULVCL : FAILDESCR;
 }
-
-/*==============================================================================
- * EM-7d-usercall-reentrant: native expression function pointer registry
- *
- * The emitter walks SM_Program for SM_LABEL instructions with a[0].s set
- * (SNOBOL4 named function entries) and emits a .data table in the .s file.
- * rt_register_expressions() is called from the emitted main() before
- * rt_init; it populates g_expression_reg[] so _rt_usercall can dispatch
- * user-defined SNOBOL4 functions by direct fn(args,nargs) without touching
- * the interpreter call stack.
- *============================================================================*/
-
 #define EXPRESSION_REG_MAX 256
-
 typedef struct { const char *name; void *fn; } ExpressionRegEntry;
 static ExpressionRegEntry g_expression_reg[EXPRESSION_REG_MAX];
 static int           g_expression_reg_count = 0;
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_register_expressions(const rt_expression_entry *tbl)
 {
     if (!tbl) return;
@@ -327,42 +208,40 @@ void rt_register_expressions(const rt_expression_entry *tbl)
         g_expression_reg_count++;
     }
 }
-
-/* EM-7c-capture: patch a heap cap_t's fn pointer to the baked child blob.
- * cap_ptr points to the cap_t; fn field is first (offset 0). */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_patch_cap_fn(void *cap_ptr, void *child_fn)
 {
     if (!cap_ptr || !child_fn) return;
-    /* fn is the first field in cap_t — cast and set */
     void **fn_slot = (void **)cap_ptr;
     *fn_slot = child_fn;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern cap_t *bb_cap_new(bb_box_fn child_fn, void *child_state, const char *varname, DESCR_t *var_ptr, int immediate);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern cap_t *bb_cap_new_call(bb_box_fn child_fn, void *child_state, const char *fnc_name, DESCR_t *fnc_args, int fnc_nargs, char **fnc_arg_names, int fnc_n_arg_names, int immediate);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_init_cap(void **slot_ptr, void *child_fn, const char *varname, int immediate)
 {
     if (!slot_ptr || !child_fn) return;
     cap_t *c = bb_cap_new((bb_box_fn)child_fn, NULL, varname, NULL, immediate);
     *slot_ptr = c;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_init_cap_call(void **slot_ptr, void *child_fn, const char *fnc_name)
 {
     if (!slot_ptr || !child_fn) return;
     cap_t *c = bb_cap_new_call((bb_box_fn)child_fn, NULL, fnc_name, NULL, 0, NULL, 0, 0);
     *slot_ptr = c;
 }
-/* EM-7c-arbno: allocate a fresh arbno_t for a baked ARBNO blob.
- * bb_arbno_new is declared in bb_box.h via the opaque extern in emitter_bb_flat.c.
- * Here we call it directly since libscrip_rt.so links bb_boxes.c. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void *bb_arbno_new(void *fn, void *state);  /* arbno_t* opaque */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_init_arbno(void **slot_ptr, void *child_fn)
 {
     if (!slot_ptr || !child_fn) return;
     *slot_ptr = bb_arbno_new(child_fn, NULL);
 }
-
-/* Look up a user function by name in the expression registry.
- * Returns fn pointer or NULL if not found. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void *chunk_reg_lookup(const char *name)
 {
     if (!name || !*name) return NULL;
@@ -372,34 +251,16 @@ static void *chunk_reg_lookup(const char *name)
     }
     return NULL;
 }
-
-/* Call a native expression (a SNOBOL4 user-defined function body emitted as a
- * sequence of SM ops ending in `ret`) with the given arguments.
- *
- * SNOBOL4 calling convention: formal parameters are bound into the NV table
- * by name before the body executes (body does `SM_PUSH_VAR "N"`, not vstack
- * pop).  We use FUNC_PARAM_fn(name, i) to get the i-th param name, save
- * the old NV value, bind the arg, call the expression, then restore.
- *
- * The expression pushes its return value onto the vstack before `ret`; we pop it.
- *
- * NOTE: no call-stack depth tracking, no local-variable isolation — this is
- * a direct-call model.  Recursive SNOBOL4 functions will reuse the same NV
- * slots; the last binding wins.  For beauty.sno's patterns (non-recursive)
- * this is correct.  Full isolation is a follow-up rung. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static DESCR_t call_native_chunk(const char *fname, void *fn,
                                   DESCR_t *args, int nargs)
 {
     static const DESCR_t SNUL_D = { DT_SNUL, {0}, 0, NULL };
-    /* Determine the retname (body writes retval into NV[retname]).
-     * For OPSYN aliases, FUNC_ENTRY_fn returns the body's canonical name. */
     const char *entry = fname ? FUNC_ENTRY_fn(fname) : NULL;
     const char *retname = (entry && fname && strcmp(entry, fname) != 0 && FNCEX_fn(entry)) ? entry : fname;
     if (!retname) retname = fname ? fname : "";
-    /* Save retname slot; clear to SNUL so body starts fresh. */
     DESCR_t saved_ret = NV_GET_fn(retname);
     NV_SET_fn(retname, SNUL_D);
-    /* Save and bind formal parameters. */
     DESCR_t saved_p[32];
     const char *pnames[32];
     int nbound = 0;
@@ -411,7 +272,6 @@ static DESCR_t call_native_chunk(const char *fname, void *fn,
         NV_SET_fn(pname, args[k]);
         nbound++;
     }
-    /* Save and clear locals (SNOBOL4 locals are reset to null on each call). */
     int nl = fname ? FUNC_NLOCALS_fn(fname) : 0;
     if (nl > 32) nl = 32;
     DESCR_t saved_l[32];
@@ -430,7 +290,6 @@ static DESCR_t call_native_chunk(const char *fname, void *fn,
     g_native_chunk_depth--;
     DESCR_t result = NV_GET_fn(retname);
     g_ops->set_depth(saved_vtop);
-    /* Restore locals, params, retname in reverse. */
     for (int k = nl - 1; k >= 0; k--)
         NV_SET_fn(lnames[k], saved_l[k]);
     for (int k = nbound - 1; k >= 0; k--)
@@ -438,74 +297,42 @@ static DESCR_t call_native_chunk(const char *fname, void *fn,
     NV_SET_fn(retname, saved_ret);
     return result;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static DESCR_t _rt_usercall(const char *name, DESCR_t *args, int nargs)
 {
-    /* Dispatch *func() in pattern position (Phase-3 BB match context).
-     * EM-7d-usercall-reentrant: look up in the native expression registry first.
-     * If found, call via direct fn pointer — no interpreter call stack needed.
-     * Falls back to C-builtin dispatch (register_fn entries) then FAILDESCR. */
     if (!name || !*name) return FAILDESCR;
-
-    /* 1. Native expression registry (user-defined SNOBOL4 functions emitted as
-     *    .LpcN expressions in the .s file). */
     void *fn = chunk_reg_lookup(name);
     if (fn) return call_native_chunk(name, fn, args, nargs);
-
-    /* 2. C builtin registered via register_fn (DT_E fn pointer in NV table). */
     DESCR_t nv = NV_GET_fn(name);
     if (!IS_FAIL_fn(nv) && nv.v == DT_E && nv.ptr) {
         typedef DESCR_t (*cfn_t)(DESCR_t *, int);
         cfn_t cfn = (cfn_t)nv.ptr;
         return cfn(args, nargs);
     }
-
-    /* 3. Not found — pattern match fails (safe: no interpreter re-entry). */
     return FAILDESCR;
 }
-
-/*==============================================================================
- * EM-1 entries
- *============================================================================*/
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_init(int argc, char **argv)
 {
     (void)argc; (void)argv;
-
-    /* EM-6: bring up the full SNOBOL4 runtime.
-     * Mirrors the init sequence in scrip.c's SM-run mode block. */
     bb_pool_init();
     SNO_INIT_fn();
-
-    /* EM-7c-variant: set BB pattern mode to LIVE so exec_stmt's Phase-3
-     * routes through bb_build_flat / bb_build_binary -> direct bb_box_fn
-     * call, NOT through bb_broker.  This is the routing distinction that
-     * separates the corrected mode-4 architecture from EM-7-pre's reverted
-     * brokered model.  Mode-3 with --bb-live is described in
-     * GOAL-MODE4-EMIT.md as "mode-4's existence proof"; we want emitted
-     * binaries to take the same code path. */
-    g_bb_mode = BB_MODE_BROKERED;  /* EDP-9: C boxes deleted; brokered blobs for all modes */
-
+    g_bb_mode = BB_MODE_BROKERED;
     register_fn("IDENT",  _rt_IDENT,  1, 2);
     register_fn("DIFFER", _rt_DIFFER, 1, 2);
-
     g_user_call_hook = _rt_usercall;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int rt_finalize(void)
 {
     return g_halt_set ? g_halt_rc : 0;
 }
-
-/*==============================================================================
- * EM-2 entries
- *============================================================================*/
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_push_int(int64_t v)
 {
     vstack_push(INTVAL(v));
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int64_t rt_pop_int(void)
 {
     DESCR_t d = vstack_pop();
@@ -516,29 +343,25 @@ int64_t rt_pop_int(void)
     }
     return d.i;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_halt(int rc)
 {
     g_halt_rc  = rc;
     g_halt_set = 1;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_halt_tos(void)
 {
-    /* Safe-pop TOS as DT_I exit code; use 0 if TOS is missing or not DT_I.
-     * This lets SM_HALT work for both synthetic tests (PUSH_LIT_I N + HALT)
-     * and real programs (HALT with non-integer TOS → normal exit rc=0). */
     int rc = 0;
     int depth = g_ops->depth();
     if (depth > 0) {
         DESCR_t d = vstack_peek();
         if (d.v == DT_I) { rc = (int)d.i; g_ops->set_depth(depth - 1); }
-        /* Non-DT_I TOS: leave stack intact, rc stays 0 */
     }
     g_halt_rc  = rc;
     g_halt_set = 1;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_unhandled_op(int op)
 {
     fprintf(stderr,
@@ -547,11 +370,7 @@ void rt_unhandled_op(int op)
         op);
     abort();
 }
-
-/*==============================================================================
- * EM-3 entries
- *============================================================================*/
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_push_str(const char *s, uint32_t slen)
 {
     DESCR_t d;
@@ -560,13 +379,13 @@ void rt_push_str(const char *s, uint32_t slen)
     d.s    = (char *)s;
     vstack_push(d);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pop_descr(DESCR_t *out)
 {
     if (!out) { fprintf(stderr, "libscrip_rt: pop_descr: NULL out ptr.\n"); abort(); }
     *out = vstack_pop();
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_arith(int op)
 {
     DESCR_t r = vstack_pop();
@@ -591,89 +410,50 @@ void rt_arith(int op)
     }
     vstack_push(INTVAL(result));
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_nv_get(const char *name)
 {
     vstack_push(NV_GET_fn(name ? name : ""));
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_nv_set(const char *name)
 {
     DESCR_t val = vstack_pop();
-    /* Mirror sm_interp.c SM_STORE_VAR: if RHS is DT_FAIL, the statement fails;
-     * no assignment occurs and last_ok=0.  This is how LINE = INPUT :F(DONE)
-     * detects EOF in mode-4 — rt_nv_get("INPUT") pushes DT_FAIL, then
-     * rt_nv_set("LINE") propagates the failure to last_ok. */
     if (val.v == DT_FAIL) {
-        vstack_push(val);   /* balanced push so subsequent pops don't underflow */
+        vstack_push(val);
         LAST_OK_SET(0);
         return;
     }
     NV_SET_fn(name ? name : "", val);
     LAST_OK_SET(1);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pop_void(void)
 {
     (void)vstack_pop();
 }
-
-/*==============================================================================
- * EM-4 entries
- *============================================================================*/
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int rt_last_ok(void)  { return LAST_OK_GET(); }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_set_last_ok(int ok) { LAST_OK_SET(ok ? 1 : 0); }
-
-/*==============================================================================
- * EM-5 entries
- *============================================================================*/
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_push_expression_descr(int64_t entry_pc, int64_t arity)
 {
-    /* DT_E expression descriptor: .i = entry_pc, .slen = arity.
-     * Mirrors sm_interp.c's DT_E handling for SM_PUSH_EXPRESSION. */
     DESCR_t d;
     d.v    = DT_E;
     d.slen = (uint32_t)arity;
     d.i    = entry_pc;
     vstack_push(d);
 }
-
-/*==============================================================================
- * EM-7c — pattern match for pre-built BB blobs (mode-4 emit path)
- *
- * The mode-4 emitter bakes invariant pattern sub-trees as flat .text
- * expressions via bb_build_flat_text(), with externally-visible entry
- * symbols `_pat_<id>_α` etc.  At runtime, the emitted binary
- * pushes the subject and replacement on the SM value stack and calls
- * rt_match_blob(blob_α, sname, has_repl).
- *
- * Stack contract (top-of-stack first, top last popped):
- *   [repl_or_zero]    ← top
- *   [subj_descr]
- *
- * Parameters:
- *   blob_α   — address of `_pat_<id>_α`
- *   subj_name    — subject variable name for write-back, or NULL
- *   has_repl     — 1 if a replacement is present
- *
- * Calls exec_stmt_blob() (declared in bb_box.h, defined in stmt_exec.c)
- * with the popped subject + replacement.  Stores the :S/:F result on
- * the libscrip_rt last-ok flag (so SM_JUMP_S / SM_JUMP_F see it).
- *============================================================================*/
-
-extern void rt_set_last_ok(int v);   /* defined below */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+extern void rt_set_last_ok(int v);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_match_blob(void *blob_α,
                          const char *subj_name,
                          int has_repl)
 {
-    /* Pop replacement (always present — sm_lower emits SM_PUSH_LIT_I 0
-     * when has_repl=0 to keep the value-stack shape uniform). */
     DESCR_t repl = vstack_pop();
     DESCR_t subj = vstack_pop();
-
     bb_box_fn root_fn = (bb_box_fn)blob_α;
     int ok = exec_stmt_blob(subj_name,
                             &subj,
@@ -682,119 +462,95 @@ void rt_match_blob(void *blob_α,
                             has_repl);
     rt_set_last_ok(ok);
 }
-
-/*==============================================================================
- * EM-7c-variant entries — pattern-construction ABI (session #80, 2026-05-07)
- *
- * Reintroduces the SM_PAT_* runtime ABI that was deleted in EM-7-revert.
- * The architectural distinction from EM-7-pre is *not* the existence of
- * a runtime pat-stack — that's necessary for any path-β style variant
- * pattern build at runtime — but the Phase-3 routing.  EM-7-pre relied
- * on the default g_bb_mode = BB_MODE_DRIVER, routing exec_stmt through
- * bb_broker (the descriptor walker).  This rung sets g_bb_mode =
- * BB_MODE_LIVE in rt_init so exec_stmt routes through
- * bb_build_flat / bb_build_binary -> direct bb_box_fn call, which is
- * the proven mode-3 pipeline ("mode-4's existence proof" per
- * GOAL-MODE4-EMIT.md).
- *
- * Each rt_pat_*() mirrors the corresponding case in sm_interp.c's
- * SM_PAT_* dispatcher byte-for-byte.  Args come from the SM value stack
- * (charsets, ints, vars) for kinds whose argument is computed; from the
- * pat-stack (children of CAT/ALT/ARBNO/FENCE1/CAPTURE) for kinds whose
- * argument is itself a pattern; from the function's parameters
- * (literals, var names) for kinds whose argument is compile-time
- * constant.  The result of each is pushed on the pat-stack.
- *
- * SM_PAT_BOXVAL bridges pat-stack -> value-stack; emitted as a single
- * call to rt_pat_boxval.  Used wherever a pattern is the value
- * of a value-stack expression (e.g., assignment to WPAT in wordcount).
- *
- * SM_EXEC_STMT for variant patterns calls rt_match_variant, which
- * pops [subj][repl_or_zero] from value-stack, pops the pattern from
- * pat-stack, and calls exec_stmt with all five.  exec_stmt in
- * BB_MODE_LIVE then handles Phases 3-5 with bb_build_flat/binary.
- *============================================================================*/
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_lit(const char *s)
 {
     vstack_push(pat_lit(s ? s : ""));
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_refname(const char *name)
 {
     vstack_push(pat_ref(name ? name : ""));
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_span(void)
 {
     const char *cs = vstack_pop_str();
     vstack_push(pat_span(cs));
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_break(void)
 {
     const char *cs = vstack_pop_str();
     vstack_push(pat_break_(cs));
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_any(void)
 {
     const char *cs = vstack_pop_str();
     vstack_push(pat_any_cs(cs));
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_notany(void)
 {
     const char *cs = vstack_pop_str();
     vstack_push(pat_notany(cs));
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_len(void)   { vstack_push(pat_len (vstack_pop_int64())); }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_pos(void)   { vstack_push(pat_pos (vstack_pop_int64())); }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_rpos(void)  { vstack_push(pat_rpos(vstack_pop_int64())); }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_tab(void)   { vstack_push(pat_tab (vstack_pop_int64())); }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_rtab(void)  { vstack_push(pat_rtab(vstack_pop_int64())); }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_arb(void)     { vstack_push(pat_arb());     }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_rem(void)     { vstack_push(pat_rem());     }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_fence(void)   { vstack_push(pat_fence());   }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_fail(void)    { vstack_push(pat_fail());    }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_abort(void)   { vstack_push(pat_abort());   }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_succeed(void) { vstack_push(pat_succeed()); }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_bal(void)     { vstack_push(pat_bal());     }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_eps(void)     { vstack_push(pat_epsilon()); }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_arbno(void)
 {
     DESCR_t inner = vstack_pop();
     vstack_push(pat_arbno(inner));
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_fence1(void)
 {
     DESCR_t child = vstack_pop();
     vstack_push(pat_fence_p(child));
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_cat(void)
 {
     DESCR_t right = vstack_pop();
     DESCR_t left  = vstack_pop();
     vstack_push(pat_cat(left, right));
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_alt(void)
 {
     DESCR_t right = vstack_pop();
     DESCR_t left  = vstack_pop();
     vstack_push(pat_alt(left, right));
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_deref(void)
 {
-    /* Mirror sm_interp.c's SM_PAT_DEREF case: pop value-stack TOS,
-     * dispatch by tag.  DT_P → already a pattern; DT_S → wrap in literal;
-     * else look up by name (deferred ref). */
     DESCR_t v = vstack_pop();
     if (v.v == DT_P) {
         vstack_push(v);
@@ -805,10 +561,9 @@ void rt_pat_deref(void)
         vstack_push(pat_ref(name ? name : ""));
     }
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_capture(const char *varname, int kind)
 {
-    /* a[0].s = varname, a[1].i = kind (0=cond, 1=imm, 2=cursor) */
     DESCR_t child = vstack_pop();
     DESCR_t var   = NAME_fn(varname ? varname : "");
     if (kind == 1)
@@ -818,11 +573,7 @@ void rt_pat_capture(const char *varname, int kind)
     else
         vstack_push(pat_assign_cond(child, var));
 }
-
-
-/* SM_PAT_CAPTURE_FN: . *func() / $ *func() — no-args form.
- * a[0].s=fname, a[1].i=is_imm(0=cond/1=imm), a[2].s=namelist (tab-sep, or NULL).
- * Pops child from pat-stack; pushes XCALLCAP node. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_capture_fn(const char *fname, int is_imm, const char *namelist)
 {
     DESCR_t child = vstack_pop();
@@ -852,10 +603,7 @@ void rt_pat_capture_fn(const char *fname, int is_imm, const char *namelist)
             : pat_assign_callcap          (child, fname, NULL, 0));
     }
 }
-
-/* SM_PAT_CAPTURE_FN_ARGS: . *func(args) / $ *func(args) — args-on-stack form.
- * a[0].s=fname, a[1].i=is_imm, a[2].i=nargs.
- * Pops nargs from vstack (last-pushed=last arg), pops child from pat-stack. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_capture_fn_args(const char *fname, int is_imm, int nargs)
 {
     if (!fname) fname = "";
@@ -868,17 +616,13 @@ void rt_pat_capture_fn_args(const char *fname, int is_imm, int nargs)
         ? pat_assign_callcap_named_imm(child, fname, argv, nargs, NULL, 0)
         : pat_assign_callcap          (child, fname, argv, nargs));
 }
-
-/* SM_PAT_USERCALL: bare *func() — no-args, no child.
- * a[0].s=fname. Builds XATP deferred-usercall node. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_usercall(const char *fname)
 {
     if (!fname) fname = "";
     vstack_push(pat_user_call(fname, NULL, 0));
 }
-
-/* SM_PAT_USERCALL_ARGS: bare *func(args) — args-on-stack form.
- * a[0].s=fname, a[1].i=nargs. Pops nargs from vstack. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pat_usercall_args(const char *fname, int nargs)
 {
     if (!fname) fname = "";
@@ -888,86 +632,47 @@ void rt_pat_usercall_args(const char *fname, int nargs)
     for (int i = nargs - 1; i >= 0; i--) argv[i] = vstack_pop();
     vstack_push(pat_user_call(fname, argv, nargs));
 }
-
-/*==============================================================================
- * rt_match_variant — SM_EXEC_STMT for variant patterns
- *
- * Stack contract (top-of-stack last popped):
- *   vstack:     [pattern_descr]  ← pushed first by rt_pat_* sequence
- *               [subj_descr]
- *               [repl_or_zero]   ← vstack TOS
- *
- * The replacement slot is ALWAYS pushed (as INTVAL(0) when has_repl=0,
- * matching sm_lower's emission convention) so we always pop three from
- * the vstack (pat + subj + repl).
- *
- * Arguments:
- *   subj_name — subject NV name for write-back, or NULL/"" for none
- *   has_repl  — 1 if the replacement is real, 0 if it's the dummy zero
- *
- * Side effects:
- *   - Calls exec_stmt(subj_name, &subj, pat, has_repl?&repl:NULL, has_repl).
- *     In BB_MODE_LIVE (set by rt_init), Phases 3-5 route through
- *     bb_build_flat/binary -> direct bb_box_fn call.
- *   - Sets g_last_ok from exec_stmt's return (so SM_JUMP_S/F observe it).
- *   - Pops pattern from vstack (pushed by rt_pat_* before subj/repl).
- *============================================================================*/
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_match_variant(const char *subj_name, int has_repl)
 {
-    DESCR_t repl   = vstack_pop();   /* always pop: real repl or INTVAL(0) */
+    DESCR_t repl   = vstack_pop();
     DESCR_t subj_d = vstack_pop();
     DESCR_t pat_d  = vstack_pop();
-
-    /* EM-7d: arm error recovery so sno_runtime_error longjmps safely.
-     * On error, treat the statement as failed (last_ok=0) and return.
-     * Mirrors sm_run_with_recovery's per-statement setjmp pattern. */
     int err = setjmp(g_sno_err_jmp);
     g_sno_err_active = 1;
     if (err != 0) {
-        /* Runtime error fired inside exec_stmt: reset bb_pool and mark failure.
-         * exec_stmt_pool_reset() frees any partial pattern blobs that were
-         * allocated before the error, so subsequent statements get fresh pool
-         * space (fixes pool-exhaustion silent-skip after heavy matching). */
         exec_stmt_pool_reset();
         LAST_OK_SET(0);
         return;
     }
-
     int ok = exec_stmt(subj_name, &subj_d, pat_d,
                        has_repl ? &repl : NULL, has_repl);
-    g_sno_err_active = 0;   /* disarm before return */
+    g_sno_err_active = 0;
     LAST_OK_SET(ok ? 1 : 0);
 }
-
-/*==============================================================================
- * EM-7 entries
- *============================================================================*/
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_concat(void)
 {
-    /* SM_CONCAT: pop right then left; push CONCAT_fn(left, right). */
     DESCR_t r = vstack_pop();
     DESCR_t l = vstack_pop();
     DESCR_t result = CONCAT_fn(l, r);
     vstack_push(result);
     LAST_OK_SET((result.v != DT_FAIL));
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_set_stno(int64_t stno)
 {
     kw_stno = stno;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_push_null(void)
 {
-    /* SM_PUSH_NULL: push null (empty-string) descriptor; null is non-fail. */
     vstack_push(NULVCL);
     LAST_OK_SET(1);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_coerce_num(void)
 {
-    /* SM_COERCE_NUM: unary +; coerce string to int (or real if not integer). */
     DESCR_t v = vstack_pop();
     if (v.v == DT_FAIL) { vstack_push(FAILDESCR); LAST_OK_SET(0); return; }
     if (v.v == DT_S) {
@@ -983,34 +688,28 @@ void rt_coerce_num(void)
     }
     LAST_OK_SET(1);
 }
-
-/* ── New rt_* entries for missing SM opcode templates ─────────────────── */
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_push_real(double v)
 {
     vstack_push(REALVAL(v));
     LAST_OK_SET(1);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_push_real_bits(uint64_t bits)
 {
-    /* SM_PUSH_LIT_F: integer register carries the double's bit pattern. */
     double v;
     __builtin_memcpy(&v, &bits, 8);
     vstack_push(REALVAL(v));
     LAST_OK_SET(1);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_push_null_noflip(void)
 {
-    /* SM_PUSH_NULL_NOFLIP: push null but preserve last_ok (used after EXEC_STMT). */
     vstack_push(NULVCL);
-    /* intentionally do NOT set LAST_OK */
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_push_expr(void *ptr)
 {
-    /* SM_PUSH_EXPR: push frozen DT_E expression descriptor. */
     DESCR_t d;
     d.v    = DT_E;
     d.slen = 0;
@@ -1018,10 +717,9 @@ void rt_push_expr(void *ptr)
     vstack_push(d);
     LAST_OK_SET(1);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_exp(void)
 {
-    /* SM_EXP: pop right (exponent) then left (base); push base**exp. */
     DESCR_t r = vstack_pop();
     DESCR_t l = vstack_pop();
     if (l.v == DT_FAIL || r.v == DT_FAIL) {
@@ -1033,36 +731,31 @@ void rt_exp(void)
     vstack_push(REALVAL(res));
     LAST_OK_SET(1);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_neg(void)
 {
-    /* SM_NEG: negate TOS. */
     DESCR_t v = vstack_pop();
     if (v.v == DT_I) vstack_push(INTVAL(-v.i));
     else              vstack_push(REALVAL(-to_real(v)));
     LAST_OK_SET(1);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_incr(int64_t n)
 {
-    /* SM_INCR: pop TOS, add n, push result. */
     DESCR_t v = vstack_pop();
     vstack_push(INTVAL(v.i + n));
     LAST_OK_SET(1);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_decr(int64_t n)
 {
-    /* SM_DECR: pop TOS, subtract n, push result. */
     DESCR_t v = vstack_pop();
     vstack_push(INTVAL(v.i - n));
     LAST_OK_SET(1);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_acomp(int op)
 {
-    /* SM_ACOMP: numeric compare.  Pop right then left.  Icon-style: on success
-     * push right and set last_ok=1; on failure push FAILDESCR and clear. */
     DESCR_t r = vstack_pop();
     DESCR_t l = vstack_pop();
     if (l.v == DT_FAIL || r.v == DT_FAIL) {
@@ -1085,10 +778,9 @@ void rt_acomp(int op)
     vstack_push(ok ? r : FAILDESCR);
     LAST_OK_SET(ok ? 1 : 0);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_lcomp(int op)
 {
-    /* SM_LCOMP: lexicographic string compare. Pop right then left. Icon-style. */
     DESCR_t r = vstack_pop();
     DESCR_t l = vstack_pop();
     if (l.v == DT_FAIL || r.v == DT_FAIL) {
@@ -1110,59 +802,51 @@ void rt_lcomp(int op)
     vstack_push(ok ? r : FAILDESCR);
     LAST_OK_SET(ok ? 1 : 0);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_define_entry(void)
 {
-    /* SM_DEFINE_ENTRY: no-op in mode-4 (mode-3 blob does conditional push rbp). */
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_define(void)
 {
-    /* SM_DEFINE: function definition handled by prescan; no-op at runtime. */
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_unhandled_sm(int op)
 {
-    /* Template placeholder for SM opcodes not yet implemented in mode-4 (M5). */
     fprintf(stderr, "libscrip_rt: unhandled SM opcode %d in emitted binary (M5 territory)\n", op);
     abort();
 }
-
-/* pseudo-calls inlined here to avoid a full INVOKE_fn round trip.
- * The full pseudo-call vocabulary mirrors sm_interp.c's SM_CALL_FN handler. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t subscript_get(DESCR_t arr, DESCR_t idx);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t subscript_get2(DESCR_t arr, DESCR_t i, DESCR_t j);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern int     subscript_set(DESCR_t arr, DESCR_t idx, DESCR_t val);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern int     subscript_set2(DESCR_t arr, DESCR_t i, DESCR_t j, DESCR_t val);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void    sno_fold_name(char *name);
-
-/* Local fold-get / fold-set helpers (mirror nv_fold_get/set in sm_interp.c).
- * Note: scrip is case-sensitive by default (RULES.md SN-31), so fold is a no-op
- * in practice — but the SIL-level NV layer may still want canonical names for
- * cases where the source explicitly uppercases.  Cheap; safe; matches interp. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static DESCR_t _rt_nv_fold_get(const char *raw)
 {
     if (!raw || !*raw) return NULVCL;
     char *n = GC_strdup(raw); sno_fold_name(n);
     return NV_GET_fn(n);
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void _rt_nv_fold_set(const char *raw, DESCR_t val)
 {
     if (!raw || !*raw) return;
     char *n = GC_strdup(raw); sno_fold_name(n);
     NV_SET_fn(n, val);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_call(const char *name, int nargs)
 {
-    /* Pop nargs from value stack into args[] in original order. */
     DESCR_t args[32];
     if (nargs > 32) nargs = 32;
     for (int k = nargs - 1; k >= 0; k--) args[k] = vstack_pop();
-
-    /* ── Pseudo-calls (handled inline, mirror sm_interp.c) ────────────── */
     if (name && strcmp(name, "INDIR_GET") == 0) {
-        /* $expr: name on stack, push value */
         DESCR_t name_d = args[0];
         DESCR_t val;
         if (IS_NAMEPTR(name_d))      val = NAME_DEREF_PTR(name_d);
@@ -1173,7 +857,6 @@ void rt_call(const char *name, int nargs)
         return;
     }
     if (name && strcmp(name, "NAME_PUSH") == 0) {
-        /* .X: pop name string, push DT_N NAMEVAL */
         DESCR_t name_d = args[0];
         const char *vname0 = VARVAL_fn(name_d);
         char *vname = GC_strdup(vname0 ? vname0 : ""); sno_fold_name(vname);
@@ -1205,7 +888,6 @@ void rt_call(const char *name, int nargs)
             vstack_push(r);
             LAST_OK_SET((r.v != DT_FAIL));
         } else {
-            /* N-dim via ITEM builtin */
             DESCR_t r = INVOKE_fn("ITEM", args, nargs);
             vstack_push(r);
             LAST_OK_SET((r.v != DT_FAIL));
@@ -1213,7 +895,7 @@ void rt_call(const char *name, int nargs)
         return;
     }
     if (name && strcmp(name, "IDX_SET") == 0) {
-        if (nargs == 3) {        /* val, base, idx */
+        if (nargs == 3) {
             DESCR_t val = args[0]; DESCR_t base = args[1]; DESCR_t idx = args[2];
             LAST_OK_SET(subscript_set(base, idx, val));
             vstack_push(val);
@@ -1225,13 +907,10 @@ void rt_call(const char *name, int nargs)
         } else {
             DESCR_t r = INVOKE_fn("ITEM_SET", args, nargs);
             LAST_OK_SET((r.v != DT_FAIL));
-            vstack_push(args[0]);  /* val */
+            vstack_push(args[0]);
         }
         return;
     }
-
-    /* SN-6: SNOBOL4 semantics — if any argument is FAIL, the call fails
-     * without invoking the function. */
     for (int k = 0; k < nargs; k++) {
         if (args[k].v == DT_FAIL) {
             vstack_push(FAILDESCR);
@@ -1239,30 +918,15 @@ void rt_call(const char *name, int nargs)
             return;
         }
     }
-
-    /* Default dispatch: try native expression registry first (user-defined SNOBOL4
-     * functions emitted as .LpcN expressions in the .s file), then INVOKE_fn for
-     * builtins.  In mode-4, INVOKE_fn → g_user_call_hook → _rt_usercall
-     * would also hit the registry, but short-circuiting here avoids the
-     * extra indirection and the risk of interpreter call-stack corruption. */
     void *cfn = chunk_reg_lookup(name ? name : "");
     if (!cfn && name) {
-        /* Two-arg DEFINE: DEFINE('nPush()', 'nPush_') — call-site name is
-         * "nPush" but the registry key is body label "nPush_".  Look up via
-         * FUNC_ENTRY_fn (mirrors sm_interp.c's FUNC_ENTRY_fn call at ~L1690). */
         const char *entry = FUNC_ENTRY_fn(name);
         if (entry && strcmp(entry, name) != 0)
             cfn = chunk_reg_lookup(entry);
     }
     if (cfn) {
-        strncpy(kw_rtntype, "RETURN", sizeof(kw_rtntype)-1); /* default; rt_do_return overwrites */
+        strncpy(kw_rtntype, "RETURN", sizeof(kw_rtntype)-1);
         DESCR_t result = call_native_chunk(name, cfn, args, nargs);
-        /* call_native_chunk reads NV[fname] for result, but FRETURN/NRETURN
-         * functions set kw_rtntype AND last_ok correctly inside rt_do_return.
-         * Do NOT overwrite last_ok with (result.v != DT_FAIL) here — that
-         * clobbers the FRETURN=0 / NRETURN=1 signal.  Instead, honour kw_rtntype:
-         * FRETURN → push FAILDESCR, last_ok=0; NRETURN → push result, last_ok=1;
-         * RETURN  → push result, last_ok=(result.v != DT_FAIL). */
         if (strcmp(kw_rtntype, "FRETURN") == 0) {
             vstack_push(FAILDESCR);
             LAST_OK_SET(0);
@@ -1286,45 +950,20 @@ void rt_call(const char *name, int nargs)
     vstack_push(result);
     LAST_OK_SET((result.v != DT_FAIL));
 }
-
-/* SM_RETURN / SM_FRETURN / SM_NRETURN and conditional variants.
- *
- * In mode-4 with native call/ret, the expression simply executes `ret` for plain
- * RETURN — the return value sits on the value stack already (value expression's
- * body pushed it).  But FRETURN must replace TOS with FAILDESCR; NRETURN
- * must pop the value and push the function's name as a NAMEVAL descriptor.
- * Conditional variants check g_last_ok before doing anything.
- *
- * Returns 1 if the return should fire (caller emits `ret`), 0 if not (caller
- * falls through).  Note: when condition not met, this function does NOT
- * touch the value stack — the expression continues normally.
- *
- * In the unconditional+plain RETURN case, the emitter does NOT call this
- * function — it emits `ret` directly.  This function exists for FRETURN /
- * NRETURN and conditional variants. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int rt_do_return(int kind, int cond)
 {
-    /* cond: 0=unconditional, 1=only if last_ok, 2=only if !last_ok */
     if (cond == 1 && !LAST_OK_GET()) return 0;
     if (cond == 2 &&  LAST_OK_GET()) return 0;
-
-    /* kind: 0=RETURN, 1=FRETURN, 2=NRETURN */
     if (kind == 1) {
-        /* FRETURN: discard whatever the body produced, push FAILDESCR.
-         * Body already pushed its retval (if any) — pop it; push FAIL. */
         if (g_ops->depth() > 0) (void)vstack_pop();
         vstack_push(FAILDESCR);
         LAST_OK_SET(0);
-        strncpy(kw_rtntype, "FRETURN", sizeof(kw_rtntype)-1); /* RS-11 mirror */
+        strncpy(kw_rtntype, "FRETURN", sizeof(kw_rtntype)-1);
     } else if (kind == 2) {
-        /* NRETURN: pop body's retval; push a NAMEVAL.  Mode-4 deviation:
-         * we don't track the function's retval-slot name at this layer, so
-         * we use the raw value as a NAME if it's a string, else FAILDESCR.
-         * This is enough for the dot-star NRETURN idiom (push_list = .dummy)
-         * because the body explicitly assigned a NAMEVAL via NAME_PUSH. */
         DESCR_t v = (g_ops->depth() > 0) ? vstack_pop() : FAILDESCR;
         if (v.v == DT_N) {
-            vstack_push(v);          /* already a NAME */
+            vstack_push(v);
         } else if (v.v == DT_S && v.s) {
             char *n = GC_strdup(v.s); sno_fold_name(n);
             vstack_push(NAMEVAL(n));
@@ -1332,20 +971,16 @@ int rt_do_return(int kind, int cond)
             vstack_push(FAILDESCR);
         }
         LAST_OK_SET(1);
-        strncpy(kw_rtntype, "NRETURN", sizeof(kw_rtntype)-1); /* RS-11 mirror */
+        strncpy(kw_rtntype, "NRETURN", sizeof(kw_rtntype)-1);
     } else {
-        /* RETURN: leave TOS alone; just `ret`. */
         int ok = 0;
         if (g_ops->depth() > 0) ok = (vstack_peek().v != DT_FAIL);
         LAST_OK_SET(ok);
-        strncpy(kw_rtntype, "RETURN",  sizeof(kw_rtntype)-1); /* RS-11 mirror */
+        strncpy(kw_rtntype, "RETURN",  sizeof(kw_rtntype)-1);
     }
     return g_native_chunk_depth > 0 ? 2 : 1;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* NRETURN variant for mode-4: fetches fname's current NV value, derefs NAME if needed,
- * pushes the value, sets last_ok=1.  Returns 1 if the condition was met (caller should ret),
- * 0 if condition not met (fall through). */
 int rt_do_nreturn(const char *fname, int cond)
 {
     if (cond == 1 && !LAST_OK_GET()) return 0;
@@ -1358,25 +993,8 @@ int rt_do_nreturn(const char *fname, int cond)
     strncpy(kw_rtntype, "NRETURN", sizeof(kw_rtntype)-1);
     return g_native_chunk_depth > 0 ? 2 : 1;
 }
-/* SM_PAT_CAPTURE_FN_ARGS / SM_PAT_USERCALL_ARGS runtime helpers and
- * their pat_assign_callcap[_named_imm] externs were REMOVED in
- * EM-7-revert (session #72) along with the rest of the brokered
- * Phase-3 path.  The underlying pat_assign_callcap* primitives in
- * snobol4_pattern.c remain available for EM-7c. */
-
-/*==============================================================================
- * EM-6 stubs — symbols pulled in transitively by eval_code.c / eval_pat.c
- * that belong to the polyglot driver (sm_interp.c, interp_eval.c, etc.).
- * These are not exercised by the EM-6 SNOBOL4 pattern gate; they will be
- * replaced by real implementations in later rungs (EM-10+).
- *============================================================================*/
-
-#include "sm_interp.h"  /* DESCR_t sm_call_expression(int) */
-#include "sm_prog.h"    /* sm_opcode_name */
-
-/* sm_call_expression: used by eval_code.c when a DT_E expression is EVAL'd.
- * Not exercised in EM-6 SNOBOL4 pattern gate (no expression-via-EVAL paths).
- * Weak so the real sm_interp.c definition wins when full runtime is linked. */
+#include "sm_interp.h"
+#include "sm_prog.h"
 __attribute__((weak)) DESCR_t sm_call_expression(int entry_pc)
 {
     fprintf(stderr,
@@ -1384,39 +1002,20 @@ __attribute__((weak)) DESCR_t sm_call_expression(int entry_pc)
         "not yet wired in EM-6.  Add to EM-10 scope.\n", entry_pc);
     abort();
 }
-
-/* sm_opcode_name: used by sm_interp diagnostics pulled in via sm_interp.h.
- * Weak so the real sm_prog.c definition wins when full runtime is linked. */
 __attribute__((weak)) const char *sm_opcode_name(sm_opcode_t op)
 {
     (void)op;
     return "?";
 }
-
-/* _is_pat_fnc_name / _expr_is_pat: used by eval_pat.c.
- * These decide at eval time whether a function call is pattern-returning.
- * Not exercised in EM-6 gate; safe stubs.
- * Declared __attribute__((weak)) so the real interp_eval.c definitions
- * override when libscrip_rt.so includes the full runtime. */
 #include "../../driver/interp_private.h"
 __attribute__((weak)) int _is_pat_fnc_name(const char *s)  { (void)s; return 0; }
 __attribute__((weak)) int _expr_is_pat(tree_t *e)          { (void)e; return 0; }
-
-/*============================================================================================================================*/
-/* rt_bb_* — Runtime BB box functions (EC-1 / zero-C-BB goal).
- * Called from x86 blobs via PLT.  Replacing the old bb_* C-ABI box functions.
- * ABI: DESCR_t fn(void *zeta, int port)  — same as old bb_* ABI, but renamed
- *      and living in libscrip_rt.so so PLT calls resolve correctly. */
-/* bb_convert.h removed EST-4 */
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <gc/gc.h>
-
-/* ── charset (span/brk/any/notany) ───────────────────────────────────── */
-/* zeta = { const char *chars; int delta; } — same layout as in bb_templates.c */
 typedef struct { const char *chars; int delta; } rt_cs_t;
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t rt_bb_span(void *zeta, int port)
 {
     rt_cs_t *ζ = zeta;
@@ -1429,7 +1028,7 @@ DESCR_t rt_bb_span(void *zeta, int port)
     }
     Δ -= ζ->delta; return FAILDESCR;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t rt_bb_brk(void *zeta, int port)
 {
     rt_cs_t *ζ = zeta;
@@ -1441,7 +1040,7 @@ DESCR_t rt_bb_brk(void *zeta, int port)
     }
     Δ -= ζ->delta; return FAILDESCR;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t rt_bb_any(void *zeta, int port)
 {
     rt_cs_t *ζ = zeta;
@@ -1452,7 +1051,7 @@ DESCR_t rt_bb_any(void *zeta, int port)
     }
     Δ--; return FAILDESCR;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t rt_bb_notany(void *zeta, int port)
 {
     rt_cs_t *ζ = zeta;
@@ -1463,22 +1062,13 @@ DESCR_t rt_bb_notany(void *zeta, int port)
     }
     Δ--; return FAILDESCR;
 }
-
-/* ── arbno ────────────────────────────────────────────────────────────── */
-/* Forward decl for arbno_t — defined locally in bb_boxes.c still via typedef */
 typedef struct { DESCR_t matched; int start; } rt_arbno_frame_t;
 typedef struct { bb_box_fn fn; void *state; int depth; int cap; rt_arbno_frame_t *stack; uint32_t magic; } rt_arbno_t;
 #define RT_ARBNO_INIT  8
 #define RT_ARBNO_MAGIC 0xA2B20000u
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t rt_bb_arbno(void *zeta, int port)
 {
-    /* In mode-4 TEXT path the .data slot holds a pointer to rt_arbno_t
-     * (set by rt_init_arbno at startup).  In binary mode zeta IS rt_arbno_t*.
-     * Detect by checking if the first word looks like a valid ptr (non-zero)
-     * whose content also looks like a valid rt_arbno_t (fn != NULL).
-     * Simpler: rt_init_arbno stores the ptr in slot[0]; check if *zeta is a
-     * non-null ptr and use double-deref. */
     rt_arbno_t *ζ;
     void *slot0 = *(void **)zeta;
     if (slot0 && ((rt_arbno_t *)slot0)->magic == RT_ARBNO_MAGIC) ζ = (rt_arbno_t *)slot0;
@@ -1502,13 +1092,12 @@ DESCR_t rt_bb_arbno(void *zeta, int port)
         fr = &ζ->stack[ζ->depth]; fr->matched = ARBNO; fr->start = Δ;
         goto try_next;
     }
-    /* port == 1: β */
     if (ζ->depth <= 0) return FAILDESCR;
     ζ->depth--; fr = &ζ->stack[ζ->depth]; Δ = fr->start;
     ARBNO = ζ->stack[ζ->depth].matched;
     return ARBNO;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void *rt_bb_arbno_new(bb_box_fn fn, void *state)
 {
     rt_arbno_t *ζ = calloc(1, sizeof(rt_arbno_t));
@@ -1519,8 +1108,7 @@ void *rt_bb_arbno_new(bb_box_fn fn, void *state)
     ζ->magic = RT_ARBNO_MAGIC;
     return ζ;
 }
-
-/* ── atp ──────────────────────────────────────────────────────────────── */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t rt_bb_atp(void *zeta, int port)
 {
     atp_t *ζ = zeta;
@@ -1534,19 +1122,17 @@ DESCR_t rt_bb_atp(void *zeta, int port)
     }
     return FAILDESCR;
 }
-
-/* ── cap (NME/FMNE/CALLCAP) ──────────────────────────────────────────── */
-/* Forward declaration of register_capture from bb_boxes.c */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void flush_pending_captures(void);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void reset_capture_registry(void);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void clear_pending_flags(void);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void rt_register_cap(cap_t *c);
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t rt_bb_cap(void *zeta, int port)
 {
-    /* In mode-4 TEXT path the .data slot holds a cap_t* set by rt_init_cap.
-     * Detect: if the first word is a non-null pointer and looks like cap_t
-     * (fn non-null), use it as cap_t*; else treat zeta itself as cap_t*. */
     cap_t *ζ;
     void *slot0 = *(void **)zeta;
     if (slot0 && !bb_in_pool(slot0) && ((cap_t *)slot0)->fn) ζ = (cap_t *)slot0;
@@ -1563,17 +1149,11 @@ DESCR_t rt_bb_cap(void *zeta, int port)
         cr = descr_match_span(Σ + pre_δ, Δ - pre_δ);
         goto cap_commit;
     }
-    /* port == 1: β */
     if (!ζ->immediate && ζ->has_pending) { NAME_pop(); ζ->has_pending = 0; }
     cr = ζ->fn(ζ->state, 1);
     if (IS_FAIL_fn(cr)) goto cap_fail;
-    /* rt_bb_arbno β restores Δ to the start of the last iteration; the capture
-     * spans from ζ->cap_start (saved at α) to current Δ (end of shorter match). */
     cr = descr_match_span(Σ + ζ->cap_start, Δ - ζ->cap_start);
 cap_commit:
-    /* EXVAL-3: guard .s/.slen access — only valid when child returned DT_S span.
-     * Non-DT_S returns (Prolog DT_SNUL success) capture the zero-length current
-     * cursor position as an empty string. */
     if (cr.v != DT_S) cr = descr_match_span(Σ + Δ, 0);
     if (ζ->immediate) {
         char *s = (char *)GC_MALLOC(cr.slen + 1);
@@ -1591,13 +1171,10 @@ cap_fail:
     if (!ζ->immediate && ζ->has_pending) { NAME_pop(); ζ->has_pending = 0; }
     return FAILDESCR;
 }
-
-/* Per-call capture registry for rt_bb_cap — mirrors the static registry in
- * bb_boxes.c but kept separate to avoid ODR clash. */
 #define RT_MAX_CAPTURES 256
 static cap_t *g_rt_cap_list[RT_MAX_CAPTURES];
 static int    g_rt_cap_count = 0;
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void rt_register_cap(cap_t *c)
 {
     for (int i = 0; i < g_rt_cap_count; i++)
@@ -1605,11 +1182,10 @@ static void rt_register_cap(cap_t *c)
     if (g_rt_cap_count < RT_MAX_CAPTURES)
         g_rt_cap_list[g_rt_cap_count++] = c;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_flush_pending_captures(void)
 {
     for (int i = 0; i < g_rt_cap_count; i++)
         g_rt_cap_list[i]->has_pending = 0;
     g_rt_cap_count = 0;
 }
-

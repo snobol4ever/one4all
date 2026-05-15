@@ -1,25 +1,3 @@
-/*
- * pl_runtime.c — Prolog interpreter runtime
- *
- * FI-5: extracted from src/driver/scrip.c.
- * Contains: pl_pred_table_*, pl_cp_stack, pl_trail_*, pl_unify_*,
- *           pl_box_choice, pl_ helpers, interp_exec_pl_builtin.
- *
- * g_pl_trail / g_pl_cut_flag remain non-static (used by pl_broker.c).
- *
- * RS-18 (2026-05-03): the 3 user-predicate clause-body invocation sites
- * route through bb_eval_value (icn_value.c), the shared Icon/Prolog
- * value-context evaluator introduced by RS-17.  No direct interp_eval
- * call site or extern declaration remains here.  bb_eval_value falls
- * through to interp_eval for the IR shapes a Prolog clause body
- * contains today (AST_BLOCK / TT_FNC / TT_CHOICE / TT_UNIFY / TT_CUT / etc.) —
- * each gets handled inside the existing interp_eval Prolog dispatch,
- * which reads g_pl_env directly for variable resolution (clause-body
- * TERM_VAR is never reached because Prolog uses pl_unified_term_from_expr
- * for variable resolution at goal evaluation, not TERM_VAR-eval).
- *
- * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6 (FI-5, 2026-04-14)
- */
 #include "pl_runtime.h"
 #include <math.h>
 #include <limits.h>
@@ -30,34 +8,26 @@
 #include "../../frontend/prolog/prolog_runtime.h"
 #include "../../frontend/prolog/prolog_atom.h"
 #include "../../frontend/prolog/prolog_builtin.h"
-
-/* pl_assert_term declared in prolog_lower.h but included here via forward decl
- * to avoid scrip_cc.h path issues from runtime/interp context. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern tree_t *pl_assert_term(Term *t, int *functor_out, int *arity_out);
 #include "../../frontend/prolog/pl_broker.h"
 #include "bb_broker.h"
-#include "icn_value.h"   /* RS-18: bb_eval_value — shared Icon/Prolog value-context evaluator */
+#include "icn_value.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include <setjmp.h>
-
-/* Globals declared in pl_runtime.h */
 Pl_PredTable  g_pl_pred_table;
 Trail         g_pl_trail;
 int           g_pl_cut_flag = 0;
 Term        **g_pl_env      = NULL;
 int           g_pl_active   = 0;
-
-/* =========================================================================
- * nb_setval / nb_getval — global non-backtrackable store (PL-10)
- * ======================================================================= */
 #define PL_NB_STORE_SIZE 64
 typedef struct { char *key; Term *val; } Pl_NbEntry;
 static Pl_NbEntry g_pl_nb_store[PL_NB_STORE_SIZE];
 static int        g_pl_nb_count = 0;
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void pl_nb_setval(const char *key, Term *val) {
     for (int i = 0; i < g_pl_nb_count; i++) {
         if (strcmp(g_pl_nb_store[i].key, key) == 0) {
@@ -70,34 +40,25 @@ static void pl_nb_setval(const char *key, Term *val) {
         g_pl_nb_count++;
     }
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static Term *pl_nb_getval(const char *key) {
     for (int i = 0; i < g_pl_nb_count; i++)
         if (strcmp(g_pl_nb_store[i].key, key) == 0)
             return g_pl_nb_store[i].val;
     return NULL;
 }
-
-/* =========================================================================
- * throw/catch — exception mechanism (PL-10)
- * A stack of catch frames; throw() longjmps to the innermost matching one.
- * ======================================================================= */
 #define PL_CATCH_STACK_MAX 64
 typedef struct {
     jmp_buf  jb;
-    Term    *catcher;   /* the Catcher pattern term */
-    Term   **env;       /* env at catch site */
+    Term    *catcher;
+    Term   **env;
     int      trail_mark;
 } Pl_CatchFrame;
-
 static Pl_CatchFrame g_pl_catch_stack[PL_CATCH_STACK_MAX];
 static int           g_pl_catch_top  = 0;
-static Term         *g_pl_exception  = NULL; /* pending exception term */
-
-/* pl_throw_iso_error: construct error(ErrorTerm, context) and throw it.
- * Returns 0 (failure) if no catch frame matches — caller should return 0. */
+static Term         *g_pl_exception  = NULL;
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int pl_throw_iso_error(Term *err_term) {
-    /* Wrap in error/2: error(err_term, context) */
     Term *args2[2]; args2[0] = err_term; args2[1] = term_new_atom(prolog_atom_intern("context"));
     Term *err = term_new_compound(prolog_atom_intern("error"), 2, args2);
     g_pl_exception = err;
@@ -113,14 +74,12 @@ static int pl_throw_iso_error(Term *err_term) {
     pl_write(err); fprintf(stderr, "\n");
     exit(1);
 }
-
-/* Convenience: throw instantiation_error */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int pl_throw_instantiation_error(void) {
     Term *e = term_new_atom(prolog_atom_intern("instantiation_error"));
     return pl_throw_iso_error(e);
 }
-
-/* Convenience: throw type_error(evaluable, Name/Arity) */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int pl_throw_type_error_evaluable(const char *name, int arity) {
     Term *na_args[2]; na_args[0] = term_new_atom(prolog_atom_intern(name)); na_args[1] = term_new_int(arity);
     Term *na = term_new_compound(prolog_atom_intern("/"), 2, na_args);
@@ -128,8 +87,7 @@ static int pl_throw_type_error_evaluable(const char *name, int arity) {
     Term *te = term_new_compound(prolog_atom_intern("type_error"), 2, te_args);
     return pl_throw_iso_error(te);
 }
-
-/* Convenience: throw existence_error(procedure, Name/Arity) — non-static so pl_broker.c can call it */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int pl_throw_existence_error_procedure(const char *name, int arity) {
     Term *na_args[2]; na_args[0] = term_new_atom(prolog_atom_intern(name)); na_args[1] = term_new_int(arity);
     Term *na = term_new_compound(prolog_atom_intern("/"), 2, na_args);
@@ -137,41 +95,36 @@ int pl_throw_existence_error_procedure(const char *name, int arity) {
     Term *te = term_new_compound(prolog_atom_intern("existence_error"), 2, te_args);
     return pl_throw_iso_error(te);
 }
-
-
 #define PL_PRED_TABLE_SIZE PL_PRED_TABLE_SIZE_FWD
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 unsigned pl_pred_hash(const char *s) {
     unsigned h = 5381;
     while (*s) h = h * 33 ^ (unsigned char)*s++;
     return h % PL_PRED_TABLE_SIZE;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void pl_pred_table_insert(Pl_PredTable *pt, const char *key, tree_t *choice) {
     unsigned h = pl_pred_hash(key);
     Pl_PredEntry *e = malloc(sizeof(Pl_PredEntry));
     e->key = key; e->choice = choice; e->entry_pc = -1; e->next = pt->buckets[h]; pt->buckets[h] = e;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 tree_t *pl_pred_table_lookup(Pl_PredTable *pt, const char *key) {
     for (Pl_PredEntry *e = pt->buckets[pl_pred_hash(key)]; e; e = e->next)
         if (strcmp(e->key, key) == 0) return e->choice;
     return NULL;
 }
-
-/* pl_pred_table_lookup_global — non-static wrapper for pl_broker.c (pl_interp.h) */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 tree_t *pl_pred_table_lookup_global(const char *key) {
     return pl_pred_table_lookup(&g_pl_pred_table, key);
 }
-/* CH-17e: return full Pl_PredEntry* for entry_pc access */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 Pl_PredEntry *pl_pred_entry_lookup(const char *key) {
     for (Pl_PredEntry *e = g_pl_pred_table.buckets[pl_pred_hash(key)]; e; e = e->next)
         if (e->key && strcmp(e->key, key) == 0) return e;
     return NULL;
 }
-
-/*----------------------------------------------------------------------------------------------------------------------------
- * pl_pred_table_get_or_create_choice — find or create the TT_CHOICE node for key in the global pred table.
- * key is "functor/arity" string (caller owns; we strdup internally if creating).
- *----------------------------------------------------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static tree_t *pl_pred_table_get_or_create_choice(const char *key) {
     tree_t *ch = pl_pred_table_lookup(&g_pl_pred_table, key);
     if (ch) return ch;
@@ -180,27 +133,20 @@ static tree_t *pl_pred_table_get_or_create_choice(const char *key) {
     pl_pred_table_insert(&g_pl_pred_table, ch->v.sval, ch);
     return ch;
 }
-
-/*----------------------------------------------------------------------------------------------------------------------------
- * pl_assert_clause — assertz (end=1) or asserta (end=0) a Term* into the global pred table.
- * Returns 1 on success, 0 on failure.
- *----------------------------------------------------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int pl_assert_clause(Term *t, int end) {
     int functor_id = -1, arity = 0;
     tree_t *ec = pl_assert_term(t, &functor_id, &arity);
     if (!ec) return 0;
-    /* Build key string "functor/arity" */
     const char *fname = prolog_atom_name(functor_id);
     if (!fname) return 0;
     char key[256];
     snprintf(key, sizeof key, "%s/%d", fname, arity);
     tree_t *ch = pl_pred_table_get_or_create_choice(key);
     if (end) {
-        /* assertz — append at end */
         expr_add_child(ch, ec);
     } else {
-        /* asserta — prepend: shift existing children up, insert at [0] */
-        expr_add_child(ch, ec);  /* grow array first */
+        expr_add_child(ch, ec);
         if (ch->n > 1) {
             memmove(&ch->c[1], &ch->c[0], (ch->n - 1) * sizeof(tree_t *));
             ch->c[0] = ec;
@@ -208,22 +154,15 @@ static int pl_assert_clause(Term *t, int end) {
     }
     return 1;
 }
-
-/*----------------------------------------------------------------------------------------------------------------------------
- * pl_retract_clause — retract first matching clause for head Term*.
- * Matches on functor/arity only (structural unification of head args not yet implemented — simple name match).
- * Returns 1 if a clause was removed, 0 if none found.
- *----------------------------------------------------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int pl_retract_clause(Term *t) {
     if (!t) return 0;
     t = term_deref(t);
-    /* Extract head from :-(Head,Body) or plain head */
     Term *head = t;
     if (t->tag == TERM_COMPOUND && t->compound.arity == 2) {
         const char *fn = prolog_atom_name(t->compound.functor);
         if (fn && strcmp(fn, ":-") == 0) head = term_deref(t->compound.args[0]);
     }
-    /* Get functor/arity key */
     const char *fname = NULL;
     int arity = 0;
     if (head->tag == TERM_ATOM) {
@@ -235,21 +174,16 @@ static int pl_retract_clause(Term *t) {
     char key[256]; snprintf(key, sizeof key, "%s/%d", fname, arity);
     tree_t *ch = pl_pred_table_lookup(&g_pl_pred_table, key);
     if (!ch || ch->n == 0) return 0;
-    /* Remove first clause */
     free(ch->c[0]);
     memmove(&ch->c[0], &ch->c[1], (ch->n - 1) * sizeof(tree_t *));
     ch->n--;
     return 1;
 }
-
-/*----------------------------------------------------------------------------------------------------------------------------
- * pl_abolish_pred — remove all clauses for functor/arity.
- *----------------------------------------------------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int pl_abolish_pred(Term *t) {
     if (!t) return 0;
     t = term_deref(t);
     const char *fname = NULL; int arity = 0;
-    /* Accept functor/arity compound or plain atom */
     if (t->tag == TERM_COMPOUND && t->compound.arity == 2) {
         const char *fn = prolog_atom_name(t->compound.functor);
         if (fn && strcmp(fn, "/") == 0) {
@@ -264,12 +198,10 @@ static int pl_abolish_pred(Term *t) {
     if (!fname) return 0;
     char key[256]; snprintf(key, sizeof key, "%s/%d", fname, arity);
     tree_t *ch = pl_pred_table_lookup(&g_pl_pred_table, key);
-    if (!ch) return 1;  /* already gone — succeed */
-    ch->n = 0;  /* remove all clauses */
+    if (!ch) return 1;
+    ch->n = 0;
     return 1;
 }
-
-/*---- Choice point stack ----*/
 #define PL_CP_STACK_MAX 4096
 typedef struct {
     jmp_buf     jb;
@@ -283,23 +215,20 @@ typedef struct {
 } Pl_ChoicePoint;
 static Pl_ChoicePoint pl_cp_stack[PL_CP_STACK_MAX];
 static int            pl_cp_top = 0;
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 Term **pl_env_new(int n) {
     if (n <= 0) return NULL;
     Term **env = malloc(n * sizeof(Term *));
     for (int i = 0; i < n; i++) env[i] = term_new_var(i);
     return env;
 }
-
-/*---- Continuation type ----*/
-/*---- Forward declarations ----*/
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 Term *pl_unified_term_from_expr(tree_t *e, Term **env);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static Term *pl_unified_deep_copy(Term *t);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int          interp_exec_pl_builtin(tree_t *goal, Term **env);
-
-
-
-/*---- pl_unified_term_from_expr ----*/
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 Term *pl_unified_term_from_expr(tree_t *e, Term **env) {
     if (!e) return term_new_atom(prolog_atom_intern("[]"));
     switch (e->t) {
@@ -308,17 +237,12 @@ Term *pl_unified_term_from_expr(tree_t *e, Term **env) {
         case TT_FLIT: return term_new_float(e->v.dval);
         case TT_VAR:  return (env && e->v.ival >= 0) ? env[e->v.ival] : term_new_var(e->v.ival);
         case TT_ADD: case TT_SUB: case TT_MUL: case TT_DIV: case TT_MOD: {
-            /* arithmetic ops used as terms (e.g. K-V): wrap as compound */
             const char *op = e->t==TT_ADD?"+":e->t==TT_SUB?"-":e->t==TT_MUL?"*":e->t==TT_DIV?"/":"%";
             int atom = prolog_atom_intern(op);
             Term *args2[2]; args2[0]=pl_unified_term_from_expr(e->c[0],env); args2[1]=pl_unified_term_from_expr(e->c[1],env);
             return term_new_compound(atom, 2, args2);
         }
         case TT_UNIFY: {
-            /* =/2 used as a term (e.g. G = (X = 5), assertz(p(X = 5))): wrap as
-             * compound. Without this, the default arm below silently produced
-             * atom("?") and any later call(G) / catch(G,_,_) saw a literal
-             * `?` instead of the unification goal. (PL-12 latent bug.) */
             int atom = prolog_atom_intern("=");
             Term *args2[2];
             args2[0] = e->n > 0 ? pl_unified_term_from_expr(e->c[0], env) : term_new_atom(atom);
@@ -340,8 +264,7 @@ Term *pl_unified_term_from_expr(tree_t *e, Term **env) {
         default: return term_new_atom(prolog_atom_intern("?"));
     }
 }
-
-/*---- pl_unified_deep_copy ----*/
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static Term *pl_unified_deep_copy(Term *t) {
     t = term_deref(t);
     if (!t || t->tag == TERM_VAR) return term_new_atom(prolog_atom_intern("_"));
@@ -357,9 +280,7 @@ static Term *pl_unified_deep_copy(Term *t) {
     }
     return term_new_atom(prolog_atom_intern("_"));
 }
-
-/* F-3 RS-7: ISO mod — sign of divisor (floor division remainder).
- * Appears in TT_MOD case and TT_FNC "mod" case — unified here. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static inline long pl_iso_mod(long n, long d) {
     if (!d) return 0;
     if (n == LONG_MIN && d == -1) return 0;
@@ -367,11 +288,9 @@ static inline long pl_iso_mod(long n, long d) {
     if (r != 0 && (r < 0) != (d < 0)) r += d;
     return r;
 }
-
-/*---- pl_unified_eval_arith_term — float-aware, returns Term* ----*/
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static Term *pl_unified_eval_arith_term(tree_t *e, Term **env) {
     if (!e) return term_new_int(0);
-    /* helper macros */
 #define _EI(x) ({ Term *_t = pl_unified_eval_arith_term(x,env); (_t&&_t->tag==TERM_INT)?_t->ival:(_t&&_t->tag==TERM_FLOAT)?(long)_t->fval:0L; })
 #define _ED(x) ({ Term *_t = pl_unified_eval_arith_term(x,env); (_t&&_t->tag==TERM_FLOAT)?_t->fval:(_t&&_t->tag==TERM_INT)?(double)_t->ival:0.0; })
 #define _EIS(x) (pl_unified_eval_arith_term(x,env)->tag==TERM_FLOAT)
@@ -391,8 +310,6 @@ static Term *pl_unified_eval_arith_term(tree_t *e, Term **env) {
             Term *lb=pl_unified_eval_arith_term(e->c[1],env);
             int fl=(la&&la->tag==TERM_FLOAT)||(lb&&lb->tag==TERM_FLOAT);
             if (fl) return term_new_float(_ED(e->c[0]) + _ED(e->c[1]));
-            /* signed-overflow detection — promote to float on wrap (matches SWI
-             * bounded=true semantics: minint_promotion expects a float result). */
             long a=_EI(e->c[0]), b=_EI(e->c[1]), r;
             if (__builtin_add_overflow(a, b, &r))
                 return term_new_float((double)a + (double)b);
@@ -427,10 +344,6 @@ static Term *pl_unified_eval_arith_term(tree_t *e, Term **env) {
                 long  n=_EI(e->c[0]);
                 long  d=_EI(e->c[1]);
                 if (!d) return term_new_int(0);
-                /* INT_MIN/-1 overflows on x86 — would raise SIGFPE.
-                 * Standard Prolog: throw evaluation_error(int_overflow);
-                 * we return LONG_MIN to avoid the crash (matches GNU Prolog
-                 * unbounded fallback shape; refined when bigint lands). */
                 if (n == LONG_MIN && d == -1) return term_new_int(LONG_MIN);
                 return term_new_int(n/d);
             }
@@ -438,7 +351,6 @@ static Term *pl_unified_eval_arith_term(tree_t *e, Term **env) {
         case TT_MOD: return term_new_int(pl_iso_mod(_EI(e->c[0]), _EI(e->c[1])));
         case TT_FNC: {
             const char *fn = e->v.sval ? e->v.sval : "";
-            /* two-arg integer bitwise / misc */
             if (strcmp(fn,"/\\")==0&&e->n==2) return term_new_int(_EI(e->c[0])&_EI(e->c[1]));
             if (strcmp(fn,"\\/")==0&&e->n==2) return term_new_int(_EI(e->c[0])|_EI(e->c[1]));
             if (strcmp(fn,"xor")==0&&e->n==2) return term_new_int(_EI(e->c[0])^_EI(e->c[1]));
@@ -450,12 +362,10 @@ static Term *pl_unified_eval_arith_term(tree_t *e, Term **env) {
                 long n=_EI(e->c[0]); long d=_EI(e->c[1]);
                 if (!d) return term_new_int(0);
                 if (n == LONG_MIN && d == -1) return term_new_int(0);
-                return term_new_int(n%d);  /* rem: truncating, sign of dividend */
+                return term_new_int(n%d);
             }
-            /* two-arg float-aware */
             if (strcmp(fn,"**")==0&&e->n==2) return term_new_float(pow(_ED(e->c[0]),_ED(e->c[1])));
             if (strcmp(fn,"^")==0&&e->n==2) {
-                /* ^ returns integer for non-negative integer exponents, else float */
                 Term *la=pl_unified_eval_arith_term(e->c[0],env);
                 Term *lb=pl_unified_eval_arith_term(e->c[1],env);
                 if (la&&lb&&la->tag==TERM_INT&&lb->tag==TERM_INT&&lb->ival>=0) {
@@ -468,7 +378,6 @@ static Term *pl_unified_eval_arith_term(tree_t *e, Term **env) {
             if (strcmp(fn,"max")==0&&e->n==2) { Term *la=pl_unified_eval_arith_term(e->c[0],env),*lb=pl_unified_eval_arith_term(e->c[1],env); int fl=(la&&la->tag==TERM_FLOAT)||(lb&&lb->tag==TERM_FLOAT); return fl?(_ED(e->c[0])>=_ED(e->c[1])?la:lb):(_EI(e->c[0])>=_EI(e->c[1])?la:lb); }
             if (strcmp(fn,"min")==0&&e->n==2) { Term *la=pl_unified_eval_arith_term(e->c[0],env),*lb=pl_unified_eval_arith_term(e->c[1],env); int fl=(la&&la->tag==TERM_FLOAT)||(lb&&lb->tag==TERM_FLOAT); return fl?(_ED(e->c[0])<=_ED(e->c[1])?la:lb):(_EI(e->c[0])<=_EI(e->c[1])?la:lb); }
             if (strcmp(fn,"gcd")==0&&e->n==2) { long a=labs(_EI(e->c[0])),b=labs(_EI(e->c[1])); while(b){long r=a%b;a=b;b=r;} return term_new_int(a); }
-            /* one-arg float ops */
             if (e->n==1) {
                 double d = _ED(e->c[0]);
                 long   i = _EI(e->c[0]);
@@ -490,14 +399,11 @@ static Term *pl_unified_eval_arith_term(tree_t *e, Term **env) {
                 if (strcmp(fn,"sign")==0)               return isf ? term_new_float(d>0?1.0:d<0?-1.0:0.0) : term_new_int(i>0?1:i<0?-1:0);
                 if (strcmp(fn,"-")==0)                  return isf ? term_new_float(-d) : term_new_int(-i);
             }
-            /* atom constants */
             if (strcmp(fn,"pi")==0&&e->n==0) return term_new_float(M_PI);
             if (strcmp(fn,"e")==0&&e->n==0)  return term_new_float(M_E);
-            /* unknown evaluable: resolve via env (e.g. TERM_INT/TERM_FLOAT atom from copy_term) */
             Term *t=term_deref(pl_unified_term_from_expr(e,env));
             if (!t || t->tag == TERM_VAR) { pl_throw_instantiation_error(); return NULL; }
             if (t->tag == TERM_INT || t->tag == TERM_FLOAT) return t;
-            /* truly non-evaluable: throw type_error(evaluable, Name/Arity) */
             pl_throw_type_error_evaluable(fn ? fn : "", e->n);
             return NULL;
         }
@@ -508,8 +414,7 @@ static Term *pl_unified_eval_arith_term(tree_t *e, Term **env) {
 #undef _EIS
 #undef _EF
 }
-
-/*---- pl_unified_eval_arith — integer wrapper (kept for comparison callers) ----*/
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static long pl_unified_eval_arith(tree_t *e, Term **env) {
     Term *t = pl_unified_eval_arith_term(e, env);
     if (!t) return 0;
@@ -517,8 +422,7 @@ static long pl_unified_eval_arith(tree_t *e, Term **env) {
     if (t->tag == TERM_INT)   return t->ival;
     return 0;
 }
-
-/*---- is_pl_user_call ----*/
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int is_pl_user_call(tree_t *goal) {
     if (!goal || goal->t != TT_FNC || !goal->v.sval) return 0;
     static const char *builtins[] = {
@@ -549,19 +453,17 @@ int is_pl_user_call(tree_t *goal) {
     for (int i = 0; builtins[i]; i++) if (strcmp(goal->v.sval, builtins[i]) == 0) return 0;
     return 1;
 }
-
-/*---- term_order_cmp — ISO standard order: var < number < atom < compound ----*/
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int term_order_cmp(Term *a, Term *b) {
     a = term_deref(a); b = term_deref(b);
     if (!a && !b) return 0;
     if (!a) return -1;
     if (!b) return  1;
-    /* Type rank: var=0, number=1, atom=2, compound=3 */
     int ra = (a->tag==TERM_VAR)?0:(a->tag==TERM_INT||a->tag==TERM_FLOAT)?1:(a->tag==TERM_ATOM)?2:3;
     int rb = (b->tag==TERM_VAR)?0:(b->tag==TERM_INT||b->tag==TERM_FLOAT)?1:(b->tag==TERM_ATOM)?2:3;
     if (ra != rb) return ra - rb;
     switch (a->tag) {
-        case TT_VAR:   return (int)(a - b);  /* address order for unbound vars */
+        case TT_VAR:   return (int)(a - b);
         case TERM_INT:   return (a->ival < b->ival) ? -1 : (a->ival > b->ival) ? 1 : 0;
         case TERM_FLOAT: return (a->fval < b->fval) ? -1 : (a->fval > b->fval) ? 1 : 0;
         case TERM_ATOM: {
@@ -570,7 +472,6 @@ static int term_order_cmp(Term *a, Term *b) {
             return strcmp(sa ? sa : "", sb ? sb : "");
         }
         case TERM_COMPOUND: {
-            /* arity first, then functor name, then args left-to-right */
             if (a->compound.arity != b->compound.arity) return a->compound.arity - b->compound.arity;
             const char *fa = prolog_atom_name(a->compound.functor);
             const char *fb = prolog_atom_name(b->compound.functor);
@@ -585,31 +486,19 @@ static int term_order_cmp(Term *a, Term *b) {
         default: return 0;
     }
 }
-
-/* =========================================================================
- * copy_term helper — deep-copy a term, replacing variables with fresh ones
- * Uses a simple var-mapping array: old_var[i] → new_var[i]
- * ======================================================================= */
 #define COPY_TERM_MAX_VARS 256
 typedef struct { Term *orig; Term *copy; } CopyVarMap;
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static Term *copy_term_rec(Term *t, CopyVarMap *map, int *nmap) {
     t = term_deref(t);
     if (!t) {
-        /* unbound variable — create or reuse fresh var.
-         * NOTE: var_slot must be non-negative so bind() trails this var.
-         * -1 means "anonymous wildcard, don't trail" — wrong for copy_term.
-         * PL-12 session #7: use synthetic slot 1<<20 + nmap to avoid env
-         * collisions (real env slots are 0..arity, typically <64). */
         Term *fresh = term_new_var((1 << 20) + *nmap);
         return fresh;
     }
     switch (t->tag) {
         case TT_VAR: {
-            /* unbound — look up or create a fresh copy */
             for (int i = 0; i < *nmap; i++)
                 if (map[i].orig == t) return map[i].copy;
-            /* PL-12 session #7: see comment above — slot != -1 needed. */
             Term *fresh = term_new_var((1 << 20) + *nmap);
             if (*nmap < COPY_TERM_MAX_VARS) {
                 map[*nmap].orig = t; map[*nmap].copy = fresh; (*nmap)++;
@@ -631,71 +520,24 @@ static Term *copy_term_rec(Term *t, CopyVarMap *map, int *nmap) {
         default: return t;
     }
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static Term *pl_copy_term(Term *t) {
     CopyVarMap map[COPY_TERM_MAX_VARS];
     int nmap = 0;
     return copy_term_rec(t, map, &nmap);
 }
-
-/*============================================================================
- * pl_term_to_synth_expr / pl_invoke_var_goal — Term→EXPR bridge for var-bound
- * goal dispatch (catch/3, \+/1, once/1, not/1).
- *
- * Defect background (PL-12 fix #2 v3):
- * When `catch(G,_,_)`'s G is a runtime variable (e.g. plunit asserts test
- * goals into a clause and dispatches them via catch), the EXPR at the catch
- * call site has goal_e->t == TERM_VAR. The previous fall-through dispatched
- * `interp_exec_pl_builtin(TERM_VAR, env)` which had no TERM_VAR case and returned
- * 1 (silent success) via the `default:` arm. The Var-bound goal never ran.
- * Same defect afflicts \+/1, once/1, not/1 (lines 681/689).
- *
- * Lifecycle / env-sharing strategy:
- * Session #4 (2026-04-30 #4) attempted a bridge that allocated a separate
- * tenv decoupled from the caller's env, then dispatched via pl_box_goal_from_ir
- * + bb_broker. That collapsed the SWI suite 43→7. Root cause hypothesis: the
- * bb_broker's choice-point machinery interacted badly with the tenv slot
- * Term*s.
- *
- * v3 simplification: the synth EXPR's TERM_VAR slots store **the original Term**
- * (deref'd) directly. Dispatch goes through `interp_exec_pl_builtin(synth, tenv)`
- * — same routine the surrounding catch code already uses for non-Var goals.
- * No new bb_broker entry. When the synth TERM_VAR is resolved by
- * `pl_unified_term_from_expr(child=TERM_VAR, env=tenv)`, it returns `tenv[k]`
- * which IS the original Term* from the goal. Bindings made on that Term
- * (TERM_REF chained back to the caller's env vars) propagate naturally; on
- * caller's unify-stage uargs[k] is bound TERM_REF -> tenv[k] which itself is
- * TERM_REF -> caller_env[m], so the chain flows correctly.
- *
- * Only the kinds plunit-style goal Terms actually carry are handled:
- *   TERM_VAR    -> TERM_VAR slot (deduped by pointer identity, X+X = one slot)
- *   TERM_INT    -> TT_ILIT
- *   TERM_FLOAT  -> TT_FLIT
- *   TERM_ATOM   -> TT_FNC nchildren=0 sval=name (true/fail/etc. handled there)
- *   TERM_COMPOUND with functor f arity n:
- *     `=` arity 2  -> TT_UNIFY
- *     `+`/`-`/`*`/`/`/`mod` arity 2 -> TT_ADD/TT_SUB/TT_MUL/TT_DIV/TT_MOD
- *       (only when used inside is/2 RHS or similar arith-eval context;
- *       at goal level these aren't valid Prolog goals — but interp_exec_pl_builtin
- *       still recurses on children, so the kinds match what lower_term emits)
- *     anything else -> TT_FNC sval=fn nchildren=n
- *
- * Memory: synth EXPR allocated on heap, freed on exit. Var dedup via
- * pointer-identity scan of tenv (linear; fine for typical goal sizes <16).
- *==========================================================================*/
-
 #define PL_SYNTH_TENV_MAX 64
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static tree_t *pl_synth_new(tree_e k) {
     tree_t *e = (tree_t *)calloc(1, sizeof(tree_t));
     e->t = k;
     return e;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void pl_synth_add_child(tree_t *e, tree_t *child) {
     ast_push(e, child);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void pl_synth_free(tree_t *e) {
     if (!e) return;
     for (int i = 0; i < e->n; i++) pl_synth_free(e->c[i]);
@@ -703,15 +545,14 @@ static void pl_synth_free(tree_t *e) {
     if (e->v.sval) free(e->v.sval);
     free(e);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int pl_tenv_add_dedup(Term **tenv, int *pn, Term *v) {
-    /* Dedup by pointer identity — same Term twice -> same slot */
     for (int i = 0; i < *pn; i++) if (tenv[i] == v) return i;
     if (*pn >= PL_SYNTH_TENV_MAX) return -1;
     tenv[*pn] = v;
     return (*pn)++;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static tree_t *pl_term_to_synth_expr(Term *t, Term **tenv, int *pn) {
     t = term_deref(t);
     if (!t) {
@@ -746,17 +587,12 @@ static tree_t *pl_term_to_synth_expr(Term *t, Term **tenv, int *pn) {
             const char *fn = prolog_atom_name(t->compound.functor);
             if (!fn) fn = "?";
             int arity = t->compound.arity;
-            /* =/2 -> TT_UNIFY */
             if (arity == 2 && strcmp(fn, "=") == 0) {
                 tree_t *e = pl_synth_new(TT_UNIFY);
                 pl_synth_add_child(e, pl_term_to_synth_expr(t->compound.args[0], tenv, pn));
                 pl_synth_add_child(e, pl_term_to_synth_expr(t->compound.args[1], tenv, pn));
                 return e;
             }
-            /* arith ops -> TT_ADD etc. only meaningful inside is/2 RHS, but
-             * interp_exec_pl_builtin only recurses on children of recognised
-             * top-level goals — this is fine because is/2 calls
-             * pl_unified_eval_arith_term which knows these kinds. */
             if (arity == 2) {
                 tree_e ak = TT_KIND_COUNT;
                 if      (!strcmp(fn,"+"))   ak = TT_ADD;
@@ -771,7 +607,6 @@ static tree_t *pl_term_to_synth_expr(Term *t, Term **tenv, int *pn) {
                     return e;
                 }
             }
-            /* General compound -> TT_FNC sval=fn */
             tree_t *e = pl_synth_new(TT_FNC);
             e->v.sval = strdup(fn);
             for (int i = 0; i < arity; i++)
@@ -779,30 +614,16 @@ static tree_t *pl_term_to_synth_expr(Term *t, Term **tenv, int *pn) {
             return e;
         }
     }
-    /* unreachable */
     return pl_synth_new(TT_FNC);
 }
-
-/* pl_invoke_var_goal — entry point.
- * Caller passes a Term that should be invoked as a goal. Returns 1 = success,
- * 0 = failure. Throws are propagated via the existing catch-frame longjmp
- * mechanism; this routine itself does not catch them.
- *
- * NOTE: caller_env is unused by this function — the bridge owns its tenv —
- * but is kept in the signature for future use (e.g. if we ever need to alias
- * synth TERM_VAR slots to specific caller_env[k] indices instead of via tenv
- * Term*s). Today it's unused; tenv-by-Term*-identity already preserves the
- * caller's variable bindings via the deref chains. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int pl_invoke_var_goal(Term *gt, Term **caller_env) {
     (void)caller_env;
     gt = term_deref(gt);
     if (!gt) return 0;
-    /* Unbound var as goal: instantiation_error in standard Prolog; we just fail. */
     if (gt->tag == TERM_VAR)   return 0;
-    /* Numbers aren't callable */
     if (gt->tag == TERM_INT)   return 0;
     if (gt->tag == TERM_FLOAT) return 0;
-
     Term *tenv[PL_SYNTH_TENV_MAX];
     for (int i = 0; i < PL_SYNTH_TENV_MAX; i++) tenv[i] = NULL;
     int    tn = 0;
@@ -811,10 +632,7 @@ static int pl_invoke_var_goal(Term *gt, Term **caller_env) {
     pl_synth_free(synth);
     return ok;
 }
-
-/*---- interp_exec_pl_builtin — execute one Prolog builtin goal ----*/
-/* Uses file-scope globals g_pl_trail, g_pl_cut_flag, g_pl_pred_table, g_pl_env.
- * Returns 1=success, 0=fail. Called by pl_box_builtin in pl_broker.c. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int interp_exec_pl_builtin(tree_t *goal, Term **env) {
     if (!goal) return 1;
     Trail *trail = &g_pl_trail;
@@ -832,7 +650,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
         case TT_FNC: {
             const char *fn = goal->v.sval ? goal->v.sval : "true";
             int arity = goal->n;
-            /* ---- user-defined predicate dispatch (must come before builtin checks) ---- */
             if (is_pl_user_call(goal)) {
                 char ukey[256]; snprintf(ukey,sizeof ukey,"%s/%d",fn,arity);
                 tree_t *uch = pl_pred_table_lookup(&g_pl_pred_table, ukey);
@@ -853,7 +670,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
             if (strcmp(fn,"fail")==0&&arity==0) return 0;
             if (strcmp(fn,"halt")==0&&arity==0) exit(0);
             if (strcmp(fn,"halt")==0&&arity==1){Term *t=term_deref(pl_unified_term_from_expr(goal->c[0],env));exit(t&&t->tag==TERM_INT?(int)t->ival:0);}
-            /* ---- directive no-ops: dynamic, discontiguous, module, use_module, include, etc. ---- */
             if ((strcmp(fn,"dynamic")==0||strcmp(fn,"discontiguous")==0||
                  strcmp(fn,"module")==0||strcmp(fn,"use_module")==0||
                  strcmp(fn,"ensure_loaded")==0||strcmp(fn,"style_check")==0||
@@ -864,7 +680,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                  strcmp(fn,"public")==0||strcmp(fn,"volatile")==0||
                  strcmp(fn,"thread_local")==0||strcmp(fn,"table")==0||
                  strcmp(fn,"set_test_options")==0||strcmp(fn,"encoding")==0)) return 1;
-            /* include/1: silently succeed (file already parsed by prolog_compile) */
             if (strcmp(fn,"include")==0) return 1;
             if (strcmp(fn,"nl")==0&&arity==0){putchar('\n');return 1;}
             if (strcmp(fn,"write")==0&&arity==1){pl_write(pl_unified_term_from_expr(goal->c[0],env));return 1;}
@@ -885,7 +700,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 if(!unify(lhs,val,trail)){trail_unwind(trail,mark);return 0;}
                 return 1;
             }
-            /* arithmetic comparisons */
             { struct{const char *n;int op;}cmps[]={{"<",0},{">",1},{"=<",2},{">=",3},{"=:=",4},{"=\\=",5},{NULL,0}};
               for(int ci=0;cmps[ci].n;ci++) if(strcmp(fn,cmps[ci].n)==0&&arity==2){
                   long a=pl_unified_eval_arith(goal->c[0],env),b=pl_unified_eval_arith(goal->c[1],env);
@@ -922,7 +736,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 if(t1->tag==TERM_VAR) return t1!=t2;
                 return 1;
             }
-            /* type tests */
             if (arity==1){
                 Term *t=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 if(strcmp(fn,"var"     )==0)return !t||t->tag==TERM_VAR;
@@ -938,7 +751,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     for(Term *c=t;;){c=term_deref(c);if(!c)return 0;if(c->tag==TERM_ATOM&&c->atom_id==nil)return 1;if(c->tag!=TERM_COMPOUND||c->compound.arity!=2||c->compound.functor!=dot)return 0;c=c->compound.args[1];}
                 }
             }
-            /* ,/N conjunction — run each child goal in sequence */
             if (strcmp(fn,",")==0){
                 for(int i=0;i<goal->n;i++){
                     tree_t *g=goal->c[i];
@@ -957,10 +769,8 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 }
                 return 1;
             }
-            /* ;/N disjunction */
             if (strcmp(fn,";")==0&&arity>=2){
                 tree_t *left=goal->c[0],*right=goal->c[1];
-                /* if-then-else: (Cond -> Then ; Else) */
                 if(left&&left->t==TT_FNC&&left->v.sval&&strcmp(left->v.sval,"->")==0&&left->n>=2){
                     int mark=trail_mark(trail); int cut2=0;
                     if(interp_exec_pl_builtin(left->c[0],env)){
@@ -970,24 +780,16 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     trail_unwind(trail,mark);
                     return interp_exec_pl_builtin(right,env);
                 }
-                /* plain disjunction */
                 {int mark=trail_mark(trail);
                  if(interp_exec_pl_builtin(left,env)) return 1;
                  trail_unwind(trail,mark);
                  return interp_exec_pl_builtin(right,env);}
             }
-            /* ->/N if-then */
             if (strcmp(fn,"->")==0&&arity>=2){
                 if(!interp_exec_pl_builtin(goal->c[0],env)) return 0;
                 for(int i=1;i<goal->n;i++) if(!interp_exec_pl_builtin(goal->c[i],env)) return 0;
                 return 1;
             }
-            /* \+/not — PR-19b: var-goal arg dispatches via Term→EXPR bridge.
-             * Without this, child[0]->t == TERM_VAR fell through to the
-             * `default: return 1;` arm of interp_exec_pl_builtin (silent
-             * success), so `\+ Var` always returned 0 (negation of fake
-             * success) and the inner goal never ran. Same defect as the
-             * catch/3 fix in PR-19a, applied here for \+/not. */
             if ((strcmp(fn,"\\+")==0||strcmp(fn,"not")==0)&&arity==1){
                 int mark=trail_mark(trail);
                 int ok;
@@ -999,11 +801,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 }
                 trail_unwind(trail,mark);return !ok;
             }
-            /* once/1 — succeed/fail like the goal; tree-walker has no
-             * choice points to discard, so semantically equivalent to
-             * a plain call here. Trail rolled back on failure.
-             * PR-19b: var-goal arg routed through Term→EXPR bridge —
-             * same silent-success defect as catch/3 / \+/not. */
             if (strcmp(fn,"once")==0&&arity==1){
                 int mark=trail_mark(trail);
                 int ok;
@@ -1016,37 +813,15 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 if(!ok) trail_unwind(trail,mark);
                 return ok;
             }
-            /* call/N — PR-19c: dispatch goal-as-variable or reconstruct compound.
-             *
-             * call(G)          — G is a callable Term; dispatch via bridge.
-             * call(G, A1, ...) — G is an atom or compound; build G(G_args..., A1...)
-             *                    and dispatch the reconstructed compound.
-             *
-             * When call's first child is TERM_VAR (goal_e->t == TERM_VAR after
-             * resolving child[0]), the deref'd Term becomes the goal or its
-             * base.  Extra args (call/2, call/3, ...) are resolved and appended.
-             *
-             * For call/1 with no extra args: straightforward bridge dispatch.
-             * For call/N (N>1): reconstruct a fresh TERM_COMPOUND Term whose
-             * functor = G's functor and whose args = G's existing args ++ extras.
-             * Then dispatch via pl_invoke_var_goal on the reconstructed Term.
-             */
             if (strcmp(fn,"call")==0 && arity>=1) {
                 tree_t *g_expr = goal->c[0];
-                /* Resolve the goal arg to a Term (handles TERM_VAR and direct TT_FNC) */
                 Term *g_term = pl_unified_term_from_expr(g_expr, env);
                 g_term = term_deref(g_term);
                 if (!g_term) return 0;
-
-                int n_extra = arity - 1; /* number of extra args (call/2 → 1, etc.) */
-
+                int n_extra = arity - 1;
                 if (n_extra == 0) {
-                    /* call(G) — simple dispatch via bridge */
                     return pl_invoke_var_goal(g_term, env);
                 }
-
-                /* call(G, A1, ...) — build reconstructed compound */
-                /* Extract base functor name and existing args from g_term */
                 const char *cfn = NULL;
                 int carity_base = 0;
                 Term **cargs_base = NULL;
@@ -1058,11 +833,9 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     carity_base = g_term->compound.arity;
                     cargs_base = g_term->compound.args;
                 } else {
-                    return 0; /* not callable */
+                    return 0;
                 }
                 if (!cfn) return 0;
-
-                /* Resolve extra args from the call/N expression */
                 int total_arity = carity_base + n_extra;
                 Term **all_args = (Term **)malloc(total_arity * sizeof(Term *));
                 for (int i = 0; i < carity_base; i++)
@@ -1070,38 +843,29 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 for (int i = 0; i < n_extra; i++)
                     all_args[carity_base + i] =
                         pl_unified_term_from_expr(goal->c[1 + i], env);
-
-                /* Build a fresh TERM_COMPOUND for the reconstructed call */
                 int fn_id = prolog_atom_intern(cfn);
                 Term **rargs2 = (Term **)malloc(total_arity * sizeof(Term *));
                 for (int i = 0; i < total_arity; i++) rargs2[i] = all_args[i];
                 free(all_args);
                 Term *reconstructed = term_new_compound(fn_id, total_arity, rargs2);
                 free(rargs2);
-
-                /* Dispatch via bridge (reconstructed is a concrete Term, not TERM_VAR,
-                 * so pl_invoke_var_goal handles it correctly via the TERM_COMPOUND path) */
                 return pl_invoke_var_goal(reconstructed, env);
             }
-            /* functor/3 */
             if (strcmp(fn,"functor")==0&&arity==3){
                 int mark=trail_mark(trail);
                 if(!pl_functor(pl_unified_term_from_expr(goal->c[0],env),pl_unified_term_from_expr(goal->c[1],env),pl_unified_term_from_expr(goal->c[2],env),trail)){trail_unwind(trail,mark);return 0;}
                 return 1;
             }
-            /* arg/3 */
             if (strcmp(fn,"arg")==0&&arity==3){
                 int mark=trail_mark(trail);
                 if(!pl_arg(pl_unified_term_from_expr(goal->c[0],env),pl_unified_term_from_expr(goal->c[1],env),pl_unified_term_from_expr(goal->c[2],env),trail)){trail_unwind(trail,mark);return 0;}
                 return 1;
             }
-            /* =../2 */
             if (strcmp(fn,"=..")==0&&arity==2){
                 int mark=trail_mark(trail);
                 if(!pl_univ(pl_unified_term_from_expr(goal->c[0],env),pl_unified_term_from_expr(goal->c[1],env),trail)){trail_unwind(trail,mark);return 0;}
                 return 1;
             }
-            /* assert/assertz/asserta/retract/retractall/abolish */
             if ((strcmp(fn,"assert")==0||strcmp(fn,"assertz")==0)&&arity==1) {
                 Term *arg=pl_unified_term_from_expr(goal->c[0],env);
                 return pl_assert_clause(arg,1);
@@ -1118,8 +882,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 Term *arg=pl_unified_term_from_expr(goal->c[0],env);
                 return pl_abolish_pred(arg);
             }
-            /*---- atom builtins (PL-4) ----*/
-            /* atom_length(+Atom, ?Len) */
             if (strcmp(fn,"atom_length")==0&&arity==2) {
                 Term *a=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *l=pl_unified_term_from_expr(goal->c[1],env);
@@ -1132,12 +894,10 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 if (!unify(l,len,trail)){trail_unwind(trail,mark);return 0;}
                 return 1;
             }
-            /* atom_concat(+A1, +A2, ?A3)  or  atom_concat(?A1, ?A2, +A3) */
             if (strcmp(fn,"atom_concat")==0&&arity==3) {
                 Term *a1=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *a2=term_deref(pl_unified_term_from_expr(goal->c[1],env));
                 Term *a3=pl_unified_term_from_expr(goal->c[2],env);
-                /* mode: +,+,? */
                 if (a1&&a1->tag==TERM_ATOM&&a2&&a2->tag==TERM_ATOM) {
                     const char *s1=prolog_atom_name(a1->atom_id);
                     const char *s2=prolog_atom_name(a2->atom_id);
@@ -1149,7 +909,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     if(!unify(a3,res,trail)){trail_unwind(trail,mark);return 0;}
                     return 1;
                 }
-                /* mode: ?,?,+ — split */
                 Term *a3d=term_deref(a3);
                 if (a3d&&a3d->tag==TERM_ATOM) {
                     const char *s3=prolog_atom_name(a3d->atom_id);
@@ -1168,13 +927,11 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 }
                 return 0;
             }
-            /* atom_chars(+Atom, ?Chars)  or  atom_chars(?Atom, +Chars) */
             if (strcmp(fn,"atom_chars")==0&&arity==2) {
                 Term *a=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *cl=pl_unified_term_from_expr(goal->c[1],env);
                 int nil_id=prolog_atom_intern("[]"), dot_id=prolog_atom_intern(".");
                 if (a&&a->tag==TERM_ATOM) {
-                    /* +Atom → build char list */
                     const char *s=prolog_atom_name(a->atom_id);
                     int n=(int)strlen(s);
                     Term *lst=term_new_atom(nil_id);
@@ -1187,7 +944,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     if(!unify(cl,lst,trail)){trail_unwind(trail,mark);return 0;}
                     return 1;
                 } else {
-                    /* +Chars → build atom */
                     Term *cur=term_deref(cl); char buf[1024]; int pos=0;
                     while(cur&&cur->tag==TERM_COMPOUND&&cur->compound.arity==2){
                         Term *hd=term_deref(cur->compound.args[0]);
@@ -1203,7 +959,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     return 1;
                 }
             }
-            /* atom_codes(+Atom, ?Codes)  or  atom_codes(?Atom, +Codes) */
             if (strcmp(fn,"atom_codes")==0&&arity==2) {
                 Term *a=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *cl=pl_unified_term_from_expr(goal->c[1],env);
@@ -1234,7 +989,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     return 1;
                 }
             }
-            /*---- term ordering: @</2, @>/2, @=</2, @>=/2, compare/3 (PL-5) ----*/
             if (arity==2&&(strcmp(fn,"@<")==0||strcmp(fn,"@>")==0||strcmp(fn,"@=<")==0||strcmp(fn,"@>=")==0)) {
                 Term *a=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *b=term_deref(pl_unified_term_from_expr(goal->c[1],env));
@@ -1255,12 +1009,10 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 if(!unify(order,ot,trail)){trail_unwind(trail,mark);return 0;}
                 return 1;
             }
-            /*---- sort/2 and msort/2 (PL-5) ----*/
             if ((strcmp(fn,"sort")==0||strcmp(fn,"msort")==0)&&arity==2) {
                 int do_dedup=(strcmp(fn,"sort")==0);
                 Term *lst=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *out=pl_unified_term_from_expr(goal->c[1],env);
-                /* collect list into array */
                 Term *elems[4096]; int n=0;
                 Term *cur=lst;
                 int nil_id=prolog_atom_intern("[]"),dot_id=prolog_atom_intern(".");
@@ -1268,28 +1020,23 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     if(n<4096) elems[n++]=term_deref(cur->compound.args[0]);
                     cur=term_deref(cur->compound.args[1]);
                 }
-                /* insertion sort (small lists; good enough for ladder) */
                 for(int i=1;i<n;i++){
                     Term *key=elems[i]; int j=i-1;
                     while(j>=0&&term_order_cmp(elems[j],key)>0){elems[j+1]=elems[j];j--;}
                     elems[j+1]=key;
                 }
-                /* dedup for sort/2 */
                 if(do_dedup&&n>0){
                     int w=0;
                     for(int i=0;i<n;i++)
                         if(i==0||term_order_cmp(elems[i-1],elems[i])!=0) elems[w++]=elems[i];
                     n=w;
                 }
-                /* build result list */
                 Term *res=term_new_atom(nil_id);
                 for(int i=n-1;i>=0;i--){Term *a2[2];a2[0]=elems[i];a2[1]=res;res=term_new_compound(dot_id,2,a2);}
                 int mark=trail_mark(trail);
                 if(!unify(out,res,trail)){trail_unwind(trail,mark);return 0;}
                 return 1;
             }
-            /*---- succ/2, plus/3, format/2 (PL-6) ----*/
-            /* succ(?X, ?Y)  — Y = X+1, at least one must be bound */
             if (strcmp(fn,"succ")==0&&arity==2) {
                 Term *a=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *b=term_deref(pl_unified_term_from_expr(goal->c[1],env));
@@ -1307,7 +1054,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 }
                 return 0;
             }
-            /* plus(?X, ?Y, ?Z)  — Z = X+Y, at least two must be bound */
             if (strcmp(fn,"plus")==0&&arity==3) {
                 Term *a=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *b=term_deref(pl_unified_term_from_expr(goal->c[1],env));
@@ -1323,21 +1069,17 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 if(!unify(tgt,r,trail)){trail_unwind(trail,mark);return 0;}
                 return 1;
             }
-            /* format(+Fmt, +Args) / format(+Fmt) — ~w ~a ~d ~i ~n ~N ~t~| ~` */
             if (strcmp(fn,"format")==0&&(arity==1||arity==2)) {
                 Term *fmt_t=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 const char *fmt=NULL;
                 if (fmt_t&&fmt_t->tag==TERM_ATOM) fmt=prolog_atom_name(fmt_t->atom_id);
                 if (!fmt) return 0;
-                /* Build args list */
                 Term *args_list=(arity==2)?term_deref(pl_unified_term_from_expr(goal->c[1],env)):NULL;
                 int nil_id=prolog_atom_intern("[]");
-                /* Process format string */
                 for (const char *p=fmt; *p; p++) {
                     if (*p=='~') {
                         p++;
                         if (*p=='w'||*p=='a'||*p=='p') {
-                            /* ~w/~a/~p: write next arg */
                             if (args_list&&args_list->tag==TERM_COMPOUND&&args_list->compound.arity==2) {
                                 pl_write(term_deref(args_list->compound.args[0]));
                                 args_list=term_deref(args_list->compound.args[1]);
@@ -1349,22 +1091,19 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                                 args_list=term_deref(args_list->compound.args[1]);
                             }
                         } else if (*p=='i') {
-                            /* ~i: ignore next arg */
                             if (args_list&&args_list->tag==TERM_COMPOUND&&args_list->compound.arity==2)
                                 args_list=term_deref(args_list->compound.args[1]);
                         } else if (*p=='n') { putchar('\n');
-                        } else if (*p=='N') { /* newline if not at start of line — approx */ putchar('\n');
+                        } else if (*p=='N') { putchar('\n');
                         } else if (*p=='~') { putchar('~');
                         } else if (*p=='t') { putchar('\t');
-                        } else if (*p=='r') { /* radix — skip for now */ }
+                        } else if (*p=='r') { }
                     } else {
                         putchar(*p);
                     }
                 }
                 return 1;
             }
-            /*---- numbervars/3 and char_type/2 (PL-7) ----*/
-            /* numbervars(+Term, +Start, -End) — bind unbound vars to '$VAR'(N) */
             if (strcmp(fn,"numbervars")==0&&arity==3) {
                 Term *t   = pl_unified_term_from_expr(goal->c[0],env);
                 Term *s   = term_deref(pl_unified_term_from_expr(goal->c[1],env));
@@ -1372,7 +1111,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 if (!s||s->tag!=TERM_INT) return 0;
                 long n = s->ival;
                 int var_id = prolog_atom_intern("$VAR");
-                /* Iterative DFS to number all unbound vars */
                 Term *stk[4096]; int top=0;
                 stk[top++]=term_deref(t);
                 while (top>0) {
@@ -1392,15 +1130,9 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 if(!unify(end,end_t,trail)){trail_unwind(trail,mark);return 0;}
                 return 1;
             }
-            /* term_singletons(+Term, -Singletons) — list of variables that
-             * occur exactly once in Term. We walk the term, gather all
-             * unbound TERM_VAR pointers, count occurrences, and unify Singletons
-             * with the list of those that appear once.  Order: leftmost-first
-             * (matches SWI). */
             if (strcmp(fn,"term_singletons")==0&&arity==2) {
                 Term *t   = pl_unified_term_from_expr(goal->c[0],env);
                 Term *out = pl_unified_term_from_expr(goal->c[1],env);
-                /* Two passes: collect unique vars in order, then count */
                 Term *vars[1024]; int counts[1024]; int nv=0;
                 Term *stk[4096]; int top=0;
                 stk[top++]=term_deref(t);
@@ -1417,7 +1149,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                             if (top<4095) stk[top++]=term_deref(cur->compound.args[i]);
                     }
                 }
-                /* Build list of singletons (count==1) in collection order */
                 int dot=prolog_atom_intern("."), nil=prolog_atom_intern("[]");
                 Term *list = term_new_atom(nil);
                 for (int i=nv-1;i>=0;i--) {
@@ -1430,7 +1161,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 if(!unify(out,list,trail)){trail_unwind(trail,mark);return 0;}
                 return 1;
             }
-            /* char_type(+Char, ?Type) */
             if (strcmp(fn,"char_type")==0&&arity==2) {
                 Term *ch=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *ty=term_deref(pl_unified_term_from_expr(goal->c[1],env));
@@ -1438,7 +1168,7 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 const char *cs=prolog_atom_name(ch->atom_id);
                 if (!cs||!cs[0]) return 0;
                 unsigned char c=(unsigned char)cs[0];
-                if (!ty||ty->tag==TERM_VAR) return 0; /* need bound type for now */
+                if (!ty||ty->tag==TERM_VAR) return 0;
                 const char *tname=NULL;
                 int tarity=0;
                 if (ty->tag==TERM_ATOM) { tname=prolog_atom_name(ty->atom_id); tarity=0; }
@@ -1492,7 +1222,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 }
                 return 0;
             }
-            /* U-23: nv_get(+Name, -Val) / nv_set(+Name, +Val) -- SNO NV store bridge */
             if (strcmp(fn,"nv_get")==0&&arity==2) {
                 Term *nm=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 if (!nm || nm->tag != TERM_ATOM) return 0;
@@ -1517,13 +1246,10 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 NV_SET_fn(nm_str, dv);
                 return 1;
             }
-            /*---- PL-9: string/IO builtins ----*/
-            /* term_string(+Term, -String) or term_string(-Term, +String) */
             if (strcmp(fn,"term_string")==0&&arity==2) {
                 Term *ta=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *ts=term_deref(pl_unified_term_from_expr(goal->c[1],env));
                 if (ta && ta->tag!=TERM_VAR) {
-                    /* mode: +Term, -String — render term as atom */
                     char *buf = pl_term_to_string(ta);
                     Term *str = term_new_atom(prolog_atom_intern(buf));
                     free(buf);
@@ -1531,10 +1257,8 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     if(!unify(ts,str,trail)){trail_unwind(trail,mark);return 0;}
                     return 1;
                 } else if (ts && ts->tag==TERM_ATOM) {
-                    /* mode: -Term, +String — parse atom as term (simple: just intern as atom) */
                     const char *s = prolog_atom_name(ts->atom_id);
                     if (!s) return 0;
-                    /* Try to parse as integer */
                     char *end; long iv = strtol(s, &end, 10);
                     Term *parsed;
                     if (*end=='\0') parsed = term_new_int(iv);
@@ -1545,7 +1269,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 }
                 return 0;
             }
-            /* number_codes(+Number, ?Codes) or number_codes(?Number, +Codes) */
             if (strcmp(fn,"number_codes")==0&&arity==2) {
                 Term *tn=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *tc=pl_unified_term_from_expr(goal->c[1],env);
@@ -1561,7 +1284,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     if(!unify(tc,lst,trail)){trail_unwind(trail,mark);return 0;}
                     return 1;
                 } else {
-                    /* +Codes → Number */
                     Term *cur=term_deref(tc); char buf[64]; int pos=0;
                     while(cur&&cur->tag==TERM_COMPOUND&&cur->compound.arity==2){
                         Term *hd=term_deref(cur->compound.args[0]);
@@ -1577,7 +1299,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     return 1;
                 }
             }
-            /* number_chars(+Number, ?Chars) or number_chars(?Number, +Chars) */
             if (strcmp(fn,"number_chars")==0&&arity==2) {
                 Term *tn=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *tc=pl_unified_term_from_expr(goal->c[1],env);
@@ -1609,7 +1330,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     return 1;
                 }
             }
-            /* char_code(+Char, ?Code) or char_code(?Char, +Code) */
             if (strcmp(fn,"char_code")==0&&arity==2) {
                 Term *tch=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *tco=term_deref(pl_unified_term_from_expr(goal->c[1],env));
@@ -1628,7 +1348,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 }
                 return 0;
             }
-            /* upcase_atom(+Atom, -Upper) */
             if (strcmp(fn,"upcase_atom")==0&&arity==2) {
                 Term *ta=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *tr=pl_unified_term_from_expr(goal->c[1],env);
@@ -1641,7 +1360,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 if(!unify(tr,res,trail)){trail_unwind(trail,mark);return 0;}
                 return 1;
             }
-            /* downcase_atom(+Atom, -Lower) */
             if (strcmp(fn,"downcase_atom")==0&&arity==2) {
                 Term *ta=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *tr=pl_unified_term_from_expr(goal->c[1],env);
@@ -1654,24 +1372,18 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 if(!unify(tr,res,trail)){trail_unwind(trail,mark);return 0;}
                 return 1;
             }
-            /* sub_atom/5: sub_atom(+Atom, ?Before, ?Length, ?After, ?SubAtom)
-             * Unifies SubAtom with a sub-atom of Atom starting at Before (0-based),
-             * with Length chars, and After = len(Atom)-Before-Length.
-             * On backtrack (via findall), yields all solutions. */
             if (strcmp(fn,"sub_atom")==0&&arity==5) {
                 Term *ta  = term_deref(pl_unified_term_from_expr(goal->c[0],env));
-                Term *tb  = pl_unified_term_from_expr(goal->c[1],env); /* Before */
-                Term *tl  = pl_unified_term_from_expr(goal->c[2],env); /* Length */
-                Term *taf = pl_unified_term_from_expr(goal->c[3],env); /* After  */
-                Term *ts  = pl_unified_term_from_expr(goal->c[4],env); /* SubAtom */
+                Term *tb  = pl_unified_term_from_expr(goal->c[1],env);
+                Term *tl  = pl_unified_term_from_expr(goal->c[2],env);
+                Term *taf = pl_unified_term_from_expr(goal->c[3],env);
+                Term *ts  = pl_unified_term_from_expr(goal->c[4],env);
                 if (!ta || ta->tag != TERM_ATOM) return 0;
                 const char *s = prolog_atom_name(ta->atom_id); if (!s) return 0;
                 int slen = (int)strlen(s);
-                /* Determine Before and Length if bound */
                 int bef = -1, len = -1;
                 Term *tbv = term_deref(tb); if (tbv && tbv->tag == TERM_INT) bef = (int)tbv->ival;
                 Term *tlv = term_deref(tl); if (tlv && tlv->tag == TERM_INT) len = (int)tlv->ival;
-                /* If both bound, single deterministic solution */
                 if (bef >= 0 && len >= 0) {
                     if (bef + len > slen) return 0;
                     int aft = slen - bef - len;
@@ -1684,7 +1396,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     if (!unify(ts, rsub, trail)) { trail_unwind(trail,mark); return 0; }
                     return 1;
                 }
-                /* If Before bound but Length free: try all lengths at that position */
                 if (bef >= 0) {
                     for (int l2 = 0; l2 <= slen - bef; l2++) {
                         int aft = slen - bef - l2;
@@ -1699,7 +1410,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     }
                     return 0;
                 }
-                /* General: iterate all (bef, len) pairs — used by findall */
                 for (int b2 = 0; b2 <= slen; b2++) {
                     for (int l2 = 0; l2 <= slen - b2; l2++) {
                         int aft = slen - b2 - l2;
@@ -1716,8 +1426,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 }
                 return 0;
             }
-            /* atom_number/2: atom_number(?Atom, ?Number)
-             * atom_number('+3.14', N) -> N=3.14; atom_number(A, 42) -> A='42' */
             if (strcmp(fn,"atom_number")==0&&arity==2) {
                 Term *ta = term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *tn = pl_unified_term_from_expr(goal->c[1],env);
@@ -1744,60 +1452,36 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 }
                 return 0;
             }
-            /* atom_to_term/3: atom_to_term(+Atom, -Term, -Bindings)
-             * or atom_to_term(-Atom, +Term, +Bindings)
-             * Parse atom as a Prolog term; Bindings is list of 'Name'=Var pairs. */
             if (strcmp(fn,"atom_to_term")==0&&arity==3) {
                 Term *ta   = term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *tt   = pl_unified_term_from_expr(goal->c[1],env);
                 Term *tbnd = pl_unified_term_from_expr(goal->c[2],env);
                 if (ta && ta->tag == TERM_ATOM) {
-                    /* Parse mode: atom -> term + bindings */
                     const char *src = prolog_atom_name(ta->atom_id);
                     if (!src) return 0;
-                    /* Build a temporary program string "tmp :- " + src + "." */
-                    /* Simple: use atom_chars to build a term from parsing */
-                    /* For the test cases we handle: atoms and simple compounds */
-                    /* Full parser reuse is complex; implement naive approach:
-                     * call prolog_compile on a temporary directive and extract */
-                    /* Minimal: treat atom as-is for atomic terms, else parse */
-                    /* For test 04: 'foo(1,2)' -> foo(1,2), [] */
-                    /* We use the existing prolog frontend parser */
                     char *prog = malloc(strlen(src)+32);
                     snprintf(prog, strlen(src)+32, ":- X = (%s).\n", src);
-                    /* We can't easily invoke the parser here without a reentrant API.
-                     * Implement a simple recursive-descent term reader for common cases. */
                     free(prog);
-                    /* Fallback: treat atom as itself if atomic */
-                    /* For compound terms in atom form, use term_string path */
-                    /* Check if it's a simple atom (no parens/commas) */
                     const char *p = src;
                     while (*p && *p != '(' && *p != ',') p++;
                     Term *parsed = NULL;
                     if (*p == '\0') {
-                        /* simple atom or number */
                         char *end; long iv = strtol(src, &end, 10);
                         if (*end=='\0') parsed = term_new_int(iv);
                         else { double dv = strtod(src,&end); if(*end=='\0') parsed=term_new_float(dv); }
                         if (!parsed) parsed = term_new_atom(prolog_atom_intern(src));
                     } else {
-                        /* compound: parse functor(args) — delegate to term_string */
-                        /* Use existing number_codes/atom_codes + term_string if available */
-                        /* For now: reconstruct via prolog_atom for the functor name */
-                        /* Extract functor name up to '(' */
                         int flen = (int)(strchr(src,'(') - src);
                         char *fname2 = malloc(flen+1); strncpy(fname2,src,flen); fname2[flen]='\0';
                         int fatom = prolog_atom_intern(fname2); free(fname2);
-                        /* Count args (naive: count commas at depth 1) */
                         int depth=0, argc=1; const char *q=strchr(src,'(')+1;
-                        const char *qend = src+strlen(src)-1; /* points at ')' */
+                        const char *qend = src+strlen(src)-1;
                         for (const char *r=q; r<qend; r++) {
                             if (*r=='(') depth++;
                             else if (*r==')') depth--;
                             else if (*r==',' && depth==0) argc++;
                         }
                         Term **args = malloc(argc*sizeof(Term*));
-                        /* parse each arg as integer/float/atom (naive) */
                         int ai=0; const char *astart=q;
                         depth=0;
                         for (const char *r=q; r<=qend; r++) {
@@ -1807,7 +1491,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                             if (sep) {
                                 int alen=(int)(r-astart);
                                 char *abuf=malloc(alen+1); strncpy(abuf,astart,alen); abuf[alen]='\0';
-                                /* trim spaces */
                                 char *at=abuf; while(*at==' ')at++;
                                 char *end2; long iv2=strtol(at,&end2,10);
                                 if (*end2=='\0') args[ai]=term_new_int(iv2);
@@ -1824,22 +1507,18 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     if (!unify(tbnd, empty_bindings, trail)) { trail_unwind(trail,mark); return 0; }
                     return 1;
                 } else {
-                    /* Write mode: term -> atom */
                     Term *tv = term_deref(tt);
                     if (!tv) return 0;
-                    /* Convert term to atom string via pl_write to buffer */
                     char *buf = NULL; size_t bsz = 0;
                     FILE *mf = open_memstream(&buf, &bsz);
                     if (!mf) return 0;
-                    FILE *old_stdout = stdout; /* redirect pl_write */
-                    /* pl_write goes to stdout; use dup2 trick or buffer */
+                    FILE *old_stdout = stdout;
                     fflush(stdout);
                     int pipefd[2]; pipe(pipefd);
                     int saved_fd = dup(1); dup2(pipefd[1], 1); close(pipefd[1]);
                     pl_write(tv);
                     fflush(stdout);
                     dup2(saved_fd, 1); close(saved_fd);
-                    /* read from pipe */
                     char rbuf[4096]; int nr = (int)read(pipefd[0], rbuf, sizeof(rbuf)-1);
                     close(pipefd[0]);
                     fclose(mf); free(buf);
@@ -1850,15 +1529,12 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     return 1;
                 }
             }
-            /* phrase/2,3 — call a DCG rule: phrase(Rule, List) or phrase(Rule, List, Rest) */
-            /* phrase/2,3 — call a DCG rule: phrase(Rule, List) or phrase(Rule, List, Rest) */
             if ((strcmp(fn,"phrase")==0) && (arity==2||arity==3)) {
                 Term *rule = term_deref(pl_unified_term_from_expr(goal->c[0], env));
                 Term *s0   = pl_unified_term_from_expr(goal->c[1], env);
                 Term *s1   = (arity==3) ? pl_unified_term_from_expr(goal->c[2], env)
                                         : term_new_atom(prolog_atom_intern("[]"));
                 if (!rule) return 0;
-                /* Extract functor name and existing args from rule term */
                 const char *rfn = NULL;
                 int rarity = 0;
                 Term **rargs = NULL;
@@ -1871,7 +1547,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     rargs = rule->compound.args;
                 }
                 if (!rfn) return 0;
-                /* Build call: rfn(rargs..., s0, s1) — arity = rarity+2 */
                 int call_arity = rarity + 2;
                 char ukey[256]; snprintf(ukey, sizeof ukey, "%s/%d", rfn, call_arity);
                 tree_t *uch = pl_pred_table_lookup(&g_pl_pred_table, ukey);
@@ -1884,7 +1559,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 int umark = trail_mark(utrail);
                 Term **saved_env = g_pl_env;
                 g_pl_env = uargs;
-                /* CH-17e: prefer SM-expression path when entry_pc resolved */
                 Pl_PredEntry *_upe1 = pl_pred_entry_lookup(ukey);
                 extern void *g_current_sm_prog;
                 bb_node_t uroot = (_upe1 && _upe1->entry_pc >= 0 && g_current_sm_prog != NULL)
@@ -1896,21 +1570,14 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 if (uargs) free(uargs);
                 return uok;
             }
-            /* findall/3 — collect ALL solutions via bb_broker retry loop */
             if (strcmp(fn,"findall")==0&&arity==3){
                 tree_t *tmpl_expr=goal->c[0];
                 tree_t *goal_expr=goal->c[1];
                 tree_t *list_expr=goal->c[2];
                 Term **solutions=NULL; int nsol=0,sol_cap=0;
-                /* Isolate in sub-trail so bindings don't leak to parent */
                 Trail fa_trail; trail_init(&fa_trail);
-                Trail saved_global_trail=g_pl_trail;  /* save by value — NOT pointer (self-alias bug) */
+                Trail saved_global_trail=g_pl_trail;
                 g_pl_trail=fa_trail;
-                /* Build a box for the goal and drive α/β to exhaustion.
-                 * PR-19d bridge: if goal_expr is TERM_VAR, deref to a Term and
-                 * build a synth EXPR so the goal can be retried across solutions.
-                 * outer_env is kept for tmpl_expr/list_expr which belong to the
-                 * static IR and must still resolve against the caller's env. */
                 tree_t *fa_synth = NULL; Term **fa_tenv = NULL;
                 Term **outer_env = env;
                 if (goal_expr && goal_expr->t == TERM_VAR) {
@@ -1924,19 +1591,12 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 bb_node_t goal_box=pl_box_goal_from_ir(goal_expr,env);
                 DESCR_t fa_r=goal_box.fn(goal_box.ζ,α);
                 while(!IS_FAIL_fn(fa_r)){
-                    /* PL-12 session #7: use pl_copy_term (preserves var
-                     * sharing within snapshot via CopyVarMap) instead of
-                     * pl_unified_deep_copy (collapsed every TERM_VAR to atom `_`,
-                     * which destroyed test goal vars carried through findall).
-                     * plunit's pj_run_suite stores test bodies as findall
-                     * snapshots; without this fix the goals would lose their
-                     * var bindings even before reaching catch's bridge. */
                     Term *snap=pl_copy_term(pl_unified_term_from_expr(tmpl_expr,outer_env));
                     if(nsol>=sol_cap){sol_cap=sol_cap?sol_cap*2:8;solutions=realloc(solutions,sol_cap*sizeof(Term*));}
                     solutions[nsol++]=snap;
                     fa_r=goal_box.fn(goal_box.ζ,β);
                 }
-                g_pl_trail=saved_global_trail;  /* restore parent trail */
+                g_pl_trail=saved_global_trail;
                 if (fa_synth) { pl_synth_free(fa_synth); free(fa_tenv); }
                 int nil_id=prolog_atom_intern("[]"),dot_id=prolog_atom_intern(".");
                 Term *lst=term_new_atom(nil_id);
@@ -1947,13 +1607,11 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 if(!unify(list_term,lst,trail)){trail_unwind(trail,u_mark);return 0;}
                 return 1;
             }
-            /* Look up user-defined predicate in global pred table (assertz/asserta support) */
             {
                 char ukey[256]; snprintf(ukey, sizeof ukey, "%s/%d", fn, arity);
                 tree_t *uch = pl_pred_table_lookup(&g_pl_pred_table, ukey);
                 if (uch) {
                     Term **uargs = (arity > 0) ? pl_env_new(arity) : NULL;
-                    /* Unify call arguments into fresh env */
                     Trail *utrail = &g_pl_trail;
                     int umark = trail_mark(utrail);
                     int uok = 1;
@@ -1964,7 +1622,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     if (uok) {
                         Term **saved_env = g_pl_env;
                         g_pl_env = uargs;
-                        /* CH-17e: prefer SM-expression path when entry_pc resolved */
                         Pl_PredEntry *_upe2 = pl_pred_entry_lookup(ukey);
                         extern void *g_current_sm_prog;
                         bb_node_t uroot = (_upe2 && _upe2->entry_pc >= 0 && g_current_sm_prog != NULL)
@@ -1978,7 +1635,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     return uok;
                 }
             }
-            /* ---- copy_term/2 (PL-10) ---- */
             if (strcmp(fn,"copy_term")==0&&arity==2) {
                 Term *orig = pl_unified_term_from_expr(goal->c[0],env);
                 Term *dest = pl_unified_term_from_expr(goal->c[1],env);
@@ -1987,7 +1643,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 if (!unify(dest, copy, trail)) { trail_unwind(trail,mark); return 0; }
                 return 1;
             }
-            /* ---- atomic_list_concat/2 and /3 (PL-10) ---- */
             if ((strcmp(fn,"atomic_list_concat")==0||strcmp(fn,"concat_atom")==0)&&(arity==2||arity==3)) {
                 Term *lst = term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 int nil_id = prolog_atom_intern("[]"), dot_id = prolog_atom_intern(".");
@@ -1998,7 +1653,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     if (sv && sv->tag==TERM_ATOM) sep=prolog_atom_name(sv->atom_id);
                     else if (sv && sv->tag==TERM_INT) { snprintf(sepbuf,sizeof sepbuf,"%ld",sv->ival); sep=sepbuf; }
                 }
-                /* build result string from list */
                 char buf[4096]; int pos=0; int first=1;
                 for (Term *cur=lst; cur; cur=term_deref(cur->compound.args[1])) {
                     cur = term_deref(cur);
@@ -2022,11 +1676,9 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 if (!unify(out,res,trail)){trail_unwind(trail,mark);return 0;}
                 return 1;
             }
-            /* ---- string_to_atom/2 (PL-10) ---- */
             if (strcmp(fn,"string_to_atom")==0&&arity==2) {
                 Term *a0 = term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *a1 = pl_unified_term_from_expr(goal->c[1],env);
-                /* mode +,? : convert string/atom arg0 to atom arg1 */
                 if (a0 && (a0->tag==TERM_ATOM||a0->tag==TERM_INT||a0->tag==TERM_FLOAT)) {
                     const char *s=NULL; char tmp[64];
                     if(a0->tag==TERM_ATOM) s=prolog_atom_name(a0->atom_id);
@@ -2037,7 +1689,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     if(!unify(a1,res,trail)){trail_unwind(trail,mark);return 0;}
                     return 1;
                 }
-                /* mode ?,+ : arg1 is the atom, unify with arg0 */
                 Term *a1d = term_deref(a1);
                 if (a1d && a1d->tag==TERM_ATOM) {
                     int mark=trail_mark(trail);
@@ -2046,7 +1697,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 }
                 return 0;
             }
-            /* ---- nb_setval/2, nb_getval/2 (PL-10) ---- */
             if (strcmp(fn,"nb_setval")==0&&arity==2) {
                 Term *key = term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *val = pl_unified_term_from_expr(goal->c[1],env);
@@ -2064,15 +1714,10 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 if(!unify(out,val,trail)){trail_unwind(trail,mark);return 0;}
                 return 1;
             }
-            /* ---- aggregate_all/3 (PL-10) ---- */
-            /* aggregate_all(+Template, :Goal, -Result)
-             * Template: count | sum(Var) | max(Var) | min(Var)
-             * Uses same α/β broker loop as findall. */
             if (strcmp(fn,"aggregate_all")==0&&arity==3) {
                 Term   *tmpl_t    = term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 tree_t *goal_expr = goal->c[1];
                 Term   *result_out= pl_unified_term_from_expr(goal->c[2],env);
-                /* classify template */
                 int is_count=0, is_sum=0, is_max=0, is_min=0;
                 tree_t *val_expr = NULL;
                 if (tmpl_t && tmpl_t->tag==TERM_ATOM) {
@@ -2080,21 +1725,16 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     if (strcmp(tn,"count")==0) is_count=1;
                 } else if (tmpl_t && tmpl_t->tag==TERM_COMPOUND && tmpl_t->compound.arity==1) {
                     const char *fn2=prolog_atom_name(tmpl_t->compound.functor);
-                    /* val_expr is the IR child of sum(Expr)/max(Expr)/min(Expr) */
                     if (goal->c[0] && goal->c[0]->n>0)
                         val_expr = goal->c[0]->c[0];
                     if (strcmp(fn2,"sum")==0) is_sum=1;
                     else if (strcmp(fn2,"max")==0) is_max=1;
                     else if (strcmp(fn2,"min")==0) is_min=1;
                 }
-                /* Use findall machinery: collect all snapshots, then aggregate.
-                 * This correctly handles anonymous _ vars in the goal. */
                 Trail ag_trail; trail_init(&ag_trail);
                 Trail saved_global_trail = g_pl_trail;
                 g_pl_trail = ag_trail;
                 long ag_count=0, ag_sum=0, ag_best=0; int ag_best_set=0;
-                /* Use goal children[0] (the template IR expr) as snapshot template.
-                 * For count, snapshot a dummy atom; for sum/max/min, snapshot val_expr. */
                 tree_t *snap_expr = (is_count || !val_expr) ? NULL : val_expr;
                 bb_node_t goal_box = pl_box_goal_from_ir(goal_expr, env);
                 DESCR_t ag_r = goal_box.fn(goal_box.ζ, α);
@@ -2113,26 +1753,22 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     ag_r = goal_box.fn(goal_box.ζ, β);
                 }
                 g_pl_trail = saved_global_trail;
-                /* build result term */
                 Term *res = NULL;
                 if (is_count) res = term_new_int(ag_count);
                 else if (is_sum) res = term_new_int(ag_sum);
                 else if ((is_max||is_min) && ag_best_set) res = term_new_int(ag_best);
-                else if (is_max||is_min) return 0; /* no solutions */
-                else res = term_new_int(ag_count); /* fallback */
+                else if (is_max||is_min) return 0;
+                else res = term_new_int(ag_count);
                 int mark = trail_mark(trail);
                 if (!unify(result_out, res, trail)) { trail_unwind(trail,mark); return 0; }
                 return 1;
             }
-            /* ---- throw/1 (PL-10) ---- */
             if (strcmp(fn,"throw")==0&&arity==1) {
                 Term *exc = pl_unified_term_from_expr(goal->c[0],env);
                 g_pl_exception = exc;
-                /* unwind to innermost catch frame that matches */
                 while (g_pl_catch_top > 0) {
                     int ci = g_pl_catch_top - 1;
                     Pl_CatchFrame *cf = &g_pl_catch_stack[ci];
-                    /* try to unify catcher pattern with exception */
                     Trail tmptrail; trail_init(&tmptrail);
                     int tmmark = trail_mark(&tmptrail);
                     int matched = unify(cf->catcher, exc, &tmptrail);
@@ -2142,12 +1778,10 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     }
                     g_pl_catch_top--;
                 }
-                /* uncaught exception — print and exit */
                 fprintf(stderr,"ERROR: Unhandled exception: ");
                 pl_write(exc); fprintf(stderr,"\n");
                 exit(1);
             }
-            /* ---- catch/3 (PL-10) ---- */
             if (strcmp(fn,"catch")==0&&arity==3) {
                 tree_t *goal_e   = goal->c[0];
                 Term   *catcher  = pl_unified_term_from_expr(goal->c[1],env);
@@ -2160,18 +1794,7 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 g_pl_catch_top++;
                 int threw = setjmp(cf->jb);
                 if (!threw) {
-                    /* run the goal */
                     int ok;
-                    /* PL-12 fix #2 v3: TERM_VAR-shaped goal (catch's first arg is a
-                     * runtime variable bound to a callable Term, e.g. plunit
-                     * pj_do_succeed(...) calling catch(Goal,_,...)). Without
-                     * this branch the else-arm dispatched
-                     * interp_exec_pl_builtin(TERM_VAR, env) which fell through to
-                     * `default: return 1;` — the silent-success defect that
-                     * gates ~3-4 plunit suites. Bridge derefs the env-resolved
-                     * Term and dispatches via Term->synth EXPR with tenv slots
-                     * holding the original Term*s (preserving binding chains
-                     * back to caller env). */
                     if (goal_e && goal_e->t == TERM_VAR) {
                         Term *gt = pl_unified_term_from_expr(goal_e, env);
                         ok = pl_invoke_var_goal(gt, env);
@@ -2190,43 +1813,29 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                             if(uenv)free(uenv);
                             ok=!IS_FAIL_fn(rd);
                         } else {
-                            /* undefined predicate (no table entry or zero clauses)
-                             * — throw existence_error(procedure, Name/Arity) */
                             ok = pl_throw_existence_error_procedure(
                                 goal_e->v.sval ? goal_e->v.sval : "", goal_e->n);
                         }
                     } else {
                         ok = interp_exec_pl_builtin(goal_e, env);
                     }
-                    /* goal completed without throw — pop catch frame */
                     if (g_pl_catch_top>0 && &g_pl_catch_stack[g_pl_catch_top-1]==cf)
                         g_pl_catch_top--;
                     return ok;
                 } else {
-                    /* exception was thrown and matched this frame */
-                    /* g_pl_catch_top already decremented by throw */
                     trail_unwind(trail, cf->trail_mark);
-                    /* unify exception with catcher var in current env */
                     Term *exc = g_pl_exception;
                     g_pl_exception = NULL;
-                    /* bind catcher pattern */
                     int mark2=trail_mark(trail);
                     unify(catcher, exc, trail);
-                    /* run recovery goal */
                     int rok = interp_exec_pl_builtin(recovery, env);
                     return rok;
                 }
             }
-            /* ---- setup_call_cleanup/3 (PR-19e) ---- */
-            /* setup_call_cleanup(+Setup, :Goal, +Cleanup)
-             * Setup runs once. Goal runs (BB_ONCE here). Cleanup runs once
-             * after Goal finishes (success or failure) or throws.
-             * TERM_VAR bridge applied to all three positions. */
             if (strcmp(fn,"setup_call_cleanup")==0&&arity==3) {
                 tree_t *setup_e    = goal->c[0];
                 tree_t *scc_goal_e = goal->c[1];
                 tree_t *cleanup_e  = goal->c[2];
-                /* Resolve TERM_VAR arms to synth EXPRs */
                 tree_t *s_synth=NULL; Term **s_tenv=NULL;
                 tree_t *g_synth=NULL; Term **g_tenv=NULL;
                 tree_t *c_synth=NULL; Term **c_tenv=NULL;
@@ -2245,7 +1854,6 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     c_tenv=calloc(PL_SYNTH_TENV_MAX,sizeof(Term*)); int n=0;
                     c_synth=pl_term_to_synth_expr(gt,c_tenv,&n); cleanup_e=c_synth;
                 }
-                /* Run Setup */
                 int sok = interp_exec_pl_builtin(setup_e, s_synth ? s_tenv : env);
                 if (!sok) {
                     if (s_synth){pl_synth_free(s_synth);free(s_tenv);}
@@ -2253,19 +1861,15 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     if (c_synth){pl_synth_free(c_synth);free(c_tenv);}
                     return 0;
                 }
-                /* Run Goal */
                 int gok = interp_exec_pl_builtin(scc_goal_e, g_synth ? g_tenv : env);
-                /* Run Cleanup unconditionally */
                 interp_exec_pl_builtin(cleanup_e, c_synth ? c_tenv : env);
                 if (s_synth){pl_synth_free(s_synth);free(s_tenv);}
                 if (g_synth){pl_synth_free(g_synth);free(g_tenv);}
                 if (c_synth){pl_synth_free(c_synth);free(c_tenv);}
                 return gok;
             }
-            /* Unknown functor — treat as no-op (directive or future builtin). */
             return 1;
         }
         default: return 1;
     }
 }
-
