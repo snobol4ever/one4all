@@ -559,7 +559,18 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
             outs[2+clen] = '\0';
             *out = STRVAL(outs); return 1;
         }
-        /* IJ-3: file values — integer FH index with name in raku_fh_name */
+        /* IJ-3: file values — DT_FH descriptor only (not plain integers) */
+        if (IS_FH_fn(av)) {
+            int idx = (int)av.i;
+            if (idx >= 0 && idx < RAKU_FH_MAX && raku_fh_name[idx]) {
+                snprintf(buf,256,"file(%s)",raku_fh_name[idx]);
+                *out = STRVAL(buf); return 1;
+            }
+            if (idx == 0) { snprintf(buf,256,"file(&input)");  *out = STRVAL(buf); return 1; }
+            if (idx == 1) { snprintf(buf,256,"file(&output)"); *out = STRVAL(buf); return 1; }
+            if (idx == 2) { snprintf(buf,256,"file(&errout)"); *out = STRVAL(buf); return 1; }
+            snprintf(buf,256,"file(?)"); *out = STRVAL(buf); return 1;
+        }
         if (IS_INT_fn(av)) {
             int idx = (int)av.i;
             if (idx >= 0 && idx < RAKU_FH_MAX && raku_fh_name[idx]) {
