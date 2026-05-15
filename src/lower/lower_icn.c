@@ -193,3 +193,19 @@ DESCR_t icn_binop_apply(IcnBinopKind op, DESCR_t lv, DESCR_t rv, int *rel_fail) 
         default: return FAILDESCR;
     }
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+#include "sm_interp.h"
+IR_block_t *lower_icn_proc_gen(GeneratorState *gs) {
+    if (!gs) return NULL;
+    IR_block_t *cfg = IR_alloc(4, IR_LANG_ICN);
+    if (!cfg) return NULL;
+    IR_t *nd = IR_node_alloc(cfg, IR_ICN_PROC_GEN);
+    if (!nd) return NULL;
+    nd->opaque = (void *)gs;
+    nd->α      = nd;
+    nd->β      = nd;
+    nd->γ      = NULL;
+    nd->ω      = NULL;
+    cfg->entry = nd;
+    return cfg;
+}

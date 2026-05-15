@@ -12,7 +12,7 @@
 #define EVERY_GEN_SLOT_MAX    16
 #define SCAN_STACK_MAX  16
 #define GLOBAL_MAX      64
-struct SmGenState;
+struct GeneratorState;
 typedef struct { tree_t *node; long cur; const char *sval; } IcnGenEntry_d;
 typedef struct { const char *name; int slot; } IcnScopeEnt;
 typedef struct { IcnScopeEnt e[FRAME_SLOT_MAX]; int n; } IcnScope;
@@ -31,7 +31,7 @@ typedef struct {
     int           suspending;
     DESCR_t       suspend_val;
     tree_t       *suspend_do;
-    struct SmGenState *every_gen[EVERY_GEN_SLOT_MAX];
+    struct GeneratorState *every_gen[EVERY_GEN_SLOT_MAX];
 } IcnFrame;
 extern IcnProcEntry proc_table[PROC_TABLE_MAX];
 extern int          proc_count;

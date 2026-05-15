@@ -26,4 +26,7 @@ IR_block_t *lower_icn_limit(bb_node_t gen, int64_t max);
 IR_block_t *lower_icn_binop(bb_node_t left, bb_node_t right, IcnBinopKind op, int is_relop);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t icn_binop_apply(IcnBinopKind op, DESCR_t lv, DESCR_t rv, int *rel_fail);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+struct GeneratorState;
+IR_block_t *lower_icn_proc_gen(struct GeneratorState *gs);
 #endif

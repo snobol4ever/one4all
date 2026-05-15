@@ -109,7 +109,7 @@ __attribute__((constructor))
 static void exprs_audit_register(void) {
     atexit(exprs_audit_summary);
 }
-SmGenState *g_current_gen_state = NULL;
+GeneratorState *g_current_generator_state = NULL;
 #define EVERY_TABLE_INIT 16
 static tree_t **g_every_table     = NULL;
 static int     g_every_table_n   = 0;
@@ -796,7 +796,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 st->last_ok = 0;
                 break;
             }
-            SmGenState *gs = sm_gen_state_new(entry_pc);
+            GeneratorState *gs = generator_state_new(entry_pc);
             int ticks = bb_broker_drive_sm(gs, pump_print, NULL);
             st->last_ok = (ticks > 0);
             break;
@@ -1060,9 +1060,9 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             }
             if (name && strcmp(name, "ICN_BANG_NEXT") == 0) {
                 DESCR_t result = FAILDESCR;
-                if (!g_current_gen_state) { sm_push(st, FAILDESCR); st->last_ok = 0; break; }
-                DESCR_t container = g_current_gen_state->locals[0];
-                long    pos       = g_current_gen_state->locals[1].i;
+                if (!g_current_generator_state) { sm_push(st, FAILDESCR); st->last_ok = 0; break; }
+                DESCR_t container = g_current_generator_state->locals[0];
+                long    pos       = g_current_generator_state->locals[1].i;
                 if (container.v == DT_S || container.v == DT_SNUL) {
                     const char *s = container.s ? container.s : "";
                     long slen = IS_CSET_fn(container) ? (long)strlen(s)
@@ -1094,7 +1094,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 }
                 icn_bang_done:
                 if (!IS_FAIL_fn(result))
-                    g_current_gen_state->locals[1].i = pos + 1;
+                    g_current_generator_state->locals[1].i = pos + 1;
                 sm_push(st, result);
                 st->last_ok = !IS_FAIL_fn(result);
                 break;
@@ -1545,8 +1545,8 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
         }
         case SM_SUSPEND: {
             DESCR_t yielded = (st->sp > 0) ? sm_pop(st) : FAILDESCR;
-            if (g_current_gen_state) {
-                SmGenState *gs = g_current_gen_state;
+            if (g_current_generator_state) {
+                GeneratorState *gs = g_current_generator_state;
                 gs->yielded    = yielded;
                 gs->resume_pc  = st->pc;
                 gs->last_ok    = st->last_ok;
@@ -1565,8 +1565,8 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
         }
         case SM_LOAD_GLOCAL: {
             int slot = (int)ins->a[0].i;
-            if (g_current_gen_state && slot >= 0 && slot < SM_GEN_LOCAL_MAX) {
-                sm_push(st, g_current_gen_state->locals[slot]);
+            if (g_current_generator_state && slot >= 0 && slot < SM_GEN_LOCAL_MAX) {
+                sm_push(st, g_current_generator_state->locals[slot]);
                 st->last_ok = 1;
             } else {
                 sm_push(st, FAILDESCR);
@@ -1577,8 +1577,8 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
         case SM_STORE_GLOCAL: {
             int slot = (int)ins->a[0].i;
             DESCR_t v = sm_pop(st);
-            if (g_current_gen_state && slot >= 0 && slot < SM_GEN_LOCAL_MAX) {
-                g_current_gen_state->locals[slot] = v;
+            if (g_current_generator_state && slot >= 0 && slot < SM_GEN_LOCAL_MAX) {
+                g_current_generator_state->locals[slot] = v;
                 sm_push(st, v);
                 st->last_ok = 1;
             } else {
@@ -1682,22 +1682,59 @@ DESCR_t sm_call_expression(int entry_pc)
     return result;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-SmGenState *sm_gen_state_new(int entry_pc)
+GeneratorState *generator_state_new(int entry_pc)
 {
-    SmGenState *gs = GC_malloc(sizeof(SmGenState));
+    GeneratorState *gs = GC_malloc(sizeof(GeneratorState));
     memset(gs, 0, sizeof *gs);
-    gs->entry_pc  = entry_pc;
-    gs->resume_pc = entry_pc;
-    gs->started   = 0;
-    gs->yielded   = FAILDESCR;
-    gs->stack     = NULL;
-    gs->sp        = 0;
-    gs->stack_cap = 0;
-    gs->last_ok   = 1;
+    gs->entry_pc         = entry_pc;
+    gs->resume_pc        = entry_pc;
+    gs->started          = 0;
+    gs->yielded          = FAILDESCR;
+    gs->stack            = NULL;
+    gs->sp               = 0;
+    gs->stack_cap        = 0;
+    gs->last_ok          = 1;
+    gs->saved_frame_depth = 0;
     return gs;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int bb_broker_drive_sm(SmGenState *gs, void (*body_fn)(DESCR_t val, void *arg), void *arg)
+GeneratorState *generator_state_new_proc(int pi, DESCR_t *args, int nargs)
+{
+    if (pi < 0 || pi >= proc_count) return NULL;
+    int entry_pc = proc_table[pi].entry_pc;
+    if (entry_pc < 0 || !g_current_sm_prog) return NULL;
+    if (frame_depth >= FRAME_STACK_MAX) return NULL;
+    IcnFrame *f = &frame_stack[frame_depth++];
+    memset(f, 0, sizeof *f);
+    int nparams = proc_table[pi].nparams;
+    int nslots = (nparams > 0) ? nparams : 1;
+    if (nslots > FRAME_SLOT_MAX) nslots = FRAME_SLOT_MAX;
+    f->env_n = nslots;
+    for (int i = 0; i < nparams && i < nargs && i < FRAME_SLOT_MAX; i++) f->env[i] = args[i];
+    tree_t *proc = proc_table[pi].proc;
+    if (proc) {
+        int nparams_p = proc->_id;
+        int body_start = 1 + nparams_p;
+        for (int bi = body_start; bi < proc->n; bi++) icn_scope_patch(&proc_table[pi].lower_sc, proc->c[bi]);
+        int total_slots = proc_table[pi].lower_sc.n;
+        if (total_slots > f->env_n) f->env_n = total_slots;
+        f->sc = proc_table[pi].lower_sc;
+    }
+    GeneratorState *gs = GC_malloc(sizeof(GeneratorState));
+    memset(gs, 0, sizeof *gs);
+    gs->entry_pc          = entry_pc;
+    gs->resume_pc         = entry_pc;
+    gs->started           = 0;
+    gs->yielded           = FAILDESCR;
+    gs->stack             = NULL;
+    gs->sp                = 0;
+    gs->stack_cap         = 0;
+    gs->last_ok           = 1;
+    gs->saved_frame_depth = frame_depth;
+    return gs;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+int bb_broker_drive_sm(GeneratorState *gs, void (*body_fn)(DESCR_t val, void *arg), void *arg)
 {
     SM_Program *prog = g_current_sm_prog;
     if (!prog || !gs || gs->started == 2) return 0;
@@ -1715,11 +1752,11 @@ int bb_broker_drive_sm(SmGenState *gs, void (*body_fn)(DESCR_t val, void *arg), 
             memcpy(st->stack, gs->stack, gs->sp * sizeof(DESCR_t));
             st->sp = gs->sp;
         }
-        SmGenState *outer_gs = g_current_gen_state;
-        g_current_gen_state  = gs;
+        GeneratorState *outer_gs = g_current_generator_state;
+        g_current_generator_state  = gs;
         gs->started = 1;
         int rc = sm_interp_run(prog, st);
-        g_current_gen_state = outer_gs;
+        g_current_generator_state = outer_gs;
         if (rc == SM_INTERP_SUSPENDED) {
             ticks++;
             if (body_fn) body_fn(gs->yielded, arg);
@@ -1731,10 +1768,11 @@ int bb_broker_drive_sm(SmGenState *gs, void (*body_fn)(DESCR_t val, void *arg), 
     return ticks;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int bb_broker_drive_sm_one(SmGenState *gs, DESCR_t *out)
+int bb_broker_drive_sm_one(GeneratorState *gs, DESCR_t *out)
 {
     SM_Program *prog = g_current_sm_prog;
     if (!prog || !gs || gs->started == 2) { *out = FAILDESCR; return 0; }
+    if (gs->saved_frame_depth > 0) frame_depth = gs->saved_frame_depth;
     SM_State *st = GC_malloc(sizeof(SM_State));
     sm_state_init(st);
     st->pc      = gs->resume_pc;
@@ -1747,16 +1785,17 @@ int bb_broker_drive_sm_one(SmGenState *gs, DESCR_t *out)
         memcpy(st->stack, gs->stack, gs->sp * sizeof(DESCR_t));
         st->sp = gs->sp;
     }
-    SmGenState *outer_gs = g_current_gen_state;
-    g_current_gen_state  = gs;
+    GeneratorState *outer_gs = g_current_generator_state;
+    g_current_generator_state  = gs;
     gs->started = 1;
     int rc = sm_interp_run(prog, st);
-    g_current_gen_state = outer_gs;
+    g_current_generator_state = outer_gs;
     if (rc == SM_INTERP_SUSPENDED) {
         *out = gs->yielded;
         return 1;
     } else {
         gs->started = 2;
+        if (gs->saved_frame_depth > 0) frame_depth = gs->saved_frame_depth - 1;
         *out = FAILDESCR;
         return 0;
     }

@@ -79,6 +79,7 @@ typedef enum {
     IR_ICN_LIMIT,       /* gen\N — opaque=icn_lim_dcg_t*{gen,max,count}; yield up to max ticks            */
     IR_ICN_BINOP,       /* arith/relop with generative operands; opaque=icn_binop_dcg_t*                    */
     IR_ICN_TO_NESTED,   /* (lo_gen) to (hi_gen) cross-product; opaque=icn_to_nested_state_t*                */
+    IR_ICN_PROC_GEN,    /* user proc generator via GeneratorState; opaque=GeneratorState*                            */
     IR_E_COUNT
 } IR_e;
 typedef struct IR_t IR_t;

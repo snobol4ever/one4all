@@ -14,6 +14,7 @@ extern int         Ω;
 extern int         Σlen;
 #include "snobol4.h"
 #include "lower_icn.h"
+#include "sm_interp.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void bb_exec_stmt(void *e);
 #include "bb_box.h"
@@ -447,6 +448,16 @@ IR_t * IR_exec_node(IR_t * nd) {
         icn_every_body_pre();
         if (nd->sval2) bb_exec_stmt((void *)nd->sval2);
         if (icn_every_body_broke()) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+        nd->value = v;
+        return nd->γ;
+    }
+    case IR_ICN_PROC_GEN: {
+        GeneratorState *gs = (GeneratorState *)nd->opaque;
+        if (!gs) { nd->value = FAILDESCR; return nd->ω; }
+        DESCR_t v;
+        int ok = bb_broker_drive_sm_one(gs, &v);
+        if (!ok) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+        nd->state = 1;
         nd->value = v;
         return nd->γ;
     }

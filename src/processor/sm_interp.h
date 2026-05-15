@@ -21,7 +21,7 @@ typedef struct {
 } SmCallFrame;
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 #define SM_GEN_LOCAL_MAX 8
-struct SmGenState {
+struct GeneratorState {
     int      entry_pc;
     int      resume_pc;
     int      started;
@@ -31,6 +31,7 @@ struct SmGenState {
     int      stack_cap;
     int      last_ok;
     DESCR_t  locals[SM_GEN_LOCAL_MAX];
+    int      saved_frame_depth;
 };
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 typedef struct {
@@ -61,10 +62,11 @@ extern int     g_sm_step_limit;
 extern int     g_sm_steps_done;
 extern jmp_buf g_sm_step_jmp;
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-SmGenState * sm_gen_state_new     (int entry_pc);
-int bb_broker_drive_sm    (SmGenState * gs, void (*body_fn)(DESCR_t val, void * arg), void * arg);
-int bb_broker_drive_sm_one(SmGenState * gs, DESCR_t * out);
-extern SmGenState * g_current_gen_state;
+GeneratorState * generator_state_new     (int entry_pc);
+GeneratorState * generator_state_new_proc(int pi, DESCR_t * args, int nargs);
+int bb_broker_drive_sm    (GeneratorState * gs, void (*body_fn)(DESCR_t val, void * arg), void * arg);
+int bb_broker_drive_sm_one(GeneratorState * gs, DESCR_t * out);
+extern GeneratorState * g_current_generator_state;
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 struct tree_t;
 int            every_table_register(struct tree_t * ast);

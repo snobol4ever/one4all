@@ -129,7 +129,7 @@ typedef struct {
     int arity;
 } SmExpression_t;
 #define SM_INTERP_SUSPENDED  1
-typedef struct SmGenState SmGenState;
+typedef struct GeneratorState GeneratorState;
 #define SM_MAX_OPERANDS 3
 typedef struct {
     sm_opcode_t   op;

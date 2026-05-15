@@ -9,6 +9,7 @@
 #include "scan_builtins.h"
 #include "../../lower/ir_exec.h"
 #include "../../lower/lower_icn.h"
+#include "../../processor/sm_interp.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -287,6 +288,13 @@ int icn_descr_identical(DESCR_t a, DESCR_t b) {
     if (a.v == DT_T) return a.tbl == b.tbl;
     if (a.v == DT_DATA) return a.ptr == b.ptr;
     return memcmp(&a, &b, sizeof(DESCR_t)) == 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static int proc_has_suspend(tree_t *t) {
+    if (!t) return 0;
+    if (t->t == TT_SUSPEND) return 1;
+    for (int i = 0; i < t->n; i++) if (proc_has_suspend(t->c[i])) return 1;
+    return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int is_suspendable(tree_t *e) {
@@ -1328,8 +1336,18 @@ bb_node_t icn_bb_build(tree_t *e) {
                 }
             }
             DESCR_t *args = nargs > 0 ? calloc(nargs, sizeof(DESCR_t)) : NULL;
-            for (int j = 0; j < nargs; j++)
-                args[j] = bb_eval_value(e->c[1+j]);
+            for (int j = 0; j < nargs; j++) args[j] = bb_eval_value(e->c[1+j]);
+            if (proc_has_suspend(proc_table[i].proc) && proc_table[i].entry_pc >= 0 && g_current_sm_prog) {
+                GeneratorState *pgs = generator_state_new_proc(i, args, nargs);
+                if (pgs) {
+                    IR_block_t *pcfg = lower_icn_proc_gen(pgs);
+                    if (pcfg) {
+                        icn_dcg_state_t *pdz = calloc(1, sizeof(*pdz));
+                        pdz->cfg = pcfg; pdz->first = 1;
+                        return (bb_node_t){ icn_bb_dcg, pdz, 0 };
+                    }
+                }
+            }
             icn_bb_oneshot_state_t *oshot3 = calloc(1, sizeof(*oshot3));
             oshot3->val = proc_table_call(i, args, nargs);
             return (bb_node_t){ icn_bb_oneshot, oshot3, 0 };

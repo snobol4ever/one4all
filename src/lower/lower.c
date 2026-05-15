@@ -873,7 +873,7 @@ static void lower_suspend(const tree_t *t)
     if (t->n > 0 && t->c[0]) lower_expr(t->c[0]);
     else sm_emit(g_p, SM_PUSH_NULL);
     int jf = sm_emit_i(g_p, SM_JUMP_F, 0);
-    sm_emit(g_p, SM_SUSPEND_VALUE);
+    sm_emit(g_p, SM_SUSPEND);
     if (t->n > 1 && t->c[1]) { lower_expr(t->c[1]); sm_emit(g_p, SM_VOID_POP); }
     sm_emit(g_p, SM_PUSH_NULL);
     int jdone = sm_emit_i(g_p, SM_JUMP, 0);

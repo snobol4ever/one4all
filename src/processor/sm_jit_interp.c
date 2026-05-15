@@ -394,7 +394,7 @@ static void h_bb_pump_sm(void)
         STATE->last_ok = 0;
         return;
     }
-    SmGenState *gs = sm_gen_state_new(entry_pc);
+    GeneratorState *gs = generator_state_new(entry_pc);
     int ticks = bb_broker_drive_sm(gs, jit_pump_print, NULL);
     STATE->last_ok = (ticks > 0);
 }
@@ -940,8 +940,8 @@ static void  h_decr(void)  { DESCR_t v = POP(); PUSH(INTVAL(v.i - CUR_INS->a[0].
 static void h_load_glocal(void)
 {
     int slot = (int)CUR_INS->a[0].i;
-    if (g_current_gen_state && slot >= 0 && slot < SM_GEN_LOCAL_MAX) {
-        PUSH(g_current_gen_state->locals[slot]);
+    if (g_current_generator_state && slot >= 0 && slot < SM_GEN_LOCAL_MAX) {
+        PUSH(g_current_generator_state->locals[slot]);
         STATE->last_ok = 1;
     } else {
         PUSH(FAILDESCR);
@@ -953,8 +953,8 @@ static void h_store_glocal(void)
 {
     int slot = (int)CUR_INS->a[0].i;
     DESCR_t v = POP();
-    if (g_current_gen_state && slot >= 0 && slot < SM_GEN_LOCAL_MAX) {
-        g_current_gen_state->locals[slot] = v;
+    if (g_current_generator_state && slot >= 0 && slot < SM_GEN_LOCAL_MAX) {
+        g_current_generator_state->locals[slot] = v;
         PUSH(v);
         STATE->last_ok = 1;
     } else {

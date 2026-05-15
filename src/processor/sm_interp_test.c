@@ -225,7 +225,7 @@ static void test_generator_suspend_resume(void)
     sm_emit(p, SM_RETURN);
     SM_Program *saved_prog = g_current_sm_prog;
     g_current_sm_prog = p;
-    SmGenState *gs   = sm_gen_state_new(0);
+    GeneratorState *gs   = generator_state_new(0);
     int         ticks = bb_broker_drive_sm(gs, collect_gen_val, NULL);
     g_current_sm_prog = saved_prog;
     CHECK(ticks == 3, "generator: tick count == 3");
@@ -260,7 +260,7 @@ static void test_gen_locals_survive_suspend(void)
     sm_emit(p, SM_RETURN);
     SM_Program *saved_prog = g_current_sm_prog;
     g_current_sm_prog = p;
-    SmGenState *gs    = sm_gen_state_new(0);
+    GeneratorState *gs    = generator_state_new(0);
     int         ticks = bb_broker_drive_sm(gs, collect_gen_val, NULL);
     g_current_sm_prog = saved_prog;
     CHECK(ticks == 3, "gen-locals: tick count == 3");
@@ -287,12 +287,12 @@ static void test_gen_locals_isolated_per_invocation(void)
     SM_Program *saved_prog = g_current_sm_prog;
     g_current_sm_prog = p;
     gen_count = 0;
-    SmGenState *gs_a = sm_gen_state_new(0);
+    GeneratorState *gs_a = generator_state_new(0);
     int ticks_a = bb_broker_drive_sm(gs_a, collect_gen_val, NULL);
     int64_t a_first  = gen_collected[0];
     int64_t a_second = gen_collected[1];
     gen_count = 0;
-    SmGenState *gs_b = sm_gen_state_new(0);
+    GeneratorState *gs_b = generator_state_new(0);
     int ticks_b = bb_broker_drive_sm(gs_b, collect_gen_val, NULL);
     int64_t b_first  = gen_collected[0];
     int64_t b_second = gen_collected[1];
