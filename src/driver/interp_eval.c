@@ -1088,37 +1088,59 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
             }
         *out = FAILDESCR; return 1;
     }
-    if (!strcmp(fn,"push") && nargs == 2) {
-        DESCR_t ld = args[0]; DESCR_t vd = args[1];
+    if (!strcmp(fn,"push") && nargs >= 1) {
+        DESCR_t ld = args[0];
         if (ld.v != DT_DATA) return 0;
         DESCR_t tag = FIELD_GET_fn(ld,"icn_type");
         if (!(tag.v==DT_S && tag.s && strcmp(tag.s,"list")==0)) return 0;
-        int n=(int)FIELD_GET_fn(ld,"frame_size").i;
-        DESCR_t ea=FIELD_GET_fn(ld,"frame_elems");
-        DESCR_t *old=(ea.v==DT_DATA)?(DESCR_t*)ea.ptr:NULL;
-        DESCR_t *nb=GC_malloc((n+1)*sizeof(DESCR_t));
-        nb[0]=vd;
-        if(old&&n>0) memcpy(nb+1,old,n*sizeof(DESCR_t));
-        FIELD_SET_fn(ld,"frame_elems",(DESCR_t){.v=DT_DATA,.ptr=nb});
-        FIELD_SET_fn(ld,"frame_size",INTVAL(n+1));
+        int _nv = (nargs > 1) ? nargs - 1 : 1;
+        for (int _pi = 0; _pi < _nv; _pi++) {
+            DESCR_t vd = (nargs > 1) ? args[1 + _pi] : NULVCL;
+            int n=(int)FIELD_GET_fn(ld,"frame_size").i;
+            DESCR_t ea=FIELD_GET_fn(ld,"frame_elems");
+            DESCR_t *old=(ea.v==DT_DATA)?(DESCR_t*)ea.ptr:NULL;
+            DESCR_t *nb=GC_malloc((n+1)*sizeof(DESCR_t));
+            nb[0]=vd;
+            if(old&&n>0) memcpy(nb+1,old,n*sizeof(DESCR_t));
+            FIELD_SET_fn(ld,"frame_elems",(DESCR_t){.v=DT_DATA,.ptr=nb});
+            FIELD_SET_fn(ld,"frame_size",INTVAL(n+1));
+        }
         *out = ld; return 1;
     }
-    if (!strcmp(fn,"put") && nargs == 2) {
-        DESCR_t ld = args[0]; DESCR_t vd = args[1];
+    if (!strcmp(fn,"put") && nargs >= 1) {
+        DESCR_t ld = args[0];
         if (ld.v != DT_DATA) return 0;
         DESCR_t tag = FIELD_GET_fn(ld,"icn_type");
         if (!(tag.v==DT_S && tag.s && strcmp(tag.s,"list")==0)) return 0;
-        int n=(int)FIELD_GET_fn(ld,"frame_size").i;
-        DESCR_t ea=FIELD_GET_fn(ld,"frame_elems");
-        DESCR_t *old=(ea.v==DT_DATA)?(DESCR_t*)ea.ptr:NULL;
-        DESCR_t *nb=GC_malloc((n+1)*sizeof(DESCR_t));
-        if(old&&n>0) memcpy(nb,old,n*sizeof(DESCR_t));
-        nb[n]=vd;
-        FIELD_SET_fn(ld,"frame_elems",(DESCR_t){.v=DT_DATA,.ptr=nb});
-        FIELD_SET_fn(ld,"frame_size",INTVAL(n+1));
+        int _nv = (nargs > 1) ? nargs - 1 : 1;
+        for (int _pi = 0; _pi < _nv; _pi++) {
+            DESCR_t vd = (nargs > 1) ? args[1 + _pi] : NULVCL;
+            int n=(int)FIELD_GET_fn(ld,"frame_size").i;
+            DESCR_t ea=FIELD_GET_fn(ld,"frame_elems");
+            DESCR_t *old=(ea.v==DT_DATA)?(DESCR_t*)ea.ptr:NULL;
+            DESCR_t *nb=GC_malloc((n+1)*sizeof(DESCR_t));
+            if(old&&n>0) memcpy(nb,old,n*sizeof(DESCR_t));
+            nb[n]=vd;
+            FIELD_SET_fn(ld,"frame_elems",(DESCR_t){.v=DT_DATA,.ptr=nb});
+            FIELD_SET_fn(ld,"frame_size",INTVAL(n+1));
+        }
         *out = ld; return 1;
     }
     if (!strcmp(fn,"get") && nargs == 1) {
+        DESCR_t ld = args[0];
+        if (ld.v != DT_DATA) return 0;
+        DESCR_t tag = FIELD_GET_fn(ld,"icn_type");
+        if (!(tag.v==DT_S && tag.s && strcmp(tag.s,"list")==0)) return 0;
+        DESCR_t ea=FIELD_GET_fn(ld,"frame_elems");
+        int n=(int)FIELD_GET_fn(ld,"frame_size").i;
+        DESCR_t *arr=(ea.v==DT_DATA)?(DESCR_t*)ea.ptr:NULL;
+        if(!arr||n<=0) { *out=FAILDESCR; return 1; }
+        DESCR_t ret=arr[0];
+        FIELD_SET_fn(ld,"frame_elems",(DESCR_t){.v=DT_DATA,.ptr=arr+1});
+        FIELD_SET_fn(ld,"frame_size",INTVAL(n-1));
+        *out = ret; return 1;
+    }
+    if (!strcmp(fn,"pop") && nargs == 1) {
         DESCR_t ld = args[0];
         if (ld.v != DT_DATA) return 0;
         DESCR_t tag = FIELD_GET_fn(ld,"icn_type");
