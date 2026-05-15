@@ -182,6 +182,7 @@ const _kw_store = {
     STLIMIT: -1,
     ALPHABET: (function() { let s=''; for(let i=0;i<256;i++) s+=String.fromCharCode(i); return s; })(),
     DIGITS: '0123456789',
+    MAXINT: 2147483647,
     MAXLNGTH: 5000,
     TRIM: 0,
     RTNTYPE: '',
