@@ -391,24 +391,14 @@ void rt_arith(int op)
     DESCR_t r = vstack_pop();
     DESCR_t l = vstack_pop();
     if (l.v == DT_FAIL || r.v == DT_FAIL) { vstack_push(FAILDESCR); LAST_OK_SET(0); return; }
-    int64_t lv = (l.v == DT_I) ? l.i : to_int(l);
-    int64_t rv = (r.v == DT_I) ? r.i : to_int(r);
-    int64_t result;
-    switch (op) {
-        case 18: result = lv + rv; break;
-        case 19: result = lv - rv; break;
-        case 20: result = lv * rv; break;
-        case 21:
-            if (!rv) { fprintf(stderr, "libscrip_rt: SM_DIV by zero.\n"); abort(); }
-            result = lv / rv; break;
-        case 23:
-            if (!rv) { fprintf(stderr, "libscrip_rt: SM_MOD by zero.\n"); abort(); }
-            result = lv % rv; break;
-        default:
-            fprintf(stderr, "libscrip_rt: rt_arith: bad op=%d.\n", op);
-            abort();
-    }
-    vstack_push(INTVAL(result));
+    if (l.v == DT_S) l = INTVAL(to_int(l));
+    if (r.v == DT_S) r = INTVAL(to_int(r));
+    if (l.v == DT_SNUL) l = INTVAL(0);
+    if (r.v == DT_SNUL) r = INTVAL(0);
+    extern DESCR_t shared_arith(DESCR_t l, DESCR_t r, int op);
+    DESCR_t result = shared_arith(l, r, op);
+    vstack_push(result);
+    LAST_OK_SET(result.v != DT_FAIL);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_nv_get(const char *name)
