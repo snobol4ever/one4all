@@ -516,6 +516,7 @@ tree_t *find_leaf_suspendable(tree_t *e) {
 typedef struct { bb_node_t rhs_gen; tree_t *lhs; } icn_assign_gen_state_t;
 typedef struct { tree_t *str_var; tree_t *rhs_expr; int pos; int len; char *buf; DESCR_t rec; int is_rec; } icn_assign_lhs_iter_state_t;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static DESCR_t icn_assign_write(tree_t *lhs, DESCR_t val);
 static DESCR_t icn_bb_assign_lhs_iter(void *zeta, int entry) {
     icn_assign_lhs_iter_state_t *z = (icn_assign_lhs_iter_state_t *)zeta;
     if (entry == α) {
@@ -541,7 +542,7 @@ static DESCR_t icn_bb_assign_lhs_iter(void *zeta, int entry) {
     } else {
         const char *ch = VARVAL_fn(val);
         z->buf[z->pos++] = (ch && *ch) ? ch[0] : '\0';
-        if (z->str_var->t == TT_VAR && z->str_var->v.sval) NV_SET_fn(z->str_var->v.sval, STRVAL(z->buf));
+        icn_assign_write(z->str_var, STRVAL(z->buf));
     }
     return val;
 }
