@@ -165,63 +165,6 @@ static int pl_directive_max_var_slot(tree_t *root)
     return max_slot;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void polyglot_execute(const tree_t *prog) {
-    if (!prog) return;
-    if (g_polyglot) {
-        execute_program(prog);
-        return;
-    }
-    int slang = LANG_SNO;
-    for (int _i = 0; _i < prog->n; _i++) {
-        const tree_t *ch = prog->c[_i];
-        if (ch && (ch->t == TT_STMT || ch->t == TT_END)) {
-            slang = s_int(ch, ":lang"); break;
-        }
-    }
-    uint32_t mask = polyglot_lang_mask(prog);
-    polyglot_init(prog, mask);
-    if (slang == LANG_ICN) {
-        g_lang = 1;
-        for (int i = 0; i < proc_count; i++) {
-            if (strcmp(proc_table[i].name, "main") == 0) {
-                proc_table_call(i, NULL, 0);
-                return;
-            }
-        }
-        fprintf(stderr, "icon: no main procedure\n");
-    } else if (slang == LANG_PL) {
-        g_pl_active = 1;
-        for (int _ci = 0; _ci < prog->n; _ci++) {
-            const tree_t *_s = prog->c[_ci];
-            if (!_s || _s->t != TT_STMT) continue;
-            if (s_int(_s, ":lang") != LANG_PL) continue;
-            tree_t *_subj = s_expr(_s, ":subj");
-            if (!_subj) continue;
-            if (_subj->t == TT_CHOICE || _subj->t == TT_CLAUSE) continue;
-            int _max_slot = pl_directive_max_var_slot(_subj);
-            Term **_dir_env = (_max_slot >= 0) ? pl_env_new(_max_slot + 1) : NULL;
-            Term **_saved   = g_pl_env;
-            if (_dir_env) g_pl_env = _dir_env;
-            interp_exec_pl_builtin(_subj, _dir_env);
-            g_pl_env = _saved;
-            if (_dir_env) free(_dir_env);
-        }
-        Pl_PredEntry *_main_pe = pl_pred_entry_lookup("main/0");
-        tree_t *main_choice = pl_pred_table_lookup(&g_pl_pred_table, "main/0");
-        extern SM_Program *g_current_sm_prog;
-        if (_main_pe && _main_pe->entry_pc >= 0 && g_current_sm_prog != NULL) {
-            extern DESCR_t sm_call_expression(int);
-            sm_call_expression(_main_pe->entry_pc);
-        } else if (main_choice) interp_eval(main_choice);
-        else fprintf(stderr, "prolog: no main/0 predicate\n");
-        g_pl_active = 0;
-    } else if (slang == LANG_REB) {
-        execute_program(prog);
-    } else {
-        execute_program(prog);
-    }
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern tree_t *sno_parse_string_ast(const char *src, CODE_t **code_out);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 tree_t *parse_scrip_polyglot(const char *src, const char *filename)

@@ -399,8 +399,6 @@ int main(int argc, char **argv)
             return 1;
         }
         return 0;
-    } else if (has_non_sno && g_polyglot) {
-        polyglot_execute(ast_prog);
     } else if (mode_sm_run) {
         SM_Program *sm = sm_preamble(ast_prog);
         if (!sm) return 1;
