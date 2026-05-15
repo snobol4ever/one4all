@@ -1076,23 +1076,59 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
 
     /* Icon string-scanning builtins — operate on scan_subj / scan_pos globals.
      * All require scan_pos > 0 (i.e. active scanning context). */
-    if (!strcmp(fn,"any") && nargs >= 1 && scan_pos > 0) {
+    if (!strcmp(fn,"any") && nargs >= 1 && (scan_pos > 0 || nargs >= 2)) {
         const char *cv = VARVAL_fn(args[0]); if (!cv) { *out = FAILDESCR; return 1; }
+        if (nargs >= 2) {
+            /* any(cs, s [,i1 [,i2]]) — explicit string, no scan context needed */
+            const char *s = VARVAL_fn(args[1]); if (!s) s = "";
+            int slen = (int)strlen(s);
+            int i1 = (nargs >= 3) ? (int)args[2].i : (scan_pos > 0 ? scan_pos : 1);
+            int i2 = (nargs >= 4) ? (int)args[3].i : slen + 1;
+            if (i1 <= 0 || i1 > slen) { *out = FAILDESCR; return 1; }
+            if (i2 <= 0) i2 = slen + 1;
+            int p = i1 - 1, end = i2 - 1;
+            if (p < 0 || p >= slen || p >= end || !strchr(cv, s[p])) { *out = FAILDESCR; return 1; }
+            *out = INTVAL(p + 2); return 1;
+        }
         if (!scan_subj) { *out = FAILDESCR; return 1; }
         int slen = (int)strlen(scan_subj), p0 = scan_pos - 1;
         if (p0 < 0 || p0 >= slen || !strchr(cv, scan_subj[p0])) { *out = FAILDESCR; return 1; }
         *out = INTVAL(p0 + 2); return 1;
     }
-    if (!strcmp(fn,"many") && nargs >= 1 && scan_pos > 0) {
+    if (!strcmp(fn,"many") && nargs >= 1 && (scan_pos > 0 || nargs >= 2)) {
         const char *cv = VARVAL_fn(args[0]); if (!cv) { *out = FAILDESCR; return 1; }
+        if (nargs >= 2) {
+            const char *s = VARVAL_fn(args[1]); if (!s) s = "";
+            int slen = (int)strlen(s);
+            int i1 = (nargs >= 3) ? (int)args[2].i : (scan_pos > 0 ? scan_pos : 1);
+            int i2 = (nargs >= 4) ? (int)args[3].i : slen + 1;
+            if (i1 <= 0 || i1 > slen) { *out = FAILDESCR; return 1; }
+            if (i2 <= 0) i2 = slen + 1;
+            int p = i1 - 1, end = i2 - 1;
+            if (p < 0 || p >= slen || p >= end || !strchr(cv, s[p])) { *out = FAILDESCR; return 1; }
+            while (p < end && p < slen && strchr(cv, s[p])) p++;
+            *out = INTVAL(p + 1); return 1;
+        }
         if (!scan_subj) { *out = FAILDESCR; return 1; }
         int slen = (int)strlen(scan_subj), p0 = scan_pos - 1;
         if (p0 < 0 || p0 >= slen || !strchr(cv, scan_subj[p0])) { *out = FAILDESCR; return 1; }
         while (p0 < slen && strchr(cv, scan_subj[p0])) p0++;
         *out = INTVAL(p0 + 1); return 1;
     }
-    if (!strcmp(fn,"upto") && nargs >= 1 && scan_pos > 0) {
+    if (!strcmp(fn,"upto") && nargs >= 1 && (scan_pos > 0 || nargs >= 2)) {
         const char *cv = VARVAL_fn(args[0]); if (!cv) { *out = FAILDESCR; return 1; }
+        if (nargs >= 2) {
+            const char *s = VARVAL_fn(args[1]); if (!s) s = "";
+            int slen = (int)strlen(s);
+            int i1 = (nargs >= 3) ? (int)args[2].i : (scan_pos > 0 ? scan_pos : 1);
+            int i2 = (nargs >= 4) ? (int)args[3].i : slen + 1;
+            if (i1 <= 0 || i1 > slen) { *out = FAILDESCR; return 1; }
+            if (i2 <= 0) i2 = slen + 1;
+            int p = i1 - 1, end = (i2 - 1 < slen ? i2 - 1 : slen);
+            while (p < end && !strchr(cv, s[p])) p++;
+            if (p >= end) { *out = FAILDESCR; return 1; }
+            *out = INTVAL(p + 1); return 1;
+        }
         if (!scan_subj) { *out = FAILDESCR; return 1; }
         int slen = (int)strlen(scan_subj), p0 = scan_pos - 1;
         while (p0 < slen && !strchr(cv, scan_subj[p0])) p0++;
