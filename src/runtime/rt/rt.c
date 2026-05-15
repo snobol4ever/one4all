@@ -390,52 +390,52 @@ static void *chunk_reg_lookup(const char *name)
 static DESCR_t call_native_chunk(const char *fname, void *fn,
                                   DESCR_t *args, int nargs)
 {
-    /* Bind formal parameters into the NV table, saving old values. */
-    DESCR_t saved[32];
+    static const DESCR_t SNUL_D = { DT_SNUL, {0}, 0, NULL };
+    /* Determine the retname (body writes retval into NV[retname]).
+     * For OPSYN aliases, FUNC_ENTRY_fn returns the body's canonical name. */
+    const char *entry = fname ? FUNC_ENTRY_fn(fname) : NULL;
+    const char *retname = (entry && fname && strcmp(entry, fname) != 0 && FNCEX_fn(entry)) ? entry : fname;
+    if (!retname) retname = fname ? fname : "";
+    /* Save retname slot; clear to SNUL so body starts fresh. */
+    DESCR_t saved_ret = NV_GET_fn(retname);
+    NV_SET_fn(retname, SNUL_D);
+    /* Save and bind formal parameters. */
+    DESCR_t saved_p[32];
     const char *pnames[32];
     int nbound = 0;
     for (int k = 0; k < nargs && k < 32; k++) {
         const char *pname = FUNC_PARAM_fn(fname, k);
         if (!pname || !*pname) break;
         pnames[nbound] = pname;
-        saved[nbound]  = NV_GET_fn(pname);
+        saved_p[nbound] = NV_GET_fn(pname);
         NV_SET_fn(pname, args[k]);
         nbound++;
     }
-
-    /* Snapshot the value-stack depth so we can restore it: the SNOBOL4
-     * user-function calling convention is "value of the function = NV[fname]"
-     * (the body executes `fname = expr`, which is SM_STORE_VAR popping TOS
-     * into NV[fname]).  The expression does NOT push its retval onto vstack
-     * before `ret` — that's the SM-interp's job (sm_interp.c:1208-1210
-     * does `NV_GET_fn(retval_name)` after the expression returns).  We mirror
-     * that here: read NV[fname] for the retval; ignore vstack residue. */
+    /* Save and clear locals (SNOBOL4 locals are reset to null on each call). */
+    int nl = fname ? FUNC_NLOCALS_fn(fname) : 0;
+    if (nl > 32) nl = 32;
+    DESCR_t saved_l[32];
+    const char *lnames[32];
+    for (int k = 0; k < nl; k++) {
+        const char *lname = FUNC_LOCAL_fn(fname, k);
+        lnames[k] = lname ? lname : "";
+        saved_l[k] = NV_GET_fn(lnames[k]);
+        NV_SET_fn(lnames[k], SNUL_D);
+    }
     int saved_vtop = g_ops->depth();
-
-    /* Call the native expression.  It runs its SM body and executes `ret`.
-     * Calling convention: void(void) at the ABI level — the expression
-     * reads/writes the global vstack and NV table directly. */
     typedef void (*chunk_fn_t)(void);
     chunk_fn_t cfn = (chunk_fn_t)fn;
     g_native_chunk_depth++;
     cfn();
     g_native_chunk_depth--;
-
-    /* SNOBOL4 user-function retval convention: read NV[fname].  Mirrors
-     * sm_interp.c:1208-1210 user-function branch.  If the body never
-     * assigned to fname, NV_GET_fn returns the function's NV slot's
-     * default (DT_SNUL) — same behaviour as the interpreter. */
-    DESCR_t result = NV_GET_fn(fname ? fname : "");
-
-    /* Restore vstack depth — drop any residue the body pushed and didn't
-     * pop.  Mirrors sm_interp.c:1215-1222 which restores caller_sp.  Since
-     * we share one global vstack, "restore" = truncate to pre-call depth. */
+    DESCR_t result = NV_GET_fn(retname);
     g_ops->set_depth(saved_vtop);
-
-    /* Restore saved parameter values. */
+    /* Restore locals, params, retname in reverse. */
+    for (int k = nl - 1; k >= 0; k--)
+        NV_SET_fn(lnames[k], saved_l[k]);
     for (int k = nbound - 1; k >= 0; k--)
-        NV_SET_fn(pnames[k], saved[k]);
-
+        NV_SET_fn(pnames[k], saved_p[k]);
+    NV_SET_fn(retname, saved_ret);
     return result;
 }
 
