@@ -183,15 +183,15 @@ static void lower_mns(const tree_t *t) { ICN_BB_EVAL(t); LOWER1_VAL(SM_NEG); }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_pls(const tree_t *t) { ICN_BB_EVAL(t); LOWER1_VAL(SM_COERCE_NUM); }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void lower_add(const tree_t *t) { ICN_BB_EVAL(t); LOWER2(SM_ADD); }
+static void lower_add(const tree_t *t) { ICN_BB_EVAL(t); lower_expr(T0(t)); sm_emit(g_p, SM_COERCE_NUM); lower_expr(T1(t)); sm_emit(g_p, SM_COERCE_NUM); sm_emit(g_p, SM_ADD); }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void lower_sub(const tree_t *t) { ICN_BB_EVAL(t); LOWER2(SM_SUB); }
+static void lower_sub(const tree_t *t) { ICN_BB_EVAL(t); lower_expr(T0(t)); sm_emit(g_p, SM_COERCE_NUM); lower_expr(T1(t)); sm_emit(g_p, SM_COERCE_NUM); sm_emit(g_p, SM_SUB); }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void lower_mul(const tree_t *t) { ICN_BB_EVAL(t); LOWER2(SM_MUL); }
+static void lower_mul(const tree_t *t) { ICN_BB_EVAL(t); lower_expr(T0(t)); sm_emit(g_p, SM_COERCE_NUM); lower_expr(T1(t)); sm_emit(g_p, SM_COERCE_NUM); sm_emit(g_p, SM_MUL); }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void lower_div(const tree_t *t) { ICN_BB_EVAL(t); LOWER2(SM_DIV); }
+static void lower_div(const tree_t *t) { ICN_BB_EVAL(t); lower_expr(T0(t)); sm_emit(g_p, SM_COERCE_NUM); lower_expr(T1(t)); sm_emit(g_p, SM_COERCE_NUM); sm_emit(g_p, SM_DIV); }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void lower_mod(const tree_t *t) { ICN_BB_EVAL(t); LOWER2(SM_MOD); }
+static void lower_mod(const tree_t *t) { ICN_BB_EVAL(t); lower_expr(T0(t)); sm_emit(g_p, SM_COERCE_NUM); lower_expr(T1(t)); sm_emit(g_p, SM_COERCE_NUM); sm_emit(g_p, SM_MOD); }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_pow(const tree_t *t) { ICN_BB_EVAL(t); LOWER2(SM_EXP); }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
