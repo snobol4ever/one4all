@@ -514,17 +514,31 @@ tree_t *find_leaf_suspendable(tree_t *e) {
     return NULL;
 }
 typedef struct { bb_node_t rhs_gen; tree_t *lhs; } icn_assign_gen_state_t;
-typedef struct { tree_t *str_var; tree_t *rhs_expr; int pos; int len; char *buf; DESCR_t rec; int is_rec; } icn_assign_lhs_iter_state_t;
+typedef struct { tree_t *str_var; tree_t *rhs_expr; int pos; int len; char *buf; DESCR_t rec; int is_rec; int is_tbl; int is_list; TBBLK_t *tbl; int tbl_bucket; TBPAIR_t *tbl_entry; DESCR_t *list_elems; } icn_assign_lhs_iter_state_t;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static DESCR_t icn_assign_write(tree_t *lhs, DESCR_t val);
 static DESCR_t icn_bb_assign_lhs_iter(void *zeta, int entry) {
     icn_assign_lhs_iter_state_t *z = (icn_assign_lhs_iter_state_t *)zeta;
     if (entry == α) {
         DESCR_t cv = bb_eval_value(z->str_var);
-        if (cv.v == DT_DATA && cv.u && cv.u->type && cv.u->type->nfields > 0 && cv.u->fields) {
-            z->is_rec = 1; z->rec = cv; z->pos = 0; z->len = cv.u->type->nfields;
+        z->is_tbl = 0; z->is_list = 0; z->is_rec = 0;
+        if (cv.v == DT_T && cv.tbl) {
+            z->is_tbl = 1; z->tbl = cv.tbl; z->tbl_bucket = 0; z->tbl_entry = NULL;
+            while (z->tbl_bucket < TABLE_BUCKETS && !z->tbl->buckets[z->tbl_bucket]) z->tbl_bucket++;
+            z->tbl_entry = (z->tbl_bucket < TABLE_BUCKETS) ? z->tbl->buckets[z->tbl_bucket] : NULL;
+        } else if (cv.v == DT_DATA && cv.u) {
+            DESCR_t tag = FIELD_GET_fn(cv, "icn_type");
+            if (tag.v == DT_S && tag.s && strcmp(tag.s, "list") == 0) {
+                DESCR_t ea = FIELD_GET_fn(cv, "frame_elems");
+                z->len = (int)FIELD_GET_fn(cv, "frame_size").i;
+                z->list_elems = (ea.v == DT_DATA) ? (DESCR_t *)ea.ptr : NULL;
+                z->is_list = (z->list_elems && z->len > 0) ? 1 : 0;
+                z->pos = 0;
+                if (!z->is_list) return FAILDESCR;
+            } else if (cv.u->type && cv.u->type->nfields > 0 && cv.u->fields) {
+                z->is_rec = 1; z->rec = cv; z->pos = 0; z->len = cv.u->type->nfields;
+            } else return FAILDESCR;
         } else {
-            z->is_rec = 0;
             const char *s = VARVAL_fn(cv);
             if (!s) return FAILDESCR;
             z->len = (int)strlen(s);
@@ -533,6 +547,25 @@ static DESCR_t icn_bb_assign_lhs_iter(void *zeta, int entry) {
             memcpy(z->buf, s, (size_t)(z->len + 1));
             z->pos = 0;
         }
+    }
+    if (z->is_tbl) {
+        if (!z->tbl_entry) return FAILDESCR;
+        DESCR_t val = bb_eval_value(z->rhs_expr);
+        if (IS_FAIL_fn(val)) return FAILDESCR;
+        z->tbl_entry->val = val;
+        z->tbl_entry = z->tbl_entry->next;
+        while (!z->tbl_entry && z->tbl_bucket < TABLE_BUCKETS - 1) {
+            z->tbl_bucket++;
+            z->tbl_entry = z->tbl->buckets[z->tbl_bucket];
+        }
+        return val;
+    }
+    if (z->is_list) {
+        if (z->pos >= z->len) return FAILDESCR;
+        DESCR_t val = bb_eval_value(z->rhs_expr);
+        if (IS_FAIL_fn(val)) return FAILDESCR;
+        z->list_elems[z->pos++] = val;
+        return val;
     }
     if (z->pos >= z->len) return FAILDESCR;
     DESCR_t val = bb_eval_value(z->rhs_expr);
