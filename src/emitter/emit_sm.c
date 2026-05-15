@@ -2293,7 +2293,6 @@ static void simstack_push_const_s(SimStack *ss, const char *s)
     SimVal v;
     v.val.v  = DT_S;
     v.val.s  = s;
-    v.val.i  = 0;
     v.is_pat = 0;
     v.is_variant = 0;
     simstack_push(ss, v);
@@ -2304,7 +2303,6 @@ static void simstack_push_const_i(SimStack *ss, int64_t n)
     SimVal v;
     v.val.v  = DT_I;
     v.val.i  = n;
-    v.val.s  = NULL;
     v.is_pat = 0;
     v.is_variant = 0;
     simstack_push(ss, v);
