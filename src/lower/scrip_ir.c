@@ -1,4 +1,4 @@
-#include "scrip_ir.h"
+#include "IR.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

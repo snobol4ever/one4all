@@ -2,7 +2,7 @@
 #ifndef EMIT_IR_H
 #define EMIT_IR_H
 #include <stdio.h>
-#include "scrip_ir.h"
+#include "IR.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* emit_ir_block — ONE entry point for ALL 6 backends × ALL 6 frontends.
    cfg:    IR_block_t produced by lower from any frontend (SNOBOL4, Snocone, Rebus, Icon, Prolog, Raku).

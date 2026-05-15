@@ -1,5 +1,5 @@
 #include "lower_pat_dcg.h"
-#include "scrip_ir.h"
+#include "IR.h"
 #include "../ast/ast.h"
 #include "snobol4.h"
 #include <gc/gc.h>

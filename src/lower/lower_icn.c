@@ -1,5 +1,5 @@
 #include "lower_icn.h"
-#include "scrip_ir.h"
+#include "IR.h"
 #include "snobol4.h"
 #include "coerce.h"
 #include <string.h>

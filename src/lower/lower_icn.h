@@ -1,6 +1,6 @@
 #ifndef LOWER_ICN_H
 #define LOWER_ICN_H
-#include "scrip_ir.h"
+#include "IR.h"
 #include "../processor/bb_box.h"
 #include "../frontend/icon/icon_gen.h"
 typedef struct { bb_node_t gen[2]; int which; } icn_alt_dcg_t;
