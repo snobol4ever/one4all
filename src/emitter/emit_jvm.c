@@ -625,6 +625,7 @@ static int emit_jvm_from_sm(SM_Program * sm, FILE * out) {
     fprintf(out, "    ; ── SM Program instructions ──\n");
     for (int i = 0; i < sm->count; i++) {
         SM_Instr * instr = &sm->instrs[i];
+        fprintf(out, "sm_pc_%d:\n", i);
         switch (instr->op) {
         case SM_LABEL:
             break;
@@ -696,15 +697,35 @@ static int emit_jvm_from_sm(SM_Program * sm, FILE * out) {
             jvm_push_int(out, instr->a[0].i);
             fprintf(out, "    invokestatic rt/SnoRt/lcomp(I)V\n");
             break;
-        case SM_JUMP:
-            fprintf(out, "    ; SM_JUMP to %lld (not implemented in JVM; would require state machine)\n", instr->a[0].i);
+        case SM_JUMP: {
+            int target = (int)instr->a[0].i;
+            if (target >= 0 && target < sm->count) {
+                fprintf(out, "    goto_w sm_pc_%d\n", target);
+            } else {
+                fprintf(out, "    goto_w sm_pc_end\n");
+            }
             break;
-        case SM_JUMP_S:
-            fprintf(out, "    ; SM_JUMP_S to %lld (not implemented in JVM; would require state machine)\n", instr->a[0].i);
+        }
+        case SM_JUMP_S: {
+            int target = (int)instr->a[0].i;
+            if (target >= 0 && target < sm->count) {
+                fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n");
+                fprintf(out, "    ifeq sm_pc_%d_skip\n", i);
+                fprintf(out, "    goto_w sm_pc_%d\n", target);
+                fprintf(out, "sm_pc_%d_skip:\n", i);
+            }
             break;
-        case SM_JUMP_F:
-            fprintf(out, "    ; SM_JUMP_F to %lld (not implemented in JVM; would require state machine)\n", instr->a[0].i);
+        }
+        case SM_JUMP_F: {
+            int target = (int)instr->a[0].i;
+            if (target >= 0 && target < sm->count) {
+                fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n");
+                fprintf(out, "    ifne sm_pc_%d_skip\n", i);
+                fprintf(out, "    goto_w sm_pc_%d\n", target);
+                fprintf(out, "sm_pc_%d_skip:\n", i);
+            }
             break;
+        }
         case SM_CALL_FN:
             jvm_emit_ldc_string(out, instr->a[0].s ? instr->a[0].s : "");
             jvm_push_int(out, instr->a[1].i);
@@ -712,11 +733,13 @@ static int emit_jvm_from_sm(SM_Program * sm, FILE * out) {
             break;
         case SM_HALT:
             fprintf(out, "    invokestatic rt/SnoRt/halt_tos()V\n");
+            fprintf(out, "    goto_w sm_pc_end\n");
             break;
         default:
             break;
         }
     }
+    fprintf(out, "sm_pc_end:\n");
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/

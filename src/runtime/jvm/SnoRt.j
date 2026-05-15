@@ -737,7 +737,8 @@ call_not_DUPL:
     ldc "SUBSTR"
     invokevirtual java/lang/String/equals(Ljava/lang/Object;)Z
     ifeq call_not_SUBSTR
-    invokestatic rt/SnoRt/builtin_SUBSTR()V
+    iload_1
+    invokestatic rt/SnoRt/builtin_SUBSTR(I)V
     return
 call_not_SUBSTR:
     aload_0
@@ -768,12 +769,172 @@ call_not_INTEGER:
     invokestatic rt/SnoRt/builtin_DATATYPE()V
     return
 call_not_DATATYPE:
-    ; unknown function — set last_ok=false, push ""
+    aload_0
+    ldc "LE"
+    invokevirtual java/lang/String/equals(Ljava/lang/Object;)Z
+    ifeq call_not_LE
+    bipush 0
+    invokestatic rt/SnoRt/builtin_numcmp(I)V
+    return
+call_not_LE:
+    aload_0
+    ldc "LT"
+    invokevirtual java/lang/String/equals(Ljava/lang/Object;)Z
+    ifeq call_not_LT
+    bipush 1
+    invokestatic rt/SnoRt/builtin_numcmp(I)V
+    return
+call_not_LT:
+    aload_0
+    ldc "GE"
+    invokevirtual java/lang/String/equals(Ljava/lang/Object;)Z
+    ifeq call_not_GE
+    bipush 2
+    invokestatic rt/SnoRt/builtin_numcmp(I)V
+    return
+call_not_GE:
+    aload_0
+    ldc "GT"
+    invokevirtual java/lang/String/equals(Ljava/lang/Object;)Z
+    ifeq call_not_GT
+    bipush 3
+    invokestatic rt/SnoRt/builtin_numcmp(I)V
+    return
+call_not_GT:
+    aload_0
+    ldc "EQ"
+    invokevirtual java/lang/String/equals(Ljava/lang/Object;)Z
+    ifeq call_not_EQ
+    bipush 4
+    invokestatic rt/SnoRt/builtin_numcmp(I)V
+    return
+call_not_EQ:
+    aload_0
+    ldc "NE"
+    invokevirtual java/lang/String/equals(Ljava/lang/Object;)Z
+    ifeq call_not_NE
+    bipush 5
+    invokestatic rt/SnoRt/builtin_numcmp(I)V
+    return
+call_not_NE:
+    ; unknown function — pop nargs args, set last_ok=false, push ""
+call_unknown_pop_loop:
+    iload_1
+    ifle call_unknown_done
+    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;
+    pop
+    iinc 1 -1
+    goto call_unknown_pop_loop
+call_unknown_done:
     iconst_0
     putstatic rt/SnoRt/last_ok Z
     ldc ""
     invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V
     return
+.end method
+
+; ── numcmp — numeric comparison: 0=LE 1=LT 2=GE 3=GT 4=EQ 5=NE
+; Pops B then A. Sets last_ok = (A cmp B). Pushes "" on success, FAILs on failure (last_ok=false).
+.method private static builtin_numcmp(I)V
+    .limit stack 6
+    .limit locals 5
+    ; param 0 = op
+    ; Pop B → local 1, Pop A → local 2
+    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;
+    astore_1
+    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;
+    astore_2
+    ; Compute A vs B comparison
+    aload_2
+    invokestatic rt/SnoRt/to_long(Ljava/lang/Object;)J
+    aload_1
+    invokestatic rt/SnoRt/to_long(Ljava/lang/Object;)J
+    ; Stack: a (long), b (long) — lcmp gives a<b=-1, a==b=0, a>b=1
+    lcmp
+    ; Stack: [int cmp_result]
+    istore_3
+    ; Branch on op
+    iload_0
+    ifne numcmp_op_not_0
+    iload_3
+    ifgt numcmp_fail
+    goto numcmp_ok
+numcmp_op_not_0:
+    iload_0
+    iconst_1
+    if_icmpne numcmp_op_not_1
+    iload_3
+    ifge numcmp_fail
+    goto numcmp_ok
+numcmp_op_not_1:
+    iload_0
+    iconst_2
+    if_icmpne numcmp_op_not_2
+    iload_3
+    iflt numcmp_fail
+    goto numcmp_ok
+numcmp_op_not_2:
+    iload_0
+    iconst_3
+    if_icmpne numcmp_op_not_3
+    iload_3
+    ifle numcmp_fail
+    goto numcmp_ok
+numcmp_op_not_3:
+    iload_0
+    iconst_4
+    if_icmpne numcmp_op_not_4
+    iload_3
+    ifne numcmp_fail
+    goto numcmp_ok
+numcmp_op_not_4:
+    iload_3
+    ifeq numcmp_fail
+    goto numcmp_ok
+numcmp_ok:
+    iconst_1
+    putstatic rt/SnoRt/last_ok Z
+    ldc ""
+    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V
+    return
+numcmp_fail:
+    iconst_0
+    putstatic rt/SnoRt/last_ok Z
+    ldc ""
+    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V
+    return
+.end method
+
+; ── to_long — coerce Object to long (Number → longValue, String → parse, null → 0)
+.method private static to_long(Ljava/lang/Object;)J
+    .limit stack 4
+    .limit locals 3
+    aload_0
+    ifnonnull to_long_nonnull
+    lconst_0
+    lreturn
+to_long_nonnull:
+    aload_0
+    instanceof java/lang/Number
+    ifeq to_long_not_num
+    aload_0
+    checkcast java/lang/Number
+    invokevirtual java/lang/Number/longValue()J
+    lreturn
+to_long_not_num:
+    aload_0
+    invokevirtual java/lang/Object/toString()Ljava/lang/String;
+    invokestatic rt/SnoRt/try_parse_long(Ljava/lang/String;)Ljava/lang/Object;
+    astore_1
+    aload_1
+    ifnonnull to_long_parsed
+    lconst_0
+    lreturn
+to_long_parsed:
+    aload_1
+    checkcast java/lang/Long
+    invokevirtual java/lang/Long/longValue()J
+    lreturn
 .end method
 
 ; ── do_return — function return (kind: 0=RETURN 1=FRETURN 2=NRETURN) ─────────
@@ -899,41 +1060,110 @@ dupl_done:
 .end method
 
 ; SUBSTR(s, i, n) → substring (1-based, SNOBOL4 convention)
-.method private static builtin_SUBSTR()V
+.method private static builtin_SUBSTR(I)V
     .limit stack 6
-    .limit locals 4
-    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;
-    astore_0
-    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;
-    astore_1
+    .limit locals 7
+    ; Stack: if nargs=3: N (top), POS, STR  ;  if nargs=2: POS (top), STR — N defaults to remaining
+    ; SNOBOL4 semantics: SUBSTR(STR, POS [, N]) returns substring or fails (last_ok=false)
+    ; Param 0 is nargs (int). Locals: 1=nargs, 3=N, 4=POS, 5=STR, 6=str_len
+    iload_0
+    istore_1
+    ; If nargs >= 3, pop N from top; else N = -1 (sentinel meaning "to end")
+    iload_1
+    iconst_3
+    if_icmplt substr_2arg
     invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;
     astore_2
-    aload_0
+    aload_2
+    instanceof java/lang/Number
+    ifeq substr_fail
+    aload_2
     checkcast java/lang/Number
     invokevirtual java/lang/Number/intValue()I
     istore_3
-    aload_1
+    goto substr_have_n
+substr_2arg:
+    iconst_m1
+    istore_3
+substr_have_n:
+    ; Pop POS
+    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;
+    astore_2
+    aload_2
+    instanceof java/lang/Number
+    ifeq substr_fail
+    aload_2
     checkcast java/lang/Number
     invokevirtual java/lang/Number/intValue()I
-    istore 1
+    istore 4
+    ; Pop STR
+    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;
+    astore_2
     aload_2
-    ifnonnull substr_nonnull
+    ifnonnull substr_str_nonnull
     ldc ""
-    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V
-    return
-substr_nonnull:
+    astore 5
+    goto substr_str_done
+substr_str_nonnull:
     aload_2
     invokevirtual java/lang/Object/toString()Ljava/lang/String;
-    iload 1
+    astore 5
+substr_str_done:
+    ; Get string length → local 6
+    aload 5
+    invokevirtual java/lang/String/length()I
+    istore 6
+    ; If N == -1 (2-arg case), N = length - (POS-1) = length - POS + 1
+    iload_3
+    iconst_m1
+    if_icmpne substr_have_explicit_n
+    iload 6
+    iload 4
+    isub
+    iconst_1
+    iadd
+    istore_3
+substr_have_explicit_n:
+    ; Bounds check: POS <= 0 → fail
+    iload 4
+    ifle substr_fail
+    ; Bounds check: N < 0 → fail
+    iload_3
+    iflt substr_fail
+    ; Bounds check: POS-1 > size(STR) → fail
+    iload 4
+    iconst_1
+    isub
+    iload 6
+    if_icmpgt substr_fail
+    ; Bounds check: POS-1+N > size(STR) → fail
+    iload 4
     iconst_1
     isub
     iload_3
-    iload 1
+    iadd
+    iload 6
+    if_icmpgt substr_fail
+    ; Valid: extract substring(POS-1, POS-1+N)
+    aload 5
+    iload 4
     iconst_1
     isub
+    iload 4
+    iconst_1
+    isub
+    iload_3
     iadd
     invokevirtual java/lang/String/substring(II)Ljava/lang/String;
     invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V
+    iconst_1
+    putstatic rt/SnoRt/last_ok Z
+    return
+substr_fail:
+    ldc ""
+    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V
+    iconst_0
+    putstatic rt/SnoRt/last_ok Z
     return
 .end method
 
