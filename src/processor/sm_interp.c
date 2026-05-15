@@ -878,13 +878,39 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             /* SM_BB_EVAL — Icon A|B (TT_ALTERNATE) in value context.
              * a[0].i = every_table id; look up tree_t*, call bb_eval_value.
              * bb_eval_value handles TT_ALTERNATE via icn_bb_build(e)+α with correct frame.
-             * Integer id avoids ast_gc_clone (which triggers GC mid-lowering). */
+             * Integer id avoids ast_gc_clone (which triggers GC mid-lowering).
+             * IJ-19-fail: if bb_eval_value drives TT_PROC_FAIL (e.g. `n > 0 | fail`),
+             * FRAME.returning is set.  Propagate as SM_FRETURN: pop SM call frame or halt. */
             int eval_id    = (int)ins->a[0].i;
             tree_t *expr   = every_table_lookup(eval_id);
             if (!expr) { st->last_ok = 0; sm_push(st, FAILDESCR); break; }
             g_ast_pump_active++;
             DESCR_t val = bb_eval_value(expr);
             g_ast_pump_active--;
+            if (frame_depth > 0 && FRAME.returning) {
+                FRAME.returning = 0;
+                if (st->call_depth > 0) {
+                    SmCallFrame *fr = &st->call_stack[--st->call_depth];
+                    for (int k = fr->nsaved - 1; k >= 0; k--)
+                        NV_SET_fn(fr->saved_names[k], fr->saved_vals[k]);
+                    if (fr->caller_sp > 0 && fr->caller_stack) {
+                        if (fr->caller_sp > st->stack_cap) {
+                            st->stack = GC_realloc(st->stack, fr->caller_sp * sizeof(DESCR_t));
+                            st->stack_cap = fr->caller_sp;
+                        }
+                        memcpy(st->stack, fr->caller_stack, fr->caller_sp * sizeof(DESCR_t));
+                    }
+                    st->sp = fr->caller_sp;
+                    sm_push(st, FAILDESCR);
+                    st->last_ok = 0;
+                    strncpy(kw_rtntype, "FRETURN", sizeof(kw_rtntype)-1);
+                    st->pc = fr->ret_pc;
+                } else {
+                    strncpy(kw_rtntype, "FRETURN", sizeof(kw_rtntype)-1);
+                    return 0;
+                }
+                break;
+            }
             st->last_ok = !IS_FAIL_fn(val);
             sm_push(st, val);
             break;
@@ -2303,8 +2329,12 @@ DESCR_t sm_call_expression(int entry_pc)
         SM_State *nested = GC_malloc(sizeof(SM_State));
         sm_state_init(nested);
         nested->pc = entry_pc;
+        kw_rtntype[0] = '\0';
         sm_interp_run(prog, nested);
-        if (nested->sp > 0) result = nested->stack[nested->sp - 1];
+        /* IJ-19-fail: SM_FRETURN at top-level of nested state sets kw_rtntype="FRETURN"
+         * and halts without pushing FAILDESCR.  Detect and propagate as proc-fail. */
+        if (strncmp(kw_rtntype, "FRETURN", 7) == 0) result = FAILDESCR;
+        else if (nested->sp > 0) result = nested->stack[nested->sp - 1];
     } /* else: expression errored — result stays FAILDESCR */
 
     /* Restore outer err_jmp */
