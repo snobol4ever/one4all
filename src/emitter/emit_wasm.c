@@ -17,10 +17,14 @@
 extern SM_Program * sm_preamble(const tree_t * ast_prog);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* String table — deduplicate literal strings into (data ...) segments.
-   Strings are placed starting at STR_DATA_BASE = 0x50000 (above runtime fixed data at 0x31010).
+   Strings are placed starting at STR_DATA_BASE = 0x100000 (1MB).  This is high enough to be safe
+   above all runtime regions: stack (0x00000..0x0FFFF), var table (0x20000..0x2FFFF), static
+   literals (0x30000..0x3FFFF), output buffer (0x40000..0x4FFFF), BB arena (0x50000..0x5FFFF),
+   and the dynamic string heap (which bumps upward from 0x60000).  The memory is 32 pages (2MB)
+   total, so we have 1MB headroom for program literals.
    We keep a flat list of (sval, address, length) triples. */
-#define STRTAB_MAX 1024
-#define STR_DATA_BASE 0x50000
+#define STRTAB_MAX 4096
+#define STR_DATA_BASE 0x100000
 typedef struct { const char * s; int addr; int len; } StrEntry;
 static StrEntry g_strtab[STRTAB_MAX];
 static int g_strtab_n   = 0;
@@ -371,7 +375,7 @@ int emit_wasm_from_sm(SM_Program * sm, FILE * out) {
 static int emit_wasm_prologue(FILE * out, SM_Program * sm) {
     fprintf(out, "(module\n");
     fprintf(out, "  ;; imports from sno_runtime\n");
-    fprintf(out, "  (import \"sno\" \"memory\"          (memory 8))\n");
+    fprintf(out, "  (import \"sno\" \"memory\"          (memory 32))\n");
     fprintf(out, "  (import \"sno\" \"sno_init\"         (func $sno_init))\n");
     fprintf(out, "  (import \"sno\" \"sno_finalize\"     (func $sno_finalize))\n");
     fprintf(out, "  (import \"sno\" \"sno_push_int\"     (func $sno_push_int    (param i32)))\n");
@@ -448,12 +452,4 @@ int emit_wasm_program(const tree_t * ast_prog, FILE * out) {
     sm_prog_free(sm);
     return 0;
 }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* vtable registration for the IR walk path (used by emit_ir_block). */
-IR_emit_vtable_t g_emit_vtable_wasm = {
-    "wasm",
-    emit_wasm_scalar,
-    emit_wasm_generator,
-    NULL,
-    NULL
-};
+/* g_emit_vtable_wasm defined in emit_ir_targets.c */

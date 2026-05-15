@@ -1,15 +1,16 @@
 ;; sno_runtime.wat — SNOBOL4 WASM scalar stack-machine runtime
 ;; Implements SM-level operations called from emitted $main functions.
-;; Memory layout (32 pages = 2MB):
-;;   [0x00000..0x0FFFF]  value stack    (16-byte slots, STACK_BASE=0)
-;;   [0x10000..0x1FFFF]  string heap    (bump alloc, STR_HEAP_BASE=0x10000)
-;;   [0x20000..0x2FFFF]  variable table (hash table, VAR_BASE=0x20000)
-;;   [0x30000..0x3FFFF]  string data    (static literals, STR_DATA_BASE=0x30000)
-;;   [0x40000..0x4FFFF]  output buffer  (OUTPUT_BUF=0x40000)
-;;   [0x50000..0x5FFFF]  BB arena       (32-byte box slots, BOX_ARENA_BASE=0x50000)
+;; Memory layout (32 pages = 2MB total):
+;;   [0x000000..0x00FFFF]  value stack       (16-byte slots, STACK_BASE=0, 4096 slots)
+;;   [0x010000..0x013FFF]  variable table    (512 slots × 32 bytes = 16KB, VAR_BASE=0x10000)
+;;   [0x031000..0x031FFF]  runtime keywords  (INPUT @ 0x31000, OUTPUT @ 0x31010)
+;;   [0x040000..0x04FFFF]  output buffer     (OUTPUT_BUF=0x40000, unused so far)
+;;   [0x050000..0x05FFFF]  BB arena          (32-byte box slots, BOX_ARENA_BASE=0x50000)
+;;   [0x080000..0x0FFFFF]  dynamic str heap  (bump alloc from STR_HEAP_BASE=0x80000, 512KB)
+;;   [0x100000..0x1FFFFF]  emitter literals  (STR_DATA_BASE=0x100000 in emit_wasm.c, 1MB)
 ;; Stack slot layout (16 bytes): +0=tag(i32) +4=ival(i32) +8=len(i32) +12=pad(i32)
 ;; Type tags: 0=integer 1=string 2=real 3=null 4=fail
-;; Author: Claude Sonnet 4.6 — SN4-WASM-1
+;; Authors: Claude Sonnet 4.6 (SN4-WASM-1), Claude Opus 4.7 (SN4-WASM-5 prep)
 
 (module
   ;; imports MUST come before memory/globals in WASM
@@ -30,7 +31,7 @@
 
   ;; mutable globals
   (global $sp       (mut i32) (i32.const 0))        ;; stack pointer (byte offset, STACK_BASE=0)
-  (global $str_ptr  (mut i32) (i32.const 0x60000))  ;; string heap bump ptr (above 0x50000 program data)
+  (global $str_ptr  (mut i32) (i32.const 0x80000))  ;; dynamic string heap bump ptr (above arena at 0x50000..0x5FFFF)
   (global $last_ok  (mut i32) (i32.const 1))        ;; last match result
   (global $stno     (mut i32) (i32.const 0))        ;; statement number
   (global $pop_tag  (mut i32) (i32.const 0))        ;; pop result staging
@@ -40,6 +41,15 @@
   ;; static keyword strings at known addresses
   (data (i32.const 0x31000) "INPUT")
   (data (i32.const 0x31010) "OUTPUT")
+  ;; built-in names for $sno_call dispatch (each entry's address is the i32.const used in sno_call)
+  (data (i32.const 0x31100) "LT")
+  (data (i32.const 0x31103) "GT")
+  (data (i32.const 0x31106) "EQ")
+  (data (i32.const 0x31109) "NE")
+  (data (i32.const 0x3110c) "GE")
+  (data (i32.const 0x3110f) "LE")
+  (data (i32.const 0x31112) "IDENT")
+  (data (i32.const 0x31118) "DIFFER")
 
   ;; ── memory helpers ───────────────────────────────────────────────────────
   (func $memcpy (param $dst i32) (param $src i32) (param $len i32)
@@ -188,7 +198,7 @@
     (local.set $h (call $var_hash (local.get $name_ptr) (local.get $name_len)))
     (local.set $idx (local.get $h))
     (block $found (loop $probe
-      (local.set $saddr (i32.add (i32.const 0xA0000) (i32.mul (local.get $idx) (i32.const 32))))
+      (local.set $saddr (i32.add (i32.const 0x10000) (i32.mul (local.get $idx) (i32.const 32))))
       (local.set $snl (i32.load (i32.add (local.get $saddr) (i32.const 4))))
       (br_if $found (i32.eqz (local.get $snl)))
       (local.set $snp (i32.load (local.get $saddr)))
@@ -197,15 +207,23 @@
       (local.set $idx (i32.rem_u (i32.add (local.get $idx) (i32.const 1)) (i32.const 512)))
       (br_if $probe (i32.ne (local.get $idx) (local.get $h)))
     ))
-    (i32.add (i32.const 0xA0000) (i32.mul (local.get $idx) (i32.const 32)))
+    (i32.add (i32.const 0x10000) (i32.mul (local.get $idx) (i32.const 32)))
   )
 
   ;; ── exported runtime functions ────────────────────────────────────────────
   (func $sno_init (export "sno_init")
+    (local $i i32)
     (global.set $sp (i32.const 0))
-    (global.set $str_ptr (i32.const 0x60000))
+    (global.set $str_ptr (i32.const 0x80000))
     (global.set $last_ok (i32.const 1))
     (global.set $stno (i32.const 0))
+    (local.set $i (i32.const 0))
+    (block $B (loop $L
+      (br_if $B (i32.ge_u (local.get $i) (i32.const 0x4000)))
+      (i32.store (i32.add (i32.const 0x10000) (local.get $i)) (i32.const 0))
+      (local.set $i (i32.add (local.get $i) (i32.const 4)))
+      (br $L)
+    ))
   )
 
   (func $sno_finalize (export "sno_finalize"))
@@ -457,10 +475,83 @@
     (global.set $sp (i32.sub (global.get $sp) (i32.const 16)))
   )
 
-  ;; sno_call: call built-in by name (name_ptr,name_len) with nargs args; pushes result
-  ;; Minimal stub: pops nargs, pushes null
+  ;; sno_call: dispatch by builtin name; for now handle the numeric comparators
+  ;; LT/GT/EQ/NE/GE/LE (each takes 2 numeric args) and IDENT/DIFFER (2 args, any type).
+  ;; Success → push "" (TAG_STR len=0) and set last_ok=1; Failure → push null and set last_ok=0.
+  ;; Unknown builtin → pops nargs, pushes null (legacy stub behavior, last_ok unchanged).
   (func $sno_call (export "sno_call") (param $name_ptr i32) (param $name_len i32) (param $nargs i32)
     (local $i i32)
+    (local $a_tag i32) (local $a_ival i32) (local $a_len i32) (local $a_off i32)
+    (local $b_tag i32) (local $b_ival i32) (local $b_len i32) (local $b_off i32)
+    (local $cmp i32) (local $ok i32) (local $matched i32)
+    (local.set $matched (i32.const 0))
+    ;; If exactly 2 args, peek both. b is TOS, a is TOS-1.
+    (if (i32.eq (local.get $nargs) (i32.const 2))
+      (then
+        (local.set $b_off (i32.sub (global.get $sp) (i32.const 16)))
+        (local.set $a_off (i32.sub (global.get $sp) (i32.const 32)))
+        (local.set $b_tag  (i32.load (local.get $b_off)))
+        (local.set $b_ival (i32.load (i32.add (local.get $b_off) (i32.const 4))))
+        (local.set $b_len  (i32.load (i32.add (local.get $b_off) (i32.const 8))))
+        (local.set $a_tag  (i32.load (local.get $a_off)))
+        (local.set $a_ival (i32.load (i32.add (local.get $a_off) (i32.const 4))))
+        (local.set $a_len  (i32.load (i32.add (local.get $a_off) (i32.const 8))))
+        ;; LT(a,b) ─ succeed iff a<b
+        (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31100) (i32.const 2))
+          (then (local.set $matched (i32.const 1))
+                (local.set $ok (i32.lt_s (local.get $a_ival) (local.get $b_ival)))))
+        (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31103) (i32.const 2))
+          (then (local.set $matched (i32.const 1))
+                (local.set $ok (i32.gt_s (local.get $a_ival) (local.get $b_ival)))))
+        (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31106) (i32.const 2))
+          (then (local.set $matched (i32.const 1))
+                (local.set $ok (i32.eq (local.get $a_ival) (local.get $b_ival)))))
+        (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31109) (i32.const 2))
+          (then (local.set $matched (i32.const 1))
+                (local.set $ok (i32.ne (local.get $a_ival) (local.get $b_ival)))))
+        (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x3110c) (i32.const 2))
+          (then (local.set $matched (i32.const 1))
+                (local.set $ok (i32.ge_s (local.get $a_ival) (local.get $b_ival)))))
+        (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x3110f) (i32.const 2))
+          (then (local.set $matched (i32.const 1))
+                (local.set $ok (i32.le_s (local.get $a_ival) (local.get $b_ival)))))
+        ;; IDENT(a,b) ─ succeed iff a===b (same type and value).  For ints/reals use ival; for strings use byte-eq.
+        (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31112) (i32.const 5))
+          (then
+            (local.set $matched (i32.const 1))
+            (local.set $ok (i32.const 0))
+            (if (i32.eq (local.get $a_tag) (local.get $b_tag))
+              (then
+                (if (i32.eq (local.get $a_tag) (global.get $TAG_STR))
+                  (then (local.set $ok
+                         (call $str_eq (local.get $a_ival) (local.get $a_len)
+                                       (local.get $b_ival) (local.get $b_len))))
+                  (else (local.set $ok (i32.eq (local.get $a_ival) (local.get $b_ival)))))))))
+        ;; DIFFER(a,b) ─ succeed iff !IDENT(a,b)
+        (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31118) (i32.const 6))
+          (then
+            (local.set $matched (i32.const 1))
+            (local.set $ok (i32.const 1))
+            (if (i32.eq (local.get $a_tag) (local.get $b_tag))
+              (then
+                (if (i32.eq (local.get $a_tag) (global.get $TAG_STR))
+                  (then (local.set $ok
+                         (i32.eqz (call $str_eq (local.get $a_ival) (local.get $a_len)
+                                                (local.get $b_ival) (local.get $b_len)))))
+                  (else (local.set $ok (i32.ne (local.get $a_ival) (local.get $b_ival)))))))))
+        (if (local.get $matched)
+          (then
+            ;; pop both args, push result, set last_ok
+            (global.set $sp (i32.sub (global.get $sp) (i32.const 32)))
+            (if (local.get $ok)
+              (then
+                (call $push3 (global.get $TAG_STR) (i32.const 0) (i32.const 0))
+                (global.set $last_ok (i32.const 1)))
+              (else
+                (call $push3 (global.get $TAG_NULL) (i32.const 0) (i32.const 0))
+                (global.set $last_ok (i32.const 0))))
+            (return)))))
+    ;; Fallback stub: pop nargs, push null, leave last_ok unchanged.
     (local.set $i (i32.const 0))
     (block $B (loop $L
       (br_if $B (i32.ge_u (local.get $i) (local.get $nargs)))

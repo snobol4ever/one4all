@@ -83,6 +83,7 @@ RT_PIC_SRCS := \
 $(SRC)/emitter/emit_jvm.c \
     $(SRC)/emitter/emit_js.c \
     $(SRC)/emitter/emit_net.c \
+    $(SRC)/emitter/emit_wasm.c \
     \
     $(SRC)/processor/bb_boxes.c \
     $(SRC)/processor/bb_broker.c \
@@ -290,7 +291,7 @@ scrip:
 	$(CC) $(CRT)   -c $(SRC)/emitter/emit_jvm.c -o $(OBJ)/emit_jvm.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/emit_js.c  -o $(OBJ)/emit_js.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/emit_net.c -o $(OBJ)/emit_net.o
-	$(CC) $(CRT)   -c $(SRC)/emitter/emit_net.c -o $(OBJ)/emit_net.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/emit_wasm.c -o $(OBJ)/emit_wasm.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/rt/rt.c   -o $(OBJ)/rt.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_globals.c -o $(OBJ)/interp_globals.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_label.c   -o $(OBJ)/interp_label.o

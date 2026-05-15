@@ -27,6 +27,7 @@ extern void ir_print_node_nl(const tree_t *e, FILE *f);
 extern int emit_jvm_program(const tree_t * ast_prog, FILE * out);
 extern int emit_js_program(const tree_t * ast_prog, FILE * out);
 extern int emit_net_program(const tree_t * ast_prog, FILE * out);
+extern int emit_wasm_program(const tree_t * ast_prog, FILE * out);
 #include "snobol4.h"
 #include "sil_macros.h"
 #include "snobol4_runtime_shim.h"
@@ -373,6 +374,11 @@ int main(int argc, char **argv)
         } else if (strcmp(target_name, "net") == 0) {
             if (emit_net_program(ast_prog, stdout) != 0) {
                 fprintf(stderr, "scrip: emit_net_program failed\n");
+                return 1;
+            }
+        } else if (strcmp(target_name, "wasm") == 0) {
+            if (emit_wasm_program(ast_prog, stdout) != 0) {
+                fprintf(stderr, "scrip: emit_wasm_program failed\n");
                 return 1;
             }
         } else {
