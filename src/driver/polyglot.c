@@ -1,24 +1,9 @@
-/*
- * polyglot.c — polyglot runtime init and dispatch (SCRIP unified driver)
- *
- * Contains: ScripModule registry, polyglot_init(), polyglot_execute(),
- *           parse_scrip_polyglot().
- *
- * Extracted from scrip.c by GOAL-FULL-INTEGRATION FI-7.
- * After this step scrip.c is main() + arg parse + frontend dispatch only.
- *
- * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6
- * DATE:    2026-04-14
- * PURPOSE: Polyglot layer — separated to enable parallel frontend sessions
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <gc.h>
-
 #include "frontend/snobol4/scrip_cc.h"
-extern int64_t kw_case;   /* &CASE: 0=fold, 1=sensitive; default 1 matches SPITBOL */
+extern int64_t kw_case;
 #include "frontend/prolog/prolog_driver.h"
 #include "frontend/prolog/prolog_atom.h"
 #include "frontend/icon/icon_driver.h"
@@ -28,31 +13,16 @@ extern int64_t kw_case;   /* &CASE: 0=fold, 1=sensitive; default 1 matches SPITB
 #include "runtime/interp/pl_runtime.h"
 #include "driver/interp.h"
 #include "driver/polyglot.h"
-#include "lower.h"   /* CH-17g-irrun-lowers: sm_lower */
-#include "sm_prog.h"    /* CH-17g-irrun-lowers: sm_prog_free */
-/* PB-8: scrip_sm.h include removed — sm_resolve_irrun_entry_pcs deleted */
-
-ScripModuleRegistry g_registry;   /* zero-initialised; nmod==0 for single-lang */
-
-/* CH-17g-irrun-lowers: set by scrip.c --ir-run non-SNO path to populate
- * entry_pcs before proc_table_call dispatches.  Default 0. */
-/* PB-8: g_irrun_lowers deleted (CH-17g-irrun-execution: --ir-run now uses sm_preamble directly) */
-
-/* SI-6: stmt_attr accessor helpers (mirrors interp_exec.c) */
+#include "lower.h"
+#include "sm_prog.h"
+ScripModuleRegistry g_registry;
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static inline int           s_int(const tree_t *s, const char *tag) {
     const char *v = stmt_attr_str(stmt_attr_find(s, tag)); return v ? atoi(v) : 0; }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static inline tree_t        *s_expr(const tree_t *s, const char *tag) {
     return stmt_attr_expr(stmt_attr_find(s, tag)); }
-
-
-
-/* ══════════════════════════════════════════════════════════════════════════
- * polyglot_lang_mask — compute bitmask of languages present in prog  (FI-8)
- *
- * Returns a uint32_t with bit (1u << LANG_X) set for each language X that
- * appears in at least one STMT_t.lang field.  Callers pass this into
- * polyglot_init so per-language init is skipped when not needed.
- * ══════════════════════════════════════════════════════════════════════════ */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 uint32_t polyglot_lang_mask(const tree_t *prog)
 {
     uint32_t mask = 0;
@@ -64,46 +34,26 @@ uint32_t polyglot_lang_mask(const tree_t *prog)
         if (lang >= 0 && lang < 32)
             mask |= (1u << lang);
     }
-    /* LANG_SNO=0 is always present even when no explicit :lang attr */
     mask |= (1u << LANG_SNO);
     return mask;
 }
-
-/* ══════════════════════════════════════════════════════════════════════════
- * polyglot_init — language-selective runtime init  (U-14, FI-8)
- *
- * lang_mask: bitmask of languages present (compute via polyglot_lang_mask).
- * Only inits runtimes for languages actually used — single-lang .sno programs
- * skip Icon and Prolog init entirely.
- *
- * Replaces the three separate init sequences that lived in execute_program,
- * icn_execute_program_unified, and pl_execute_program_unified.
- * ══════════════════════════════════════════════════════════════════════════ */
-
-/* FI-8: counters to verify lazy-init correctness in tests */
 int g_fi8_icn_init_count = 0;
 int g_fi8_pl_init_count  = 0;
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void polyglot_init(const tree_t *prog, uint32_t lang_mask)
 {
     if (!prog) return;
-
-    /* ── SNO: label table + DEFINE prescan — always required ────────── */
     label_table_build(prog);
     prescan_defines(prog);
-    kw_case = 1;   /* default case-sensitive, matching SPITBOL oracle (&CASE=1) */
-
-    /* ── ICN: proc table — only when Icon or Raku stmts present ─────── */
+    kw_case = 1;
     if (lang_mask & ((1u << LANG_ICN) | (1u << LANG_RAKU))) {
         g_fi8_icn_init_count++;
-        proc_count = 0; global_count = 0;  /* U-23: reset global name bridge */
+        proc_count = 0; global_count = 0;
         frame_depth = 0;
         memset(frame_stack, 0, sizeof frame_stack);
         scan_subj = ""; scan_pos = 1; scan_depth = 0;
         g_icn_root = NULL;
     }
-
-    /* ── PL: pred table + trail — only when Prolog stmts present ────── */
     if (lang_mask & (1u << LANG_PL)) {
         g_fi8_pl_init_count++;
         prolog_atom_init();
@@ -113,22 +63,14 @@ void polyglot_init(const tree_t *prog, uint32_t lang_mask)
         g_pl_env      = NULL;
         g_pl_active   = 0;
     }
-
-    /* ── Registry reset  (U-21) ─────────────────────────────────────── */
     memset(&g_registry, 0, sizeof g_registry);
     g_registry.main_mod = -1;
-
-    /* ── Single pass: populate flat tables + registry  (U-14 + U-21) ── */
-    int cur_lang = -1;   /* language of the module currently being built */
-    int mod_idx  = -1;   /* index into g_registry.mods, or -1 if none open */
-
+    int cur_lang = -1;
+    int mod_idx  = -1;
     for (int _ci = 0; _ci < prog->n; _ci++) {
         const tree_t *s = prog->c[_ci];
         if (!s || (s->t != TT_STMT && s->t != TT_END)) continue;
-
         int s_lang = s_int(s, ":lang");
-
-        /* ── Registry: detect module boundary on lang change  (U-21) ── */
         if (s_lang != cur_lang) {
             if (g_registry.nmod < SCRIP_MOD_MAX) {
                 cur_lang = s_lang;
@@ -145,16 +87,12 @@ void polyglot_init(const tree_t *prog, uint32_t lang_mask)
                 m->proc_count       = 0;
             }
         }
-
-        /* Update last/nstmts for the current module */
         if (mod_idx >= 0) {
             g_registry.mods[mod_idx].last = s;
             g_registry.mods[mod_idx].nstmts++;
         }
-
         tree_t *subj = s_expr(s, ":subj");
         if (!subj) continue;
-
         if (s_lang == LANG_ICN || s_lang == LANG_RAKU) {
             tree_t *proc = subj;
             if (proc->t == TT_GLOBAL) {
@@ -182,8 +120,8 @@ void polyglot_init(const tree_t *prog, uint32_t lang_mask)
                     proc_table[proc_count].proc     = proc;
                     proc_table[proc_count].entry_pc = -1;
                     proc_table[proc_count].nparams  = (s_lang == LANG_ICN)
-                        ? proc->_id              /* SI-13 fix: Icon stores nparams in _id */
-                        : (int)proc->v.ival;     /* Raku: v.ival (SUB_TAG already stripped by parser) */
+                        ? proc->_id
+                        : (int)proc->v.ival;
                     proc_count++;
                     if (mod_idx >= 0) g_registry.mods[mod_idx].proc_count++;
                     if (strcmp(name, "main") == 0 && g_registry.main_mod < 0)
@@ -208,21 +146,7 @@ void polyglot_init(const tree_t *prog, uint32_t lang_mask)
         }
     }
 }
-
-
-/*============================================================================================================================
- * pl_directive_max_var_slot — walk a lowered Prolog directive subject EXPR
- * and return the largest TT_VAR ival found, or -1 if none.
- *
- * PL-12 (2026-04-30 #3): used by polyglot_execute's LANG_PL branch to size
- * a per-directive cenv. Without this, directives like
- *   :- assertz(test_g(hello)), test_g(G), write(G).
- * passed env=NULL to interp_exec_pl_builtin, which made every TT_VAR read
- * mint a fresh disconnected Term*var via pl_unified_term_from_expr —
- * unify could not thread bindings between conjuncts. The walk uses an
- * iterative explicit stack (no recursion) to avoid blowing C stack on
- * deeply nested goal trees built by the lowerer.
- *============================================================================================================================*/
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int pl_directive_max_var_slot(tree_t *root)
 {
     if (!root) return -1;
@@ -240,25 +164,13 @@ static int pl_directive_max_var_slot(tree_t *root)
     }
     return max_slot;
 }
-
-
-/*============================================================================================================================
- * polyglot_execute — OE-7: ONE top-level entry point for all languages.
- *
- * For polyglot programs: calls execute_program (which runs all SNO stmts and
- * the U-23 registry walk for ICN/PL).  Ensures g_lang=1 is set for each ICN
- * module dispatch (the U-23 block in execute_program was missing this).
- *
- * For single-language programs: routes to the appropriate legacy entry point.
- * OE-8 will retire the legacy entry points entirely.
- *============================================================================================================================*/
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void polyglot_execute(const tree_t *prog) {
     if (!prog) return;
     if (g_polyglot) {
-        execute_program(prog);   /* runs SNO + U-23 ICN/PL registry dispatch */
+        execute_program(prog);
         return;
     }
-    /* Single-language .icn or .pl — detect from first non-empty child's :lang */
     int slang = LANG_SNO;
     for (int _i = 0; _i < prog->n; _i++) {
         const tree_t *ch = prog->c[_i];
@@ -268,19 +180,17 @@ void polyglot_execute(const tree_t *prog) {
     }
     uint32_t mask = polyglot_lang_mask(prog);
     polyglot_init(prog, mask);
-    /* PB-8: g_irrun_lowers hook deleted — --ir-run now routes through sm_preamble */
     if (slang == LANG_ICN) {
         g_lang = 1;
         for (int i = 0; i < proc_count; i++) {
             if (strcmp(proc_table[i].name, "main") == 0) {
-                proc_table_call(i, NULL, 0);   /* CH-17g-call-sites */
+                proc_table_call(i, NULL, 0);
                 return;
             }
         }
         fprintf(stderr, "icon: no main procedure\n");
     } else if (slang == LANG_PL) {
         g_pl_active = 1;
-        /* Execute non-TT_CHOICE/TT_CLAUSE LANG_PL stmts as directives before main/0. */
         for (int _ci = 0; _ci < prog->n; _ci++) {
             const tree_t *_s = prog->c[_ci];
             if (!_s || _s->t != TT_STMT) continue;
@@ -306,53 +216,31 @@ void polyglot_execute(const tree_t *prog) {
         else fprintf(stderr, "prolog: no main/0 predicate\n");
         g_pl_active = 0;
     } else if (slang == LANG_REB) {
-        execute_program(prog);   /* Rebus lowers to SNO-style label/goto chains — FI-1B */
+        execute_program(prog);
     } else {
-        execute_program(prog);   /* SNO single-lang fallback */
+        execute_program(prog);
     }
 }
-
-/*============================================================================================================================
- * parse_scrip_polyglot — parse a fenced polyglot .scrip/.md file into one TT_PROGRAM  (U-13, SI-6)
- *
- * Scans the source for fenced code blocks:
- *   ```SNOBOL4  ...  ```
- *   ```Icon     ...  ```
- *   ```Prolog   ...  ```
- * Each block is compiled with its own frontend.  All resulting TT_STMT children
- * are appended in source order into one TT_PROGRAM, with :lang attr already set
- * by each frontend (U-12).  Unrecognised fence languages are skipped silently.
- *============================================================================================================================*/
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern tree_t *sno_parse_string_ast(const char *src, CODE_t **code_out);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 tree_t *parse_scrip_polyglot(const char *src, const char *filename)
 {
     tree_t *result = calloc(1, sizeof(tree_t));
     if (!result) return NULL;
     result->t = TT_PROGRAM;
-
     const char *p = src;
-
     while (*p) {
-        /* Find next ``` fence open */
         const char *fence = strstr(p, "```");
         if (!fence) break;
-
-        /* Read the language tag on the same line as the fence open */
         const char *tag_start = fence + 3;
         const char *tag_end   = tag_start;
         while (*tag_end && *tag_end != '\n' && *tag_end != '\r') tag_end++;
-
-        /* Trim trailing whitespace from tag */
         while (tag_end > tag_start && (tag_end[-1] == ' ' || tag_end[-1] == '\t')) tag_end--;
-
         int tag_len = (int)(tag_end - tag_start);
-
-        /* Advance past the fence-open line */
         p = tag_end;
         while (*p && *p != '\n') p++;
         if (*p == '\n') p++;
-
-        /* Detect language (case-insensitive) */
         int lang = -1;
         if      (tag_len == 7 && strncasecmp(tag_start, "SNOBOL4", 7) == 0) lang = LANG_SNO;
         else if (tag_len == 4 && strncasecmp(tag_start, "Icon",    4) == 0) lang = LANG_ICN;
@@ -361,25 +249,18 @@ tree_t *parse_scrip_polyglot(const char *src, const char *filename)
         else if (tag_len == 5 && strncasecmp(tag_start, "Scrip",   5) == 0) lang = LANG_SCRIP;
         else if (tag_len == 6 && strncasecmp(tag_start, "SCRIP",   5) == 0) lang = LANG_SCRIP;
         else if (tag_len == 5 && strncasecmp(tag_start, "Rebus",   5) == 0) lang = LANG_REB;
-
-        /* Find the matching fence close ``` */
         const char *block_start = p;
         const char *close = strstr(p, "```");
         if (!close) break;
-
         int   blen = (int)(close - block_start);
         char *block = malloc(blen + 1);
         if (!block) { p = close + 3; continue; }
         memcpy(block, block_start, blen);
         block[blen] = '\0';
-
         p = close + 3;
         while (*p && *p != '\n') p++;
         if (*p == '\n') p++;
-
         if (lang < 0) { free(block); continue; }
-
-        /* Compile block with the appropriate frontend, collect TT_PROGRAM */
         tree_t *sub_ast = NULL;
         if (lang == LANG_SNO || lang == LANG_SCRIP) {
             sub_ast = sno_parse_string_ast(block, NULL);
@@ -393,10 +274,7 @@ tree_t *parse_scrip_polyglot(const char *src, const char *filename)
             rebus_compile(block, filename, &sub_ast);
         }
         free(block);
-
         if (!sub_ast || sub_ast->n == 0) { free(sub_ast); continue; }
-
-        /* Append sub_ast's children into result */
         for (int _i = 0; _i < sub_ast->n; _i++) {
             tree_t *ch = sub_ast->c[_i];
             if (!ch) continue;
@@ -404,6 +282,5 @@ tree_t *parse_scrip_polyglot(const char *src, const char *filename)
         }
         free(sub_ast->c); free(sub_ast);
     }
-
     return result;
 }

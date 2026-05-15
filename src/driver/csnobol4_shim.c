@@ -1,15 +1,3 @@
-/*============================================================= csnobol4_shim.c
- * csnobol4_shim.c — CSNOBOL4 in-process executor shim (IM-15b).
- *
- * Compiled only when WITH_CSNOBOL4 is defined (scrip-monitor build).
- * Links against csnobol4/libcsnobol4.a.
- *
- * CSNOBOL4 macro convention: S_L(x), S_A(x) etc. expect x to be a POINTER
- * (they cast via _SPEC(x) = *(struct spec *)(x)). Use &sp not sp.
- *
- * Variable table walk: OBLIST..OBEND bucket array, LNKFLD chains.
- * Each node: name at BCDFLD via X_LOCSP, value descriptor at node+DESCR.
- *===========================================================================*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,30 +9,23 @@
 #include "/home/claude/csnobol4/equ.h"
 #include "/home/claude/csnobol4/res.h"
 #include "/home/claude/csnobol4/data.h"
-
 typedef struct { char *name; char *val_str; } CsnNvPair;
-
-/*--- Hook globals (extern in csnobol4/isnobol4.c via IM-15b patch) ---------*/
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 typedef void (*csn_step_fn)(int stno, void *arg);
 csn_step_fn  g_csn_step_hook = NULL;
 void        *g_csn_step_arg  = NULL;
 int          g_csn_stno      = 0;
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void csn_step_reset(void) { g_csn_stno = 0; }
-
-/*--- endex_jmpbuf: SHARED build — endex() longjmps here instead of exit() --*/
-/* Defined in csnobol4/libcsnobol4.a (main_pic.o / snobol4_vars).           */
-/* endex.c uses: extern VAR jmp_buf endex_jmpbuf — we just reference it.   */
 extern jmp_buf endex_jmpbuf;
-
-/*--- Step-limit longjmp ----------------------------------------------------*/
 static jmp_buf _csn_step_jmp;
 static int     _csn_step_target = 0;
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void _csn_step_cb(int stno, void *arg) {
     (void)arg;
     if (stno >= _csn_step_target) longjmp(_csn_step_jmp, 1);
 }
-
-/*--- Value descriptor → string ---------------------------------------------*/
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static char *csn_descr_to_str(ptr_t vp) {
     int vtype = (int)D_V(vp);
     char buf[256];
@@ -74,8 +55,7 @@ static char *csn_descr_to_str(ptr_t vp) {
         return strdup(buf);
     }
 }
-
-/*--- Walk OBSTRT hash table -------------------------------------------------*/
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int csn_nv_snapshot(CsnNvPair **out_pairs, int *out_count) {
     int cap = 64, n = 0;
     CsnNvPair *pairs = malloc((size_t)cap * sizeof(CsnNvPair));
@@ -111,11 +91,9 @@ static int csn_nv_snapshot(CsnNvPair **out_pairs, int *out_count) {
     }
     *out_pairs = pairs; *out_count = n; return n;
 }
-
-/*--- Public interface -------------------------------------------------------*/
-/* main.c defines: #define main snobol4_main — so the archive exports snobol4_main */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int snobol4_main(int argc, char *argv[]);
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int csnobol4_run_steps(const char *sno_path, int step_limit,
                        CsnNvPair **out_pairs, int *out_count) {
     *out_pairs = NULL; *out_count = 0;
@@ -125,13 +103,7 @@ int csnobol4_run_steps(const char *sno_path, int step_limit,
     g_csn_step_hook = _csn_step_cb;
     g_csn_step_arg  = NULL;
     char *argv_csn[] = { (char *)"csnobol4", (char *)sno_path, NULL };
-    /* Use a single exit point for both paths:
-     * - step hook  (_csn_step_cb) longjmps _csn_step_jmp with value 1
-     * - normal END (endex/SHARED) longjmps endex_jmpbuf with value 1
-     * Point endex_jmpbuf AT _csn_step_jmp so both land in the same place. */
     if (setjmp(_csn_step_jmp) == 0) {
-        /* Redirect endex_jmpbuf → _csn_step_jmp so END lands here too.
-         * memcpy is safe: both are jmp_buf (same type, same size). */
         memcpy(&endex_jmpbuf, &_csn_step_jmp, sizeof(jmp_buf));
         snobol4_main(2, argv_csn);
     }
@@ -139,15 +111,11 @@ int csnobol4_run_steps(const char *sno_path, int step_limit,
     csn_nv_snapshot(out_pairs, out_count);
     return 0;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void csn_nv_snapshot_free(CsnNvPair *pairs, int n) {
     if (!pairs) return;
     for (int i = 0; i < n; i++) { free(pairs[i].name); free(pairs[i].val_str); }
     free(pairs);
 }
-
-/*--- cleanup() override: no-op for embedded CSNOBOL4 (IM-16) ---------------*
- * SHARED endex() calls cleanup() which walks dynamic-load lib lists.        *
- * Embedded CSNOBOL4 has no dynamic loads; those lists are uninitialised     *
- * and crash. This definition (linked before libcsnobol4.a) wins.           */
-void cleanup(void) { /* no-op: embedded CSNOBOL4 makes no dynamic LOAD calls */ }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+void cleanup(void) { }

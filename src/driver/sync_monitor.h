@@ -1,80 +1,34 @@
-/*============================================================= sync_monitor.h
- * In-process sync monitor — IM-2
- *
- * ExecSnapshot captures all mutable global state that the three executors
- * (IR, SM, JIT) share. exec_snapshot_take() captures; exec_snapshot_restore()
- * resets the world to that state so the next executor starts clean.
- *
- * In production: nothing here is called — zero overhead.
- *==========================================================================*/
 #ifndef SYNC_MONITOR_H
 #define SYNC_MONITOR_H
-
-#include "snobol4.h"          /* NvPair, DESCR_t */
-#include "runtime/interp/icn_runtime.h"   /* IcnFrame, frame_depth */
-#include "runtime/interp/pl_runtime.h"    /* Trail, trail_mark */
-
-/*------------------------------------------------------------------------
- * ExecSnapshot — flat capture of all mutable inter-executor state
- *----------------------------------------------------------------------*/
+#include "snobol4.h"
+#include "runtime/interp/icn_runtime.h"
+#include "runtime/interp/pl_runtime.h"
 typedef struct {
-    /* NV store snapshot */
     NvPair  *nv_pairs;
     int      nv_count;
-
-    /* Keyword globals */
     int64_t  kw_stcount;
     int64_t  kw_stlimit;
     int64_t  kw_anchor;
-
-    /* ICN frame stack depth (frame locals snapshotted in IM-10) */
     int      frame_depth;
-
-    /* Prolog trail mark — restore by unwinding to this position */
     int      pl_trail_mark;
-
-    /* IM-8: last statement success/fail flag (-1 = unknown/IR) */
     int      last_ok;
-
-    /* IM-9: sequence of source labels reached, one entry per statement executed.
-     * label_path[i] = label of the (i+1)th statement executed, or NULL if unlabelled.
-     * label_path_n  = number of entries (= steps executed by this executor).\
-     * Strings are not owned — they point into STMT_t / SM_Program storage. */
     const char **label_path;
     int          label_path_n;
     int          label_path_cap;
-
-    /* IM-10: ICN/Raku frame-local variables.
-     * Flat array of NvPair, one per named slot across all active frames.
-     * Names are not owned (point into IcnScope string storage).
-     * frame_locals_count = 0 when no ICN frames are active. */
     NvPair  *frame_locals;
     int      frame_locals_count;
-
-    /* IM-11: Prolog trail-bound variables.
-     * One entry per trail slot that is currently bound (tag==TT_REF).
-     * Both name and val_str are owned heap strings. */
     struct PlLocalPair {
-        char *name;     /* "_V<saved_slot>" */
-        char *val_str;  /* stringified dereffed value */
+        char *name;
+        char *val_str;
     } *pl_locals;
     int      pl_locals_count;
 } ExecSnapshot;
-
-/*------------------------------------------------------------------------
- * Public interface
- *----------------------------------------------------------------------*/
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void exec_snapshot_take(ExecSnapshot *s);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void exec_snapshot_restore(const ExecSnapshot *s);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void exec_snapshot_free(ExecSnapshot *s);
-
-/* IM-6: in-process comparator — runs all three executors step by step.
- * Returns 0 if IR/SM/JIT agree on all statements, else first diverging stmt#.
- * verbose: 0=silent on agreement, 1=per-stmt progress, 2=full diff. */
-/* sync_monitor_run takes TT_PROGRAM directly (SI-6). */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int sync_monitor_run(const tree_t *prog, int verbose, const char *sno_path);
-
-/* IM-15b: CSNOBOL4 4th executor interface lives in csnobol4_shim.c (WITH_CSNOBOL4 build).
- * Normal builds use inline stubs in sync_monitor.c — no public declarations needed. */
-
-#endif /* SYNC_MONITOR_H */
+#endif

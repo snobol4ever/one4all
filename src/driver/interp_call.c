@@ -1,34 +1,10 @@
-/*
- * interp_call.c — call frame, shadow table, call_user_function
- *
- * Split from interp.c by RS-3 (GOAL-REWRITE-SCRIP).
- * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6
- * DATE:    2026-05-02
- */
-
 #include "interp_private.h"
-
-/* ══════════════════════════════════════════════════════════════════════════
- * call_stack — RETURN/FRETURN longjmp infrastructure
- * ══════════════════════════════════════════════════════════════════════════ */
-
-
-/* SN-3: shadow table for params/locals whose names collide with SPITBOL builtins
- * (e.g. LEN, ANY, SPAN — NV_SET_fn cannot override these in the SPITBOL NV store).
- * Checked in TT_VAR and NV_SET before NV_GET_fn/NV_SET_fn. */
-
-
 CallFrame  call_stack[CALL_STACK_MAX];
 int        call_depth = 0;
-
-/* ── IC-5: TT_INITIAL persistence — file-scope table keyed on tree_t node id ── */
 IcnInitEnt init_tab[ICN_INIT_MAX];
 int        icn_init_n = 0;
-
-/* Called just before NV restore in call_user_function to update snapshots */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void icn_init_update_snapshot(char **snames, DESCR_t *svals, int nsaved) {
-    /* For each init entry, check if any tracked var appears in snames (locals).
-     * If so, capture its current NV value (pre-restore = end-of-call value). */
     for (int ei = 0; ei < icn_init_n; ei++) {
         IcnInitEnt *ent = &init_tab[ei];
         for (int si = 0; si < ent->ns; si++) {
@@ -41,31 +17,23 @@ void icn_init_update_snapshot(char **snames, DESCR_t *svals, int nsaved) {
         }
     }
 }
-
-/* IC-5: Save current ICN frame's local values back into init_tab snapshots.
- * Called by coro_call just before popping the frame, so initial-block
- * statics (x in "initial x := 10") persist across calls. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void icn_init_save_frame(void) {
     if (frame_depth <= 0) return;
     IcnFrame *f = &frame_stack[frame_depth - 1];
     for (int ei = 0; ei < icn_init_n; ei++) {
         IcnInitEnt *ent = &init_tab[ei];
         for (int si = 0; si < ent->ns; si++) {
-            /* Find this variable's slot in the current frame scope */
             int slot = scope_get(&f->sc, ent->s[si].nm);
             if (slot >= 0 && slot < f->env_n) {
                 ent->s[si].val = f->env[slot];
             } else {
-                /* Global variable — read from NV */
                 ent->s[si].val = NV_GET_fn(ent->s[si].nm);
             }
         }
     }
 }
-
-
-/* SN-3: shadow table helpers — check active frames top-down
- * SN-19 stage-2: names arrive canonical (folded at lex/ingest), plain strcmp is correct. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int shadow_get(const char *name, DESCR_t *out) {
     for (int d = call_depth - 1; d >= 0; d--) {
         CallFrame *fr = &call_stack[d];
@@ -74,6 +42,7 @@ int shadow_get(const char *name, DESCR_t *out) {
     }
     return 0;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void shadow_set_cur(const char *name, DESCR_t val) {
     if (call_depth <= 0) return;
     CallFrame *fr = &call_stack[call_depth - 1];
@@ -86,6 +55,7 @@ void shadow_set_cur(const char *name, DESCR_t val) {
         fr->nshadow++;
     }
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int shadow_has(const char *name) {
     for (int d = call_depth - 1; d >= 0; d--) {
         CallFrame *fr = &call_stack[d];
@@ -94,17 +64,13 @@ int shadow_has(const char *name) {
     }
     return 0;
 }
-
-/* The program being interpreted (set in main before execute_program) */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
 {
     NO_AST_WALK_GUARD("call_user_function");
     if (call_depth >= CALL_STACK_MAX) return FAILDESCR;
-
-    /* ── Gather param and local names via source-case accessors ── */
     int np = FUNC_NPARAMS_fn(fname);
     int nl = FUNC_NLOCALS_fn(fname);
-
     char *pnames[64]; if (np > 64) np = 64;
     char *lnames[64]; if (nl > 64) nl = 64;
     for (int i = 0; i < np; i++) {
@@ -115,10 +81,6 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
         const char *l = FUNC_LOCAL_fn(fname, i);
         lnames[i] = l ? GC_strdup(l) : GC_strdup("");
     }
-
-    /* ufname: case-folded variant of fname, used only as fallback lookup key.
-     * In case-sensitive mode (default) ufname == fname — no folding.
-     * In case-insensitive mode sno_fold_name uppercases in place. */
     char ufname[128];
     {
         size_t flen = strlen(fname);
@@ -126,48 +88,15 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
         for (size_t i = 0; i <= flen; i++) ufname[i] = fname[i];
         sno_fold_name(ufname);
     }
-
-    /* ── Determine retname: the NV variable the body writes its return value into.
-     * For a normal call: retname == fname (body writes "fact" = ...).
-     * For an OPSYN alias: fname="facto" but entry_label="fact"; the body writes
-     * "fact", so we must save/restore "fact" and read it back on RETURN.
-     * We use FUNC_ENTRY_fn(fname) as retname whenever it differs from fname
-     * (case-insensitively) — that's the canonical body name. ── */
     const char *entry_pre = FUNC_ENTRY_fn(fname);
     const char *retname = fname;
-    /* For OPSYN aliases: fname="facto", entry_label="fact" — entry_label IS a registered
-     * function whose body writes "fact=...".  Use entry_label as the return-value slot.
-     * For alternate-entry: fname="fact2", entry_label="fact2_entry" — entry_label is just
-     * a label, NOT a registered function; body still writes "fact2=...".  Use fname.
-     * SN-19 stage-2: both names arrive canonical, plain strcmp is correct. */
     if (entry_pre && strcmp(entry_pre, fname) != 0 && FNCEX_fn(entry_pre))
         retname = entry_pre;
-
-    /* SN-26-bridge-coverage-n: emit CALL on the wire BEFORE the entry-pass
-     * NV writes.  SPITBOL's bridge fires CALL at bpf09 (before parameter
-     * binding); scrip's comm_call must fire in the same relative order so
-     * the wire records the function entry rather than the entry-pass clear
-     * of the return slot.  Without this, NV_SET_fn(retname, "") at the
-     * save/clear pass below fires comm_var first, which the controller
-     * sees as `VALUE retname=''` — categorically a different event from
-     * SPITBOL's `CALL fname`.  Beauty line 119 (`snoExprList = nPush()`,
-     * stno=709) is the canonical reproducer.
-     *
-     * Pass retname (canonical body name) not fname (caller-side alias).
-     * For OPSYN aliases like `OPSYN('&', 'reduce', 2)`, fname='&' but
-     * retname='reduce' — SPITBOL reports the body name, so scrip aligns. */
-    comm_call(retname);   /* T-2: FUNCTION trace CALL event */
-
-    /* ── Save current values of retname-var, params, locals ──
-     * SN-26-bridge-coverage-n: silence the wire — these NV writes are
-     * interpreter mechanism, not user-visible assignments.  SPITBOL's
-     * SIL doesn't emit comm_var for the equivalent internal stores. */
+    comm_call(retname);
     monitor_quiet_depth++;
     int nsaved = 1 + np + nl;
     char   **snames = GC_malloc((size_t)nsaved * sizeof(char *));
     DESCR_t *svals  = GC_malloc((size_t)nsaved * sizeof(DESCR_t));
-    /* Save/clear the return-value slot using retname (may differ from fname for OPSYN).
-     * NV store is case-sensitive: function body writes "fact" not "FACT". */
     snames[0] = GC_strdup(retname);
     svals[0]  = NV_GET_fn(retname);
     NV_SET_fn(retname, STRVAL(""));    /* BUG-QIZE: clear return slot to empty string,
@@ -177,12 +106,8 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                                         * succeed (non-null) → divergence on Qize body. */
     for (int i = 0; i < np; i++) {
         snames[1+i] = pnames[i];
-        /* If this param name aliases retname (e.g. DEFINE('f(f)')), the NV cell
-         * is shared.  Record the pre-call global (already in svals[0]), then
-         * write the arg.  The body writes retname= to set return value — same
-         * NV cell as the param, which is correct SIL behaviour. */
-        if (strcmp(pnames[i], retname) == 0)  /* SN-19: both canonical from lexer */
-            svals[1+i] = svals[0];          /* dedup: same original global */
+        if (strcmp(pnames[i], retname) == 0)
+            svals[1+i] = svals[0];
         else
             svals[1+i] = NV_GET_fn(pnames[i]);
         NV_SET_fn(pnames[i], (i < nargs) ? args[i] : NULVCL);
@@ -193,16 +118,11 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
         NV_SET_fn(lnames[i], NULVCL);
     }
     monitor_quiet_depth--;
-
-    /* ── Push call frame ── */
     CallFrame *fr = &call_stack[call_depth++];
-    kw_fnclevel = call_depth;  /* &FNCLEVEL tracks live nesting depth */
+    kw_fnclevel = call_depth;
     strncpy(fr->fname, retname, sizeof(fr->fname)-1);
     fr->fname[sizeof(fr->fname)-1] = '\0';
-    fr->nshadow = 0;  /* SN-3: clear shadow table for this frame */
-    /* SN-3: register params/locals whose names collide with SPITBOL builtins
-     * (e.g. LEN, ANY, SPAN — NV_GET_fn returns the builtin descriptor, ignoring
-     * NV_SET_fn writes). Shadow table takes priority in TT_VAR lookup. */
+    fr->nshadow = 0;
     for (int i = 0; i < np; i++)
         if (_is_pat_fnc_name(pnames[i]))
             shadow_set_cur(pnames[i], (i < nargs) ? args[i] : NULVCL);
@@ -212,99 +132,67 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
     fr->saved_names = snames;
     fr->saved_vals  = svals;
     fr->nsaved      = nsaved;
-    fr->retval_cell = STRVAL("");  /* cleared return slot, matches NV_SET clear above */
+    fr->retval_cell = STRVAL("");
     fr->retval_set  = 0;
-
     DESCR_t retval = NULVCL;
-
-    /* SN-26c-parseerr-f: save outer scan context so a recursive call to
-     * exec_stmt inside the function body (e.g. "subject pattern" in match())
-     * doesn't clobber the caller's Σ/Δ/Ω/Σlen globals. */
     const char *saved_Σ    = Σ;
     int         saved_Δ    = Δ;
     int         saved_Ω    = Ω;
     int         saved_Σlen = Σlen;
-
     int ret_kind = setjmp(fr->ret_env);
     if (ret_kind == 0) {
-        /* ── Find body label: use entry_label (supports OPSYN aliases and
-         * alternate entry points), then fall back to fname/ufname ── */
         const char *entry = FUNC_ENTRY_fn(fname);
         const tree_t *body = entry ? label_lookup(entry) : NULL;
         if (!body) body = label_lookup(fname);
         if (!body) body = label_lookup(ufname);
-
-        /* SIL UNDF: no body label AND not a registered builtin → Error 5 (soft) */
         if (!body && !FNCEX_fn(fname) && !FNCEX_fn(ufname)) {
             sno_runtime_error(5, NULL);
-            /* longjmp taken above; this line only reached if !g_sno_err_active */
             retval = FAILDESCR;
             goto fn_done;
         }
-
         if (body && g_exec_prog) {
-            /* SI-6: walk TT_STMT children of g_exec_prog forward from the body label.
-             * Mirrors execute_program's index-based loop; STMT_t linked-list removed. */
             int ci = 0;
             for (int _i = 0; _i < g_exec_prog->n; _i++)
                 if (g_exec_prog->c[_i] == body) { ci = _i; break; }
             int nch = g_exec_prog->n;
-
             while (ci < nch) {
                 const tree_t *s = g_exec_prog->c[ci];
                 if (!s) { ci++; continue; }
                 if (s->t == TT_END) break;
                 if (s->t != TT_STMT) { ci++; continue; }
-
-                /* Read stmt fields via attr helpers (same as execute_program). */
                 tree_t *s_subject = stmt_attr_expr(stmt_attr_find(s, ":subj"));
                 tree_t *s_pattern = stmt_attr_expr(stmt_attr_find(s, ":pat"));
                 tree_t *s_repl    = stmt_attr_expr(stmt_attr_find(s, ":repl"));
                 int    s_has_eq  = stmt_attr_find(s, ":eq") != NULL;
                 int    s_stno    = 0;
                 { const char *_v = stmt_attr_str(stmt_attr_find(s, ":stno")); if (_v) s_stno = atoi(_v); }
-
                 if (s_subject && (s_subject->t == TT_CHOICE ||
                                   s_subject->t == TT_UNIFY  ||
                                   s_subject->t == TT_CLAUSE)) {
                     ci++; continue;
                 }
-                /* SN-26-bridge-coverage-n: fire MWK_LABEL on every executed
-                 * statement inside a function body — same coverage as the
-                 * top-level execute_program loop.  SPITBOL's bridge fires
-                 * LABEL via SIL's stmgo for every executed stmt regardless
-                 * of nesting; scrip matches by emitting here.  Skipped for
-                 * non-statement IR nodes (TT_CHOICE/TT_UNIFY/TT_CLAUSE) above. */
                 {
                     extern void mon_emit_label_bin(int64_t stno);
                     mon_emit_label_bin((int64_t)s_stno);
                 }
-
                 DESCR_t     subj_val  = NULVCL;
                 const char *subj_name = NULL;
                 if (s_subject) {
                     if (s_subject->t == TT_VAR && s_subject->v.sval) {
                         subj_name = s_subject->v.sval;
-                        /* Only read value when needed for pattern match */
                         if (s_pattern)
                             subj_val = NV_GET_fn(subj_name);
                     } else if (s_subject->t == TT_INDIRECT && s_subject->n > 0) {
-                        /* $'$B' or $X as subject — resolve to variable name for write-back.
-                         * child is TT_QLIT "$B" (literal) or TT_VAR X (runtime indirect).
-                         * SN-26-bridge-coverage-y: if the resolved value is a DT_N NAMEPTR
-                         * (e.g. assign(name,...) where name was bound as `.snoBrackets`),
-                         * recover the variable name from the NV cell pointer instead of
-                         * letting VARVAL_fn read junk from the union's .s slot. */
                         tree_t *ic = s_subject->c[0];
                         if (ic->t == TT_QLIT && ic->v.sval) {
-                            subj_name = ic->v.sval;  /* $'name' — literal name, use directly */
+                            subj_name = ic->v.sval;
                         } else if (ic->t == TT_VAR && ic->v.sval) {
-                            DESCR_t xv = NV_GET_fn(ic->v.sval); /* $X — indirect */
+                            DESCR_t xv = NV_GET_fn(ic->v.sval);
                             if (IS_NAMEPTR(xv)) {
                                 const char *_rn = NV_name_from_ptr((const DESCR_t*)xv.ptr);
                                 subj_name = _rn ? _rn : NULL;
                             } else if (xv.v == DT_N && xv.slen == 0 && xv.s) {
-                                subj_name = xv.s;  /* NAMEVAL form */
+                                subj_name = xv.s;
                             } else {
                                 subj_name = VARVAL_fn(xv);
                             }
@@ -313,7 +201,6 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                             subj_name = VARVAL_fn(nd);
                         }
                         if (subj_name) {
-                            /* SN-19: $name as subject — lex-fold the runtime-sourced name */
                             char *fn = GC_strdup(subj_name); sno_fold_name(fn);
                             subj_name = fn;
                         }
@@ -322,18 +209,10 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                         } else if (!subj_name)
                             subj_val = interp_eval(s_subject);
                     } else if (s_subject->t == TT_FNC && s_has_eq && !s_pattern) {
-                        /* SN-6 session 14: same guard as top-level execute_program
-                         * loop (~L4142).  Dedicated branches below (ITEM/FIELD setter
-                         * at ~L673, NRETURN lvalue-assign at ~L699) call the function
-                         * exactly once to obtain the assignment target.  Evaluating
-                         * s_subject here would double-call the function inside a
-                         * user function body — expr_eval.sno Binary() does
-                         * Push() = EVAL(...) and needs this guard to match SPITBOL. */
                     } else {
                         subj_val = interp_eval(s_subject);
                     }
                 }
-
                 int succeeded = 1;
                 if (s_pattern) {
                     DESCR_t pat_d = interp_eval_pat(s_pattern);
@@ -351,26 +230,14 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                             pat_d, has_repl ? &repl_val : NULL, has_repl);
                     }
                 } else if (s_has_eq && subj_name) {
-                    /* Plain assignment: X = expr  — always value context.
-                     * *expr produces DT_E EXPRESSION (RUNTIME-6), not pattern. */
                     DESCR_t repl_val = s_repl ? interp_eval(s_repl) : NULVCL;
-                    /* BP-1: if the RHS was a NRETURN function call, interp_eval
-                     * NAME_DEREFs the DT_N (value context). But we want to store the
-                     * DT_N itself so the caller can later use $nm for indirect assign.
-                     * kw_rtntype is set by call_user_function before it returns and
-                     * is still valid here (no nested call between interp_eval return
-                     * and this check). Re-fetch from the function's return variable. */
-                    if (strcmp(kw_rtntype, "NRETURN") == 0      /* SN-19: literal uppercase */
+                    if (strcmp(kw_rtntype, "NRETURN") == 0
                             && s_repl && s_repl->t == TT_FNC && s_repl->v.sval) {
                         DESCR_t raw = NV_GET_fn(s_repl->v.sval);
                         if (IS_NAME(raw)) repl_val = raw;
                     }
                     if (IS_FAIL_fn(repl_val)) succeeded = 0;
                     else {
-                        /* NRETURN lvalue write-through: subj_name may be a zero-param
-                         * user fn returning DT_N (name ref). Only check when not already
-                         * inside a function body (call_depth==0) to avoid re-entrant
-                         * assignment during body execution (e.g. "ref_a = .a" in body). */
                         if (call_depth == 0 && FNCEX_fn(subj_name)
                                 && FUNC_NPARAMS_fn(subj_name) == 0) {
                             DESCR_t fres = call_user_function(subj_name, NULL, 0);
@@ -382,9 +249,6 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                     DESCR_t repl_val = s_repl ? interp_eval(s_repl) : NULVCL;
                     if (IS_FAIL_fn(repl_val)) succeeded = 0;
                     else {
-                        /* SIL ASGNIC: delegate to ASGNIC_fn (snobol4.c export).
-                         * Coerces to INTEGER and writes keyword global.
-                         * Falls back to NV_SET_fn for unrecognised names (safety). */
                         if (!ASGNIC_fn(s_subject->v.sval, repl_val))
                             NV_SET_fn(s_subject->v.sval, repl_val);
                         succeeded = 1;
@@ -400,8 +264,6 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                             DESCR_t idx2 = interp_eval(s_subject->c[2]);
                             subscript_set2(base, idx, idx2, rv);
                         } else { subscript_set(base, idx, rv); }
-                        /* SN-26-bridge-coverage-g: fire VALUE record for subscript store
-                         * inside user function body. */
                         { const char *base_nm = (s_subject->c[0] &&
                                                  s_subject->c[0]->t == TT_VAR)
                                                ? s_subject->c[0]->v.sval : NULL;
@@ -410,10 +272,9 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                     }
                 } else if (s_has_eq && s_subject && s_subject->t == TT_FNC &&
                            s_subject->v.sval && s_subject->n >= 1) {
-                    /* ITEM(arr,i[,j]) = val  or  field(obj) = val at statement level */
                     DESCR_t rv = s_repl ? interp_eval(s_repl) : NULVCL;
                     if (!IS_FAIL_fn(rv)) {
-                        if (strcmp(s_subject->v.sval, "ITEM") == 0 && s_subject->n >= 2) {  /* SN-19 */
+                        if (strcmp(s_subject->v.sval, "ITEM") == 0 && s_subject->n >= 2) {
                             DESCR_t base = interp_eval(s_subject->c[0]);
                             DESCR_t idx  = interp_eval(s_subject->c[1]);
                             if (!IS_FAIL_fn(base) && !IS_FAIL_fn(idx)) {
@@ -426,14 +287,9 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                                 succeeded = 1;
                             } else succeeded = 0;
                         } else {
-                            /* DATA field setter: fname(obj) = val */
                             DESCR_t obj = interp_eval(s_subject->c[0]);
                             if (!IS_FAIL_fn(obj)) {
                                 FIELD_SET_fn(obj, s_subject->v.sval, rv);
-                                /* SN-26-bridge-coverage-v: SPITBOL fires sysmw
-                                 * (`<lval>` sentinel VALUE) on every aggregate
-                                 * element store, including DATA fields.  Mirror
-                                 * here for harness symmetry. */
                                 comm_var("<lval>", rv);
                                 succeeded = 1;
                             } else succeeded = 0;
@@ -441,8 +297,6 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                     } else succeeded = 0;
                 } else if (s_has_eq && s_subject && s_subject->t == TT_FNC &&
                            s_subject->v.sval && s_subject->n == 0) {
-                    /* NRETURN lvalue assign: ref_a() = val  (zero-arg fn call as lvalue)
-                     * Call the function; if result is DT_N write through to named variable. */
                     DESCR_t fres = call_user_function(s_subject->v.sval, NULL, 0);
                     if (IS_NAME(fres)) {
                         DESCR_t rv = s_repl ? interp_eval(s_repl) : NULVCL;
@@ -454,27 +308,17 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                     DESCR_t repl_val = s_repl ? interp_eval(s_repl) : NULVCL;
                     if (IS_FAIL_fn(repl_val)) { succeeded = 0; }
                     else {
-                        /* Evaluate the inner expr to get a NAME or string to indirect through */
                         DESCR_t ind_val = ichild ? interp_eval(ichild) : NULVCL;
-                        /* If it's already a DT_N (e.g. $Push where Push = .stk[1]),
-                         * write directly through the pointer — SIL ASGNVV semantics.
-                         * SN-26-bridge-coverage-y: recover variable name from the NV cell
-                         * pointer (same as name_t.c NM_PTR fix, session #55) and emit
-                         * comm_var so SPITBOL's asinp asnpa fire-point is mirrored. */
                         if (IS_NAMEPTR(ind_val)) {
                             *(DESCR_t*)ind_val.ptr = repl_val;
                             { const char *_rn = NV_name_from_ptr((const DESCR_t*)ind_val.ptr);
                               comm_var(_rn ? _rn : "<lval>", repl_val); }
                             succeeded = 1;
                         } else {
-                            /* Otherwise treat as string variable name */
                             const char *nm0 = VARVAL_fn(ind_val);
                             if (!nm0 || !*nm0) { succeeded = 0; }
                             else {
-                                /* SN-19: $name = val — lex-fold the runtime-sourced name */
                                 char *nm = GC_strdup(nm0); sno_fold_name(nm);
-                                /* If the named variable itself holds a DT_N, write through.
-                                 * SN-26-bridge-coverage-y: emit comm_var here too. */
                                 DESCR_t named = NV_GET_fn(nm);
                                 if (IS_NAMEPTR(named)) {
                                     NAME_DEREF_PTR(named) = repl_val;
@@ -490,8 +334,6 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                 } else if (s_subject && !s_pattern && !s_has_eq) {
                     if (IS_FAIL_fn(subj_val)) succeeded = 0;
                 }
-
-                /* ── Goto resolution ── */
                 const char *target = NULL;
                 tree_t *go_s_attr = stmt_attr_find(s, ":goS");
                 tree_t *go_f_attr = stmt_attr_find(s, ":goF");
@@ -502,7 +344,6 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                 tree_t *goto_s_expr = (go_s_attr && !goto_s) ? stmt_attr_expr(go_s_attr) : NULL;
                 tree_t *goto_f_expr = (go_f_attr && !goto_f) ? stmt_attr_expr(go_f_attr) : NULL;
                 tree_t *goto_u_expr = (go_u_attr && !goto_u) ? stmt_attr_expr(go_u_attr) : NULL;
-
                 if (goto_u && *goto_u)
                     target = goto_u;
                 else if (goto_u_expr) {
@@ -519,23 +360,19 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                     DESCR_t cv = interp_eval(goto_f_expr);
                     target = (cv.v == DT_S && cv.s) ? cv.s : NULL;
                 }
-
                 if (target) {
-                    if (strcmp(target, "END") == 0) break;  /* SN-19: canonical */
-                    if (strcmp(target, "RETURN") == 0) {  /* SN-19: canonical from lexer */
+                    if (strcmp(target, "END") == 0) break;
+                    if (strcmp(target, "RETURN") == 0) {
                         retval = fr->retval_set ? fr->retval_cell : NV_GET_fn(fr->fname);
                         strncpy(kw_rtntype, "RETURN",  sizeof(kw_rtntype)-1);
                         goto fn_done;
                     }
-                    if (strcmp(target, "FRETURN") == 0) {  /* SN-19 */
+                    if (strcmp(target, "FRETURN") == 0) {
                         retval = FAILDESCR;
                         strncpy(kw_rtntype, "FRETURN", sizeof(kw_rtntype)-1);
                         goto fn_done;
                     }
-                    if (strcmp(target, "NRETURN") == 0) {  /* SN-19 */
-                        /* NRETURN: return DT_N from fn return var as-is;
-                         * caller (TT_FNC) applies NAME_DEREF (slen discriminates
-                         * NAMEPTR from NAMEVAL). */
+                    if (strcmp(target, "NRETURN") == 0) {
                         retval = fr->retval_set ? fr->retval_cell : NV_GET_fn(fr->fname);
                         strncpy(kw_rtntype, "NRETURN", sizeof(kw_rtntype)-1);
                         goto fn_done;
@@ -551,7 +388,6 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                 ci++;
             }
         }
-        /* fell off body without RETURN — return function's name variable */
         retval = fr->retval_set ? fr->retval_cell : NV_GET_fn(fr->fname);
         strncpy(kw_rtntype, "RETURN",  sizeof(kw_rtntype)-1);
     } else if (ret_kind == 1) {
@@ -561,9 +397,7 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
         retval = FAILDESCR;
         strncpy(kw_rtntype, "FRETURN", sizeof(kw_rtntype)-1);
     }
-
 fn_done:
-    /* SN-26c-parseerr-f: restore outer scan context clobbered by recursive exec_stmt */
     Σ    = saved_Σ;
     Δ    = saved_Δ;
     Ω    = saved_Ω;
@@ -571,10 +405,7 @@ fn_done:
     comm_return(retname, retval);  /* T-2: FUNCTION trace RETURN event;
                                       use retname (body name) not fname
                                       (alias) for OPSYN parity with SPITBOL. */
-    /* ── IC-5: snapshot initial-block locals before they're wiped ── */
     icn_init_update_snapshot(snames, svals, nsaved);
-    /* ── Restore saved variables and pop frame ──
-     * SN-26-bridge-coverage-n: silence the wire — these are mechanism. */
     monitor_quiet_depth++;
     for (int i = 0; i < nsaved; i++)
         NV_SET_fn(snames[i], svals[i]);
@@ -583,4 +414,3 @@ fn_done:
     kw_fnclevel = call_depth;
     return retval;
 }
-

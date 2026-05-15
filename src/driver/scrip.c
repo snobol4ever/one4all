@@ -1,34 +1,3 @@
-/*
- * scrip.c — unified SCRIP driver
- *
- * One binary, all modes. Frontend inferred from file extension.
- *
- * Usage:
- *   scrip [mode] [bb] [target] [options] <file> [-- program-args...]
- *
- * Execution modes (default: --sm-run):
- *   --ast-run        interpret via AST tree-walk (correctness reference)
- *   --sm-run         interpret SM_Program via dispatch loop  [DEFAULT]
- *   --jit-run        lower SM_Program to x86 bytes -> mmap slab -> jump in
- *
- * Byrd Box pattern mode (default: --bb-driver):
- *   --bb-driver      pattern matching via driver/broker
- *   --bb-live        pattern matching live-wired in exec memory
- *
- * Diagnostic options:
- *   --dump-ir        print IR after frontend
- *   --dump-sm        print SM_Program after lowering
- *   --dump-bb        print BB-GRAPH for each statement
- *   --trace          MONITOR trace output (for two-way diff vs CSNOBOL4)
- *   --bench          print wall-clock time after execution
- *
- * Frontend inferred from extension:
- *   .sno=SNOBOL4  .icn=Icon  .pl=Prolog  .sc=Snocone  .reb=Rebus
- *
- * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6
- * SPRINT:  M-SCRIP-U0
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,157 +6,108 @@
 #include <setjmp.h>
 #include <time.h>
 #include <gc.h>
-
-/* ── frontend ─────────────────────────────────────────────────────────── */
 #include "../frontend/snobol4/scrip_cc.h"
-/* CMPILE.h removed — bison/flex path only (GOAL-REMOVE-CMPILE S-5) */
 #include "../frontend/snocone/snocone_driver.h"
 #include "../frontend/prolog/prolog_driver.h"
-#include "../frontend/prolog/term.h"            /* Term — needed by Prolog globals block */
-#include "../frontend/prolog/prolog_runtime.h"  /* Trail — needed by Prolog globals block */
-#include "../frontend/prolog/prolog_atom.h"     /* prolog_atom_name — U-23: 64-bit ptr, must be declared */
-#include "../frontend/prolog/prolog_builtin.h"  /* interp_exec_pl_builtin declaration */
+#include "../frontend/prolog/term.h"
+#include "../frontend/prolog/prolog_runtime.h"
+#include "../frontend/prolog/prolog_atom.h"
+#include "../frontend/prolog/prolog_builtin.h"
 #include "../frontend/prolog/pl_broker.h"       /* pl_box_choice, pl_box_* — S-BB-7; pl_exec_goal removed U-11 */
 #include "../frontend/icon/icon_driver.h"
 #include "../frontend/raku/raku_driver.h"
 #include "../frontend/rebus/rebus_lower.h"
-#include "../frontend/icon/icon_gen.h"    /* icn_bb_to/by/iterate/suspend, state types — U-17 */
+#include "../frontend/icon/icon_gen.h"
 #include "../frontend/icon/icon_lex.h"    /* IcnTkKind — TK_AUG* for TT_AUGOP in unified interp */
-
-/* ir_print_node — from src/ast/ast_print.c (linked via Makefile) */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void ir_print_node   (const tree_t *e, FILE *f);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void ir_print_node_nl(const tree_t *e, FILE *f);
-
-/* ── runtime ──────────────────────────────────────────────────────────── */
 #include "snobol4.h"
-#include "sil_macros.h"   /* SIL macro translations — both RT and SM axes */
+#include "sil_macros.h"
 #include "snobol4_runtime_shim.h"
-
-/* ── SM stack machine (M-SCRIP-U3) ───────────────────────────────────── */
 #include "lower.h"
 #include "sm_interp.h"
 #include "sm_prog.h"
-#include "bb_build.h"    /* M-BB-LIVE-WIRE: bb_mode_t, g_bb_mode */
-#include "sm_jit_interp.h"  /* mode 3: sm_codegen, sm_jit_run */
-#include "emit_sm.h"    /* mode 4: sm_codegen_text */
-#include "emit.h"              /* EM-BB-FORMAT: g_bb_emit_format */
+#include "bb_build.h"
+#include "sm_jit_interp.h"
+#include "emit_sm.h"
+#include "emit.h"
 #include "emit_bb.h"
-#include "scrip_sm.h"                   /* RS-14: sm_preamble, sm_run_with_recovery */
-#include "sync_monitor.h"               /* IM-7: --monitor in-process comparator */
-#include "sm_image.h"    /* M-JIT-RUN: sm_image_init */
-
-/* pat_at_cursor not exposed in snobol4.h — forward-declare here */
+#include "scrip_sm.h"
+#include "sync_monitor.h"
+#include "sm_image.h"
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_at_cursor(const char *varname);
-
-/* stmt_init — stubbed: SM/IR paths init via SNO_INIT_fn() in snobol4.c */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void stmt_init(void) {}
-
-/* ── eval_code.c ─────────────────────────────────────────────────────── */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t      eval_expr(const char *src);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern const char  *exec_code(DESCR_t code_block);
-
-/* ── exec_stmt (from stmt_exec.c) ────────────────────────────────── */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern int exec_stmt(const char *subj_name,
                           DESCR_t    *subj_var,
                           DESCR_t     pat,
                           DESCR_t    *repl,
                           int         has_repl);
-
-/* subject globals owned by stmt_exec.c — extern here */
 extern const char *Σ;
 extern int         Ω;
 extern int         Δ;
-
 #include "../runtime/interp/icn_runtime.h"
 #include "../runtime/interp/pl_runtime.h"
-#include "interp.h"   /* FI-6: interp loop extracted to interp.c */
-
-#include "driver/polyglot.h"   /* FI-7: polyglot layer extracted to polyglot.c */
-
+#include "interp.h"
+#include "driver/polyglot.h"
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int main(int argc, char **argv)
 {
-    /* ── flag parsing ─────────────────────────────────────────────────── */
-
-    /* Execution modes — mutually exclusive (default: --sm-run) */
-    int mode_ir_run        = 0;  /* --ast-run (canonical) / --ir-run (deprecated alias): AST tree-walk */
-    int mode_sm_run        = 0;  /* --sm-run   : interpret SM_Program via dispatch loop [DEFAULT] */
-    int mode_jit_run       = 0;  /* --jit-run  : SM_Program -> x86 bytes -> mmap slab -> jump in */
-    int mode_monitor       = 0;  /* --monitor  : in-process sync comparator (IR vs SM vs JIT) */
-
-    /* M-JITEM-X64 / EM-1 — `--jit-emit --x64` is two flags combined.
-     * The driver requires both before selecting standalone-asm emission;
-     * later rungs (M6) introduce `--jvm`, `--net`, `--wasm`, `--js` as
-     * sibling sub-flags of `--jit-emit`. */
-    int opt_jit_emit       = 0;  /* --jit-emit : enables standalone backend emission */
-    int opt_emit_x64       = 0;  /* --x64      : x86-64 backend selector */
-    int opt_jit_emit_inline = 0; /* --jit-emit-inline : inline GAS (no macros) */
-    int opt_bb_format       = 0; /* --bb-format : BB boxes emit 3-col macro invocations */
-
-    /* Byrd Box pattern mode — independent switch (default: --bb-driver) */
-    int bb_driver          = 0;  /* --bb-driver : pattern matching via driver/broker */
-    int bb_live            = 0;  /* --bb-live   : live-wired in exec memory */
-
-
-
-    /* Diagnostic options */
-    int dump_parse         = 0;  /* --dump-parse      */
-    int dump_parse_flat    = 0;  /* --dump-parse-flat */
-    int dump_ir            = 0;  /* --dump-ast (canonical) / --dump-ir (deprecated alias): print AST after frontend */
-    int dump_ir_bison      = 0;  /* --dump-ast-bison (canonical) / --dump-ir-bison (deprecated alias) */
-    int dump_sm            = 0;  /* --dump-sm   : print SM_Program after lowering */
-    int dump_bb            = 0;  /* --dump-bb   : print BB-GRAPH per statement */
-    int opt_trace          = 0;  /* --trace     : MONITOR trace output */
-    int opt_bench          = 0;  /* --bench     : print wall-clock time after execution */
-
-    /* SN-19/SN-31: case sensitivity.  one4all default is case-SENSITIVE
-     * — .sno / .inc corpus uses mixed-case identifiers (bSlash, semicolon,
-     * snoLine, Push_list) and we preserve source spelling verbatim.
-     * --case-sensitive is a no-op today (default matches); kept for
-     * script compatibility.  No flag wires back to classic fold-to-upper
-     * — if that mode ever needs revival, add --fold-case here and call
-     * sno_set_case_sensitive(0). */
+    int mode_ir_run        = 0;
+    int mode_sm_run        = 0;
+    int mode_jit_run       = 0;
+    int mode_monitor       = 0;
+    int opt_jit_emit       = 0;
+    int opt_emit_x64       = 0;
+    int opt_jit_emit_inline = 0;
+    int opt_bb_format       = 0;
+    int bb_driver          = 0;
+    int bb_live            = 0;
+    int dump_parse         = 0;
+    int dump_parse_flat    = 0;
+    int dump_ir            = 0;
+    int dump_ir_bison      = 0;
+    int dump_sm            = 0;
+    int dump_bb            = 0;
+    int opt_trace          = 0;
+    int opt_bench          = 0;
     int opt_case_sensitive = 1;
-
     int argi = 1;
     while (argi < argc && argv[argi][0] == '-' && argv[argi][1] == '-') {
-        /* execution modes */
         if      (strcmp(argv[argi], "--ast-run")         == 0) { mode_ir_run        = 1; argi++; }
-        else if (strcmp(argv[argi], "--ir-run")          == 0) { mode_ir_run        = 1; argi++; } /* deprecated: use --ast-run */
+        else if (strcmp(argv[argi], "--ir-run")          == 0) { mode_ir_run        = 1; argi++; }
         else if (strcmp(argv[argi], "--sm-run")        == 0) { mode_sm_run        = 1; argi++; }
         else if (strcmp(argv[argi], "--jit-run")       == 0) { mode_jit_run       = 1; argi++; }
         else if (strcmp(argv[argi], "--monitor")       == 0) { mode_monitor       = 1; argi++; }
-        /* M-JITEM-X64 / EM-1 — standalone-asm emission */
         else if (strcmp(argv[argi], "--jit-emit")      == 0) { opt_jit_emit       = 1; argi++; }
         else if (strcmp(argv[argi], "--x64")           == 0) { opt_emit_x64       = 1; argi++; }
         else if (strcmp(argv[argi], "--jit-emit-inline") == 0) { opt_jit_emit_inline = 1; opt_jit_emit = 1; argi++; }
         else if (strcmp(argv[argi], "--bb-format")       == 0) { opt_bb_format       = 1; argi++; }
-        /* BB pattern mode */
         else if (strcmp(argv[argi], "--bb-driver")     == 0) { bb_driver          = 1; argi++; }
         else if (strcmp(argv[argi], "--bb-live")       == 0) { bb_live            = 1; argi++; }
-        /* diagnostic */
         else if (strcmp(argv[argi], "--dump-parse")      == 0) { dump_parse      = 1; argi++; }
         else if (strcmp(argv[argi], "--dump-parse-flat") == 0) { dump_parse_flat = 1; argi++; }
         else if (strcmp(argv[argi], "--dump-ast")        == 0) { dump_ir         = 1; argi++; }
-        else if (strcmp(argv[argi], "--dump-ir")         == 0) { dump_ir         = 1; argi++; } /* deprecated: use --dump-ast */
+        else if (strcmp(argv[argi], "--dump-ir")         == 0) { dump_ir         = 1; argi++; }
         else if (strcmp(argv[argi], "--dump-ast-bison")  == 0) { dump_ir_bison   = 1; argi++; }
-        else if (strcmp(argv[argi], "--dump-ir-bison")   == 0) { dump_ir_bison   = 1; argi++; } /* deprecated: use --dump-ast-bison */
+        else if (strcmp(argv[argi], "--dump-ir-bison")   == 0) { dump_ir_bison   = 1; argi++; }
         else if (strcmp(argv[argi], "--dump-sm")         == 0) { dump_sm         = 1; argi++; }
         else if (strcmp(argv[argi], "--dump-bb")         == 0) { dump_bb         = 1; argi++; }
         else if (strcmp(argv[argi], "--trace")           == 0) { opt_trace       = 1; argi++; }
         else if (strcmp(argv[argi], "--bench")           == 0) { opt_bench       = 1; argi++; }
-        /* SN-19 */
         else if (strcmp(argv[argi], "--case-sensitive")  == 0) { opt_case_sensitive = 1; argi++; }
         else if (strcmp(argv[argi], "--fold-case")       == 0) { opt_case_sensitive = 0; argi++; }
         else break;
     }
-
-    /* SN-19: wire case sensitivity into the SNOBOL4 lexer before sno_parse(). */
     sno_set_case_sensitive(opt_case_sensitive);
-
-    /* M-JITEM-X64 / EM-1 — compose the new mode from its two parts.
-     * Both flags must be present together; otherwise emit a clear error.
-     * Once selected, treat as mutually exclusive with --ir-run / --sm-run /
-     * --jit-run / --monitor. */
     int mode_jit_emit_x64 = (opt_jit_emit && opt_emit_x64);
     if (opt_jit_emit && !opt_emit_x64) {
         fprintf(stderr,
@@ -207,29 +127,12 @@ int main(int argc, char **argv)
             "--ast-run / --sm-run / --jit-run / --monitor\n");
         return 1;
     }
-
-    /* Default execution mode: --jit-run (not when --monitor or --jit-emit).
-     * Mode-3 (jit-run) is the closest stand-in for mode-4 (jit-emit-x64) while
-     * mode-4 is being built — emit-time bytes-into-`.s` is just mode-3's runtime
-     * bytes-into-`bb_pool` written somewhere else.  Daily testing should hit
-     * the path closest to destination.  --sm-run / --ir-run remain opt-in for
-     * fall-back testing. */
     if (!mode_ir_run && !mode_sm_run && !mode_jit_run && !mode_monitor &&
         !mode_jit_emit_x64)
         mode_jit_run = 1;
-
-    /* Default BB mode: --bb-live (mode-4's existence proof — bb_emit dual-mode
-     * + bb_flat for invariants + bb_pool for variant runtime emit IS the
-     * architecture for mode-4).  --bb-driver remains opt-in for fall-back
-     * testing. */
     if (!bb_driver && !bb_live) bb_live = 1;
-
-    /* Suppress unused warning for bb_driver (not yet wired to stmt_exec.c guard) */
     (void)bb_driver;
-
-    /* M-BB-LIVE-WIRE: propagate BB mode to stmt_exec.c */
     if (bb_live) g_bb_mode = BB_MODE_LIVE;
-
     if (argi >= argc) {
         fprintf(stderr,
             "usage: scrip [mode] [bb] [options] <file> [-- program-args...]\n"
@@ -268,22 +171,9 @@ int main(int argc, char **argv)
         );
         return 1;
     }
-    /* ── Multi-file load (U-MULTIFILE) ─────────────────────────────────────
-     * All remaining argv entries are input files.  Each is compiled with the
-     * appropriate frontend (by extension) and merged into one TT_PROGRAM in
-     * source order.  This enables:
-     *   scrip --ast-run lib.pl main.pl
-     *   scrip --ast-run shim.pl test_arith.pl
-     *   scrip --ast-run base.sno ext.icn main.pl   (polyglot multi-file)
-     * A single .scrip/.md file is still handled via parse_scrip_polyglot.
-     * --dump-parse/--dump-ir only act on the first file (unchanged). */
-
     extern void sno_add_include_dir(const char *d);
-
     struct timespec _t0, _t1, _t2, _t3;
     if (opt_bench) clock_gettime(CLOCK_MONOTONIC, &_t0);
-
-    /* Scan all input files to detect if any non-SNO language is present */
     int first_file_argi = argi; (void)first_file_argi;
     int has_non_sno = 0;
     for (int fi = argi; fi < argc; fi++) {
@@ -293,11 +183,8 @@ int main(int argc, char **argv)
                   strcmp(d,".sc")==0 || strcmp(d,".scrip")==0 || strcmp(d,".md")==0))
             has_non_sno = 1;
     }
-
-    CODE_t *sub = NULL;  /* --dump-ir-bison only: receives old CODE_t for legacy IR dump */
+    CODE_t *sub = NULL;
     tree_t  *ast_prog = NULL;
-
-    /* Helper: append one TT_PROGRAM's children into ast_prog, stripping trailing TT_END. */
     #define MERGE_AST(sub_ast) do { \
         if (sub_ast) { \
             if (!ast_prog) { ast_prog = sub_ast; } \
@@ -313,11 +200,8 @@ int main(int argc, char **argv)
             } \
         } \
     } while(0)
-
     for (; argi < argc; argi++) {
         const char *input_path = argv[argi];
-
-        /* Add include dirs for each file's directory */
         {
             char dirbuf[4096];
             strncpy(dirbuf, input_path, sizeof dirbuf - 1);
@@ -344,8 +228,6 @@ int main(int argc, char **argv)
             }
             sno_add_include_dir(".");
         }
-
-        /* Detect language from extension */
         const char *dot = strrchr(input_path, '.');
         int lang_snocone  = dot && strcmp(dot, ".sc")   == 0;
         int lang_prolog   = dot && strcmp(dot, ".pl")   == 0;
@@ -353,9 +235,7 @@ int main(int argc, char **argv)
         int lang_raku     = dot && strcmp(dot, ".raku") == 0;
         int lang_rebus    = dot && strcmp(dot, ".reb")  == 0;
         int lang_polyglot = dot && (strcmp(dot, ".scrip") == 0 || strcmp(dot, ".md") == 0);
-
-        sub = NULL;  /* reset for each file (used by --dump-ir-bison only) */
-
+        sub = NULL;
         if (lang_polyglot) {
             g_polyglot = 1;
             FILE *f = fopen(input_path, "r");
@@ -386,7 +266,6 @@ int main(int argc, char **argv)
             }
             MERGE_AST(sub_ast);
         } else if (dump_ir) {
-            /* --dump-ir: parse SNO via sno_parse_ast, dump TT_PROGRAM */
             FILE *f = fopen(input_path, "r");
             if (!f) { fprintf(stderr, "scrip: cannot open '%s'\n", input_path); return 1; }
             if (opt_bench) clock_gettime(CLOCK_MONOTONIC, &_t1);
@@ -395,7 +274,6 @@ int main(int argc, char **argv)
             ir_dump_program(sub_ast, stdout);
             return 0;
         } else if (dump_parse || dump_parse_flat) {
-            /* --dump-parse handled later; just parse to ast_prog */
             FILE *f = fopen(input_path, "r");
             if (!f) { fprintf(stderr, "scrip: cannot open '%s'\n", input_path); return 1; }
             if (opt_bench) clock_gettime(CLOCK_MONOTONIC, &_t1);
@@ -405,99 +283,64 @@ int main(int argc, char **argv)
         } else {
             FILE *f = fopen(input_path, "r");
             if (!f) { fprintf(stderr, "scrip: cannot open '%s'\n", input_path); return 1; }
-            /* SI-4/SI-6: sno_parse_ast builds TT_PROGRAM directly. */
             tree_t *sub_ast = sno_parse_ast(f, input_path, dump_ir_bison ? &sub : NULL);
             fclose(f);
             if (dump_ir_bison) { ir_dump_program(sub, stdout); return 0; }
             MERGE_AST(sub_ast);
         }
-
         if (!ast_prog) {
             fprintf(stderr, "scrip: parse failed for '%s'\n", input_path);
             return 1;
         }
     }
-
     if (opt_bench) clock_gettime(CLOCK_MONOTONIC, &_t1);
-
-    /* Primary input path (last file, used for --monitor label) */
     const char *input_path = argv[argc - 1];
-
     if (opt_bench) clock_gettime(CLOCK_MONOTONIC, &_t2);
-
     if (!ast_prog) {
         fprintf(stderr, "scrip: parse failed for '%s'\n", input_path);
         return 1;
     }
-
-    /* Initialise binary box pool (M-DYN-B1) */
     {
         extern void bb_pool_init(void);
         bb_pool_init();
     }
-
-    /* Initialise all builtins (GT, LT, SIZE, DATATYPE, etc.) registered in snobol4.c */
     extern void SNO_INIT_fn(void);
     SNO_INIT_fn();
-
     stmt_init();
-
-    /* S-10 fix: register scrip.c-only builtins so APPLY_fn can dispatch them
-     * at match time (used by *IDENT(x) / *DIFFER(x) in pattern position). */
     register_fn("IDENT",  _builtin_IDENT,  1, 2);
     register_fn("DIFFER", _builtin_DIFFER, 1, 2);
     register_fn("EVAL",   _builtin_EVAL,   1, 1);
     register_fn("CODE",   _builtin_CODE,   1, 1);
     register_fn("DATA",   _builtin_DATA,   1, 1);
     register_fn("print",  _builtin_print,  0, 99);
-
-    /* Wire user-function dispatch hook (wrapper defined above main) */
     extern DESCR_t (*g_user_call_hook)(const char *, DESCR_t *, int);
     g_user_call_hook = _usercall_hook;
-
-    /* Wire LABEL() predicate hook */
     {
         extern void sno_set_label_exists_hook(int (*fn)(const char *));
         sno_set_label_exists_hook(_label_exists_fn);
     }
-
-    /* Wire DT_P eval hook: EVAL(*func(args)) runs pattern against empty subject */
     {
         extern DESCR_t (*g_eval_pat_hook)(DESCR_t pat);
         g_eval_pat_hook = _eval_pat_impl_fn;
     }
-
-    /* Wire DT_S eval hook: EVAL(string) containing complex operators
-     * (TT_DEFER, cursor-assign) routes through interp_eval_pat. */
     {
         extern DESCR_t (*g_eval_str_hook)(const char *s);
         g_eval_str_hook = _eval_str_impl_fn;
     }
-
-    /* ── Set diagnostic globals ─────────────────────────────────────── */
     g_opt_trace   = opt_trace;
     g_opt_dump_bb = dump_bb;
-
-    /* ── --dump-sm with --ir-run: lower-only, no execution ─────────── */
     if (dump_sm && !mode_sm_run) {
         label_table_build(ast_prog);
         prescan_defines(ast_prog);
-        /* SI-6: lower takes TT_PROGRAM directly. */
         SM_Program *sm0 = lower(ast_prog);
         if (!sm0) { fprintf(stderr, "scrip: sm_lower failed\n"); return 1; }
         sm_prog_print(sm0, stdout);
         sm_prog_free(sm0);
         return 0;
     }
-
     if (mode_jit_emit_x64) {
-        /* M-JITEM-X64 / EM-1 — standalone-asm emission.
-         * Lower IR -> SM_Program (same path as --sm-run / --jit-run);
-         * hand the program to sm_codegen_x64_emit, which writes an asm
-         * source to stdout. The emitted asm is then assembled+linked
-         * outside scrip (see scripts/test_smoke_jit_emit_x64.sh). */
-        g_jit_emit_inline = opt_jit_emit_inline;  /* EDP-2 */
-        g_bb_emit_format  = opt_bb_format;         /* EM-BB-FORMAT */
+        g_jit_emit_inline = opt_jit_emit_inline;
+        g_bb_emit_format  = opt_bb_format;
         SM_Program *sm = sm_preamble(ast_prog);
         if (!sm) return 1;
         if (sm_codegen_text(sm, stdout, input_path) != 0) {
@@ -508,32 +351,19 @@ int main(int argc, char **argv)
         sm_prog_free(sm);
         return 0;
     }
-
     if (mode_monitor) {
-        /* IM-7: --monitor — in-process sync comparator.
-         * Runs IR, SM, and JIT step-by-step over the same TT_PROGRAM,
-         * snapshot/restoring state between each run.
-         * Returns 0 if all three agree; exits non-zero on first divergence. */
         label_table_build(ast_prog);
         prescan_defines(ast_prog);
         g_sno_err_active = 1;
-        int div_stmt = sync_monitor_run(ast_prog, 1 /* verbose */, input_path);
+        int div_stmt = sync_monitor_run(ast_prog, 1, input_path);
         if (div_stmt != 0) {
             fprintf(stderr, "scrip --monitor: DIVERGE at stmt %d\n", div_stmt);
             return 1;
         }
         return 0;
     } else if (has_non_sno && g_polyglot) {
-        /* Multi-fence .scrip/.md polyglot file: always use polyglot_execute.
-         * RS-26b: single-language Icon/Prolog with --sm-run falls through to
-         * the sm_preamble path below. */
         polyglot_execute(ast_prog);
     } else if (mode_sm_run) {
-        /* --sm-run: SM-LOWER path — IR → SM_Program → sm_interp_run.
-         * RS-14: preamble + run loop extracted to scrip_sm.{c,h}.
-         * RS-26: sm_preamble keeps the IR alive when lang_mask contains
-         * any non-SNO bit; proc_table / pred-table pointers reference
-         * live IR for the BB engine. */
         SM_Program *sm = sm_preamble(ast_prog);
         if (!sm) return 1;
         if (dump_sm) {
@@ -544,8 +374,6 @@ int main(int argc, char **argv)
         sm_run_with_recovery(sm, sm_interp_run);
         sm_prog_free(sm);
     } else if (mode_jit_run) {
-        /* --jit-run: SM-LOWER → sm_codegen → sm_jit_run.
-         * RS-14: shares sm_preamble + sm_run_with_recovery with --sm-run. */
         SM_Program *sm = sm_preamble(ast_prog);
         if (!sm) return 1;
         if (dump_sm) { sm_prog_print(sm, stdout); sm_prog_free(sm); return 0; }
@@ -560,10 +388,6 @@ int main(int argc, char **argv)
         sm_run_with_recovery(sm, sm_jit_run);
         sm_prog_free(sm);
     } else if (has_non_sno) {
-        /* PB-8 / CH-17g-irrun-execution: route --ir-run non-SNO through the
-         * same sm_preamble + sm_run_with_recovery pipeline as --sm-run.
-         * This gives the SM interpreter control over backtracking for Prolog
-         * and Icon proc bodies, replacing the legacy polyglot_execute AST walker. */
         SM_Program *sm = sm_preamble(ast_prog);
         if (!sm) return 1;
         sm_run_with_recovery(sm, sm_interp_run);
@@ -579,7 +403,6 @@ int main(int argc, char **argv)
         fprintf(stderr, "BENCH parse=%.2fms lower=%.2fms exec=%.2fms total=%.2fms\n",
                 parse_ms, lower_ms, exec_ms, parse_ms + lower_ms + exec_ms);
     }
-    /* M-DYN-B13: BINARY_AUDIT=1 is canonical; SNO_BINARY_BOXES=1 is legacy alias */
     if (getenv("BINARY_AUDIT") || getenv("SNO_BINARY_BOXES")) {
         extern void bin_audit_print(void);
         bin_audit_print();

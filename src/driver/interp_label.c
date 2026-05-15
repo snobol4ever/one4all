@@ -1,22 +1,7 @@
-/*
- * interp_label.c — label table and DEFINE prescan
- *
- * Split from interp.c by RS-3 (GOAL-REWRITE-SCRIP).
- * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6
- * DATE:    2026-05-02
- */
-
 #include "interp_private.h"
-
-/* ══════════════════════════════════════════════════════════════════════════
- * label_table — map SNOBOL4 source labels → const tree_t*
- * ══════════════════════════════════════════════════════════════════════════ */
-
-
-
 LabelEntry label_table[LABEL_MAX];
 int label_count = 0;
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void label_table_build(const tree_t *prog)
 {
     label_count = 0;
@@ -32,7 +17,7 @@ void label_table_build(const tree_t *prog)
         }
     }
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 const tree_t *label_lookup(const char *name)
 {
     if (!name || !*name) return NULL;
@@ -41,12 +26,11 @@ const tree_t *label_lookup(const char *name)
             return label_table[i].stmt;
     return NULL;
 }
-
-/* ── Extract DEFINE spec string from TT_FNC("DEFINE",...) subject node ── */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 const char *define_spec_from_expr(tree_t *subj)
 {
     if (!subj || subj->t != TT_FNC) return NULL;
-    if (!subj->v.sval || strcmp(subj->v.sval, "DEFINE") != 0) return NULL;  /* SN-19 */
+    if (!subj->v.sval || strcmp(subj->v.sval, "DEFINE") != 0) return NULL;
     if (subj->n < 1 || !subj->c[0]) return NULL;
     tree_t *arg = subj->c[0];
     if (arg->t == TT_QLIT) return arg->v.sval;
@@ -68,15 +52,13 @@ const char *define_spec_from_expr(tree_t *subj)
     }
     return NULL;
 }
-
-/* ── Extract optional entry-label string from second arg of DEFINE ── */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 const char *define_entry_from_expr(tree_t *subj)
 {
     if (!subj || subj->t != TT_FNC) return NULL;
-    if (!subj->v.sval || strcmp(subj->v.sval, "DEFINE") != 0) return NULL;  /* SN-19 */
+    if (!subj->v.sval || strcmp(subj->v.sval, "DEFINE") != 0) return NULL;
     if (subj->n < 2 || !subj->c[1]) return NULL;
     tree_t *arg2 = subj->c[1];
-    /* .label_name → TT_NAME(TT_VAR sval="label_name") or TT_CAPT_COND_ASGN */
     if (arg2->t == TT_NAME && arg2->n == 1) {
         tree_t *inner = arg2->c[0];
         if (inner->t == TT_VAR && inner->v.sval) return inner->v.sval;
@@ -89,8 +71,7 @@ const char *define_entry_from_expr(tree_t *subj)
     if (arg2->t == TT_QLIT && arg2->v.sval) return arg2->v.sval;
     return NULL;
 }
-
-/* ── Pre-scan program and register all DEFINE'd functions ── */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void prescan_defines(const tree_t *prog)
 {
     if (!prog) return;
@@ -108,6 +89,3 @@ void prescan_defines(const tree_t *prog)
         }
     }
 }
-
-/* SI-6: label_table_clear_stmts removed — GC owns tree_t nodes; no dangling
- * pointer hazard after TT_PROGRAM is freed. */
