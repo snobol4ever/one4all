@@ -2181,14 +2181,15 @@ static int emit_sm_return_variant_dispatch(FILE *out, sm_opcode_t op, int pc, co
         const char *fname = NULL;
         for (int i = pc - 1; i >= 0 && !fname; i--) {
             const SM_Instr *si = &prog->instrs[i];
-            if (si->op == SM_LABEL && si->a[2].i && si->a[0].s)
+            if (si->op == SM_LABEL && si->a[0].s) {
                 fname = si->a[0].s;
+                break;
+            }
         }
         if (fname) {
-            char lbl[64];
-            strtab_label(lbl, sizeof(lbl), fname);
+            const char *fname_lbl = codegen_intern_str(fname);
             emit_mode_set(TEXT_MODE(), out);
-            return emit_sm_ret_nreturn(out, lbl, cond, pc, sm_opcode_name(op));
+            return emit_sm_ret_nreturn(out, fname_lbl, cond, pc, sm_opcode_name(op));
         }
     }
     return emit_sm_ret_var(out, kind, cond, pc, sm_opcode_name(op));

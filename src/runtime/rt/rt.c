@@ -975,11 +975,7 @@ int rt_do_nreturn(const char *fname, int cond)
 {
     if (cond == 1 && !LAST_OK_GET()) return 0;
     if (cond == 2 &&  LAST_OK_GET()) return 0;
-    DESCR_t retval = fname ? NV_GET_fn(fname) : FAILDESCR;
-    if (IS_NAMEPTR(retval))      retval = NAME_DEREF_PTR(retval);
-    else if (IS_NAMEVAL(retval)) retval = NV_GET_fn(retval.s);
-    vstack_push(retval);
-    LAST_OK_SET(retval.v != DT_FAIL);
+    LAST_OK_SET(fname ? 1 : 0);
     strncpy(kw_rtntype, "NRETURN", sizeof(kw_rtntype)-1);
     return g_native_chunk_depth > 0 ? 2 : 1;
 }
