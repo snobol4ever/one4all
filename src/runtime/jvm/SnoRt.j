@@ -120,7 +120,7 @@
 .method public static push_null()V
     .limit stack 2
     .limit locals 0
-    aconst_null
+    ldc ""
     invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V
     return
 .end method
@@ -232,6 +232,8 @@ concat_right_append:
 .end method
 
 ; ── coerce_num — coerce TOS to numeric (Long or Double) ──────────────────────
+; Mirrors C rt_coerce_num: string→atoll first; if 0 and not "0" prefix try atof; else 0.
+; Non-numeric strings → 0 (no exception), matching C atoll/atof behavior.
 .method public static coerce_num()V
     .limit stack 4
     .limit locals 2
@@ -243,15 +245,13 @@ concat_right_append:
     aload_0
     instanceof java/lang/Double
     ifne coerce_num_done_push
-    ; try parse as long first, then double, else 0
     aload_0
     ifnull coerce_num_zero
     aload_0
     invokevirtual java/lang/Object/toString()Ljava/lang/String;
     astore_1
     aload_1
-    invokestatic java/lang/Long/parseLong(Ljava/lang/String;)J
-    invokestatic java/lang/Long/valueOf(J)Ljava/lang/Long;
+    invokestatic rt/SnoRt/parse_long_safe(Ljava/lang/String;)Ljava/lang/Object;
     invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V
     return
 coerce_num_zero:
@@ -263,6 +263,66 @@ coerce_num_done_push:
     aload_0
     invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V
     return
+.end method
+; ── parse_long_safe — atoll-like: parse trimmed string as Long; if fails try Double; else Long(0) ──
+.method private static parse_long_safe(Ljava/lang/String;)Ljava/lang/Object;
+    .limit stack 4
+    .limit locals 2
+    aload_0
+    invokevirtual java/lang/String/trim()Ljava/lang/String;
+    astore_1
+    ; try Long.parseLong
+    aload_1
+    invokestatic rt/SnoRt/try_parse_long(Ljava/lang/String;)Ljava/lang/Object;
+    astore_0
+    aload_0
+    ifnull parse_long_try_double
+    aload_0
+    areturn
+parse_long_try_double:
+    aload_1
+    invokestatic rt/SnoRt/try_parse_double(Ljava/lang/String;)Ljava/lang/Object;
+    astore_0
+    aload_0
+    ifnull parse_long_zero
+    aload_0
+    areturn
+parse_long_zero:
+    lconst_0
+    invokestatic java/lang/Long/valueOf(J)Ljava/lang/Long;
+    areturn
+.end method
+; ── try_parse_long — returns Long or null on NumberFormatException ──
+.method private static try_parse_long(Ljava/lang/String;)Ljava/lang/Object;
+    .limit stack 3
+    .limit locals 2
+    .catch java/lang/NumberFormatException from L_tpl_start to L_tpl_end using L_tpl_catch
+L_tpl_start:
+    aload_0
+    invokestatic java/lang/Long/parseLong(Ljava/lang/String;)J
+    invokestatic java/lang/Long/valueOf(J)Ljava/lang/Long;
+    areturn
+L_tpl_end:
+L_tpl_catch:
+    astore_1
+    aconst_null
+    areturn
+.end method
+; ── try_parse_double — returns Double or null on NumberFormatException ──
+.method private static try_parse_double(Ljava/lang/String;)Ljava/lang/Object;
+    .limit stack 3
+    .limit locals 2
+    .catch java/lang/NumberFormatException from L_tpd_start to L_tpd_end using L_tpd_catch
+L_tpd_start:
+    aload_0
+    invokestatic java/lang/Double/parseDouble(Ljava/lang/String;)D
+    invokestatic java/lang/Double/valueOf(D)Ljava/lang/Double;
+    areturn
+L_tpd_end:
+L_tpd_catch:
+    astore_1
+    aconst_null
+    areturn
 .end method
 
 ; ── neg — negate TOS ──────────────────────────────────────────────────────────
@@ -310,9 +370,29 @@ neg_long:
     invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V
     return
 .end method
+; ── mod — modulo (integer only; string/mixed → 0) ──────────────────────────────
+.method public static mod()V
+    .limit stack 4
+    .limit locals 2
+    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;
+    astore_0
+    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;
+    astore_1
+    aload_1
+    checkcast java/lang/Long
+    invokevirtual java/lang/Long/longValue()J
+    aload_0
+    checkcast java/lang/Long
+    invokevirtual java/lang/Long/longValue()J
+    lrem
+    invokestatic java/lang/Long/valueOf(J)Ljava/lang/Long;
+    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V
+    return
+.end method
 
 ; ── arith — arithmetic: op codes match SM_ARITH constants
 ; op: 0=add 1=sub 2=mul 3=div
+; Defensive: if operands are not Long/Double, coerce them first.
 .method public static arith(I)V
     .limit stack 8
     .limit locals 5
@@ -320,6 +400,31 @@ neg_long:
     astore_1
     invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;
     astore_2
+    ; coerce both operands to numeric
+    aload_2
+    instanceof java/lang/Long
+    ifne arith_b_ok
+    aload_2
+    instanceof java/lang/Double
+    ifne arith_b_ok
+    aload_2
+    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V
+    invokestatic rt/SnoRt/coerce_num()V
+    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;
+    astore_2
+arith_b_ok:
+    aload_1
+    instanceof java/lang/Long
+    ifne arith_a_ok
+    aload_1
+    instanceof java/lang/Double
+    ifne arith_a_ok
+    aload_1
+    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V
+    invokestatic rt/SnoRt/coerce_num()V
+    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;
+    astore_1
+arith_a_ok:
     ; if either is Double, use double arithmetic
     aload_1
     instanceof java/lang/Double
@@ -399,6 +504,7 @@ arith_d_div:
 
 ; ── acomp — arithmetic comparison: pop b then a, push 1/0 (or set last_ok)
 ; op: 0=LT 1=LE 2=EQ 3=NE 4=GE 5=GT
+; Defensive: coerce both operands to numeric first.
 .method public static acomp(I)V
     .limit stack 8
     .limit locals 4
@@ -406,6 +512,25 @@ arith_d_div:
     astore_1
     invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;
     astore_2
+    ; coerce both operands
+    aload_2
+    instanceof java/lang/Number
+    ifne acomp_b_ok
+    aload_2
+    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V
+    invokestatic rt/SnoRt/coerce_num()V
+    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;
+    astore_2
+acomp_b_ok:
+    aload_1
+    instanceof java/lang/Number
+    ifne acomp_a_ok
+    aload_1
+    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V
+    invokestatic rt/SnoRt/coerce_num()V
+    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;
+    astore_1
+acomp_a_ok:
     aload_2
     checkcast java/lang/Number
     invokevirtual java/lang/Number/doubleValue()D
@@ -637,10 +762,10 @@ call_not_INTEGER:
     invokestatic rt/SnoRt/builtin_DATATYPE()V
     return
 call_not_DATATYPE:
-    ; unknown function — set last_ok=false, push null
+    ; unknown function — set last_ok=false, push ""
     iconst_0
     putstatic rt/SnoRt/last_ok Z
-    aconst_null
+    ldc ""
     invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V
     return
 .end method
@@ -848,7 +973,7 @@ ident_a_done:
 ident_false:
     iconst_0
     putstatic rt/SnoRt/last_ok Z
-    aconst_null
+    ldc ""
     invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V
     return
 .end method
@@ -899,7 +1024,7 @@ integer_ok:
     putstatic rt/SnoRt/last_ok Z
     return
 integer_fail:
-    aconst_null
+    ldc ""
     invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V
     iconst_0
     putstatic rt/SnoRt/last_ok Z

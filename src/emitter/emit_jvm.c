@@ -667,19 +667,19 @@ static int emit_jvm_from_sm(SM_Program * sm, FILE * out) {
             fprintf(out, "    invokestatic rt/SnoRt/exp_op()V\n");
             break;
         case SM_ADD:
-            fprintf(out, "    bipush 1\n    invokestatic rt/SnoRt/arith(I)V\n");
+            fprintf(out, "    bipush 0\n    invokestatic rt/SnoRt/arith(I)V\n");
             break;
         case SM_SUB:
-            fprintf(out, "    bipush 2\n    invokestatic rt/SnoRt/arith(I)V\n");
+            fprintf(out, "    bipush 1\n    invokestatic rt/SnoRt/arith(I)V\n");
             break;
         case SM_MUL:
-            fprintf(out, "    bipush 3\n    invokestatic rt/SnoRt/arith(I)V\n");
+            fprintf(out, "    bipush 2\n    invokestatic rt/SnoRt/arith(I)V\n");
             break;
         case SM_DIV:
-            fprintf(out, "    bipush 4\n    invokestatic rt/SnoRt/arith(I)V\n");
+            fprintf(out, "    bipush 3\n    invokestatic rt/SnoRt/arith(I)V\n");
             break;
         case SM_MOD:
-            fprintf(out, "    bipush 6\n    invokestatic rt/SnoRt/arith(I)V\n");
+            fprintf(out, "    invokestatic rt/SnoRt/mod()V\n");
             break;
         case SM_ACOMP:
             jvm_push_int(out, instr->a[0].i);
