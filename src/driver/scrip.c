@@ -177,6 +177,7 @@ int main(int argc, char **argv)
         else if (strcmp(argv[argi], "--bench")           == 0) { opt_bench       = 1; argi++; }
         /* SN-19 */
         else if (strcmp(argv[argi], "--case-sensitive")  == 0) { opt_case_sensitive = 1; argi++; }
+        else if (strcmp(argv[argi], "--fold-case")       == 0) { opt_case_sensitive = 0; argi++; }
         else break;
     }
 
