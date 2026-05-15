@@ -23,6 +23,9 @@
 extern void ir_print_node   (const tree_t *e, FILE *f);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void ir_print_node_nl(const tree_t *e, FILE *f);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+extern int emit_jvm_program(const tree_t * ast_prog, FILE * out);
+extern int emit_js_program(const tree_t * ast_prog, FILE * out);
 #include "snobol4.h"
 #include "sil_macros.h"
 #include "snobol4_runtime_shim.h"
@@ -358,6 +361,11 @@ int main(int argc, char **argv)
         if (strcmp(target_name, "js") == 0) {
             if (emit_js_program(ast_prog, stdout) != 0) {
                 fprintf(stderr, "scrip: emit_js_program failed\n");
+                return 1;
+            }
+        } else if (strcmp(target_name, "jvm") == 0) {
+            if (emit_jvm_program(ast_prog, stdout) != 0) {
+                fprintf(stderr, "scrip: emit_jvm_program failed\n");
                 return 1;
             }
         } else {
