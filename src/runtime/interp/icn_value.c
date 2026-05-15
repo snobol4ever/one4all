@@ -101,12 +101,47 @@ static DESCR_t bb_section(tree_t *e, bb_section_t kind)
     if (e->n < 3) return NULVCL;
     DESCR_t sd = bb_eval_value(e->c[0]);
     if (IS_FAIL_fn(sd)) return FAILDESCR;
-    const char *s = VARVAL_fn(sd);
-    if (!s) s = "";
-    int slen = (int)strlen(s);
     DESCR_t a1 = bb_eval_value(e->c[1]);
     DESCR_t a2 = bb_eval_value(e->c[2]);
     if (IS_FAIL_fn(a1) || IS_FAIL_fn(a2)) return FAILDESCR;
+    if (sd.v == DT_DATA) {
+        DESCR_t tag = FIELD_GET_fn(sd, "icn_type");
+        if (tag.v == DT_S && tag.s && strcmp(tag.s, "list") == 0) {
+            int n = (int)FIELD_GET_fn(sd, "frame_size").i;
+            DESCR_t ea = FIELD_GET_fn(sd, "frame_elems");
+            DESCR_t *elems = (ea.v == DT_DATA) ? (DESCR_t *)ea.ptr : NULL;
+            int i = (int)to_int(a1), x = (int)to_int(a2);
+            if (i == 0) i = n + 1; else if (i < 0) i = n + i + 1;
+            int lo, hi;
+            if (kind == BBS_RANGE) {
+                if (x == 0) x = n + 1; else if (x < 0) x = n + x + 1;
+                if (i < 1 || i > n+1 || x < 1 || x > n+1) return FAILDESCR;
+                lo = i < x ? i : x; hi = i < x ? x : i;
+            } else if (kind == BBS_PLUS) {
+                if (x >= 0) { lo = i; hi = i + x; } else { lo = i + x; hi = i; }
+                if (lo < 1 || hi > n+1) return FAILDESCR;
+            } else {
+                if (x >= 0) { lo = i - x; hi = i; } else { lo = i; hi = i - x; }
+                if (lo < 1 || hi > n+1) return FAILDESCR;
+            }
+            int rlen = hi - lo;
+            if (rlen <= 0) {
+                static int icnlist_empty_reg2 = 0;
+                if (!icnlist_empty_reg2) { DEFDAT_fn("icnlist(frame_elems,frame_size,icn_type)"); icnlist_empty_reg2 = 1; }
+                DESCR_t ep; ep.v = DT_DATA; ep.slen = 0; ep.ptr = NULL;
+                return DATCON_fn("icnlist", ep, INTVAL(0), STRVAL("list"));
+            }
+            DESCR_t *rbuf = GC_malloc((size_t)rlen * sizeof(DESCR_t));
+            for (int k = 0; k < rlen; k++) rbuf[k] = (elems && lo+k-1 >= 0 && lo+k-1 < n) ? elems[lo+k-1] : NULVCL;
+            DESCR_t rp; rp.v = DT_DATA; rp.slen = 0; rp.ptr = (void *)rbuf;
+            static int icnlist_sect_reg = 0;
+            if (!icnlist_sect_reg) { DEFDAT_fn("icnlist(frame_elems,frame_size,icn_type)"); icnlist_sect_reg = 1; }
+            return DATCON_fn("icnlist", rp, INTVAL(rlen), STRVAL("list"));
+        }
+    }
+    const char *s = VARVAL_fn(sd);
+    if (!s) s = "";
+    int slen = (int)strlen(s);
     int i = (int)to_int(a1);
     int x = (int)to_int(a2);
     if (i == 0) i = slen + 1; else if (i < 0) i = slen + 1 + i;
@@ -350,13 +385,22 @@ DESCR_t cv = bb_eval_value(lhs->c[0]);
             }
         } else if (lhs && lhs->t == TT_RANDOM && lhs->n >= 1) {
             DESCR_t base = bb_eval_value(lhs->c[0]);
-            if (base.v == DT_DATA && base.u && base.u->type && base.u->type->nfields > 0 && base.u->fields) {
-                extern unsigned long bb_icn_rnd_seed;
-                bb_icn_rnd_seed = bb_icn_rnd_seed * 6364136223846793005UL + 1442695040888963407UL;
-                int fi = (int)((bb_icn_rnd_seed >> 33) % (unsigned long)base.u->type->nfields);
-                base.u->fields[fi] = val;
+            extern unsigned long bb_icn_rnd_seed;
+            if (base.v == DT_DATA) {
+                DESCR_t tag = FIELD_GET_fn(base, "icn_type");
+                if (tag.v == DT_S && tag.s && strcmp(tag.s, "list") == 0) {
+                    int n = (int)FIELD_GET_fn(base, "frame_size").i;
+                    if (n > 0) {
+                        bb_icn_rnd_seed = bb_icn_rnd_seed * 6364136223846793005UL + 1442695040888963407UL;
+                        int fi = (int)((bb_icn_rnd_seed >> 33) % (unsigned long)n);
+                        subscript_set(base, INTVAL(fi + 1), val);  /* 1-based indexing */
+                    }
+                } else if (base.u && base.u->type && base.u->type->nfields > 0 && base.u->fields) {
+                    bb_icn_rnd_seed = bb_icn_rnd_seed * 6364136223846793005UL + 1442695040888963407UL;
+                    int fi = (int)((bb_icn_rnd_seed >> 33) % (unsigned long)base.u->type->nfields);
+                    base.u->fields[fi] = val;
+                }
             } else if (base.v == DT_T && base.tbl && base.tbl->size > 0) {
-                extern unsigned long bb_icn_rnd_seed;
                 bb_icn_rnd_seed = bb_icn_rnd_seed * 6364136223846793005UL + 1442695040888963407UL;
                 int target = (int)((bb_icn_rnd_seed >> 33) % (unsigned long)base.tbl->size);
                 int seen = 0;
