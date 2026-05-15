@@ -1,40 +1,29 @@
-/*
- * ir_exec.c — DCG graph-walk executor: IR_exec_once, IR_exec_pump (LR-2)
- *             IR_PAT_* cursor-walk cases + IR_exec_pat (LR-S1b)
- * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6 (LR-2, 2026-05-14; LR-S1b, 2026-05-14)
- */
 #include "ir_exec.h"
 #include <stddef.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <gc/gc.h>
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void icn_every_body_pre(void);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern int  icn_every_body_broke(void);
-/* ── Cursor globals from stmt_exec.c ───────────────────────────────────────
- * Σ = subject string base, Δ = current cursor, Ω = anchor limit,
- * Σlen = true subject length (Ω may be clamped by &ANCHOR).
- * Non-static file-scope in stmt_exec.c; extern here for IR_PAT_* nodes. */
 extern const char *Σ;
 extern int         Δ;
 extern int         Ω;
 extern int         Σlen;
-/* NV_SET_fn for conditional/immediate capture assignment (IR_PAT_ASSIGN_*). */
 #include "snobol4.h"
 #include "lower_icn.h"
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void bb_exec_stmt(void *e);
-/* descr_match_span: construct DT_S match descriptor from (base, len). */
 #include "bb_box.h"
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t icn_binop_apply(IcnBinopKind op, DESCR_t lv, DESCR_t rv, int *rel_fail);
-/*------------------------------------------------------------------------------------------------------------------------------------*/
-/* IR_exec_node — evaluate nd in its current state; return next port.
- * Self-evaluating scalar kinds set nd->value and return γ or ω.
- * Generative kinds consult nd->state / nd->counter and update them.
- * Unimplemented kinds return ω (explicit, safe, detectable in tests). */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t IR_exec_once(IR_block_t * cfg);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 IR_t * IR_exec_node(IR_t * nd) {
     switch (nd->t) {
-    /*-- Literals: always succeed, value is the literal. ----------------------------------------------------------------*/
     case IR_LIT_I:
         nd->value = INTVAL(nd->ival);
         return nd->γ;
@@ -48,30 +37,23 @@ IR_t * IR_exec_node(IR_t * nd) {
     case IR_SUCCEED:
         nd->value = NULVCL;
         return nd->γ;
-    /*-- FAIL: always fails. --------------------------------------------------------------------------------------------*/
     case IR_FAIL:
         nd->value = FAILDESCR;
         return nd->ω;
-    /*-- TO_BY: integer range generator.
-     * state 0 = fresh (init from children c[0]=from, c[1]=to, c[2]=by or NULL).
-     * state 1 = running; nd->counter = current value; nd->value = INTVAL(counter).
-     * state 2 = exhausted → ω. -------------------------------------------------------------------------------*/
     case IR_TO_BY: {
         if (nd->state == 0) {
-            /* evaluate children to get from/to/by -- do not rely on pre-set values */
             int64_t from = 0, by = 1;
             if (nd->n > 0 && nd->c[0]) { IR_exec_node(nd->c[0]); from = nd->c[0]->value.i; }
             if (nd->n > 2 && nd->c[2]) { IR_exec_node(nd->c[2]); by   = nd->c[2]->value.i; }
             if (by == 0) by = 1;
             nd->counter = from;
-            nd->ival    = by;   /* reuse ival for step */
+            nd->ival    = by;
             nd->state   = 1;
         }
         if (nd->state == 2) {
             nd->value = FAILDESCR;
             return nd->ω;
         }
-        /* evaluate to-child (may be dynamic) */
         int64_t to_val = 0;
         if (nd->n > 1 && nd->c[1]) { IR_exec_node(nd->c[1]); to_val = nd->c[1]->value.i; }
         int64_t by = nd->ival;
@@ -84,22 +66,13 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->counter += by;
         return nd->γ;
     }
-    /*-- ALTERNATE(A,B): try A; on A-fail try B. Wired by lower:
-     * α→A.start, A.succ→self.γ, A.fail→B.start,
-     * B.succ→self.γ, B.fail→self.ω.
-     * IR_exec_node is not called for ALTERNATE in the walker —
-     * the port wiring handles routing.  But if somehow called, route to fail. */
     case IR_ALTERNATE:
         nd->value = FAILDESCR;
         return nd->ω;
-    /*-- IR_PAT_LIT: literal string match.
-     * counter = length of literal (set on first call from nd->sval).
-     * On entry: try to match nd->sval at Σ+Δ.  Advance Δ on success. ------------------------------------------------*/
     case IR_PAT_LIT: {
         const char *lit = nd->sval ? nd->sval : "";
         int         len = (int)strlen(lit);
         if (nd->state == 0) {
-            /* fresh: attempt match at current Δ */
             if (Δ + len > Σlen || (len > 0 && memcmp(Σ + Δ, lit, (size_t)len) != 0)) {
                 nd->value = FAILDESCR;
                 return nd->ω;
@@ -110,14 +83,11 @@ IR_t * IR_exec_node(IR_t * nd) {
             Δ += len;
             return nd->γ;
         }
-        /* resume → undo and fail (literal is non-generative) */
         Δ -= (int)nd->counter;
         nd->state = 0;
         nd->value = FAILDESCR;
         return nd->ω;
     }
-    /*-- IR_PAT_ANY: match one char from charset.
-     * Non-generative: succeeds once or fails. -----------------------------------------------------------------------*/
     case IR_PAT_ANY: {
         const char *chars = nd->sval ? nd->sval : "";
         if (nd->state == 0) {
@@ -130,14 +100,11 @@ IR_t * IR_exec_node(IR_t * nd) {
             Δ++;
             return nd->γ;
         }
-        /* resume → undo */
         Δ--;
         nd->state = 0;
         nd->value = FAILDESCR;
         return nd->ω;
     }
-    /*-- IR_PAT_BREAK: match chars NOT in charset, up to first member.
-     * Non-generative: matches 0 or more chars (may match empty). ---------------------------------------------------*/
     case IR_PAT_BREAK: {
         const char *chars = nd->sval ? nd->sval : "";
         if (nd->state == 0) {
@@ -149,31 +116,25 @@ IR_t * IR_exec_node(IR_t * nd) {
             Δ += i;
             return nd->γ;
         }
-        /* resume → undo */
         Δ -= (int)nd->counter;
         nd->state = 0;
         nd->value = FAILDESCR;
         return nd->ω;
     }
-    /*-- IR_PAT_SPAN: match one or more chars from charset; generative (try-shorter on resume).
-     * state 0 = fresh; counter = chars consumed (max greedy match).
-     * state 1 = yielded max; resume tries max-1, max-2, ... down to 1.
-     * state 2 = exhausted → fail. -----------------------------------------------------------------------------------*/
     case IR_PAT_SPAN: {
         const char *chars = nd->sval ? nd->sval : "";
         if (nd->state == 0) {
             int i = 0;
             while (Δ + i < Σlen && strchr(chars, Σ[Δ + i])) i++;
             if (i == 0) { nd->value = FAILDESCR; return nd->ω; }
-            nd->counter = i;   /* max match length */
+            nd->counter = i;
             nd->state   = 1;
             nd->value   = descr_match_span(Σ + Δ, i);
             Δ += i;
             return nd->γ;
         }
         if (nd->state == 1) {
-            /* resume: try one shorter */
-            Δ -= (int)nd->counter;   /* undo previous */
+            Δ -= (int)nd->counter;
             nd->counter--;
             if (nd->counter < 1) { nd->state = 2; nd->value = FAILDESCR; return nd->ω; }
             nd->value = descr_match_span(Σ + Δ, (int)nd->counter);
@@ -183,20 +144,14 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->value = FAILDESCR;
         return nd->ω;
     }
-    /*-- IR_PAT_ARB: match any number of chars (0,1,2,...); generative (try-longer on resume).
-     * state 0 = fresh; tries 0 chars first.
-     * state 1 = running; counter = chars consumed last time; resume tries counter+1.
-     * state 2 = exhausted (Δ+counter >= Σlen). ----------------------------------------------------------------------*/
     case IR_PAT_ARB: {
         if (nd->state == 0) {
             nd->counter = 0;
             nd->state   = 1;
             nd->value   = descr_match_span(Σ + Δ, 0);
-            /* do NOT advance Δ — 0-length match */
             return nd->γ;
         }
         if (nd->state == 1) {
-            /* resume: undo last, try one longer */
             Δ -= (int)nd->counter;
             nd->counter++;
             if (Δ + (int)nd->counter > Σlen) {
@@ -211,7 +166,6 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->value = FAILDESCR;
         return nd->ω;
     }
-    /*-- IR_PAT_REM: match everything from Δ to end of subject. Non-generative. ------------------------------------*/
     case IR_PAT_REM: {
         if (nd->state == 0) {
             int rem = Σlen - Δ;
@@ -221,30 +175,24 @@ IR_t * IR_exec_node(IR_t * nd) {
             Δ = Σlen;
             return nd->γ;
         }
-        /* resume → undo */
         Δ -= (int)nd->counter;
         nd->state = 0;
         nd->value = FAILDESCR;
         return nd->ω;
     }
-    /*-- IR_PAT_FENCE: succeed once, cut on resume (prevent backtrack through). ------------------------------------*/
     case IR_PAT_FENCE: {
         if (nd->state == 0) {
             nd->state = 1;
             nd->value = NULVCL;
             return nd->γ;
         }
-        /* resume → hard fail (FENCE cuts backtrack) */
         nd->value = FAILDESCR;
         return nd->ω;
     }
-    /*-- IR_PAT_ABORT: always fails unconditionally (no backtrack). ------------------------------------------------*/
     case IR_PAT_ABORT: {
         nd->value = FAILDESCR;
         return nd->ω;
     }
-    /*-- IR_PAT_LEN: match exactly n characters. Non-generative.
-     * counter = n (set from ival at first call). -----------------------------------------------------------------------*/
     case IR_PAT_LEN: {
         int64_t n = nd->ival;
         if (nd->state == 0) {
@@ -258,7 +206,6 @@ IR_t * IR_exec_node(IR_t * nd) {
         Δ -= (int)nd->counter;
         nd->state = 0; nd->value = FAILDESCR; return nd->ω;
     }
-    /*-- IR_PAT_NOTANY: match one char NOT in charset. Non-generative. -----------------------------------------------*/
     case IR_PAT_NOTANY: {
         const char *chars = nd->sval ? nd->sval : "";
         if (nd->state == 0) {
@@ -270,10 +217,6 @@ IR_t * IR_exec_node(IR_t * nd) {
         }
         Δ--; nd->state = 0; nd->value = FAILDESCR; return nd->ω;
     }
-    /*-- IR_PAT_POS: zero-width cursor assert.
-     * ival = n (position argument). n=0 → POS (from left), n=1 → RPOS (from right).
-     * nd->n is the direction flag: 0=POS, 1=RPOS. Never reset by IR_reset.
-     * Non-generative. ---------------------------------------------------------------*/
     case IR_PAT_POS: {
         if (nd->state == 0) {
             int64_t arg = nd->ival;
@@ -285,9 +228,6 @@ IR_t * IR_exec_node(IR_t * nd) {
         }
         nd->state = 0; nd->value = FAILDESCR; return nd->ω;
     }
-    /*-- IR_PAT_TAB: advance cursor to position n.
-     * ival = n (position argument). nd->n = direction flag: 0=TAB (from left), 1=RTAB (from right).
-     * Non-generative (succeeds if Δ ≤ target). ---------------------------------------------------------*/
     case IR_PAT_TAB: {
         if (nd->state == 0) {
             int64_t arg    = nd->ival;
@@ -299,33 +239,23 @@ IR_t * IR_exec_node(IR_t * nd) {
             Δ = target;
             return nd->γ;
         }
-        /* resume: restore Δ */
         Δ = (int)nd->counter;
         nd->state = 0; nd->value = FAILDESCR; return nd->ω;
     }
-    /*-- IR_PAT_CAT / IR_PAT_ALT: wiring-only nodes — routing handled by port pointers.
-     * IR_exec_node is not called on these during normal walk; if called, pass through. ---------------------------*/
     case IR_PAT_CAT:
     case IR_PAT_ALT:
         nd->value = NULVCL;
         return nd->γ;
-    /*-- IR_PAT_ASSIGN_COND (P $ V): conditional capture.
-     * nd sits between inner's γ and the real sp.
-     * state 0: record Δ_before, return nd->α (= inner entry) to start inner.
-     * state 1: inner succeeded and routed to nd as its sp; do assignment,
-     *          reset to state 0, return nd->γ (= real sp). */
     case IR_PAT_ASSIGN_COND: {
         if (nd->state == 0) {
-            nd->counter = Δ;   /* record Δ before inner runs */
+            nd->counter = Δ;
             nd->state   = 1;
             nd->value   = NULVCL;
-            return nd->α;      /* enter inner pattern */
+            return nd->α;
         }
-        /* state 1: inner succeeded, we are its sp */
         if (nd->sval && *nd->sval) {
             int matched_len = Δ - (int)nd->counter;
             if (matched_len < 0) matched_len = 0;
-            /* null-terminate copy so NV table and OUTPUT use strlen safely */
             char *copy = (char *)GC_MALLOC((size_t)matched_len + 1);
             if (copy) { memcpy(copy, Σ + (int)nd->counter, (size_t)matched_len); copy[matched_len] = '\0'; }
             DESCR_t matched = { .v = DT_S, .slen = (uint32_t)matched_len, .s = copy ? copy : "" };
@@ -333,9 +263,8 @@ IR_t * IR_exec_node(IR_t * nd) {
         }
         nd->state = 0;
         nd->value = NULVCL;
-        return nd->γ;   /* real sp */
+        return nd->γ;
     }
-    /*-- IR_PAT_ASSIGN_IMM (P . V): immediate capture — same structure as COND. */
     case IR_PAT_ASSIGN_IMM: {
         if (nd->state == 0) {
             nd->counter = Δ;
@@ -355,48 +284,33 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->value = NULVCL;
         return nd->γ;
     }
-    /*-- IR_PAT_ARBNO: match inner zero or more times (greedy).
-     * nd->c    = void*[2]: [0]=inner IR_block_t*, [1]=int* position stack
-     * nd->n    = position stack capacity
-     * nd->state = 0 → fresh (build greedy stack); N → have N items; -1 → exhausted.
-     * On first call: loop inner_cfg until it fails, push each Δ.
-     * On each yield: return γ with Δ = stack top (or start if empty).
-     * On resume (β=nd): pop one, return γ. When stack empty → return ω. -------*/
     case IR_PAT_ARBNO: {
         IR_block_t * inner_blk = nd->c ? (IR_block_t *)((void **)nd->c)[0] : NULL;
         int       * pos_stack = nd->c ? (int       *)((void **)nd->c)[1] : NULL;
         if (!inner_blk || !pos_stack) { nd->value = FAILDESCR; return nd->ω; }
         if (nd->state == 0) {
-            /* Build greedy stack: try inner from current Δ repeatedly. */
             int depth = 0;
             int cap   = nd->n;
-            nd->counter = Δ;   /* save start position for full-unwind resume */
+            nd->counter = Δ;
             while (depth < cap) {
                 int pre = Δ;
                 DESCR_t r = IR_exec_once(inner_blk);
-                if (IS_FAIL_fn(r) || Δ == pre) break;  /* fail or zero-progress → stop */
+                if (IS_FAIL_fn(r) || Δ == pre) break;
                 pos_stack[depth++] = Δ;
             }
             nd->state = depth;
-            /* Yield greedy match: Δ is already at max position. */
             nd->value = NULVCL;
             return nd->γ;
         }
-        /* Resume: pop one position (try one fewer repetition). */
         nd->state--;
         if (nd->state < 0) { nd->value = FAILDESCR; return nd->ω; }
         Δ = (nd->state > 0) ? pos_stack[nd->state - 1] : (int)nd->counter;
         nd->value = NULVCL;
         return nd->γ;
     }
-    /*-- IR_ICN_UPTO: upto(cset, str) — generate positions where cset char appears (IJ-19-lower).
-     * state 0 = fresh (α): reset counter to 0, scan forward.
-     * state 1 = resumed (β): continue scanning from counter.
-     * nd->sval = cset; nd->sval2 = hay (stable pointer; not zeroed by IR_reset).
-     * Returns 1-based position of next match, or ω. */
     case IR_ICN_UPTO: {
-        if (nd->state == 0) nd->counter = 0;   /* α: start from beginning */
-        nd->state = 1;                           /* β path next time        */
+        if (nd->state == 0) nd->counter = 0;
+        nd->state = 1;
         const char *cset = nd->sval ? nd->sval : "";
         const char *hay  = nd->sval2 ? nd->sval2 : "";
         int slen = (int)strlen(hay);
@@ -404,7 +318,7 @@ IR_t * IR_exec_node(IR_t * nd) {
             char c = hay[nd->counter];
             nd->counter++;
             if (strchr(cset, c)) {
-                nd->value = INTVAL((int64_t)nd->counter);  /* 1-based */
+                nd->value = INTVAL((int64_t)nd->counter);
                 return nd->γ;
             }
         }
@@ -536,17 +450,12 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->value = v;
         return nd->γ;
     }
-    /*-- All other kinds: not yet implemented — return ω explicitly. ----------------------------------------*/
     default:
         nd->value = FAILDESCR;
         return nd->ω;
     }
 }
-/*------------------------------------------------------------------------------------------------------------------------------------*/
-/* IR_exec_once — drive cfg from entry to first succ or fail.
- * Graph walker: pointer-chase from entry through γ/ω.
- * Back-edges (cycles) are traversed by the pointer chain; exhaustion is
- * when a node routes to ω with no further resume path. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t IR_exec_once(IR_block_t * cfg) {
     if (!cfg || !cfg->entry) return FAILDESCR;
     IR_reset(cfg);
@@ -561,8 +470,7 @@ DESCR_t IR_exec_once(IR_block_t * cfg) {
     }
     return FAILDESCR;
 }
-
-/* IR_exec_resume — same as IR_exec_once but skips IR_reset (β path). */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t IR_exec_resume(IR_block_t * cfg) {
     if (!cfg || !cfg->entry) return FAILDESCR;
     IR_t * cur = cfg->entry;
@@ -576,11 +484,7 @@ DESCR_t IR_exec_resume(IR_block_t * cfg) {
     }
     return FAILDESCR;
 }
-/*------------------------------------------------------------------------------------------------------------------------------------*/
-/* IR_exec_pump — drive cfg to exhaustion, calling body_fn per value.
- * After IR_exec_once returns a value, resume by following β of the
- * deepest node that has one.  Implementation: simple retry loop using
- * IR_exec_once_resume which starts from β of the last-succ node. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int IR_exec_pump(IR_block_t * cfg, IR_body_fn body_fn, void * ctx) {
     if (!cfg || !cfg->entry) return 0;
     IR_reset(cfg);
@@ -590,37 +494,22 @@ int IR_exec_pump(IR_block_t * cfg, IR_body_fn body_fn, void * ctx) {
     while (cur && safety-- > 0) {
         IR_t * next = IR_exec_node(cur);
         if (!next) {
-            /* terminal node: check value */
             if (!IS_FAIL_fn(cur->value)) {
                 ticks++;
                 if (body_fn && body_fn(cur->value, ctx)) break;
-                /* resume from this node's β — do NOT reset state */
                 next = cur->β;
                 if (!next) break;
             } else {
                 break;
             }
         } else if (next == cur) {
-            /* self-loop on a generative node: eval again without resetting */
             continue;
         }
         cur = next;
     }
     return ticks;
 }
-/*------------------------------------------------------------------------------------------------------------------------------------*/
-/* IR_exec_pat — LR-S1b: IR-path equivalent of exec_stmt() for SNOBOL4 patterns.
- *
- * Called from SM_EXEC_STMT when ins->a[2].ptr is a non-NULL IR_block_t* (built by
- * IR_lower_pat at lower time).  Mirrors exec_stmt Phases 1+3+4+5 using the IR graph
- * walker instead of the dynamic bb_node_t broker.
- *
- * Cursor globals Σ/Δ/Ω/Σlen are set up here (Phase 1) and consumed by IR_exec_node
- * PAT_* cases.  On match success the BB_SCAN equivalent is finding the first anchor
- * position where IR_exec_once returns non-FAIL; then Phase 4/5 perform replacement.
- *
- * Returns 1 on match (:S branch), 0 on no-match (:F branch).
- */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int IR_exec_pat(IR_block_t *cfg,
                 const char *subj_name,
                 DESCR_t    *subj_var,
@@ -628,7 +517,6 @@ int IR_exec_pat(IR_block_t *cfg,
                 int         has_repl)
 {
     if (!cfg || !cfg->entry) return 0;
-    /* ── Phase 1: set up subject cursor ── */
     const char *subj_str = "";
     int         subj_len = 0;
     DESCR_t subj_fetched;
@@ -646,7 +534,6 @@ int IR_exec_pat(IR_block_t *cfg,
     Σ    = subj_str;
     Σlen = subj_len;
     Ω    = subj_len;
-    /* ── Phase 3: scan — try each anchor position 0..Ω ── */
     int match_start = -1;
     int match_end   = -1;
     extern int64_t kw_anchor;
@@ -661,10 +548,9 @@ int IR_exec_pat(IR_block_t *cfg,
             break;
         }
     }
-    if (match_start < 0) return 0;   /* :F */
-    /* ── Phase 4/5: replacement (mirrors exec_stmt) ── */
-    if (!has_repl || !repl) return 1;   /* :S, no replacement */
-    if (!subj_name && !subj_var)        return 0;   /* no lvalue — :F */
+    if (match_start < 0) return 0;
+    if (!has_repl || !repl) return 1;
+    if (!subj_name && !subj_var)        return 0;
     const char *repl_str = "";
     int         repl_len = 0;
     if (repl->v == DT_S && repl->s) {

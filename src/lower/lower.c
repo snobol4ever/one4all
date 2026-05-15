@@ -1,31 +1,4 @@
-/*
- * lower.c — AST → SM_Program compiler pass
- *
- * Six frontends produce a shared AST. This file walks that AST and emits
- * a flat SM_Program (stack-machine instruction sequence) consumed by four
- * execution backends: IR-interp, SM-interp, JIT-exec, native-emit.
- *
- * Entry point: SM_Program *lower(const tree_t *prog)  — prog is TT_PROGRAM
- *
- * Three phases inside lower():
- *   1. lower_proc_skeletons — JUMP/label/RETURN stubs for every procedure
- *      and Prolog predicate so forward calls resolve before bodies land.
- *   2. lower_stmt loop — walks TT_PROGRAM children (TT_STMT / TT_END);
- *      lower_stmt() routes each statement to pattern-match, assignment,
- *      or expression paths; lower_expr() dispatches via g_handlers[].
- *   3. SM_HALT + labtab_resolve — patches forward GOTO targets; reports any
- *      AST kinds that hit lower_unhandled() (diagnostic, normally silent).
- *
- * File-scope state: g_p (SM_Program), g_labtab (LabelTable),
- * g_in_proc_body + g_proc_scope (Icon frame-slot context), g_unhandled_kinds (diagnostic).
- * Naming: p = SM_Program*, t = tree_t*, s = TT_STMT / TT_END node.
- * Handler signature: static void lower_foo(const tree_t *t)
- *
- * Authors: Lon Jones Cherryholmes · Claude Sonnet 4.6
- */
-
-#define IR_DEFINE_NAMES   /* enable tt_e_name[] in ast.h */
-
+#define IR_DEFINE_NAMES
 #include "lower.h"
 #include "lower_ctx.h"
 #include "sm_prog.h"
@@ -33,8 +6,8 @@
 #include "../../frontend/snobol4/scrip_cc.h"
 #include "../ast/ast.h"
 #include "ast_clone.h"
-#include "lower_pat_dcg.h"         /* LR-S1: build IR_block_t alongside pattern lowering */
-#include "lower_icn.h"             /* IJ-19-lower: Icon DCG builders */
+#include "lower_pat_dcg.h"
+#include "lower_icn.h"
 #include "../../runtime/interp/icn_runtime.h"
 #include "../../runtime/interp/pl_runtime.h"
 #include "../../frontend/icon/icon_lex.h"
@@ -45,16 +18,14 @@
 #include <ctype.h>
 #include <gc/gc.h>
 #include "snobol4.h"
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_pat_nary(const tree_t *t, sm_opcode_t op);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void lower_expr    (const tree_t *t);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void lower_pat_expr(const tree_t *t);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void lower_stmt    (const tree_t *s);
-
-/*── File-scope lowering state ───────────────────────────────────────────────
- * lower() initializes these before the pass; all handlers read/write them.
- * Only one lowering pass runs at a time (lower() is not reentrant).
- *────────────────────────────────────────────────────────────────────────────*/
 #define LOWER_UNHANDLED_WORDS 4
 #define ICN_BB_EVAL(t) do { if (g_lang == LANG_ICN) { sm_emit_i(g_p, SM_BB_EVAL, (int64_t)every_table_register((tree_t *)(t))); return; } } while(0)
 static SM_Program  *g_p;
@@ -62,19 +33,11 @@ static LabelTable   g_labtab;
 static int          g_in_proc_body;
 static IcnScope    *g_proc_scope;
 static unsigned long long g_unhandled_kinds[LOWER_UNHANDLED_WORDS];
-/* IJ-9: tracks whether lower_expr is being called in a value/arg context
- * (inside a function arg list, binop, etc.) rather than as a bare statement.
- * When > 0, TT_EVERY emits SM_BB_EVAL (value-context: fails as expression)
- * rather than SM_BB_PUMP_EVERY (statement: runs for side effects). */
 static int          g_in_value_ctx;
-/* GOAL-ICON-BB-COMPLETE rung13: hoisted alternate context for lower_every */
 static const tree_t *g_hoist_alt   = NULL;
 static int           g_hoist_entry = -1;
 static int           g_hoist_slot  = -1;
-
-/* GOAL-ICON-BB-COMPLETE rung13: Icon-aware suspendable check that includes TT_SEQ.
- * is_suspendable() (icn_runtime.c) intentionally excludes TT_SEQ to avoid breaking
- * the interp_eval TT_EVERY augop path. We need TT_SEQ here in the lowering layer only. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int lower_is_suspendable_icn(const tree_t *e)
 {
     if (!e) return 0;
@@ -85,15 +48,14 @@ static int lower_is_suspendable_icn(const tree_t *e)
     }
     return is_suspendable((tree_t *)e);
 }
-
-extern int g_lang;   /* set per-statement in lower_stmt; read by lower_cat_seq */
-
+extern int g_lang;
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_push_expr(const tree_t *t)
 {
     if (!t) { sm_emit(g_p, SM_PUSH_NULL); return; }
     sm_emit_ptr(g_p, SM_PUSH_EXPR, (void *)ast_gc_clone(t));
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_unhandled(const tree_t *t)
 {
     if (!g_in_proc_body && t->t >= 0 && t->t < TT_KIND_COUNT) {
@@ -102,12 +64,10 @@ static void lower_unhandled(const tree_t *t)
     }
     sm_emit(g_p, SM_PUSH_NULL);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_goto(sm_opcode_t op, const char *target)
 {
     if (!target) return -1;
-    /* RETURN/FRETURN/NRETURN as goto-targets: pick the row, then the column
-     * (op == JUMP_S → success, JUMP_F → fail, else unconditional). */
     static const struct {
         const char *name;
         sm_opcode_t plain, succ, fail;
@@ -130,26 +90,17 @@ static int emit_goto(sm_opcode_t op, const char *target)
     else               labtab_patch_later(&g_labtab, idx, target);
     return idx;
 }
-
-/* Inline frame-slot load for a named variable, falling back to NV store. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_var_load(const char *vn)
 {
     if (g_in_proc_body && g_proc_scope && vn[0] && vn[0] != '&') {
-        /* IJ-3: if this name is a known Icon proc (not a local variable),
-         * skip the slot path so SM_PUSH_VAR fires instead.  SM_PUSH_VAR
-         * promotes Icon proc names to DT_E proc-value descriptors, letting
-         * `pv := p0; pv()` work.  Without this, scope_get finds a slot (any
-         * referenced name gets one during scope building) and SM_LOAD_FRAME
-         * pushes the zero-initialised slot value, never a DT_E. */
         if (g_lang == LANG_ICN) {
             for (int _pi = 0; _pi < proc_count; _pi++) {
                 if (proc_table[_pi].name && strcmp(proc_table[_pi].name, vn) == 0) {
-                    sm_emit_s(g_p, SM_PUSH_VAR, vn);   /* SM_PUSH_VAR → DT_E promotion */
+                    sm_emit_s(g_p, SM_PUSH_VAR, vn);
                     return;
                 }
             }
-            /* IJ-4: also check known Icon builtins (sqrt, write, sin, etc.).
-             * SM_PUSH_VAR will call icn_proc_as_value which returns DT_S(name). */
             extern DESCR_t icn_proc_as_value(const char *);
             DESCR_t pv = icn_proc_as_value(vn);
             if (pv.v == DT_S) {
@@ -162,7 +113,7 @@ static void emit_var_load(const char *vn)
     }
     sm_emit_s(g_p, SM_PUSH_VAR, vn);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_var_store(const char *vn)
 {
     if (g_in_proc_body && g_proc_scope && vn[0] && vn[0] != '&') {
@@ -171,9 +122,7 @@ static void emit_var_store(const char *vn)
     }
     sm_emit_s(g_p, SM_STORE_VAR, vn);
 }
-
-/* Emit a thunked SM expression (JUMP/body/RETURN/PUSH_EXPRESSION).
- * Used by DEFER, EVAL, and pattern-capture argument lowering. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_thunk(const tree_t *body)
 {
     int skip = sm_emit_i(g_p, SM_JUMP, 0);
@@ -183,19 +132,19 @@ static void emit_thunk(const tree_t *body)
     sm_patch_jump(g_p, skip, sm_label(g_p));
     sm_emit_ii(g_p, SM_PUSH_EXPRESSION, (int64_t)entry, 0);
 }
-
-/*── Literals ────────────────────────────────────────────────────────────────*/
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_strlit(const tree_t *t) { ICN_BB_EVAL(t); sm_emit_s(g_p, SM_PUSH_LIT_S, t->v.sval ? t->v.sval : ""); }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_ilit  (const tree_t *t) { ICN_BB_EVAL(t); sm_emit_i(g_p, SM_PUSH_LIT_I, (int64_t)t->v.ival); }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_flit  (const tree_t *t) { ICN_BB_EVAL(t); sm_emit_f(g_p, SM_PUSH_LIT_F, t->v.dval); }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_nul   (const tree_t *t) { ICN_BB_EVAL(t); (void)t; sm_emit(g_p, SM_PUSH_NULL); }
-
-/*── Variable references ─────────────────────────────────────────────────────*/
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_var(const tree_t *t)     { ICN_BB_EVAL(t); emit_var_load(t->v.sval ? t->v.sval : ""); }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_keyword(const tree_t *t) { ICN_BB_EVAL(t); sm_emit_s(g_p, SM_PUSH_VAR, kw_canonicalize(t->v.sval)); }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_indirect(const tree_t *t)
 {
     ICN_BB_EVAL(t);
@@ -214,17 +163,14 @@ static void lower_indirect(const tree_t *t)
     lower_expr(ch);
     sm_emit_si(g_p, SM_CALL_FN, "INDIR_GET", 1);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_defer(const tree_t *t)
 {
-    /* *expr in value context — thunk the child, push a DT_E descriptor. */
     emit_thunk(T0(t));
 }
-
-/*── Arithmetic ──────────────────────────────────────────────────────────────*/
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_interrogate(const tree_t *t) { ICN_BB_EVAL(t); lower_expr(T0(t)); }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_name(const tree_t *t)
 {
     ICN_BB_EVAL(t);
@@ -232,18 +178,23 @@ static void lower_name(const tree_t *t)
     sm_emit_s(g_p, SM_PUSH_LIT_S, vname);
     sm_emit_si(g_p, SM_CALL_FN, "NAME_PUSH", 1);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_mns(const tree_t *t) { ICN_BB_EVAL(t); LOWER1_VAL(SM_NEG); }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_pls(const tree_t *t) { ICN_BB_EVAL(t); LOWER1_VAL(SM_COERCE_NUM); }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_add(const tree_t *t) { ICN_BB_EVAL(t); LOWER2(SM_ADD); }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_sub(const tree_t *t) { ICN_BB_EVAL(t); LOWER2(SM_SUB); }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_mul(const tree_t *t) { ICN_BB_EVAL(t); LOWER2(SM_MUL); }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_div(const tree_t *t) { ICN_BB_EVAL(t); LOWER2(SM_DIV); }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_mod(const tree_t *t) { ICN_BB_EVAL(t); LOWER2(SM_MOD); }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_pow(const tree_t *t) { ICN_BB_EVAL(t); LOWER2(SM_EXP); }
-
-/*── Sequences and alternation ───────────────────────────────────────────────*/
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_vlist(const tree_t *t)
 {
     ICN_BB_EVAL(t);
@@ -259,7 +210,7 @@ static void lower_vlist(const tree_t *t)
     for (int i = 0; i < n; i++) sm_patch_jump(g_p, jumps[i], done);
     free(jumps);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_cat_seq(const tree_t *t)
 {
     ICN_BB_EVAL(t);
@@ -271,7 +222,7 @@ static void lower_cat_seq(const tree_t *t)
         for (int i = 0; i < t->n; i++) {
             lower_expr(t->c[i]);
             if (i < t->n - 1) {
-                fail_jumps[i] = sm_emit_i(g_p, SM_JUMP_F, 0); /* -> done with FAILDESCR */
+                fail_jumps[i] = sm_emit_i(g_p, SM_JUMP_F, 0);
                 sm_emit(g_p, SM_VOID_POP);
             }
         }
@@ -289,12 +240,12 @@ static void lower_cat_seq(const tree_t *t)
         for (int i = 1; i < t->n; i++) sm_emit(g_p, SM_CONCAT);
     }
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_opsyn(const tree_t *t)
 {
     ICN_BB_EVAL(t);
     const char *raw = t->v.sval ? t->v.sval : "&";
-    char op_buf[4];   /* local — lower_expr is re-entrant; static would be clobbered */
+    char op_buf[4];
     const char *op = raw;
     const char *lp = strchr(raw, '(');
     if (lp && lp[1] && lp[2] == ')') { op_buf[0] = lp[1]; op_buf[1] = '\0'; op = op_buf; }
@@ -303,11 +254,7 @@ static void lower_opsyn(const tree_t *t)
     for (int i = 0; i < t->n; i++) lower_expr(t->c[i]);
     sm_emit_si(g_p, SM_CALL_FN, op, (int64_t)t->n);
 }
-
-/*── Pattern-context lowering ────────────────────────────────────────────────*/
-
-/* Build a tab-separated argument name list from *fn(var,...) for SM_PAT_CAPTURE_FN.
- * Returns NULL if any arg is not a plain TT_VAR (caller falls back to stack args). */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 const char *sm_pat_capture_fn_arg_names(const tree_t *fnc)
 {
     if (!fnc || fnc->n <= 0) return NULL;
@@ -326,9 +273,7 @@ const char *sm_pat_capture_fn_arg_names(const tree_t *fnc)
     }
     return buf;
 }
-
-/* Emit args for a *fn(arg,...) pattern-capture call.
- * Literal args go inline; non-literal args are thunked. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_pat_fn_args(const tree_t *fnc)
 {
     for (int i = 0; i < fnc->n; i++) {
@@ -337,9 +282,7 @@ static void emit_pat_fn_args(const tree_t *fnc)
         else                              emit_thunk(arg);
     }
 }
-
-/* Emit a pattern capture of kind mode (0=conditional .V, 1=immediate $V, 2=cursor @V).
- * Handles variable, *fn(), and *fn(args) targets. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_pat_capture(const tree_t *var_node, int mode)
 {
     if (var_node && var_node->t == TT_DEFER
@@ -362,14 +305,13 @@ static void emit_pat_capture(const tree_t *var_node, int mode)
         g_p->instrs[idx].a[1].i = mode;
     }
 }
-
-/* Lower all children in pattern context then emit (n-1) copies of op. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_pat_nary(const tree_t *t, sm_opcode_t op)
 {
     for (int i = 0; i < t->n; i++) lower_pat_expr(t->c[i]);
     for (int i = 1; i < t->n; i++) sm_emit(g_p, op);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void lower_pat_expr(const tree_t *t)
 {
     if (!t) return;
@@ -419,7 +361,6 @@ void lower_pat_expr(const tree_t *t)
         return;
     case TT_DEFER: {
         const tree_t *ch = T0(t);
-        /* *fn() in pattern — run fn at each match position via SM_PAT_USERCALL. */
         if (ch && ch->t == TT_FNC && ch->v.sval) {
             if (ch->n == 0) {
                 int idx = sm_emit_s(g_p, SM_PAT_USERCALL, ch->v.sval);
@@ -431,7 +372,6 @@ void lower_pat_expr(const tree_t *t)
             }
             return;
         }
-        /* *var — push by name so self-recursive patterns resolve at match time. */
         if (ch && ch->t == TT_VAR && ch->v.sval) { sm_emit_s(g_p, SM_PAT_REFNAME, ch->v.sval); return; }
         lower_expr(ch); sm_emit(g_p, SM_PAT_DEREF);
         return;
@@ -441,28 +381,19 @@ void lower_pat_expr(const tree_t *t)
         return;
     }
 }
-
-/*── Function calls, assignment, scanning ────────────────────────────────────*/
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_fnc(const tree_t *t)
 {
     int nargs = t->n;
-
-    /* EVAL(*expr) — thunk the expression, call it via SM_CALL_EXPRESSION. */
     if (nargs == 1 && t->v.sval && strcmp(t->v.sval, "EVAL") == 0
             && t->c[0] && t->c[0]->t == TT_DEFER) {
         emit_thunk(T0(t->c[0]));
         g_p->instrs[g_p->count - 1].op = SM_CALL_EXPRESSION;
         return;
     }
-
-    /* IJ-19-lower: upto(cset, str) with compile-time-constant scalar args →
-     * build DCG at lower time, emit SM_EXEC_BB(ptr).
-     * Icon calls: sval==NULL, c[0]->v.sval = "upto", args at c[1], c[2]. */
     {
         int is_upto = 0;
         const char *cset = NULL, *hay = NULL;
-        /* SNOBOL4-style: t->v.sval = "upto" */
         if (t->v.sval && strcmp(t->v.sval, "upto") == 0 && nargs >= 2) {
             if (t->c[0] && (t->c[0]->t == TT_CSET || t->c[0]->t == TT_QLIT) &&
                 t->c[1] && (t->c[1]->t == TT_QLIT || t->c[1]->t == TT_CSET)) {
@@ -471,7 +402,6 @@ static void lower_fnc(const tree_t *t)
                 is_upto = 1;
             }
         }
-        /* Icon-style: t->v.sval==NULL, c[0]->v.sval = "upto", args at c[1], c[2] */
         if (!t->v.sval && nargs >= 3 && t->c[0] && t->c[0]->v.sval
                 && strcmp(t->c[0]->v.sval, "upto") == 0) {
             if (t->c[1] && (t->c[1]->t == TT_CSET || t->c[1]->t == TT_QLIT) &&
@@ -490,9 +420,7 @@ static void lower_fnc(const tree_t *t)
             }
         }
     }
-
     if (t->v.sval) { ICN_BB_EVAL(t); }
-    /* Icon-style call: sval==NULL, children[0] is the callee name node. */
     if (!t->v.sval && nargs >= 1 && t->c[0] && t->c[0]->v.sval) {
         const char *fn = t->c[0]->v.sval;
         for (int i = 1; i < nargs; i++) lower_expr(t->c[i]);
@@ -502,15 +430,14 @@ static void lower_fnc(const tree_t *t)
     for (int i = 0; i < nargs; i++) lower_expr(t->c[i]);
     sm_emit_si(g_p, SM_CALL_FN, t->v.sval ? t->v.sval : "", (int64_t)nargs);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_idx(const tree_t *t)
 {
     ICN_BB_EVAL(t);
     for (int i = 0; i < t->n; i++) lower_expr(t->c[i]);
     sm_emit_si(g_p, SM_CALL_FN, "IDX", (int64_t)t->n);
 }
-
-/* Store TOS into lhs (value already on stack). Handles all lhs shapes. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_lhs_store(const tree_t *lhs)
 {
     if (!lhs) return;
@@ -558,12 +485,13 @@ static void emit_lhs_store(const tree_t *lhs)
     lower_expr(lhs);
     sm_emit_si(g_p, SM_CALL_FN, "ASGN", 2);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_assign(const tree_t *t)
 {
-    lower_expr(T1(t));   /* rhs first */
+    lower_expr(T1(t));
     emit_lhs_store(T0(t));
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_scan(const tree_t *t)
 {
     if (t->n < 1) { sm_emit(g_p, SM_PUSH_NULL); return; }
@@ -573,6 +501,7 @@ static void lower_scan(const tree_t *t)
     if (t->n > 1) lower_expr(t->c[1]); else sm_emit(g_p, SM_PUSH_NULL);
     sm_emit_si(g_p, SM_CALL_FN, "ICN_SCAN_POP", 1);
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_swap(const tree_t *t)
 {
     if (t->n >= 2 && T0(t) && T1(t)
@@ -580,19 +509,13 @@ static void lower_swap(const tree_t *t)
         const char *ln = T0(t)->v.sval ? T0(t)->v.sval : "";
         const char *rn = T1(t)->v.sval ? T1(t)->v.sval : "";
         if (ln[0] == '&' || rn[0] == '&') {
-            /* Keyword swap: push lv, rv, kw_name, var_name, var_slot, kw_is_lhs
-             * → ICN_KW_SWAP 6.
-             * lv = old value of T0 (lhs), rv = old value of T1 (rhs).
-             * kw_name and var_name identify the two sides; kw_is_lhs (1/0) records
-             * whether the keyword was T0 (lhs) or T1 (rhs) so the handler writes
-             * in the original left-to-right order. */
             const char *kw  = (ln[0] == '&') ? ln : rn;
             const char *var = (ln[0] == '&') ? rn : ln;
             int kw_is_lhs = (ln[0] == '&') ? 1 : 0;
             int var_slot = -1;
             if (g_in_proc_body && g_proc_scope && var[0] && var[0] != '&')
                 var_slot = scope_get(g_proc_scope, var);
-            emit_var_load(ln);  emit_var_load(rn);   /* push lv=T0, rv=T1 */
+            emit_var_load(ln);  emit_var_load(rn);
             sm_emit_s(g_p, SM_PUSH_LIT_S, kw);
             sm_emit_s(g_p, SM_PUSH_LIT_S, var);
             sm_emit_i(g_p, SM_PUSH_LIT_I, (int64_t)var_slot);
@@ -609,20 +532,18 @@ static void lower_swap(const tree_t *t)
     lower_expr(T0(t)); lower_expr(T1(t));
     sm_emit_si(g_p, SM_CALL_FN, "SWAP", 2);
 }
-
-/*── Relational operators ────────────────────────────────────────────────────*/
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_comp(const tree_t *t, sm_opcode_t op)
 {
     ICN_BB_EVAL(t);
     lower_expr(T0(t)); lower_expr(T1(t));
     sm_emit_i(g_p, op, (int64_t)t->t);
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_acomp(const tree_t *t) { lower_comp(t, SM_ACOMP); }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_lcomp(const tree_t *t) { lower_comp(t, SM_LCOMP); }
-
-/*── Cset / list ops ─────────────────────────────────────────────────────────*/
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_lconcat(const tree_t *t)
 {
     ICN_BB_EVAL(t);
@@ -637,19 +558,22 @@ static void lower_lconcat(const tree_t *t)
     }
     lower_unhandled(t);
 }
-
-/*── Unary Icon ops ──────────────────────────────────────────────────────────*/
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_nonnull (const tree_t *t) { ICN_BB_EVAL(t); lower_expr(T0(t)); sm_emit_si(g_p, SM_CALL_FN, "NONNULL",    1); }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_null    (const tree_t *t) { ICN_BB_EVAL(t); lower_expr(T0(t)); sm_emit_si(g_p, SM_CALL_FN, "ICN_NULL",  1); }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_size    (const tree_t *t) { ICN_BB_EVAL(t); lower_expr(T0(t)); sm_emit_si(g_p, SM_CALL_FN, "SIZE",      1); }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_identical(const tree_t *t){ ICN_BB_EVAL(t); lower_expr(T0(t)); lower_expr(T1(t)); sm_emit_si(g_p, SM_CALL_FN, "IDENTICAL", 2); }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_random  (const tree_t *t)
 {
     ICN_BB_EVAL(t);
     if (t->n >= 1) { lower_expr(T0(t)); sm_emit_si(g_p, SM_CALL_FN, "ICN_RANDOM", 1); }
     else           { sm_emit(g_p, SM_PUSH_NULL); }
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_not(const tree_t *t)
 {
     ICN_BB_EVAL(t);
@@ -661,15 +585,14 @@ static void lower_not(const tree_t *t)
     sm_emit(g_p, SM_VOID_POP); sm_emit_si(g_p, SM_CALL_FN, "FAIL", 0);
     sm_patch_jump(g_p, jend, sm_label(g_p));
 }
-
-/* Emit the store half of an augmented-assignment fast path. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_augop_store(int lslot, int is_kw, const char *lname)
 {
     if      (lslot >= 0) sm_emit_i(g_p, SM_STORE_FRAME, lslot);
     else if (is_kw)      sm_emit_s(g_p, SM_STORE_VAR, kw_canonicalize(lname));
     else                 sm_emit_s(g_p, SM_STORE_VAR, lname);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_augop(const tree_t *t)
 {
     ICN_BB_EVAL(t);
@@ -696,21 +619,18 @@ static void lower_augop(const tree_t *t)
         case TK_AUGMOD:    sm_emit(g_p, SM_MOD);    emit_augop_store(lslot, is_kw, lname); return;
         case TK_AUGCONCAT: sm_emit(g_p, SM_CONCAT); emit_augop_store(lslot, is_kw, lname); return;
         case TK_AUGPOW:    sm_emit(g_p, SM_EXP);    emit_augop_store(lslot, is_kw, lname); return;
-        /* Numeric relop augops: SM_ACOMP on success stores rhs, on fail pushes FAILDESCR. */
         case TK_AUGEQ: sm_emit_i(g_p, SM_ACOMP, TT_EQ); emit_augop_store(lslot, is_kw, lname); return;
         case TK_AUGNE: sm_emit_i(g_p, SM_ACOMP, TT_NE); emit_augop_store(lslot, is_kw, lname); return;
         case TK_AUGLT: sm_emit_i(g_p, SM_ACOMP, TT_LT); emit_augop_store(lslot, is_kw, lname); return;
         case TK_AUGLE: sm_emit_i(g_p, SM_ACOMP, TT_LE); emit_augop_store(lslot, is_kw, lname); return;
         case TK_AUGGT: sm_emit_i(g_p, SM_ACOMP, TT_GT); emit_augop_store(lslot, is_kw, lname); return;
         case TK_AUGGE: sm_emit_i(g_p, SM_ACOMP, TT_GE); emit_augop_store(lslot, is_kw, lname); return;
-        /* String relop augops: SM_LCOMP on success stores rhs, on fail pushes FAILDESCR. */
         case TK_AUGSEQ:  sm_emit_i(g_p, SM_LCOMP, TT_LEQ); emit_augop_store(lslot, is_kw, lname); return;
         case TK_AUGSNE:  sm_emit_i(g_p, SM_LCOMP, TT_LNE); emit_augop_store(lslot, is_kw, lname); return;
         case TK_AUGSLT:  sm_emit_i(g_p, SM_LCOMP, TT_LLT); emit_augop_store(lslot, is_kw, lname); return;
         case TK_AUGSLE:  sm_emit_i(g_p, SM_LCOMP, TT_LLE); emit_augop_store(lslot, is_kw, lname); return;
         case TK_AUGSGT:  sm_emit_i(g_p, SM_LCOMP, TT_LGT); emit_augop_store(lslot, is_kw, lname); return;
         case TK_AUGSGE:  sm_emit_i(g_p, SM_LCOMP, TT_LGE); emit_augop_store(lslot, is_kw, lname); return;
-        /* IJ-15: cset augmented ops — SM_CALL_FN dispatches to icn_try_call_builtin_by_name */
         case TK_AUGCSET_UNION: sm_emit_si(g_p, SM_CALL_FN, "++", 2); emit_augop_store(lslot, is_kw, lname); return;
         case TK_AUGCSET_DIFF:  sm_emit_si(g_p, SM_CALL_FN, "--", 2); emit_augop_store(lslot, is_kw, lname); return;
         case TK_AUGCSET_INTER: sm_emit_si(g_p, SM_CALL_FN, "**", 2); emit_augop_store(lslot, is_kw, lname); return;
@@ -724,9 +644,7 @@ static void lower_augop(const tree_t *t)
     sm_emit_i(g_p, SM_PUSH_LIT_I, (int64_t)op);
     sm_emit_si(g_p, SM_CALL_FN, "AUGOP", 3);
 }
-
-/*── Control flow ────────────────────────────────────────────────────────────*/
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_seq_expr(const tree_t *t)
 {
     if (t->n == 0) { sm_emit(g_p, SM_PUSH_NULL); return; }
@@ -735,7 +653,7 @@ static void lower_seq_expr(const tree_t *t)
         if (i < t->n - 1) sm_emit(g_p, SM_VOID_POP);
     }
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_if(const tree_t *t)
 {
     if (t->n < 1) { sm_emit(g_p, SM_PUSH_NULL); return; }
@@ -749,8 +667,7 @@ static void lower_if(const tree_t *t)
     if (t->n > 2) lower_expr(t->c[2]); else sm_emit(g_p, SM_PUSH_NULL);
     sm_patch_jump(g_p, jend, sm_label(g_p));
 }
-
-/* Shared body for while/until — differs only in which jump exits. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_while_until(const tree_t *t, int exit_on_success)
 {
     int top = sm_label(g_p);
@@ -763,9 +680,11 @@ static void lower_while_until(const tree_t *t, int exit_on_success)
     sm_patch_jump(g_p, jx, sm_label(g_p));
     sm_emit(g_p, SM_VOID_POP); sm_emit(g_p, SM_PUSH_NULL);
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_while(const tree_t *t) { lower_while_until(t, 0); }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_until(const tree_t *t) { lower_while_until(t, 1); }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_repeat(const tree_t *t)
 {
     int top = sm_label(g_p);
@@ -773,40 +692,33 @@ static void lower_repeat(const tree_t *t)
     sm_emit_i(g_p, SM_JUMP, top);
     sm_emit(g_p, SM_PUSH_NULL);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_loop_break(const tree_t *t)
 {
     if (t->n > 0) lower_expr(t->c[0]); else sm_emit(g_p, SM_PUSH_NULL);
-    sm_emit_i(g_p, SM_JUMP, g_p->count + 1);  /* sentinel: sm_interp detects self+1 as break */
+    sm_emit_i(g_p, SM_JUMP, g_p->count + 1);
 }
-
-/* TT_LOOP_NEXT is Icon `next` / Snocone `continue`.  The SM interp handles
- * the actual loop-top jump via the loop frame; we just need a value on the
- * stack to satisfy the trailing SM_VOID_POP in the proc-body loop. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_loop_next(const tree_t *t) { (void)t; sm_emit(g_p, SM_PUSH_NULL); }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_return(const tree_t *t)
 {
     if (t->n > 0) lower_expr(t->c[0]); else sm_emit(g_p, SM_PUSH_NULL);
     sm_emit(g_p, SM_RETURN);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_proc_fail(const tree_t *t)
 {
     (void)t; sm_emit(g_p, SM_PUSH_NULL); sm_emit(g_p, SM_FRETURN);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_case(const tree_t *t)
 {
     if (t->n < 1) { sm_emit(g_p, SM_PUSH_NULL); return; }
-
-    /* Raku triple layout: (n-1) divisible by 3, child[1] is ILIT or NUL. */
     int is_raku = (t->n >= 4 && (t->n - 1) % 3 == 0
                    && t->c[1]
                    && (t->c[1]->t == TT_ILIT || t->c[1]->t == TT_NUL));
-
     if (!is_raku) {
-        /* Icon pair layout: topic + (val,body)* + [default] */
         int nc = t->n - 1, has_def = nc % 2, npairs = nc / 2;
         lower_expr(t->c[0]);
         sm_emit_s(g_p, SM_STORE_VAR, "__case_topic__"); sm_emit(g_p, SM_VOID_POP);
@@ -827,8 +739,6 @@ static void lower_case(const tree_t *t)
         for (int i = 0; i < nend; i++) sm_patch_jump(g_p, end_jumps[i], end);
         return;
     }
-
-    /* Raku triple layout: topic + (cmp_kind, val, body)* + [default triple] */
     int ntriples = (t->n - 1) / 3, has_def = 0, def_idx = -1;
     if (ntriples > 0) {
         tree_t *last_cmp = t->c[1 + (ntriples-1)*3];
@@ -845,16 +755,14 @@ static void lower_case(const tree_t *t)
     if (has_def) { emit_thunk(t->c[1 + def_idx*3 + 2]); }
     sm_emit_ii(g_p, SM_BB_PUMP_CASE, (int64_t)(ntriples - has_def), (int64_t)has_def);
 }
-
-/*── Data constructors ───────────────────────────────────────────────────────*/
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_makelist(const tree_t *t)
 {
     ICN_BB_EVAL(t);
     for (int i = 0; i < t->n; i++) lower_expr(t->c[i]);
     sm_emit_si(g_p, SM_CALL_FN, "MAKELIST", (int64_t)t->n);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_record(const tree_t *t)
 {
     ICN_BB_EVAL(t);
@@ -862,7 +770,7 @@ static void lower_record(const tree_t *t)
     for (int i = 0; i < t->n; i++) lower_expr(t->c[i]);
     sm_emit_si(g_p, SM_CALL_FN, "RECORD_MAKE", (int64_t)t->n + 1);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_field(const tree_t *t)
 {
     ICN_BB_EVAL(t);
@@ -870,12 +778,11 @@ static void lower_field(const tree_t *t)
     sm_emit_s(g_p, SM_PUSH_LIT_S, t->v.sval ? t->v.sval : "");
     sm_emit_si(g_p, SM_CALL_FN, "FIELD_GET", 2);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_global(const tree_t *t) { ICN_BB_EVAL(t); (void)t; sm_emit(g_p, SM_PUSH_NULL); }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_initial(const tree_t *t)
 {
-    /* Once-on-first-call guard: NV sentinel per AST node pointer. */
     char sentinel[64];
     snprintf(sentinel, sizeof sentinel, "__initial_%lx__", (unsigned long)(uintptr_t)t);
     sm_emit_s(g_p, SM_PUSH_VAR, sentinel);
@@ -892,9 +799,7 @@ static void lower_initial(const tree_t *t)
     sm_patch_jump(g_p, skip, sm_label(g_p)); sm_emit(g_p, SM_VOID_POP);
     sm_patch_jump(g_p, done, sm_label(g_p)); sm_emit(g_p, SM_PUSH_NULL);
 }
-
-/*── String sections ─────────────────────────────────────────────────────────*/
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_section_3(const tree_t *t, const char *fn)
 {
     if (t->n >= 3) {
@@ -902,52 +807,35 @@ static void lower_section_3(const tree_t *t, const char *fn)
         sm_emit_si(g_p, SM_CALL_FN, fn, 3);
     } else sm_emit(g_p, SM_PUSH_NULL);
 }
-/* IB-6: lower_bang_binary — Icon E1!E2 in value/sub-expr context.
- * SM_BB_EVAL: registered by id via every_table; bb_eval_value handles TT_BANG_BINARY.
- * Non-ICN: falls through to lower_unhandled. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_bang_binary  (const tree_t *t)
 {
     if (g_lang != LANG_ICN) { lower_unhandled(t); return; }
     sm_emit_i(g_p, SM_BB_EVAL, (int64_t)every_table_register((tree_t *)t));
 }
-
-/*── Generator coroutines ────────────────────────────────────────────────────*/
-
-/* Emit an SM coroutine body for integer range lo..hi [by step].
- * glocal slots: 0=lo, 1=hi, 2=cur, (3=step for to_by). */
-/* IB-1: lower_to / lower_to_by — Icon integer range generator in value/sub-expr context.
- * SM_BB_EVAL: a[0].i = every_table id; handler calls bb_eval_value → push first value.
- * Registered by id (no ast_gc_clone — avoids GC hazard mid-lowering).
- * Statement-level every-loops handled by SM_BB_PUMP_EVERY (in lower_every). */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_to(const tree_t *t) {
     if (g_lang != LANG_ICN) { lower_unhandled(t); return; }
     sm_emit_i(g_p, SM_BB_EVAL, (int64_t)every_table_register((tree_t *)t));
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_to_by(const tree_t *t) {
     if (g_lang != LANG_ICN) { lower_unhandled(t); return; }
     sm_emit_i(g_p, SM_BB_EVAL, (int64_t)every_table_register((tree_t *)t));
 }
-
-/* GOAL-ICON-BB-COMPLETE rung13: find the first TT_ALTERNATE that is a direct
- * RHS of a TT_ASSIGN (or direct child of the gen expr root). Only these can be
- * safely hoisted — alternates nested inside TT_LIMIT/TT_FNC/etc. must not be hoisted
- * because the outer construct's semantics depend on driving the alternate. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static const tree_t *find_first_alternate(const tree_t *t)
 {
     if (!t) return NULL;
-    /* Direct alternate at this level */
     if (t->t == TT_ALTERNATE) return t;
-    /* TT_ASSIGN: only look in the RHS (c[1]) */
     if (t->t == TT_ASSIGN && t->n >= 2)
         return find_first_alternate(t->c[1]);
-    /* TT_SEQ (Icon conjunction): search children for assign-level alternates */
     if (t->t == TT_SEQ) {
         for (int i = 0; i < t->n; i++) {
             const tree_t *found = find_first_alternate(t->c[i]);
             if (found) return found;
         }
     }
-    /* Relops / arith: search only one level deep for direct TT_ASSIGN children */
     for (int i = 0; i < t->n; i++) {
         if (t->c[i] && t->c[i]->t == TT_ASSIGN) {
             const tree_t *found = find_first_alternate(t->c[i]);
@@ -956,55 +844,30 @@ static const tree_t *find_first_alternate(const tree_t *t)
     }
     return NULL;
 }
-
-/* IB-10 (2026-05-12): SM coroutine body purged.  The rung13/rung14 pure-SM
- * coroutine implementation (SM_RESUME / SM_STORE_GLOCAL / SM_SUSPEND_VALUE
- * etc) was the WRONG approach — see GOAL-ICON-BB-NATIVE.md "Why
- * GOAL-ICON-BB-COMPLETE was wrong".  All Icon TT_LIMIT-as-every gen-exprs
- * now route through SM_BB_PUMP_EVERY → icn_bb_build → bb_broker, the
- * statement-level dispatch that IB-1..IB-8 left in place as the correct
- * fallback while flat-BB templates land for individual constructs. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_limit_every(const tree_t *limit_node, const tree_t *body)
 {
     (void)body;
     sm_emit_i(g_p, SM_BB_PUMP_EVERY, (int64_t)every_table_register((tree_t *)limit_node));
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_every(const tree_t *t)
 {
     if (t->n < 1) { sm_emit(g_p, SM_PUSH_NULL); return; }
     const tree_t *gen_expr = t->c[0];
     const tree_t *body     = (t->n > 1) ? t->c[1] : NULL;
-
-    /* IJ-9: TT_EVERY in expression/value context (arg to a function, operand of
-     * a binop, etc.) — in JCON semantics `every` always fails as an expression.
-     * Route through SM_BB_EVAL → bb_eval_value(TT_EVERY) which runs the generator
-     * to exhaustion for side effects and returns FAILDESCR to the caller.
-     * Statement-context `every` (bare statement, g_in_value_ctx <= 1) keeps the
-     * SM_BB_PUMP_EVERY path which drives for side effects and pushes NULVCL.
-     * g_in_value_ctx == 1: lower_stmt called lower_expr(this_stmt) — still top-level.
-     * g_in_value_ctx >= 2: lower_expr_inner called lower_expr(sub_expr) — value context. */
     if (g_lang == LANG_ICN && g_in_value_ctx >= 2) {
         sm_emit_i(g_p, SM_BB_EVAL, (int64_t)every_table_register((tree_t *)t));
         return;
     }
-
-    /* GOAL-ICON-BB-COMPLETE rung14: TT_LIMIT in generator — pure SM limit coroutine */
     if (g_lang == LANG_ICN && gen_expr->t == TT_LIMIT) {
         lower_limit_every(gen_expr, body);
         return;
     }
-
-    /* IB-10 (2026-05-12): SM coroutine path purged.  Was: hoisted-alt rung13
-     * pure-SM every loop emitting SM_RESUME / SM_GEN_TICK / SM_SUSPEND.
-     * Route every Icon `every` statement through SM_BB_PUMP_EVERY → icn_bb_build
-     * → bb_broker, the statement-level dispatch that is the correct fallback
-     * until flat-BB templates (emit_bb_icn_every from IB-4) supersede it for
-     * the specific shapes they cover. */
     (void)body;
     sm_emit_i(g_p, SM_BB_PUMP_EVERY, (int64_t)every_table_register((tree_t *)t));
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_suspend(const tree_t *t)
 {
     if (t->n > 0 && t->c[0]) lower_expr(t->c[0]);
@@ -1017,84 +880,57 @@ static void lower_suspend(const tree_t *t)
     sm_patch_jump(g_p, jf, sm_label(g_p));
     sm_patch_jump(g_p, jdone, sm_label(g_p));
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_limit(const tree_t *t) { emit_push_expr(t); sm_emit(g_p, SM_BB_PUMP); }
-
-/* IB-2: lower_iterate — Icon !E generator in value/sub-expr context.
- * SM_BB_EVAL: registered by id via every_table; bb_eval_value handles TT_ITERATE.
- * Non-ICN fallback (Rebus/Raku) not yet migrated — emits SM_PUSH_NULL. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_iterate(const tree_t *t)
 {
     if (!t || t->n < 1 || !t->c[0]) { sm_emit(g_p, SM_PUSH_NULL); return; }
     if (g_lang != LANG_ICN) { lower_unhandled(t); return; }
     sm_emit_i(g_p, SM_BB_EVAL, (int64_t)every_table_register((tree_t *)t));
 }
-
-/*── Prolog ──────────────────────────────────────────────────────────────────*/
-
-/* Emit SM_BB_ONCE_PROC for a named predicate, parsing arity from "name/n". */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_prolog_call(const char *sval)
 {
     const char *sl = strrchr(sval, '/');
     sm_emit_si(g_p, SM_BB_ONCE_PROC, sval, (int64_t)(sl ? atoi(sl + 1) : 0));
 }
-
-/* TT_CHOICE stmt calls (Pass 3 predicate-def stmts) use arity=0 to match IR
- * semantics: interp_eval calls pl_box_choice with arity=0 regardless of actual
- * predicate arity, so head unification is skipped and non-zero-arity predicates
- * fail fast without producing spurious side-effect output. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_prolog_call_arity0(const char *sval)
 {
     sm_emit_si(g_p, SM_BB_ONCE_PROC, sval, 0);
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_choice(const tree_t *t)
 {
     if (t->v.sval) emit_prolog_call(t->v.sval);
     else {
-        /* PB-7: unnamed TT_CHOICE fallthrough (SM_BB_ONCE) deleted.
-         * All TT_CHOICE nodes must be named by prolog_lower.c. */
         fprintf(stderr, "FATAL: lower_choice unnamed TT_CHOICE reached — legacy SM_BB_ONCE deleted (PB-7)\n");
         abort();
     }
 }
-
-
-
-/*── Statement lowering ──────────────────────────────────────────────────────
- * lower_stmt reads TT_STMT / TT_END nodes produced by a frontend.
- *
- * TT_STMT children are tagged attribute nodes (kind=TT_ATTR, sval=tag).
- * Access via stmt_attr_find(s, ":tag") → attr node; stmt_attr_expr(attr) → expr.
- * Tags: :lbl :lang :line :stno :subj :pat :eq :repl :goS :goF :go
- *────────────────────────────────────────────────────────────────────────────*/
-
-/* Scan s->c for attribute tag; return expr child or NULL. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static tree_t *attr_expr_of(const tree_t *s, const char *tag)
 {
     tree_t *a = stmt_attr_find(s, tag);
     return a ? stmt_attr_expr(a) : NULL;
 }
-
-/* Return attribute string value (first child's sval), or NULL. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static const char *attr_str_of(const tree_t *s, const char *tag)
 {
     tree_t *a = stmt_attr_find(s, tag);
     return stmt_attr_str(a);
 }
-
-/* Return attribute integer value (parse first child's sval), or 0. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int attr_int_of(const tree_t *s, const char *tag)
 {
     const char *sv = attr_str_of(s, tag);
     return sv ? atoi(sv) : 0;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void lower_stmt(const tree_t *s)
 {
     LabelTable *tbl = &g_labtab;
-
-    /* TT_END — the END statement */
     if (s->t == TT_END) {
         const char *lbl = attr_str_of(s, ":lbl");
         if (lbl && lbl[0]) {
@@ -1107,63 +943,42 @@ void lower_stmt(const tree_t *s)
         sm_emit(g_p, SM_HALT);
         return;
     }
-
-    /* TT_STMT — read tagged attributes */
     const char *label   = attr_str_of(s, ":lbl");
     int         lang    = attr_int_of(s, ":lang");
-    g_lang = lang;   /* propagates to lower_cat_seq: seq in Icon context = conjunction */
+    g_lang = lang;
     int         stno    = attr_int_of(s, ":stno");
     int         lineno  = attr_int_of(s, ":line");
     tree_t      *subject = attr_expr_of(s, ":subj");
     tree_t      *pattern = attr_expr_of(s, ":pat");
     int         has_eq  = (stmt_attr_find(s, ":eq") != NULL);
     tree_t      *replacement = attr_expr_of(s, ":repl");
-
-    /* Goto arms */
     tree_t      *go_s_attr = stmt_attr_find(s, ":goS");
     tree_t      *go_f_attr = stmt_attr_find(s, ":goF");
     tree_t      *go_u_attr = stmt_attr_find(s, ":go");
-
     const char *goto_s      = go_s_attr ? stmt_attr_str(go_s_attr)  : NULL;
     const char *goto_f      = go_f_attr ? stmt_attr_str(go_f_attr)  : NULL;
     const char *goto_u      = go_u_attr ? stmt_attr_str(go_u_attr)  : NULL;
     tree_t      *goto_s_expr = go_s_attr ? stmt_attr_expr(go_s_attr) : NULL;
     tree_t      *goto_f_expr = go_f_attr ? stmt_attr_expr(go_f_attr) : NULL;
     tree_t      *goto_u_expr = go_u_attr ? stmt_attr_expr(go_u_attr) : NULL;
-
-    /* Skip blank lines entirely */
     if ((!label || !label[0])
             && !subject && !pattern && !has_eq
             && !goto_u && !goto_u_expr
             && !goto_s && !goto_s_expr
             && !goto_f && !goto_f_expr)
         return;
-
     if (label && label[0]) {
         int lbl_idx = sm_label_named(g_p, label);
         labtab_define(tbl, label, lbl_idx);
         if (FUNC_IS_ENTRY_LABEL(label)) {
             g_p->instrs[g_p->count - 1].a[2].i = 1;
             sm_emit(g_p, SM_DEFINE_ENTRY);
-            /* EM-MODE4-IS-MODE3-DUMP-DEFINE-ENTRY-LOOP: internal :(fname) gotos must
-             * skip the DEFINE_ENTRY prologue.  External call (rt_call → chunk_reg_lookup
-             * → call_native_chunk) reaches the function via expression registry pointing
-             * at SM_LABEL+1 = SM_DEFINE_ENTRY.  Internal goto reaches it via labtab.
-             * Re-point the labtab entry to the PC AFTER SM_DEFINE_ENTRY. */
             tbl->labels[tbl->nlabels - 1].instr_idx = g_p->count;
         }
     }
-
     sm_emit_ii(g_p, SM_STNO, (int64_t)stno, (int64_t)lineno);
-    /* LANG_ICN statements are registered by polyglot_init and lowered as Icon proc
-     * skeletons in lower_proc_skeletons(); they must not reach lower_stmt.
-     * This guard is a safety net for any future code path that might slip through. */
     if (lang == LANG_ICN) return;
-
     if (lang == LANG_PL) {
-        /* Named TT_CHOICE stmts (Pass 3 of prolog_lower): call the predicate.
-         * This mirrors IR mode where interp_eval runs every LANG_PL stmt.
-         * Predicates that fail (wrong arity etc.) do so silently. */
         if (subject && subject->t == TT_CHOICE && subject->v.sval) {
             emit_prolog_call_arity0(subject->v.sval);
             goto emit_gotos;
@@ -1171,26 +986,19 @@ void lower_stmt(const tree_t *s)
         if (subject && subject->t == TT_FNC && subject->v.sval
                  && strcmp(subject->v.sval, "initialization") == 0
                  && subject->n == 1 && subject->c[0] && subject->c[0]->v.sval) {
-            /* :- initialization(Goal) directive — main/0 TT_CHOICE stmt will
-             * call it already; suppress to avoid double-call. PB-4. */
             goto emit_gotos;
         }
         else if (subject && subject->t == TT_FNC && subject->v.sval) {
-            /* Other Prolog directive (assertz, asserta, etc.) —
-             * drive via PL_BUILTIN to avoid icn_bb_build. PB-4. */
             emit_push_expr(subject);
             sm_emit_si(g_p, SM_CALL_FN, "PL_BUILTIN", 0);
         }
         else {
-            /* PB-7: unnamed LANG_PL stmt fallthrough (lower_expr + SM_BB_ONCE) deleted.
-             * All LANG_PL stmt subjects must be TT_CHOICE (named) or TT_FNC directives. */
             fprintf(stderr, "FATAL: lower_stmt LANG_PL unnamed subject kind=%d sval=%s — legacy SM_BB_ONCE deleted (PB-7)\n",
                     subject ? subject->t : -1, (subject && subject->v.sval) ? subject->v.sval : "(null)");
             abort();
         }
         goto emit_gotos;
     }
-
     if (pattern) {
         lower_pat_expr(pattern);
         if (subject) lower_expr(subject); else sm_emit(g_p, SM_PUSH_NULL);
@@ -1199,12 +1007,10 @@ void lower_stmt(const tree_t *s)
         else                       sm_emit_i(g_p, SM_PUSH_LIT_I, 0);
         const char *sname = (subject && (subject->t == TT_VAR
                               || subject->t == TT_KEYWORD)) ? subject->v.sval : NULL;
-        /* LR-S1: build DCG alongside existing SM_PAT_* path (additive). */
         IR_block_t *pat_dcg = IR_lower_pat(pattern);
         sm_emit_sip(g_p, SM_EXEC_STMT, sname, (int64_t)has_eq, (void *)pat_dcg);
         goto emit_gotos;
     }
-
     if (subject) {
         if (has_eq) {
             if (replacement) lower_expr(replacement); else sm_emit(g_p, SM_PUSH_NULL);
@@ -1218,24 +1024,17 @@ void lower_stmt(const tree_t *s)
             lower_expr(subject); sm_emit(g_p, SM_VOID_POP);
         }
     }
-
 emit_gotos:
     if (!goto_u && !goto_u_expr && !goto_s && !goto_s_expr
             && !goto_f && !goto_f_expr) return;
     if (goto_u && goto_u[0]) { emit_goto(SM_JUMP,   goto_u); return; }
-    if (goto_u_expr) { /* computed goto: parser produces Error 24; unreachable */ return; }
+    if (goto_u_expr) { return; }
     if (goto_s && goto_s[0]) emit_goto(SM_JUMP_S, goto_s);
     if (goto_f && goto_f[0]) emit_goto(SM_JUMP_F, goto_f);
 }
-
-/*── Expression dispatcher ────────────────────────────────────────────────────
- * One switch — the compiler sees all cases, warns on missing ones (-Wswitch).
- * Pattern primitives all delegate to lower_pat_expr (they carry no extra state).
- * TT_REVASSIGN / TT_REVSWAP fall to default until implemented.
- *────────────────────────────────────────────────────────────────────────────*/
-/* IJ-9: lower_expr_inner is the dispatch body; lower_expr wraps it with
- * g_in_value_ctx tracking so lower_every can detect expression context. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_expr_inner(const tree_t *t);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void lower_expr(const tree_t *t)
 {
     if (!t) { sm_emit(g_p, SM_PUSH_NULL); return; }
@@ -1243,10 +1042,10 @@ void lower_expr(const tree_t *t)
     lower_expr_inner(t);
     g_in_value_ctx--;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_expr_inner(const tree_t *t)
 {
     switch (t->t) {
-    /* literals */
     case TT_QLIT:                             lower_strlit(t);        return;
     case TT_CSET: {
         if (g_lang == LANG_ICN) { sm_emit_i(g_p, SM_BB_EVAL, (int64_t)every_table_register((tree_t *)t)); return; }
@@ -1258,51 +1057,40 @@ static void lower_expr_inner(const tree_t *t)
     case TT_ILIT:                             lower_ilit(t);          return;
     case TT_FLIT:                             lower_flit(t);          return;
     case TT_NUL:                              lower_nul(t);           return;
-    /* references */
     case TT_VAR:                              lower_var(t);           return;
     case TT_KEYWORD:                          lower_keyword(t);       return;
     case TT_INDIRECT:                         lower_indirect(t);      return;
     case TT_DEFER:                            lower_defer(t);         return;
-    /* arithmetic */
     case TT_INTERROGATE:                      lower_interrogate(t);   return;
     case TT_NAME:                             lower_name(t);          return;
     case TT_MNS:   lower_mns(t);   return;    case TT_PLS: lower_pls(t); return;
     case TT_ADD:   lower_add(t);   return;    case TT_SUB: lower_sub(t); return;
     case TT_MUL:   lower_mul(t);   return;    case TT_DIV: lower_div(t); return;
     case TT_MOD:   lower_mod(t);   return;    case TT_POW: lower_pow(t); return;
-    /* sequences */
     case TT_VLIST:                            lower_vlist(t);         return;
     case TT_CAT: case TT_SEQ:                lower_cat_seq(t);       return;
     case TT_ALT:                              lower_pat_expr(t);      return;
     case TT_OPSYN:                            lower_opsyn(t);         return;
-    /* pattern primitives — delegate to lower_pat_expr */
     case TT_ARB:    case TT_ARBNO:  case TT_POS:    case TT_RPOS:
     case TT_ANY:    case TT_NOTANY: case TT_SPAN:   case TT_BREAK:  case TT_BREAKX:
     case TT_LEN:    case TT_TAB:    case TT_RTAB:   case TT_REM:
     case TT_FAIL:   case TT_SUCCEED:case TT_FENCE:  case TT_ABORT:  case TT_BAL:
     case TT_CAPT_COND_ASGN: case TT_CAPT_IMMED_ASGN: case TT_CAPT_CURSOR:
                                                lower_pat_expr(t);      return;
-    /* calls */
     case TT_FNC:                              lower_fnc(t);           return;
     case TT_IDX:                              lower_idx(t);           return;
     case TT_ASSIGN:                           lower_assign(t);        return;
     case TT_SCAN:                             lower_scan(t);          return;
     case TT_SWAP:                             lower_swap(t);          return;
-    /* relops */
     case TT_LT: case TT_LE: case TT_GT: case TT_GE: case TT_EQ: case TT_NE:
                                                lower_acomp(t);         return;
     case TT_LLT: case TT_LLE: case TT_LGT: case TT_LGE: case TT_LEQ: case TT_LNE:
                                                lower_lcomp(t);         return;
-    /* cset / list */
     case TT_CSET_UNION: ICN_BB_EVAL(t); lower_expr(T0(t)); lower_expr(T1(t)); sm_emit_si(g_p, SM_CALL_FN, "++", 2); return;
     case TT_CSET_DIFF:  ICN_BB_EVAL(t); lower_expr(T0(t)); lower_expr(T1(t)); sm_emit_si(g_p, SM_CALL_FN, "--", 2); return;
     case TT_CSET_INTER: ICN_BB_EVAL(t); lower_expr(T0(t)); lower_expr(T1(t)); sm_emit_si(g_p, SM_CALL_FN, "**", 2); return;
     case TT_CSET_COMPL: ICN_BB_EVAL(t); lower_expr(T0(t));                    sm_emit_si(g_p, SM_CALL_FN, "~", 1); return;
-    /* IJ-15: above cases replace emit_push_expr fallback so sm_interp handles cset ops
-     * via icn_try_call_builtin_by_name (++/--/**) and IJ-7 ~~.  Generative cset children
-     * (e.g. ~~(A|B|C)) are rare and still handled by icn_runtime when they arise via BB. */
     case TT_LCONCAT:                          lower_lconcat(t);       return;
-    /* unary Icon */
     case TT_NONNULL:                          lower_nonnull(t);       return;
     case TT_NULL:                             lower_null(t);          return;
     case TT_NOT:                              lower_not(t);           return;
@@ -1310,7 +1098,6 @@ static void lower_expr_inner(const tree_t *t)
     case TT_RANDOM:                           lower_random(t);        return;
     case TT_IDENTICAL:                        lower_identical(t);     return;
     case TT_AUGOP:                            lower_augop(t);         return;
-    /* control */
     case TT_SEQ_EXPR:                         lower_seq_expr(t);      return;
     case TT_IF:                               lower_if(t);            return;
     case TT_WHILE:                            lower_while(t);         return;
@@ -1321,48 +1108,37 @@ static void lower_expr_inner(const tree_t *t)
     case TT_RETURN:                           lower_return(t);        return;
     case TT_PROC_FAIL:                        lower_proc_fail(t);     return;
     case TT_CASE:                             lower_case(t);          return;
-    /* data */
     case TT_MAKELIST:                         lower_makelist(t);      return;
     case TT_RECORD:                           lower_record(t);        return;
     case TT_FIELD:                            lower_field(t);         return;
     case TT_GLOBAL:                           lower_global(t);        return;
     case TT_INITIAL:                          lower_initial(t);       return;
-    /* sections */
     case TT_SECTION:       { ICN_BB_EVAL(t); lower_section_3(t, "ICN_SECTION_RANGE"); return; }
     case TT_SECTION_PLUS:  { ICN_BB_EVAL(t); lower_section_3(t, "ICN_SECTION_PLUS");  return; }
     case TT_SECTION_MINUS: { ICN_BB_EVAL(t); lower_section_3(t, "ICN_SECTION_MINUS"); return; }
     case TT_BANG_BINARY:                      lower_bang_binary(t);   return;
-    /* generators */
     case TT_SUSPEND:                          lower_suspend(t);       return;
     case TT_TO:                               lower_to(t);            return;
     case TT_TO_BY:                            lower_to_by(t);         return;
     case TT_LIMIT:                            lower_limit(t);         return;
-    /* IB-3: TT_ALTERNATE in sub-expression / value context (A|B goal-directed OR).
-     * SM_BB_EVAL: a[0].i = every_table id; handler calls bb_eval_value(expr) → push result.
-     * Registered by id to avoid ast_gc_clone (which triggers GC, invalidating live AST nodes).
-     * Statement-level every-loop drives via SM_BB_PUMP_EVERY (in lower_every). */
     case TT_ALTERNATE:
         if (g_lang != LANG_ICN) { lower_unhandled(t); return; }
         sm_emit_i(g_p, SM_BB_EVAL, (int64_t)every_table_register((tree_t *)t)); return;
-    case TT_ITERATE:             lower_iterate(t);       return; /* rung15 */
+    case TT_ITERATE:             lower_iterate(t);       return;
     case TT_EVERY:                            lower_every(t);         return;
-    /* Prolog */
     case TT_CHOICE:                           lower_choice(t);        return;
-    case TT_UNIFY: emit_push_expr(t); sm_emit_si(g_p, SM_CALL_FN, "PL_UNIFY", 0); return; /* PB-1 */
-    case TT_CUT:   emit_push_expr(t); sm_emit_si(g_p, SM_CALL_FN, "PL_CUT", 0);   return; /* PB-2 */
-    case TT_TRAIL_MARK:   sm_emit_si(g_p, SM_CALL_FN, "PL_TRAIL_MARK",   0); return; /* PB-3 */
-    case TT_TRAIL_UNWIND: sm_emit_si(g_p, SM_CALL_FN, "PL_TRAIL_UNWIND", 0); return; /* PB-3 */
-    case TT_CLAUSE: lower_unhandled(t); return;  /* PB-7: tombstone deleted; TT_CLAUSE not emitted into lower_expr */
-    /* not yet implemented (TT_REVASSIGN, TT_REVSWAP) */
+    case TT_UNIFY: emit_push_expr(t); sm_emit_si(g_p, SM_CALL_FN, "PL_UNIFY", 0); return;
+    case TT_CUT:   emit_push_expr(t); sm_emit_si(g_p, SM_CALL_FN, "PL_CUT", 0);   return;
+    case TT_TRAIL_MARK:   sm_emit_si(g_p, SM_CALL_FN, "PL_TRAIL_MARK",   0); return;
+    case TT_TRAIL_UNWIND: sm_emit_si(g_p, SM_CALL_FN, "PL_TRAIL_UNWIND", 0); return;
+    case TT_CLAUSE: lower_unhandled(t); return;
     default:                                   lower_unhandled(t);     return;
     }
 }
-
-/*── Procedure skeletons ─────────────────────────────────────────────────────*/
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void build_proc_scope(IcnScope *sc, const tree_t *proc, int body_start)
 {
-    int nparams = proc->_id;   /* SI-13 fix: stored in _id, not v.ival (union alias) */
+    int nparams = proc->_id;
     sc->n = 0;
     for (int i = 0; i < nparams && i < FRAME_SLOT_MAX; i++) {
         tree_t *pn = proc->c[1+i];
@@ -1370,7 +1146,6 @@ static void build_proc_scope(IcnScope *sc, const tree_t *proc, int body_start)
     }
     for (int i = body_start; i < proc->n; i++)
         expression_scope_walk(sc, proc->c[i]);
-    /* Remove names assigned in initial{} — they must use NV, not frame slots. */
     for (int i = body_start; i < proc->n; i++) {
         tree_t *ch = proc->c[i];
         if (!ch || ch->t != TT_INITIAL) continue;
@@ -1389,8 +1164,7 @@ static void build_proc_scope(IcnScope *sc, const tree_t *proc, int body_start)
         }
     }
 }
-
-/* Emit a JUMP/label/RETURN/patch stub — used for bodyless Prolog predicate skeletons. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_proc_stub(const char *name)
 {
     int skip = sm_emit_i(g_p, SM_JUMP, 0);
@@ -1398,10 +1172,9 @@ static void emit_proc_stub(const char *name)
     sm_emit(g_p, SM_RETURN);
     sm_patch_jump(g_p, skip, sm_label(g_p));
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_proc_skeletons(void)
 {
-
     for (int pi = 0; pi < proc_count; pi++) {
         const char *nm = proc_table[pi].name;
         if (!nm || !*nm) continue;
@@ -1409,51 +1182,39 @@ static void lower_proc_skeletons(void)
         int skip = sm_emit_i(g_p, SM_JUMP, 0);
         sm_label_named(g_p, nm);
         if (proc) {
-            int body_start = 1 + proc->_id;   /* SI-13 fix: nparams in _id */
+            int body_start = 1 + proc->_id;
             IcnScope sc; build_proc_scope(&sc, proc, body_start);
             proc_table[pi].lower_sc = sc;
             g_proc_scope = &sc; g_in_proc_body = 1;
-            /* All proc bodies use Icon conjunction-style lowering: TT_SEQ means
-             * goal-directed conjunction (JUMP_F short-circuit), not string concat. */
             g_lang = LANG_ICN;
             for (int i = body_start; i < proc->n; i++) {
                 if (!proc->c[i]) continue;
                 lower_expr( proc->c[i]); sm_emit(g_p, SM_VOID_POP);
             }
-            g_lang = 0;          /* restore to LANG_SNO */
+            g_lang = 0;
             g_in_proc_body = 0; g_proc_scope = NULL;
         }
         sm_emit(g_p, SM_RETURN);
         sm_patch_jump(g_p, skip, sm_label(g_p));
     }
-
     for (int b = 0; b < PL_PRED_TABLE_SIZE_FWD; b++)
         for (Pl_PredEntry *e = g_pl_pred_table.buckets[b]; e; e = e->next)
             if (e->key && *e->key) emit_proc_stub(e->key);
 }
-
-/*── Public entry point ──────────────────────────────────────────────────────
- * lower() takes a TT_PROGRAM node produced by a frontend.
- * Children must be TT_STMT / TT_END nodes.
- *────────────────────────────────────────────────────────────────────────────*/
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 SM_Program *lower(const tree_t *prog)
 {
     if (!prog || prog->t != TT_PROGRAM) return NULL;
-
     g_p            = sm_prog_new();
     g_in_proc_body = 0;
     g_proc_scope   = NULL;
     labtab_init(&g_labtab);
     for (int i = 0; i < LOWER_UNHANDLED_WORDS; i++) g_unhandled_kinds[i] = 0;
-
     lower_proc_skeletons();
-
     int stno = 0, has_icn = 0;
     for (int ci = 0; ci < prog->n; ci++) {
         const tree_t *s = prog->c[ci];
         if (!s) continue;
-        /* Icon defs are registered by polyglot_init; skip SM emission */
         int s_lang = (s->t == TT_STMT) ? attr_int_of(s, ":lang") : 0;
         if (s->t == TT_STMT && s_lang == LANG_ICN) {
             has_icn = 1;
@@ -1465,13 +1226,10 @@ SM_Program *lower(const tree_t *prog)
                           ? attr_str_of(s, ":lbl") : NULL;
         sm_stno_label_record(g_p, ++stno, (lbl && lbl[0]) ? lbl : NULL);
     }
-
     if (has_icn) sm_emit_si(g_p, SM_BB_PUMP_PROC, "main", 0);
     if (g_p->count == 0 || g_p->instrs[g_p->count - 1].op != SM_HALT) sm_emit(g_p, SM_HALT);
-
     labtab_resolve(&g_labtab, g_p);
     labtab_free(&g_labtab);
-
     int any = 0;
     for (int w = 0; w < LOWER_UNHANDLED_WORDS; w++) if (g_unhandled_kinds[w]) { any = 1; break; }
     if (any) {
@@ -1483,6 +1241,5 @@ SM_Program *lower(const tree_t *prog)
         }
         fprintf(stderr, "\n");
     }
-
     return g_p;
 }
