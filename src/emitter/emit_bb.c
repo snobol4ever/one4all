@@ -1602,6 +1602,30 @@ static int emit_flat_body(PATND_t *p, const char *prefix, int text_externalise, 
     return 0;
 }
 static int g_in_prebuild = 0;
+static int g_text_child_counter = 0;
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static void pre_build_children_text(PATND_t *p, FILE *out, const char *base_prefix) {
+    if (!p) return;
+    if (p->kind == XARBN || p->kind == XNME || p->kind == XFNME || p->kind == XCALLCAP) {
+        PATND_t *ch = (p->nchildren > 0) ? p->children[0] : NULL;
+        if (ch && !child_cache_get(ch)) {
+            pre_build_children_text(ch, out, base_prefix);
+            char child_prefix[120];
+            snprintf(child_prefix, sizeof(child_prefix), "%s_c%d", base_prefix, g_text_child_counter++);
+            emitter_init_text(out, TEXT_MODE_INVOCATION);
+            emit_flat_body(ch, child_prefix, 1, 0);
+            emitter_end();
+            bb3c_flush_pending();
+            char α_lbl[128];
+            snprintf(α_lbl, sizeof(α_lbl), "%s_α", child_prefix);
+            bb_box_fn sentinel = (bb_box_fn)(uintptr_t)ch;
+            child_cache_put(ch, sentinel);
+            child_cache_set_lbl(sentinel, α_lbl);
+        }
+        return;
+    }
+    for (int i = 0; i < p->nchildren; i++) pre_build_children_text(p->children[i], out, base_prefix);
+}
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void pre_build_children(PATND_t *p) {
     if (!p) return;
@@ -1648,6 +1672,9 @@ bb_box_fn bb_build_brokered(PATND_t *p) {
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_flat_build(PATND_t *p, FILE *out, const char *prefix) {
+    g_child_cache_n = 0;
+    g_text_child_counter = 0;
+    pre_build_children_text(p, out, prefix);
     emitter_init_text(out, TEXT_MODE_INVOCATION);
     int rc = emit_flat_body(p, prefix, 1, 0);
     emitter_end();

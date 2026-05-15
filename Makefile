@@ -80,8 +80,6 @@ RT_PIC_SRCS := \
     $(SRC)/emitter/emit_sm.c \
     $(SRC)/emitter/emit_ir.c \
     $(SRC)/emitter/emit_ir_targets.c \
-    $(SRC)/emitter/emit_js.c \
-    $(SRC)/emitter/emit_jvm.c \
     \
     $(SRC)/processor/bb_boxes.c \
     $(SRC)/processor/bb_broker.c \
@@ -147,7 +145,7 @@ RT_PIC_SRCS := \
 out/libscrip_rt.so: $(RT_PIC_SRCS) $(RT)/rt/rt.h
 	@mkdir -p out
 	$(CC) -O0 -g $(WARN) -fPIC -shared \
-	    -I$(SRC) -I$(SRC)/lower -I$(SRC)/processor -I$(SRC)/emitter -I$(SRC)/runtime/snobol4 -I$(RT) -I$(RT)/rt \
+	    -I$(SRC) -I$(SRC)/include -I$(SRC)/lower -I$(SRC)/processor -I$(SRC)/emitter -I$(SRC)/runtime/snobol4 -I$(RT) -I$(RT)/rt \
 	    -I$(SRC)/frontend/snobol4 -I$(SRC)/frontend/raku \
 	    -DDYN_ENGINE_LINKED -DIR_DEFINE_NAMES \
 	    $(RT_PIC_SRCS) \
@@ -286,9 +284,6 @@ scrip:
 	$(CC) $(CRT)   -c $(SRC)/emitter/emit_bb.c -o $(OBJ)/emit_bb.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/emit_ir.c -o $(OBJ)/emit_ir.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/emit_ir_targets.c -o $(OBJ)/emit_ir_targets.o
-
-	$(CC) $(CRT)   -c $(SRC)/emitter/emit_js.c -o $(OBJ)/emit_js.o
-	$(CC) $(CRT)   -c $(SRC)/emitter/emit_jvm.c -o $(OBJ)/emit_jvm.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/rt/rt.c   -o $(OBJ)/rt.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_globals.c -o $(OBJ)/interp_globals.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_label.c   -o $(OBJ)/interp_label.o
