@@ -25,6 +25,12 @@
   //    pending conditional captures (varname / matched-text pairs)            
   .field private static class [mscorlib]System.Collections.Generic.List`1<string> _caps
 
+  //    return-pc stack for user-defined function calls                         
+  .field private static class [mscorlib]System.Collections.Generic.Stack`1<int32> _ret
+
+  //    function-locals frames (one int32->object dict per active call)         
+  .field private static class [mscorlib]System.Collections.Generic.Stack`1<class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>> _frames
+
   //    static constructor                                                      
   .method static void .cctor() cil managed
   {
@@ -35,6 +41,10 @@
     stsfld     bool SnoRt::_last_ok
     newobj     instance void class [mscorlib]System.Collections.Generic.List`1<string>::.ctor()
     stsfld     class [mscorlib]System.Collections.Generic.List`1<string> SnoRt::_caps
+    newobj     instance void class [mscorlib]System.Collections.Generic.Stack`1<int32>::.ctor()
+    stsfld     class [mscorlib]System.Collections.Generic.Stack`1<int32> SnoRt::_ret
+    newobj     instance void class [mscorlib]System.Collections.Generic.Stack`1<class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>>::.ctor()
+    stsfld     class [mscorlib]System.Collections.Generic.Stack`1<class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>> SnoRt::_frames
     ret
   }
 
@@ -48,6 +58,10 @@
     stsfld     bool SnoRt::_last_ok
     newobj     instance void class [mscorlib]System.Collections.Generic.List`1<string>::.ctor()
     stsfld     class [mscorlib]System.Collections.Generic.List`1<string> SnoRt::_caps
+    newobj     instance void class [mscorlib]System.Collections.Generic.Stack`1<int32>::.ctor()
+    stsfld     class [mscorlib]System.Collections.Generic.Stack`1<int32> SnoRt::_ret
+    newobj     instance void class [mscorlib]System.Collections.Generic.Stack`1<class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>>::.ctor()
+    stsfld     class [mscorlib]System.Collections.Generic.Stack`1<class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>> SnoRt::_frames
     ret
   }
 
@@ -55,6 +69,30 @@
   .method public static void _finalize() cil managed
   {
     .maxstack 1
+    ret
+  }
+
+  //    push_ret_pc / pop_ret_pc   user-function return-address stack           
+  .method public static void push_ret_pc(int32 pc) cil managed
+  {
+    .maxstack 2
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<int32> SnoRt::_ret
+    ldarg.0
+    callvirt   instance void class [mscorlib]System.Collections.Generic.Stack`1<int32>::Push(!0)
+    ret
+  }
+  .method public static int32 pop_ret_pc() cil managed
+  {
+    .maxstack 1
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<int32> SnoRt::_ret
+    callvirt   instance int32 class [mscorlib]System.Collections.Generic.Stack`1<int32>::get_Count()
+    ldc.i4.0
+    bgt        POP_RET_OK
+    ldc.i4.m1
+    ret
+  POP_RET_OK:
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<int32> SnoRt::_ret
+    callvirt   instance !0 class [mscorlib]System.Collections.Generic.Stack`1<int32>::Pop()
     ret
   }
 

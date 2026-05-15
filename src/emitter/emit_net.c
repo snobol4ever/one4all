@@ -668,10 +668,25 @@ static int emit_net_scalar(IR_t * nd, FILE * out) {
 /* emit_net_from_sm — walk SM_Program and emit MSIL switch-dispatch loop. */
 static int emit_net_from_sm(SM_Program * sm, FILE * out) {
     if (!sm || !out) return 0;
+    int n = sm->count;
+    int * fn_pcs = NULL;
+    const char ** fn_names = NULL;
+    int fn_count = 0;
+    if (n > 0) {
+        fn_pcs = (int *)calloc((size_t)n, sizeof(int));
+        fn_names = (const char **)calloc((size_t)n, sizeof(const char *));
+        for (int i = 0; i < n; i++) {
+            SM_Instr * ins = &sm->instrs[i];
+            if (ins->op == SM_LABEL && ins->a[2].i && ins->a[0].s) {
+                fn_pcs[fn_count] = i;
+                fn_names[fn_count] = ins->a[0].s;
+                fn_count++;
+            }
+        }
+    }
     fprintf(out, "    .locals init (int32 _pc)\n");
     fprintf(out, "    ldc.i4.0\n    stloc      _pc\n");
     fprintf(out, "  NET_DISPATCH:\n    ldloc      _pc\n");
-    int n = sm->count;
     fprintf(out, "    switch (");
     for (int i = 0; i < n; i++) { fprintf(out, "NET_L%d", i); if (i < n - 1) fprintf(out, ", "); }
     fprintf(out, ")\n    br         NET_DONE\n");
@@ -772,17 +787,35 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
             fprintf(out, "    ldc.i4     %lld\n    stloc      _pc\n    br         NET_DISPATCH\n", instr->a[0].i);
             has_continue = 1;
             break;
-        case SM_CALL_FN:
-            net_escape_ldstr(out, instr->a[0].s ? instr->a[0].s : "");
-            net_push_i4(out, (int)instr->a[1].i);
-            fprintf(out, "    call       void SnoRt::sno_call(string, int32)\n");
+        case SM_SUSPEND_VALUE:
+        case SM_CALL_FN: {
+            const char * cname = instr->a[0].s ? instr->a[0].s : "";
+            int entry_pc = -1;
+            for (int k = 0; k < fn_count; k++) {
+                if (fn_names[k] && strcmp(fn_names[k], cname) == 0) { entry_pc = fn_pcs[k]; break; }
+            }
+            if (entry_pc >= 0) {
+                net_push_i4(out, i + 1);
+                fprintf(out, "    call       void SnoRt::push_ret_pc(int32)\n");
+                net_push_i4(out, entry_pc);
+                fprintf(out, "    stloc      _pc\n    br         NET_DISPATCH\n");
+                has_continue = 1;
+            } else {
+                net_escape_ldstr(out, cname);
+                net_push_i4(out, (int)instr->a[1].i);
+                fprintf(out, "    call       void SnoRt::sno_call(string, int32)\n");
+            }
             break;
+        }
         case SM_RETURN:
         case SM_RETURN_S:
         case SM_RETURN_F:
             net_push_i4(out, 0);
             net_push_i4(out, 1);
             fprintf(out, "    call       void SnoRt::do_return(int32, bool)\n");
+            fprintf(out, "    call       int32 SnoRt::pop_ret_pc()\n");
+            fprintf(out, "    stloc      _pc\n    br         NET_DISPATCH\n");
+            has_continue = 1;
             break;
         case SM_FRETURN:
         case SM_FRETURN_S:
@@ -790,6 +823,9 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
             net_push_i4(out, 1);
             net_push_i4(out, 0);
             fprintf(out, "    call       void SnoRt::do_return(int32, bool)\n");
+            fprintf(out, "    call       int32 SnoRt::pop_ret_pc()\n");
+            fprintf(out, "    stloc      _pc\n    br         NET_DISPATCH\n");
+            has_continue = 1;
             break;
         case SM_NRETURN:
         case SM_NRETURN_S:
@@ -797,6 +833,9 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
             net_push_i4(out, 2);
             net_push_i4(out, 0);
             fprintf(out, "    call       void SnoRt::do_return(int32, bool)\n");
+            fprintf(out, "    call       int32 SnoRt::pop_ret_pc()\n");
+            fprintf(out, "    stloc      _pc\n    br         NET_DISPATCH\n");
+            has_continue = 1;
             break;
         case SM_DEFINE_ENTRY:
         case SM_DEFINE:
@@ -810,7 +849,6 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
         case SM_STORE_FRAME:
         case SM_LOAD_GLOCAL:
         case SM_STORE_GLOCAL:
-        case SM_SUSPEND_VALUE:
         case SM_SUSPEND:
         case SM_PAT_LIT:
         case SM_PAT_ANY:
@@ -859,6 +897,8 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
         if (!has_continue && i + 1 < n) { net_push_i4(out, i + 1); fprintf(out, "    stloc      _pc\n    br         NET_DISPATCH\n"); }
     }
     fprintf(out, "  NET_DONE:\n");
+    free(fn_pcs);
+    free(fn_names);
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
