@@ -633,7 +633,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             DESCR_t subj_d = sm_pop(st);
             DESCR_t pat_d  = sm_pop(st);
             const char *sname = ins->a[0].s;
-            IR_block_t *pat_dcg = (IR_block_t *)ins->a[2].ptr;
+            IR_block_t *pat_dcg = (int)ins->a[2].i >= 0 ? g_current_sm_prog->dcg_table[(int)ins->a[2].i] : NULL;
             int ok;
             if (pat_dcg) {
                 ok = IR_exec_pat(pat_dcg, sname, &subj_d,
@@ -818,7 +818,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             break;
         }
         case SM_EXEC_BB: {
-            IR_block_t * cfg = (IR_block_t *)ins->a[0].ptr;
+            IR_block_t * cfg = g_current_sm_prog->dcg_table[(int)ins->a[0].i];
             DESCR_t _val;
             if (!cfg) { _val = FAILDESCR; }
             else if (ins->a[1].i == 0) { ins->a[1].i = 1; _val = IR_exec_once(cfg); }
@@ -829,7 +829,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             break;
         }
         case SM_PUMP_BB: {
-            IR_block_t * cfg = (IR_t *)ins->a[0].ptr;
+            IR_block_t * cfg = g_current_sm_prog->dcg_table[(int)ins->a[0].i];
             int _ticks = cfg ? IR_exec_pump(cfg, NULL, NULL) : 0;
             st->last_ok = (_ticks > 0);
             sm_push(st, INTVAL(_ticks));

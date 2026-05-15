@@ -414,8 +414,9 @@ static void lower_fnc(const tree_t *t)
         if (g_lang == LANG_ICN && is_upto && cset && hay) {
             IR_block_t *cfg = lower_icn_upto(cset, hay);
             if (cfg) {
-                int idx = sm_emit(g_p, SM_EXEC_BB);
-                g_p->instrs[idx].a[0].ptr = cfg;
+                int dcg_idx = sm_prog_dcg_add(g_p, cfg);
+                int idx = sm_emit_i(g_p, SM_EXEC_BB, (int64_t)dcg_idx);
+                (void)idx;
                 return;
             }
         }
@@ -1017,7 +1018,7 @@ void lower_stmt(const tree_t *s)
         const char *sname = (subject && (subject->t == TT_VAR
                               || subject->t == TT_KEYWORD)) ? subject->v.sval : NULL;
         IR_block_t *pat_dcg = IR_lower_pat(pattern);
-        sm_emit_sip(g_p, SM_EXEC_STMT, sname, (int64_t)has_eq, (void *)pat_dcg);
+        sm_emit_sii(g_p, SM_EXEC_STMT, sname, (int64_t)has_eq, (int64_t)sm_prog_dcg_add(g_p, pat_dcg));
         goto emit_gotos;
     }
     if (subject) {

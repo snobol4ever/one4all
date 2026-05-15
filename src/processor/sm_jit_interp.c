@@ -687,7 +687,7 @@ static void h_exec_stmt(void)
     DESCR_t pat_d  = POP();
     const char *sn = CUR_INS->a[0].s;
     int ok;
-    IR_block_t *pat_dcg = (IR_block_t *)CUR_INS->a[2].ptr;
+    IR_block_t *pat_dcg = (int)CUR_INS->a[2].i >= 0 ? g_current_sm_prog->dcg_table[(int)CUR_INS->a[2].i] : NULL;
     if (pat_dcg) {
         ok = IR_exec_pat(pat_dcg, sn, &subj_d, has_repl ? &repl : NULL, has_repl);
     } else {

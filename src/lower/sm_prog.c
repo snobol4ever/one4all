@@ -1,4 +1,5 @@
 #include "sm_prog.h"
+#include "IR.h"
 #include <string.h>
 #include <stdlib.h>
 SM_Program *g_current_sm_prog = NULL;
@@ -14,6 +15,9 @@ SM_Program *sm_prog_new(void)
     p->stno_labels_cap = 64;
     p->stno_labels     = calloc((size_t)p->stno_labels_cap, sizeof(const char *));
     p->stno_count      = 0;
+    p->dcg_cap         = 16;
+    p->dcg_count       = 0;
+    p->dcg_table       = calloc((size_t)p->dcg_cap, sizeof(IR_block_t *));
     return p;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -22,6 +26,7 @@ void sm_prog_free(SM_Program *p)
     if (!p) return;
     free(p->instrs);
     free(p->stno_labels);
+    free(p->dcg_table);
     free(p);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -266,4 +271,24 @@ void sm_prog_print(const SM_Program *p, FILE *out)
         }
         fprintf(out, "\n");
     }
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+int sm_prog_dcg_add(SM_Program *p, struct IR_block_t *cfg) {
+    if (!cfg) return -1;
+    if (p->dcg_count >= p->dcg_cap) {
+        p->dcg_cap *= 2;
+        p->dcg_table = realloc(p->dcg_table, (size_t)p->dcg_cap * sizeof(IR_block_t *));
+    }
+    int idx = p->dcg_count++;
+    p->dcg_table[idx] = cfg;
+    return idx;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+int sm_emit_sii(SM_Program *p, sm_opcode_t op, const char *s, int64_t i0, int64_t i1) {
+    int idx = _grow(p);
+    p->instrs[idx].op    = op;
+    p->instrs[idx].a[0].s = s;
+    p->instrs[idx].a[1].i = i0;
+    p->instrs[idx].a[2].i = i1;
+    return idx;
 }
