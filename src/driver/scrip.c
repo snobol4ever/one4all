@@ -37,6 +37,7 @@ extern void ir_print_node_nl(const tree_t *e, FILE *f);
 #include "scrip_sm.h"
 #include "sync_monitor.h"
 #include "sm_image.h"
+#include "emit_ir.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_at_cursor(const char *varname);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -80,6 +81,7 @@ int main(int argc, char **argv)
     int opt_trace          = 0;
     int opt_bench          = 0;
     int opt_case_sensitive = 1;
+    const char * target_name = NULL;
     int argi = 1;
     while (argi < argc && argv[argi][0] == '-' && argv[argi][1] == '-') {
         if      (strcmp(argv[argi], "--ast-run")         == 0) { mode_ir_run        = 1; argi++; }
@@ -88,7 +90,8 @@ int main(int argc, char **argv)
         else if (strcmp(argv[argi], "--jit-run")       == 0) { mode_jit_run       = 1; argi++; }
         else if (strcmp(argv[argi], "--monitor")       == 0) { mode_monitor       = 1; argi++; }
         else if (strcmp(argv[argi], "--jit-emit")      == 0) { opt_jit_emit       = 1; argi++; }
-        else if (strcmp(argv[argi], "--x64")           == 0) { opt_emit_x64       = 1; argi++; }
+        else if (strcmp(argv[argi], "--x64")           == 0) { opt_emit_x64 = 1; target_name = "x86"; argi++; }
+        else if (strncmp(argv[argi], "--target=", 9)   == 0) { target_name = argv[argi] + 9; opt_jit_emit = 1; argi++; }
         else if (strcmp(argv[argi], "--jit-emit-inline") == 0) { opt_jit_emit_inline = 1; opt_jit_emit = 1; argi++; }
         else if (strcmp(argv[argi], "--bb-format")       == 0) { opt_bb_format       = 1; argi++; }
         else if (strcmp(argv[argi], "--bb-driver")     == 0) { bb_driver          = 1; argi++; }
@@ -108,16 +111,16 @@ int main(int argc, char **argv)
         else break;
     }
     sno_set_case_sensitive(opt_case_sensitive);
-    int mode_jit_emit_x64 = (opt_jit_emit && opt_emit_x64);
-    if (opt_jit_emit && !opt_emit_x64) {
+    if (!target_name && opt_emit_x64) target_name = "x86";
+    int mode_jit_emit_x64 = (opt_jit_emit && target_name && strcmp(target_name, "x86") == 0);
+    if (opt_jit_emit && !target_name) {
         fprintf(stderr,
             "scrip: --jit-emit requires a backend selector "
-            "(--x64 is the only one wired in EM-1)\n");
+            "(--x64 or --target=jvm / --target=js / --target=x86)\n");
         return 1;
     }
     if (opt_emit_x64 && !opt_jit_emit) {
-        fprintf(stderr,
-            "scrip: --x64 is meaningful only with --jit-emit\n");
+        fprintf(stderr, "scrip: --x64 is meaningful only with --jit-emit\n");
         return 1;
     }
     if (mode_jit_emit_x64 &&
@@ -349,6 +352,13 @@ int main(int argc, char **argv)
             return 1;
         }
         sm_prog_free(sm);
+        return 0;
+    }
+    if (opt_jit_emit && target_name && strcmp(target_name, "x86") != 0) {
+        if (emit_ir_block(NULL, stdout, target_name) != 0) {
+            fprintf(stderr, "scrip: emit_ir_block failed for target '%s'\n", target_name);
+            return 1;
+        }
         return 0;
     }
     if (mode_monitor) {

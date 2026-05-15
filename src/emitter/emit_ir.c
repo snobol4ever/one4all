@@ -37,7 +37,7 @@ void ir_walk(IR_block_t * cfg, void (*visit)(IR_t *, void *), void * ctx) {
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int emit_ir_block(IR_block_t * cfg, FILE * out, const char * target) {
-    if (!cfg || !out || !target) return 1;
+    if (!out || !target) return 1;
     if (strcmp(target, "jvm")  == 0) return emit_ir_block_jvm(cfg, out);
     if (strcmp(target, "js")   == 0) return emit_ir_block_js (cfg, out);
     if (strcmp(target, "x86")  == 0) return emit_ir_block_x86(cfg, out);
