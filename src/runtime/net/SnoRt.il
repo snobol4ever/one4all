@@ -31,6 +31,9 @@
   //    function-locals frames (one int32->object dict per active call)         
   .field private static class [mscorlib]System.Collections.Generic.Stack`1<class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>> _frames
 
+  //    variable name -> value map (the SNOBOL4 global name-value store)       
+  .field private static class [mscorlib]System.Collections.Generic.Dictionary`2<string,object> _vars
+
   //    static constructor                                                      
   .method static void .cctor() cil managed
   {
@@ -45,6 +48,8 @@
     stsfld     class [mscorlib]System.Collections.Generic.Stack`1<int32> SnoRt::_ret
     newobj     instance void class [mscorlib]System.Collections.Generic.Stack`1<class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>>::.ctor()
     stsfld     class [mscorlib]System.Collections.Generic.Stack`1<class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>> SnoRt::_frames
+    newobj     instance void class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>::.ctor()
+    stsfld     class [mscorlib]System.Collections.Generic.Dictionary`2<string,object> SnoRt::_vars
     ret
   }
 
@@ -62,6 +67,8 @@
     stsfld     class [mscorlib]System.Collections.Generic.Stack`1<int32> SnoRt::_ret
     newobj     instance void class [mscorlib]System.Collections.Generic.Stack`1<class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>>::.ctor()
     stsfld     class [mscorlib]System.Collections.Generic.Stack`1<class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>> SnoRt::_frames
+    newobj     instance void class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>::.ctor()
+    stsfld     class [mscorlib]System.Collections.Generic.Dictionary`2<string,object> SnoRt::_vars
     ret
   }
 
@@ -135,11 +142,11 @@
     ret
   }
 
-  //    push_var   read variable by name (INPUT special-cased)                  
+  //    push_var   read variable by name (INPUT special-cased, else from _vars) 
   .method public static void push_var(string name) cil managed
   {
-    .maxstack 2
-    .locals init (string V_line)
+    .maxstack 3
+    .locals init (string V_line, object V_val)
     ldarg.0
     ldstr      "INPUT"
     call       bool [mscorlib]System.String::op_Equality(string, string)
@@ -162,6 +169,18 @@
     stsfld     bool SnoRt::_last_ok
     ret
   PUSH_VAR_NOT_INPUT:
+    ldnull
+    stloc      V_val
+    ldsfld     class [mscorlib]System.Collections.Generic.Dictionary`2<string,object> SnoRt::_vars
+    ldarg.0
+    ldloca     V_val
+    callvirt   instance bool class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>::TryGetValue(!0, !1&)
+    brfalse    PUSH_VAR_EMPTY
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
+    ldloc      V_val
+    callvirt   instance void class [mscorlib]System.Collections.Generic.Stack`1<object>::Push(!0)
+    ret
+  PUSH_VAR_EMPTY:
     ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
     ldstr      ""
     callvirt   instance void class [mscorlib]System.Collections.Generic.Stack`1<object>::Push(!0)
@@ -171,7 +190,7 @@
   //    store_var   pop TOS and assign to variable (OUTPUT special-cased)       
   .method public static void store_var(string name) cil managed
   {
-    .maxstack 2
+    .maxstack 3
     .locals init (object V_val, string V_str)
     ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<object> SnoRt::_stk
     callvirt   instance !0 class [mscorlib]System.Collections.Generic.Stack`1<object>::Pop()
@@ -185,6 +204,10 @@
     call       void [mscorlib]System.Console::WriteLine(string)
     ret
   STORE_VAR_NOT_OUTPUT:
+    ldsfld     class [mscorlib]System.Collections.Generic.Dictionary`2<string,object> SnoRt::_vars
+    ldarg.0
+    ldloc      V_val
+    callvirt   instance void class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>::set_Item(!0, !1)
     ret
   }
 
