@@ -495,6 +495,35 @@ static tree_t *pt_binop(const char *op, tree_t *lhs, tree_t *rhs) {
  * Children in source order. NO conjunction flattening, NO if-then-else
  * detection — those are lower's job. The tree is a geometric record of
  * the token stream; lower interprets it. */
+/* Flatten a tree_t conjunction (TT_FNC(",")) into flat TT_PROGRAM children.
+ * This is n-ary flattening — a reduce action on left-recursive grammar.
+ * Mirrors flatten_conj() for the Term* path. Stays in parser per design. */
+static void pt_flatten_conj(tree_t *t, tree_t *prog) {
+    if (!t) return;
+    if (t->t == TT_FNC && t->v.sval && strcmp(t->v.sval, ",") == 0) {
+        for (int i = 0; i < t->n; i++)
+            pt_flatten_conj(t->c[i], prog);
+        return;
+    }
+    ast_push(prog, t);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* Detect ;(->(Cond,Then),Else) and collapse to TT_IF(cond,then,else).
+ * This is a grammar-level reduce: the ';'/'->' combination is a
+ * syntactic idiom that maps to a dedicated node kind. */
+static tree_t *pt_maybe_ifthenelse(tree_t *semi_node) {
+    if (semi_node->n != 2) return semi_node;
+    tree_t *left  = semi_node->c[0];
+    tree_t *right = semi_node->c[1];
+    if (!left || left->t != TT_FNC || !left->v.sval) return semi_node;
+    if (strcmp(left->v.sval, "->") != 0 || left->n < 2) return semi_node;
+    tree_t *iff = ast_node_new(TT_IF);
+    ast_push(iff, left->c[0]);   /* cond */
+    ast_push(iff, left->c[1]);   /* then */
+    ast_push(iff, right);        /* else */
+    return iff;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static tree_t *pt_make_clause(tree_t *head_tr, tree_t *body_tr) {
     tree_t *cl = ast_node_new(TT_CLAUSE);
     if (head_tr) {
@@ -502,7 +531,10 @@ static tree_t *pt_make_clause(tree_t *head_tr, tree_t *body_tr) {
     } else {
         ast_push(cl, ast_node_new(TT_NUL));   /* directive: head is TT_NUL */
     }
-    if (body_tr) ast_push(cl, body_tr);        /* raw body — no flattening */
+    /* body: flatten conjunction into TT_PROGRAM (n-ary reduce) */
+    tree_t *prog = ast_node_new(TT_PROGRAM);
+    if (body_tr) pt_flatten_conj(body_tr, prog);
+    ast_push(cl, prog);
     return cl;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -708,8 +740,9 @@ static tree_t *pt_term(Parser *p, TreeScope *ts, int max_prec) {
         tree_t *rhs = pt_term(p, ts, rprec);
         if (!rhs) break;
         tree_t *node = pt_binop(op->name, lhs, rhs);
-        /* Pure reduce: no structural rewriting here.
-         * ';'('->'(C,T),E) stays as-is — prolog_lower.c detects it. */
+        /* Collapse ;(->(C,T),E) → TT_IF(c,t,e) at parse time (n-ary reduce). */
+        if (strcmp(op->name, ";") == 0)
+            node = pt_maybe_ifthenelse(node);
         lhs = node;
     }
     return lhs;
