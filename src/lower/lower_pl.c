@@ -79,7 +79,9 @@ static IR_t *lower_pl_stmt_node(IR_block_t *cfg, const tree_t *e) {
     if (strcmp(fn,"true")==0||strcmp(fn,"otherwise")==0) return IR_node_alloc(cfg, IR_SUCCEED);
     if (strcmp(fn,"fail")==0||strcmp(fn,"false")==0)     return IR_node_alloc(cfg, IR_FAIL);
     if (strcmp(fn,"nl")==0) { IR_t *nd = IR_node_alloc(cfg, IR_PL_BUILTIN); if (!nd) return NULL; nd->sval = fn; nd->n = 0; return nd; }
-    if (strcmp(fn,"write")==0||strcmp(fn,"writeln")==0||strcmp(fn,"is")==0) {
+    if (strcmp(fn,"write")==0||strcmp(fn,"writeln")==0||strcmp(fn,"is")==0
+        ||strcmp(fn,">")==0||strcmp(fn,"<")==0||strcmp(fn,">=")==0||strcmp(fn,"<=")==0
+        ||strcmp(fn,"=:=")==0||strcmp(fn,"=\\=")==0) {
         IR_t *nd = IR_node_alloc(cfg, IR_PL_BUILTIN); if (!nd) return NULL; nd->sval = fn;
         if (e->n > 0) {
             nd->c = malloc((size_t)e->n*sizeof(IR_t*)); if (!nd->c) return NULL; nd->n = 0;

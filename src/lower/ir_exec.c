@@ -1012,7 +1012,7 @@ IR_t * IR_exec_node(IR_t * nd) {
         IR_exec_node(nd->c[1]); DESCR_t rv = nd->c[1]->value;
         Term *lt = NULL, *rt = NULL;
         if (nd->c[0]->t == IR_PL_VAR) {
-            int slot = (int)nd->c[0]->ival;
+            int slot = (int)nd->c[0]->ival2;
             lt = (g_pl_env && slot >= 0 && g_pl_env[slot]) ? term_deref(g_pl_env[slot]) : NULL;
             if (!lt) { lt = term_new_var(slot); if (g_pl_env && slot >= 0) g_pl_env[slot] = lt; }
         } else {
@@ -1021,7 +1021,7 @@ IR_t * IR_exec_node(IR_t * nd) {
             else lt = term_new_atom(prolog_atom_intern("[]"));
         }
         if (nd->c[1]->t == IR_PL_VAR) {
-            int slot = (int)nd->c[1]->ival;
+            int slot = (int)nd->c[1]->ival2;
             rt = (g_pl_env && slot >= 0 && g_pl_env[slot]) ? term_deref(g_pl_env[slot]) : NULL;
             if (!rt) { rt = term_new_var(slot); if (g_pl_env && slot >= 0) g_pl_env[slot] = rt; }
         } else {
