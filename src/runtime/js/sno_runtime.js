@@ -65,21 +65,26 @@ const _vars = new Proxy(_store, {
         if (k === 'INPUT') {
             /* Synchronous line-at-a-time read from stdin — Node.js only.
              * Read one byte at a time to avoid consuming beyond the newline.
-             * _stdin_buf holds leftover bytes from previous reads (shouldn't
-             * occur with byte-at-a-time, but kept for safety). */
+             * Distinguish blank line (return '') from true EOF (return _FAIL).
+             * EOF = first readSync returns 0 with no bytes consumed.
+             * Honor &TRIM: when nonzero, trim trailing whitespace. */
             try {
                 const fs = require('fs');
                 const oneByte = Buffer.alloc(1);
                 const chars = [];
+                let saw_any = false;
                 while (true) {
                     const n = fs.readSync(0, oneByte, 0, 1, null);
                     if (n <= 0) break;              // EOF
+                    saw_any = true;
                     const ch = oneByte[0];
                     if (ch === 10) break;           // newline — end of line
                     if (ch !== 13) chars.push(ch);  // skip CR
                 }
-                if (chars.length === 0) return _FAIL;  // EOF with no data
-                return Buffer.from(chars).toString();
+                if (!saw_any) return _FAIL;  // true EOF — no bytes at all
+                let line = Buffer.from(chars).toString();
+                if (_kw_store.TRIM) line = line.replace(/[ \t]+$/, '');
+                return line;
             } catch(e) { return _FAIL; }
         }
         return null; /* unset variable = SNOBOL4 null */
@@ -396,10 +401,23 @@ const _builtins = {
     ITEM_SET(args)   { return _FAIL; },
 };
 
+/* Builtins that propagate _FAIL — if any arg is _FAIL, the result is _FAIL.
+ * Excludes IDENT/DIFFER/the *EQ/*NE/*LT/etc. relational ops, FAIL itself,
+ * APPLY (which forwards to user dispatch), and DATATYPE (which classifies). */
+const _fail_propagate = new Set([
+    'SIZE','TRIM','DUPL','SUBSTR','CHAR','CODE','LPAD','RPAD',
+    'REPLACE','REVERSE','UPPER','LOWER','INTEGER','REAL','CONVERT',
+    'REMDR','FENCE','SUCCEED'
+]);
 function _apply(name, args) {
     if (!name) return _FAIL;  /* empty name (e.g. SM_PAT_* emitted without builder) — fail */
     const uname = name.toUpperCase();
-    if (uname in _builtins) return _builtins[uname](args);
+    if (uname in _builtins) {
+        if (_fail_propagate.has(uname)) {
+            for (const a of args) if (a === _FAIL) return _FAIL;
+        }
+        return _builtins[uname](args);
+    }
     /* User-defined: should normally be invoked via call_or_jump (sets up frame + jumps to body).
      * If somehow reached via _apply (e.g. APPLY builtin), we can't synchronously run the body
      * here since the entire program is one switch loop. Return FAIL. */
@@ -584,6 +602,7 @@ function call(name, nargs) {
     const args = _stack.splice(_stack.length - nargs, nargs);
     const result = _apply(name, args);
     _stack.push(result);
+    _last_ok = (result !== _FAIL);
 }
 
 /* -----------------------------------------------------------------------
@@ -645,6 +664,7 @@ function call_or_jump(name, nargs, ret_pc) {
     const args = _stack.splice(_stack.length - nargs, nargs);
     const result = _apply(name || '', args);
     _stack.push(result);
+    _last_ok = (result !== _FAIL);
     return -1;
 }
 

@@ -29,8 +29,15 @@ run_one() {
     fi
     
     # Run (fresh process)
+    # Input precedence: .input file > inline data after END line in .sno > /dev/null
     local stdin_arg="< /dev/null"
-    [ -f "$inp" ] && stdin_arg="< \"$inp\""
+    local post_end="$TMPD/$base.post_end"
+    if [ -f "$inp" ]; then
+        stdin_arg="< \"$inp\""
+    else
+        awk '/^[Ee][Nn][Dd][ \t]*$/{found=1; next} found' "$sno" > "$post_end"
+        if [ -s "$post_end" ]; then stdin_arg="< \"$post_end\""; fi
+    fi
     if ! eval "timeout $TIMEOUT node \"$js\" $stdin_arg > \"$out\" 2>/dev/null"; then
         [[ "$VERBOSE" == "--verbose" ]] && echo "FAIL $base [node]"
         FAIL=$((FAIL+1)); return 0
