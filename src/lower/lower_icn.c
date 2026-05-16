@@ -626,6 +626,72 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         asgn->n    = 2;
         return asgn;
     }
+    case TT_LOOP_BREAK: {
+        IR_t *nd = IR_node_alloc(cfg, IR_BREAK);
+        return nd;
+    }
+    case TT_LOOP_NEXT: {
+        IR_t *nd = IR_node_alloc(cfg, IR_NEXT);
+        return nd;
+    }
+    case TT_PROC_FAIL: {
+        IR_t *nd = IR_node_alloc(cfg, IR_FAIL);
+        return nd;
+    }
+    case TT_IDENTICAL: {
+        if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
+        IR_t *lhs = lower_icn_expr_node(cfg, e->c[0]);
+        if (!lhs) return NULL;
+        IR_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
+        if (!rhs) return NULL;
+        IR_t *nd = IR_node_alloc(cfg, IR_IDENTICAL);
+        if (!nd) return NULL;
+        nd->c = calloc(2, sizeof(IR_t *));
+        if (!nd->c) return NULL;
+        nd->c[0] = lhs;
+        nd->c[1] = rhs;
+        nd->n    = 2;
+        return nd;
+    }
+    case TT_NONNULL: {
+        if (e->n < 1 || !e->c[0]) return NULL;
+        IR_t *inner = lower_icn_expr_node(cfg, e->c[0]);
+        if (!inner) return NULL;
+        IR_t *nd = IR_node_alloc(cfg, IR_NONNULL);
+        if (!nd) return NULL;
+        nd->c = calloc(1, sizeof(IR_t *));
+        if (!nd->c) return NULL;
+        nd->c[0] = inner;
+        nd->n    = 1;
+        return nd;
+    }
+    case TT_NULL: {
+        if (e->n < 1 || !e->c[0]) {
+            IR_t *nd = IR_node_alloc(cfg, IR_LIT_NUL);
+            return nd;
+        }
+        IR_t *inner = lower_icn_expr_node(cfg, e->c[0]);
+        if (!inner) return NULL;
+        IR_t *nd = IR_node_alloc(cfg, IR_NULL_TEST);
+        if (!nd) return NULL;
+        nd->c = calloc(1, sizeof(IR_t *));
+        if (!nd->c) return NULL;
+        nd->c[0] = inner;
+        nd->n    = 1;
+        return nd;
+    }
+    case TT_RANDOM: {
+        if (e->n < 1 || !e->c[0]) return NULL;
+        IR_t *inner = lower_icn_expr_node(cfg, e->c[0]);
+        if (!inner) return NULL;
+        IR_t *nd = IR_node_alloc(cfg, IR_RANDOM);
+        if (!nd) return NULL;
+        nd->c = calloc(1, sizeof(IR_t *));
+        if (!nd->c) return NULL;
+        nd->c[0] = inner;
+        nd->n    = 1;
+        return nd;
+    }
     default:
         return NULL;
     }

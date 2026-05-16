@@ -190,13 +190,20 @@ IR_t * IR_exec_node(IR_t * nd) {
         /* Statement consumer: drive c[0] to exhaustion within ONE outer IR_exec_node call.  c[0]'s state (counter, etc.) persists across the inner IR_exec_node calls because IR_reset is not invoked.   */
         /* every-loop in statement context always "succeeds" with &null after exhaustion — never propagates the generator's final FAIL upward.                                                              */
         if (nd->n < 1 || !nd->c[0]) { nd->value = NULVCL; return nd->γ; }
+        int saved_brk = frame_depth > 0 ? FRAME.loop_break : 0;
+        int saved_nxt = frame_depth > 0 ? FRAME.loop_next  : 0;
+        if (frame_depth > 0) { FRAME.loop_break = 0; FRAME.loop_next = 0; }
         int safety = 1000000;
         while (safety-- > 0) {
             IR_exec_node(nd->c[0]);
             DESCR_t v = nd->c[0]->value;
             if (IS_FAIL_fn(v)) break;
-            if (nd->n >= 2 && nd->c[1]) IR_exec_node(nd->c[1]);
+            if (frame_depth > 0 && FRAME.loop_break) break;
+            if (nd->n >= 2 && nd->c[1]) { IR_exec_node(nd->c[1]); }
+            if (frame_depth > 0 && (FRAME.loop_break || FRAME.returning)) break;
+            if (frame_depth > 0) FRAME.loop_next = 0;
         }
+        if (frame_depth > 0) { FRAME.loop_break = saved_brk; FRAME.loop_next = saved_nxt; }
         nd->value = NULVCL;
         return nd->γ;
     }
@@ -205,28 +212,42 @@ IR_t * IR_exec_node(IR_t * nd) {
         /* Loop: eval cond; if cond fails, break; else eval body; repeat.  Cond's state is reset before each pump via IR_exec_node — for plain scalar conds (BINOP relops) this is correct; for generator   */
         /* conds, the resume-on-next-iteration is the right semantics for while (cond drives one pump per iteration).  Always succeeds with NULVCL after termination.                                       */
         if (nd->n < 1 || !nd->c[0]) { nd->value = NULVCL; return nd->γ; }
+        int saved_brk_w = frame_depth > 0 ? FRAME.loop_break : 0;
+        int saved_nxt_w = frame_depth > 0 ? FRAME.loop_next  : 0;
+        if (frame_depth > 0) { FRAME.loop_break = 0; FRAME.loop_next = 0; }
         int safety = 1000000;
         while (safety-- > 0) {
             nd->c[0]->state = 0;
             IR_exec_node(nd->c[0]);
             DESCR_t cv = nd->c[0]->value;
             if (IS_FAIL_fn(cv)) break;
-            if (nd->n >= 2 && nd->c[1]) IR_exec_node(nd->c[1]);
+            if (frame_depth > 0 && FRAME.loop_break) break;
+            if (nd->n >= 2 && nd->c[1]) { IR_exec_node(nd->c[1]); }
+            if (frame_depth > 0 && (FRAME.loop_break || FRAME.returning)) break;
+            if (frame_depth > 0) FRAME.loop_next = 0;
         }
+        if (frame_depth > 0) { FRAME.loop_break = saved_brk_w; FRAME.loop_next = saved_nxt_w; }
         nd->value = NULVCL;
         return nd->γ;
     }
     case IR_UNTIL: {
         /* Icon until C [do B].  c[0]=cond (mandatory), c[1]=optional body.  Inverse of WHILE: loop while cond FAILS, exit when cond succeeds.                                                                */
         if (nd->n < 1 || !nd->c[0]) { nd->value = NULVCL; return nd->γ; }
-        int safety = 1000000;
-        while (safety-- > 0) {
+        int saved_brk_u = frame_depth > 0 ? FRAME.loop_break : 0;
+        int saved_nxt_u = frame_depth > 0 ? FRAME.loop_next  : 0;
+        if (frame_depth > 0) { FRAME.loop_break = 0; FRAME.loop_next = 0; }
+        int safety_u = 1000000;
+        while (safety_u-- > 0) {
             nd->c[0]->state = 0;
             IR_exec_node(nd->c[0]);
             DESCR_t cv = nd->c[0]->value;
             if (!IS_FAIL_fn(cv)) break;
-            if (nd->n >= 2 && nd->c[1]) IR_exec_node(nd->c[1]);
+            if (frame_depth > 0 && FRAME.loop_break) break;
+            if (nd->n >= 2 && nd->c[1]) { IR_exec_node(nd->c[1]); }
+            if (frame_depth > 0 && (FRAME.loop_break || FRAME.returning)) break;
+            if (frame_depth > 0) FRAME.loop_next = 0;
         }
+        if (frame_depth > 0) { FRAME.loop_break = saved_brk_u; FRAME.loop_next = saved_nxt_u; }
         nd->value = NULVCL;
         return nd->γ;
     }
@@ -234,12 +255,18 @@ IR_t * IR_exec_node(IR_t * nd) {
         /* Icon repeat B. Run body forever; exit when body produces FAIL (break semantics). */
         /* nd->c[0] = body. Safety cap prevents infinite loops in broken programs.          */
         if (nd->n < 1 || !nd->c[0]) { nd->value = NULVCL; return nd->γ; }
-        int safety = 1000000;
-        while (safety-- > 0) {
+        int saved_brk_r = frame_depth > 0 ? FRAME.loop_break : 0;
+        int saved_nxt_r = frame_depth > 0 ? FRAME.loop_next  : 0;
+        if (frame_depth > 0) { FRAME.loop_break = 0; FRAME.loop_next = 0; }
+        int safety_r = 1000000;
+        while (safety_r-- > 0) {
             nd->c[0]->state = 0;
             IR_exec_node(nd->c[0]);
             if (IS_FAIL_fn(nd->c[0]->value)) break;
+            if (frame_depth > 0 && (FRAME.loop_break || FRAME.returning)) break;
+            if (frame_depth > 0) FRAME.loop_next = 0;
         }
+        if (frame_depth > 0) { FRAME.loop_break = saved_brk_r; FRAME.loop_next = saved_nxt_r; }
         nd->value = NULVCL;
         return nd->γ;
     }
@@ -355,6 +382,98 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->c[0]->state = 0;
         IR_exec_node(nd->c[0]);
         if (IS_FAIL_fn(nd->c[0]->value)) { nd->value = NULVCL; return nd->γ; }
+        nd->value = FAILDESCR;
+        return nd->ω;
+    }
+    case IR_BREAK: {
+        /* Icon break — set loop_break flag on current frame; propagate failure upward.         */
+        if (frame_depth > 0) FRAME.loop_break = 1;
+        nd->value = FAILDESCR;
+        return nd->ω;
+    }
+    case IR_NEXT: {
+        /* Icon next — set loop_next flag on current frame; propagate failure upward.           */
+        if (frame_depth > 0) FRAME.loop_next = 1;
+        nd->value = FAILDESCR;
+        return nd->ω;
+    }
+    case IR_NONNULL: {
+        /* Icon \x nonnull-test — c[0]=operand; succeed with operand if non-null, else ω.      */
+        if (nd->n < 1 || !nd->c[0]) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[0]);
+        DESCR_t v = nd->c[0]->value;
+        if (IS_FAIL_fn(v)) { nd->value = FAILDESCR; return nd->ω; }
+        if (v.v == DT_SNUL) { nd->value = FAILDESCR; return nd->ω; }
+        nd->value = v;
+        return nd->γ;
+    }
+    case IR_IDENTICAL: {
+        /* Icon === — c[0]=lhs, c[1]=rhs; succeed with rhs if identical (same object), else ω. */
+        if (nd->n < 2 || !nd->c[0] || !nd->c[1]) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[0]);
+        DESCR_t lv = nd->c[0]->value;
+        IR_exec_node(nd->c[1]);
+        DESCR_t rv = nd->c[1]->value;
+        if (IS_FAIL_fn(lv) || IS_FAIL_fn(rv)) { nd->value = FAILDESCR; return nd->ω; }
+        int ident = 0;
+        if (lv.v == rv.v) {
+            if (lv.v == DT_SNUL) ident = 1;
+            else if (lv.v == DT_I) ident = (lv.i == rv.i);
+            else if (lv.v == DT_S || lv.v == DT_K) ident = (lv.s == rv.s) || (lv.s && rv.s && strcmp(lv.s, rv.s) == 0);
+            else if (lv.v == DT_DATA) ident = (lv.ptr == rv.ptr);
+            else if (lv.v == DT_T) ident = (lv.tbl == rv.tbl);
+            else ident = (lv.i == rv.i);
+        }
+        if (!ident) { nd->value = FAILDESCR; return nd->ω; }
+        nd->value = rv;
+        return nd->γ;
+    }
+    case IR_NULL_TEST: {
+        /* Icon \x null-test — c[0]=operand; succeed with &null if operand is &null, else ω.   */
+        if (nd->n < 1 || !nd->c[0]) { nd->value = NULVCL; return nd->γ; }
+        IR_exec_node(nd->c[0]);
+        DESCR_t v = nd->c[0]->value;
+        if (IS_FAIL_fn(v)) { nd->value = FAILDESCR; return nd->ω; }
+        if (v.v == DT_SNUL) { nd->value = NULVCL; return nd->γ; }
+        nd->value = FAILDESCR;
+        return nd->ω;
+    }
+    case IR_RANDOM: {
+        /* Icon ?E — random element of string/list/table/integer. c[0]=operand.                 */
+        if (nd->n < 1 || !nd->c[0]) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[0]);
+        DESCR_t v = nd->c[0]->value;
+        if (IS_FAIL_fn(v)) { nd->value = FAILDESCR; return nd->ω; }
+        extern uint64_t bb_icn_rnd_seed;
+        bb_icn_rnd_seed = bb_icn_rnd_seed * 6364136223846793005UL + 1442695040888963407UL;
+        unsigned long rnd = (unsigned long)(bb_icn_rnd_seed >> 33);
+        if (IS_INT_fn(v)) {
+            int64_t n = v.i;
+            if (n <= 0) { nd->value = INTVAL(0); return nd->γ; }
+            nd->value = INTVAL((int64_t)(rnd % (unsigned long)n) + 1);
+            return nd->γ;
+        }
+        if (v.v == DT_T) {
+            if (!v.tbl || v.tbl->size <= 0) { nd->value = FAILDESCR; return nd->ω; }
+            int target = (int)(rnd % (unsigned long)v.tbl->size);
+            int seen = 0;
+            for (int b = 0; b < TABLE_BUCKETS; b++) {
+                for (TBPAIR_t *p = v.tbl->buckets[b]; p; p = p->next) {
+                    if (seen == target) { nd->value = p->val; return nd->γ; }
+                    seen++;
+                }
+            }
+            nd->value = FAILDESCR; return nd->ω;
+        }
+        const char *s = VARVAL_fn(v);
+        if (s) {
+            long slen = v.slen > 0 ? v.slen : (long)strlen(s);
+            if (slen <= 0) { nd->value = FAILDESCR; return nd->ω; }
+            int idx = (int)(rnd % (unsigned long)slen);
+            char buf[2] = { s[idx], '\0' };
+            nd->value = STRVAL(GC_strdup(buf));
+            return nd->γ;
+        }
         nd->value = FAILDESCR;
         return nd->ω;
     }

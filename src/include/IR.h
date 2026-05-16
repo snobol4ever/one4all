@@ -91,6 +91,11 @@ typedef enum {
     IR_ICN_BINOP,       /* arith/relop with generative operands; opaque=icn_binop_dcg_t*                    */
     IR_ICN_TO_NESTED,   /* (lo_gen) to (hi_gen) cross-product; opaque=icn_to_nested_state_t*                */
     IR_ICN_PROC_GEN,    /* user proc generator via GeneratorState; opaque=GeneratorState*                            */
+    IR_BREAK,           /* Icon break — set FRAME.loop_break=1; propagate ω                                         */
+    IR_NEXT,            /* Icon next — set FRAME.loop_next=1; propagate ω                                           */
+    IR_IDENTICAL,       /* Icon === — c[0]=lhs, c[1]=rhs; succeed with rhs if identical, else ω                     */
+    IR_NULL_TEST,       /* Icon \x null-test — c[0]=operand; succeed with &null if null, else ω                     */
+    IR_RANDOM,          /* Icon ?E random element — c[0]=operand; succeed with random value, else ω                 */
     IR_E_COUNT
 } IR_e;
 typedef struct IR_t IR_t;
