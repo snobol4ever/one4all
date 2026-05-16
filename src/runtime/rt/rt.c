@@ -915,7 +915,24 @@ void rt_call(const char *name, int nargs)
             DESCR_t val = args[0]; DESCR_t base = args[1]; DESCR_t idx = args[2];
             LAST_OK_SET(subscript_set(base, idx, val));
             vstack_push(val);
-        } else if (nargs == 4) {
+        } else if (nargs >= 4) {
+            DESCR_t val = args[0]; DESCR_t base = args[1];
+            DESCR_t i = args[2]; DESCR_t j = args[3];
+            LAST_OK_SET(subscript_set2(base, i, j, val));
+            vstack_push(val);
+        } else {
+            DESCR_t r = INVOKE_fn("ITEM_SET", args, nargs);
+            LAST_OK_SET((r.v != DT_FAIL));
+            vstack_push(args[0]);
+        }
+        return;
+    }
+    if (name && strcmp(name, "ITEM_SET") == 0) {
+        if (nargs == 3) {
+            DESCR_t val = args[0]; DESCR_t base = args[1]; DESCR_t idx = args[2];
+            LAST_OK_SET(subscript_set(base, idx, val));
+            vstack_push(val);
+        } else if (nargs >= 4) {
             DESCR_t val = args[0]; DESCR_t base = args[1];
             DESCR_t i = args[2]; DESCR_t j = args[3];
             LAST_OK_SET(subscript_set2(base, i, j, val));
