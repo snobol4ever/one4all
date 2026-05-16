@@ -273,7 +273,24 @@ int emit_js_program(const tree_t * ast_prog, FILE * out) {
     if (!ast_prog || !out) return 1;
     SM_Program *sm = sm_preamble(ast_prog);
     if (!sm) return 1;
-    emit_js_prologue(NULL, out);
+    /* Prologue: header + runtime require + _init. */
+    fprintf(out, "'use strict';\n");
+    fprintf(out, "const rt = require('/home/claude/one4all/src/runtime/js/sno_runtime.js');\n");
+    fprintf(out, "rt._init();\n");
+    /* Pre-scan: emit user-fn entry-PC registration for all SM_LABEL with define_entry=1. */
+    fprintf(out, "rt._register_label_pcs({");
+    int first = 1;
+    for (int i = 0; i < sm->count; i++) {
+        SM_Instr *in = &sm->instrs[i];
+        if (in->op == SM_LABEL && in->a[2].i && in->a[0].s) {
+            if (!first) fprintf(out, ",");
+            fprintf(out, "\"%s\":%d", in->a[0].s, i);
+            first = 0;
+        }
+    }
+    fprintf(out, "});\n");
+    fprintf(out, "let _pc = 0;\n");
+    fprintf(out, "loop: while (true) { switch (_pc) {\n");
     emit_js_from_sm(sm, out);
     emit_js_epilogue(NULL, out);
     sm_prog_free(sm);
@@ -361,18 +378,52 @@ int emit_js_from_sm(SM_Program * sm, FILE * out) {
             has_continue = 1;
             break;
         case SM_SUSPEND_VALUE:
-            fprintf(out, "rt.call(\"%s\", %lld); ", instr->a[0].s ? instr->a[0].s : "", instr->a[1].i);
+            fprintf(out, "{ let _r = rt.call_or_jump(\"%s\", %lld, %d); if (_r >= 0) { _pc = _r; continue; } } ",
+                    instr->a[0].s ? instr->a[0].s : "", instr->a[1].i, i + 1);
             fprintf(out, "rt.set_last_ok(!rt._is_fail(rt._peek())); ");
             break;
         case SM_CALL_FN:
-            fprintf(out, "rt.call(\"%s\", %lld); ", instr->a[0].s ? instr->a[0].s : "", instr->a[1].i);
+            fprintf(out, "{ let _r = rt.call_or_jump(\"%s\", %lld, %d); if (_r >= 0) { _pc = _r; continue; } } ",
+                    instr->a[0].s ? instr->a[0].s : "", instr->a[1].i, i + 1);
+            break;
+        case SM_RETURN:
+            fprintf(out, "{ let _r = rt.fn_return(0, 0); if (_r === -2) { break loop; } _pc = _r; continue; } ");
+            has_continue = 1;
+            break;
+        case SM_FRETURN:
+            fprintf(out, "{ let _r = rt.fn_return(1, 0); if (_r === -2) { break loop; } _pc = _r; continue; } ");
+            has_continue = 1;
             break;
         case SM_NRETURN:
-        case SM_NRETURN_F:
-        case SM_FRETURN:
+            fprintf(out, "{ let _r = rt.fn_return(2, 0); if (_r === -2) { break loop; } _pc = _r; continue; } ");
+            has_continue = 1;
+            break;
+        case SM_RETURN_S:
+            fprintf(out, "{ let _r = rt.fn_return(0, 1); if (_r === -1) { _pc = %d; continue; } if (_r === -2) { break loop; } _pc = _r; continue; } ", i + 1);
+            has_continue = 1;
+            break;
+        case SM_RETURN_F:
+            fprintf(out, "{ let _r = rt.fn_return(0, 2); if (_r === -1) { _pc = %d; continue; } if (_r === -2) { break loop; } _pc = _r; continue; } ", i + 1);
+            has_continue = 1;
+            break;
         case SM_FRETURN_S:
-        case SM_RETURN:
-            fprintf(out, "/* function return stub */ ");
+            fprintf(out, "{ let _r = rt.fn_return(1, 1); if (_r === -1) { _pc = %d; continue; } if (_r === -2) { break loop; } _pc = _r; continue; } ", i + 1);
+            has_continue = 1;
+            break;
+        case SM_FRETURN_F:
+            fprintf(out, "{ let _r = rt.fn_return(1, 2); if (_r === -1) { _pc = %d; continue; } if (_r === -2) { break loop; } _pc = _r; continue; } ", i + 1);
+            has_continue = 1;
+            break;
+        case SM_NRETURN_S:
+            fprintf(out, "{ let _r = rt.fn_return(2, 1); if (_r === -1) { _pc = %d; continue; } if (_r === -2) { break loop; } _pc = _r; continue; } ", i + 1);
+            has_continue = 1;
+            break;
+        case SM_NRETURN_F:
+            fprintf(out, "{ let _r = rt.fn_return(2, 2); if (_r === -1) { _pc = %d; continue; } if (_r === -2) { break loop; } _pc = _r; continue; } ", i + 1);
+            has_continue = 1;
+            break;
+        case SM_DEFINE_ENTRY:
+            /* Marker after a define_entry label; no runtime action (registration done by DEFINE builtin). */
             break;
         case SM_EXEC_STMT:
         case SM_PUSH_EXPRESSION:

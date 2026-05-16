@@ -256,7 +256,24 @@ const _builtins = {
     SUCCEED(args) { return args[0] !== undefined ? args[0] : ''; },
     APPLY(args)   { return _apply(_str(args[0]), args.slice(1)); },
     REMDR(args)   { const a=_num(args[0]),b=_num(args[1]); if(b===0) throw new Error('SNOBOL4: remdr by zero'); return Math.trunc(a)%Math.trunc(b); },
-    DEFINE(args)  { /* stub — user-defined functions not yet wired */ return null; },
+    DEFINE(args)  {
+        /* SNOBOL4 DEFINE(proto, entry).
+         * proto: "NAME(p1,p2,...)" or "NAME(p1,p2,...)l1,l2,..." with locals after ')'.
+         * entry: optional alternate entry label (defaults to NAME).
+         * Parse proto, look up entry_pc from emitted _label_pcs map, register user fn. */
+        const proto = _str(args[0]);
+        const entry_override = args[1] != null ? _str(args[1]) : null;
+        const m = proto.match(/^([A-Za-z_][A-Za-z_0-9]*)\s*(?:\(([^)]*)\))?\s*(.*)$/);
+        if (!m) return null;
+        const name = m[1];
+        const params = m[2] ? m[2].split(',').map(s => s.trim()).filter(s => s) : [];
+        const locals = m[3] ? m[3].split(',').map(s => s.trim()).filter(s => s) : [];
+        const entry_name = entry_override || name;
+        const entry_pc = _label_pcs[entry_name];
+        if (entry_pc === undefined) return null;  /* no entry label found — silently fail */
+        _user_fns[name] = { entry_pc, params, locals, retname: name };
+        return name;
+    },
     ARRAY(args)   { /* stub */ return []; },
     TABLE(args)   { /* stub */ return {}; },
     PROTOTYPE(args){ return null; },
@@ -272,14 +289,76 @@ const _builtins = {
     TAB(args)     { return ''; /* stub */ },
     RTAB(args)    { return ''; /* stub */ },
     ARBNO(args)   { return ''; /* stub */ },
+    /* SM-internal dispatches via SM_CALL_FN — these are not user-callable but
+     * the emitter emits rt.call("NAME_PUSH", ...) etc. for indirection ops. */
+    NAME_PUSH(args)  { /* push variable name as NAME — stub returns name string */
+        const v = args[0];
+        if (v === null || v === undefined) return '';
+        return _str(v);
+    },
+    INDIR_GET(args)  { /* dereference name → value */
+        const nm = _str(args[0]);
+        if (!nm) return null;
+        return _vars[nm];
+    },
+    ASGN_INDIR(args) { /* indirect assignment: ASGN_INDIR(value, name) → store value at name */
+        const val = args[0], nm = _str(args[1]);
+        if (nm) _vars[nm] = val;
+        return val;
+    },
+    IDX(args)        { /* array/table index — stub */
+        const obj = args[0];
+        if (!obj || typeof obj !== 'object') return _FAIL;
+        const key = args.length > 1 ? args[1] : 0;
+        if (Array.isArray(obj)) return obj[_num(key)] != null ? obj[_num(key)] : null;
+        return obj[_str(key)] != null ? obj[_str(key)] : null;
+    },
+    IDX_SET(args)    { /* array/table index set — stub: (val, obj, key) */
+        const val = args[0], obj = args[1], key = args[2];
+        if (obj && typeof obj === 'object') {
+            if (Array.isArray(obj)) obj[_num(key)] = val;
+            else obj[_str(key)] = val;
+        }
+        return val;
+    },
+    PL_BUILTIN(args) { return _FAIL; /* prolog builtin, not used here */ },
+    /* Tracing — stubs */
+    TRACE(args)      { return null; },
+    STOPTR(args)     { return null; },
+    /* SETEXIT / OPSYN — error handling, stubs */
+    SETEXIT(args)    { return null; },
+    OPSYN(args)      { return null; },
+    /* I/O — stubs */
+    ENDFILE(args)    { return null; },
+    EJECT(args)      { return null; },
+    REWIND(args)     { return null; },
+    OPEN(args)       { return null; },
+    CLOSE(args)      { return null; },
+    LOAD(args)       { return _FAIL; /* dynamic load — fail */ },
+    UNLOAD(args)     { return null; },
+    HOST(args)       { return null; },
+    DUMP(args)       { return null; },
+    DATE(args)       { const d = new Date(); return d.toString(); },
+    CLOCK(args)      { return Date.now(); },
+    /* DATA / table — partial */
+    DATA(args)       { return null; /* prototype-style DATA() — stub */ },
+    FIELD(args)      { return null; },
+    PROTOTYPE(args)  { return null; },
+    COPY(args)       { return args[0]; },
+    ITEM(args)       { return _FAIL; },
+    ITEM_SET(args)   { return _FAIL; },
 };
 
 function _apply(name, args) {
+    if (!name) return _FAIL;  /* empty name (e.g. SM_PAT_* emitted without builder) — fail */
     const uname = name.toUpperCase();
     if (uname in _builtins) return _builtins[uname](args);
-    /* user-defined: look up in _user_fns */
-    if (name in _user_fns) return _user_fns[name](args);
-    throw new Error('SNOBOL4: undefined function: ' + name);
+    /* User-defined: should normally be invoked via call_or_jump (sets up frame + jumps to body).
+     * If somehow reached via _apply (e.g. APPLY builtin), we can't synchronously run the body
+     * here since the entire program is one switch loop. Return FAIL. */
+    if (name in _user_fns || uname in _user_fns) return _FAIL;
+    /* Don't throw — fail gracefully so the program can use :S/:F to recover. */
+    return _FAIL;
 }
 
 const _user_fns = {};
@@ -351,7 +430,14 @@ function pop_void()          { _stack.pop(); }
 
 function store_var(name) {
     const v = _stack[_stack.length - 1];
+    if (v === _FAIL) {
+        _stack.pop();
+        _stack.push(_FAIL);
+        _last_ok = false;
+        return;
+    }
     _vars[name] = v;
+    _last_ok = true;
 }
 
 function concat() {
@@ -448,6 +534,96 @@ function call(name, nargs) {
     _stack.push(result);
 }
 
+/* -----------------------------------------------------------------------
+ * User-defined function support (SJ4-JS-4c)
+ *
+ * Architecture: the entire emitted program is one switch loop with PCs.
+ * User functions live as cases within that same loop, identified by their
+ * SM_LABEL with define_entry=1.  call_or_jump and fn_return manipulate
+ * _pc to enter/exit function bodies and save/restore parameter & retval
+ * variable bindings.
+ * ----------------------------------------------------------------------- */
+
+const _label_pcs = {};       /* label name → PC of SM_LABEL with define_entry=1 */
+const _call_stack = [];      /* frames: {ret_pc, retname, saved: [[name,val]...]} */
+
+function _register_label_pcs(map) {
+    for (const k in map) _label_pcs[k] = map[k];
+}
+
+/* call_or_jump — used by emitted code for SM_CALL_FN / SM_SUSPEND_VALUE.
+ * Returns >= 0 if emitted code should set _pc to that value (user function call).
+ * Returns -1 if call was a builtin and result is already on stack. */
+function call_or_jump(name, nargs, ret_pc) {
+    if (_stack.length < nargs) throw new Error('SNOBOL4: call_or_jump underflow: ' + name);
+    if (name && _user_fns.hasOwnProperty(name)) {
+        const fn = _user_fns[name];
+        const args = _stack.splice(_stack.length - nargs, nargs);
+        const saved = [];
+        /* Save and clear the return-value variable (retname). */
+        saved.push([fn.retname, _store[fn.retname.toUpperCase()]]);
+        _vars[fn.retname] = '';
+        /* Save and bind formals. */
+        for (let k = 0; k < fn.params.length; k++) {
+            const p = fn.params[k];
+            saved.push([p, _store[p.toUpperCase()]]);
+            _vars[p] = (k < args.length) ? args[k] : null;
+        }
+        /* Save and clear locals. */
+        for (const l of fn.locals) {
+            saved.push([l, _store[l.toUpperCase()]]);
+            _vars[l] = null;
+        }
+        /* Save the caller's value stack and start the callee with an empty one. */
+        const caller_stack = _stack;
+        _stack = [];
+        _call_stack.push({ ret_pc, retname: fn.retname, saved, caller_stack });
+        return fn.entry_pc;
+    }
+    const args = _stack.splice(_stack.length - nargs, nargs);
+    const result = _apply(name || '', args);
+    _stack.push(result);
+    return -1;
+}
+
+/* fn_return — used by emitted code for SM_RETURN / SM_NRETURN / SM_FRETURN
+ * and conditional _S/_F variants. kind: 0=RETURN, 1=FRETURN, 2=NRETURN.
+ * cond: 0=plain, 1=if last_ok true, 2=if last_ok false.
+ * Returns >= 0 if a return actually fired (emitted code sets _pc),
+ * or -1 to indicate the condition was not met (fall through to next pc). */
+function fn_return(kind, cond) {
+    if (cond === 1 && !_last_ok) return -1;
+    if (cond === 2 &&  _last_ok) return -1;
+    if (_call_stack.length === 0) {
+        /* Top-level RETURN — treat as HALT. */
+        return -2;
+    }
+    const fr = _call_stack.pop();
+    let retval;
+    if (kind === 1) {
+        retval = _FAIL;
+    } else {
+        retval = _store[fr.retname.toUpperCase()];
+        if (retval === undefined) retval = null;
+        if (kind === 2) {
+            /* NRETURN: return a NAME — for now, just dereference current value. */
+        }
+    }
+    /* Restore saved bindings (in reverse order to handle duplicates correctly). */
+    for (let i = fr.saved.length - 1; i >= 0; i--) {
+        const [n, v] = fr.saved[i];
+        const uk = n.toUpperCase();
+        if (v === undefined) delete _store[uk];
+        else _store[uk] = v;
+    }
+    /* Restore the caller's value stack and push the return value. */
+    _stack = fr.caller_stack;
+    _stack.push(retval);
+    _last_ok = (retval !== _FAIL);
+    if (kind === 1) _last_ok = false;
+    return fr.ret_pc;
+}
+
 function do_return(kind, cond) {
     /* Stub — full return semantics deferred to SJ4-JS-3 */
 }
@@ -516,5 +692,7 @@ module.exports = {
     store_var, pop_void, concat, neg, exp_op, coerce_num,
     arith, acomp, lcomp, last_ok, set_last_ok, set_stno,
     halt_tos, call, do_return,
+    /* User-fn dispatch (SJ4-JS-4c) */
+    _register_label_pcs, call_or_jump, fn_return,
     MatchState,
 };
