@@ -287,8 +287,20 @@ static void h_bb_once(void)
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void h_bb_once_proc(void)
 {
-    fprintf(stderr, "[NO-AST] h_bb_once_proc stub: needs fresh SM/BB lowering\n");
-    STATE->last_ok = 0;
+    const char *name  = CUR_INS->a[0].s;
+    int         arity = (int)CUR_INS->a[1].i;
+    bb_node_t node = pl_bb_once_proc_by_name(name, arity);
+    if (node.fn) {
+        extern Term **g_pl_env;
+        Term **saved_env = g_pl_env;
+        pl_bb_env_push(16);
+        int ok = bb_broker(node, BB_ONCE, NULL, NULL);
+        pl_bb_env_pop(saved_env);
+        STATE->last_ok = (ok > 0);
+    } else {
+        fprintf(stderr, "[NO-AST] h_bb_once_proc stub: needs fresh SM/BB lowering\n");
+        STATE->last_ok = 0;
+    }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern bb_node_t icn_bb_pump_proc_by_name(const char *name, DESCR_t *args, int nargs);
