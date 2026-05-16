@@ -272,14 +272,14 @@ static void jit_pump_print(DESCR_t val, void *arg)
 static void h_bb_pump(void)
 {
     POP();
-    fprintf(stderr, "[NO-AST] h_bb_pump stub: needs fresh SM/BB lowering\n");
+    fprintf(stderr, "[NO-AST] SM_BB_PUMP stub: needs fresh SM/BB lowering\n");
     STATE->last_ok = 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void h_bb_once(void)
 {
     POP();
-    fprintf(stderr, "[NO-AST] h_bb_once stub: needs fresh SM/BB lowering\n");
+    fprintf(stderr, "[NO-AST] SM_BB_ONCE stub: needs fresh SM/BB lowering\n");
     STATE->last_ok = 0;
 }
 #include "../../frontend/prolog/pl_broker.h"
@@ -298,7 +298,7 @@ static void h_bb_once_proc(void)
         pl_bb_env_pop(saved_env);
         STATE->last_ok = (ok > 0);
     } else {
-        fprintf(stderr, "[NO-AST] h_bb_once_proc stub: needs fresh SM/BB lowering\n");
+        fprintf(stderr, "[NO-AST] SM_BB_ONCE_PROC stub: needs fresh SM/BB lowering\n");
         STATE->last_ok = 0;
     }
 }
@@ -402,7 +402,7 @@ static void h_bb_pump_sm(void)
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void h_bb_pump_every(void)
 {
-    fprintf(stderr, "[NO-AST] h_bb_pump_every stub: needs fresh SM/BB lowering\n");
+    fprintf(stderr, "[NO-AST] SM_BB_PUMP_EVERY stub: needs fresh SM/BB lowering\n");
     STATE->last_ok = 0;
     PUSH(NULVCL);
 }
