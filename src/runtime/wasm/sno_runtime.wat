@@ -18,6 +18,7 @@
   ;; imports MUST come before memory/globals in WASM
   (import "host" "write_line" (func $host_write_line (param i32 i32)))
   (import "host" "read_line"  (func $host_read_line  (param i32) (result i32)))
+  (import "host" "format_real" (func $host_format_real (param f64 i32) (result i32)))
 
   (memory (export "memory") 32)
 
@@ -77,6 +78,11 @@
   (data (i32.const 0x31218) "MAXLNGTH")
   (data (i32.const 0x31220) "TRIM")
   (data (i32.const 0x31228) "ERRLIMIT")
+  (data (i32.const 0x31250) "STNO")
+  (data (i32.const 0x31258) "FNCLEVEL")
+  (data (i32.const 0x31268) "ANCHOR")
+  (data (i32.const 0x31270) "FULLSCAN")
+  (data (i32.const 0x31280) "CASE")
   (data (i32.const 0x31230) "ALPHABET")
   (data (i32.const 0x31238) "DIGITS")
   (data (i32.const 0x31240) "UCASE")
@@ -215,6 +221,7 @@
   ;; coerce top-of-stack to string (ptr,len); does NOT pop
   (func $tos_to_str (result i32 i32)
     (local $tag i32) (local $ival i32) (local $len i32)
+    (local $bits i64) (local $ptr i32) (local $rlen i32)
     (local.set $tag  (call $peek_tag))
     (local.set $ival (call $peek_ival))
     (local.set $len  (call $peek_len))
@@ -224,6 +231,16 @@
       (then (return (i32.const 0) (i32.const 0))))
     (if (i32.eq (local.get $tag) (global.get $TAG_INT))
       (then (return (call $int_to_str (local.get $ival)))))
+    (if (i32.eq (local.get $tag) (global.get $TAG_REAL))
+      (then
+        ;; Reconstruct f64 from (ival=lo32, len=hi32), let host format it into
+        ;; a small buffer in the dynamic string heap.
+        (local.set $bits (i64.or
+          (i64.extend_i32_u (local.get $ival))
+          (i64.shl (i64.extend_i32_u (local.get $len)) (i64.const 32))))
+        (local.set $ptr (call $alloc_str (i32.const 64)))
+        (local.set $rlen (call $host_format_real (f64.reinterpret_i64 (local.get $bits)) (local.get $ptr)))
+        (return (local.get $ptr) (local.get $rlen))))
     (return (i32.const 0) (i32.const 0))
   )
 
@@ -320,6 +337,21 @@
       (then (call $push3 (global.get $TAG_INT) (i32.const 0) (i32.const 0)) (return)))
     (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31220) (i32.const 4))
       (then (call $push3 (global.get $TAG_INT) (i32.const 0) (i32.const 0)) (return)))
+    ;; STNO (4): current statement number
+    (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31250) (i32.const 4))
+      (then (call $push3 (global.get $TAG_INT) (global.get $stno) (i32.const 0)) (return)))
+    ;; FNCLEVEL (8): function-call depth — we don't track it; return 0
+    (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31258) (i32.const 8))
+      (then (call $push3 (global.get $TAG_INT) (i32.const 0) (i32.const 0)) (return)))
+    ;; ANCHOR (6): match-anchor flag, default 0
+    (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31268) (i32.const 6))
+      (then (call $push3 (global.get $TAG_INT) (i32.const 0) (i32.const 0)) (return)))
+    ;; FULLSCAN (8): default 0
+    (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31270) (i32.const 8))
+      (then (call $push3 (global.get $TAG_INT) (i32.const 0) (i32.const 0)) (return)))
+    ;; CASE (4): case sensitivity, default 1
+    (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31280) (i32.const 4))
+      (then (call $push3 (global.get $TAG_INT) (i32.const 1) (i32.const 0)) (return)))
     ;; ALPHABET (8 chars): 256-byte string of \00..\FF
     (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31230) (i32.const 8))
       (then (call $push3 (global.get $TAG_STR) (i32.const 0x31300) (i32.const 256)) (return)))
@@ -461,9 +493,62 @@
 
   ;; arith: op 0=add 1=sub 2=mul 3=div 4=mod
   (func $sno_arith (export "sno_arith") (param $op i32)
+    (local $tag1 i32) (local $ival1 i32) (local $len1 i32)
+    (local $tag2 i32) (local $ival2 i32) (local $len2 i32)
     (local $v1 i32) (local $v2 i32) (local $r i32)
-    (call $pop_slot) (local.set $v2 (global.get $pop_ival))
-    (call $pop_slot) (local.set $v1 (global.get $pop_ival))
+    (local $bits1 i64) (local $bits2 i64) (local $rf f64) (local $f1 f64) (local $f2 f64) (local $rbits i64)
+    (call $pop_slot)
+    (local.set $tag2  (global.get $pop_tag))
+    (local.set $ival2 (global.get $pop_ival))
+    (local.set $len2  (global.get $pop_len))
+    (call $pop_slot)
+    (local.set $tag1  (global.get $pop_tag))
+    (local.set $ival1 (global.get $pop_ival))
+    (local.set $len1  (global.get $pop_len))
+    ;; FAIL propagation
+    (if (i32.or (i32.eq (local.get $tag1) (global.get $TAG_FAIL))
+                (i32.eq (local.get $tag2) (global.get $TAG_FAIL)))
+      (then
+        (call $push3 (global.get $TAG_FAIL) (i32.const 0) (i32.const 0))
+        (global.set $last_ok (i32.const 0))
+        (return)))
+    ;; If either operand is REAL, do f64 arithmetic.
+    (if (i32.or (i32.eq (local.get $tag1) (global.get $TAG_REAL))
+                (i32.eq (local.get $tag2) (global.get $TAG_REAL)))
+      (then
+        (if (i32.eq (local.get $tag1) (global.get $TAG_REAL))
+          (then
+            (local.set $bits1 (i64.or
+              (i64.extend_i32_u (local.get $ival1))
+              (i64.shl (i64.extend_i32_u (local.get $len1)) (i64.const 32))))
+            (local.set $f1 (f64.reinterpret_i64 (local.get $bits1))))
+          (else (local.set $f1 (f64.convert_i32_s (local.get $ival1)))))
+        (if (i32.eq (local.get $tag2) (global.get $TAG_REAL))
+          (then
+            (local.set $bits2 (i64.or
+              (i64.extend_i32_u (local.get $ival2))
+              (i64.shl (i64.extend_i32_u (local.get $len2)) (i64.const 32))))
+            (local.set $f2 (f64.reinterpret_i64 (local.get $bits2))))
+          (else (local.set $f2 (f64.convert_i32_s (local.get $ival2)))))
+        (if (i32.eq (local.get $op) (i32.const 0))
+          (then (local.set $rf (f64.add (local.get $f1) (local.get $f2))))
+          (else (if (i32.eq (local.get $op) (i32.const 1))
+            (then (local.set $rf (f64.sub (local.get $f1) (local.get $f2))))
+            (else (if (i32.eq (local.get $op) (i32.const 2))
+              (then (local.set $rf (f64.mul (local.get $f1) (local.get $f2))))
+              (else (if (i32.eq (local.get $op) (i32.const 3))
+                (then (local.set $rf (f64.div (local.get $f1) (local.get $f2))))
+                (else (local.set $rf (f64.const 0))))))))))
+        (local.set $rbits (i64.reinterpret_f64 (local.get $rf)))
+        (call $push3
+          (global.get $TAG_REAL)
+          (i32.wrap_i64 (local.get $rbits))
+          (i32.wrap_i64 (i64.shr_u (local.get $rbits) (i64.const 32))))
+        (global.set $last_ok (i32.const 1))
+        (return)))
+    ;; Integer arithmetic
+    (local.set $v1 (local.get $ival1))
+    (local.set $v2 (local.get $ival2))
     (local.set $r (i32.const 0))
     (if (i32.eq (local.get $op) (i32.const 0))
       (then (local.set $r (i32.add (local.get $v1) (local.get $v2))))
@@ -481,6 +566,7 @@
         (then (local.set $r (i32.const 0)))
         (else (local.set $r (i32.rem_s (local.get $v1) (local.get $v2)))))))))))))
     (call $push3 (global.get $TAG_INT) (local.get $r) (i32.const 0))
+    (global.set $last_ok (i32.const 1))
   )
 
   ;; acomp: op 0=eq 1=ne 2=lt 3=le 4=gt 5=ge

@@ -44,6 +44,44 @@ const hostImports = {
       for (let i = 0; i < bytes.length; i++) mem[buf_ptr + i] = bytes[i];
       return bytes.length;
     },
+    // Print a real number directly, formatting per SNOBOL4 conventions:
+    //   1.0 -> "1.", 0.001 -> "0.001", 1e-06 -> "1e-06"
+    write_real_line: (val) => {
+      let s;
+      if (val === Math.floor(val) && Math.abs(val) < 1e15) {
+        // Whole real: SNOBOL4 prints "X." (trailing dot).
+        s = val.toFixed(0) + '.';
+      } else {
+        s = val.toString();
+        // JS produces "1e-6" but SNOBOL4 expects "1e-06" (zero-padded).
+        s = s.replace(/e([+-])(\d)$/, 'e$10$2');
+      }
+      process.stdout.write(s + '\n');
+    },
+    // Format a real as string into linear memory at buf_ptr; return length.
+    // Mirrors SNOBOL4 conventions:
+    //   - whole reals print with trailing dot: 1.0 → "1."
+    //   - exponential at |val| < 1e-3 or |val| >= 1e16: 1e-6 → "1e-06"
+    //   - otherwise decimal: 0.001, 3.14159
+    format_real: (val, buf_ptr) => {
+      let s;
+      if (val === Math.floor(val) && Math.abs(val) < 1e15) {
+        s = val.toFixed(0) + '.';
+      } else {
+        const av = Math.abs(val);
+        if (av !== 0 && (av < 1e-3 || av >= 1e16)) {
+          s = val.toExponential();
+          s = s.replace(/e([+-])(\d)$/, 'e$10$2');
+        } else {
+          s = val.toString();
+          s = s.replace(/e([+-])(\d)$/, 'e$10$2');
+        }
+      }
+      const mem = new Uint8Array(snoRtInst.exports.memory.buffer);
+      const bytes = new TextEncoder().encode(s);
+      for (let i = 0; i < bytes.length; i++) mem[buf_ptr + i] = bytes[i];
+      return bytes.length;
+    },
   }
 };
 
