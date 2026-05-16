@@ -303,8 +303,9 @@ public final class SnoPat {
                 });
             }
             case REFNAME: {
-                /* *var in pattern context — evaluate var at match time, treat as literal. */
+                /* *var in pattern context — evaluate var at match time. If the value is a SnoPat, delegate to it. If a string, treat as literal. */
                 Object v = SnoRt.get_var_external(s);
+                if (v instanceof SnoPat) return ((SnoPat) v).match(c, pos, k);
                 String lit = v == null ? "" : v.toString();
                 int len = lit.length();
                 if (pos + len > c.subjLen) return false;
