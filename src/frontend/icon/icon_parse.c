@@ -220,8 +220,8 @@ static tree_t *parse_postfix(IcnParser *p) {
             if (p->cur.kind != TK_IDENT) { parser_error(p, "expected field name"); break; }
             IcnToken fname = p->cur; advance(p);
             tree_t *fe = ast_node_new(TT_FIELD);
-            fe->v.sval = intern_n(fname.val.sval.data, (int)fname.val.sval.len);
             push_child(fe, n);
+            push_child(fe, e_leaf_sval(TT_VAR, fname.val.sval.data, (int)fname.val.sval.len));
             n = fe;
         } else {
             break;
@@ -254,14 +254,7 @@ static tree_t *parse_unary(IcnParser *p) {
     if (check(p, TK_NOT))       { advance(p); return e_unary(TT_NOT,        parse_unary(p)); }
     if (check(p, TK_QMARK))     { advance(p); return e_unary(TT_RANDOM,     parse_unary(p)); }
     if (check(p, TK_TILDE))     { advance(p); return e_unary(TT_CSET_COMPL, parse_unary(p)); }
-    if (check(p, TK_EQ)) {
-        advance(p);
-        tree_t *inner = parse_unary(p);
-        tree_t *call = ast_node_new(TT_FNC);
-        push_child(call, e_leaf_sval(TT_VAR, "match", -1));
-        push_child(call, inner);
-        return call;
-    }
+    if (check(p, TK_EQ)) { advance(p); return e_unary(TT_MATCH_UNARY, parse_unary(p)); }
     return parse_limit(p);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/

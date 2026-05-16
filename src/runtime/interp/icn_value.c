@@ -237,10 +237,10 @@ static void bb_augop_writeback(tree_t *lhs, DESCR_t res)
         DESCR_t idx  = bb_eval_value(lhs->c[1]);
         if (!IS_FAIL_fn(base) && !IS_FAIL_fn(idx))
             subscript_set(base, idx, res);
-    } else if (lhs->t == TT_FIELD && lhs->v.sval && lhs->n >= 1) {
+    } else if (lhs->t == TT_FIELD && ICN_FIELD_NAME(lhs)) {
         DESCR_t obj = bb_eval_value(lhs->c[0]);
         if (!IS_FAIL_fn(obj)) {
-            DESCR_t *cell = data_field_ptr(lhs->v.sval, obj);
+            DESCR_t *cell = data_field_ptr(ICN_FIELD_NAME(lhs), obj);
             if (cell) *cell = res;
         }
     }
@@ -343,10 +343,10 @@ if (e->n < 2) return NULVCL;
                 DESCR_t idx = bb_eval_value(lhs->c[1]);
                 if (!IS_FAIL_fn(idx)) subscript_set(base, idx, val);
             }
-        } else if (lhs && lhs->t == TT_FIELD && lhs->v.sval && lhs->n >= 1) {
+        } else if (lhs && lhs->t == TT_FIELD && ICN_FIELD_NAME(lhs)) {
             DESCR_t obj = bb_eval_value(lhs->c[0]);
             if (!IS_FAIL_fn(obj)) {
-                DESCR_t *cell = data_field_ptr(lhs->v.sval, obj);
+                DESCR_t *cell = data_field_ptr(ICN_FIELD_NAME(lhs), obj);
                 if (cell) *cell = val;
             }
         } else if (lhs && lhs->t == TT_ITERATE && lhs->n >= 1) {
@@ -553,10 +553,10 @@ DESCR_t cv = bb_eval_value(lhs->c[0]);
         return subscript_get2(base, i1, i2);
     }
     case TT_FIELD: {
-        if (!e->v.sval || e->n < 1) return NULVCL;
+        if (!ICN_FIELD_NAME(e)) return NULVCL;
         DESCR_t obj = bb_eval_value(e->c[0]);
         if (IS_FAIL_fn(obj)) return FAILDESCR;
-        DESCR_t *cell = data_field_ptr(e->v.sval, obj);
+        DESCR_t *cell = data_field_ptr(ICN_FIELD_NAME(e), obj);
         if (!cell) return FAILDESCR;
         return *cell;
     }
@@ -1084,10 +1084,10 @@ DESCR_t cv = bb_eval_value(lhs->c[0]);
                 DESCR_t idx = bb_eval_value(lhs->c[1]);
                 if (!IS_FAIL_fn(idx)) subscript_set(base, idx, val);
             }
-        } else if (lhs && lhs->t == TT_FIELD && lhs->v.sval && lhs->n >= 1) {
+        } else if (lhs && lhs->t == TT_FIELD && ICN_FIELD_NAME(lhs)) {
             DESCR_t obj = bb_eval_value(lhs->c[0]);
             if (!IS_FAIL_fn(obj)) {
-                DESCR_t *cell = data_field_ptr(lhs->v.sval, obj);
+                DESCR_t *cell = data_field_ptr(ICN_FIELD_NAME(lhs), obj);
                 if (cell) *cell = val;
             }
         }

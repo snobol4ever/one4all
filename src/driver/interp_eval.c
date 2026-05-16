@@ -3063,7 +3063,7 @@ DESCR_t interp_eval(tree_t *e)
                 }
             }
         }
-        else if (lv && lv->t == TT_FNC && lv->v.sval && lv->n >= 1) {
+        else if (lv && lv->t == TT_FNC && ICN_FIELD_NAME(lv)) {
             if (strcmp(lv->v.sval, "ITEM") == 0 && lv->n >= 2) {
                 DESCR_t base = interp_eval(lv->c[0]);
                 if (!IS_FAIL_fn(base)) {
@@ -3084,10 +3084,10 @@ DESCR_t interp_eval(tree_t *e)
                     FIELD_SET_fn(obj, lv->v.sval, val);
             }
         }
-        else if (lv && lv->t == TT_FIELD && lv->v.sval && lv->n >= 1) {
+        else if (lv && lv->t == TT_FIELD && ICN_FIELD_NAME(lv)) {
             DESCR_t obj = interp_eval(lv->c[0]);
             if (!IS_FAIL_fn(obj)) {
-                DESCR_t *cell = data_field_ptr(lv->v.sval, obj);
+                DESCR_t *cell = data_field_ptr(ICN_FIELD_NAME(lv), obj);
                 if (cell) *cell = val;
             }
         }
@@ -3906,9 +3906,9 @@ DESCR_t interp_eval(tree_t *e)
                 DESCR_t _base = interp_eval(lhs->c[0]); \
                 DESCR_t _idx  = interp_eval(lhs->c[1]); \
                 if (!IS_FAIL_fn(_base) && !IS_FAIL_fn(_idx)) subscript_set(_base, _idx, _res); \
-            } else if (!IS_FAIL_fn(_res) && lhs->t == TT_FIELD && lhs->v.sval && lhs->n >= 1) { \
+            } else if (!IS_FAIL_fn(_res) && lhs->t == TT_FIELD && ICN_FIELD_NAME(lhs)) { \
                 DESCR_t _obj = interp_eval(lhs->c[0]); \
-                if (!IS_FAIL_fn(_obj)) { DESCR_t *_cell = data_field_ptr(lhs->v.sval, _obj); if (_cell) *_cell = _res; } \
+                if (!IS_FAIL_fn(_obj)) { DESCR_t *_cell = data_field_ptr(ICN_FIELD_NAME(lhs), _obj); if (_cell) *_cell = _res; } \
             } \
             _augop_result = _res; \
         } while(0)
@@ -4253,10 +4253,10 @@ DESCR_t interp_eval(tree_t *e)
         return NULVCL;
     }
     case TT_FIELD: {
-        if (!e->v.sval || e->n < 1) return NULVCL;
+        if (!ICN_FIELD_NAME(e)) return NULVCL;
         DESCR_t obj = interp_eval(e->c[0]);
         if (IS_FAIL_fn(obj)) return FAILDESCR;
-        DESCR_t *cell = data_field_ptr(e->v.sval, obj);
+        DESCR_t *cell = data_field_ptr(ICN_FIELD_NAME(e), obj);
         if (!cell) return FAILDESCR;
         return *cell;
     }

@@ -585,7 +585,7 @@ static DESCR_t icn_assign_write(tree_t *lhs, DESCR_t val) {
         int slot = lhs->_id;
         if (slot >= 0 && slot < FRAME.env_n) { FRAME.env[slot] = val; }
         else if (slot < 0 && lhs->v.sval && lhs->v.sval[0] != '&') NV_SET_fn(lhs->v.sval, val);
-    } else if (lhs && lhs->t == TT_FIELD && lhs->v.sval && lhs->n >= 1) {
+    } else if (lhs && lhs->t == TT_FIELD && ICN_FIELD_NAME(lhs)) {
         DESCR_t obj = bb_eval_value(lhs->c[0]);
         if (!IS_FAIL_fn(obj)) FIELD_SET_fn(obj, lhs->v.sval, val);
     }

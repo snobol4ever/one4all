@@ -30,10 +30,10 @@ DESCR_t *interp_eval_ref(tree_t *e)
         return NULL;
     }
     case TT_FIELD: {
-        if (!e->v.sval || e->n < 1) return NULL;
+        if (!ICN_FIELD_NAME(e)) return NULL;
         DESCR_t obj = interp_eval(e->c[0]);
         if (IS_FAIL_fn(obj)) return NULL;
-        return data_field_ptr(e->v.sval, obj);
+        return data_field_ptr(ICN_FIELD_NAME(e), obj);
     }
     case TT_CAPT_COND_ASGN: {
         if (e->n >= 1 && e->c[0]->t == TT_VAR)

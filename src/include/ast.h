@@ -22,7 +22,7 @@ typedef enum tree_e {
     TT_LT,                TT_LE,                TT_GT,                TT_GE,                TT_EQ,                TT_NE,
     TT_LLT,               TT_LLE,               TT_LGT,               TT_LGE,               TT_LEQ,               TT_LNE,
     TT_CSET_COMPL,        TT_CSET_UNION,        TT_CSET_DIFF,         TT_CSET_INTER,        TT_LCONCAT,
-    TT_NONNULL,           TT_NULL,              TT_NOT,               TT_SIZE,              TT_RANDOM,            TT_IDENTICAL,         TT_AUGOP,
+    TT_NONNULL,           TT_NULL,              TT_NOT,               TT_SIZE,              TT_RANDOM,            TT_IDENTICAL,         TT_AUGOP,             TT_MATCH_UNARY,
     TT_SEQ_EXPR,          TT_EVERY,             TT_WHILE,             TT_UNTIL,             TT_REPEAT,            TT_FOR,
     TT_IF,                TT_CASE,              TT_RETURN,            TT_PROC_FAIL,         TT_LOOP_BREAK,        TT_LOOP_NEXT,         TT_BANG_BINARY,
     TT_SECTION,           TT_SECTION_PLUS,      TT_SECTION_MINUS,
@@ -99,6 +99,9 @@ static inline tree_t * ast_node_new(tree_e kind) {
     e->t = kind;
     return e;
 }
+/*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* TT_FIELD layout: c[0]=object expr, c[1]=TT_VAR(field_name). Use this macro everywhere. */
+#define ICN_FIELD_NAME(e) ((e)->n >= 2 && (e)->c[1] ? (e)->c[1]->v.sval : NULL)
 /*================================================================================================================================================================================*/
 #ifdef IR_DEFINE_NAMES
 static const char * const tt_e_name[TT_KIND_COUNT] = {
@@ -136,7 +139,7 @@ static const char * const tt_e_name[TT_KIND_COUNT] = {
     [TT_CSET_INTER]       = "TT_CSET_INTER",     [TT_LCONCAT]          = "TT_LCONCAT",
     [TT_NONNULL]          = "TT_NONNULL",        [TT_NULL]             = "TT_NULL",            [TT_NOT]              = "TT_NOT",
     [TT_SIZE]             = "TT_SIZE",           [TT_RANDOM]           = "TT_RANDOM",          [TT_IDENTICAL]        = "TT_IDENTICAL",
-    [TT_AUGOP]            = "TT_AUGOP",
+    [TT_AUGOP]            = "TT_AUGOP",          [TT_MATCH_UNARY]      = "TT_MATCH_UNARY",
     [TT_SEQ_EXPR]         = "TT_SEQ_EXPR",       [TT_EVERY]            = "TT_EVERY",           [TT_WHILE]            = "TT_WHILE",
     [TT_UNTIL]            = "TT_UNTIL",          [TT_REPEAT]           = "TT_REPEAT",          [TT_FOR]              = "TT_FOR",            [TT_IF]               = "TT_IF",
     [TT_CASE]             = "TT_CASE",           [TT_RETURN]           = "TT_RETURN",          [TT_PROC_FAIL]        = "TT_PROC_FAIL",

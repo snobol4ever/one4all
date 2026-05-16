@@ -469,7 +469,7 @@ static void emit_lhs_store(const tree_t *lhs)
     }
     if (lhs->t == TT_FIELD) {
         lower_expr(T0(lhs));
-        sm_emit_s(g_p, SM_PUSH_LIT_S, lhs->v.sval ? lhs->v.sval : "");
+        sm_emit_s(g_p, SM_PUSH_LIT_S, ICN_FIELD_NAME(lhs) ? ICN_FIELD_NAME(lhs) : "");
         sm_emit_si(g_p, SM_CALL_FN, "FIELD_SET", 3); return;
     }
     if (lhs->t == TT_RANDOM && lhs->n >= 1) {
@@ -787,7 +787,7 @@ static void lower_field(const tree_t *t)
 {
     ICN_BB_EVAL(t);
     lower_expr(T0(t));
-    sm_emit_s(g_p, SM_PUSH_LIT_S, t->v.sval ? t->v.sval : "");
+    sm_emit_s(g_p, SM_PUSH_LIT_S, ICN_FIELD_NAME(t) ? ICN_FIELD_NAME(t) : "");
     sm_emit_si(g_p, SM_CALL_FN, "FIELD_GET", 2);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
