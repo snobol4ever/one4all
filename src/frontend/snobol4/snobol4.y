@@ -7,33 +7,33 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-typedef struct { CODE_t *prog; AST_t **result; AST_t *ast_prog; } PP;
+typedef struct { CODE_t *prog; tree_t **result; tree_t *ast_prog; } PP;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void     sno4_stmt_commit_go(void*,Token,AST_t*,AST_t*,int,AST_t*,AST_t*,AST_t*,AST_t*);
+static void     sno4_stmt_commit_go(void*,Token,tree_t*,tree_t*,int,tree_t*,tree_t*,tree_t*,tree_t*);
 static Lex     *g_lx;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void     fixup_val(AST_t*);
+static void     fixup_val(tree_t*);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int      is_pat(AST_t*);
+static int      is_pat(tree_t*);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static AST_t  *parse_expr(Lex*);
+static tree_t  *parse_expr(Lex*);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static AST_e pat_prim_kind(const char *s) {
-    if (!s) return AST_VAR;
-    static const struct { const char *n; AST_e k; } m[] = {
-        {"ANY",AST_ANY},{"NOTANY",AST_NOTANY},{"SPAN",AST_SPAN},{"BREAK",AST_BREAK},{"BREAKX",AST_BREAKX},
-        {"LEN",AST_LEN},{"POS",AST_POS},{"RPOS",AST_RPOS},{"TAB",AST_TAB},{"RTAB",AST_RTAB},
-        {"ARB",AST_ARB},{"ARBNO",AST_ARBNO},{"REM",AST_REM},{"FAIL",AST_FAIL},{"SUCCEED",AST_SUCCEED},
-        {"FENCE",AST_FENCE},{"ABORT",AST_ABORT},{"BAL",AST_BAL},{NULL,AST_VAR}
+static tree_e pat_prim_kind(const char *s) {
+    if (!s) return TT_VAR;
+    static const struct { const char *n; tree_e k; } m[] = {
+        {"ANY",TT_ANY},{"NOTANY",TT_NOTANY},{"SPAN",TT_SPAN},{"BREAK",TT_BREAK},{"BREAKX",TT_BREAKX},
+        {"LEN",TT_LEN},{"POS",TT_POS},{"RPOS",TT_RPOS},{"TAB",TT_TAB},{"RTAB",TT_RTAB},
+        {"ARB",TT_ARB},{"ARBNO",TT_ARBNO},{"REM",TT_REM},{"FAIL",TT_FAIL},{"SUCCEED",TT_SUCCEED},
+        {"FENCE",TT_FENCE},{"ABORT",TT_ABORT},{"BAL",TT_BAL},{NULL,TT_VAR}
     };
     for (int i = 0; m[i].n; i++) if (strcasecmp(s, m[i].n) == 0) return m[i].k;
-    return AST_VAR;
+    return TT_VAR;
 }
 }
 %define api.prefix {snobol4_}
 %define api.pure full
 %parse-param { void *yyparse_param }
-%union { AST_t *expr; Token tok; }
+%union { tree_t *expr; Token tok; }
 %token <tok> T_IDENT T_FUNCTION T_KEYWORD T_END T_INT T_REAL T_STR
 %token <tok> T_LABEL T_GOTO_S T_GOTO_F T_GOTO_LPAREN T_GOTO_RPAREN T_STMT_END
 %token T_2EQUAL T_2QUEST T_2PIPE T_2PLUS T_2MINUS
@@ -62,12 +62,12 @@ stmt
              | T_LABEL opt_subject opt_repl T_GOTO_F goto_label_expr T_STMT_END            { sno4_stmt_commit_go(yyparse_param,$1,$2,NULL,($3!=NULL),$3,NULL,NULL,$5); }
              | T_LABEL opt_subject opt_repl T_GOTO_S goto_label_expr T_GOTO_F goto_label_expr T_STMT_END { sno4_stmt_commit_go(yyparse_param,$1,$2,NULL,($3!=NULL),$3,NULL,$5,$7); }
              | T_LABEL opt_subject opt_repl T_GOTO_F goto_label_expr T_GOTO_S goto_label_expr T_STMT_END { sno4_stmt_commit_go(yyparse_param,$1,$2,NULL,($3!=NULL),$3,NULL,$7,$5); }
-           | T_LABEL expr2 T_2QUEST opt_pattern opt_repl T_STMT_END                      { sno4_stmt_commit_go(yyparse_param,$1,expr_binary(AST_SCAN,$2,$4),NULL,($5!=NULL),$5,NULL,NULL,NULL); }
-           | T_LABEL expr2 T_2QUEST opt_pattern opt_repl goto_label_expr T_STMT_END      { sno4_stmt_commit_go(yyparse_param,$1,expr_binary(AST_SCAN,$2,$4),NULL,($5!=NULL),$5,$6,NULL,NULL); }
-           | T_LABEL expr2 T_2QUEST opt_pattern opt_repl T_GOTO_S goto_label_expr T_STMT_END { sno4_stmt_commit_go(yyparse_param,$1,expr_binary(AST_SCAN,$2,$4),NULL,($5!=NULL),$5,NULL,$7,NULL); }
-           | T_LABEL expr2 T_2QUEST opt_pattern opt_repl T_GOTO_F goto_label_expr T_STMT_END { sno4_stmt_commit_go(yyparse_param,$1,expr_binary(AST_SCAN,$2,$4),NULL,($5!=NULL),$5,NULL,NULL,$7); }
-           | T_LABEL expr2 T_2QUEST opt_pattern opt_repl T_GOTO_S goto_label_expr T_GOTO_F goto_label_expr T_STMT_END { sno4_stmt_commit_go(yyparse_param,$1,expr_binary(AST_SCAN,$2,$4),NULL,($5!=NULL),$5,NULL,$7,$9); }
-           | T_LABEL expr2 T_2QUEST opt_pattern opt_repl T_GOTO_F goto_label_expr T_GOTO_S goto_label_expr T_STMT_END { sno4_stmt_commit_go(yyparse_param,$1,expr_binary(AST_SCAN,$2,$4),NULL,($5!=NULL),$5,NULL,$9,$7); }
+           | T_LABEL expr2 T_2QUEST opt_pattern opt_repl T_STMT_END                      { sno4_stmt_commit_go(yyparse_param,$1,expr_binary(TT_SCAN,$2,$4),NULL,($5!=NULL),$5,NULL,NULL,NULL); }
+           | T_LABEL expr2 T_2QUEST opt_pattern opt_repl goto_label_expr T_STMT_END      { sno4_stmt_commit_go(yyparse_param,$1,expr_binary(TT_SCAN,$2,$4),NULL,($5!=NULL),$5,$6,NULL,NULL); }
+           | T_LABEL expr2 T_2QUEST opt_pattern opt_repl T_GOTO_S goto_label_expr T_STMT_END { sno4_stmt_commit_go(yyparse_param,$1,expr_binary(TT_SCAN,$2,$4),NULL,($5!=NULL),$5,NULL,$7,NULL); }
+           | T_LABEL expr2 T_2QUEST opt_pattern opt_repl T_GOTO_F goto_label_expr T_STMT_END { sno4_stmt_commit_go(yyparse_param,$1,expr_binary(TT_SCAN,$2,$4),NULL,($5!=NULL),$5,NULL,NULL,$7); }
+           | T_LABEL expr2 T_2QUEST opt_pattern opt_repl T_GOTO_S goto_label_expr T_GOTO_F goto_label_expr T_STMT_END { sno4_stmt_commit_go(yyparse_param,$1,expr_binary(TT_SCAN,$2,$4),NULL,($5!=NULL),$5,NULL,$7,$9); }
+           | T_LABEL expr2 T_2QUEST opt_pattern opt_repl T_GOTO_F goto_label_expr T_GOTO_S goto_label_expr T_STMT_END { sno4_stmt_commit_go(yyparse_param,$1,expr_binary(TT_SCAN,$2,$4),NULL,($5!=NULL),$5,NULL,$9,$7); }
            | unlabeled_stmt
            ;
 unlabeled_stmt
@@ -77,12 +77,12 @@ unlabeled_stmt
              | opt_subject opt_repl T_GOTO_F goto_label_expr T_STMT_END                    { sno4_stmt_commit_go(yyparse_param,((Token){NULL,0,0,0}),$1,NULL,($2!=NULL),$2,NULL,NULL,$4); }
              | opt_subject opt_repl T_GOTO_S goto_label_expr T_GOTO_F goto_label_expr T_STMT_END { sno4_stmt_commit_go(yyparse_param,((Token){NULL,0,0,0}),$1,NULL,($2!=NULL),$2,NULL,$4,$6); }
              | opt_subject opt_repl T_GOTO_F goto_label_expr T_GOTO_S goto_label_expr T_STMT_END { sno4_stmt_commit_go(yyparse_param,((Token){NULL,0,0,0}),$1,NULL,($2!=NULL),$2,NULL,$6,$4); }
-           | expr2 T_2QUEST opt_pattern opt_repl T_STMT_END                              { sno4_stmt_commit_go(yyparse_param,((Token){NULL,0,0,0}),expr_binary(AST_SCAN,$1,$3),NULL,($4!=NULL),$4,NULL,NULL,NULL); }
-           | expr2 T_2QUEST opt_pattern opt_repl goto_label_expr T_STMT_END              { sno4_stmt_commit_go(yyparse_param,((Token){NULL,0,0,0}),expr_binary(AST_SCAN,$1,$3),NULL,($4!=NULL),$4,$5,NULL,NULL); }
-           | expr2 T_2QUEST opt_pattern opt_repl T_GOTO_S goto_label_expr T_STMT_END     { sno4_stmt_commit_go(yyparse_param,((Token){NULL,0,0,0}),expr_binary(AST_SCAN,$1,$3),NULL,($4!=NULL),$4,NULL,$6,NULL); }
-           | expr2 T_2QUEST opt_pattern opt_repl T_GOTO_F goto_label_expr T_STMT_END     { sno4_stmt_commit_go(yyparse_param,((Token){NULL,0,0,0}),expr_binary(AST_SCAN,$1,$3),NULL,($4!=NULL),$4,NULL,NULL,$6); }
-           | expr2 T_2QUEST opt_pattern opt_repl T_GOTO_S goto_label_expr T_GOTO_F goto_label_expr T_STMT_END { sno4_stmt_commit_go(yyparse_param,((Token){NULL,0,0,0}),expr_binary(AST_SCAN,$1,$3),NULL,($4!=NULL),$4,NULL,$6,$8); }
-           | expr2 T_2QUEST opt_pattern opt_repl T_GOTO_F goto_label_expr T_GOTO_S goto_label_expr T_STMT_END { sno4_stmt_commit_go(yyparse_param,((Token){NULL,0,0,0}),expr_binary(AST_SCAN,$1,$3),NULL,($4!=NULL),$4,NULL,$8,$6); }
+           | expr2 T_2QUEST opt_pattern opt_repl T_STMT_END                              { sno4_stmt_commit_go(yyparse_param,((Token){NULL,0,0,0}),expr_binary(TT_SCAN,$1,$3),NULL,($4!=NULL),$4,NULL,NULL,NULL); }
+           | expr2 T_2QUEST opt_pattern opt_repl goto_label_expr T_STMT_END              { sno4_stmt_commit_go(yyparse_param,((Token){NULL,0,0,0}),expr_binary(TT_SCAN,$1,$3),NULL,($4!=NULL),$4,$5,NULL,NULL); }
+           | expr2 T_2QUEST opt_pattern opt_repl T_GOTO_S goto_label_expr T_STMT_END     { sno4_stmt_commit_go(yyparse_param,((Token){NULL,0,0,0}),expr_binary(TT_SCAN,$1,$3),NULL,($4!=NULL),$4,NULL,$6,NULL); }
+           | expr2 T_2QUEST opt_pattern opt_repl T_GOTO_F goto_label_expr T_STMT_END     { sno4_stmt_commit_go(yyparse_param,((Token){NULL,0,0,0}),expr_binary(TT_SCAN,$1,$3),NULL,($4!=NULL),$4,NULL,NULL,$6); }
+           | expr2 T_2QUEST opt_pattern opt_repl T_GOTO_S goto_label_expr T_GOTO_F goto_label_expr T_STMT_END { sno4_stmt_commit_go(yyparse_param,((Token){NULL,0,0,0}),expr_binary(TT_SCAN,$1,$3),NULL,($4!=NULL),$4,NULL,$6,$8); }
+           | expr2 T_2QUEST opt_pattern opt_repl T_GOTO_F goto_label_expr T_GOTO_S goto_label_expr T_STMT_END { sno4_stmt_commit_go(yyparse_param,((Token){NULL,0,0,0}),expr_binary(TT_SCAN,$1,$3),NULL,($4!=NULL),$4,NULL,$8,$6); }
            ;
 opt_subject: expr3                                                                                { $$=$1; }
            |                                                                           { $$=NULL; }
@@ -91,105 +91,105 @@ opt_pattern: expr3                                                              
            |                                                                           { $$=NULL; }
            ;
 opt_repl   : T_2EQUAL expr0                                                                   { $$=$2; }
-           | T_2EQUAL                                                                          { AST_t*e=expr_new(AST_QLIT);e->sval=strdup("");$$=e; }
+           | T_2EQUAL                                                                          { tree_t*e=ast_node_new(TT_QLIT);e->v.sval=strdup("");$$=e; }
            |                                                                           { $$=NULL; }
            ;
-goto_atom  : T_STR   { AST_t*e=expr_new(AST_QLIT);  e->sval=(char*)$1.sval; $$=e; }
-           | T_IDENT  { AST_t*e=expr_new(AST_VAR);   e->sval=(char*)$1.sval; $$=e; }
-           | T_FUNCTION { AST_t*e=expr_new(AST_VAR); e->sval=(char*)$1.sval; $$=e; }
-           | T_END    { AST_t*e=expr_new(AST_VAR);   e->sval=(char*)$1.sval; $$=e; }
+goto_atom  : T_STR   { tree_t*e=ast_node_new(TT_QLIT);  e->v.sval=(char*)$1.sval; $$=e; }
+           | T_IDENT  { tree_t*e=ast_node_new(TT_VAR);   e->v.sval=(char*)$1.sval; $$=e; }
+           | T_FUNCTION { tree_t*e=ast_node_new(TT_VAR); e->v.sval=(char*)$1.sval; $$=e; }
+           | T_END    { tree_t*e=ast_node_new(TT_VAR);   e->v.sval=(char*)$1.sval; $$=e; }
            ;
 goto_expr  : goto_atom                          { $$=$1; }
-           | goto_expr T_CONCAT goto_atom       { if($1->kind==AST_SEQ){expr_add_child($1,$3);$$=$1;}else{AST_t*s=expr_new(AST_SEQ);expr_add_child(s,$1);expr_add_child(s,$3);$$=s;} }
+           | goto_expr T_CONCAT goto_atom       { if($1->t==TT_SEQ){expr_add_child($1,$3);$$=$1;}else{tree_t*s=ast_node_new(TT_SEQ);expr_add_child(s,$1);expr_add_child(s,$3);$$=s;} }
            ;
 goto_label_expr
-           : T_GOTO_LPAREN T_IDENT T_GOTO_RPAREN                                             { AST_t*e=expr_new(AST_QLIT);e->sval=strdup($2.sval);$$=e; }
-           | T_GOTO_LPAREN T_END T_GOTO_RPAREN                                               { AST_t*e=expr_new(AST_QLIT);e->sval=strdup($2.sval);$$=e; }
-           | T_GOTO_LPAREN T_FUNCTION T_GOTO_RPAREN                                          { AST_t*e=expr_new(AST_QLIT);e->sval=strdup($2.sval);$$=e; }
-           | T_GOTO_LPAREN T_1DOLLAR T_IDENT T_GOTO_RPAREN                                   { AST_t*e=expr_new(AST_QLIT);char buf[512];snprintf(buf,sizeof buf,"$%s",$3.sval);e->sval=strdup(buf);$$=e; }
+           : T_GOTO_LPAREN T_IDENT T_GOTO_RPAREN                                             { tree_t*e=ast_node_new(TT_QLIT);e->v.sval=strdup($2.sval);$$=e; }
+           | T_GOTO_LPAREN T_END T_GOTO_RPAREN                                               { tree_t*e=ast_node_new(TT_QLIT);e->v.sval=strdup($2.sval);$$=e; }
+           | T_GOTO_LPAREN T_FUNCTION T_GOTO_RPAREN                                          { tree_t*e=ast_node_new(TT_QLIT);e->v.sval=strdup($2.sval);$$=e; }
+           | T_GOTO_LPAREN T_1DOLLAR T_IDENT T_GOTO_RPAREN                                   { tree_t*e=ast_node_new(TT_QLIT);char buf[512];snprintf(buf,sizeof buf,"$%s",$3.sval);e->v.sval=strdup(buf);$$=e; }
            | T_GOTO_LPAREN T_1DOLLAR T_GOTO_LPAREN goto_expr T_GOTO_RPAREN T_GOTO_RPAREN    { $$=$4; }
-           | T_GOTO_LPAREN T_1DOLLAR T_STR T_GOTO_RPAREN                                     { AST_t*e=expr_new(AST_QLIT);e->sval=strdup($3.sval);$$=e; }
+           | T_GOTO_LPAREN T_1DOLLAR T_STR T_GOTO_RPAREN                                     { tree_t*e=ast_node_new(TT_QLIT);e->v.sval=strdup($3.sval);$$=e; }
            ;
-expr0      : expr2 T_2EQUAL expr0                                                             { $$=expr_binary(AST_ASSIGN,          $1,$3); }
-           | expr2 T_2QUEST      expr0                                                             { $$=expr_binary(AST_SCAN,            $1,$3); }
+expr0      : expr2 T_2EQUAL expr0                                                             { $$=expr_binary(TT_ASSIGN,          $1,$3); }
+           | expr2 T_2QUEST      expr0                                                             { $$=expr_binary(TT_SCAN,            $1,$3); }
            | expr2                                                                                 { $$=$1; }
            ;
-expr2      : expr2 T_2AMP  expr3                                                             { AST_t*_e=expr_binary(AST_OPSYN,$1,$3); _e->sval=strdup("&"); $$=_e; }
+expr2      : expr2 T_2AMP  expr3                                                             { tree_t*_e=expr_binary(TT_OPSYN,$1,$3); _e->v.sval=strdup("&"); $$=_e; }
            | expr3                                                                                 { $$=$1; }
            ;
-expr3      : expr3 T_2PIPE expr4                                                            { if($1->kind==AST_ALT){expr_add_child($1,$3);$$=$1;}else{AST_t*a=expr_new(AST_ALT);expr_add_child(a,$1);expr_add_child(a,$3);$$=a;} }
+expr3      : expr3 T_2PIPE expr4                                                            { if($1->t==TT_ALT){expr_add_child($1,$3);$$=$1;}else{tree_t*a=ast_node_new(TT_ALT);expr_add_child(a,$1);expr_add_child(a,$3);$$=a;} }
            | expr4                                                                                 { $$=$1; }
            ;
-expr4      : expr4 T_CONCAT expr5                                                                           { if($1->kind==AST_SEQ){expr_add_child($1,$3);$$=$1;}else{AST_t*s=expr_new(AST_SEQ);expr_add_child(s,$1);expr_add_child(s,$3);$$=s;} }
+expr4      : expr4 T_CONCAT expr5                                                                           { if($1->t==TT_SEQ){expr_add_child($1,$3);$$=$1;}else{tree_t*s=ast_node_new(TT_SEQ);expr_add_child(s,$1);expr_add_child(s,$3);$$=s;} }
            | expr5                                                                                 { $$=$1; }
            ;
-expr5      : expr5 T_2AT    expr6                                                             { AST_t*_e=expr_binary(AST_OPSYN,$1,$3); _e->sval=strdup("@"); $$=_e; }
+expr5      : expr5 T_2AT    expr6                                                             { tree_t*_e=expr_binary(TT_OPSYN,$1,$3); _e->v.sval=strdup("@"); $$=_e; }
            | expr6                                                                                 { $$=$1; }
            ;
-expr6      : expr6 T_2PLUS   expr7                                                             { $$=expr_binary(AST_ADD,             $1,$3); }
-           | expr6 T_2MINUS expr7                                                            { $$=expr_binary(AST_SUB,             $1,$3); }
+expr6      : expr6 T_2PLUS   expr7                                                             { $$=expr_binary(TT_ADD,             $1,$3); }
+           | expr6 T_2MINUS expr7                                                            { $$=expr_binary(TT_SUB,             $1,$3); }
            | expr7                                                                                 { $$=$1; }
            ;
-expr7      : expr7 T_2POUND      expr8                                                             { $$=expr_binary(AST_MUL,             $1,$3); }
+expr7      : expr7 T_2POUND      expr8                                                             { $$=expr_binary(TT_MUL,             $1,$3); }
            | expr8                                                                                 { $$=$1; }
            ;
-expr8      : expr8 T_2SLASH   expr9                                                             { $$=expr_binary(AST_DIV,             $1,$3); }
+expr8      : expr8 T_2SLASH   expr9                                                             { $$=expr_binary(TT_DIV,             $1,$3); }
            | expr9                                                                                 { $$=$1; }
            ;
-expr9      : expr9 T_2STAR expr10                                                        { $$=expr_binary(AST_MUL,             $1,$3); }
+expr9      : expr9 T_2STAR expr10                                                        { $$=expr_binary(TT_MUL,             $1,$3); }
            | expr10                                                                                { $$=$1; }
            ;
-expr10     : expr10 T_2PERCENT   expr11                                                            { $$=expr_binary(AST_DIV,             $1,$3); }
+expr10     : expr10 T_2PERCENT   expr11                                                            { $$=expr_binary(TT_DIV,             $1,$3); }
            | expr11                                                                                { $$=$1; }
            ;
-expr11     : expr12 T_2CARET expr11                                                       { $$=expr_binary(AST_POW,             $1,$3); }
+expr11     : expr12 T_2CARET expr11                                                       { $$=expr_binary(TT_POW,             $1,$3); }
            | expr12                                                                                { $$=$1; }
            ;
-expr12     : expr12 T_2DOLLAR expr13                                                     { $$=expr_binary(AST_CAPT_IMMED_ASGN,$1,$3); }
-           | expr12 T_2DOT      expr13                                                     { $$=expr_binary(AST_CAPT_COND_ASGN, $1,$3); }
+expr12     : expr12 T_2DOLLAR expr13                                                     { $$=expr_binary(TT_CAPT_IMMED_ASGN,$1,$3); }
+           | expr12 T_2DOT      expr13                                                     { $$=expr_binary(TT_CAPT_COND_ASGN, $1,$3); }
            | expr13                                                                                { $$=$1; }
            ;
-expr13     : expr14 T_2TILDE     expr13                                                            { AST_t*_e=expr_binary(AST_OPSYN,$1,$3); _e->sval=strdup("~"); $$=_e; }
+expr13     : expr14 T_2TILDE     expr13                                                            { tree_t*_e=expr_binary(TT_OPSYN,$1,$3); _e->v.sval=strdup("~"); $$=_e; }
            | expr14                                                                                { $$=$1; }
            ;
-expr14     : T_1AT      expr14                                                             { $$=expr_unary(AST_CAPT_CURSOR,     $2); }
-           | T_1TILDE        expr14                                                             { $$=expr_unary(AST_NOT,             $2); }
-           | T_1QUEST expr14                                                            { $$=expr_unary(AST_INTERROGATE,     $2); }
-           | T_1AMP    expr14                                                             { AST_t*_e=expr_unary(AST_OPSYN,$2); _e->sval=strdup("&"); $$=_e; }
-           | T_1PLUS         expr14                                                             { $$=expr_unary(AST_PLS,             $2); }
-           | T_1MINUS        expr14                                                             { $$=expr_unary(AST_MNS,             $2); }
-           | T_1STAR     expr14                                                             { $$=expr_unary(AST_DEFER,           $2); }
-           | T_1DOLLAR  expr14                                                             { $$=expr_unary(AST_INDIRECT,        $2); }
-           | T_1DOT       expr14                                                             { $$=expr_unary(AST_NAME,            $2); }
-           | T_1BANG  expr14                                                             { $$=expr_unary(AST_POW,             $2); }
-           | T_1PERCENT      expr14                                                             { $$=expr_unary(AST_DIV,             $2); }
-           | T_1SLASH        expr14                                                             { $$=expr_unary(AST_DIV,             $2); }
-           | T_1POUND        expr14                                                             { $$=expr_unary(AST_MUL,             $2); }
-           | T_1EQUAL        expr14                                                             { $$=expr_unary(AST_ASSIGN,          $2); }
-           | T_1PIPE expr14                                                             { AST_t*_e=expr_unary(AST_OPSYN,$2); _e->sval=strdup("|"); $$=_e; }
+expr14     : T_1AT      expr14                                                             { $$=expr_unary(TT_CAPT_CURSOR,     $2); }
+           | T_1TILDE        expr14                                                             { $$=expr_unary(TT_NOT,             $2); }
+           | T_1QUEST expr14                                                            { $$=expr_unary(TT_INTERROGATE,     $2); }
+           | T_1AMP    expr14                                                             { tree_t*_e=expr_unary(TT_OPSYN,$2); _e->v.sval=strdup("&"); $$=_e; }
+           | T_1PLUS         expr14                                                             { $$=expr_unary(TT_PLS,             $2); }
+           | T_1MINUS        expr14                                                             { $$=expr_unary(TT_MNS,             $2); }
+           | T_1STAR     expr14                                                             { $$=expr_unary(TT_DEFER,           $2); }
+           | T_1DOLLAR  expr14                                                             { $$=expr_unary(TT_INDIRECT,        $2); }
+           | T_1DOT       expr14                                                             { $$=expr_unary(TT_NAME,            $2); }
+           | T_1BANG  expr14                                                             { $$=expr_unary(TT_POW,             $2); }
+           | T_1PERCENT      expr14                                                             { $$=expr_unary(TT_DIV,             $2); }
+           | T_1SLASH        expr14                                                             { $$=expr_unary(TT_DIV,             $2); }
+           | T_1POUND        expr14                                                             { $$=expr_unary(TT_MUL,             $2); }
+           | T_1EQUAL        expr14                                                             { $$=expr_unary(TT_ASSIGN,          $2); }
+           | T_1PIPE expr14                                                             { tree_t*_e=expr_unary(TT_OPSYN,$2); _e->v.sval=strdup("|"); $$=_e; }
            | expr15                                                                                { $$=$1; }
            ;
-expr15     : expr15 T_LBRACK exprlist T_RBRACK                                                  { AST_t*i=expr_new(AST_IDX);expr_add_child(i,$1);for(int j=0;j<$3->nchildren;j++)expr_add_child(i,$3->children[j]);free($3->children);free($3);$$=i; }
-           | expr15 T_LANGLE exprlist T_RANGLE                                                  { AST_t*i=expr_new(AST_IDX);expr_add_child(i,$1);for(int j=0;j<$3->nchildren;j++)expr_add_child(i,$3->children[j]);free($3->children);free($3);$$=i; }
+expr15     : expr15 T_LBRACK exprlist T_RBRACK                                                  { tree_t*i=ast_node_new(TT_IDX);expr_add_child(i,$1);for(int j=0;j<$3->n;j++)expr_add_child(i,$3->c[j]);free($3->c);free($3);$$=i; }
+           | expr15 T_LANGLE exprlist T_RANGLE                                                  { tree_t*i=ast_node_new(TT_IDX);expr_add_child(i,$1);for(int j=0;j<$3->n;j++)expr_add_child(i,$3->c[j]);free($3->c);free($3);$$=i; }
            | expr17                                                                                { $$=$1; }
            ;
 exprlist   : exprlist_ne                                                                           { $$=$1; }
-           |                                                                           { $$=expr_new(AST_NUL); }
+           |                                                                           { $$=ast_node_new(TT_NUL); }
            ;
 exprlist_ne: exprlist_ne T_COMMA expr0                                                            { expr_add_child($1,$3);$$=$1; }
-           | exprlist_ne T_COMMA                                                                  { expr_add_child($1,expr_new(AST_NUL));$$=$1; }
-           | expr0                                                                                 { AST_t*l=expr_new(AST_NUL);expr_add_child(l,$1);$$=l; }
+           | exprlist_ne T_COMMA                                                                  { expr_add_child($1,ast_node_new(TT_NUL));$$=$1; }
+           | expr0                                                                                 { tree_t*l=ast_node_new(TT_NUL);expr_add_child(l,$1);$$=l; }
            ;
 expr17     : T_LPAREN expr0 T_RPAREN                                                            { $$=$2; }
-           | T_LPAREN expr0 T_COMMA exprlist_ne T_RPAREN                                       { AST_t*a=expr_new(AST_VLIST);expr_add_child(a,$2);for(int i=0;i<$4->nchildren;i++)expr_add_child(a,$4->children[i]);free($4->children);free($4);$$=a; }
-           | T_LPAREN T_RPAREN                                                                  { $$=expr_new(AST_NUL); }
-           | T_FUNCTION T_LPAREN exprlist T_RPAREN                                             { AST_e _k=pat_prim_kind($1.sval);AST_t*e=expr_new(_k==AST_VAR?AST_FNC:_k);if(_k==AST_VAR)e->sval=(char*)$1.sval;for(int i=0;i<$3->nchildren;i++)expr_add_child(e,$3->children[i]);free($3->children);free($3);$$=e; }
-           | T_IDENT                                                                              { AST_t*e=expr_new(AST_VAR);e->sval=(char*)$1.sval;$$=e; }
-           | T_END                                                                                { AST_t*e=expr_new(AST_VAR);    e->sval=(char*)$1.sval;$$=e; }
-           | T_KEYWORD                                                                            { AST_t*e=expr_new(AST_KEYWORD);e->sval=(char*)$1.sval;$$=e; }
-           | T_STR                                                                                { AST_t*e=expr_new(AST_QLIT);   e->sval=(char*)$1.sval;$$=e; }
-           | T_INT                                                                                { AST_t*e=expr_new(AST_ILIT);   e->ival=$1.ival;$$=e; }
-           | T_REAL                                                                               { AST_t*e=expr_new(AST_FLIT);   e->dval=$1.dval;$$=e; }
+           | T_LPAREN expr0 T_COMMA exprlist_ne T_RPAREN                                       { tree_t*a=ast_node_new(TT_VLIST);expr_add_child(a,$2);for(int i=0;i<$4->n;i++)expr_add_child(a,$4->c[i]);free($4->c);free($4);$$=a; }
+           | T_LPAREN T_RPAREN                                                                  { $$=ast_node_new(TT_NUL); }
+           | T_FUNCTION T_LPAREN exprlist T_RPAREN                                             { tree_e _k=pat_prim_kind($1.sval);tree_t*e=ast_node_new(_k==TT_VAR?TT_FNC:_k);if(_k==TT_VAR)e->v.sval=(char*)$1.sval;for(int i=0;i<$3->n;i++)expr_add_child(e,$3->c[i]);free($3->c);free($3);$$=e; }
+           | T_IDENT                                                                              { tree_t*e=ast_node_new(TT_VAR);e->v.sval=(char*)$1.sval;$$=e; }
+           | T_END                                                                                { tree_t*e=ast_node_new(TT_VAR);    e->v.sval=(char*)$1.sval;$$=e; }
+           | T_KEYWORD                                                                            { tree_t*e=ast_node_new(TT_KEYWORD);e->v.sval=(char*)$1.sval;$$=e; }
+           | T_STR                                                                                { tree_t*e=ast_node_new(TT_QLIT);   e->v.sval=(char*)$1.sval;$$=e; }
+           | T_INT                                                                                { tree_t*e=ast_node_new(TT_ILIT);   e->v.ival=$1.ival;$$=e; }
+           | T_REAL                                                                               { tree_t*e=ast_node_new(TT_FLIT);   e->v.dval=$1.dval;$$=e; }
            ;
 %%
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -202,52 +202,43 @@ int snobol4_lex(YYSTYPE *yylval_param, void *yyparse_param) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void snobol4_error(void *p,const char *msg){(void)p;sno_error(g_lx?g_lx->lineno:0,"parse error: %s",msg);}
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void fixup_val(AST_t *e){ (void)e; }
+static void fixup_val(tree_t *e){ (void)e; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int is_pat(AST_t *e){
+static int is_pat(tree_t *e){
     if(!e) return 0;
-    switch(e->kind){case AST_ARB:case AST_ARBNO:case AST_CAPT_COND_ASGN:case AST_CAPT_IMMED_ASGN:case AST_CAPT_CURSOR:case AST_DEFER:return 1;default:break;}
-    for(int i=0;i<e->nchildren;i++) if(is_pat(e->children[i])) return 1;
+    switch(e->t){case TT_ARB:case TT_ARBNO:case TT_CAPT_COND_ASGN:case TT_CAPT_IMMED_ASGN:case TT_CAPT_CURSOR:case TT_DEFER:return 1;default:break;}
+    for(int i=0;i<e->n;i++) if(is_pat(e->c[i])) return 1;
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void sno4_stmt_commit_go(void *param,Token lbl,AST_t *subj,AST_t *pat,int has_eq,AST_t *repl,AST_t *gu,AST_t *gs,AST_t *gf){
+static void sno4_stmt_commit_go(void *param,Token lbl,tree_t *subj,tree_t *pat,int has_eq,tree_t *repl,tree_t *gu,tree_t *gs,tree_t *gf){
     PP *pp=(PP*)param;
-    if(lbl.sval&&strcasecmp(lbl.sval,"EXPORT")==0){
-        if(subj&&subj->kind==AST_VAR&&subj->sval){
-            ExportEntry*e=calloc(1,sizeof*e);e->name=strdup(subj->sval);
-            for(char*p=e->name;*p;p++)*p=(char)toupper((unsigned char)*p);
-            e->next=pp->prog->exports;pp->prog->exports=e;
-        } return;
-    }
-    if(lbl.sval&&strcasecmp(lbl.sval,"IMPORT")==0){
-        ImportEntry*e=calloc(1,sizeof*e);const char*n=subj&&subj->sval?subj->sval:"";
-        char*dot1=strchr(n,'.');
-        if(dot1){char*dot2=strchr(dot1+1,'.');
-            if(dot2){e->lang=strndup(n,(size_t)(dot1-n));e->name=strndup(dot1+1,(size_t)(dot2-dot1-1));e->method=strdup(dot2+1);}
-            else{e->lang=strdup("");e->name=strndup(n,(size_t)(dot1-n));e->method=strdup(dot1+1);}}
-        else{e->lang=strdup("");e->name=strdup(n);e->method=strdup(n);}
-        e->next=pp->prog->imports;pp->prog->imports=e;return;
-    }
+    /* PST-SN4-1a (2026-05-16): EXPORT/IMPORT special-case removed.  The parser
+     * no longer interprets statements with label "EXPORT"/"IMPORT" specially.
+     * They flow through as ordinary labeled statements with subject expressions,
+     * exactly as the SNOBOL4 grammar describes them.  No downstream consumer
+     * reads prog->exports / prog->imports today (only code_free walks them, to
+     * free).  If a future feature needs cross-language link information, it
+     * lives as a post-parse pass over the tree_t / TT_PROGRAM. */
     STMT_t *s=stmt_new();
     s->lineno = lbl.lineno ? lbl.lineno : snobol4_get_stmt_lineno();
     s->stno = ++pp->prog->nstmts;
     if(lbl.sval){s->label=strdup(lbl.sval);s->is_end=lbl.ival||(strcmp(lbl.sval,"END")==0);}
-    if(!pat && subj && subj->kind==AST_SCAN && subj->nchildren==2) {
-        AST_t *orig = subj;
-        subj = orig->children[0];
-        pat  = orig->children[1];
+    if(!pat && subj && subj->t==TT_SCAN && subj->n==2) {
+        tree_t *orig = subj;
+        subj = orig->c[0];
+        pat  = orig->c[1];
     }
-    if(!pat && subj && (subj->kind==AST_SEQ) && subj->nchildren>=2) {
-        AST_t *first = subj->children[0];
-        if(first->kind==AST_VAR || first->kind==AST_KEYWORD || first->kind==AST_QLIT || first->kind==AST_INDIRECT) {
-            int nc = subj->nchildren - 1;
-            AST_t *rest;
+    if(!pat && subj && (subj->t==TT_SEQ) && subj->n>=2) {
+        tree_t *first = subj->c[0];
+        if(first->t==TT_VAR || first->t==TT_KEYWORD || first->t==TT_QLIT || first->t==TT_INDIRECT) {
+            int nc = subj->n - 1;
+            tree_t *rest;
             if(nc == 1) {
-                rest = subj->children[1];
+                rest = subj->c[1];
             } else {
-                rest = expr_new(AST_SEQ);
-                for(int i=1;i<subj->nchildren;i++) expr_add_child(rest,subj->children[i]);
+                rest = ast_node_new(TT_SEQ);
+                for(int i=1;i<subj->n;i++) expr_add_child(rest,subj->c[i]);
             }
             subj = first;
             pat  = rest;
@@ -256,22 +247,22 @@ static void sno4_stmt_commit_go(void *param,Token lbl,AST_t *subj,AST_t *pat,int
     s->subject=subj; s->pattern=pat;
     if(s->subject) fixup_val(s->subject);
     if(has_eq){s->has_eq=1;s->replacement=repl;if(repl&&!is_pat(repl))fixup_val(repl);}
-    if(gu){ if(gu->kind==AST_QLIT) s->goto_u=gu->sval; else s->goto_u_expr=gu; }
-    if(gs){ if(gs->kind==AST_QLIT) s->goto_s=gs->sval; else s->goto_s_expr=gs; }
-    if(gf){ if(gf->kind==AST_QLIT) s->goto_f=gf->sval; else s->goto_f_expr=gf; }
+    if(gu){ if(gu->t==TT_QLIT) s->goto_u=gu->v.sval; else s->goto_u_expr=gu; }
+    if(gs){ if(gs->t==TT_QLIT) s->goto_s=gs->v.sval; else s->goto_s_expr=gs; }
+    if(gf){ if(gf->t==TT_QLIT) s->goto_f=gf->v.sval; else s->goto_f_expr=gf; }
     if(!pp->prog->head) pp->prog->head=pp->prog->tail=s; else{pp->prog->tail->next=s;pp->prog->tail=s;}
     if (pp->ast_prog) {
-        AST_t *anode = stmt_to_ast(s);
-        if (pp->ast_prog->nchildren >= pp->ast_prog->nalloc) {
-            pp->ast_prog->nalloc = pp->ast_prog->nalloc ? pp->ast_prog->nalloc * 2 : 64;
-            pp->ast_prog->children = realloc(pp->ast_prog->children,
-                (size_t)pp->ast_prog->nalloc * sizeof(AST_t*));
+        tree_t *anode = stmt_to_ast(s);
+        if (pp->ast_prog->n >= pp->ast_prog->_nalloc) {
+            pp->ast_prog->_nalloc = pp->ast_prog->_nalloc ? pp->ast_prog->_nalloc * 2 : 64;
+            pp->ast_prog->c = realloc(pp->ast_prog->c,
+                (size_t)pp->ast_prog->_nalloc * sizeof(tree_t*));
         }
-        pp->ast_prog->children[pp->ast_prog->nchildren++] = anode;
+        pp->ast_prog->c[pp->ast_prog->n++] = anode;
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static AST_t *parse_expr(Lex *lx){
+static tree_t *parse_expr(Lex *lx){
     CODE_t *prog=calloc(1,sizeof*prog);PP p={prog,NULL,NULL};g_lx=lx;snobol4_parse(&p);
     return prog->head?prog->head->subject:NULL;
 }
@@ -280,9 +271,9 @@ CODE_t *parse_program_tokens(Lex *stream){
     CODE_t *prog=calloc(1,sizeof*prog);PP p={prog,NULL,NULL};g_lx=stream;snobol4_parse(&p);return prog;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-CODE_t *parse_program_tokens_ast(Lex *stream, AST_t **ast_out){
+CODE_t *parse_program_tokens_ast(Lex *stream, tree_t **ast_out){
     CODE_t *prog=calloc(1,sizeof*prog);
-    AST_t *ast=calloc(1,sizeof*ast); ast->kind=AST_PROGRAM;
+    tree_t *ast=calloc(1,sizeof*ast); ast->t=TT_PROGRAM;
     PP p={prog,NULL,ast};g_lx=stream;snobol4_parse(&p);
     *ast_out=ast;
     return prog;
@@ -290,11 +281,11 @@ CODE_t *parse_program_tokens_ast(Lex *stream, AST_t **ast_out){
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 CODE_t *parse_program(LineArray *lines){(void)lines;return calloc(1,sizeof(CODE_t));}
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-AST_t *parse_expr_from_str(const char *src){
+tree_t *parse_expr_from_str(const char *src){
     if(!src||!*src) return NULL;Lex lx={0};lex_open_str(&lx,src,(int)strlen(src),0);return parse_expr(&lx);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-AST_t *parse_expr_pat_from_str(const char *src) {
+tree_t *parse_expr_pat_from_str(const char *src) {
     if (!src || !*src) return NULL;
     int slen = (int)strlen(src);
     char *buf = malloc(slen + 2);
@@ -309,17 +300,17 @@ AST_t *parse_expr_pat_from_str(const char *src) {
     g_lx = &lx;
     snobol4_parse(&p);
     free(buf);
-    if (p.ast_prog && p.ast_prog->nchildren > 0) {
-        const AST_t *s = p.ast_prog->children[0];
+    if (p.ast_prog && p.ast_prog->n > 0) {
+        const tree_t *s = p.ast_prog->c[0];
         if (s) {
-            AST_t *pat = stmt_attr_expr(stmt_attr_find(s, ":pat"));
+            tree_t *pat = stmt_attr_expr(stmt_attr_find(s, ":pat"));
             if (pat) { free(prog); return pat; }
             return stmt_attr_expr(stmt_attr_find(s, ":subj"));
         }
     }
     if (!prog->head) { free(prog); return NULL; }
     STMT_t *s = prog->head;
-    AST_t *res = s->pattern ? s->pattern : s->subject;
+    tree_t *res = s->pattern ? s->pattern : s->subject;
     free(prog);
     return res;
 }
@@ -342,7 +333,7 @@ CODE_t *sno_parse_string(const char *src) {
     return prog;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-AST_t *sno_parse_string_ast(const char *src, CODE_t **code_out) {
+tree_t *sno_parse_string_ast(const char *src, CODE_t **code_out) {
     if (!src) { if (code_out) *code_out = calloc(1, sizeof(CODE_t)); return NULL; }
     int slen = (int)strlen(src);
     char *buf = malloc(slen + 2);
@@ -353,7 +344,7 @@ AST_t *sno_parse_string_ast(const char *src, CODE_t **code_out) {
     Lex lx = {0};
     lex_open_str_initial(&lx, buf, slen + 1, 0);
     CODE_t *prog = calloc(1, sizeof(CODE_t));
-    AST_t  *ast  = NULL;
+    tree_t  *ast  = NULL;
     PP p = {prog, NULL, NULL};
     g_lx = &lx;
     snobol4_parse(&p);
