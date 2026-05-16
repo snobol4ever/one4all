@@ -34,6 +34,11 @@
   //    variable name -> value map (the SNOBOL4 global name-value store)       
   .field private static class [mscorlib]System.Collections.Generic.Dictionary`2<string,object> _vars
 
+  //    pattern matching globals (Σ/Δ/Ω — subject, cursor, omega/length)       
+  .field private static string _sigma
+  .field private static int32  _delta
+  .field private static int32  _omega
+
   //    static constructor                                                      
   .method static void .cctor() cil managed
   {
@@ -50,6 +55,12 @@
     stsfld     class [mscorlib]System.Collections.Generic.Stack`1<class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>> SnoRt::_frames
     newobj     instance void class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>::.ctor()
     stsfld     class [mscorlib]System.Collections.Generic.Dictionary`2<string,object> SnoRt::_vars
+    ldstr      ""
+    stsfld     string SnoRt::_sigma
+    ldc.i4.0
+    stsfld     int32 SnoRt::_delta
+    ldc.i4.0
+    stsfld     int32 SnoRt::_omega
     ret
   }
 
@@ -69,6 +80,12 @@
     stsfld     class [mscorlib]System.Collections.Generic.Stack`1<class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>> SnoRt::_frames
     newobj     instance void class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>::.ctor()
     stsfld     class [mscorlib]System.Collections.Generic.Dictionary`2<string,object> SnoRt::_vars
+    ldstr      ""
+    stsfld     string SnoRt::_sigma
+    ldc.i4.0
+    stsfld     int32 SnoRt::_delta
+    ldc.i4.0
+    stsfld     int32 SnoRt::_omega
     ret
   }
 
@@ -1182,6 +1199,45 @@
     ret
   OTD_ZERO:
     ldc.r8     0.0
+    ret
+  }
+
+  .method public static string get_sigma() cil managed {
+    .maxstack 1
+    ldsfld     string SnoRt::_sigma
+    ret
+  }
+
+  .method public static void set_sigma(string v) cil managed {
+    .maxstack 1
+    ldarg.0
+    stsfld     string SnoRt::_sigma
+    ret
+  }
+
+  .method public static int32 get_delta() cil managed {
+    .maxstack 1
+    ldsfld     int32 SnoRt::_delta
+    ret
+  }
+
+  .method public static void set_delta(int32 v) cil managed {
+    .maxstack 1
+    ldarg.0
+    stsfld     int32 SnoRt::_delta
+    ret
+  }
+
+  .method public static int32 get_omega() cil managed {
+    .maxstack 1
+    ldsfld     int32 SnoRt::_omega
+    ret
+  }
+
+  .method public static void set_omega(int32 v) cil managed {
+    .maxstack 1
+    ldarg.0
+    stsfld     int32 SnoRt::_omega
     ret
   }
 
