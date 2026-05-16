@@ -43,6 +43,7 @@ typedef enum {
     IR_TO_BY,
     IR_EVERY,
     IR_WHILE,
+    IR_UNTIL,
     IR_LIMIT,
     IR_SUSPEND,
     IR_PROC,

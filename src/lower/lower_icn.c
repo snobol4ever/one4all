@@ -337,6 +337,44 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         nd->n = nc;
         return nd;
     }
+    case TT_WHILE:
+    case TT_UNTIL: {
+        /* while C [do B] / until C [do B].  c[0]=cond, c[1]=body (optional).                                                                                                                                */
+        if (e->n < 1 || !e->c[0]) return NULL;
+        IR_t *cond = lower_icn_expr_node(cfg, e->c[0]);
+        if (!cond) return NULL;
+        IR_t *body = NULL;
+        if (e->n >= 2 && e->c[1]) {
+            body = lower_icn_expr_node(cfg, e->c[1]);
+            if (!body) return NULL;
+        }
+        IR_t *nd = IR_node_alloc(cfg, e->t == TT_WHILE ? IR_WHILE : IR_UNTIL);
+        if (!nd) return NULL;
+        int nc = body ? 2 : 1;
+        nd->c = calloc((size_t)nc, sizeof(IR_t *));
+        if (!nd->c) return NULL;
+        nd->c[0] = cond;
+        if (body) nd->c[1] = body;
+        nd->n = nc;
+        return nd;
+    }
+    case TT_SEQ_EXPR: {
+        /* { stmt1; stmt2; ... } — a compound block, parsed when 2+ statements appear in braces.                                                                                                              */
+        /* Lower each child, wrap in IR_SEQ.  Single-statement blocks are unwrapped by the parser, so n>=2 here.                                                                                              */
+        if (e->n < 1) return NULL;
+        IR_t **stmts = calloc((size_t)e->n, sizeof(IR_t *));
+        if (!stmts) return NULL;
+        for (int j = 0; j < e->n; j++) {
+            if (!e->c[j]) { free(stmts); return NULL; }
+            stmts[j] = lower_icn_expr_node(cfg, e->c[j]);
+            if (!stmts[j]) { free(stmts); return NULL; }
+        }
+        IR_t *nd = IR_node_alloc(cfg, IR_SEQ);
+        if (!nd) { free(stmts); return NULL; }
+        nd->c = stmts;
+        nd->n = e->n;
+        return nd;
+    }
     case TT_ADD: case TT_SUB: case TT_MUL: case TT_DIV: case TT_MOD:
     case TT_LT:  case TT_LE:  case TT_GT:  case TT_GE:  case TT_EQ:  case TT_NE:
     case TT_CAT: {
@@ -373,6 +411,15 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         }
         nd->ival  = (int64_t)op;
         nd->ival2 = (int64_t)is_relop;
+        return nd;
+    }
+    case TT_GLOBAL:
+    case TT_INITIAL: {
+        /* `local x;`, `static x;`, `global x;`, `initial expr;` — scope/init declarations.                                                                                                                   */
+        /* Scope is built at lower time (proc_table[i].lower_sc); these are no-ops at IR exec time.                                                                                                            */
+        /* Emit IR_SUCCEED which returns NULVCL via nd->γ.                                                                                                                                                    */
+        IR_t *nd = IR_node_alloc(cfg, IR_SUCCEED);
+        if (!nd) return NULL;
         return nd;
     }
     default:

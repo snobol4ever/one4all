@@ -164,6 +164,36 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->value = NULVCL;
         return nd->γ;
     }
+    case IR_WHILE: {
+        /* Icon while C [do B].  c[0]=cond (mandatory), c[1]=optional body.                                                                                                                                  */
+        /* Loop: eval cond; if cond fails, break; else eval body; repeat.  Cond's state is reset before each pump via IR_exec_node — for plain scalar conds (BINOP relops) this is correct; for generator   */
+        /* conds, the resume-on-next-iteration is the right semantics for while (cond drives one pump per iteration).  Always succeeds with NULVCL after termination.                                       */
+        if (nd->n < 1 || !nd->c[0]) { nd->value = NULVCL; return nd->γ; }
+        int safety = 1000000;
+        while (safety-- > 0) {
+            nd->c[0]->state = 0;
+            IR_exec_node(nd->c[0]);
+            DESCR_t cv = nd->c[0]->value;
+            if (IS_FAIL_fn(cv)) break;
+            if (nd->n >= 2 && nd->c[1]) IR_exec_node(nd->c[1]);
+        }
+        nd->value = NULVCL;
+        return nd->γ;
+    }
+    case IR_UNTIL: {
+        /* Icon until C [do B].  c[0]=cond (mandatory), c[1]=optional body.  Inverse of WHILE: loop while cond FAILS, exit when cond succeeds.                                                                */
+        if (nd->n < 1 || !nd->c[0]) { nd->value = NULVCL; return nd->γ; }
+        int safety = 1000000;
+        while (safety-- > 0) {
+            nd->c[0]->state = 0;
+            IR_exec_node(nd->c[0]);
+            DESCR_t cv = nd->c[0]->value;
+            if (!IS_FAIL_fn(cv)) break;
+            if (nd->n >= 2 && nd->c[1]) IR_exec_node(nd->c[1]);
+        }
+        nd->value = NULVCL;
+        return nd->γ;
+    }
     case IR_TO_BY: {
         if (nd->state == 0) {
             int64_t from = 0, by = 1;
