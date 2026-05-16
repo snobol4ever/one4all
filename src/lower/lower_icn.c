@@ -302,18 +302,29 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         return nd;
     }
     case TT_TO: {
-        /* Icon `lo to hi` generator.  Emit IR_ICN_TO using literal int bounds when both operands are TT_ILIT.                                                                                              */
-        /* For non-literal bounds, fall back to NULL — covered by future work or icn_bb_build path.                                                                                                         */
+        /* Icon `lo to hi` generator. Emit IR_ICN_TO. If both bounds are literal ints, store them            */
+        /* directly in ival/ival2. Otherwise recursively lower the bound expressions as c[0]/c[1] —         */
+        /* the IR_ICN_TO executor evaluates them on the α path to seed the counter.                         */
         if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
-        if (e->c[0]->t != TT_ILIT || e->c[1]->t != TT_ILIT) return NULL;
-        int64_t lo = e->c[0]->v.ival;
-        int64_t hi = e->c[1]->v.ival;
         IR_t *nd = IR_node_alloc(cfg, IR_ICN_TO);
         if (!nd) return NULL;
-        nd->ival    = lo;
-        nd->ival2   = hi;
-        nd->counter = lo;
-        nd->state   = 0;
+        if (e->c[0]->t == TT_ILIT && e->c[1]->t == TT_ILIT) {
+            nd->ival    = e->c[0]->v.ival;
+            nd->ival2   = e->c[1]->v.ival;
+            nd->counter = nd->ival;
+            nd->state   = 0;
+            return nd;
+        }
+        IR_t *lo = lower_icn_expr_node(cfg, e->c[0]);
+        if (!lo) return NULL;
+        IR_t *hi = lower_icn_expr_node(cfg, e->c[1]);
+        if (!hi) return NULL;
+        nd->c = calloc(2, sizeof(IR_t *));
+        if (!nd->c) return NULL;
+        nd->c[0] = lo;
+        nd->c[1] = hi;
+        nd->n    = 2;
+        nd->state = 0;
         return nd;
     }
     case TT_EVERY: {

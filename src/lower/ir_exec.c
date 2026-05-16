@@ -479,7 +479,18 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->state = 0; nd->value = FAILDESCR; return nd->ω;
     }
     case IR_ICN_TO: {
-        if (nd->state == 0) nd->counter = nd->ival;
+        if (nd->state == 0) {
+            /* α path: if c[0]/c[1] present, evaluate them now to seed ival/ival2 (dynamic bounds). */
+            if (nd->n >= 2 && nd->c[0] && nd->c[1]) {
+                IR_exec_node(nd->c[0]);
+                if (IS_FAIL_fn(nd->c[0]->value)) { nd->value = FAILDESCR; return nd->ω; }
+                IR_exec_node(nd->c[1]);
+                if (IS_FAIL_fn(nd->c[1]->value)) { nd->value = FAILDESCR; return nd->ω; }
+                nd->ival  = nd->c[0]->value.i;
+                nd->ival2 = nd->c[1]->value.i;
+            }
+            nd->counter = nd->ival;
+        }
         else nd->counter++;
         nd->state = 1;
         if (nd->counter > nd->ival2) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
