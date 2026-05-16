@@ -54,6 +54,14 @@ run_smoke "define_simple" "        DEFINE('Greet(who)')                         
 Greet   Greet = 'Hello, ' who                         :(RETURN)
 end_g   OUTPUT = Greet('World')
 END"
+run_smoke "define_recursive" "        DEFINE('Fact(n)')                             :(fact_end)
+Fact    IDENT(n, 0)                                   :S(fact_base)
+        Fact = n * Fact(n - 1)                        :(RETURN)
+fact_base
+        Fact = 1                                      :(RETURN)
+fact_end
+        OUTPUT = Fact(5)
+END"
 echo "---"
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]

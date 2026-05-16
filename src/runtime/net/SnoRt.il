@@ -102,6 +102,91 @@
     callvirt   instance !0 class [mscorlib]System.Collections.Generic.Stack`1<int32>::Pop()
     ret
   }
+  //    frame_push  -- push a new empty frame dict onto _frames              
+  .method public static void frame_push() cil managed
+  {
+    .maxstack 2
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>> SnoRt::_frames
+    newobj     instance void class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>::.ctor()
+    callvirt   instance void class [mscorlib]System.Collections.Generic.Stack`1<class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>>::Push(!0)
+    ret
+  }
+  //    frame_save  -- snapshot current value of named var into top frame    
+  .method public static void frame_save(string name) cil managed
+  {
+    .maxstack 4
+    .locals init (class [mscorlib]System.Collections.Generic.Dictionary`2<string,object> frame, object curval)
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>> SnoRt::_frames
+    callvirt   instance int32 class [mscorlib]System.Collections.Generic.Stack`1<class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>>::get_Count()
+    ldc.i4.0
+    ble        FSAVE_DONE
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>> SnoRt::_frames
+    callvirt   instance !0 class [mscorlib]System.Collections.Generic.Stack`1<class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>>::Peek()
+    stloc.0
+    ldsfld     class [mscorlib]System.Collections.Generic.Dictionary`2<string,object> SnoRt::_vars
+    ldarg.0
+    callvirt   instance bool class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>::ContainsKey(!0)
+    brfalse    FSAVE_NULL
+    ldsfld     class [mscorlib]System.Collections.Generic.Dictionary`2<string,object> SnoRt::_vars
+    ldarg.0
+    callvirt   instance !1 class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>::get_Item(!0)
+    stloc.1
+    br         FSAVE_STORE
+  FSAVE_NULL:
+    ldstr      ""
+    stloc.1
+  FSAVE_STORE:
+    ldloc.0
+    ldarg.0
+    ldloc.1
+    callvirt   instance void class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>::set_Item(!0, !1)
+  FSAVE_DONE:
+    ret
+  }
+  //    frame_exit  -- pop top frame and restore all saved vars              
+  .method public static void frame_exit() cil managed
+  {
+    .maxstack 4
+    .locals init (class [mscorlib]System.Collections.Generic.Dictionary`2<string,object> frame,
+                  class [mscorlib]System.Collections.Generic.List`1<string> klist,
+                  int32 idx,
+                  string k)
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>> SnoRt::_frames
+    callvirt   instance int32 class [mscorlib]System.Collections.Generic.Stack`1<class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>>::get_Count()
+    ldc.i4.0
+    ble        FEXIT_DONE
+    ldsfld     class [mscorlib]System.Collections.Generic.Stack`1<class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>> SnoRt::_frames
+    callvirt   instance !0 class [mscorlib]System.Collections.Generic.Stack`1<class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>>::Pop()
+    stloc.0
+    ldloc.0
+    callvirt   instance class [mscorlib]System.Collections.Generic.Dictionary`2/KeyCollection<!0,!1> class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>::get_Keys()
+    newobj     instance void class [mscorlib]System.Collections.Generic.List`1<string>::.ctor(class [mscorlib]System.Collections.Generic.IEnumerable`1<!0>)
+    stloc.1
+    ldc.i4.0
+    stloc.2
+  FEXIT_LOOP:
+    ldloc.2
+    ldloc.1
+    callvirt   instance int32 class [mscorlib]System.Collections.Generic.List`1<string>::get_Count()
+    bge        FEXIT_DONE
+    ldloc.1
+    ldloc.2
+    callvirt   instance !0 class [mscorlib]System.Collections.Generic.List`1<string>::get_Item(int32)
+    stloc.3
+    ldsfld     class [mscorlib]System.Collections.Generic.Dictionary`2<string,object> SnoRt::_vars
+    ldloc.3
+    ldloc.0
+    ldloc.3
+    callvirt   instance !1 class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>::get_Item(!0)
+    callvirt   instance void class [mscorlib]System.Collections.Generic.Dictionary`2<string,object>::set_Item(!0, !1)
+    ldloc.2
+    ldc.i4.1
+    add
+    stloc.2
+    br         FEXIT_LOOP
+  FEXIT_DONE:
+    ret
+  }
 
   //    push helpers                                                            
   .method public static void push_int(int32 v) cil managed
