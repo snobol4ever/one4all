@@ -32,4 +32,8 @@ IR_block_t *lower_icn_proc_gen(struct GeneratorState *gs);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 struct tree_t;
 IR_block_t *lower_icn_proc_body(struct tree_t *proc);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* lower_icn_expr_top — build IR_block_t* for a single Icon expression (top-level wrapper).                                                                                                            */
+/* Returns NULL when the expr kind isn't yet supported (caller falls back).                                                                                                                            */
+IR_block_t *lower_icn_expr_top(struct tree_t *e);
 #endif

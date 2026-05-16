@@ -102,6 +102,21 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->value = FAILDESCR;
         return nd->ω;
     }
+    case IR_BINOP: {
+        /* Plain (non-generator) binop.  c[0]=lhs, c[1]=rhs; nd->ival=IcnBinopKind, nd->ival2=is_relop. */
+        if (nd->n < 2 || !nd->c[0] || !nd->c[1]) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[0]);
+        DESCR_t lv = nd->c[0]->value;
+        if (IS_FAIL_fn(lv)) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[1]);
+        DESCR_t rv = nd->c[1]->value;
+        if (IS_FAIL_fn(rv)) { nd->value = FAILDESCR; return nd->ω; }
+        int rel_fail = 0;
+        DESCR_t result = icn_binop_apply((IcnBinopKind)nd->ival, lv, rv, &rel_fail);
+        if (IS_FAIL_fn(result)) { nd->value = FAILDESCR; return nd->ω; }
+        nd->value = result;
+        return nd->γ;
+    }
     case IR_LIT_F:
         nd->value = REALVAL(nd->dval);
         return nd->γ;

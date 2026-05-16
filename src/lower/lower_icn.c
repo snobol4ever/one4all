@@ -275,9 +275,59 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         nd->n    = nargs;
         return nd;
     }
+    case TT_ADD: case TT_SUB: case TT_MUL: case TT_DIV: case TT_MOD:
+    case TT_LT:  case TT_LE:  case TT_GT:  case TT_GE:  case TT_EQ:  case TT_NE:
+    case TT_CAT: {
+        /* Plain (non-generator) arithmetic / relop / concat. Lower both operands; emit IR_BINOP.   */
+        if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
+        IR_t *lhs = lower_icn_expr_node(cfg, e->c[0]);
+        if (!lhs) return NULL;
+        IR_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
+        if (!rhs) return NULL;
+        IR_t *nd = IR_node_alloc(cfg, IR_BINOP);
+        if (!nd) return NULL;
+        nd->c = calloc(2, sizeof(IR_t *));
+        if (!nd->c) return NULL;
+        nd->c[0] = lhs;
+        nd->c[1] = rhs;
+        nd->n    = 2;
+        /* Encode the IcnBinopKind in ival.                                                          */
+        IcnBinopKind op = ICN_BINOP_ADD;
+        int is_relop = 0;
+        switch (e->t) {
+        case TT_ADD: op = ICN_BINOP_ADD;    break;
+        case TT_SUB: op = ICN_BINOP_SUB;    break;
+        case TT_MUL: op = ICN_BINOP_MUL;    break;
+        case TT_DIV: op = ICN_BINOP_DIV;    break;
+        case TT_MOD: op = ICN_BINOP_MOD;    break;
+        case TT_LT:  op = ICN_BINOP_LT; is_relop = 1; break;
+        case TT_LE:  op = ICN_BINOP_LE; is_relop = 1; break;
+        case TT_GT:  op = ICN_BINOP_GT; is_relop = 1; break;
+        case TT_GE:  op = ICN_BINOP_GE; is_relop = 1; break;
+        case TT_EQ:  op = ICN_BINOP_EQ; is_relop = 1; break;
+        case TT_NE:  op = ICN_BINOP_NE; is_relop = 1; break;
+        case TT_CAT: op = ICN_BINOP_CONCAT; break;
+        default: break;
+        }
+        nd->ival  = (int64_t)op;
+        nd->ival2 = (int64_t)is_relop;
+        return nd;
+    }
     default:
         return NULL;
     }
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* lower_icn_expr_top — public wrapper.  Build a fresh IR_block_t whose entry is the lowered expr.                                                                                                       */
+/* Returns NULL on any unsupported AST node (caller falls back to legacy path).                                                                                                                          */
+IR_block_t *lower_icn_expr_top(tree_t *e) {
+    if (!e) return NULL;
+    IR_block_t *cfg = IR_alloc(64, IR_LANG_ICN);
+    if (!cfg) return NULL;
+    IR_t *nd = lower_icn_expr_node(cfg, e);
+    if (!nd) { IR_free(cfg); return NULL; }
+    cfg->entry = nd;
+    return cfg;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* lower_icn_proc_body — build IR_block_t* for an Icon procedure body.                                                                                                                                     */
