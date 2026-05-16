@@ -47,6 +47,36 @@ static int intern_str(const char * s) {
     return addr;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* intern_name: case-fold name to uppercase (SNOBOL4 default), then intern.
+   Used for variable / function / keyword names — anywhere case-insensitive identifier
+   semantics apply.  Literal string content (PUSH_LIT_S payloads) MUST use intern_str. */
+static int intern_name(const char * s) {
+    if (!s) return intern_str(s);
+    int len = (int)strlen(s);
+    static char buf[256];
+    if (len >= (int)sizeof(buf)) len = (int)sizeof(buf) - 1;
+    for (int i = 0; i < len; i++) {
+        unsigned char c = (unsigned char)s[i];
+        buf[i] = (c >= 'a' && c <= 'z') ? (char)(c - 32) : (char)c;
+    }
+    buf[len] = 0;
+    /* Linear lookup over existing strtab (case-sensitive against the upper-cased version). */
+    for (int i = 0; i < g_strtab_n; i++)
+        if (g_strtab[i].len == len && (len == 0 || memcmp(g_strtab[i].s, buf, (size_t)len) == 0)) return g_strtab[i].addr;
+    /* Allocate a persistent copy because buf is static. */
+    char * persistent = (char *)malloc((size_t)len + 1);
+    memcpy(persistent, buf, (size_t)len);
+    persistent[len] = 0;
+    if (g_strtab_n >= STRTAB_MAX) { free(persistent); return STR_DATA_BASE; }
+    int addr = g_str_next;
+    g_strtab[g_strtab_n].s    = persistent;
+    g_strtab[g_strtab_n].addr = addr;
+    g_strtab[g_strtab_n].len  = len;
+    g_strtab_n++;
+    g_str_next += len + 1;
+    return addr;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* emit_wasm_data_segments: emit (data ...) for all interned strings. */
 static void emit_wasm_data_segments(FILE * out) {
     for (int i = 0; i < g_strtab_n; i++) {
@@ -60,6 +90,117 @@ static void emit_wasm_data_segments(FILE * out) {
             else fputc(c, out);
         }
         fprintf(out, "\")\n");
+    }
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* User-defined function table for SN4-WASM-5f.
+   Populated by a pre-scan over SM_Program before $main emission.
+   Each entry: name, entry_pc, param names (parsed from preceding SM_PUSH_LIT_S "FNAME(P1,P2,...)").
+   Lookup is linear (case-sensitive — names already canonical at this layer). */
+#define USERFNS_MAX     1024
+#define USERFN_PARAMS_MAX 32
+typedef struct {
+    char * name;
+    int    entry_pc;
+    int    nparams;
+    char * params[USERFN_PARAMS_MAX];
+} UserFn;
+static UserFn g_userfns[USERFNS_MAX];
+static int    g_userfns_n = 0;
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static void userfns_reset(void) {
+    for (int i = 0; i < g_userfns_n; i++) {
+        free(g_userfns[i].name);
+        for (int k = 0; k < g_userfns[i].nparams; k++) free(g_userfns[i].params[k]);
+    }
+    g_userfns_n = 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static UserFn * userfn_find(const char * name) {
+    if (!name) return NULL;
+    int len = (int)strlen(name);
+    for (int i = 0; i < g_userfns_n; i++) {
+        if (!g_userfns[i].name) continue;
+        if ((int)strlen(g_userfns[i].name) != len) continue;
+        int match = 1;
+        for (int k = 0; k < len; k++) {
+            unsigned char a = (unsigned char)name[k];
+            unsigned char b = (unsigned char)g_userfns[i].name[k];
+            if (a >= 'a' && a <= 'z') a = (unsigned char)(a - 32);
+            if (b >= 'a' && b <= 'z') b = (unsigned char)(b - 32);
+            if (a != b) { match = 0; break; }
+        }
+        if (match) return &g_userfns[i];
+    }
+    return NULL;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* parse_define_signature: input like "FACT(X)" or "DOIT(X,Y)" or "FOO()" — populates fn->name & params.
+   The fn->name is set to the part before '(' (caller already knows the name, but we store it anyway).
+   Returns 0 on success, nonzero on parse failure (in which case caller should leave entry alone). */
+static int parse_define_signature(UserFn * fn, const char * sig) {
+    if (!sig) return 1;
+    const char * lp = strchr(sig, '(');
+    if (!lp) {
+        fn->nparams = 0;
+        return 0;
+    }
+    const char * p = lp + 1;
+    while (*p && *p != ')') {
+        while (*p == ' ' || *p == '\t' || *p == ',') p++;
+        if (*p == ')' || !*p) break;
+        const char * start = p;
+        while (*p && *p != ',' && *p != ')' && *p != ' ' && *p != '\t') p++;
+        int len = (int)(p - start);
+        if (len > 0 && fn->nparams < USERFN_PARAMS_MAX) {
+            char * nm = (char *)malloc((size_t)len + 1);
+            memcpy(nm, start, (size_t)len);
+            nm[len] = 0;
+            fn->params[fn->nparams++] = nm;
+        }
+    }
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* pre_scan_userfns: walk SM_Program and collect all SM_LABEL with define_entry (a[2].i=1).
+   For each, find the most recent SM_PUSH_LIT_S preceding an SM_SUSPEND_VALUE s="DEFINE" with this fn name
+   to extract the parameter list.  Also intern fn name into the string table for later use. */
+static void pre_scan_userfns(SM_Program * sm) {
+    userfns_reset();
+    for (int i = 0; i < sm->count; i++) {
+        SM_Instr * ins = &sm->instrs[i];
+        if (ins->op == SM_LABEL && ins->a[2].i == 1 && ins->a[0].s && ins->a[0].s[0]) {
+            if (g_userfns_n >= USERFNS_MAX) break;
+            UserFn * fn = &g_userfns[g_userfns_n++];
+            fn->name = strdup(ins->a[0].s);
+            fn->entry_pc = i;
+            fn->nparams = 0;
+            /* Scan backward for the DEFINE("FNAME(...)") signature.
+               DEFINE in SNOBOL4 is dispatched through SM_CALL_FN (not SM_SUSPEND_VALUE);
+               accept either opcode for robustness across frontends. */
+            for (int j = i - 1; j >= 0; j--) {
+                SM_Instr * jn = &sm->instrs[j];
+                int is_call = (jn->op == SM_CALL_FN || jn->op == SM_SUSPEND_VALUE);
+                if (is_call && jn->a[0].s && strcmp(jn->a[0].s, "DEFINE") == 0) {
+                    /* The previous SM_PUSH_LIT_S should be the signature string. */
+                    if (j >= 1
+                        && (sm->instrs[j-1].op == SM_PUSH_LIT_S
+                            || sm->instrs[j-1].op == SM_PUSH_LIT_CS)
+                        && sm->instrs[j-1].a[0].s) {
+                        const char * sig = sm->instrs[j-1].a[0].s;
+                        const char * lp  = strchr(sig, '(');
+                        int namelen = lp ? (int)(lp - sig) : (int)strlen(sig);
+                        if (namelen > 0 && (int)strlen(fn->name) == namelen
+                            && strncmp(sig, fn->name, (size_t)namelen) == 0) {
+                            parse_define_signature(fn, sig);
+                            break;
+                        }
+                    }
+                }
+            }
+            intern_name(fn->name);
+            for (int k = 0; k < fn->nparams; k++) intern_name(fn->params[k]);
+        }
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -272,13 +413,13 @@ int emit_wasm_from_sm(SM_Program * sm, FILE * out) {
             fprintf(out, "          (call $sno_push_null)\n");
             break;
         case SM_PUSH_VAR: {
-            int addr = intern_str(ins->a[0].s);
+            int addr = intern_name(ins->a[0].s);
             int len  = ins->a[0].s ? (int)strlen(ins->a[0].s) : 0;
             fprintf(out, "          (call $sno_push_var (i32.const 0x%x) (i32.const %d))\n", addr, len);
             break;
         }
         case SM_STORE_VAR: {
-            int addr = intern_str(ins->a[0].s);
+            int addr = intern_name(ins->a[0].s);
             int len  = ins->a[0].s ? (int)strlen(ins->a[0].s) : 0;
             fprintf(out, "          (call $sno_store_var (i32.const 0x%x) (i32.const %d))\n", addr, len);
             break;
@@ -333,23 +474,158 @@ int emit_wasm_from_sm(SM_Program * sm, FILE * out) {
             has_jump = 1;
             break;
         case SM_CALL_FN: {
-            int addr = intern_str(ins->a[0].s);
-            int len  = ins->a[0].s ? (int)strlen(ins->a[0].s) : 0;
-            fprintf(out, "          (call $sno_call (i32.const 0x%x) (i32.const %d) (i32.const %lld))\n",
-                    addr, len, ins->a[1].i);
+            /* SM_CALL_FN with a name = call (builtin or user fn).
+               SM_CALL_FN with NULL name = implicit return (end of function body, fall through). */
+            const char * cname = ins->a[0].s;
+            int nargs = (int)ins->a[1].i;
+            if (cname && cname[0]) {
+                UserFn * fn = userfn_find(cname);
+                if (fn) {
+                    /* User-defined function call. */
+                    int name_addr = intern_name(fn->name);
+                    int name_len  = (int)strlen(fn->name);
+                    fprintf(out, "          ;; user-fn call: %s (entry_pc=%d, nparams=%d)\n",
+                            fn->name, fn->entry_pc, fn->nparams);
+                    /* Open a frame: push returns frame address into a local so save_var calls reference it. */
+                    fprintf(out, "          (local.set $fr (call $sno_call_frame_push\n");
+                    fprintf(out, "                            (i32.const %d) (i32.const 0x%x) (i32.const %d)))\n",
+                            i + 1, name_addr, name_len);
+                    /* Save retname binding. */
+                    fprintf(out, "          (call $sno_save_var (local.get $fr) (i32.const 0x%x) (i32.const %d))\n",
+                            name_addr, name_len);
+                    /* Save each param binding. */
+                    for (int k = 0; k < fn->nparams; k++) {
+                        int p_addr = intern_name(fn->params[k]);
+                        int p_len  = (int)strlen(fn->params[k]);
+                        fprintf(out, "          (call $sno_save_var (local.get $fr) (i32.const 0x%x) (i32.const %d))\n",
+                                p_addr, p_len);
+                    }
+                    /* Clear retname to empty string. */
+                    fprintf(out, "          (call $sno_clear_var (i32.const 0x%x) (i32.const %d))\n",
+                            name_addr, name_len);
+                    /* Bind formals from value stack (args are pushed in order; topmost = last param).
+                       Walk params right-to-left so we pop in reverse. */
+                    int nbind = (nargs < fn->nparams) ? nargs : fn->nparams;
+                    for (int k = nbind - 1; k >= 0; k--) {
+                        int p_addr = intern_name(fn->params[k]);
+                        int p_len  = (int)strlen(fn->params[k]);
+                        fprintf(out, "          (call $sno_set_var_from_tos (i32.const 0x%x) (i32.const %d))\n",
+                                p_addr, p_len);
+                    }
+                    /* Drop any extra args (nargs > nparams). */
+                    for (int k = fn->nparams; k < nargs; k++) {
+                        fprintf(out, "          (call $sno_pop_to_null)\n");
+                    }
+                    /* Clear locals not yet supported (would need scanning DEFINE 3rd-arg signature). */
+                    /* Commit the frame. */
+                    fprintf(out, "          (call $sno_call_frame_close)\n");
+                    /* Jump to entry PC. */
+                    fprintf(out, "          (i32.const %d) (local.set $pc) (br $lp)\n", fn->entry_pc);
+                    has_jump = 1;
+                    break;
+                }
+                /* Builtin or unknown function — dispatch through $sno_call. */
+                int addr = intern_name(cname);
+                int len  = (int)strlen(cname);
+                fprintf(out, "          (call $sno_call (i32.const 0x%x) (i32.const %d) (i32.const %d))\n",
+                        addr, len, nargs);
+            } else {
+                /* SM_CALL_FN with NULL name = implicit RETURN at end of fn body. */
+                fprintf(out, "          (local.set $tmp (call $sno_fn_return (i32.const 0) (i32.const 0)))\n");
+                fprintf(out, "          (if (i32.eq (local.get $tmp) (i32.const -2))\n");
+                fprintf(out, "            (then (br $done))\n");
+                fprintf(out, "            (else (local.set $pc (local.get $tmp)) (br $lp)))\n");
+                has_jump = 1;
+            }
+            break;
+        }
+        case SM_SUSPEND_VALUE: {
+            /* SM_SUSPEND_VALUE s="NAME" nargs=N — call a function (builtin or user-defined).
+               This is the primary call opcode used by the SNOBOL4 frontend. */
+            const char * cname = ins->a[0].s;
+            int nargs = (int)ins->a[1].i;
+            if (cname && cname[0]) {
+                UserFn * fn = userfn_find(cname);
+                if (fn) {
+                    int name_addr = intern_name(fn->name);
+                    int name_len  = (int)strlen(fn->name);
+                    fprintf(out, "          ;; user-fn call (suspend_value): %s\n", fn->name);
+                    fprintf(out, "          (local.set $fr (call $sno_call_frame_push\n");
+                    fprintf(out, "                            (i32.const %d) (i32.const 0x%x) (i32.const %d)))\n",
+                            i + 1, name_addr, name_len);
+                    fprintf(out, "          (call $sno_save_var (local.get $fr) (i32.const 0x%x) (i32.const %d))\n",
+                            name_addr, name_len);
+                    for (int k = 0; k < fn->nparams; k++) {
+                        int p_addr = intern_name(fn->params[k]);
+                        int p_len  = (int)strlen(fn->params[k]);
+                        fprintf(out, "          (call $sno_save_var (local.get $fr) (i32.const 0x%x) (i32.const %d))\n",
+                                p_addr, p_len);
+                    }
+                    fprintf(out, "          (call $sno_clear_var (i32.const 0x%x) (i32.const %d))\n",
+                            name_addr, name_len);
+                    int nbind = (nargs < fn->nparams) ? nargs : fn->nparams;
+                    for (int k = nbind - 1; k >= 0; k--) {
+                        int p_addr = intern_name(fn->params[k]);
+                        int p_len  = (int)strlen(fn->params[k]);
+                        fprintf(out, "          (call $sno_set_var_from_tos (i32.const 0x%x) (i32.const %d))\n",
+                                p_addr, p_len);
+                    }
+                    for (int k = fn->nparams; k < nargs; k++) {
+                        fprintf(out, "          (call $sno_pop_to_null)\n");
+                    }
+                    fprintf(out, "          (call $sno_call_frame_close)\n");
+                    fprintf(out, "          (i32.const %d) (local.set $pc) (br $lp)\n", fn->entry_pc);
+                    has_jump = 1;
+                    break;
+                }
+                /* Builtin dispatch. */
+                int addr = intern_name(cname);
+                int len  = (int)strlen(cname);
+                fprintf(out, "          (call $sno_call (i32.const 0x%x) (i32.const %d) (i32.const %d))\n",
+                        addr, len, nargs);
+            } else {
+                /* No name — should not happen for SUSPEND_VALUE; emit a no-op. */
+                fprintf(out, "          ;; SM_SUSPEND_VALUE with NULL name (no-op)\n");
+            }
             break;
         }
         case SM_RETURN:
         case SM_FRETURN:
-        case SM_NRETURN:
-        case SM_RETURN_S:
-        case SM_RETURN_F:
-        case SM_FRETURN_S:
-        case SM_FRETURN_F:
-        case SM_NRETURN_S:
-        case SM_NRETURN_F:
-            fprintf(out, "          (call $sno_do_return (i32.const 0) (i32.const 0))\n");
+        case SM_NRETURN: {
+            int kind = (ins->op == SM_FRETURN) ? 1 : ((ins->op == SM_NRETURN) ? 2 : 0);
+            fprintf(out, "          (local.set $tmp (call $sno_fn_return (i32.const %d) (i32.const 0)))\n", kind);
+            fprintf(out, "          (if (i32.eq (local.get $tmp) (i32.const -2))\n");
+            fprintf(out, "            (then (br $done))\n");
+            fprintf(out, "            (else (local.set $pc (local.get $tmp)) (br $lp)))\n");
+            has_jump = 1;
             break;
+        }
+        case SM_RETURN_S:
+        case SM_FRETURN_S:
+        case SM_NRETURN_S: {
+            int kind = (ins->op == SM_FRETURN_S) ? 1 : ((ins->op == SM_NRETURN_S) ? 2 : 0);
+            fprintf(out, "          (local.set $tmp (call $sno_fn_return (i32.const %d) (i32.const 1)))\n", kind);
+            fprintf(out, "          (if (i32.eq (local.get $tmp) (i32.const -1))\n");
+            fprintf(out, "            (then (i32.const %d) (local.set $pc) (br $lp))\n", i + 1);
+            fprintf(out, "            (else (if (i32.eq (local.get $tmp) (i32.const -2))\n");
+            fprintf(out, "              (then (br $done))\n");
+            fprintf(out, "              (else (local.set $pc (local.get $tmp)) (br $lp)))))\n");
+            has_jump = 1;
+            break;
+        }
+        case SM_RETURN_F:
+        case SM_FRETURN_F:
+        case SM_NRETURN_F: {
+            int kind = (ins->op == SM_FRETURN_F) ? 1 : ((ins->op == SM_NRETURN_F) ? 2 : 0);
+            fprintf(out, "          (local.set $tmp (call $sno_fn_return (i32.const %d) (i32.const 2)))\n", kind);
+            fprintf(out, "          (if (i32.eq (local.get $tmp) (i32.const -1))\n");
+            fprintf(out, "            (then (i32.const %d) (local.set $pc) (br $lp))\n", i + 1);
+            fprintf(out, "            (else (if (i32.eq (local.get $tmp) (i32.const -2))\n");
+            fprintf(out, "              (then (br $done))\n");
+            fprintf(out, "              (else (local.set $pc (local.get $tmp)) (br $lp)))))\n");
+            has_jump = 1;
+            break;
+        }
         case SM_INCR:
         case SM_DECR:
             fprintf(out, "          (call $sno_arith (i32.const %d))\n", ins->op == SM_INCR ? 0 : 1);
@@ -398,6 +674,13 @@ static int emit_wasm_prologue(FILE * out, SM_Program * sm) {
     fprintf(out, "  (import \"sno\" \"sno_halt_tos\"     (func $sno_halt_tos))\n");
     fprintf(out, "  (import \"sno\" \"sno_call\"         (func $sno_call        (param i32 i32 i32)))\n");
     fprintf(out, "  (import \"sno\" \"sno_do_return\"    (func $sno_do_return   (param i32 i32)))\n");
+    fprintf(out, "  (import \"sno\" \"sno_fn_return\"    (func $sno_fn_return   (param i32 i32) (result i32)))\n");
+    fprintf(out, "  (import \"sno\" \"sno_call_frame_push\" (func $sno_call_frame_push (param i32 i32 i32) (result i32)))\n");
+    fprintf(out, "  (import \"sno\" \"sno_call_frame_close\" (func $sno_call_frame_close))\n");
+    fprintf(out, "  (import \"sno\" \"sno_save_var\"     (func $sno_save_var    (param i32 i32 i32)))\n");
+    fprintf(out, "  (import \"sno\" \"sno_clear_var\"    (func $sno_clear_var   (param i32 i32)))\n");
+    fprintf(out, "  (import \"sno\" \"sno_set_var_from_tos\" (func $sno_set_var_from_tos (param i32 i32)))\n");
+    fprintf(out, "  (import \"sno\" \"sno_pop_to_null\"  (func $sno_pop_to_null))\n");
     fprintf(out, "  ;; arena allocator (from bb_boxes.wat)\n");
     fprintf(out, "  (import \"bb\"  \"arena_alloc\"      (func $arena_alloc     (result i32)))\n");
     (void)sm;
@@ -426,24 +709,30 @@ int emit_wasm_scalar(IR_t * nd, FILE * out) {
 int emit_wasm_program(const tree_t * ast_prog, FILE * out) {
     if (!ast_prog || !out) return 1;
     strtab_reset();
+    userfns_reset();
     SM_Program * sm = sm_preamble(ast_prog);
     if (!sm) return 1;
     /* Pre-pass: intern all strings so data segments are emitted before $main references them. */
     for (int i = 0; i < sm->count; i++) {
         SM_Instr * ins = &sm->instrs[i];
         if (ins->op == SM_PUSH_LIT_S && ins->a[0].s) intern_str(ins->a[0].s);
-        else if (ins->op == SM_PUSH_VAR  && ins->a[0].s) intern_str(ins->a[0].s);
-        else if (ins->op == SM_STORE_VAR && ins->a[0].s) intern_str(ins->a[0].s);
-        else if (ins->op == SM_CALL_FN   && ins->a[0].s) intern_str(ins->a[0].s);
+        else if (ins->op == SM_PUSH_LIT_CS && ins->a[0].s) intern_str(ins->a[0].s);
+        else if (ins->op == SM_PUSH_VAR  && ins->a[0].s) intern_name(ins->a[0].s);
+        else if (ins->op == SM_STORE_VAR && ins->a[0].s) intern_name(ins->a[0].s);
+        else if (ins->op == SM_CALL_FN   && ins->a[0].s) intern_name(ins->a[0].s);
+        else if (ins->op == SM_SUSPEND_VALUE && ins->a[0].s) intern_name(ins->a[0].s);
     }
     /* intern fixed keyword strings */
     intern_str("OUTPUT");
     intern_str("INPUT");
+    /* Build user-fn table from SM_LABEL define_entry markers (also interns names + params). */
+    pre_scan_userfns(sm);
     emit_wasm_prologue(out, sm);
     /* $main function */
     fprintf(out, "  (func $main (export \"main\")\n");
     fprintf(out, "    (local $pc i32)\n");
     fprintf(out, "    (local $tmp i32)\n");
+    fprintf(out, "    (local $fr i32)\n");
     fprintf(out, "    (call $sno_init)\n");
     emit_wasm_from_sm(sm, out);
     fprintf(out, "    (call $sno_finalize)\n");

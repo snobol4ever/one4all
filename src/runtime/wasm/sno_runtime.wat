@@ -6,6 +6,8 @@
 ;;   [0x031000..0x031FFF]  runtime keywords  (INPUT @ 0x31000, OUTPUT @ 0x31010)
 ;;   [0x040000..0x04FFFF]  output buffer     (OUTPUT_BUF=0x40000, unused so far)
 ;;   [0x050000..0x05FFFF]  BB arena          (32-byte box slots, BOX_ARENA_BASE=0x50000)
+;;   [0x070000..0x077FFF]  call stack        (32-byte frames, CALL_STACK_BASE=0x70000, 1024 frames)
+;;   [0x078000..0x07FFFF]  saved bindings    (20-byte entries, SAVED_VARS_BASE=0x78000, bump)
 ;;   [0x080000..0x0FFFFF]  dynamic str heap  (bump alloc from STR_HEAP_BASE=0x80000, 512KB)
 ;;   [0x100000..0x1FFFFF]  emitter literals  (STR_DATA_BASE=0x100000 in emit_wasm.c, 1MB)
 ;; Stack slot layout (16 bytes): +0=tag(i32) +4=ival(i32) +8=len(i32) +12=pad(i32)
@@ -37,6 +39,8 @@
   (global $pop_tag  (mut i32) (i32.const 0))        ;; pop result staging
   (global $pop_ival (mut i32) (i32.const 0))
   (global $pop_len  (mut i32) (i32.const 0))
+  (global $call_sp  (mut i32) (i32.const 0x70000))  ;; call-stack pointer (next free frame addr)
+  (global $sv_top   (mut i32) (i32.const 0x78000))  ;; saved-vars region bump ptr
 
   ;; static keyword strings at known addresses
   (data (i32.const 0x31000) "INPUT")
@@ -77,6 +81,26 @@
   (data (i32.const 0x31238) "DIGITS")
   (data (i32.const 0x31240) "UCASE")
   (data (i32.const 0x31248) "LCASE")
+  ;; Keyword VALUES (string contents) at separate addresses for push_var fast-path.
+  ;; ALPHABET: 256 bytes of \\00..\\FF; emitted byte-by-byte via \\xx escapes.
+  (data (i32.const 0x31300)
+    "\00\01\02\03\04\05\06\07\08\09\0a\0b\0c\0d\0e\0f"
+    "\10\11\12\13\14\15\16\17\18\19\1a\1b\1c\1d\1e\1f"
+    " !\22#$%&'()*+,-./0123456789:;<=>?"
+    "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\5c]^_"
+    "`abcdefghijklmnopqrstuvwxyz{|}~\7f"
+    "\80\81\82\83\84\85\86\87\88\89\8a\8b\8c\8d\8e\8f"
+    "\90\91\92\93\94\95\96\97\98\99\9a\9b\9c\9d\9e\9f"
+    "\a0\a1\a2\a3\a4\a5\a6\a7\a8\a9\aa\ab\ac\ad\ae\af"
+    "\b0\b1\b2\b3\b4\b5\b6\b7\b8\b9\ba\bb\bc\bd\be\bf"
+    "\c0\c1\c2\c3\c4\c5\c6\c7\c8\c9\ca\cb\cc\cd\ce\cf"
+    "\d0\d1\d2\d3\d4\d5\d6\d7\d8\d9\da\db\dc\dd\de\df"
+    "\e0\e1\e2\e3\e4\e5\e6\e7\e8\e9\ea\eb\ec\ed\ee\ef"
+    "\f0\f1\f2\f3\f4\f5\f6\f7\f8\f9\fa\fb\fc\fd\fe\ff")
+  ;; DIGITS, UCASE, LCASE values
+  (data (i32.const 0x31400) "0123456789")
+  (data (i32.const 0x31410) "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+  (data (i32.const 0x31430) "abcdefghijklmnopqrstuvwxyz")
 
   ;; ── memory helpers ───────────────────────────────────────────────────────
   (func $memcpy (param $dst i32) (param $src i32) (param $len i32)
@@ -296,6 +320,18 @@
       (then (call $push3 (global.get $TAG_INT) (i32.const 0) (i32.const 0)) (return)))
     (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31220) (i32.const 4))
       (then (call $push3 (global.get $TAG_INT) (i32.const 0) (i32.const 0)) (return)))
+    ;; ALPHABET (8 chars): 256-byte string of \00..\FF
+    (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31230) (i32.const 8))
+      (then (call $push3 (global.get $TAG_STR) (i32.const 0x31300) (i32.const 256)) (return)))
+    ;; DIGITS (6 chars): "0123456789"
+    (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31238) (i32.const 6))
+      (then (call $push3 (global.get $TAG_STR) (i32.const 0x31400) (i32.const 10)) (return)))
+    ;; UCASE (5 chars): "A".."Z"
+    (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31240) (i32.const 5))
+      (then (call $push3 (global.get $TAG_STR) (i32.const 0x31410) (i32.const 26)) (return)))
+    ;; LCASE (5 chars): "a".."z"
+    (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31248) (i32.const 5))
+      (then (call $push3 (global.get $TAG_STR) (i32.const 0x31430) (i32.const 26)) (return)))
     (local.set $saddr (call $var_slot_addr (local.get $name_ptr) (local.get $name_len)))
     (local.set $snl (i32.load (i32.add (local.get $saddr) (i32.const 4))))
     (if (i32.eqz (local.get $snl))
@@ -315,6 +351,9 @@
     (local.set $tag  (global.get $pop_tag))
     (local.set $ival (global.get $pop_ival))
     (local.set $len  (global.get $pop_len))
+    ;; FAIL value: do not store, do not print; just set last_ok=0.
+    (if (i32.eq (local.get $tag) (global.get $TAG_FAIL))
+      (then (global.set $last_ok (i32.const 0)) (return)))
     ;; check for OUTPUT (6 chars)
     (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31010) (i32.const 6))
       (then
@@ -324,6 +363,7 @@
         (local.set $p)
         (global.set $sp (i32.sub (global.get $sp) (i32.const 16)))
         (call $host_write_line (local.get $p) (local.get $l))
+        (global.set $last_ok (i32.const 1))
         (return)))
     (local.set $saddr (call $var_slot_addr (local.get $name_ptr) (local.get $name_len)))
     (i32.store (local.get $saddr) (local.get $name_ptr))
@@ -331,6 +371,7 @@
     (i32.store (i32.add (local.get $saddr) (i32.const 8)) (local.get $tag))
     (i32.store (i32.add (local.get $saddr) (i32.const 12)) (local.get $ival))
     (i32.store (i32.add (local.get $saddr) (i32.const 16)) (local.get $len))
+    (global.set $last_ok (i32.const 1))
   )
 
   (func $sno_pop_void (export "sno_pop_void")
@@ -350,6 +391,13 @@
     (local.set $tag1  (global.get $pop_tag))
     (local.set $ival1 (global.get $pop_ival))
     (local.set $len1  (global.get $pop_len))
+    ;; If either operand is FAIL, the result is FAIL (propagates through).
+    (if (i32.or (i32.eq (local.get $tag1) (global.get $TAG_FAIL))
+                (i32.eq (local.get $tag2) (global.get $TAG_FAIL)))
+      (then
+        (call $push3 (global.get $TAG_FAIL) (i32.const 0) (i32.const 0))
+        (global.set $last_ok (i32.const 0))
+        (return)))
     (call $push3 (local.get $tag1) (local.get $ival1) (local.get $len1))
     (call $tos_to_str)
     (local.set $l1)
@@ -589,7 +637,7 @@
                 (call $push3 (global.get $TAG_STR) (i32.const 0) (i32.const 0))
                 (global.set $last_ok (i32.const 1)))
               (else
-                (call $push3 (global.get $TAG_NULL) (i32.const 0) (i32.const 0))
+                (call $push3 (global.get $TAG_FAIL) (i32.const 0) (i32.const 0))
                 (global.set $last_ok (i32.const 0))))
             (return)))))
     ;; ---- 1-arg builtins ----
@@ -751,7 +799,9 @@
                     (global.set $last_ok (i32.const 0))))
             (return)))
       ))
-    ;; Fallback stub: pop nargs, push null, leave last_ok unchanged.
+    ;; Fallback stub: pop nargs, push FAIL, set last_ok=0.  Treating unknown builtins as failures
+    ;; matches the SNOBOL4 semantics where an unimplemented function returns failure, which causes
+    ;; the surrounding assignment to be a no-op (no print on OUTPUT = unknown_fn(...)).
     (local.set $i (i32.const 0))
     (block $B (loop $L
       (br_if $B (i32.ge_u (local.get $i) (local.get $nargs)))
@@ -759,7 +809,150 @@
       (local.set $i (i32.add (local.get $i) (i32.const 1)))
       (br $L)
     ))
-    (call $push3 (global.get $TAG_NULL) (i32.const 0) (i32.const 0))
+    (call $push3 (global.get $TAG_FAIL) (i32.const 0) (i32.const 0))
+    (global.set $last_ok (i32.const 0))
+  )
+
+  ;; ── call-frame helpers (user-defined function support, SN4-WASM-5f) ─────
+  ;; Frame layout (32 bytes at $call_sp):
+  ;;   +0  ret_pc          i32
+  ;;   +4  retname_ptr     i32
+  ;;   +8  retname_len     i32
+  ;;   +12 saved_start_off i32   (offset into saved-vars region where this frame's saved entries start)
+  ;;   +16 saved_count     i32   (number of saved entries)
+  ;;   +20 caller_sp       i32   (value-stack pointer saved at call time)
+  ;;   +24..+31 reserved
+  ;; Saved-var entry layout (20 bytes at $sv_top):
+  ;;   +0  name_ptr  i32
+  ;;   +4  name_len  i32
+  ;;   +8  tag       i32
+  ;;   +12 ival      i32
+  ;;   +16 len       i32
+
+  ;; sno_call_frame_push: open a new frame, return its start address (for the emitter helper to populate
+  ;; saved_count after recording bindings). Records ret_pc, retname, current sv_top as saved_start_off,
+  ;; saved_count=0, caller_sp=current sp. Does NOT advance call_sp until sno_call_frame_close.
+  (func $sno_call_frame_push (export "sno_call_frame_push")
+        (param $ret_pc i32) (param $retname_ptr i32) (param $retname_len i32)
+        (result i32)
+    (local $fr i32)
+    (local.set $fr (global.get $call_sp))
+    (i32.store              (local.get $fr)                       (local.get $ret_pc))
+    (i32.store (i32.add     (local.get $fr) (i32.const 4))        (local.get $retname_ptr))
+    (i32.store (i32.add     (local.get $fr) (i32.const 8))        (local.get $retname_len))
+    (i32.store (i32.add     (local.get $fr) (i32.const 12))       (global.get $sv_top))
+    (i32.store (i32.add     (local.get $fr) (i32.const 16))       (i32.const 0))
+    (i32.store (i32.add     (local.get $fr) (i32.const 20))       (global.get $sp))
+    (local.get $fr)
+  )
+
+  ;; sno_call_frame_close: commit the frame (advance call_sp by 32).
+  (func $sno_call_frame_close (export "sno_call_frame_close")
+    (global.set $call_sp (i32.add (global.get $call_sp) (i32.const 32)))
+  )
+
+  ;; sno_save_var: record current binding of (name_ptr,name_len) into saved-vars region;
+  ;; bump $sv_top; increment current frame's saved_count.  $fr is the open frame address.
+  (func $sno_save_var (export "sno_save_var")
+        (param $fr i32) (param $name_ptr i32) (param $name_len i32)
+    (local $svaddr i32) (local $vslot i32) (local $cnt i32)
+    (local.set $svaddr (global.get $sv_top))
+    (local.set $vslot  (call $var_slot_addr (local.get $name_ptr) (local.get $name_len)))
+    (i32.store              (local.get $svaddr)                     (local.get $name_ptr))
+    (i32.store (i32.add     (local.get $svaddr) (i32.const 4))      (local.get $name_len))
+    (i32.store (i32.add     (local.get $svaddr) (i32.const 8))      (i32.load (i32.add (local.get $vslot) (i32.const 8))))
+    (i32.store (i32.add     (local.get $svaddr) (i32.const 12))     (i32.load (i32.add (local.get $vslot) (i32.const 12))))
+    (i32.store (i32.add     (local.get $svaddr) (i32.const 16))     (i32.load (i32.add (local.get $vslot) (i32.const 16))))
+    (global.set $sv_top (i32.add (local.get $svaddr) (i32.const 20)))
+    (local.set $cnt (i32.load (i32.add (local.get $fr) (i32.const 16))))
+    (i32.store (i32.add (local.get $fr) (i32.const 16)) (i32.add (local.get $cnt) (i32.const 1)))
+  )
+
+  ;; sno_clear_var: set var to empty string (tag=STR, ival=0, len=0).
+  (func $sno_clear_var (export "sno_clear_var") (param $name_ptr i32) (param $name_len i32)
+    (local $vslot i32)
+    (local.set $vslot (call $var_slot_addr (local.get $name_ptr) (local.get $name_len)))
+    (i32.store              (local.get $vslot)                     (local.get $name_ptr))
+    (i32.store (i32.add     (local.get $vslot) (i32.const 4))      (local.get $name_len))
+    (i32.store (i32.add     (local.get $vslot) (i32.const 8))      (global.get $TAG_STR))
+    (i32.store (i32.add     (local.get $vslot) (i32.const 12))     (i32.const 0))
+    (i32.store (i32.add     (local.get $vslot) (i32.const 16))     (i32.const 0))
+  )
+
+  ;; sno_set_var_from_tos: pop value stack, store into var (used to bind a formal parameter).
+  (func $sno_set_var_from_tos (export "sno_set_var_from_tos") (param $name_ptr i32) (param $name_len i32)
+    (local $vslot i32) (local $taddr i32)
+    (call $pop_slot)
+    (local.set $vslot (call $var_slot_addr (local.get $name_ptr) (local.get $name_len)))
+    (i32.store              (local.get $vslot)                     (local.get $name_ptr))
+    (i32.store (i32.add     (local.get $vslot) (i32.const 4))      (local.get $name_len))
+    (i32.store (i32.add     (local.get $vslot) (i32.const 8))      (global.get $pop_tag))
+    (i32.store (i32.add     (local.get $vslot) (i32.const 12))     (global.get $pop_ival))
+    (i32.store (i32.add     (local.get $vslot) (i32.const 16))     (global.get $pop_len))
+  )
+
+  ;; sno_pop_to_null: pop value stack discarding the slot (used when there are extra args).
+  (func $sno_pop_to_null (export "sno_pop_to_null")
+    (global.set $sp (i32.sub (global.get $sp) (i32.const 16)))
+  )
+
+  ;; sno_fn_return: pop top frame, restore saved bindings, push retval to value stack, return ret_pc.
+  ;; kind: 0=RETURN (use retname's value), 1=FRETURN (failure), 2=NRETURN (treat as RETURN for now).
+  ;; cond: 0=plain, 1=only if last_ok, 2=only if NOT last_ok.
+  ;; Returns -1 if cond not met (caller falls through), -2 if no frame (halt), else ret_pc.
+  (func $sno_fn_return (export "sno_fn_return") (param $kind i32) (param $cond i32) (result i32)
+    (local $fr i32) (local $ret_pc i32) (local $retname_ptr i32) (local $retname_len i32)
+    (local $sv_start i32) (local $sv_cnt i32) (local $i i32) (local $svaddr i32)
+    (local $vslot i32) (local $r_tag i32) (local $r_ival i32) (local $r_len i32)
+    (if (i32.and (i32.eq (local.get $cond) (i32.const 1)) (i32.eqz (global.get $last_ok)))
+      (then (return (i32.const -1))))
+    (if (i32.and (i32.eq (local.get $cond) (i32.const 2)) (global.get $last_ok))
+      (then (return (i32.const -1))))
+    (if (i32.le_u (global.get $call_sp) (i32.const 0x70000))
+      (then (return (i32.const -2))))
+    (global.set $call_sp (i32.sub (global.get $call_sp) (i32.const 32)))
+    (local.set $fr (global.get $call_sp))
+    (local.set $ret_pc       (i32.load              (local.get $fr)))
+    (local.set $retname_ptr  (i32.load (i32.add     (local.get $fr) (i32.const 4))))
+    (local.set $retname_len  (i32.load (i32.add     (local.get $fr) (i32.const 8))))
+    (local.set $sv_start     (i32.load (i32.add     (local.get $fr) (i32.const 12))))
+    (local.set $sv_cnt       (i32.load (i32.add     (local.get $fr) (i32.const 16))))
+    ;; Read retval BEFORE restoring saved bindings (so we get the callee's value).
+    (if (i32.eq (local.get $kind) (i32.const 1))
+      (then
+        (local.set $r_tag  (global.get $TAG_FAIL))
+        (local.set $r_ival (i32.const 0))
+        (local.set $r_len  (i32.const 0)))
+      (else
+        (local.set $vslot (call $var_slot_addr (local.get $retname_ptr) (local.get $retname_len)))
+        (local.set $r_tag  (i32.load (i32.add (local.get $vslot) (i32.const 8))))
+        (local.set $r_ival (i32.load (i32.add (local.get $vslot) (i32.const 12))))
+        (local.set $r_len  (i32.load (i32.add (local.get $vslot) (i32.const 16))))))
+    ;; Restore saved bindings (reverse order to handle duplicates correctly).
+    (local.set $i (local.get $sv_cnt))
+    (block $B (loop $L
+      (br_if $B (i32.eqz (local.get $i)))
+      (local.set $i (i32.sub (local.get $i) (i32.const 1)))
+      (local.set $svaddr (i32.add (local.get $sv_start) (i32.mul (local.get $i) (i32.const 20))))
+      (local.set $vslot (call $var_slot_addr
+        (i32.load              (local.get $svaddr))
+        (i32.load (i32.add     (local.get $svaddr) (i32.const 4)))))
+      (i32.store              (local.get $vslot)                 (i32.load              (local.get $svaddr)))
+      (i32.store (i32.add     (local.get $vslot) (i32.const 4))  (i32.load (i32.add     (local.get $svaddr) (i32.const 4))))
+      (i32.store (i32.add     (local.get $vslot) (i32.const 8))  (i32.load (i32.add     (local.get $svaddr) (i32.const 8))))
+      (i32.store (i32.add     (local.get $vslot) (i32.const 12)) (i32.load (i32.add     (local.get $svaddr) (i32.const 12))))
+      (i32.store (i32.add     (local.get $vslot) (i32.const 16)) (i32.load (i32.add     (local.get $svaddr) (i32.const 16))))
+      (br $L)
+    ))
+    ;; Reclaim saved-vars space.
+    (global.set $sv_top (local.get $sv_start))
+    ;; Push retval onto value stack.
+    (if (i32.eq (local.get $kind) (i32.const 1))
+      (then (call $push3 (global.get $TAG_FAIL) (i32.const 0) (i32.const 0))
+            (global.set $last_ok (i32.const 0)))
+      (else (call $push3 (local.get $r_tag) (local.get $r_ival) (local.get $r_len))
+            (global.set $last_ok (i32.const 1))))
+    (local.get $ret_pc)
   )
 
   (func $sno_do_return (export "sno_do_return") (param $kind i32) (param $cond i32))
