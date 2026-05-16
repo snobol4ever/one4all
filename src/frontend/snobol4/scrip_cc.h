@@ -93,6 +93,34 @@ tree_t       *code_to_ast(const CODE_t *prog);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 tree_t       *stmt_attr_find(const tree_t *stmt, const char *tag);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PST-SN4-1c: find a TT_GOTO_S/F/U child of a TT_STMT node by kind */
+static inline tree_t *stmt_goto_find(const tree_t *stmt, tree_e kind)
+{
+    for (int i = 0; i < stmt->n; i++) {
+        tree_t *ch = stmt->c[i];
+        if (ch && ch->t == kind) return ch;
+    }
+    return NULL;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PST-SN4-1c: extract label string from a TT_GOTO_* node (NULL if computed/absent) */
+static inline const char *goto_node_str(const tree_t *gnode)
+{
+    if (!gnode || gnode->n == 0) return NULL;
+    tree_t *ch = gnode->c[0];
+    if (ch && ch->t == TT_QLIT) return ch->v.sval;
+    return NULL;  /* computed goto — expression child */
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PST-SN4-1c: extract expression from a TT_GOTO_* node (NULL if literal label) */
+static inline tree_t *goto_node_expr(const tree_t *gnode)
+{
+    if (!gnode || gnode->n == 0) return NULL;
+    tree_t *ch = gnode->c[0];
+    if (ch && ch->t != TT_QLIT) return ch;
+    return NULL;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 tree_t       *stmt_attr_expr(const tree_t *attr);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 const char  *stmt_attr_str(const tree_t *attr);

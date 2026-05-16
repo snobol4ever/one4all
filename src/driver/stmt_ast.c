@@ -52,11 +52,23 @@ tree_t *ast_attr_expr(const char *tag, tree_t *expr)
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static tree_t *attr_expr(const char *tag, tree_t *e) { return ast_attr_expr(tag, e); }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static tree_t *make_goto_attr(const char *tag, const char *label, tree_t *expr)
+/* PST-SN4-1c (2026-05-16): goto fields now emitted as TT_GOTO_S/TT_GOTO_F/TT_GOTO_U
+ * children of TT_STMT instead of TT_ATTR(":goS"/":goF"/":go") nodes.
+ * A literal-label goto gets a TT_QLIT child (v.sval = label string).
+ * A computed-goto gets the expression tree as its child directly.
+ * Consumers use stmt_goto_find(s, TT_GOTO_S/F/U) instead of stmt_attr_find(s, ":goS"). */
+static tree_t *make_goto_node(tree_e kind, const char *label, tree_t *expr)
 {
-    if (expr)                   return attr_expr(tag, expr);
-    if (label && label[0])      return attr_leaf(tag, label);
-    return NULL;
+    if (!expr && !(label && label[0])) return NULL;
+    tree_t *node = sa_new(kind);
+    if (expr) {
+        sa_add(node, expr);
+    } else {
+        tree_t *lit = sa_new(TT_QLIT);
+        lit->v.sval = strdup(label);
+        sa_add(node, lit);
+    }
+    return node;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 tree_t *stmt_to_ast(const STMT_t *s)
@@ -90,9 +102,9 @@ tree_t *stmt_to_ast(const STMT_t *s)
             sa_add(node, attr_expr(":repl", empty));
         }
     }
-    sa_add(node, make_goto_attr(":goS", s->goto_s, s->goto_s_expr));
-    sa_add(node, make_goto_attr(":goF", s->goto_f, s->goto_f_expr));
-    sa_add(node, make_goto_attr(":go",  s->goto_u, s->goto_u_expr));
+    sa_add(node, make_goto_node(TT_GOTO_S, s->goto_s, s->goto_s_expr));
+    sa_add(node, make_goto_node(TT_GOTO_F, s->goto_f, s->goto_f_expr));
+    sa_add(node, make_goto_node(TT_GOTO_U, s->goto_u, s->goto_u_expr));
     return node;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/

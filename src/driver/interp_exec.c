@@ -64,15 +64,16 @@ void execute_program(const tree_t *prog)
         s_subject = s_expr(s, ":subj");
         s_pattern = s_expr(s, ":pat");
         s_repl    = s_expr(s, ":repl");
-        go_s_attr = stmt_attr_find(s, ":goS");
-        go_f_attr = stmt_attr_find(s, ":goF");
-        go_u_attr = stmt_attr_find(s, ":go");
-        goto_s      = go_s_attr ? stmt_attr_str(go_s_attr)  : NULL;
-        goto_f      = go_f_attr ? stmt_attr_str(go_f_attr)  : NULL;
-        goto_u      = go_u_attr ? stmt_attr_str(go_u_attr)  : NULL;
-        goto_s_expr = (go_s_attr && !goto_s) ? stmt_attr_expr(go_s_attr) : NULL;
-        goto_f_expr = (go_f_attr && !goto_f) ? stmt_attr_expr(go_f_attr) : NULL;
-        goto_u_expr = (go_u_attr && !goto_u) ? stmt_attr_expr(go_u_attr) : NULL;
+        /* PST-SN4-1c: TT_GOTO_S/F/U children */
+        go_s_attr   = stmt_goto_find(s, TT_GOTO_S);
+        go_f_attr   = stmt_goto_find(s, TT_GOTO_F);
+        go_u_attr   = stmt_goto_find(s, TT_GOTO_U);
+        goto_s      = goto_node_str(go_s_attr);
+        goto_f      = goto_node_str(go_f_attr);
+        goto_u      = goto_node_str(go_u_attr);
+        goto_s_expr = goto_node_expr(go_s_attr);
+        goto_f_expr = goto_node_expr(go_f_attr);
+        goto_u_expr = goto_node_expr(go_u_attr);
         if (!s_label && !s_subject && !s_pattern && !s_repl &&
             !goto_u && !goto_u_expr && !goto_s && !goto_s_expr && !goto_f && !goto_f_expr) {
             stno = s_int(s, ":stno");

@@ -346,9 +346,10 @@ const char *exec_code(DESCR_t code_block)
         tree_t *subject     = stmt_attr_expr(stmt_attr_find(s, ":subj"));
         tree_t *pattern     = stmt_attr_expr(stmt_attr_find(s, ":pat"));
         tree_t *replacement = stmt_attr_expr(stmt_attr_find(s, ":repl"));
-        const char *goto_u = stmt_attr_str(stmt_attr_find(s, ":go"));
-        const char *goto_s = stmt_attr_str(stmt_attr_find(s, ":goS"));
-        const char *goto_f = stmt_attr_str(stmt_attr_find(s, ":goF"));
+        /* PST-SN4-1c: TT_GOTO_S/F/U children */
+        const char *goto_u = goto_node_str(stmt_goto_find(s, TT_GOTO_U));
+        const char *goto_s = goto_node_str(stmt_goto_find(s, TT_GOTO_S));
+        const char *goto_f = goto_node_str(stmt_goto_find(s, TT_GOTO_F));
         DESCR_t subj_val = NULVCL;
         const char *subj_name = NULL;
         if (subject) {

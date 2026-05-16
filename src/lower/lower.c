@@ -964,15 +964,16 @@ void lower_stmt(const tree_t *s)
     tree_t      *pattern = attr_expr_of(s, ":pat");
     int         has_eq  = (stmt_attr_find(s, ":eq") != NULL);
     tree_t      *replacement = attr_expr_of(s, ":repl");
-    tree_t      *go_s_attr = stmt_attr_find(s, ":goS");
-    tree_t      *go_f_attr = stmt_attr_find(s, ":goF");
-    tree_t      *go_u_attr = stmt_attr_find(s, ":go");
-    const char *goto_s      = go_s_attr ? stmt_attr_str(go_s_attr)  : NULL;
-    const char *goto_f      = go_f_attr ? stmt_attr_str(go_f_attr)  : NULL;
-    const char *goto_u      = go_u_attr ? stmt_attr_str(go_u_attr)  : NULL;
-    tree_t      *goto_s_expr = go_s_attr ? stmt_attr_expr(go_s_attr) : NULL;
-    tree_t      *goto_f_expr = go_f_attr ? stmt_attr_expr(go_f_attr) : NULL;
-    tree_t      *goto_u_expr = go_u_attr ? stmt_attr_expr(go_u_attr) : NULL;
+    /* PST-SN4-1c: gotos are now TT_GOTO_S/F/U children, not TT_ATTR(":goS"...) */
+    tree_t      *go_s_attr   = stmt_goto_find(s, TT_GOTO_S);
+    tree_t      *go_f_attr   = stmt_goto_find(s, TT_GOTO_F);
+    tree_t      *go_u_attr   = stmt_goto_find(s, TT_GOTO_U);
+    const char *goto_s       = goto_node_str(go_s_attr);
+    const char *goto_f       = goto_node_str(go_f_attr);
+    const char *goto_u       = goto_node_str(go_u_attr);
+    tree_t      *goto_s_expr = goto_node_expr(go_s_attr);
+    tree_t      *goto_f_expr = goto_node_expr(go_f_attr);
+    tree_t      *goto_u_expr = goto_node_expr(go_u_attr);
     if ((!label || !label[0])
             && !subject && !pattern && !has_eq
             && !goto_u && !goto_u_expr

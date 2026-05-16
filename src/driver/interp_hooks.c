@@ -184,9 +184,10 @@ void ir_dump_program(const tree_t *prog, FILE *f) {
         if (subj) { fprintf(f, " :subj "); ir_print_node(subj, f); }
         if (pat)  { fprintf(f, " :pat ");  ir_print_node(pat, f);  }
         if (repl) { fprintf(f, " :repl "); ir_print_node(repl, f); }
-        const char *go  = stmt_attr_str(stmt_attr_find(s, ":go"));
-        const char *goS = stmt_attr_str(stmt_attr_find(s, ":goS"));
-        const char *goF = stmt_attr_str(stmt_attr_find(s, ":goF"));
+        /* PST-SN4-1c: TT_GOTO_S/F/U children */
+        const char *go  = goto_node_str(stmt_goto_find(s, TT_GOTO_U));
+        const char *goS = goto_node_str(stmt_goto_find(s, TT_GOTO_S));
+        const char *goF = goto_node_str(stmt_goto_find(s, TT_GOTO_F));
         if (go)  fprintf(f, " :go %s",  go);
         if (goS) fprintf(f, " :goS %s", goS);
         if (goF) fprintf(f, " :goF %s", goF);
