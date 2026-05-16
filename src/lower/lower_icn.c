@@ -275,6 +275,68 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         nd->n    = nargs;
         return nd;
     }
+    case TT_IF: {
+        /* if cond then E1 else E2.  c[0]=cond, c[1]=then (optional), c[2]=else (optional).                                                                                                                 */
+        if (e->n < 1 || !e->c[0]) return NULL;
+        IR_t *cond = lower_icn_expr_node(cfg, e->c[0]);
+        if (!cond) return NULL;
+        IR_t *then_nd = NULL;
+        IR_t *else_nd = NULL;
+        if (e->n >= 2 && e->c[1]) {
+            then_nd = lower_icn_expr_node(cfg, e->c[1]);
+            if (!then_nd) return NULL;
+        }
+        if (e->n >= 3 && e->c[2]) {
+            else_nd = lower_icn_expr_node(cfg, e->c[2]);
+            if (!else_nd) return NULL;
+        }
+        IR_t *nd = IR_node_alloc(cfg, IR_IF);
+        if (!nd) return NULL;
+        int nc = else_nd ? 3 : (then_nd ? 2 : 1);
+        nd->c = calloc((size_t)nc, sizeof(IR_t *));
+        if (!nd->c) return NULL;
+        nd->c[0] = cond;
+        if (nc >= 2) nd->c[1] = then_nd;
+        if (nc >= 3) nd->c[2] = else_nd;
+        nd->n = nc;
+        return nd;
+    }
+    case TT_TO: {
+        /* Icon `lo to hi` generator.  Emit IR_ICN_TO using literal int bounds when both operands are TT_ILIT.                                                                                              */
+        /* For non-literal bounds, fall back to NULL — covered by future work or icn_bb_build path.                                                                                                         */
+        if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
+        if (e->c[0]->t != TT_ILIT || e->c[1]->t != TT_ILIT) return NULL;
+        int64_t lo = e->c[0]->v.ival;
+        int64_t hi = e->c[1]->v.ival;
+        IR_t *nd = IR_node_alloc(cfg, IR_ICN_TO);
+        if (!nd) return NULL;
+        nd->ival    = lo;
+        nd->ival2   = hi;
+        nd->counter = lo;
+        nd->state   = 0;
+        return nd;
+    }
+    case TT_EVERY: {
+        /* every E [do B].  c[0]=generator expr (required), c[1]=body (optional).                                                                                                                            */
+        /* Statement consumer: IR_EVERY drives c[0] to exhaustion in a single outer IR_exec_node call.                                                                                                       */
+        if (e->n < 1 || !e->c[0]) return NULL;
+        IR_t *gen = lower_icn_expr_node(cfg, e->c[0]);
+        if (!gen) return NULL;
+        IR_t *body = NULL;
+        if (e->n >= 2 && e->c[1]) {
+            body = lower_icn_expr_node(cfg, e->c[1]);
+            if (!body) return NULL;
+        }
+        IR_t *nd = IR_node_alloc(cfg, IR_EVERY);
+        if (!nd) return NULL;
+        int nc = body ? 2 : 1;
+        nd->c = calloc((size_t)nc, sizeof(IR_t *));
+        if (!nd->c) return NULL;
+        nd->c[0] = gen;
+        if (body) nd->c[1] = body;
+        nd->n = nc;
+        return nd;
+    }
     case TT_ADD: case TT_SUB: case TT_MUL: case TT_DIV: case TT_MOD:
     case TT_LT:  case TT_LE:  case TT_GT:  case TT_GE:  case TT_EQ:  case TT_NE:
     case TT_CAT: {

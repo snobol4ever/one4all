@@ -38,6 +38,7 @@ typedef enum {
     IR_SUCCEED,
     IR_GOTO,
     IR_RETURN,
+    IR_IF,
     IR_ALTERNATE,
     IR_TO_BY,
     IR_EVERY,

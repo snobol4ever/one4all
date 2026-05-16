@@ -130,6 +130,40 @@ IR_t * IR_exec_node(IR_t * nd) {
     case IR_FAIL:
         nd->value = FAILDESCR;
         return nd->ω;
+    case IR_IF: {
+        /* Icon if/then/else.  c[0]=cond, c[1]=then, c[2]=else (optional).                                                                                                                                  */
+        /* Cond succeeds if it produces any non-FAIL value.  Then-branch evaluated on success; else-branch on failure.                                                                                      */
+        if (nd->n < 1 || !nd->c[0]) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[0]);
+        DESCR_t cv = nd->c[0]->value;
+        if (!IS_FAIL_fn(cv)) {
+            if (nd->n >= 2 && nd->c[1]) { IR_exec_node(nd->c[1]); nd->value = nd->c[1]->value; }
+            else nd->value = NULVCL;
+            return nd->γ;
+        }
+        if (nd->n >= 3 && nd->c[2]) {
+            IR_exec_node(nd->c[2]);
+            nd->value = nd->c[2]->value;
+            return nd->γ;
+        }
+        nd->value = FAILDESCR;
+        return nd->ω;
+    }
+    case IR_EVERY: {
+        /* Icon every E [do B].  c[0]=generator expr (mandatory), c[1]=optional body.                                                                                                                       */
+        /* Statement consumer: drive c[0] to exhaustion within ONE outer IR_exec_node call.  c[0]'s state (counter, etc.) persists across the inner IR_exec_node calls because IR_reset is not invoked.   */
+        /* every-loop in statement context always "succeeds" with &null after exhaustion — never propagates the generator's final FAIL upward.                                                              */
+        if (nd->n < 1 || !nd->c[0]) { nd->value = NULVCL; return nd->γ; }
+        int safety = 1000000;
+        while (safety-- > 0) {
+            IR_exec_node(nd->c[0]);
+            DESCR_t v = nd->c[0]->value;
+            if (IS_FAIL_fn(v)) break;
+            if (nd->n >= 2 && nd->c[1]) IR_exec_node(nd->c[1]);
+        }
+        nd->value = NULVCL;
+        return nd->γ;
+    }
     case IR_TO_BY: {
         if (nd->state == 0) {
             int64_t from = 0, by = 1;
