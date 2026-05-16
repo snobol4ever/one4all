@@ -684,8 +684,10 @@ int emit_wasm_from_sm(SM_Program * sm, FILE * out) {
             break;
         /* Pattern matching opcodes (SN4-WASM-5g) */
         case SM_PAT_LIT: {
-            int addr = intern_str(ins->a[0].s ? ins->a[0].s : "");
-            fprintf(out, "          (call $sno_pat_lit (i32.const 0x%x) (i32.const %lld))\n", addr, (long long)ins->a[1].i);
+            const char *s = ins->a[0].s ? ins->a[0].s : "";
+            int addr = intern_str(s);
+            int len = strlen(s);
+            fprintf(out, "          (call $sno_pat_lit (i32.const 0x%x) (i32.const %d))\n", addr, len);
             break;
         }
         case SM_PAT_ANY:
