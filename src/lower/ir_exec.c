@@ -144,6 +144,76 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->value = result;
         return nd->γ;
     }
+    case IR_BINOP_GEN: {
+        /* Generator-aware binop. Yields cross-product when c[0] or c[1] is a generator.            */
+        /* If only one operand is a generator (e.g. const > (1 to 3)), single-shot the const side.  */
+        /* state==0: fresh — seed both sides. state==1: advance.                                    */
+        if (nd->n < 2 || !nd->c[0] || !nd->c[1]) { nd->value = FAILDESCR; return nd->ω; }
+        /* Inline gen-kind check — must match the set of IR kinds that act as restartable generators. */
+        #define IR_IS_GEN_KIND(k) ( \
+            (k) == IR_ICN_TO || (k) == IR_ICN_TO_BY || (k) == IR_ICN_UPTO || \
+            (k) == IR_ALT || (k) == IR_ALTERNATE || (k) == IR_BINOP_GEN || \
+            (k) == IR_ICN_ITERATE || (k) == IR_ICN_LIMIT || (k) == IR_ICN_PROC_GEN || \
+            (k) == IR_TO_BY)
+        int l_gen = IR_IS_GEN_KIND(nd->c[0]->t);
+        int r_gen = IR_IS_GEN_KIND(nd->c[1]->t);
+        if (nd->state == 0) {
+            nd->c[0]->state = 0;
+            nd->c[1]->state = 0;
+            IR_exec_node(nd->c[0]);
+            if (IS_FAIL_fn(nd->c[0]->value)) { nd->value = FAILDESCR; return nd->ω; }
+            IR_exec_node(nd->c[1]);
+            if (IS_FAIL_fn(nd->c[1]->value)) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+            nd->state = 1;
+        } else {
+            /* β: advance — try inner generator first. If only one side is a generator, the other is */
+            /* single-shot and we exhaust after one pair (relop-driven exception handled in loop).   */
+            if (r_gen) {
+                IR_exec_node(nd->c[1]);
+                if (IS_FAIL_fn(nd->c[1]->value)) {
+                    if (!l_gen) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+                    IR_exec_node(nd->c[0]);
+                    if (IS_FAIL_fn(nd->c[0]->value)) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+                    nd->c[1]->state = 0;
+                    IR_exec_node(nd->c[1]);
+                    if (IS_FAIL_fn(nd->c[1]->value)) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+                }
+            } else if (l_gen) {
+                /* Only left is a generator: advance left, keep right value (right is single-shot). */
+                IR_exec_node(nd->c[0]);
+                if (IS_FAIL_fn(nd->c[0]->value)) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+            } else {
+                /* Neither side a generator — single-shot, already returned the pair, exhaust now. */
+                nd->state = 0; nd->value = FAILDESCR; return nd->ω;
+            }
+        }
+        /* Now have a (lv, rv) pair. Apply the op; on rel_fail, advance and retry. */
+        for (;;) {
+            int rel_fail = 0;
+            DESCR_t result = icn_binop_apply((IcnBinopKind)nd->ival, nd->c[0]->value, nd->c[1]->value, &rel_fail);
+            if (!IS_FAIL_fn(result)) { nd->value = result; return nd->γ; }
+            if (!rel_fail) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+            /* relop failed: try next pair (advance generator side(s)). */
+            if (r_gen) {
+                IR_exec_node(nd->c[1]);
+                if (IS_FAIL_fn(nd->c[1]->value)) {
+                    if (!l_gen) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+                    IR_exec_node(nd->c[0]);
+                    if (IS_FAIL_fn(nd->c[0]->value)) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+                    nd->c[1]->state = 0;
+                    IR_exec_node(nd->c[1]);
+                    if (IS_FAIL_fn(nd->c[1]->value)) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+                }
+            } else if (l_gen) {
+                IR_exec_node(nd->c[0]);
+                if (IS_FAIL_fn(nd->c[0]->value)) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+            } else {
+                /* Neither side a generator, relop failed → exhaust. */
+                nd->state = 0; nd->value = FAILDESCR; return nd->ω;
+            }
+        }
+        #undef IR_IS_GEN_KIND
+    }
     case IR_LIT_F:
         nd->value = REALVAL(nd->dval);
         return nd->γ;

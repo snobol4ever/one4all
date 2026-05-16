@@ -7,6 +7,8 @@
 #include <string.h>
 #include <stdlib.h>
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+extern int is_suspendable(tree_t *e);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 IR_block_t *lower_icn_upto(const char *cset, const char *hay) {
     if (!cset || !hay) return NULL;
     IR_block_t *cfg = IR_alloc(4, IR_LANG_ICN);
@@ -448,13 +450,15 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     case TT_ADD: case TT_SUB: case TT_MUL: case TT_DIV: case TT_MOD:
     case TT_LT:  case TT_LE:  case TT_GT:  case TT_GE:  case TT_EQ:  case TT_NE:
     case TT_CAT: {
-        /* Plain (non-generator) arithmetic / relop / concat. Lower both operands; emit IR_BINOP.   */
+        /* Plain or generator-aware binop. If either operand is suspendable (a generator), emit       */
+        /* IR_BINOP_GEN which yields the full cross-product; else emit IR_BINOP (single-shot).        */
         if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
         IR_t *lhs = lower_icn_expr_node(cfg, e->c[0]);
         if (!lhs) return NULL;
         IR_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
         if (!rhs) return NULL;
-        IR_t *nd = IR_node_alloc(cfg, IR_BINOP);
+        int is_gen = is_suspendable(e->c[0]) || is_suspendable(e->c[1]);
+        IR_t *nd = IR_node_alloc(cfg, is_gen ? IR_BINOP_GEN : IR_BINOP);
         if (!nd) return NULL;
         nd->c = calloc(2, sizeof(IR_t *));
         if (!nd->c) return NULL;
