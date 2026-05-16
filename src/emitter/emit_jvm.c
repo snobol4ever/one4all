@@ -842,12 +842,220 @@ static int emit_jvm_from_sm(SM_Program * sm, FILE * out) {
         case SM_DEFINE:
             /* no-op: function entries are handled by SM_LABEL with define_entry=1 */
             break;
-        case SM_EXEC_STMT:
-            /* stub: pattern statement execution not yet implemented */
-            fprintf(out, "    ; [SM_EXEC_STMT stub — pattern matching pending]\n");
-            fprintf(out, "    iconst_0\n");
-            fprintf(out, "    invokestatic rt/SnoRt/set_last_ok(Z)V\n");
+        case SM_PAT_LIT:
+            jvm_emit_ldc_string(out, instr->a[0].s ? instr->a[0].s : "");
+            fprintf(out, "    invokestatic rt/SnoPat/lit(Ljava/lang/String;)Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
             break;
+        case SM_PAT_ANY:
+            /* pop string arg → push SnoPat.any(str) */
+            fprintf(out, "    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;\n");
+            fprintf(out, "    dup\n    ifnonnull pat_any_nn_%d\n    pop\n    ldc \"\"\n    goto pat_any_done_%d\n", i, i);
+            fprintf(out, "pat_any_nn_%d:\n    invokevirtual java/lang/Object/toString()Ljava/lang/String;\n", i);
+            fprintf(out, "pat_any_done_%d:\n    invokestatic rt/SnoPat/any(Ljava/lang/String;)Lrt/SnoPat;\n", i);
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        case SM_PAT_NOTANY:
+            fprintf(out, "    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;\n");
+            fprintf(out, "    dup\n    ifnonnull pat_nany_nn_%d\n    pop\n    ldc \"\"\n    goto pat_nany_done_%d\n", i, i);
+            fprintf(out, "pat_nany_nn_%d:\n    invokevirtual java/lang/Object/toString()Ljava/lang/String;\n", i);
+            fprintf(out, "pat_nany_done_%d:\n    invokestatic rt/SnoPat/notany(Ljava/lang/String;)Lrt/SnoPat;\n", i);
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        case SM_PAT_SPAN:
+            fprintf(out, "    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;\n");
+            fprintf(out, "    dup\n    ifnonnull pat_span_nn_%d\n    pop\n    ldc \"\"\n    goto pat_span_done_%d\n", i, i);
+            fprintf(out, "pat_span_nn_%d:\n    invokevirtual java/lang/Object/toString()Ljava/lang/String;\n", i);
+            fprintf(out, "pat_span_done_%d:\n    invokestatic rt/SnoPat/span(Ljava/lang/String;)Lrt/SnoPat;\n", i);
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        case SM_PAT_BREAK:
+            fprintf(out, "    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;\n");
+            fprintf(out, "    dup\n    ifnonnull pat_brk_nn_%d\n    pop\n    ldc \"\"\n    goto pat_brk_done_%d\n", i, i);
+            fprintf(out, "pat_brk_nn_%d:\n    invokevirtual java/lang/Object/toString()Ljava/lang/String;\n", i);
+            fprintf(out, "pat_brk_done_%d:\n    invokestatic rt/SnoPat/brk(Ljava/lang/String;)Lrt/SnoPat;\n", i);
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        case SM_PAT_LEN:
+            fprintf(out, "    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/coerce_to_long(Ljava/lang/Object;)J\n");
+            fprintf(out, "    invokestatic rt/SnoPat/len(J)Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        case SM_PAT_POS:
+            fprintf(out, "    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/coerce_to_long(Ljava/lang/Object;)J\n");
+            fprintf(out, "    invokestatic rt/SnoPat/pos(J)Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        case SM_PAT_RPOS:
+            fprintf(out, "    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/coerce_to_long(Ljava/lang/Object;)J\n");
+            fprintf(out, "    invokestatic rt/SnoPat/rpos(J)Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        case SM_PAT_TAB:
+            fprintf(out, "    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/coerce_to_long(Ljava/lang/Object;)J\n");
+            fprintf(out, "    invokestatic rt/SnoPat/tab(J)Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        case SM_PAT_RTAB:
+            fprintf(out, "    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/coerce_to_long(Ljava/lang/Object;)J\n");
+            fprintf(out, "    invokestatic rt/SnoPat/rtab(J)Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        case SM_PAT_ARB:
+            fprintf(out, "    invokestatic rt/SnoPat/arb()Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        case SM_PAT_ARBNO:
+            fprintf(out, "    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/coerce_to_pat(Ljava/lang/Object;)Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoPat/arbno(Lrt/SnoPat;)Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        case SM_PAT_REM:
+            fprintf(out, "    invokestatic rt/SnoPat/rem()Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        case SM_PAT_BAL:
+            fprintf(out, "    invokestatic rt/SnoPat/bal()Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        case SM_PAT_FENCE0:
+            fprintf(out, "    invokestatic rt/SnoPat/fence0()Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        case SM_PAT_FENCE1:
+            fprintf(out, "    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/coerce_to_pat(Ljava/lang/Object;)Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoPat/fence1(Lrt/SnoPat;)Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        case SM_PAT_ABORT:
+            fprintf(out, "    invokestatic rt/SnoPat/abort_()Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        case SM_PAT_FAIL:
+            fprintf(out, "    invokestatic rt/SnoPat/fail_()Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        case SM_PAT_SUCCEED:
+            fprintf(out, "    invokestatic rt/SnoPat/succeed_()Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        case SM_PAT_EPS:
+            fprintf(out, "    invokestatic rt/SnoPat/eps()Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        case SM_PAT_CAT:
+            /* pop right, pop left, push cat(left,right) */
+            fprintf(out, "    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/coerce_to_pat(Ljava/lang/Object;)Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/coerce_to_pat(Ljava/lang/Object;)Lrt/SnoPat;\n");
+            fprintf(out, "    swap\n");
+            fprintf(out, "    invokestatic rt/SnoPat/cat(Lrt/SnoPat;Lrt/SnoPat;)Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        case SM_PAT_ALT:
+            fprintf(out, "    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/coerce_to_pat(Ljava/lang/Object;)Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/coerce_to_pat(Ljava/lang/Object;)Lrt/SnoPat;\n");
+            fprintf(out, "    swap\n");
+            fprintf(out, "    invokestatic rt/SnoPat/alt(Lrt/SnoPat;Lrt/SnoPat;)Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        case SM_PAT_DEREF:
+            fprintf(out, "    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;\n");
+            fprintf(out, "    invokestatic rt/SnoPat/deref(Ljava/lang/Object;)Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        case SM_PAT_REFNAME:
+            jvm_emit_ldc_string(out, instr->a[0].s ? instr->a[0].s : "");
+            fprintf(out, "    invokestatic rt/SnoPat/refname(Ljava/lang/String;)Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        case SM_PAT_CAPTURE: {
+            int kind = (int)instr->a[1].i;
+            fprintf(out, "    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/coerce_to_pat(Ljava/lang/Object;)Lrt/SnoPat;\n");
+            jvm_emit_ldc_string(out, instr->a[0].s ? instr->a[0].s : "");
+            jvm_push_int2(out, kind);
+            fprintf(out, "    invokestatic rt/SnoPat/capture(Lrt/SnoPat;Ljava/lang/String;I)Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        }
+        case SM_PAT_CAPTURE_FN: {
+            const char * fname    = instr->a[0].s ? instr->a[0].s : "";
+            const char * namelist = instr->a[2].s ? instr->a[2].s : "";
+            fprintf(out, "    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/coerce_to_pat(Ljava/lang/Object;)Lrt/SnoPat;\n");
+            jvm_emit_ldc_string(out, fname);
+            jvm_emit_ldc_string(out, namelist);
+            fprintf(out, "    invokestatic rt/SnoPat/captureFn(Lrt/SnoPat;Ljava/lang/String;Ljava/lang/String;)Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        }
+        case SM_PAT_CAPTURE_FN_ARGS: {
+            const char * fname = instr->a[0].s ? instr->a[0].s : "";
+            int nargs = (int)instr->a[2].i;
+            /* Build args[] from value-stack (nargs args, last-pushed = arg[nargs-1]). */
+            fprintf(out, "    bipush %d\n", nargs);
+            fprintf(out, "    anewarray java/lang/Object\n");
+            for (int k = nargs - 1; k >= 0; k--) {
+                fprintf(out, "    dup\n");
+                fprintf(out, "    bipush %d\n", k);
+                fprintf(out, "    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;\n");
+                fprintf(out, "    aastore\n");
+            }
+            /* JVM stack: [array]. Pop child from value-stack and coerce. */
+            fprintf(out, "    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/coerce_to_pat(Ljava/lang/Object;)Lrt/SnoPat;\n");
+            /* JVM stack: [array, child_pat]. Need (child_pat, fname, array) on stack for captureFnArgs. */
+            fprintf(out, "    swap\n");
+            jvm_emit_ldc_string(out, fname);
+            fprintf(out, "    swap\n");
+            fprintf(out, "    invokestatic rt/SnoPat/captureFnArgs(Lrt/SnoPat;Ljava/lang/String;[Ljava/lang/Object;)Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        }
+        case SM_PAT_USERCALL: {
+            const char * fname = instr->a[0].s ? instr->a[0].s : "";
+            jvm_emit_ldc_string(out, fname);
+            fprintf(out, "    invokestatic rt/SnoPat/usercall(Ljava/lang/String;)Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        }
+        case SM_PAT_USERCALL_ARGS: {
+            const char * fname = instr->a[0].s ? instr->a[0].s : "";
+            int nargs = (int)instr->a[1].i;
+            fprintf(out, "    bipush %d\n", nargs);
+            fprintf(out, "    anewarray java/lang/Object\n");
+            for (int k = nargs - 1; k >= 0; k--) {
+                fprintf(out, "    dup\n");
+                fprintf(out, "    bipush %d\n", k);
+                fprintf(out, "    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;\n");
+                fprintf(out, "    aastore\n");
+            }
+            /* JVM stack: [array]. usercallArgs(fname, array): want (fname, array). */
+            jvm_emit_ldc_string(out, fname);
+            fprintf(out, "    swap\n");
+            fprintf(out, "    invokestatic rt/SnoPat/usercallArgs(Ljava/lang/String;[Ljava/lang/Object;)Lrt/SnoPat;\n");
+            fprintf(out, "    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n");
+            break;
+        }
+        case SM_EXEC_STMT: {
+            const char * sname = instr->a[0].s ? instr->a[0].s : "";
+            int has_repl = (int)instr->a[1].i;
+            jvm_emit_ldc_string(out, sname);
+            jvm_push_int2(out, has_repl);
+            fprintf(out, "    invokestatic rt/SnoRt/sno_exec_stmt(Ljava/lang/String;I)V\n");
+            break;
+        }
         case SM_HALT:
             fprintf(out, "    invokestatic rt/SnoRt/halt_tos()V\n");
             fprintf(out, "    goto_w sm_pc_end\n");

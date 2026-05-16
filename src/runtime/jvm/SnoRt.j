@@ -80,7 +80,7 @@
 
 ; ── vstack helpers ─────────────────────────────────────────────────────────────
 ; push an Object onto TOS
-.method private static push_obj(Ljava/lang/Object;)V
+.method public static push_obj(Ljava/lang/Object;)V
     .limit stack 3
     .limit locals 1
     getstatic rt/SnoRt/vstack Ljava/util/ArrayDeque;
@@ -90,7 +90,7 @@
 .end method
 
 ; pop an Object from TOS (returns null if empty)
-.method private static pop_obj()Ljava/lang/Object;
+.method public static pop_obj()Ljava/lang/Object;
     .limit stack 2
     .limit locals 1
     getstatic rt/SnoRt/vstack Ljava/util/ArrayDeque;
@@ -1511,8 +1511,281 @@ dt_not_long:
     invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V
     return
 dt_not_double:
+    aload_0
+    instanceof rt/SnoPat
+    ifeq dt_not_pat
+    ldc "PATTERN"
+    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V
+    return
+dt_not_pat:
     ldc "STRING"
     invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V
+    return
+.end method
+
+; ── Bridges for SnoPat (Java pattern matcher) ──────────────────────────────
+
+; coerce_to_long — pop_obj already done by caller; here just convert Object→long.
+.method public static coerce_to_long(Ljava/lang/Object;)J
+    .limit stack 4
+    .limit locals 2
+    aload_0
+    ifnonnull ctl_nn
+    lconst_0
+    lreturn
+ctl_nn:
+    aload_0
+    instanceof java/lang/Long
+    ifeq ctl_not_long
+    aload_0
+    checkcast java/lang/Long
+    invokevirtual java/lang/Long/longValue()J
+    lreturn
+ctl_not_long:
+    aload_0
+    instanceof java/lang/Double
+    ifeq ctl_not_double
+    aload_0
+    checkcast java/lang/Double
+    invokevirtual java/lang/Double/doubleValue()D
+    d2l
+    lreturn
+ctl_not_double:
+    aload_0
+    invokevirtual java/lang/Object/toString()Ljava/lang/String;
+    invokestatic rt/SnoRt/try_parse_long_for_pat(Ljava/lang/String;)J
+    lreturn
+.end method
+
+; try_parse_long_for_pat — try Long.parseLong, default 0 on failure.
+.method private static try_parse_long_for_pat(Ljava/lang/String;)J
+    .limit stack 2
+    .limit locals 2
+    .catch java/lang/NumberFormatException from tplfp_try to tplfp_done using tplfp_fail
+tplfp_try:
+    aload_0
+    invokestatic java/lang/Long/parseLong(Ljava/lang/String;)J
+    lreturn
+tplfp_fail:
+    pop
+    lconst_0
+    lreturn
+tplfp_done:
+    lconst_0
+    lreturn
+.end method
+
+; coerce_to_pat — Object → SnoPat. If already a SnoPat, return it; if a String/other, wrap as lit.
+.method public static coerce_to_pat(Ljava/lang/Object;)Lrt/SnoPat;
+    .limit stack 2
+    .limit locals 1
+    aload_0
+    ifnonnull ctp_nn
+    invokestatic rt/SnoPat/eps()Lrt/SnoPat;
+    areturn
+ctp_nn:
+    aload_0
+    instanceof rt/SnoPat
+    ifeq ctp_not_pat
+    aload_0
+    checkcast rt/SnoPat
+    areturn
+ctp_not_pat:
+    aload_0
+    invokevirtual java/lang/Object/toString()Ljava/lang/String;
+    invokestatic rt/SnoPat/lit(Ljava/lang/String;)Lrt/SnoPat;
+    areturn
+.end method
+
+; get_var_external — read a variable's value without touching the stack. Returns Object or null.
+.method public static get_var_external(Ljava/lang/String;)Ljava/lang/Object;
+    .limit stack 2
+    .limit locals 1
+    getstatic rt/SnoRt/vars Ljava/util/HashMap;
+    aload_0
+    invokevirtual java/util/HashMap/get(Ljava/lang/Object;)Ljava/lang/Object;
+    areturn
+.end method
+
+; store_var_external — write a variable directly (no OUTPUT trap, no print).
+; Used by pattern captures: . assignment writes to the named variable on match success.
+.method public static store_var_external(Ljava/lang/String;Ljava/lang/Object;)V
+    .limit stack 3
+    .limit locals 2
+    aload_0
+    ldc "OUTPUT"
+    invokevirtual java/lang/String/equals(Ljava/lang/Object;)Z
+    ifeq sve_normal
+    getstatic java/lang/System/out Ljava/io/PrintStream;
+    aload_1
+    ifnonnull sve_out_nn
+    ldc ""
+    goto sve_out_print
+sve_out_nn:
+    aload_1
+    invokevirtual java/lang/Object/toString()Ljava/lang/String;
+sve_out_print:
+    invokevirtual java/io/PrintStream/println(Ljava/lang/String;)V
+    return
+sve_normal:
+    getstatic rt/SnoRt/vars Ljava/util/HashMap;
+    aload_0
+    aload_1
+    invokevirtual java/util/HashMap/put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+    pop
+    return
+.end method
+
+; get_anchor — read &ANCHOR keyword; default 0 (unanchored, FULLSCAN mode).
+.method public static get_anchor()Z
+    .limit stack 4
+    .limit locals 2
+    getstatic rt/SnoRt/vars Ljava/util/HashMap;
+    ldc "&ANCHOR"
+    invokevirtual java/util/HashMap/get(Ljava/lang/Object;)Ljava/lang/Object;
+    astore_0
+    aload_0
+    ifnull anc_zero
+    aload_0
+    instanceof java/lang/Long
+    ifeq anc_zero
+    aload_0
+    checkcast java/lang/Long
+    invokevirtual java/lang/Long/longValue()J
+    lconst_0
+    lcmp
+    ifeq anc_zero
+    iconst_1
+    ireturn
+anc_zero:
+    iconst_0
+    ireturn
+.end method
+
+; call_external — called from SnoPat for capture-fn side effects.
+; (fname, argv[], matchedText) — push args + matched, invoke call, discard return.
+; Stub for now: do nothing. Real impl needs to set up args on vstack and dispatch to user fn or builtin.
+.method public static call_external(Ljava/lang/String;[Ljava/lang/Object;Ljava/lang/String;)V
+    .limit stack 1
+    .limit locals 3
+    return
+.end method
+
+; call_returning — called from SnoPat for *fn() patterns; should call fn and return its value.
+; Stub: returns empty string.
+.method public static call_returning(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/Object;
+    .limit stack 1
+    .limit locals 2
+    ldc ""
+    areturn
+.end method
+
+; ── SM_EXEC_STMT runtime ─────────────────────────────────────────────────────
+; sno_exec_stmt(subj_name, has_repl) — stack on entry (top first): repl, subj_value, pat.
+; The C runtime fetches subj from subj_name if non-empty; otherwise uses the stacked value.
+; On match success: if has_repl, build new subject and store into subj_name. Set last_ok.
+;
+; Stack arrangement matches the SM emitter: push pat, push subj_value, push repl, then SM_EXEC_STMT.
+; (See sm_interp.c: pop repl, pop subj_d, pop pat_d.)
+.method public static sno_exec_stmt(Ljava/lang/String;I)V
+    .limit stack 6
+    .limit locals 12
+    ; locals: 0=subj_name(arg), 1=has_repl(arg), 2=repl, 3=subj_value, 4=pat, 5=subj_str, 6=pat_obj, 7=ok, 8=start, 9=end, 10=new_subj
+    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;
+    astore_2
+    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;
+    astore_3
+    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;
+    astore 4
+    ; resolve subject string: from subj_name var if non-empty, else from stacked subj_value
+    aload_0
+    ifnull es_use_stack_subj
+    aload_0
+    invokevirtual java/lang/String/length()I
+    ifeq es_use_stack_subj
+    getstatic rt/SnoRt/vars Ljava/util/HashMap;
+    aload_0
+    invokevirtual java/util/HashMap/get(Ljava/lang/Object;)Ljava/lang/Object;
+    astore_3
+es_use_stack_subj:
+    aload_3
+    ifnonnull es_subj_nn
+    ldc ""
+    astore 5
+    goto es_subj_done
+es_subj_nn:
+    aload_3
+    invokevirtual java/lang/Object/toString()Ljava/lang/String;
+    astore 5
+es_subj_done:
+    ; pat must be a SnoPat — if it's a String, wrap as lit; else fail.
+    aload 4
+    instanceof rt/SnoPat
+    ifeq es_pat_not_obj
+    aload 4
+    checkcast rt/SnoPat
+    astore 6
+    goto es_match
+es_pat_not_obj:
+    aload 4
+    ifnull es_set_fail
+    aload 4
+    invokevirtual java/lang/Object/toString()Ljava/lang/String;
+    invokestatic rt/SnoPat/lit(Ljava/lang/String;)Lrt/SnoPat;
+    astore 6
+es_match:
+    aload 6
+    aload 5
+    invokestatic rt/SnoPat/execMatch(Lrt/SnoPat;Ljava/lang/String;)Z
+    istore 7
+    iload 7
+    ifeq es_set_fail
+    ; success: set last_ok=1; if has_repl, build new subject and write.
+    iconst_1
+    putstatic rt/SnoRt/last_ok Z
+    iload_1
+    ifeq es_done
+    aload_0
+    ifnull es_done
+    aload_0
+    invokevirtual java/lang/String/length()I
+    ifeq es_done
+    getstatic rt/SnoPat/matched_start I
+    istore 8
+    getstatic rt/SnoPat/matched_end I
+    istore 9
+    ; new_subj = subj[0:start] + repl_str + subj[end:]
+    new java/lang/StringBuilder
+    dup
+    invokespecial java/lang/StringBuilder/<init>()V
+    aload 5
+    iconst_0
+    iload 8
+    invokevirtual java/lang/String/substring(II)Ljava/lang/String;
+    invokevirtual java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+    aload_2
+    ifnonnull es_repl_nn
+    ldc ""
+    goto es_repl_app
+es_repl_nn:
+    aload_2
+    invokevirtual java/lang/Object/toString()Ljava/lang/String;
+es_repl_app:
+    invokevirtual java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+    aload 5
+    iload 9
+    invokevirtual java/lang/String/substring(I)Ljava/lang/String;
+    invokevirtual java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+    invokevirtual java/lang/StringBuilder/toString()Ljava/lang/String;
+    astore 10
+    aload_0
+    aload 10
+    invokestatic rt/SnoRt/store_var_external(Ljava/lang/String;Ljava/lang/Object;)V
+es_done:
+    return
+es_set_fail:
+    iconst_0
+    putstatic rt/SnoRt/last_ok Z
     return
 .end method
 
