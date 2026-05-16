@@ -95,7 +95,7 @@ IR_t * IR_exec_node(IR_t * nd) {
             nd->value = out;
             return IS_FAIL_fn(out) ? nd->ω : nd->γ;
         }
-        /* User-defined proc: look up proc_table by name; if ir_body exists, push frame and exec. */
+        /* User-defined proc: look up proc_table by name; if ir_body exists, push frame and exec. Snapshot per-node state of the callee's ir_body around IR_exec_once so the caller's activation survives when the callee is the SAME proc (recursion shares the IR graph; without snapshot, the inner IR_reset wipes the caller's per-node value/counter/state, breaking e.g. IR_BINOP_GEN's read of nd->c[0]->value after a recursive-call right operand). */
         for (int _pi = 0; _pi < proc_count; _pi++) {
             if (!proc_table[_pi].name || strcmp(proc_table[_pi].name, nd->sval) != 0) continue;
             if (!proc_table[_pi].ir_body) break;
@@ -108,10 +108,12 @@ IR_t * IR_exec_node(IR_t * nd) {
             _f->env_n = _nsl;
             for (int _k = 0; _k < proc_table[_pi].nparams && _k < nargs && _k < FRAME_SLOT_MAX; _k++)
                 _f->env[_k] = args[_k];
+            IR_node_state_t * _snap = IR_snapshot_state(proc_table[_pi].ir_body);
             IR_reset(proc_table[_pi].ir_body);
             out = IR_exec_once(proc_table[_pi].ir_body);
             if (frame_depth > 0 && FRAME.returning) { out = g_ir_return_val; FRAME.returning = 0; }
             frame_depth--;
+            IR_restore_state(proc_table[_pi].ir_body, _snap);
             nd->value = out;
             return IS_FAIL_fn(out) ? nd->ω : nd->γ;
         }

@@ -60,6 +60,34 @@ void IR_reset(IR_block_t * cfg) {
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* Snapshot the mutable per-node state (value, counter, state) of every node in cfg. Used by IR_CALL to preserve the caller's activation across a recursive call into the same ir_body, since IR_reset+IR_exec_once on the callee wipes shared graph state. Caller frees with free(). */
+IR_node_state_t * IR_snapshot_state(IR_block_t * cfg) {
+    if (!cfg || cfg->n <= 0) return NULL;
+    IR_node_state_t * snap = (IR_node_state_t *)malloc((size_t)cfg->n * sizeof(IR_node_state_t));
+    if (!snap) return NULL;
+    for (int i = 0; i < cfg->n; i++) {
+        IR_t * nd = cfg->all[i];
+        if (!nd) { snap[i].value = FAILDESCR; snap[i].counter = 0; snap[i].state = 0; continue; }
+        snap[i].value   = nd->value;
+        snap[i].counter = nd->counter;
+        snap[i].state   = nd->state;
+    }
+    return snap;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* Restore the per-node state snapshot taken by IR_snapshot_state and free the snapshot buffer. Safe to call with snap==NULL (no-op). */
+void IR_restore_state(IR_block_t * cfg, IR_node_state_t * snap) {
+    if (!cfg || !snap) { free(snap); return; }
+    for (int i = 0; i < cfg->n; i++) {
+        IR_t * nd = cfg->all[i];
+        if (!nd) continue;
+        nd->value   = snap[i].value;
+        nd->counter = snap[i].counter;
+        nd->state   = snap[i].state;
+    }
+    free(snap);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void IR_free(IR_block_t * cfg) {
     if (!cfg) return;
     for (int i = 0; i < cfg->n; i++) {
