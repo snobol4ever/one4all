@@ -53,25 +53,17 @@
 extern int raku_yydebug;
 #endif
 /* "%code requires" blocks.  */
-#line 3 "raku.y"
+#line 2 "raku.y"
 
-/*
- * raku.y — Tiny-Raku Bison grammar
- *
- * FI-3: builds tree_t/STMT_t directly — no intermediate RakuNode AST.
- *
- * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6
- */
 #include "../../ast/ast.h"
 #include "../snobol4/scrip_cc.h"
-
 typedef struct ExprList {
     tree_t **items;
     int      count;
     int      cap;
 } ExprList;
 
-#line 75 "raku.tab.h"
+#line 67 "raku.tab.h"
 
 /* Token kinds.  */
 #ifndef RAKU_YYTOKENTYPE
@@ -150,15 +142,15 @@ typedef struct ExprList {
 #if ! defined RAKU_YYSTYPE && ! defined RAKU_YYSTYPE_IS_DECLARED
 union RAKU_YYSTYPE
 {
-#line 165 "raku.y"
+#line 147 "raku.y"
 
     long      ival;
     double    dval;
     char     *sval;
-    tree_t   *node;
+    tree_t  *node;
     ExprList *list;
 
-#line 162 "raku.tab.h"
+#line 154 "raku.tab.h"
 
 };
 typedef union RAKU_YYSTYPE RAKU_YYSTYPE;

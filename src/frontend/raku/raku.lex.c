@@ -914,33 +914,20 @@ int yy_flex_debug = 0;
 #define YY_MORE_ADJ 0
 #define YY_RESTORE_YY_MORE_OFFSET
 char *yytext;
-/*
- * raku.l — Tiny-Raku flex lexer
- *
- * Subset: integer/float/string literals, $scalar/@array sigils,
- * keywords, arithmetic, string concat (~), comparisons, ranges (..),
- * logic, pointy block (->), semicolons required.
- *
- * Single-line comments: # to end of line.
- * Double-quoted strings: flat literal (no interpolation in Phase 1).
- * Single-quoted strings: literal.
- *
- * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6
- */
 #include "raku.tab.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 static char raku_strbuf[65536];
 static int  raku_strpos;
-
 static int raku_after_smatch  = 0;
 static int raku_match_global   = 0;
 static char *raku_subst_pat    = NULL;
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void raku_lex_error(const char *msg) {
     fprintf(stderr, "raku lex error line %d: %s\n", raku_yylineno, msg);
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int raku_get_lineno(void) { return raku_yylineno; }
 #define YY_NO_INPUT 1
 
@@ -1230,18 +1217,17 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-{ /* skip whitespace */ }
+{ }
 	YY_BREAK
 case 2:
 /* rule 2 can match eol */
 YY_RULE_SETUP
-{ /* raku_yylineno auto-incremented by %option yylineno */ }
+{ }
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-{ /* single-line comment */ }
+{ }
 	YY_BREAK
-/* ── Keywords ───────────────────────────────────────────────── */
 case 4:
 YY_RULE_SETUP
 { return KW_MY; }
@@ -1390,7 +1376,6 @@ case 40:
 YY_RULE_SETUP
 { return OP_DIV; }
 	YY_BREAK
-/* ── Operators (longest first) ───────────────────────────────── */
 case 41:
 YY_RULE_SETUP
 { return OP_RANGE_EX; }
@@ -1471,7 +1456,6 @@ case 60:
 YY_RULE_SETUP
 { return '='; }
 	YY_BREAK
-/* ── Punctuation ─────────────────────────────────────────────── */
 case 61:
 YY_RULE_SETUP
 { return '{'; }
@@ -1512,7 +1496,6 @@ case 70:
 YY_RULE_SETUP
 { return OP_FATARROW; }
 	YY_BREAK
-/* ── Numeric literals ────────────────────────────────────────── */
 case 71:
 YY_RULE_SETUP
 { raku_yylval.dval = atof(yytext); return LIT_FLOAT; }
@@ -1525,12 +1508,10 @@ case 73:
 YY_RULE_SETUP
 { raku_yylval.ival = atol(yytext); return LIT_INT; }
 	YY_BREAK
-/* ── Sigil variables ─────────────────────────────────────────── */
 case 74:
 YY_RULE_SETUP
 { raku_yylval.sval = strdup("$_"); return VAR_SCALAR; }
 	YY_BREAK
-/* RK-39: standard handles as integer constants */
 case 75:
 YY_RULE_SETUP
 { raku_yylval.ival = 0; return VAR_CAPTURE; }
@@ -1549,12 +1530,11 @@ YY_RULE_SETUP
 	YY_BREAK
 case 79:
 YY_RULE_SETUP
-{ /* $<name> named capture: strip $< and > */
-    int len = strlen(yytext)-3; /* skip $< and > */
+{
+    int len = strlen(yytext)-3;
     char *nm = malloc(len+1); memcpy(nm,yytext+2,len); nm[len]='\0';
     raku_yylval.sval = nm; return VAR_NAMED_CAPTURE; }
 	YY_BREAK
-/* RK-26: twigils $.field / $!field → VAR_TWIGIL (fieldname, no sigil) */
 case 80:
 YY_RULE_SETUP
 { raku_yylval.sval = strdup(yytext+2); return VAR_TWIGIL; }
@@ -1575,14 +1555,10 @@ case 84:
 YY_RULE_SETUP
 { raku_yylval.sval = strdup(yytext); return VAR_HASH; }
 	YY_BREAK
-/* ── Identifiers (bare words — sub names, builtins) ─────────── */
 case 85:
 YY_RULE_SETUP
 { raku_yylval.sval = strdup(yytext); return IDENT; }
 	YY_BREAK
-/* ── Double-quoted string: flat literal or interpolated ──────── */
-/* If the buffer contains '$', emit LIT_INTERP_STR (RK-12).     */
-/* The lowerer splits on $var boundaries into an TT_CAT chain.    */
 case 86:
 YY_RULE_SETUP
 { raku_strpos = 0; BEGIN(STR_DQ); }
@@ -1623,7 +1599,6 @@ case 93:
 YY_RULE_SETUP
 { raku_strbuf[raku_strpos++] = yytext[0]; }
 	YY_BREAK
-/* ── Single-quoted string (strictly literal) ─────────────────── */
 case 94:
 YY_RULE_SETUP
 { raku_strpos = 0; BEGIN(STR_SQ); }
@@ -1654,8 +1629,6 @@ case 99:
 YY_RULE_SETUP
 { raku_strbuf[raku_strpos++] = yytext[0]; }
 	YY_BREAK
-/* ── Regex literal /pattern/ ─────────────────────────────────── */
-/* ── s/pat/repl/[g] substitution literal ─────────────────────── */
 case 100:
 YY_RULE_SETUP
 { if (raku_after_smatch) { raku_after_smatch=0; raku_strpos=0; BEGIN(STR_SUBST_PAT); } else { yyless(1); return 's'; } }
@@ -1663,7 +1636,6 @@ YY_RULE_SETUP
 case 101:
 YY_RULE_SETUP
 {
-    /* end of pattern: stash it and start reading replacement */
     raku_strbuf[raku_strpos]='\0';
     raku_subst_pat = strdup(raku_strbuf);
     raku_strpos=0; BEGIN(STR_SUBST_REPL);
@@ -1680,7 +1652,6 @@ YY_RULE_SETUP
 case 104:
 YY_RULE_SETUP
 {
-    /* end of replacement: build combined token "pat\x01repl\x01flags" */
     raku_strbuf[raku_strpos]='\0';
     int global = (yytext[1]=='g');
     size_t plen=strlen(raku_subst_pat), rlen=raku_strpos;
@@ -1701,7 +1672,6 @@ case 106:
 YY_RULE_SETUP
 { raku_strbuf[raku_strpos++]=yytext[0]; }
 	YY_BREAK
-/* ── m:g/pat/ global match ─────────────────────────────────────── */
 case 107:
 YY_RULE_SETUP
 { if (raku_after_smatch) { raku_after_smatch=0; raku_strpos=0; BEGIN(STR_RE); raku_match_global=1; } else { yyless(3); return IDENT; } }
