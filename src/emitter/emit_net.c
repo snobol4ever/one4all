@@ -881,12 +881,25 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
                  * guard (which fires only on last_ok==false) is skipped. */
                 fprintf(out, "    ldc.i4.1\n");
                 fprintf(out, "    call       void SnoRt::set_last_ok(bool)\n");
-                /* Bind args to params in reverse pop order */
+                /* Frame save/restore: push a new frame dict, save old values of
+                 * the function name and all param names before binding new args. */
                 int k = -1;
                 for (int q = 0; q < fn_count; q++) {
                     if (fn_pcs[q] == i) { k = q; break; }
                 }
+                fprintf(out, "    call       void SnoRt::frame_push()\n");
+                if (k >= 0 && fn_names[k]) {
+                    /* save function name (return-value receptacle) */
+                    net_escape_ldstr(out, fn_names[k]);
+                    fprintf(out, "    call       void SnoRt::frame_save(string)\n");
+                }
                 if (k >= 0 && fn_params[k] && fn_nparams[k] > 0) {
+                    /* save each param's old value */
+                    for (int p = 0; p < fn_nparams[k]; p++) {
+                        net_escape_ldstr(out, fn_params[k][p]);
+                        fprintf(out, "    call       void SnoRt::frame_save(string)\n");
+                    }
+                    /* bind new args in reverse pop order (last arg on TOS) */
                     for (int p = fn_nparams[k] - 1; p >= 0; p--) {
                         net_escape_ldstr(out, fn_params[k][p]);
                         fprintf(out, "    call       void SnoRt::store_var(string)\n");
@@ -918,9 +931,27 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
                 if (fn_names[k] && strcmp(fn_names[k], cname) == 0) { entry_pc = fn_pcs[k]; break; }
             }
             if (entry_pc >= 0) {
+                /* named user-function call: push return PC and jump to entry */
                 net_push_i4(out, i + 1);
                 fprintf(out, "    call       void SnoRt::push_ret_pc(int32)\n");
                 net_push_i4(out, entry_pc);
+                fprintf(out, "    stloc      _pc\n    br         NET_DISPATCH\n");
+                has_continue = 1;
+            } else if (cname[0] == '\0' && pc_to_fn && i >= 0 && i < n && pc_to_fn[i] >= 0) {
+                /* null-name SM_CALL_FN inside a function body = implicit :(RETURN) */
+                int fk = pc_to_fn[i];
+                const char * fname = (fk >= 0 && fk < fn_count) ? fn_names[fk] : NULL;
+                if (fname) {
+                    net_escape_ldstr(out, fname);
+                    fprintf(out, "    call       void SnoRt::push_var(string)\n");
+                } else {
+                    fprintf(out, "    call       void SnoRt::push_null()\n");
+                }
+                fprintf(out, "    call       void SnoRt::frame_exit()\n");
+                net_push_i4(out, 0);
+                net_push_i4(out, 1);
+                fprintf(out, "    call       void SnoRt::do_return(int32, bool)\n");
+                fprintf(out, "    call       int32 SnoRt::pop_ret_pc()\n");
                 fprintf(out, "    stloc      _pc\n    br         NET_DISPATCH\n");
                 has_continue = 1;
             } else {
@@ -949,6 +980,7 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
             } else {
                 fprintf(out, "    call       void SnoRt::push_null()\n");
             }
+            fprintf(out, "    call       void SnoRt::frame_exit()\n");
             net_push_i4(out, 0);
             net_push_i4(out, 1);
             fprintf(out, "    call       void SnoRt::do_return(int32, bool)\n");
@@ -968,6 +1000,7 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
                 fprintf(out, "    brtrue     NET_L%d\n", i + 1);
             }
             fprintf(out, "    call       void SnoRt::push_null()\n");
+            fprintf(out, "    call       void SnoRt::frame_exit()\n");
             net_push_i4(out, 1);
             net_push_i4(out, 0);
             fprintf(out, "    call       void SnoRt::do_return(int32, bool)\n");
@@ -993,6 +1026,7 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
             } else {
                 fprintf(out, "    call       void SnoRt::push_null()\n");
             }
+            fprintf(out, "    call       void SnoRt::frame_exit()\n");
             net_push_i4(out, 2);
             net_push_i4(out, 0);
             fprintf(out, "    call       void SnoRt::do_return(int32, bool)\n");
