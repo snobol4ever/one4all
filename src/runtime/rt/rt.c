@@ -123,6 +123,11 @@ const void *rt_get_default_vstack_backend(void)
 {
     return &g_default_ops;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* Public vstack accessors used by mode-4 EVAL fnptr dispatch (EXPVAL_fn slen==2). */
+int rt_vstack_depth(void) { return g_ops->depth(); }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+DESCR_t rt_vstack_pop(void) { DESCR_t out; g_ops->pop(&out); return out; }
 static int     g_halt_rc  = 0;
 static int     g_halt_set = 0;
 static int     g_native_chunk_depth = 0;

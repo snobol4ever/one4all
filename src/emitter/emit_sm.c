@@ -745,8 +745,8 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
     case SM_TPL_PUSH_EXPRESSION:
         snprintf(macro_def, sizeof(macro_def), "%s entry, arity", t->macro_name);
         macro_line(out, "", ".macro", macro_def);
-        macro_line(out, "", "movabs", "rdi, \\entry");
-        macro_line(out, "", "mov", "esi, \\arity");
+        macro_line(out, "", "lea", "rdi, [rip + .L\\entry]");
+        macro_line(out, "", "mov", "esi, 2");
         { char ct[64]; snprintf(ct, sizeof(ct), "%s@PLT", t->runtime);
           macro_line(out, "", "call", ct); }
         macro_line(out, "", ".endm", "");

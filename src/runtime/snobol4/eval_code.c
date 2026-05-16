@@ -405,6 +405,23 @@ DESCR_t EXPVAL_fn(DESCR_t expr_d)
             int entry_pc = (int)expr_d.i;
             return sm_call_expression(entry_pc);
         }
+        if (expr_d.slen == 2) {
+            typedef void (*expr_thunk_t)(void);
+            expr_thunk_t fn = (expr_thunk_t)(uintptr_t)expr_d.i;
+            extern int     rt_vstack_depth(void);
+            extern DESCR_t rt_vstack_pop(void);
+            int sp0 = rt_vstack_depth();
+            __asm__ __volatile__(
+                "mov  %%rsp, %%rbx\n\t"
+                "and  $-16, %%rsp\n\t"
+                "sub  $8, %%rsp\n\t"
+                "call *%0\n\t"
+                "mov  %%rbx, %%rsp\n\t"
+                : : "r"(fn) : "rbx", "rax", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "memory", "cc");
+            int sp1 = rt_vstack_depth();
+            if (sp1 > sp0) return rt_vstack_pop();
+            return FAILDESCR;
+        }
         if (!expr_d.ptr) return FAILDESCR;
         const char *save_Σ = Σ;
         int         save_Ω = Ω;
