@@ -2,6 +2,7 @@
 #define PL_PARSE_H
 #include "term.h"
 #include "prolog_atom.h"
+#include "ast.h"
 #include <stdio.h>
 typedef struct PlClause PlClause;
 struct PlClause {
@@ -10,6 +11,8 @@ struct PlClause {
     int       nbody;
     int       lineno;
     PlClause *next;
+    /* PST-PL-6b: parallel tree_t path — pure syntax tree, no slot assignment */
+    tree_t   *tr;
 };
 typedef struct {
     PlClause *head;

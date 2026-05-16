@@ -389,6 +389,384 @@ static int flatten_conj(Term *t, Term **buf, int idx) {
 }
 static int dcg_var_counter = 0;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PST-PL-6b — Parallel tree_t-building path.
+ * Runs alongside the Term* path. Both active simultaneously.
+ * No variable-slot assignment here — that moves to prolog_lower.c in 6e.
+ * Variable identity is tracked by name only (TreeScope).
+ */
+#define TS_MAX_VARS 256
+typedef struct { char *name; int idx; } TSEntry;
+typedef struct { TSEntry e[TS_MAX_VARS]; int n; } TreeScope;
+
+static void ts_reset(TreeScope *ts) { ts->n = 0; }
+
+/* Return a TT_VAR node for this name. Each unique name in the clause
+ * gets a unique v.sval. No slot number — lower will assign in 6e. */
+static tree_t *ts_get(TreeScope *ts, const char *name) {
+    for (int i = 0; i < ts->n; i++)
+        if (strcmp(ts->e[i].name, name) == 0) {
+            /* Return a fresh TT_VAR node aliased to the same name;
+             * structural equivalence checked by name in 6c. */
+            tree_t *v = ast_node_new(TT_VAR);
+            v->v.sval = ts->e[i].name;   /* shared interned pointer */
+            return v;
+        }
+    if (ts->n >= TS_MAX_VARS) {
+        tree_t *v = ast_node_new(TT_VAR);
+        v->v.sval = strdup("_OVERFLOW");
+        return v;
+    }
+    char *interned = strdup(name);
+    ts->e[ts->n].name = interned;
+    ts->e[ts->n].idx  = ts->n;
+    ts->n++;
+    tree_t *v = ast_node_new(TT_VAR);
+    v->v.sval = interned;
+    return v;
+}
+
+/* Forward declarations for the parallel path */
+static tree_t *pt_term(Parser *p, TreeScope *ts, int max_prec);
+static tree_t *pt_primary(Parser *p, TreeScope *ts);
+
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static tree_t *pt_list(Parser *p, TreeScope *ts) {
+    /* Build TT_MAKELIST with flat children [e1..en, optional_tail].
+     * Lowerer will reconstruct the '.'(H,T) cons chain. */
+    Token tk = lexer_peek(&p->lx);
+    if (tk.kind == TK_RBRACKET) {
+        lexer_next(&p->lx);
+        tree_t *n = ast_node_new(TT_MAKELIST);   /* empty list */
+        return n;
+    }
+    tree_t *lst = ast_node_new(TT_MAKELIST);
+    p->in_args++;
+    for (;;) {
+        tree_t *elem = pt_term(p, ts, 1200);
+        if (elem) ast_push(lst, elem);
+        Token pk = lexer_peek(&p->lx);
+        if (pk.kind == TK_COMMA) { lexer_next(&p->lx); continue; }
+        if (pk.kind == TK_PIPE) {
+            lexer_next(&p->lx);
+            tree_t *tail = pt_term(p, ts, 1200);
+            if (tail) ast_push(lst, tail);
+            pk = lexer_peek(&p->lx);
+            if (pk.kind == TK_RBRACKET) lexer_next(&p->lx);
+        } else if (pk.kind == TK_RBRACKET) {
+            lexer_next(&p->lx);
+        }
+        break;
+    }
+    p->in_args--;
+    return lst;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static int pt_args(Parser *p, TreeScope *ts, tree_t *parent) {
+    /* Parse comma-separated args, push each as child of parent.
+     * Returns number of args added. */
+    Token pk0 = lexer_peek(&p->lx);
+    if (pk0.kind == TK_RPAREN) return 0;
+    int n = 0;
+    p->in_args++;
+    for (;;) {
+        tree_t *a = pt_term(p, ts, 1200);
+        if (!a) break;
+        ast_push(parent, a);
+        n++;
+        Token tk = lexer_peek(&p->lx);
+        if (tk.kind != TK_COMMA) break;
+        lexer_next(&p->lx);
+    }
+    p->in_args--;
+    return n;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* Build TT_FNC(op, lhs, rhs) for binary op. op is the operator name. */
+static tree_t *pt_binop(const char *op, tree_t *lhs, tree_t *rhs) {
+    tree_t *n = ast_node_new(TT_FNC);
+    n->v.sval = strdup(op);
+    ast_push(n, lhs);
+    ast_push(n, rhs);
+    return n;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* Detect and collapse ;(->(Cond,Then),Else) into TT_IF(cond,then,else).
+ * Also handle ;(->(Cond,Then)) — if-then without else — as TT_IF(cond,then).
+ * Input: a TT_FNC(";") node with children already added.
+ * Returns TT_IF node if pattern matches, else returns the original node. */
+static tree_t *pt_maybe_ifthenelse(tree_t *semi_node) {
+    /* semi_node is TT_FNC(";") with 2 children */
+    if (semi_node->n != 2) return semi_node;
+    tree_t *left = semi_node->c[0];
+    tree_t *right = semi_node->c[1];
+    /* left must be TT_FNC("->") */
+    if (!left || left->t != TT_FNC || !left->v.sval) return semi_node;
+    if (strcmp(left->v.sval, "->") != 0) return semi_node;
+    if (left->n < 2) return semi_node;
+    tree_t *cond = left->c[0];
+    tree_t *then = left->c[1];
+    tree_t *iff = ast_node_new(TT_IF);
+    ast_push(iff, cond);
+    ast_push(iff, then);
+    ast_push(iff, right);   /* else branch */
+    /* Note: we do NOT free semi_node / left — arena or GC handles it
+     * (or in this parallel path, leaking is acceptable until 6f cleanup). */
+    return iff;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static tree_t *pt_primary(Parser *p, TreeScope *ts) {
+    Token tk = lexer_next(&p->lx);
+    switch (tk.kind) {
+        case TK_VAR:
+            return ts_get(ts, tk.text);
+        case TK_ANON: {
+            tree_t *v = ast_node_new(TT_VAR);
+            v->v.sval = strdup("_");
+            return v;
+        }
+        case TK_INT: {
+            tree_t *n = ast_node_new(TT_ILIT);
+            n->v.ival = tk.ival;
+            return n;
+        }
+        case TK_FLOAT: {
+            tree_t *n = ast_node_new(TT_FLIT);
+            n->v.dval = tk.fval;
+            return n;
+        }
+        case TK_STRING: {
+            tree_t *n = ast_node_new(TT_QLIT);
+            n->v.sval = strdup(tk.text);
+            return n;
+        }
+        case TK_ATOM: {
+            Token pk = lexer_peek(&p->lx);
+            if (pk.kind == TK_LPAREN) {
+                lexer_next(&p->lx);
+                tree_t *fnc = ast_node_new(TT_FNC);
+                fnc->v.sval = strdup(tk.text);
+                pt_args(p, ts, fnc);
+                Token rp = lexer_peek(&p->lx);
+                if (rp.kind == TK_RPAREN) lexer_next(&p->lx);
+                return fnc;
+            }
+            /* Special directive atoms that consume one argument */
+            if (strcmp(tk.text, "dynamic") == 0 ||
+                strcmp(tk.text, "discontiguous") == 0 ||
+                strcmp(tk.text, "multifile") == 0 ||
+                strcmp(tk.text, "module_transparent") == 0 ||
+                strcmp(tk.text, "meta_predicate") == 0 ||
+                strcmp(tk.text, "use_module") == 0 ||
+                strcmp(tk.text, "ensure_loaded") == 0 ||
+                strcmp(tk.text, "mode") == 0) {
+                if (pk.kind == TK_ATOM || pk.kind == TK_VAR || pk.kind == TK_INT ||
+                    pk.kind == TK_FLOAT || pk.kind == TK_LPAREN || pk.kind == TK_LBRACKET ||
+                    pk.kind == TK_OP) {
+                    tree_t *fnc = ast_node_new(TT_FNC);
+                    fnc->v.sval = strdup(tk.text);
+                    tree_t *arg = pt_term(p, ts, 1150);
+                    if (arg) ast_push(fnc, arg);
+                    return fnc;
+                }
+            }
+            tree_t *n = ast_node_new(TT_QLIT);
+            n->v.sval = strdup(tk.text);
+            return n;
+        }
+        case TK_CUT: {
+            return ast_node_new(TT_CUT);
+        }
+        case TK_LPAREN: {
+            int saved = p->in_args;
+            p->in_args = 0;
+            tree_t *inner = pt_term(p, ts, 1200);
+            p->in_args = saved;
+            Token rp = lexer_peek(&p->lx);
+            if (rp.kind == TK_RPAREN) lexer_next(&p->lx);
+            return inner;
+        }
+        case TK_LBRACKET:
+            return pt_list(p, ts);
+        case TK_COMMA:
+        case TK_SEMI: {
+            const char *opname = (tk.kind == TK_COMMA) ? "," : ";";
+            Token pk2 = lexer_peek(&p->lx);
+            if (pk2.kind == TK_LPAREN) {
+                lexer_next(&p->lx);
+                tree_t *fnc = ast_node_new(TT_FNC);
+                fnc->v.sval = strdup(opname);
+                pt_args(p, ts, fnc);
+                Token rp = lexer_peek(&p->lx);
+                if (rp.kind == TK_RPAREN) lexer_next(&p->lx);
+                return fnc;
+            }
+            return NULL;
+        }
+        case TK_OP: {
+            if (strcmp(tk.text, "\\+") == 0 || strcmp(tk.text, "not") == 0) {
+                tree_t *arg = pt_term(p, ts, 900);
+                tree_t *fnc = ast_node_new(TT_FNC);
+                fnc->v.sval = strdup(tk.text);
+                if (arg) ast_push(fnc, arg);
+                return fnc;
+            }
+            if (strcmp(tk.text, "\\") == 0) {
+                tree_t *arg = pt_term(p, ts, 200);
+                tree_t *fnc = ast_node_new(TT_FNC);
+                fnc->v.sval = strdup("\\");
+                if (arg) ast_push(fnc, arg);
+                return fnc;
+            }
+            if (strcmp(tk.text, "-") == 0) {
+                Token pk3 = lexer_peek(&p->lx);
+                if (pk3.kind == TK_INT) {
+                    Token num = lexer_next(&p->lx);
+                    tree_t *n = ast_node_new(TT_ILIT);
+                    n->v.ival = -num.ival;
+                    return n;
+                }
+                if (pk3.kind == TK_FLOAT) {
+                    Token num = lexer_next(&p->lx);
+                    tree_t *n = ast_node_new(TT_FLIT);
+                    n->v.dval = -num.fval;
+                    return n;
+                }
+                if (pk3.kind == TK_ATOM || pk3.kind == TK_OP || pk3.kind == TK_VAR || pk3.kind == TK_LPAREN) {
+                    tree_t *arg = pt_term(p, ts, 200);
+                    tree_t *fnc = ast_node_new(TT_FNC);
+                    fnc->v.sval = strdup("-");
+                    if (arg) ast_push(fnc, arg);
+                    return fnc;
+                }
+            }
+            if (strcmp(tk.text, "+") == 0) {
+                Token pk3 = lexer_peek(&p->lx);
+                if (pk3.kind == TK_ATOM || pk3.kind == TK_OP || pk3.kind == TK_VAR ||
+                    pk3.kind == TK_LPAREN || pk3.kind == TK_INT || pk3.kind == TK_FLOAT) {
+                    tree_t *arg = pt_term(p, ts, 200);
+                    tree_t *fnc = ast_node_new(TT_FNC);
+                    fnc->v.sval = strdup("+");
+                    if (arg) ast_push(fnc, arg);
+                    return fnc;
+                }
+            }
+            {
+                Token pk3 = lexer_peek(&p->lx);
+                if (pk3.kind == TK_LPAREN) {
+                    lexer_next(&p->lx);
+                    tree_t *fnc = ast_node_new(TT_FNC);
+                    fnc->v.sval = strdup(tk.text);
+                    pt_args(p, ts, fnc);
+                    Token rp = lexer_peek(&p->lx);
+                    if (rp.kind == TK_RPAREN) lexer_next(&p->lx);
+                    return fnc;
+                }
+                tree_t *n = ast_node_new(TT_QLIT);
+                n->v.sval = strdup(tk.text);
+                return n;
+            }
+        }
+        case TK_LBRACE: {
+            Token pk2 = lexer_peek(&p->lx);
+            if (pk2.kind == TK_RBRACE) {
+                lexer_next(&p->lx);
+                tree_t *n = ast_node_new(TT_FNC);
+                n->v.sval = strdup("{}");
+                return n;
+            }
+            tree_t *inner = pt_term(p, ts, 1200);
+            Token rb = lexer_next(&p->lx);
+            (void)rb;
+            tree_t *fnc = ast_node_new(TT_FNC);
+            fnc->v.sval = strdup("{}");
+            if (inner) ast_push(fnc, inner);
+            return fnc;
+        }
+        default:
+            return NULL;
+    }
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static tree_t *pt_term(Parser *p, TreeScope *ts, int max_prec) {
+    /* Save and restore lexer position: pt_primary consumes tokens from p->lx
+     * but the Term* path already consumed them. We CANNOT double-consume.
+     * Strategy: pt_term is called on a SECOND parse pass of a saved token
+     * stream, OR we drive pt_term from the same single pass as the Term* path
+     * by running each sub-parse in lockstep.
+     *
+     * For PST-PL-6b the approach is: run the parallel path on a CLONED
+     * lexer snapshot taken before the Term* parse. See pt_parse_clause().
+     */
+    tree_t *lhs = pt_primary(p, ts);
+    if (!lhs) return NULL;
+    for (;;) {
+        Token pk = lexer_peek(&p->lx);
+        const char *optext = NULL;
+        if      (pk.kind == TK_OP)                              optext = pk.text;
+        else if (pk.kind == TK_ATOM)                            optext = pk.text;
+        else if (pk.kind == TK_COMMA && p->in_args > 0)         break;
+        else if (pk.kind == TK_COMMA && max_prec >= 1000)       optext = ",";
+        else if (pk.kind == TK_SEMI  && max_prec >= 1100)       optext = ";";
+        else if (pk.kind == TK_NECK  && max_prec >= 1200)       optext = ":-";
+        else break;
+        const OpEntry *op = optext ? find_binop(optext) : NULL;
+        if (!op || op->prec > max_prec) break;
+        lexer_next(&p->lx);
+        int rprec = (op->assoc == ASSOC_LEFT) ? op->prec - 1 : op->prec;
+        tree_t *rhs = pt_term(p, ts, rprec);
+        if (!rhs) break;
+        tree_t *node = pt_binop(op->name, lhs, rhs);
+        /* Detect ;(->(Cond,Then),Else) and collapse to TT_IF */
+        if (strcmp(op->name, ";") == 0)
+            node = pt_maybe_ifthenelse(node);
+        lhs = node;
+    }
+    return lhs;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* pt_parse_clause: runs the parallel tree_t path on a clone of the lexer.
+ * Called AFTER the Term* clause parse has fully consumed its tokens.
+ * We replay the same source text through a fresh lexer. */
+static tree_t *pt_parse_clause_from_src(const char *src, int start_offset,
+                                        int end_offset, TreeScope *ts,
+                                        Parser *p_orig) {
+    /* We cannot easily slice the source. Instead we use a saved Lexer
+     * snapshot taken at clause start (see pt_parse_clause below). */
+    (void)src; (void)start_offset; (void)end_offset; (void)p_orig;
+    return NULL; /* placeholder — real impl below uses saved Lexer */
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* Flatten a tree_t conjunction (TT_FNC(",", ...)) into flat TT_PROGRAM.
+ * Mirrors flatten_conj() for the Term* path. */
+static void pt_flatten_conj(tree_t *t, tree_t *prog) {
+    if (!t) return;
+    if (t->t == TT_FNC && t->v.sval && strcmp(t->v.sval, ",") == 0) {
+        for (int i = 0; i < t->n; i++)
+            pt_flatten_conj(t->c[i], prog);
+        return;
+    }
+    ast_push(prog, t);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* Build a TT_CLAUSE tree_t for one clause.
+ * head_tr: the head tree (NULL for directives → TT_NUL child).
+ * body_tr: the raw body term (conjunction or single goal), or NULL for facts.
+ * Returns TT_CLAUSE(head, body_prog) where body_prog is TT_PROGRAM. */
+static tree_t *pt_make_clause(tree_t *head_tr, tree_t *body_tr) {
+    tree_t *cl = ast_node_new(TT_CLAUSE);
+    /* c[0] = head */
+    if (head_tr) {
+        ast_push(cl, head_tr);
+    } else {
+        ast_push(cl, ast_node_new(TT_NUL));
+    }
+    /* c[1] = body as TT_PROGRAM (flat conjunction) */
+    tree_t *prog = ast_node_new(TT_PROGRAM);
+    if (body_tr) pt_flatten_conj(body_tr, prog);
+    ast_push(cl, prog);
+    return cl;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static Term *dcg_fresh_var(VarScope *sc) {
     char name[32];
     snprintf(name, sizeof(name), "_S%d", dcg_var_counter++);
@@ -661,6 +1039,9 @@ static PlClause *parse_clause(Parser *p) {
     scope_reset(&p->sc);
     Token pk = lexer_peek(&p->lx);
     if (pk.kind == TK_EOF) return NULL;
+    /* PST-PL-6b: save lexer + ifst_top before Term* parse so we can replay. */
+    Lexer saved_lx  = p->lx;
+    int   saved_ifst_top = p->ifst_top;
     PlClause *cl = calloc(1, sizeof(PlClause));
     cl->lineno = pk.line;
     if (pk.kind == TK_NECK) {
@@ -673,12 +1054,24 @@ static PlClause *parse_clause(Parser *p) {
             cl->head  = NULL;
             cl->body  = NULL;
             cl->nbody = 0;
+            cl->tr    = NULL;   /* directives: no tree */
             return cl;
         }
         cl->head  = NULL;
         cl->body  = malloc(sizeof(Term *));
         cl->body[0] = goal;
         cl->nbody = 1;
+        /* PST-PL-6b: replay directive through parallel path */
+        {
+            Parser p2 = *p;
+            p2.lx = saved_lx;
+            p2.ifst_top = saved_ifst_top;
+            p2.in_args  = 0;
+            TreeScope ts2; ts_reset(&ts2);
+            lexer_next(&p2.lx);  /* consume TK_NECK */
+            tree_t *body_tr = pt_term(&p2, &ts2, 1200);
+            cl->tr = pt_make_clause(NULL, body_tr);
+        }
         return cl;
     }
     Term *head = parse_term(p, 1199);
@@ -708,6 +1101,27 @@ static PlClause *parse_clause(Parser *p) {
     Token dot = lexer_next(&p->lx);
     if (dot.kind != TK_DOT)
         perror_at(p, dot.line, "expected . at end of clause");
+    /* PST-PL-6b: replay entire clause through parallel path */
+    {
+        Parser p2 = *p;
+        p2.lx = saved_lx;
+        p2.ifst_top = saved_ifst_top;
+        p2.in_args  = 0;
+        TreeScope ts2; ts_reset(&ts2);
+        tree_t *head_tr = pt_term(&p2, &ts2, 1199);
+        Token pk2 = lexer_peek(&p2.lx);
+        tree_t *body_tr = NULL;
+        if (pk2.kind == TK_NECK) {
+            lexer_next(&p2.lx);
+            body_tr = pt_term(&p2, &ts2, 1200);
+        } else if (pk2.kind == TK_OP && pk2.text && strcmp(pk2.text, "-->") == 0) {
+            /* DCG: skip for now — tree mirrors Term* result structurally;
+             * DCG expansion happens in lower, not parser, in the tree path. */
+            lexer_next(&p2.lx);
+            body_tr = pt_term(&p2, &ts2, 1200);
+        }
+        cl->tr = pt_make_clause(head_tr, body_tr);
+    }
     return cl;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
