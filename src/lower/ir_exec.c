@@ -1044,6 +1044,19 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->value = v;
         return nd->γ;
     }
+    case IR_PL_SEQ: {
+        /* Prolog conjunction body. Short-circuit on first failure; succeed if all goals succeed. */
+        /* On cut (IR_PL_CUT in subtree), g_pl_cut_flag is raised; SEQ ignores it (CHOICE checks). */
+        for (int j = 0; j < nd->n; j++) {
+            if (!nd->c[j]) continue;
+            IR_exec_node(nd->c[j]);
+            DESCR_t cv = nd->c[j]->value;
+            if (IS_FAIL_fn(cv)) { nd->value = FAILDESCR; return nd->ω; }
+            if (frame_depth > 0 && FRAME.returning) break;
+        }
+        nd->value = INTVAL(1);
+        return nd->γ;
+    }
     case IR_PL_ALT: {
         extern Trail g_pl_trail; extern Term **g_pl_env;
         if (!nd->c || nd->n < 2) { nd->value = FAILDESCR; return nd->ω; }
@@ -1056,17 +1069,27 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->value = FAILDESCR; return nd->ω;
     }
     case IR_PL_CHOICE: {
-        extern Trail g_pl_trail; extern Term **g_pl_env;
+        extern Trail g_pl_trail; extern Term **g_pl_env; extern int g_pl_cut_flag;
         if (!nd->c || nd->n == 0) { nd->value = FAILDESCR; return nd->ω; }
+        int saved_cut = g_pl_cut_flag;
+        g_pl_cut_flag = 0;
         for (int ci = 0; ci < nd->n; ci++) {
             int mark = trail_mark(&g_pl_trail);
             IR_block_t *body = nd->c[ci] ? (IR_block_t *)nd->c[ci]->opaque : NULL;
             Term **saved_for_retry = g_pl_env;
             DESCR_t res = body ? IR_exec_once(body) : FAILDESCR;
-            if (!IS_FAIL_fn(res)) { nd->value = res; return nd->γ; }
+            if (!IS_FAIL_fn(res)) {
+                g_pl_cut_flag = saved_cut;
+                nd->value = res; return nd->γ;
+            }
+            if (g_pl_cut_flag) {
+                g_pl_cut_flag = saved_cut;
+                nd->value = FAILDESCR; return nd->ω;
+            }
             trail_unwind(&g_pl_trail, mark);
             g_pl_env = saved_for_retry;
         }
+        g_pl_cut_flag = saved_cut;
         nd->value = FAILDESCR; return nd->ω;
     }
     case IR_PL_CALL: {
@@ -1101,6 +1124,8 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->value = INTVAL(1); return nd->γ;
     }
     case IR_PL_CUT: {
+        extern int g_pl_cut_flag;
+        g_pl_cut_flag = 1;
         nd->value = INTVAL(1); return nd->γ;
     }
     case IR_PL_ATOM: {

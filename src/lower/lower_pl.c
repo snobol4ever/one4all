@@ -33,7 +33,7 @@ static IR_t *lower_pl_term_node(IR_block_t *cfg, const tree_t *e) {
 static IR_t *lower_pl_seq(IR_block_t *cfg, const tree_t *e) {
     if (!e) return NULL;
     if (e->t == TT_FNC && e->v.sval && strcmp(e->v.sval, ",") == 0 && e->n >= 2) {
-        IR_t *seq = IR_node_alloc(cfg, IR_SEQ); if (!seq) return NULL;
+        IR_t *seq = IR_node_alloc(cfg, IR_PL_SEQ); if (!seq) return NULL;
         seq->c = malloc((size_t)e->n * sizeof(IR_t*)); if (!seq->c) return NULL;
         seq->n = 0;
         for (int i = 0; i < e->n; i++) {
@@ -126,7 +126,7 @@ static IR_block_t *lower_pl_clause_body(const tree_t *clause, int n_args) {
         stmts[built++] = nd;
     }
     if (built == 0) { IR_t *nd = IR_node_alloc(cfg, IR_SUCCEED); if (!nd) { free(stmts); IR_free(cfg); return NULL; } stmts[built++] = nd; }
-    IR_t *seq = IR_node_alloc(cfg, IR_SEQ); if (!seq) { free(stmts); IR_free(cfg); return NULL; }
+    IR_t *seq = IR_node_alloc(cfg, IR_PL_SEQ); if (!seq) { free(stmts); IR_free(cfg); return NULL; }
     seq->c = stmts; seq->n = built; cfg->entry = seq; return cfg;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/

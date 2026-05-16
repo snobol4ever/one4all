@@ -993,12 +993,24 @@ void lower_stmt(const tree_t *s)
     if (lang == LANG_ICN) return;
     if (lang == LANG_PL) {
         if (subject && subject->t == TT_CHOICE && subject->v.sval) {
-            emit_prolog_call(subject->v.sval);
+            /* Top-level TT_CHOICE-subject statements are predicate DEFINITIONS, not calls.
+             * The predicate is already registered in g_dcg_table by lower_proc_skeletons()
+             * and its SM stub label is emitted by emit_proc_stub().  Emitting
+             * SM_BB_ONCE_PROC here would invoke every defined predicate at program
+             * start, which corrupts execution for any program with multiple predicates.
+             * Entry-point invocation is the job of `:- initialization(name).` directives. */
             goto emit_gotos;
         }
         if (subject && subject->t == TT_FNC && subject->v.sval
                  && strcmp(subject->v.sval, "initialization") == 0
                  && subject->n == 1 && subject->c[0] && subject->c[0]->v.sval) {
+            /* Emit call to the named entry point.  The arg is an atom (TT_FNC n=0) or a
+             * compound term naming a goal.  We pass "name/arity" so pl_dcg_lookup finds it. */
+            const tree_t *target = subject->c[0];
+            int target_arity = target->n;
+            char key[256];
+            snprintf(key, sizeof key, "%s/%d", target->v.sval, target_arity);
+            sm_emit_si(g_p, SM_BB_ONCE_PROC, strdup(key), (int64_t)target_arity);
             goto emit_gotos;
         }
         else if (subject && subject->t == TT_FNC && subject->v.sval) {

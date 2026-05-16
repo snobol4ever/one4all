@@ -82,6 +82,7 @@ typedef enum {
     IR_PL_ATOM,         /* Prolog atom literal: sval=atom name                                     */
     IR_PL_ARITH,        /* Prolog arithmetic: sval=op, c[0]=lhs, c[1]=rhs                         */
     IR_PL_ALT,          /* Prolog inline disjunction (';'): c[0]=branch-A IR_t*, c[1]=branch-B IR_t* (no opaque) */
+    IR_PL_SEQ,          /* Prolog conjunction body: short-circuit on first failure; succeed if all succeed.       */
     IR_ICN_TO,
     IR_ICN_UPTO,
     IR_ICN_EVERY,
