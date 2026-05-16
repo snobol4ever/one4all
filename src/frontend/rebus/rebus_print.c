@@ -1,288 +1,184 @@
 #include "rebus.h"
+#include "../../ast/ast.h"
 #include <stdio.h>
 #include <string.h>
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PST-RB-5c: rebus_print now walks tree_t via body_tree/initial_tree. RExpr/RStmt deleted. */
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void indent(FILE *out, int depth) {
     for (int i = 0; i < depth; i++) fprintf(out, "  ");
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void print_expr(RExpr *e, FILE *out);
+static void print_tree(tree_t *t, FILE *out, int depth);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static const char *op_str(REKind k) {
-    switch (k) {
-        case RE_ADD:       return "+";
-        case RE_SUB:       return "-";
-        case RE_MUL:       return "*";
-        case RE_DIV:       return "/";
-        case RE_MOD:       return "%";
-        case RE_POW:       return "^";
-        case RE_STRCAT:    return "||";
-        case RE_PATCAT:    return "&";
-        case RE_ALT:       return "|";
-        case RE_EQ:        return "=";
-        case RE_NE:        return "~=";
-        case RE_LT:        return "<";
-        case RE_LE:        return "<=";
-        case RE_GT:        return ">";
-        case RE_GE:        return ">=";
-        case RE_SEQ:       return "==";
-        case RE_SNE:       return "~==";
-        case RE_SLT:       return "<<";
-        case RE_SLE:       return "<<=";
-        case RE_SGT:       return ">>";
-        case RE_SGE:       return ">>=";
-        case RE_ASSIGN:    return ":=";
-        case RE_EXCHANGE:  return ":=:";
-        case RE_ADDASSIGN: return "+:=";
-        case RE_SUBASSIGN: return "-:=";
-        case RE_CATASSIGN: return "||:=";
-        case RE_COND:      return ".";
-        case RE_IMM:       return "$";
-        default:           return "??";
+static void print_tree(tree_t *t, FILE *out, int depth) {
+    if (!t) { fprintf(out, "<null>"); return; }
+    switch (t->t) {
+    case TT_QLIT:    fprintf(out, "\"%s\"", t->v.sval ? t->v.sval : ""); break;
+    case TT_ILIT:    fprintf(out, "%ld", t->v.ival); break;
+    case TT_FLIT:    fprintf(out, "%g", t->v.dval); break;
+    case TT_NUL:     fprintf(out, "\"\""); break;
+    case TT_VAR:     fprintf(out, "%s", t->v.sval ? t->v.sval : "?"); break;
+    case TT_KEYWORD: fprintf(out, "&%s", t->v.sval ? t->v.sval : ""); break;
+    case TT_MNS:     fprintf(out, "-("); print_tree(t->c[0], out, 0); fprintf(out, ")"); break;
+    case TT_NOT:     fprintf(out, "~("); print_tree(t->c[0], out, 0); fprintf(out, ")"); break;
+    case TT_NONNULL: fprintf(out, "/("); print_tree(t->c[0], out, 0); fprintf(out, ")"); break;
+    case TT_ITERATE: fprintf(out, "!("); print_tree(t->c[0], out, 0); fprintf(out, ")"); break;
+    case TT_INDIRECT:fprintf(out, "$("); print_tree(t->c[0], out, 0); fprintf(out, ")"); break;
+    case TT_ARBNO:   fprintf(out, "~("); print_tree(t->c[0], out, 0); fprintf(out, ")"); break;
+    case TT_CAPT_CURSOR: fprintf(out, "@%s", t->v.sval ? t->v.sval : "?"); break;
+    case TT_ADD: fprintf(out, "("); print_tree(t->c[0],out,0); fprintf(out," + "); print_tree(t->c[1],out,0); fprintf(out,")"); break;
+    case TT_SUB: fprintf(out, "("); print_tree(t->c[0],out,0); fprintf(out," - "); print_tree(t->c[1],out,0); fprintf(out,")"); break;
+    case TT_MUL: fprintf(out, "("); print_tree(t->c[0],out,0); fprintf(out," * "); print_tree(t->c[1],out,0); fprintf(out,")"); break;
+    case TT_DIV: fprintf(out, "("); print_tree(t->c[0],out,0); fprintf(out," / "); print_tree(t->c[1],out,0); fprintf(out,")"); break;
+    case TT_MOD: fprintf(out, "("); print_tree(t->c[0],out,0); fprintf(out," %% "); print_tree(t->c[1],out,0); fprintf(out,")"); break;
+    case TT_POW: fprintf(out, "("); print_tree(t->c[0],out,0); fprintf(out," ^ "); print_tree(t->c[1],out,0); fprintf(out,")"); break;
+    case TT_CAT: fprintf(out, "("); print_tree(t->c[0],out,0); fprintf(out," || "); print_tree(t->c[1],out,0); fprintf(out,")"); break;
+    case TT_ALT: fprintf(out, "("); print_tree(t->c[0],out,0); fprintf(out," | "); print_tree(t->c[1],out,0); fprintf(out,")"); break;
+    case TT_EQ:  fprintf(out, "("); print_tree(t->c[0],out,0); fprintf(out," = "); print_tree(t->c[1],out,0); fprintf(out,")"); break;
+    case TT_NE:  fprintf(out, "("); print_tree(t->c[0],out,0); fprintf(out," ~= "); print_tree(t->c[1],out,0); fprintf(out,")"); break;
+    case TT_LT:  fprintf(out, "("); print_tree(t->c[0],out,0); fprintf(out," < "); print_tree(t->c[1],out,0); fprintf(out,")"); break;
+    case TT_LE:  fprintf(out, "("); print_tree(t->c[0],out,0); fprintf(out," <= "); print_tree(t->c[1],out,0); fprintf(out,")"); break;
+    case TT_GT:  fprintf(out, "("); print_tree(t->c[0],out,0); fprintf(out," > "); print_tree(t->c[1],out,0); fprintf(out,")"); break;
+    case TT_GE:  fprintf(out, "("); print_tree(t->c[0],out,0); fprintf(out," >= "); print_tree(t->c[1],out,0); fprintf(out,")"); break;
+    case TT_LEQ: fprintf(out, "("); print_tree(t->c[0],out,0); fprintf(out," == "); print_tree(t->c[1],out,0); fprintf(out,")"); break;
+    case TT_LNE: fprintf(out, "("); print_tree(t->c[0],out,0); fprintf(out," ~== "); print_tree(t->c[1],out,0); fprintf(out,")"); break;
+    case TT_LLT: fprintf(out, "("); print_tree(t->c[0],out,0); fprintf(out," << "); print_tree(t->c[1],out,0); fprintf(out,")"); break;
+    case TT_LLE: fprintf(out, "("); print_tree(t->c[0],out,0); fprintf(out," <<= "); print_tree(t->c[1],out,0); fprintf(out,")"); break;
+    case TT_LGT: fprintf(out, "("); print_tree(t->c[0],out,0); fprintf(out," >> "); print_tree(t->c[1],out,0); fprintf(out,")"); break;
+    case TT_LGE: fprintf(out, "("); print_tree(t->c[0],out,0); fprintf(out," >>= "); print_tree(t->c[1],out,0); fprintf(out,")"); break;
+    case TT_ASSIGN: fprintf(out, "("); print_tree(t->c[0],out,0); fprintf(out," := "); print_tree(t->c[1],out,0); fprintf(out,")"); break;
+    case TT_SWAP:   fprintf(out, "("); print_tree(t->c[0],out,0); fprintf(out," :=: "); print_tree(t->c[1],out,0); fprintf(out,")"); break;
+    case TT_CAPT_COND_ASGN:  fprintf(out, "("); print_tree(t->c[0],out,0); fprintf(out," . "); print_tree(t->c[1],out,0); fprintf(out,")"); break;
+    case TT_CAPT_IMMED_ASGN: fprintf(out, "("); print_tree(t->c[0],out,0); fprintf(out," $ "); print_tree(t->c[1],out,0); fprintf(out,")"); break;
+    case TT_IDX: {
+        print_tree(t->c[0], out, 0);
+        fprintf(out, "[");
+        for (int i = 1; i < t->n; i++) { if (i > 1) fprintf(out, ", "); print_tree(t->c[i], out, 0); }
+        fprintf(out, "]");
+        break;
     }
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void print_expr(RExpr *e, FILE *out) {
-    if (!e) { fprintf(out, "<null>"); return; }
-    switch (e->kind) {
-        case RE_NULL:    fprintf(out, "\"\""); break;
-        case RE_STR:     fprintf(out, "\"%s\"", e->sval ? e->sval : ""); break;
-        case RE_INT:     fprintf(out, "%ld", e->ival); break;
-        case RE_REAL:    fprintf(out, "%g", e->dval); break;
-        case RE_VAR:     fprintf(out, "%s", e->sval ? e->sval : "?"); break;
-        case RE_KEYWORD: fprintf(out, "&%s", e->sval ? e->sval : ""); break;
-        case RE_NEG:
-            fprintf(out, "-("); print_expr(e->right, out); fprintf(out, ")");
-            break;
-        case RE_POS:
-            fprintf(out, "+("); print_expr(e->right, out); fprintf(out, ")");
-            break;
-        case RE_NOT:
-            fprintf(out, "\\("); print_expr(e->right, out); fprintf(out, ")");
-            break;
-        case RE_VALUE:
-            fprintf(out, "/("); print_expr(e->right, out); fprintf(out, ")");
-            break;
-        case RE_BANG:
-            fprintf(out, "!("); print_expr(e->right, out); fprintf(out, ")");
-            break;
-        case RE_DEREF:
-            fprintf(out, "$("); print_expr(e->right, out); fprintf(out, ")");
-            break;
-        case RE_CURSOR:
-            fprintf(out, "@%s", e->sval ? e->sval : "?");
-            break;
-        case RE_PATOPT:
-            fprintf(out, "~("); print_expr(e->right, out); fprintf(out, ")");
-            break;
-        case RE_ADD: case RE_SUB: case RE_MUL: case RE_DIV: case RE_MOD:
-        case RE_POW: case RE_STRCAT: case RE_PATCAT: case RE_ALT:
-        case RE_EQ:  case RE_NE:  case RE_LT: case RE_LE: case RE_GT: case RE_GE:
-        case RE_SEQ: case RE_SNE: case RE_SLT: case RE_SLE: case RE_SGT: case RE_SGE:
-        case RE_ASSIGN: case RE_EXCHANGE: case RE_ADDASSIGN:
-        case RE_SUBASSIGN: case RE_CATASSIGN:
-            fprintf(out, "(");
-            print_expr(e->left, out);
-            fprintf(out, " %s ", op_str(e->kind));
-            print_expr(e->right, out);
-            fprintf(out, ")");
-            break;
-        case RE_COND:
-            print_expr(e->left, out);
-            fprintf(out, " . ");
-            print_expr(e->right, out);
-            break;
-        case RE_IMM:
-            print_expr(e->left, out);
-            fprintf(out, " $ ");
-            print_expr(e->right, out);
-            break;
-        case RE_RANGE:
-            print_expr(e->left, out);
-            fprintf(out, " +: ");
-            print_expr(e->right, out);
-            break;
-        case RE_CALL:
-            if (e->sval) fprintf(out, "%s", e->sval);
-            else if (e->left) { fprintf(out, "("); print_expr(e->left, out); fprintf(out, ")"); }
-            fprintf(out, "(");
-            for (int i = 0; i < e->nargs; i++) {
-                if (i) fprintf(out, ", ");
-                if (e->args[i]) print_expr(e->args[i], out);
-            }
-            fprintf(out, ")");
-            break;
-        case RE_SUB_IDX:
-            print_expr(e->left, out);
-            fprintf(out, "[");
-            for (int i = 0; i < e->nargs; i++) {
-                if (i) fprintf(out, ", ");
-                if (e->args[i]) print_expr(e->args[i], out);
-            }
-            fprintf(out, "]");
-            break;
-        default:
-            fprintf(out, "<expr:%d>", e->kind);
-            break;
+    case TT_FNC: {
+        if (t->v.sval) fprintf(out, "%s", t->v.sval);
+        fprintf(out, "(");
+        for (int i = 0; i < t->n; i++) { if (i) fprintf(out, ", "); print_tree(t->c[i], out, 0); }
+        fprintf(out, ")");
+        break;
     }
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void print_stmt(RStmt *s, FILE *out, int depth);
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void print_stmt_list(RStmt *head, FILE *out, int depth) {
-    for (RStmt *s = head; s; s = s->next)
-        print_stmt(s, out, depth);
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void print_stmt(RStmt *s, FILE *out, int depth) {
-    if (!s) return;
-    indent(out, depth);
-    switch (s->kind) {
-        case RS_EXPR:
-            print_expr(s->expr, out);
-            fprintf(out, "\n");
-            break;
-        case RS_MATCH:
-            print_expr(s->expr, out);
-            fprintf(out, " ? ");
-            print_expr(s->pat, out);
-            fprintf(out, "\n");
-            break;
-        case RS_REPLACE:
-            print_expr(s->expr, out);
-            fprintf(out, " ? ");
-            print_expr(s->pat, out);
-            fprintf(out, " <- ");
-            print_expr(s->repl, out);
-            fprintf(out, "\n");
-            break;
-        case RS_REPLN:
-            print_expr(s->expr, out);
-            fprintf(out, " ?- ");
-            print_expr(s->pat, out);
-            fprintf(out, "\n");
-            break;
-        case RS_IF:
-            fprintf(out, "if ");
-            print_stmt(s->body, out, 0);
+    case TT_SCAN: {
+        print_tree(t->c[0], out, 0);
+        fprintf(out, " ? ");
+        print_tree(t->c[1], out, 0);
+        if (t->n > 2) { fprintf(out, " <- "); print_tree(t->c[2], out, 0); }
+        break;
+    }
+    case TT_PROGRAM: {
+        for (int i = 0; i < t->n; i++) {
             indent(out, depth);
-            fprintf(out, "then\n");
-            print_stmt(s->alt, out, depth + 1);
-            if (s->repl) {
-                indent(out, depth);
-                fprintf(out, "else\n");
-                print_stmt((RStmt*)s->repl, out, depth + 1);
-            }
-            break;
-        case RS_UNLESS:
-            fprintf(out, "unless ");
-            print_stmt(s->body, out, 0);
-            indent(out, depth);
-            fprintf(out, "then\n");
-            print_stmt(s->alt, out, depth + 1);
-            break;
-        case RS_WHILE:
-            fprintf(out, "while ");
-            print_stmt(s->body, out, 0);
-            indent(out, depth);
-            fprintf(out, "do\n");
-            print_stmt(s->alt, out, depth + 1);
-            break;
-        case RS_UNTIL:
-            fprintf(out, "until ");
-            print_stmt(s->body, out, 0);
-            indent(out, depth);
-            fprintf(out, "do\n");
-            print_stmt(s->alt, out, depth + 1);
-            break;
-        case RS_REPEAT:
-            fprintf(out, "repeat\n");
-            print_stmt(s->alt, out, depth + 1);
-            break;
-        case RS_FOR:
-            fprintf(out, "for %s from ", s->for_var ? s->for_var : "?");
-            print_expr(s->for_from, out);
-            fprintf(out, " to ");
-            print_expr(s->for_to, out);
-            if (s->for_by) {
-                fprintf(out, " by ");
-                print_expr(s->for_by, out);
-            }
-            fprintf(out, " do\n");
-            print_stmt(s->alt, out, depth + 1);
-            break;
-        case RS_CASE:
-            fprintf(out, "case ");
-            print_expr(s->case_expr, out);
-            fprintf(out, " of {\n");
-            for (RCase *c = s->cases; c; c = c->next) {
-                indent(out, depth + 1);
-                if (c->is_default) {
-                    fprintf(out, "default");
-                } else {
-                    print_expr(c->guard, out);
-                }
+            print_tree(t->c[i], out, depth);
+            fprintf(out, ";\n");
+        }
+        break;
+    }
+    case TT_IF: {
+        indent(out, depth);
+        fprintf(out, "if ");
+        print_tree(t->c[0], out, 0);
+        fprintf(out, " then\n");
+        if (t->n > 1) print_tree(t->c[1], out, depth + 1);
+        if (t->n > 2) { indent(out, depth); fprintf(out, "else\n"); print_tree(t->c[2], out, depth + 1); }
+        break;
+    }
+    case TT_WHILE: {
+        indent(out, depth);
+        fprintf(out, "while ");
+        print_tree(t->c[0], out, 0);
+        fprintf(out, " do\n");
+        if (t->n > 1) print_tree(t->c[1], out, depth + 1);
+        break;
+    }
+    case TT_UNTIL: {
+        indent(out, depth);
+        fprintf(out, "until ");
+        print_tree(t->c[0], out, 0);
+        fprintf(out, " do\n");
+        if (t->n > 1) print_tree(t->c[1], out, depth + 1);
+        break;
+    }
+    case TT_REPEAT: {
+        indent(out, depth);
+        fprintf(out, "repeat\n");
+        if (t->n > 0) print_tree(t->c[0], out, depth + 1);
+        break;
+    }
+    case TT_FOR: {
+        indent(out, depth);
+        fprintf(out, "for %s from ", t->v.sval ? t->v.sval : "?");
+        if (t->n > 0) print_tree(t->c[0], out, 0);
+        fprintf(out, " to ");
+        if (t->n > 1) print_tree(t->c[1], out, 0);
+        if (t->n > 2 && t->c[2] && t->c[2]->t != TT_NUL) { fprintf(out, " by "); print_tree(t->c[2], out, 0); }
+        fprintf(out, " do\n");
+        if (t->n > 3) print_tree(t->c[3], out, depth + 1);
+        break;
+    }
+    case TT_CASE: {
+        indent(out, depth);
+        fprintf(out, "case ");
+        print_tree(t->c[0], out, 0);
+        fprintf(out, " of {\n");
+        for (int i = 1; i < t->n; i++) {
+            tree_t *cl = t->c[i];
+            indent(out, depth + 1);
+            if (cl->t == TT_IF) {
+                if (cl->c[0]->t == TT_NUL) fprintf(out, "default");
+                else print_tree(cl->c[0], out, 0);
                 fprintf(out, " :\n");
-                print_stmt(c->body, out, depth + 2);
+                if (cl->n > 1) print_tree(cl->c[1], out, depth + 2);
             }
-            indent(out, depth);
-            fprintf(out, "}\n");
-            break;
-        case RS_EXIT:   fprintf(out, "exit\n");   break;
-        case RS_NEXT:   fprintf(out, "next\n");   break;
-        case RS_FAIL:   fprintf(out, "fail\n");   break;
-        case RS_STOP:   fprintf(out, "stop\n");   break;
-        case RS_RETURN:
-            fprintf(out, "return");
-            if (s->retval) { fprintf(out, " "); print_expr(s->retval, out); }
-            fprintf(out, "\n");
-            break;
-        case RS_COMPOUND:
-            fprintf(out, "{\n");
-            for (int i = 0; i < s->nstmts; i++)
-                print_stmt(s->stmts[i], out, depth + 1);
-            indent(out, depth);
-            fprintf(out, "}\n");
-            break;
-        default:
-            fprintf(out, "<stmt:%d>\n", s->kind);
-            break;
+        }
+        indent(out, depth);
+        fprintf(out, "}\n");
+        break;
+    }
+    case TT_RETURN: {
+        indent(out, depth);
+        fprintf(out, "return");
+        if (t->n > 0) { fprintf(out, " "); print_tree(t->c[0], out, 0); }
+        fprintf(out, "\n");
+        break;
+    }
+    case TT_LOOP_BREAK: indent(out, depth); fprintf(out, "exit\n"); break;
+    case TT_LOOP_NEXT:  indent(out, depth); fprintf(out, "next\n"); break;
+    case TT_PROC_FAIL:  indent(out, depth); fprintf(out, "fail\n"); break;
+    case TT_END:        indent(out, depth); fprintf(out, "stop\n"); break;
+    default:
+        fprintf(out, "<tree:%d>", t->t);
+        break;
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void print_decl(RDecl *d, FILE *out) {
     if (!d) return;
     switch (d->kind) {
-        case RD_RECORD:
-            fprintf(out, "record %s(", d->name ? d->name : "?");
-            for (int i = 0; i < d->nfields; i++) {
-                if (i) fprintf(out, ", ");
-                fprintf(out, "%s", d->fields[i] ? d->fields[i] : "?");
-            }
-            fprintf(out, ")\n\n");
-            break;
-        case RD_FUNCTION:
-            fprintf(out, "function %s(", d->name ? d->name : "?");
-            for (int i = 0; i < d->nparams; i++) {
-                if (i) fprintf(out, ", ");
-                fprintf(out, "%s", d->params[i] ? d->params[i] : "?");
-            }
-            fprintf(out, ")");
-            if (d->nlocals > 0) {
-                fprintf(out, "\n  local ");
-                for (int i = 0; i < d->nlocals; i++) {
-                    if (i) fprintf(out, ", ");
-                    fprintf(out, "%s", d->locals[i] ? d->locals[i] : "?");
-                }
-            }
-            if (d->initial) {
-                fprintf(out, "\n  initial ");
-                print_stmt(d->initial, out, 0);
-            }
-            fprintf(out, "\n");
-            print_stmt_list(d->body, out, 1);
-            fprintf(out, "end\n\n");
-            break;
+    case RD_RECORD:
+        fprintf(out, "record %s(", d->name ? d->name : "?");
+        for (int i = 0; i < d->nfields; i++) { if (i) fprintf(out, ", "); fprintf(out, "%s", d->fields[i] ? d->fields[i] : "?"); }
+        fprintf(out, ")\n\n");
+        break;
+    case RD_FUNCTION:
+        fprintf(out, "function %s(", d->name ? d->name : "?");
+        for (int i = 0; i < d->nparams; i++) { if (i) fprintf(out, ", "); fprintf(out, "%s", d->params[i] ? d->params[i] : "?"); }
+        fprintf(out, ")");
+        if (d->nlocals > 0) {
+            fprintf(out, "\n  local ");
+            for (int i = 0; i < d->nlocals; i++) { if (i) fprintf(out, ", "); fprintf(out, "%s", d->locals[i] ? d->locals[i] : "?"); }
+        }
+        if (d->initial_tree) { fprintf(out, "\n  initial "); print_tree(d->initial_tree, out, 0); }
+        fprintf(out, "\n");
+        if (d->body_tree) print_tree(d->body_tree, out, 1);
+        fprintf(out, "end\n\n");
+        break;
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
