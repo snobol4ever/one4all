@@ -129,20 +129,18 @@ extern int rebus_yydebug;
 #if ! defined REBUS_YYSTYPE && ! defined REBUS_YYSTYPE_IS_DECLARED
 union REBUS_YYSTYPE
 {
-#line 106 "rebus.y"
+#line 52 "rebus.y"
 
     char       *sval;
     long        ival;
     double      dval;
-    RExpr      *expr;
-    RStmt      *stmt;
+    tree_t     *tree;   /* PST: exprs and stmts are tree_t* */
     RDecl      *decl;
-    RCase      *rcase;
-    void       *sal;    /* SAL* */
-    void       *eal;    /* EAL* */
-    void       *stal;   /* STAL* */
+    RCase      *rcase;  /* kept temporarily for case clause list */
+    void       *sal;    /* SAL* — for string id lists (params/locals/fields) */
+    void       *tal;    /* TAL* — for tree_t child lists (args, stmt lists) */
 
-#line 146 "rebus.tab.h"
+#line 144 "rebus.tab.h"
 
 };
 typedef union REBUS_YYSTYPE REBUS_YYSTYPE;

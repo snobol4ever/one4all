@@ -1,18 +1,18 @@
 %{
 #include "rebus.h"
+#include "../../ast/ast.h"
+#include "../../frontend/snobol4/scrip_cc.h"  /* expr_add_child, expr_binary, expr_unary */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 static RProgram *prog;
 extern RProgram *rebus_parsed_program;
 extern int       rebus_nerrors;
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static RExpr *rbinop(REKind k, RExpr *l, RExpr *r, int lineno) {
-    RExpr *e = rexpr_new(k, lineno);
-    e->left  = l;
-    e->right = r;
-    return e;
-}
+
+/* PST-RB-5b: parser now builds tree_t directly for all exprs and stmts.
+   RDecl still used for declaration structure (body/params now tree_t). */
+
 typedef struct { char **a; int n, cap; } SAL;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static SAL *sal_new(void) {
@@ -25,30 +25,21 @@ static void sal_push(SAL *s, char *v) {
     if (s->n >= s->cap) { s->cap *= 2; s->a = realloc(s->a, s->cap * sizeof(char *)); }
     s->a[s->n++] = v;
 }
-typedef struct { RExpr **a; int n, cap; } EAL;
+
+/* Dynamic tree_t child list used during parse for arg/stmt lists */
+typedef struct { tree_t **a; int n, cap; } TAL;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static EAL *eal_new(void) {
-    EAL *e = calloc(1, sizeof *e);
-    e->cap = 4; e->a = malloc(4 * sizeof(RExpr *));
-    return e;
+static TAL *tal_new(void) {
+    TAL *t = calloc(1, sizeof *t);
+    t->cap = 4; t->a = malloc(4 * sizeof(tree_t *));
+    return t;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void eal_push(EAL *e, RExpr *v) {
-    if (e->n >= e->cap) { e->cap *= 2; e->a = realloc(e->a, e->cap * sizeof(RExpr *)); }
-    e->a[e->n++] = v;
+static void tal_push(TAL *t, tree_t *v) {
+    if (t->n >= t->cap) { t->cap *= 2; t->a = realloc(t->a, t->cap * sizeof(tree_t *)); }
+    t->a[t->n++] = v;
 }
-typedef struct { RStmt **a; int n, cap; } STAL;
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static STAL *stal_new(void) {
-    STAL *s = calloc(1, sizeof *s);
-    s->cap = 8; s->a = malloc(8 * sizeof(RStmt *));
-    return s;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void stal_push(STAL *s, RStmt *v) {
-    if (s->n >= s->cap) { s->cap *= 2; s->a = realloc(s->a, s->cap * sizeof(RStmt *)); }
-    s->a[s->n++] = v;
-}
+
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern int  yylex(void);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -56,19 +47,19 @@ extern void yyerror(const char *);
 extern int  rebus_yylineno;
 #define yylineno rebus_yylineno
 %}
+
 %define api.prefix {rebus_yy}
 %union {
     char       *sval;
     long        ival;
     double      dval;
-    RExpr      *expr;
-    RStmt      *stmt;
+    tree_t     *tree;   /* PST: exprs and stmts are tree_t* */
     RDecl      *decl;
-    RCase      *rcase;
-    void       *sal;    /* SAL* */
-    void       *eal;    /* EAL* */
-    void       *stal;   /* STAL* */
+    RCase      *rcase;  /* kept temporarily for case clause list */
+    void       *sal;    /* SAL* — for string id lists (params/locals/fields) */
+    void       *tal;    /* TAL* — for tree_t child lists (args, stmt lists) */
 }
+
 %token <sval>  T_IDENT T_STR T_KEYWORD
 %token <ival>  T_INT
 %token <dval>  T_REAL
@@ -95,20 +86,23 @@ extern int  rebus_yylineno;
 %token T_SLT
 %token T_SLE
 %token T_PLUSCOLON
+
 %type <decl>   decl function_decl record_decl
-%type <stmt>   stmt stmt_body compound_stmt expr_as_stmt
-%type <stmt>   if_stmt unless_stmt while_stmt until_stmt
-%type <stmt>   repeat_stmt for_stmt case_stmt
-%type <stmt>   stmt_list stmt_list_ne
-%type <rcase>  caselist caseclause
-%type <expr>   expr opt_expr
-%type <expr>   assign_expr alt_expr cat_expr cmp_expr
-%type <expr>   add_expr mul_expr pow_expr unary_expr postfix_expr primary
-%type <expr>   pat_expr
+%type <tree>   stmt stmt_body compound_stmt expr_as_stmt
+%type <tree>   if_stmt unless_stmt while_stmt until_stmt
+%type <tree>   repeat_stmt for_stmt case_stmt
+%type <tree>   stmt_list stmt_list_ne
+%type <tree>   expr opt_expr
+%type <tree>   assign_expr alt_expr cat_expr cmp_expr
+%type <tree>   add_expr mul_expr pow_expr unary_expr postfix_expr primary
+%type <tree>   pat_expr
 %type <sal>    idlist_ne opt_idlist
 %type <sal>    opt_locals opt_params
-%type <eal>    arglist arglist_ne
-%type <stmt>   opt_initial
+%type <tal>    arglist arglist_ne
+%type <tree>   opt_initial
+/* case clause list reuses RCase for now — 5c will remove it */
+%type <rcase>  caselist caseclause
+
 %expect 1
 %nonassoc LOWER_THAN_ELSE
 %nonassoc T_ELSE
@@ -120,10 +114,13 @@ extern int  rebus_yylineno;
 %left  '*' '/' '%'
 %right T_STARSTAR '^'
 %right UMINUS UPLUS UTILDE UBACK USLASH UBANG UAT UDOLLAR UDOT
+
 %%
+
 program
     : decl_list             { }
     ;
+
 decl_list
     :
     | decl_list decl        {
@@ -141,14 +138,17 @@ decl_list
     | decl_list ';'         { }
     | decl_list error ';'   { yyerrok; }
     ;
+
 decl
     : function_decl         { $$ = $1; }
     | record_decl           { $$ = $1; }
     ;
+
 opt_semi
     :
     | ';'
     ;
+
 record_decl
     : T_RECORD T_IDENT '(' opt_idlist ')' opt_semi
         {
@@ -161,6 +161,7 @@ record_decl
             $$ = d;
         }
     ;
+
 function_decl
     : T_FUNCTION T_IDENT '(' opt_params ')' opt_semi
         opt_locals
@@ -178,55 +179,69 @@ function_decl
             d->locals   = ls->a;
             d->nlocals  = ls->n;
             free(ls);
-            d->initial  = $8;
-            d->body     = $9;
+            /* PST: initial and body are now tree_t* stored in decl_tree fields */
+            d->initial_tree = $8;   /* tree_t* or NULL */
+            d->body_tree    = $9;   /* tree_t* (TT_PROGRAM) */
             $$ = d;
         }
     ;
+
 opt_params
     :   { $$ = (void*)sal_new(); }
     | idlist_ne     { $$ = $1; }
     ;
+
 opt_locals
     :              { $$ = (void*)sal_new(); }
     | T_LOCAL idlist_ne ';'   { $$ = $2; }
     ;
+
 opt_initial
     :              { $$ = NULL; }
     | T_INITIAL compound_stmt               { $$ = $2; }
     | T_INITIAL stmt ';'                    { $$ = $2; }
     ;
+
 stmt_list
-    :   { $$ = NULL; }
+    :   {
+            tree_t *p = ast_node_new(TT_PROGRAM);
+            $$ = p;
+        }
     | stmt_list_ne  { $$ = $1; }
     ;
+
 stmt_list_ne
-    : stmt ';'                  { $$ = $1; }
+    : stmt ';'                  {
+            tree_t *p = ast_node_new(TT_PROGRAM);
+            if ($1) expr_add_child(p, $1);
+            $$ = p;
+        }
     | compound_stmt             { $$ = $1; }
     | stmt_list_ne stmt ';'     {
-            if (!$1) { $$ = $2; }
-            else {
-                RStmt *t = $1; while (t->next) t = t->next;
-                t->next = $2; $$ = $1;
-            }
+            if ($2) expr_add_child($1, $2);
+            $$ = $1;
         }
     | stmt_list_ne compound_stmt {
-            if (!$1) { $$ = $2; }
-            else {
-                RStmt *t = $1; while (t->next) t = t->next;
-                t->next = $2; $$ = $1;
+            /* merge compound children into existing program node */
+            if ($2) {
+                for (int i = 0; i < $2->n; i++)
+                    expr_add_child($1, $2->c[i]);
             }
+            $$ = $1;
         }
     | stmt_list_ne error ';'    { yyerrok; $$ = $1; }
     ;
+
 idlist_ne
     : T_IDENT               { SAL *s = sal_new(); sal_push(s, $1); $$ = s; }
     | idlist_ne ',' T_IDENT { sal_push($1, $3); $$ = $1; }
     ;
+
 opt_idlist
     :   { $$ = sal_new(); }
     | idlist_ne     { $$ = $1; }
     ;
+
 stmt
     : expr_as_stmt          { $$ = $1; }
     | if_stmt               { $$ = $1; }
@@ -236,132 +251,165 @@ stmt
     | repeat_stmt           { $$ = $1; }
     | for_stmt              { $$ = $1; }
     | case_stmt             { $$ = $1; }
-    | T_EXIT                { $$ = rstmt_new(RS_EXIT,   yylineno); }
-    | T_NEXT                { $$ = rstmt_new(RS_NEXT,   yylineno); }
-    | T_FAIL                { $$ = rstmt_new(RS_FAIL,   yylineno); }
-    | T_STOP                { $$ = rstmt_new(RS_STOP,   yylineno); }
+    | T_EXIT                { $$ = ast_node_new(TT_LOOP_BREAK); }
+    | T_NEXT                { $$ = ast_node_new(TT_LOOP_NEXT); }
+    | T_FAIL                { $$ = ast_node_new(TT_PROC_FAIL); }
+    | T_STOP                { $$ = ast_node_new(TT_END); }
     | T_RETURN opt_expr     {
-            RStmt *s = rstmt_new(RS_RETURN, yylineno);
-            s->retval = $2; $$ = s;
+            tree_t *r = ast_node_new(TT_RETURN);
+            if ($2) expr_add_child(r, $2);
+            $$ = r;
         }
     | compound_stmt         { $$ = $1; }
     ;
+
 expr_as_stmt
-    : expr                          {
-            RStmt *s = rstmt_new(RS_EXPR, $1->lineno);
-            s->expr = $1; $$ = s;
-        }
+    : expr                          { $$ = $1; }
     | expr '?' pat_expr             {
-            RStmt *s = rstmt_new(RS_MATCH, $1->lineno);
-            s->expr = $1; s->pat = $3; $$ = s;
+            /* match: TT_SCAN c[0]=subject c[1]=pattern */
+            tree_t *s = ast_node_new(TT_SCAN);
+            expr_add_child(s, $1);
+            expr_add_child(s, $3);
+            $$ = s;
         }
     | expr '?' pat_expr T_ARROW expr {
-            RStmt *s = rstmt_new(RS_REPLACE, $1->lineno);
-            s->expr = $1; s->pat = $3; s->repl = $5; $$ = s;
+            /* replace: TT_SCAN c[0]=subject c[1]=pattern c[2]=replacement */
+            tree_t *s = ast_node_new(TT_SCAN);
+            expr_add_child(s, $1);
+            expr_add_child(s, $3);
+            expr_add_child(s, $5);
+            $$ = s;
         }
     | expr T_QUESTMINUS pat_expr    {
-            RStmt *s = rstmt_new(RS_REPLN, $1->lineno);
-            s->expr = $1; s->pat = $3; $$ = s;
-        }
-    ;
-compound_stmt
-    : '{' stmt_list '}'     {
-            RStmt *s = rstmt_new(RS_COMPOUND, yylineno);
-            int n = 0; RStmt *t = $2; while (t) { n++; t = t->next; }
-            s->stmts  = malloc(n * sizeof(RStmt *));
-            s->nstmts = n;
-            t = $2;
-            for (int i = 0; i < n; i++) { s->stmts[i] = t; t = t->next; }
+            /* replace-with-null: TT_SCAN c[0]=subject c[1]=pattern c[2]=TT_NUL */
+            tree_t *s = ast_node_new(TT_SCAN);
+            expr_add_child(s, $1);
+            expr_add_child(s, $3);
+            expr_add_child(s, ast_node_new(TT_NUL));
             $$ = s;
         }
     ;
+
+compound_stmt
+    : '{' stmt_list '}'     { $$ = $2; }
+    ;
+
 stmt_body
     : stmt          { $$ = $1; }
     ;
+
 if_stmt
     : T_IF stmt T_THEN opt_semi stmt_body %prec LOWER_THAN_ELSE
         {
-            RStmt *s = rstmt_new(RS_IF, yylineno);
-            s->body  = $2;
-            s->alt   = $5;
-            s->repl  = NULL;
-            $$ = s;
+            /* TT_IF c[0]=cond c[1]=then */
+            tree_t *n = ast_node_new(TT_IF);
+            expr_add_child(n, $2);
+            expr_add_child(n, $5);
+            $$ = n;
         }
     | T_IF stmt T_THEN opt_semi stmt_body T_ELSE opt_semi stmt_body
         {
-            RStmt *s = rstmt_new(RS_IF, yylineno);
-            s->body  = $2;
-            s->alt   = $5;
-            s->repl  = (RExpr*)$8;
-            $$ = s;
+            /* TT_IF c[0]=cond c[1]=then c[2]=else */
+            tree_t *n = ast_node_new(TT_IF);
+            expr_add_child(n, $2);
+            expr_add_child(n, $5);
+            expr_add_child(n, $8);
+            $$ = n;
         }
     ;
+
 unless_stmt
     : T_UNLESS stmt T_THEN opt_semi stmt_body
         {
-            RStmt *s = rstmt_new(RS_UNLESS, yylineno);
-            s->body  = $2;
-            s->alt   = $5;
-            $$ = s;
+            /* unless cond then body == if ~cond then body
+               Represent as TT_IF with TT_NOT-wrapped condition (pure syntax) */
+            tree_t *not_cond = ast_node_new(TT_NOT);
+            expr_add_child(not_cond, $2);
+            tree_t *n = ast_node_new(TT_IF);
+            expr_add_child(n, not_cond);
+            expr_add_child(n, $5);
+            $$ = n;
         }
     ;
+
 while_stmt
     : T_WHILE stmt T_DO opt_semi stmt_body
         {
-            RStmt *s = rstmt_new(RS_WHILE, yylineno);
-            s->body  = $2;
-            s->alt   = $5;
-            $$ = s;
+            /* TT_WHILE c[0]=cond c[1]=body */
+            tree_t *n = ast_node_new(TT_WHILE);
+            expr_add_child(n, $2);
+            expr_add_child(n, $5);
+            $$ = n;
         }
     ;
+
 until_stmt
     : T_UNTIL stmt T_DO opt_semi stmt_body
         {
-            RStmt *s = rstmt_new(RS_UNTIL, yylineno);
-            s->body  = $2;
-            s->alt   = $5;
-            $$ = s;
+            /* TT_UNTIL c[0]=cond c[1]=body */
+            tree_t *n = ast_node_new(TT_UNTIL);
+            expr_add_child(n, $2);
+            expr_add_child(n, $5);
+            $$ = n;
         }
     ;
+
 repeat_stmt
     : T_REPEAT opt_semi stmt_body
         {
-            RStmt *s = rstmt_new(RS_REPEAT, yylineno);
-            s->alt   = $3;
-            $$ = s;
+            /* TT_REPEAT c[0]=body */
+            tree_t *n = ast_node_new(TT_REPEAT);
+            expr_add_child(n, $3);
+            $$ = n;
         }
     ;
+
 for_stmt
     : T_FOR T_IDENT T_FROM expr T_TO expr T_DO opt_semi stmt_body
         {
-            RStmt *s    = rstmt_new(RS_FOR, yylineno);
-            s->for_var  = $2;
-            s->for_from = $4;
-            s->for_to   = $6;
-            s->for_by   = NULL;
-            s->alt      = $9;
-            $$ = s;
+            /* TT_FOR v.sval=var c[0]=from c[1]=to c[2]=TT_NUL c[3]=body */
+            tree_t *n = ast_node_new(TT_FOR);
+            n->v.sval = strdup($2);
+            expr_add_child(n, $4);
+            expr_add_child(n, $6);
+            expr_add_child(n, ast_node_new(TT_NUL));  /* no 'by' */
+            expr_add_child(n, $9);
+            $$ = n;
         }
     | T_FOR T_IDENT T_FROM expr T_TO expr T_BY expr T_DO opt_semi stmt_body
         {
-            RStmt *s    = rstmt_new(RS_FOR, yylineno);
-            s->for_var  = $2;
-            s->for_from = $4;
-            s->for_to   = $6;
-            s->for_by   = $8;
-            s->alt      = $11;
-            $$ = s;
+            /* TT_FOR v.sval=var c[0]=from c[1]=to c[2]=by c[3]=body */
+            tree_t *n = ast_node_new(TT_FOR);
+            n->v.sval = strdup($2);
+            expr_add_child(n, $4);
+            expr_add_child(n, $6);
+            expr_add_child(n, $8);
+            expr_add_child(n, $11);
+            $$ = n;
         }
     ;
+
 case_stmt
     : T_CASE expr T_OF '{' caselist '}'
         {
-            RStmt *s      = rstmt_new(RS_CASE, yylineno);
-            s->case_expr  = $2;
-            s->cases      = $5;
-            $$ = s;
+            /* TT_CASE c[0]=expr c[1..]=clauses (each TT_IF for guard:body or TT_NUL:body for default) */
+            tree_t *cs = ast_node_new(TT_CASE);
+            expr_add_child(cs, $2);
+            /* walk RCase list, convert to tree children */
+            for (RCase *c = $5; c; c = c->next) {
+                tree_t *clause = ast_node_new(TT_IF);
+                if (c->is_default) {
+                    expr_add_child(clause, ast_node_new(TT_NUL));
+                } else {
+                    expr_add_child(clause, c->guard_tree);
+                }
+                expr_add_child(clause, c->body_tree);
+                expr_add_child(cs, clause);
+            }
+            $$ = cs;
         }
     ;
+
 caselist
     : caseclause            { $$ = $1; }
     | caselist ';' caseclause {
@@ -370,159 +418,219 @@ caselist
         }
     | caselist ';'          { $$ = $1; }
     ;
+
 caseclause
     : expr ':' stmt_body
         {
-            RCase *c  = rcase_new(yylineno);
-            c->guard  = $1;
-            c->body   = $3;
+            RCase *c      = rcase_new(yylineno);
+            c->guard_tree = $1;
+            c->body_tree  = $3;
             $$ = c;
         }
     | T_DEFAULT ':' stmt_body
         {
-            RCase *c     = rcase_new(yylineno);
+            RCase *c      = rcase_new(yylineno);
             c->is_default = 1;
-            c->body       = $3;
+            c->body_tree  = $3;
             $$ = c;
         }
     ;
+
 expr
     : assign_expr           { $$ = $1; }
     ;
+
 assign_expr
     : alt_expr                              { $$ = $1; }
-    | alt_expr T_ASSIGN    assign_expr      { $$ = rbinop(RE_ASSIGN,    $1, $3, yylineno); }
-    | alt_expr T_EXCHANGE  assign_expr      { $$ = rbinop(RE_EXCHANGE,  $1, $3, yylineno); }
-    | alt_expr T_ADDASSIGN assign_expr      { $$ = rbinop(RE_ADDASSIGN, $1, $3, yylineno); }
-    | alt_expr T_SUBASSIGN assign_expr      { $$ = rbinop(RE_SUBASSIGN, $1, $3, yylineno); }
-    | alt_expr T_CATASSIGN assign_expr      { $$ = rbinop(RE_CATASSIGN, $1, $3, yylineno); }
+    | alt_expr T_ASSIGN    assign_expr      {
+            tree_t *n = ast_node_new(TT_ASSIGN);
+            expr_add_child(n, $1); expr_add_child(n, $3); $$ = n;
+        }
+    | alt_expr T_EXCHANGE  assign_expr      {
+            tree_t *n = ast_node_new(TT_SWAP);
+            expr_add_child(n, $1); expr_add_child(n, $3); $$ = n;
+        }
+    | alt_expr T_ADDASSIGN assign_expr      {
+            /* lhs +:= rhs => TT_ASSIGN(lhs, TT_ADD(lhs, rhs)) */
+            tree_t *lhs2 = ast_node_new(TT_VAR); lhs2->v.sval = strdup($1->v.sval ? $1->v.sval : "");
+            tree_t *add  = ast_node_new(TT_ADD);
+            expr_add_child(add, $1); expr_add_child(add, $3);
+            tree_t *n = ast_node_new(TT_ASSIGN);
+            expr_add_child(n, lhs2); expr_add_child(n, add); $$ = n;
+        }
+    | alt_expr T_SUBASSIGN assign_expr      {
+            tree_t *lhs2 = ast_node_new(TT_VAR); lhs2->v.sval = strdup($1->v.sval ? $1->v.sval : "");
+            tree_t *sub  = ast_node_new(TT_SUB);
+            expr_add_child(sub, $1); expr_add_child(sub, $3);
+            tree_t *n = ast_node_new(TT_ASSIGN);
+            expr_add_child(n, lhs2); expr_add_child(n, sub); $$ = n;
+        }
+    | alt_expr T_CATASSIGN assign_expr      {
+            tree_t *lhs2 = ast_node_new(TT_VAR); lhs2->v.sval = strdup($1->v.sval ? $1->v.sval : "");
+            tree_t *cat  = ast_node_new(TT_CAT);
+            expr_add_child(cat, $1); expr_add_child(cat, $3);
+            tree_t *n = ast_node_new(TT_ASSIGN);
+            expr_add_child(n, lhs2); expr_add_child(n, cat); $$ = n;
+        }
     ;
+
 alt_expr
     : cat_expr                              { $$ = $1; }
-    | alt_expr '|' cat_expr                 { $$ = rbinop(RE_ALT,    $1, $3, yylineno); }
+    | alt_expr '|' cat_expr                 {
+            tree_t *n = ast_node_new(TT_ALT);
+            expr_add_child(n, $1); expr_add_child(n, $3); $$ = n;
+        }
     ;
+
 cat_expr
     : cmp_expr                              { $$ = $1; }
-    | cat_expr T_STRCAT cmp_expr            { $$ = rbinop(RE_STRCAT, $1, $3, yylineno); }
-    | cat_expr '&' cmp_expr                 { $$ = rbinop(RE_PATCAT, $1, $3, yylineno); }
+    | cat_expr T_STRCAT cmp_expr            {
+            tree_t *n = ast_node_new(TT_CAT);
+            expr_add_child(n, $1); expr_add_child(n, $3); $$ = n;
+        }
+    | cat_expr '&' cmp_expr                 {
+            tree_t *n = ast_node_new(TT_CAT);
+            expr_add_child(n, $1); expr_add_child(n, $3); $$ = n;
+        }
     ;
+
 cmp_expr
     : add_expr                              { $$ = $1; }
-    | cmp_expr '='    add_expr              { $$ = rbinop(RE_EQ,  $1, $3, yylineno); }
-    | cmp_expr T_NE   add_expr              { $$ = rbinop(RE_NE,  $1, $3, yylineno); }
-    | cmp_expr '<'    add_expr              { $$ = rbinop(RE_LT,  $1, $3, yylineno); }
-    | cmp_expr T_LE   add_expr              { $$ = rbinop(RE_LE,  $1, $3, yylineno); }
-    | cmp_expr '>'    add_expr              { $$ = rbinop(RE_GT,  $1, $3, yylineno); }
-    | cmp_expr T_GE   add_expr              { $$ = rbinop(RE_GE,  $1, $3, yylineno); }
-    | cmp_expr T_SEQ  add_expr              { $$ = rbinop(RE_SEQ, $1, $3, yylineno); }
-    | cmp_expr T_SNE  add_expr              { $$ = rbinop(RE_SNE, $1, $3, yylineno); }
-    | cmp_expr T_SLT  add_expr              { $$ = rbinop(RE_SLT, $1, $3, yylineno); }
-    | cmp_expr T_SLE  add_expr              { $$ = rbinop(RE_SLE, $1, $3, yylineno); }
-    | cmp_expr T_SGT  add_expr              { $$ = rbinop(RE_SGT, $1, $3, yylineno); }
-    | cmp_expr T_SGE  add_expr              { $$ = rbinop(RE_SGE, $1, $3, yylineno); }
+    | cmp_expr '='    add_expr              { tree_t *n = ast_node_new(TT_EQ);  expr_add_child(n,$1); expr_add_child(n,$3); $$ = n; }
+    | cmp_expr T_NE   add_expr              { tree_t *n = ast_node_new(TT_NE);  expr_add_child(n,$1); expr_add_child(n,$3); $$ = n; }
+    | cmp_expr '<'    add_expr              { tree_t *n = ast_node_new(TT_LT);  expr_add_child(n,$1); expr_add_child(n,$3); $$ = n; }
+    | cmp_expr T_LE   add_expr              { tree_t *n = ast_node_new(TT_LE);  expr_add_child(n,$1); expr_add_child(n,$3); $$ = n; }
+    | cmp_expr '>'    add_expr              { tree_t *n = ast_node_new(TT_GT);  expr_add_child(n,$1); expr_add_child(n,$3); $$ = n; }
+    | cmp_expr T_GE   add_expr              { tree_t *n = ast_node_new(TT_GE);  expr_add_child(n,$1); expr_add_child(n,$3); $$ = n; }
+    | cmp_expr T_SEQ  add_expr              { tree_t *n = ast_node_new(TT_LEQ); expr_add_child(n,$1); expr_add_child(n,$3); $$ = n; }
+    | cmp_expr T_SNE  add_expr              { tree_t *n = ast_node_new(TT_LNE); expr_add_child(n,$1); expr_add_child(n,$3); $$ = n; }
+    | cmp_expr T_SLT  add_expr              { tree_t *n = ast_node_new(TT_LLT); expr_add_child(n,$1); expr_add_child(n,$3); $$ = n; }
+    | cmp_expr T_SLE  add_expr              { tree_t *n = ast_node_new(TT_LLE); expr_add_child(n,$1); expr_add_child(n,$3); $$ = n; }
+    | cmp_expr T_SGT  add_expr              { tree_t *n = ast_node_new(TT_LGT); expr_add_child(n,$1); expr_add_child(n,$3); $$ = n; }
+    | cmp_expr T_SGE  add_expr              { tree_t *n = ast_node_new(TT_LGE); expr_add_child(n,$1); expr_add_child(n,$3); $$ = n; }
     ;
+
 add_expr
     : mul_expr                              { $$ = $1; }
-    | add_expr '+' mul_expr                 { $$ = rbinop(RE_ADD, $1, $3, yylineno); }
-    | add_expr '-' mul_expr                 { $$ = rbinop(RE_SUB, $1, $3, yylineno); }
+    | add_expr '+' mul_expr                 { tree_t *n = ast_node_new(TT_ADD); expr_add_child(n,$1); expr_add_child(n,$3); $$ = n; }
+    | add_expr '-' mul_expr                 { tree_t *n = ast_node_new(TT_SUB); expr_add_child(n,$1); expr_add_child(n,$3); $$ = n; }
     ;
+
 mul_expr
     : pow_expr                              { $$ = $1; }
-    | mul_expr '*' pow_expr                 { $$ = rbinop(RE_MUL, $1, $3, yylineno); }
-    | mul_expr '/' pow_expr                 { $$ = rbinop(RE_DIV, $1, $3, yylineno); }
-    | mul_expr '%' pow_expr                 { $$ = rbinop(RE_MOD, $1, $3, yylineno); }
+    | mul_expr '*' pow_expr                 { tree_t *n = ast_node_new(TT_MUL); expr_add_child(n,$1); expr_add_child(n,$3); $$ = n; }
+    | mul_expr '/' pow_expr                 { tree_t *n = ast_node_new(TT_DIV); expr_add_child(n,$1); expr_add_child(n,$3); $$ = n; }
+    | mul_expr '%' pow_expr                 { tree_t *n = ast_node_new(TT_MOD); expr_add_child(n,$1); expr_add_child(n,$3); $$ = n; }
     ;
+
 pow_expr
     : unary_expr                            { $$ = $1; }
-    | unary_expr '^'       pow_expr         { $$ = rbinop(RE_POW, $1, $3, yylineno); }
-    | unary_expr T_STARSTAR pow_expr        { $$ = rbinop(RE_POW, $1, $3, yylineno); }
+    | unary_expr '^'       pow_expr         { tree_t *n = ast_node_new(TT_POW); expr_add_child(n,$1); expr_add_child(n,$3); $$ = n; }
+    | unary_expr T_STARSTAR pow_expr        { tree_t *n = ast_node_new(TT_POW); expr_add_child(n,$1); expr_add_child(n,$3); $$ = n; }
     ;
+
 unary_expr
     : postfix_expr                          { $$ = $1; }
-    | '-' unary_expr %prec UMINUS           { $$ = rbinop(RE_NEG,   NULL, $2, yylineno); }
-    | '+' unary_expr %prec UPLUS            { $$ = rbinop(RE_POS,   NULL, $2, yylineno); }
-    | '~' unary_expr %prec UTILDE          { $$ = rbinop(RE_NOT,   NULL, $2, yylineno); }
-    | '\\' unary_expr %prec UBACK          { $$ = rbinop(RE_NOT,   NULL, $2, yylineno); }
-    | '/' unary_expr %prec USLASH          { $$ = rbinop(RE_VALUE, NULL, $2, yylineno); }
-    | '!' unary_expr %prec UBANG           { $$ = rbinop(RE_BANG,  NULL, $2, yylineno); }
+    | '-' unary_expr %prec UMINUS           { tree_t *n = ast_node_new(TT_MNS);      expr_add_child(n, $2); $$ = n; }
+    | '+' unary_expr %prec UPLUS            { $$ = $2; /* unary plus is identity */ }
+    | '~' unary_expr %prec UTILDE           { tree_t *n = ast_node_new(TT_NOT);      expr_add_child(n, $2); $$ = n; }
+    | '\\' unary_expr %prec UBACK           { tree_t *n = ast_node_new(TT_NOT);      expr_add_child(n, $2); $$ = n; }
+    | '/' unary_expr %prec USLASH           { tree_t *n = ast_node_new(TT_NONNULL);  expr_add_child(n, $2); $$ = n; }
+    | '!' unary_expr %prec UBANG            { tree_t *n = ast_node_new(TT_ITERATE);  expr_add_child(n, $2); $$ = n; }
     | '@' T_IDENT %prec UAT                 {
-            RExpr *e = rexpr_new(RE_CURSOR, yylineno);
-            e->sval = $2; $$ = e;
+            tree_t *n = ast_node_new(TT_CAPT_CURSOR);
+            n->v.sval = strdup($2); $$ = n;
         }
-    | '$' unary_expr %prec UDOLLAR         { $$ = rbinop(RE_DEREF,  NULL, $2, yylineno); }
-    | '.' unary_expr %prec UDOT            { $$ = rbinop(RE_COND,   NULL, $2, yylineno); }
+    | '$' unary_expr %prec UDOLLAR          { tree_t *n = ast_node_new(TT_INDIRECT); expr_add_child(n, $2); $$ = n; }
+    | '.' unary_expr %prec UDOT             {
+            /* prefix dot = conditional capture with implicit subject */
+            tree_t *n = ast_node_new(TT_CAPT_COND_ASGN);
+            expr_add_child(n, ast_node_new(TT_NUL));
+            expr_add_child(n, $2); $$ = n;
+        }
     ;
+
 postfix_expr
     : primary                               { $$ = $1; }
     | postfix_expr '(' arglist ')'
         {
-            EAL *al = $3;
-            RExpr *e = rexpr_new(RE_CALL, $1->lineno);
-            if ($1->kind == RE_VAR) {
-                e->sval = $1->sval; free($1);
+            TAL *al = $3;
+            tree_t *f;
+            /* if callee is a plain TT_VAR, promote to TT_FNC with name */
+            if ($1->t == TT_VAR) {
+                f = ast_node_new(TT_FNC);
+                f->v.sval = $1->v.sval;  /* steal sval */
+                $1->v.sval = NULL;
             } else {
-                e->left = $1;
+                /* indirect call: TT_FNC with no name, first child = callee */
+                f = ast_node_new(TT_FNC);
+                expr_add_child(f, $1);
             }
-            e->args  = al->a;
-            e->nargs = al->n;
-            free(al);
-            $$ = e;
+            for (int i = 0; i < al->n; i++)
+                expr_add_child(f, al->a[i] ? al->a[i] : ast_node_new(TT_NUL));
+            free(al->a); free(al);
+            $$ = f;
         }
     | postfix_expr '[' arglist ']'
         {
-            EAL *al = $3;
-            RExpr *e = rexpr_new(RE_SUB_IDX, $1->lineno);
-            e->left  = $1;
-            e->args  = al->a;
-            e->nargs = al->n;
-            free(al);
-            $$ = e;
+            TAL *al = $3;
+            tree_t *idx = ast_node_new(TT_IDX);
+            expr_add_child(idx, $1);
+            for (int i = 0; i < al->n; i++)
+                expr_add_child(idx, al->a[i] ? al->a[i] : ast_node_new(TT_NUL));
+            free(al->a); free(al);
+            $$ = idx;
         }
     | postfix_expr '[' expr T_PLUSCOLON expr ']'
         {
-            RExpr *range = rexpr_new(RE_RANGE, $3->lineno);
-            range->left  = $3;
-            range->right = $5;
-            RExpr *e = rexpr_new(RE_SUB_IDX, $1->lineno);
-            e->left  = $1;
-            e->args  = malloc(1 * sizeof(RExpr *));
-            e->args[0] = range;
-            e->nargs = 1;
-            $$ = e;
+            /* section: TT_IDX c[0]=base c[1]=start c[2]=len */
+            tree_t *idx = ast_node_new(TT_IDX);
+            expr_add_child(idx, $1);
+            expr_add_child(idx, $3);
+            expr_add_child(idx, $5);
+            $$ = idx;
         }
     | postfix_expr '.' primary
         {
-            $$ = rbinop(RE_COND, $1, $3, yylineno);
+            tree_t *n = ast_node_new(TT_CAPT_COND_ASGN);
+            expr_add_child(n, $1); expr_add_child(n, $3); $$ = n;
         }
     | postfix_expr '$' primary
         {
-            $$ = rbinop(RE_IMM, $1, $3, yylineno);
+            tree_t *n = ast_node_new(TT_CAPT_IMMED_ASGN);
+            expr_add_child(n, $1); expr_add_child(n, $3); $$ = n;
         }
     ;
+
 primary
-    : T_STR         { RExpr *e = rexpr_new(RE_STR,     yylineno); e->sval = $1; $$ = e; }
-    | T_INT         { RExpr *e = rexpr_new(RE_INT,     yylineno); e->ival = $1; $$ = e; }
-    | T_REAL        { RExpr *e = rexpr_new(RE_REAL,    yylineno); e->dval = $1; $$ = e; }
-    | T_KEYWORD     { RExpr *e = rexpr_new(RE_KEYWORD, yylineno); e->sval = $1; $$ = e; }
-    | T_IDENT       { RExpr *e = rexpr_new(RE_VAR,     yylineno); e->sval = $1; $$ = e; }
+    : T_STR         { tree_t *n = ast_node_new(TT_QLIT); n->v.sval = $1; $$ = n; }
+    | T_INT         { tree_t *n = ast_node_new(TT_ILIT); n->v.ival = $1; $$ = n; }
+    | T_REAL        { tree_t *n = ast_node_new(TT_FLIT); n->v.dval = $1; $$ = n; }
+    | T_KEYWORD     { tree_t *n = ast_node_new(TT_KEYWORD); n->v.sval = $1; $$ = n; }
+    | T_IDENT       { tree_t *n = ast_node_new(TT_VAR); n->v.sval = $1; $$ = n; }
     | '(' expr ')'  { $$ = $2; }
     ;
+
 pat_expr
     : expr      { $$ = $1; }
     ;
+
 opt_expr
     :   { $$ = NULL; }
     | expr          { $$ = $1; }
     ;
+
 arglist
-    :   { $$ = eal_new(); }
+    :   { $$ = tal_new(); }
     | arglist_ne    { $$ = $1; }
     ;
+
 arglist_ne
-    : expr                      { EAL *al = eal_new(); eal_push(al, $1); $$ = al; }
-    | arglist_ne ',' expr       { eal_push($1, $3); $$ = $1; }
-    | arglist_ne ','            { eal_push($1, NULL); $$ = $1; }
+    : expr                      { TAL *al = tal_new(); tal_push(al, $1); $$ = al; }
+    | arglist_ne ',' expr       { tal_push($1, $3); $$ = $1; }
+    | arglist_ne ','            { tal_push($1, NULL); $$ = $1; }
     ;
+
 %%
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rebus_parse_init(void) {

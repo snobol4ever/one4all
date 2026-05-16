@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include "../../ast/ast.h"  /* PST-RB-5b: tree_t used in RDecl/RCase */
 typedef enum {
     RE_STR,
     RE_INT,
@@ -108,8 +109,10 @@ struct RStmt {
 };
 struct RCase {
     int       is_default;
-    RExpr    *guard;
-    RStmt    *body;
+    RExpr    *guard;       /* old path — unused after PST-RB-5b */
+    RStmt    *body;        /* old path — unused after PST-RB-5b */
+    tree_t   *guard_tree;  /* PST: tree_t guard expression */
+    tree_t   *body_tree;   /* PST: tree_t body */
     RCase    *next;
 };
 typedef enum {
@@ -125,8 +128,10 @@ struct RDecl {
     int       nparams;
     char    **locals;
     int       nlocals;
-    RStmt    *initial;
-    RStmt    *body;
+    RStmt    *initial;      /* old path */
+    RStmt    *body;         /* old path */
+    tree_t   *initial_tree; /* PST-RB-5b: tree_t initial block */
+    tree_t   *body_tree;    /* PST-RB-5b: tree_t body (TT_PROGRAM) */
     char    **fields;
     int       nfields;
     RDecl    *next;
