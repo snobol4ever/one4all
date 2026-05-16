@@ -89,6 +89,25 @@ IR_t * IR_exec_node(IR_t * nd) {
             nd->value = out;
             return IS_FAIL_fn(out) ? nd->ω : nd->γ;
         }
+        /* User-defined proc: look up proc_table by name; if ir_body exists, push frame and exec. */
+        for (int _pi = 0; _pi < proc_count; _pi++) {
+            if (!proc_table[_pi].name || strcmp(proc_table[_pi].name, nd->sval) != 0) continue;
+            if (!proc_table[_pi].ir_body) break;
+            if (frame_depth >= FRAME_STACK_MAX) break;
+            IcnFrame *_f = &frame_stack[frame_depth++];
+            memset(_f, 0, sizeof *_f);
+            _f->sc   = proc_table[_pi].lower_sc;
+            int _nsl = _f->sc.n > 0 ? _f->sc.n : 1;
+            if (_nsl > FRAME_SLOT_MAX) _nsl = FRAME_SLOT_MAX;
+            _f->env_n = _nsl;
+            for (int _k = 0; _k < proc_table[_pi].nparams && _k < nargs && _k < FRAME_SLOT_MAX; _k++)
+                _f->env[_k] = args[_k];
+            IR_reset(proc_table[_pi].ir_body);
+            out = IR_exec_once(proc_table[_pi].ir_body);
+            frame_depth--;
+            nd->value = out;
+            return IS_FAIL_fn(out) ? nd->ω : nd->γ;
+        }
         nd->value = FAILDESCR;
         return nd->ω;
     }
@@ -194,6 +213,60 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->value = NULVCL;
         return nd->γ;
     }
+    case IR_REPEAT: {
+        /* Icon repeat B. Run body forever; exit when body produces FAIL (break semantics). */
+        /* nd->c[0] = body. Safety cap prevents infinite loops in broken programs.          */
+        if (nd->n < 1 || !nd->c[0]) { nd->value = NULVCL; return nd->γ; }
+        int safety = 1000000;
+        while (safety-- > 0) {
+            nd->c[0]->state = 0;
+            IR_exec_node(nd->c[0]);
+            if (IS_FAIL_fn(nd->c[0]->value)) break;
+        }
+        nd->value = NULVCL;
+        return nd->γ;
+    }
+    case IR_ALT: {
+        /* Icon alternation A|B|C... n-ary. On alpha: try children left to right; on beta: */
+        /* resume current child; if it exhausts, advance to next child.                     */
+        /* nd->counter holds current child index (0..n-1). nd->state: 0=fresh, 1=active.   */
+        if (nd->n < 1) { nd->value = FAILDESCR; return nd->ω; }
+        if (nd->state == 0) {
+            for (int i = 0; i < nd->n; i++) {
+                if (!nd->c[i]) continue;
+                nd->c[i]->state = 0;
+                IR_exec_node(nd->c[i]);
+                if (!IS_FAIL_fn(nd->c[i]->value)) {
+                    nd->value = nd->c[i]->value;
+                    nd->counter = i;
+                    nd->state = 1;
+                    return nd->γ;
+                }
+            }
+            nd->value = FAILDESCR;
+            return nd->ω;
+        }
+        /* beta: resume current child */
+        int ci = (int)nd->counter;
+        if (ci < nd->n && nd->c[ci]) {
+            IR_exec_node(nd->c[ci]);
+            if (!IS_FAIL_fn(nd->c[ci]->value)) { nd->value = nd->c[ci]->value; return nd->γ; }
+        }
+        /* current exhausted: try next children from fresh */
+        for (int i = ci + 1; i < nd->n; i++) {
+            if (!nd->c[i]) continue;
+            nd->c[i]->state = 0;
+            IR_exec_node(nd->c[i]);
+            if (!IS_FAIL_fn(nd->c[i]->value)) {
+                nd->value = nd->c[i]->value;
+                nd->counter = i;
+                return nd->γ;
+            }
+        }
+        nd->state = 0;
+        nd->value = FAILDESCR;
+        return nd->ω;
+    }
     case IR_TO_BY: {
         if (nd->state == 0) {
             int64_t from = 0, by = 1;
@@ -256,6 +329,15 @@ IR_t * IR_exec_node(IR_t * nd) {
         }
         Δ--;
         nd->state = 0;
+        nd->value = FAILDESCR;
+        return nd->ω;
+    }
+    case IR_NOT: {
+        /* Icon `not E`. Succeeds with &null if E fails; fails if E succeeds. One child c[0]=E. */
+        if (nd->n < 1 || !nd->c[0]) { nd->value = NULVCL; return nd->γ; }
+        nd->c[0]->state = 0;
+        IR_exec_node(nd->c[0]);
+        if (IS_FAIL_fn(nd->c[0]->value)) { nd->value = NULVCL; return nd->γ; }
         nd->value = FAILDESCR;
         return nd->ω;
     }

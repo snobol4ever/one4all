@@ -3,6 +3,7 @@
 #include "snobol4.h"
 #include "coerce.h"
 #include "ast.h"
+#include "../frontend/icon/icon_lex.h"
 #include <string.h>
 #include <stdlib.h>
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -432,6 +433,94 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         IR_t *nd = IR_node_alloc(cfg, IR_SUCCEED);
         if (!nd) return NULL;
         return nd;
+    }
+    case TT_NOT: {
+        /* Icon `not E`. Succeeds with &null if E fails; fails if E succeeds. One child c[0]=E.     */
+        if (e->n < 1 || !e->c[0]) return NULL;
+        IR_t *inner = lower_icn_expr_node(cfg, e->c[0]);
+        if (!inner) return NULL;
+        IR_t *nd = IR_node_alloc(cfg, IR_NOT);
+        if (!nd) return NULL;
+        nd->c = calloc(1, sizeof(IR_t *));
+        if (!nd->c) return NULL;
+        nd->c[0] = inner;
+        nd->n = 1;
+        return nd;
+    }
+    case TT_REPEAT: {
+        if (e->n < 1 || !e->c[0]) return NULL;
+        IR_t *body = lower_icn_expr_node(cfg, e->c[0]);
+        if (!body) return NULL;
+        IR_t *nd = IR_node_alloc(cfg, IR_REPEAT);
+        if (!nd) return NULL;
+        nd->c = calloc(1, sizeof(IR_t *));
+        if (!nd->c) return NULL;
+        nd->c[0] = body;
+        nd->n = 1;
+        return nd;
+    }
+    case TT_ALTERNATE: {
+        /* Icon A|B|C alternation — n-ary.  Lower all arms; emit IR_ALT with nd->c[0..n-1].        */
+        if (e->n < 1) return NULL;
+        IR_t **arms = calloc((size_t)e->n, sizeof(IR_t *));
+        if (!arms) return NULL;
+        for (int j = 0; j < e->n; j++) {
+            if (!e->c[j]) { free(arms); return NULL; }
+            arms[j] = lower_icn_expr_node(cfg, e->c[j]);
+            if (!arms[j]) { free(arms); return NULL; }
+        }
+        IR_t *nd = IR_node_alloc(cfg, IR_ALT);
+        if (!nd) { free(arms); return NULL; }
+        nd->c = arms;
+        nd->n = e->n;
+        return nd;
+    }
+    case TT_AUGOP: {
+        /* Icon x +:= rhs etc.  TT_AUGOP: c[0]=lhs (var), c[1]=rhs. v.ival=IcnTkKind of augop.    */
+        /* Lower as: tmp = lhs op rhs; lhs := tmp.  Use IR_BINOP + IR_ASSIGN.                      */
+        if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
+        IR_t *lhs = lower_icn_expr_node(cfg, e->c[0]);
+        if (!lhs) return NULL;
+        IR_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
+        if (!rhs) return NULL;
+        IcnBinopKind op = ICN_BINOP_ADD;
+        int is_relop = 0;
+        switch ((IcnTkKind)e->v.ival) {
+        case TK_AUGPLUS:   op = ICN_BINOP_ADD;    break;
+        case TK_AUGMINUS:  op = ICN_BINOP_SUB;    break;
+        case TK_AUGSTAR:   op = ICN_BINOP_MUL;    break;
+        case TK_AUGSLASH:  op = ICN_BINOP_DIV;    break;
+        case TK_AUGMOD:    op = ICN_BINOP_MOD;    break;
+        case TK_AUGCONCAT: op = ICN_BINOP_CONCAT; break;
+        case TK_AUGEQ:     op = ICN_BINOP_EQ;  is_relop = 1; break;
+        case TK_AUGLT:     op = ICN_BINOP_LT;  is_relop = 1; break;
+        case TK_AUGLE:     op = ICN_BINOP_LE;  is_relop = 1; break;
+        case TK_AUGGT:     op = ICN_BINOP_GT;  is_relop = 1; break;
+        case TK_AUGGE:     op = ICN_BINOP_GE;  is_relop = 1; break;
+        case TK_AUGNE:     op = ICN_BINOP_NE;  is_relop = 1; break;
+        default:           return NULL;
+        }
+        IR_t *binop = IR_node_alloc(cfg, IR_BINOP);
+        if (!binop) return NULL;
+        binop->c = calloc(2, sizeof(IR_t *));
+        if (!binop->c) return NULL;
+        binop->c[0] = lhs;
+        binop->c[1] = rhs;
+        binop->n    = 2;
+        binop->ival  = (int64_t)op;
+        binop->ival2 = (int64_t)is_relop;
+        IR_t *asgn = IR_node_alloc(cfg, IR_ASSIGN);
+        if (!asgn) return NULL;
+        asgn->c = calloc(2, sizeof(IR_t *));
+        if (!asgn->c) return NULL;
+        /* lhs must be a fresh IR_VAR node pointing to same variable as c[0].                       */
+        /* Re-lower e->c[0] to get a writable lvalue ref.                                           */
+        IR_t *lhs2 = lower_icn_expr_node(cfg, e->c[0]);
+        if (!lhs2) return NULL;
+        asgn->c[0] = lhs2;
+        asgn->c[1] = binop;
+        asgn->n    = 2;
+        return asgn;
     }
     default:
         return NULL;
