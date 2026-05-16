@@ -492,34 +492,29 @@ function _apply(name, args) {
 const _user_fns = {};
 
 /* -----------------------------------------------------------------------
- * Pattern matching — sno_engine.js (SJ-5, M-SJ-B01)
+ * Pattern matching — DELETED (SJ4-JS-BB0)
+ *
+ * All interpreter code and references removed.
+ * See GOAL-SN4-JS-EMIT-BB-REWRITE.md for Byrd-box pattern factory implementation.
  * ----------------------------------------------------------------------- */
 
-const _engine = require(process.env.SNO_ENGINE ||
-    require('path').join(__dirname, 'sno_engine.js'));
-
-/* Inject vars hook so CAPT_IMM/CAPT_COND can write to _vars */
-_engine._set_vars_hook((v, text) => { _vars[v] = text; });
+/* Inject vars hook — DELETED */
+/* _engine._set_vars_hook(...) removed */
 
 /**
- * _match(subject, pat_node) → {matched,start,end} | null
- * pat_node is a pattern tree built by PAT_* helpers (or a string literal).
- * Used by pattern-match statements emitted by emit_js.c.
+ * _match(subject, pat_node) — DELETED
+ * Stub for compatibility.
  */
 function _match(subject, pat_node) {
-    if (pat_node === null || pat_node === undefined || pat_node === _FAIL)
-        return null;
-    return _engine.sno_search(_str(subject), pat_node);
+    throw new Error('_match: pattern matching not implemented (use Byrd-box factories via SJ4-JS-BB1+)');
 }
 
 /**
- * _match_anchored(subject, pat_node) → {matched,start,end} | null
- * Anchored at position 0 (for &ANCHOR / POS(0) patterns).
+ * _match_anchored(subject, pat_node) — DELETED
+ * Stub for compatibility.
  */
 function _match_anchored(subject, pat_node) {
-    if (pat_node === null || pat_node === undefined || pat_node === _FAIL)
-        return null;
-    return _engine.sno_match(_str(subject), pat_node);
+    throw new Error('_match_anchored: pattern matching not implemented (use Byrd-box factories via SJ4-JS-BB1+)');
 }
 
 /* -----------------------------------------------------------------------
@@ -546,22 +541,10 @@ function push_int(n)         { _stack.push(n); }
 function push_str(s, len)    { _stack.push(_str(s)); }
 function push_real_bits(bits){ _stack.push(_mkreal(bits)); }
 function push_null()         { _stack.push(null); }
-/* SNOBOL4 predefined pattern globals — pre-bound by all SNOBOL4 oracles
- * (SPITBOL/CSNOBOL4 expose FAIL, ARB, REM, BAL, SUCCEED, ABORT, FENCE as
- * read-only globals).  Resolved case-insensitively so that scrip's
- * case-sensitive name space still finds them when source uses lowercase
- * (which SPITBOL's default folding mode silently allows). */
+/* SNOBOL4 predefined pattern globals — DELETED (stub below) */
 function _builtin_pat_global(uname) {
-    switch (uname) {
-        case 'FAIL':    return _engine.PAT_fail();
-        case 'SUCCEED': return _engine.PAT_succeed();
-        case 'ABORT':   return _engine.PAT_abort();
-        case 'FENCE':   return _engine.PAT_fence();
-        case 'ARB':     return _engine.PAT_arb();
-        case 'REM':     return _engine.PAT_rem();
-        case 'BAL':     return _engine.PAT_bal();
-    }
-    return undefined;
+    /* Pattern globals require Byrd-box factories — not yet implemented */
+    throw new Error(`Pattern global ${uname} not implemented (use SJ4-JS-BB1+ Byrd-box factories)`);
 }
 function push_var(name) {
     const uname = name.toUpperCase();
@@ -840,141 +823,51 @@ function MatchState(subject) {
  * Exports
  * ----------------------------------------------------------------------- */
 
-/* Re-export PAT_* builders so emitted code can use them */
-const {
-    PAT_lit, PAT_alt, PAT_seq, PAT_any, PAT_notany,
-    PAT_span, PAT_break, PAT_arb, PAT_rem,
-    PAT_len, PAT_pos, PAT_rpos, PAT_tab, PAT_rtab,
-    PAT_fence, PAT_succeed, PAT_fail, PAT_abort, PAT_bal,
-    PAT_arbno, PAT_capt_imm, PAT_capt_cond,
-} = _engine;
+/* Re-export PAT_* builders — DELETED with sno_engine.js
+ * Stubs only — real implementation via emitted Byrd-box factories (SJ4-JS-BB1+)
+ */
 
-function _peek() { return _stack.length > 0 ? _stack[_stack.length - 1] : null; }
-
-/* -----------------------------------------------------------------------
- * SM_PAT_* stack-machine operations (SJ4-JS-5)
- *
- * Each pat_* function pops operands from _stack and pushes a pattern node
- * (an opaque object understood by sno_engine.engine).  Pattern construction
- * is left-to-right at compile time; the resulting tree is consumed by
- * exec_stmt() to perform the actual match.
- * ----------------------------------------------------------------------- */
-function pat_lit(s)     { _stack.push(_engine.PAT_lit(s != null ? _str(s) : '')); }
-function pat_span()     { const cs = _str(_stack.pop()); _stack.push(_engine.PAT_span(cs)); }
-function pat_break()    { const cs = _str(_stack.pop()); _stack.push(_engine.PAT_break(cs)); }
-function pat_any()      { const cs = _str(_stack.pop()); _stack.push(_engine.PAT_any(cs)); }
-function pat_notany()   { const cs = _str(_stack.pop()); _stack.push(_engine.PAT_notany(cs)); }
-function pat_len()      { const n  = _num(_stack.pop()); _stack.push(_engine.PAT_len(n)); }
-function pat_pos()      { const n  = _num(_stack.pop()); _stack.push(_engine.PAT_pos(n)); }
-function pat_rpos()     { const n  = _num(_stack.pop()); _stack.push(_engine.PAT_rpos(n)); }
-function pat_tab()      { const n  = _num(_stack.pop()); _stack.push(_engine.PAT_tab(n)); }
-function pat_rtab()     { const n  = _num(_stack.pop()); _stack.push(_engine.PAT_rtab(n)); }
-function pat_rem()      { _stack.push(_engine.PAT_rem()); }
-function pat_arb()      { _stack.push(_engine.PAT_arb()); }
-function pat_arbno()    { const p  = _stack.pop(); _stack.push(_engine.PAT_arbno(p)); }
-function pat_bal()      { _stack.push(_engine.PAT_bal()); }
-function pat_fail()     { _stack.push(_engine.PAT_fail()); }
-function pat_succeed()  { _stack.push(_engine.PAT_succeed()); }
-function pat_abort()    { _stack.push(_engine.PAT_abort()); }
-function pat_fence()    { _stack.push(_engine.PAT_fence()); }
-function pat_eps()      { _stack.push(''); /* epsilon = empty literal */ }
-function pat_cat()      { const r = _stack.pop(); const l = _stack.pop();
-                          _stack.push(_engine.PAT_seq(l, r)); }
-function pat_alt()      { const r = _stack.pop(); const l = _stack.pop();
-                          _stack.push(_engine.PAT_alt(l, r)); }
-function pat_deref()    {
-    const v = _stack.pop();
-    if (v && typeof v === 'object' && v.__pat) { _stack.push(v); return; }
-    if (typeof v === 'string') { _stack.push(_engine.PAT_lit(v)); return; }
-    _stack.push(_engine.PAT_lit(_str(v)));
-}
-function pat_refname(name) {
-    /* Deferred variable reference — at match time, look up the variable's
-     * current value as a pattern.  Modeled via PAT_deferred. */
-    _stack.push(_engine.PAT_deferred(() => {
-        const v = _vars[name];
-        if (v && typeof v === 'object' && v.__pat) return v;
-        return _engine.PAT_lit(_str(v));
-    }));
-}
-function pat_capture(vname, kind) {
-    /* Pop child pattern, wrap in capture node:
-     * kind 0 = conditional (. operator), kind 1 = immediate ($ operator) */
-    const child = _stack.pop();
-    if (kind === 1) _stack.push(_engine.PAT_capt_imm(child, vname));
-    else            _stack.push(_engine.PAT_capt_cond(child, vname));
-}
-function pat_capture_fn(fname, kind, namelist) {
-    /* . *func() / $ *func() — call func on matched text, assign to vars. */
-    const child = _stack.pop();
-    const names = namelist ? namelist.split('\t').filter(s => s) : [];
-    /* Wrap: capture matched text, then call func with named vars set. */
-    const tmp = '__cap_' + (_capture_seq++);
-    const wrap = _engine.PAT_capt_cond(child, tmp);
-    /* On success, schedule the call.  For now, simple wrapper. */
-    _stack.push({__pat:1, t:'CAPT_FN', child: wrap, fname, names, kind, tmp});
-}
-let _capture_seq = 0;
-function pat_capture_fn_args(fname, kind, nargs) {
-    const argv = [];
-    for (let i = 0; i < nargs; i++) argv.unshift(_stack.pop());
-    const child = _stack.pop();
-    _stack.push({__pat:1, t:'CAPT_FN_ARGS', child, fname, argv, kind});
-}
-function pat_usercall(fname) {
-    _stack.push({__pat:1, t:'USERCALL', fname, argv: []});
-}
-function pat_usercall_args(fname, nargs) {
-    const argv = [];
-    for (let i = 0; i < nargs; i++) argv.unshift(_stack.pop());
-    _stack.push({__pat:1, t:'USERCALL', fname, argv});
+function _stub_not_implemented(name) {
+    throw new Error(`SNOBOL4 pattern operation NOT IMPLEMENTED: ${name} (Byrd-box pattern factories not yet emitted by emit_js.c).`);
 }
 
-/* -----------------------------------------------------------------------
- * exec_stmt — execute a pattern statement (SUBJ PAT [= REPL])
- *
- * Stack before: [..., pat, subj, repl]  (repl is 0 when has_repl=0)
- * has_repl: 0=match only, 1=match-and-replace
- * subj_name: variable name to update with replacement (or empty/null)
- * Sets _last_ok to match success/failure.
- * ----------------------------------------------------------------------- */
-function exec_stmt(subj_name, has_repl) {
-    const repl    = _stack.pop();
-    const subject = _stack.pop();
-    const pattern = _stack.pop();
-    const s = _str(subject);
-    let result;
-    try {
-        const anchor = !!(_kw_store.ANCHOR);
-        result = anchor ? _engine.sno_match(s, pattern)
-                        : _engine.sno_search(s, pattern);
-    } catch (e) {
-        result = null;
-    }
-    if (!result || !result.matched) {
-        _last_ok = false;
-        return;
-    }
-    _last_ok = true;
-    /* Replacement: subj_name <- subj[0:start] + repl + subj[end:] */
-    if (has_repl && subj_name) {
-        const r = _str(repl);
-        const newsubj = s.slice(0, result.start) + r + s.slice(result.end);
-        _vars[subj_name] = newsubj;
-    }
-}
+function pat_lit(s) { _stub_not_implemented('pat_lit'); }
+function pat_span() { _stub_not_implemented('pat_span'); }
+function pat_break() { _stub_not_implemented('pat_break'); }
+function pat_any() { _stub_not_implemented('pat_any'); }
+function pat_notany() { _stub_not_implemented('pat_notany'); }
+function pat_len() { _stub_not_implemented('pat_len'); }
+function pat_pos() { _stub_not_implemented('pat_pos'); }
+function pat_rpos() { _stub_not_implemented('pat_rpos'); }
+function pat_tab() { _stub_not_implemented('pat_tab'); }
+function pat_rtab() { _stub_not_implemented('pat_rtab'); }
+function pat_rem() { _stub_not_implemented('pat_rem'); }
+function pat_arb() { _stub_not_implemented('pat_arb'); }
+function pat_arbno() { _stub_not_implemented('pat_arbno'); }
+function pat_bal() { _stub_not_implemented('pat_bal'); }
+function pat_fail() { _stub_not_implemented('pat_fail'); }
+function pat_succeed() { _stub_not_implemented('pat_succeed'); }
+function pat_abort() { _stub_not_implemented('pat_abort'); }
+function pat_fence() { _stub_not_implemented('pat_fence'); }
+function pat_eps() { _stub_not_implemented('pat_eps'); }
+function pat_cat() { _stub_not_implemented('pat_cat'); }
+function pat_alt() { _stub_not_implemented('pat_alt'); }
+function pat_deref() { _stub_not_implemented('pat_deref'); }
+function pat_refname(name) { _stub_not_implemented('pat_refname'); }
+function pat_capture(vname, kind) { _stub_not_implemented('pat_capture'); }
+function pat_capture_fn(fname, kind, namelist) { _stub_not_implemented('pat_capture_fn'); }
+function pat_capture_fn_args(fname, kind, nargs) { _stub_not_implemented('pat_capture_fn_args'); }
+function pat_usercall(fname) { _stub_not_implemented('pat_usercall'); }
+function pat_usercall_args(fname, nargs) { _stub_not_implemented('pat_usercall_args'); }
+function exec_stmt(subj_name, has_repl) { _stub_not_implemented('exec_stmt'); }
+
+function _peek() { throw new Error('_peek deleted'); }
 
 module.exports = {
     /* Core runtime */
     _vars, _FAIL, _is_fail, _str, _num, _cat,
     _add, _sub, _mul, _div, _pow, _apply, _kw, _is_int, _is_real, _real_result,
-    _match, _match_anchored, _user_fns, _peek,
-    /* Pattern builders */
-    PAT_lit, PAT_alt, PAT_seq, PAT_any, PAT_notany,
-    PAT_span, PAT_break, PAT_arb, PAT_rem,
-    PAT_len, PAT_pos, PAT_rpos, PAT_tab, PAT_rtab,
-    PAT_fence, PAT_succeed, PAT_fail, PAT_abort, PAT_bal,
-    PAT_arbno, PAT_capt_imm, PAT_capt_cond,
+    _match, _match_anchored, _user_fns,
     /* Stack machine API (SJ4-JS-2) */
     _init, _finalize,
     push_int, push_str, push_real_bits, push_null, push_var,
@@ -983,7 +876,7 @@ module.exports = {
     halt_tos, call, do_return,
     /* User-fn dispatch (SJ4-JS-4c) */
     _register_label_pcs, call_or_jump, fn_return,
-    /* SM-level pattern stack ops (SJ4-JS-5) */
+    /* SM-level pattern stack ops — STUBS ONLY (see SJ4-JS-BB1 for real impl) */
     pat_lit, pat_span, pat_break, pat_any, pat_notany,
     pat_len, pat_pos, pat_rpos, pat_tab, pat_rtab,
     pat_rem, pat_arb, pat_arbno, pat_bal,
@@ -992,5 +885,4 @@ module.exports = {
     pat_capture, pat_capture_fn, pat_capture_fn_args,
     pat_usercall, pat_usercall_args,
     exec_stmt,
-    MatchState,
 };
