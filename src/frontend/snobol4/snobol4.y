@@ -100,7 +100,7 @@ goto_atom  : T_STR   { tree_t*e=ast_node_new(TT_QLIT);  e->v.sval=(char*)$1.sval
            | T_END    { tree_t*e=ast_node_new(TT_VAR);   e->v.sval=(char*)$1.sval; $$=e; }
            ;
 goto_expr  : goto_atom                          { $$=$1; }
-           | goto_expr T_CONCAT goto_atom       { if($1->t==TT_SEQ){expr_add_child($1,$3);$$=$1;}else{tree_t*s=ast_node_new(TT_SEQ);expr_add_child(s,$1);expr_add_child(s,$3);$$=s;} }
+           | goto_expr T_CONCAT goto_atom       { tree_t*s=ast_node_new(TT_SEQ);expr_add_child(s,$1);expr_add_child(s,$3);$$=s; }
            ;
 goto_label_expr
            : T_GOTO_LPAREN T_IDENT T_GOTO_RPAREN                                             { tree_t*e=ast_node_new(TT_QLIT);e->v.sval=strdup($2.sval);$$=e; }
@@ -117,10 +117,10 @@ expr0      : expr2 T_2EQUAL expr0                                               
 expr2      : expr2 T_2AMP  expr3                                                             { tree_t*_e=expr_binary(TT_OPSYN,$1,$3); _e->v.sval=strdup("&"); $$=_e; }
            | expr3                                                                                 { $$=$1; }
            ;
-expr3      : expr3 T_2PIPE expr4                                                            { if($1->t==TT_ALT){expr_add_child($1,$3);$$=$1;}else{tree_t*a=ast_node_new(TT_ALT);expr_add_child(a,$1);expr_add_child(a,$3);$$=a;} }
+expr3      : expr3 T_2PIPE expr4                                                            { tree_t*a=ast_node_new(TT_ALT);expr_add_child(a,$1);expr_add_child(a,$3);$$=a; }
            | expr4                                                                                 { $$=$1; }
            ;
-expr4      : expr4 T_CONCAT expr5                                                                           { if($1->t==TT_SEQ){expr_add_child($1,$3);$$=$1;}else{tree_t*s=ast_node_new(TT_SEQ);expr_add_child(s,$1);expr_add_child(s,$3);$$=s;} }
+expr4      : expr4 T_CONCAT expr5                                                                           { tree_t*s=ast_node_new(TT_SEQ);expr_add_child(s,$1);expr_add_child(s,$3);$$=s; }
            | expr5                                                                                 { $$=$1; }
            ;
 expr5      : expr5 T_2AT    expr6                                                             { tree_t*_e=expr_binary(TT_OPSYN,$1,$3); _e->v.sval=strdup("@"); $$=_e; }
