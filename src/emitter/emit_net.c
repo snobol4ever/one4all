@@ -665,22 +665,121 @@ static int emit_net_scalar(IR_t * nd, FILE * out) {
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* net_parse_define_proto — parse a DEFINE prototype string "FuncName(p1,p2,...)[locals]"
+ * Fills *out_fname (malloc'd) with the function name, and returns a malloc'd NULL-terminated
+ * array of malloc'd param names. Caller must free both. On no parens, returns empty list. */
+static char ** net_parse_define_proto(const char * proto, char ** out_fname, int * out_n) {
+    *out_fname = NULL;
+    *out_n = 0;
+    if (!proto) return NULL;
+    const char * lp = strchr(proto, '(');
+    const char * rp = lp ? strchr(lp, ')') : NULL;
+    if (!lp) {
+        /* No parens — function with no formal parameters */
+        size_t flen = strlen(proto);
+        char * fn = (char *)malloc(flen + 1);
+        memcpy(fn, proto, flen); fn[flen] = '\0';
+        *out_fname = fn;
+        return NULL;
+    }
+    size_t flen = (size_t)(lp - proto);
+    char * fn = (char *)malloc(flen + 1);
+    memcpy(fn, proto, flen); fn[flen] = '\0';
+    *out_fname = fn;
+    if (!rp || rp <= lp + 1) return NULL;
+    /* Parse comma-separated param list between lp+1 and rp */
+    int cap = 4, count = 0;
+    char ** params = (char **)malloc((size_t)(cap + 1) * sizeof(char *));
+    const char * s = lp + 1;
+    while (s < rp) {
+        while (s < rp && (*s == ' ' || *s == '\t')) s++;
+        const char * pstart = s;
+        while (s < rp && *s != ',' && *s != ' ' && *s != '\t') s++;
+        size_t plen = (size_t)(s - pstart);
+        if (plen > 0) {
+            if (count >= cap) { cap *= 2; params = (char **)realloc(params, (size_t)(cap + 1) * sizeof(char *)); }
+            char * p = (char *)malloc(plen + 1);
+            memcpy(p, pstart, plen); p[plen] = '\0';
+            params[count++] = p;
+        }
+        while (s < rp && (*s == ' ' || *s == '\t')) s++;
+        if (s < rp && *s == ',') s++;
+    }
+    params[count] = NULL;
+    *out_n = count;
+    return params;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* emit_net_from_sm — walk SM_Program and emit MSIL switch-dispatch loop. */
 static int emit_net_from_sm(SM_Program * sm, FILE * out) {
     if (!sm || !out) return 0;
     int n = sm->count;
     int * fn_pcs = NULL;
     const char ** fn_names = NULL;
+    char *** fn_params = NULL;   /* fn_params[k] = NULL-terminated array of param names for function k */
+    int * fn_nparams = NULL;
     int fn_count = 0;
+    int * pc_to_fn = NULL;
     if (n > 0) {
         fn_pcs = (int *)calloc((size_t)n, sizeof(int));
         fn_names = (const char **)calloc((size_t)n, sizeof(const char *));
+        fn_params = (char ***)calloc((size_t)n, sizeof(char **));
+        fn_nparams = (int *)calloc((size_t)n, sizeof(int));
+        pc_to_fn = (int *)malloc((size_t)n * sizeof(int));
+        for (int p = 0; p < n; p++) pc_to_fn[p] = -1;
+        /* First pass: find define_entry labels */
         for (int i = 0; i < n; i++) {
             SM_Instr * ins = &sm->instrs[i];
             if (ins->op == SM_LABEL && ins->a[2].i && ins->a[0].s) {
                 fn_pcs[fn_count] = i;
                 fn_names[fn_count] = ins->a[0].s;
                 fn_count++;
+            }
+        }
+        /* Second pass: scan for SUSPEND_VALUE "DEFINE" with preceding PUSH_LIT_S,
+         * parse the prototype, and link param lists to function entries by name. */
+        for (int i = 1; i < n; i++) {
+            SM_Instr * ins = &sm->instrs[i];
+            if (ins->op != SM_SUSPEND_VALUE) continue;
+            if (!ins->a[0].s || strcmp(ins->a[0].s, "DEFINE") != 0) continue;
+            SM_Instr * prev = &sm->instrs[i - 1];
+            if (prev->op != SM_PUSH_LIT_S && prev->op != SM_PUSH_LIT_CS) continue;
+            if (!prev->a[0].s) continue;
+            char * fname = NULL; int npar = 0;
+            char ** pars = net_parse_define_proto(prev->a[0].s, &fname, &npar);
+            if (fname) {
+                for (int k = 0; k < fn_count; k++) {
+                    if (fn_names[k] && strcmp(fn_names[k], fname) == 0) {
+                        fn_params[k] = pars;
+                        fn_nparams[k] = npar;
+                        pars = NULL;   /* ownership transferred */
+                        break;
+                    }
+                }
+                free(fname);
+                if (pars) {
+                    for (int q = 0; q < npar; q++) free(pars[q]);
+                    free(pars);
+                }
+            }
+        }
+        /* Third pass: build a per-PC mapping of which function (if any) each PC belongs to.
+         * A function's body extends from its entry_pc through the corresponding SM_JUMP-around
+         * target minus one. We find this by looking backward from each entry_pc for the
+         * SM_JUMP that jumps to a PC strictly past entry_pc — that's the around-jump. */
+        for (int k = 0; k < fn_count; k++) {
+            int entry = fn_pcs[k];
+            int around_target = -1;
+            for (int p = entry - 1; p >= 0; p--) {
+                SM_Instr * pi = &sm->instrs[p];
+                if (pi->op == SM_JUMP && (int)pi->a[0].i > entry) {
+                    around_target = (int)pi->a[0].i;
+                    break;
+                }
+            }
+            int body_end = (around_target > 0) ? around_target - 1 : entry;
+            for (int p = entry; p <= body_end && p < n; p++) {
+                if (pc_to_fn[p] < 0) pc_to_fn[p] = k;
             }
         }
     }
@@ -770,6 +869,23 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
             has_continue = 1;
             break;
         case SM_LABEL:
+            if (instr->a[2].i && instr->a[0].s) {
+                /* define_entry: set last_ok=true so the function-entry NRETURN_F
+                 * guard (which fires only on last_ok==false) is skipped. */
+                fprintf(out, "    ldc.i4.1\n");
+                fprintf(out, "    call       void SnoRt::set_last_ok(bool)\n");
+                /* Bind args to params in reverse pop order */
+                int k = -1;
+                for (int q = 0; q < fn_count; q++) {
+                    if (fn_pcs[q] == i) { k = q; break; }
+                }
+                if (k >= 0 && fn_params[k] && fn_nparams[k] > 0) {
+                    for (int p = fn_nparams[k] - 1; p >= 0; p--) {
+                        net_escape_ldstr(out, fn_params[k][p]);
+                        fprintf(out, "    call       void SnoRt::store_var(string)\n");
+                    }
+                }
+            }
             break;
         case SM_JUMP:
             fprintf(out, "    ldc.i4     %lld\n    stloc      _pc\n    br         NET_DISPATCH\n", instr->a[0].i);
@@ -809,7 +925,23 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
         }
         case SM_RETURN:
         case SM_RETURN_S:
-        case SM_RETURN_F:
+        case SM_RETURN_F: {
+            int fk = (i >= 0 && i < n && pc_to_fn) ? pc_to_fn[i] : -1;
+            const char * fname = (fk >= 0) ? fn_names[fk] : NULL;
+            /* _S: skip if !last_ok; _F: skip if last_ok */
+            if (instr->op == SM_RETURN_S) {
+                fprintf(out, "    call       bool SnoRt::last_ok()\n");
+                fprintf(out, "    brfalse    NET_L%d\n", i + 1);
+            } else if (instr->op == SM_RETURN_F) {
+                fprintf(out, "    call       bool SnoRt::last_ok()\n");
+                fprintf(out, "    brtrue     NET_L%d\n", i + 1);
+            }
+            if (fname) {
+                net_escape_ldstr(out, fname);
+                fprintf(out, "    call       void SnoRt::push_var(string)\n");
+            } else {
+                fprintf(out, "    call       void SnoRt::push_null()\n");
+            }
             net_push_i4(out, 0);
             net_push_i4(out, 1);
             fprintf(out, "    call       void SnoRt::do_return(int32, bool)\n");
@@ -817,9 +949,18 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
             fprintf(out, "    stloc      _pc\n    br         NET_DISPATCH\n");
             has_continue = 1;
             break;
+        }
         case SM_FRETURN:
         case SM_FRETURN_S:
         case SM_FRETURN_F:
+            if (instr->op == SM_FRETURN_S) {
+                fprintf(out, "    call       bool SnoRt::last_ok()\n");
+                fprintf(out, "    brfalse    NET_L%d\n", i + 1);
+            } else if (instr->op == SM_FRETURN_F) {
+                fprintf(out, "    call       bool SnoRt::last_ok()\n");
+                fprintf(out, "    brtrue     NET_L%d\n", i + 1);
+            }
+            fprintf(out, "    call       void SnoRt::push_null()\n");
             net_push_i4(out, 1);
             net_push_i4(out, 0);
             fprintf(out, "    call       void SnoRt::do_return(int32, bool)\n");
@@ -829,7 +970,22 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
             break;
         case SM_NRETURN:
         case SM_NRETURN_S:
-        case SM_NRETURN_F:
+        case SM_NRETURN_F: {
+            int fk = (i >= 0 && i < n && pc_to_fn) ? pc_to_fn[i] : -1;
+            const char * fname = (fk >= 0) ? fn_names[fk] : NULL;
+            if (instr->op == SM_NRETURN_S) {
+                fprintf(out, "    call       bool SnoRt::last_ok()\n");
+                fprintf(out, "    brfalse    NET_L%d\n", i + 1);
+            } else if (instr->op == SM_NRETURN_F) {
+                fprintf(out, "    call       bool SnoRt::last_ok()\n");
+                fprintf(out, "    brtrue     NET_L%d\n", i + 1);
+            }
+            if (fname) {
+                net_escape_ldstr(out, fname);
+                fprintf(out, "    call       void SnoRt::push_var(string)\n");
+            } else {
+                fprintf(out, "    call       void SnoRt::push_null()\n");
+            }
             net_push_i4(out, 2);
             net_push_i4(out, 0);
             fprintf(out, "    call       void SnoRt::do_return(int32, bool)\n");
@@ -837,6 +993,7 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
             fprintf(out, "    stloc      _pc\n    br         NET_DISPATCH\n");
             has_continue = 1;
             break;
+        }
         case SM_DEFINE_ENTRY:
         case SM_DEFINE:
         case SM_EXEC_STMT:
@@ -897,6 +1054,17 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
         if (!has_continue && i + 1 < n) { net_push_i4(out, i + 1); fprintf(out, "    stloc      _pc\n    br         NET_DISPATCH\n"); }
     }
     fprintf(out, "  NET_DONE:\n");
+    if (fn_params) {
+        for (int k = 0; k < fn_count; k++) {
+            if (fn_params[k]) {
+                for (int q = 0; q < fn_nparams[k]; q++) free(fn_params[k][q]);
+                free(fn_params[k]);
+            }
+        }
+        free(fn_params);
+    }
+    free(fn_nparams);
+    free(pc_to_fn);
     free(fn_pcs);
     free(fn_names);
     return 0;
