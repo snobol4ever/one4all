@@ -294,7 +294,46 @@ const _builtins = {
     LNE(args)     { return _str(args[0]) !== _str(args[1]) ? '' : _FAIL; },
     INTEGER(args) { const n=Number(args[0]); return Number.isInteger(n) ? n : _FAIL; },
     REAL(args)    { const n=Number(args[0]); return isFinite(n) ? n : _FAIL; },
-    CONVERT(args) { /* basic: return arg[0] */ return args[0]; },
+    CONVERT(args) {
+        /* CONVERT(value, type) — convert value to the named type.
+         * type is a string like 'INTEGER', 'REAL', 'STRING', 'NUMERIC',
+         * 'EXPRESSION', 'PATTERN', 'ARRAY', 'TABLE' (latter four stubbed).
+         * On failure returns _FAIL so :F branches work. */
+        const v = args[0];
+        const t = (args[1] !== null && args[1] !== undefined) ? _str(args[1]).toUpperCase() : 'STRING';
+        if (v === _FAIL) return _FAIL;
+        switch (t) {
+            case 'INTEGER': {
+                if (v === null || v === undefined || v === '') return 0;
+                if (_is_real(v)) return Math.trunc(v.v);
+                const n = Number(v);
+                if (!isFinite(n)) return _FAIL;
+                return Math.trunc(n);
+            }
+            case 'REAL': {
+                if (v === null || v === undefined || v === '') return _real_result(0);
+                if (_is_real(v)) return v;
+                const n = Number(v);
+                if (!isFinite(n)) return _FAIL;
+                return _real_result(n);
+            }
+            case 'NUMERIC': {
+                if (v === null || v === undefined || v === '') return 0;
+                if (_is_real(v)) return v;
+                const n = Number(v);
+                if (!isFinite(n)) return _FAIL;
+                return Number.isInteger(n) ? n : _real_result(n);
+            }
+            case 'STRING': return _str(v);
+            case 'EXPRESSION':
+            case 'PATTERN':
+            case 'ARRAY':
+            case 'TABLE':
+                return v;  /* stubbed — return as-is */
+            default:
+                return v;
+        }
+    },
     DATATYPE(args){ const v=args[0]; if(_is_real(v)) return 'REAL'; if(typeof v==='number'||(_is_int(v)&&v!==null&&v!=='')) return 'INTEGER'; return 'STRING'; },
     INPUT(args)   { return _vars['INPUT']; },
     OUTPUT(args)  { if(args[0]!==undefined) _vars['OUTPUT']=args[0]; return args[0]; },
@@ -495,13 +534,40 @@ function push_int(n)         { _stack.push(n); }
 function push_str(s, len)    { _stack.push(_str(s)); }
 function push_real_bits(bits){ _stack.push(_mkreal(bits)); }
 function push_null()         { _stack.push(null); }
+/* SNOBOL4 predefined pattern globals — pre-bound by all SNOBOL4 oracles
+ * (SPITBOL/CSNOBOL4 expose FAIL, ARB, REM, BAL, SUCCEED, ABORT, FENCE as
+ * read-only globals).  Resolved case-insensitively so that scrip's
+ * case-sensitive name space still finds them when source uses lowercase
+ * (which SPITBOL's default folding mode silently allows). */
+function _builtin_pat_global(uname) {
+    switch (uname) {
+        case 'FAIL':    return _engine.PAT_fail();
+        case 'SUCCEED': return _engine.PAT_succeed();
+        case 'ABORT':   return _engine.PAT_abort();
+        case 'FENCE':   return _engine.PAT_fence();
+        case 'ARB':     return _engine.PAT_arb();
+        case 'REM':     return _engine.PAT_rem();
+        case 'BAL':     return _engine.PAT_bal();
+    }
+    return undefined;
+}
 function push_var(name) {
     const uname = name.toUpperCase();
     if (uname in _kw_store) {
         _stack.push(_kw(uname));
-    } else {
-        _stack.push(_vars[name]);
+        return;
     }
+    if (name in _vars) {
+        _stack.push(_vars[name]);
+        return;
+    }
+    /* Predefined SNOBOL4 pattern globals (FAIL, ARB, REM, BAL, etc.).
+     * Pre-bound by all SNOBOL4 oracles.  Resolved case-insensitively so
+     * scrip's case-sensitive name space still finds them when source uses
+     * lowercase (which SPITBOL's default folding mode silently allows). */
+    const pg = _builtin_pat_global(uname);
+    if (pg !== undefined) { _stack.push(pg); return; }
+    _stack.push(_vars[name]);  /* yields null/undefined, the SNOBOL4 null */
 }
 function pop_void()          { _stack.pop(); }
 
