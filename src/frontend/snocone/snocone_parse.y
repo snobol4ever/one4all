@@ -37,31 +37,69 @@ typedef struct ScParseState {
 #include <string.h>
 #include <ctype.h>
 #include "snocone_lex.h"
+#include "../icon/icon_lex.h"
+/* compat shims: old names → new canonical names */
+#define expr_new(k)            ast_node_new(k)
+#define expr_add_child(p,c)    ast_push((p),(c))
+#define AST_ASSIGN  TT_ASSIGN
+#define AST_ADD     TT_ADD
+#define AST_SUB     TT_SUB
+#define AST_MUL     TT_MUL
+#define AST_DIV     TT_DIV
+#define AST_POW     TT_POW
+#define AST_SEQ     TT_SEQ
+#define AST_ALT     TT_ALT
+#define AST_SCAN    TT_SCAN
+#define AST_FNC     TT_FNC
+#define AST_VAR     TT_VAR
+#define AST_KEYWORD TT_KEYWORD
+#define AST_QLIT    TT_QLIT
+#define AST_ILIT    TT_ILIT
+#define AST_FLIT    TT_FLIT
+#define AST_NUL     TT_NUL
+#define AST_VLIST   TT_VLIST
+#define AST_IDX     TT_IDX
+#define AST_INDIRECT   TT_INDIRECT
+#define AST_DEFER      TT_DEFER
+#define AST_NAME       TT_NAME
+#define AST_CAPT_CURSOR      TT_CAPT_CURSOR
+#define AST_CAPT_IMMED_ASGN  TT_CAPT_IMMED_ASGN
+#define AST_CAPT_COND_ASGN   TT_CAPT_COND_ASGN
+#define AST_PLS        TT_PLS
+#define AST_MNS        TT_MNS
+#define AST_NOT        TT_NOT
+#define AST_INTERROGATE TT_INTERROGATE
+#define AST_OPSYN      TT_OPSYN
+/* old field names → new field names */
+#define kind       t
+#define nchildren  n
+#define children   c
+#define sval       v.sval
+#define ival       v.ival
+#define dval       v.dval
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int  sc_lex  (SC_STYPE *yylval, ScParseState *st);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void sc_error(ScParseState *st, const char *msg);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void     sc_append_stmt        (ScParseState *st, AST_t *top);
+static void     sc_append_stmt        (ScParseState *st, tree_t *top);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void     sc_split_subject_pattern(AST_t **subj_io, AST_t **pat_io);
+static void     sc_split_subject_pattern(tree_t **subj_io, tree_t **pat_io);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static AST_t  *sc_int_literal        (const char *txt);
+static tree_t  *sc_int_literal        (const char *txt);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static AST_t  *sc_real_literal       (const char *txt);
+static tree_t  *sc_real_literal       (const char *txt);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static AST_t  *sc_str_literal        (const char *txt);
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static AST_t  *sc_clone_expr_simple  (AST_t *e);
+static tree_t  *sc_str_literal        (const char *txt);
 struct IfHead {
-    AST_t *cond;
+    tree_t *cond;
     STMT_t *before_body;   /* st->code->tail snapshot at end of if_head reduction
                               (NULL if list was empty); body starts at
                               before_body->next or st->code->head if NULL.     */
     int     lineno;
 };
 struct WhileHead {
-    AST_t *cond;
+    tree_t *cond;
     STMT_t *before_body;
     int     lineno;
     char   *cont_label;
@@ -75,8 +113,8 @@ struct DoHead {
 };
 struct ForHead {
     STMT_t *before_loop;
-    AST_t *cond;
-    AST_t *step;
+    tree_t *cond;
+    tree_t *step;
     int     lineno;
     char   *cont_label;
     char   *end_label;
@@ -94,10 +132,10 @@ struct FuncHead {
 };
 struct CaseEntry {
     char   *case_label;
-    AST_t *value;
+    tree_t *value;
 };
 struct SwitchHead {
-    AST_t *disc;
+    tree_t *disc;
     char   *tmp_name;
     char   *end_label;
     char   *default_label;
@@ -113,15 +151,15 @@ struct SwitchHead {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static char    *sc_label_new          (ScParseState *st, const char *prefix);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static struct IfHead    *sc_if_head_new    (ScParseState *st, AST_t *cond);
+static struct IfHead    *sc_if_head_new    (ScParseState *st, tree_t *cond);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static struct WhileHead *sc_while_head_new (ScParseState *st, AST_t *cond);
+static struct WhileHead *sc_while_head_new (ScParseState *st, tree_t *cond);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static struct DoHead    *sc_do_head_new    (ScParseState *st);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static struct ForHead   *sc_for_head_new   (ScParseState *st, AST_t *cond, AST_t *step);
+static struct ForHead   *sc_for_head_new   (ScParseState *st, tree_t *cond, tree_t *step);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void     sc_append_return      (ScParseState *st, AST_t *retval);
+static void     sc_append_return      (ScParseState *st, tree_t *retval);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_append_freturn     (ScParseState *st);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -141,7 +179,7 @@ static void     sc_finalize_if_else   (ScParseState *st, struct IfHead *h, STMT_
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_finalize_while     (ScParseState *st, struct WhileHead *h);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void     sc_finalize_do_while  (ScParseState *st, struct DoHead *h, AST_t *cond);
+static void     sc_finalize_do_while  (ScParseState *st, struct DoHead *h, tree_t *cond);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_finalize_for       (ScParseState *st, struct ForHead *h);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -169,9 +207,9 @@ static void     sc_append_break        (ScParseState *st, char *user_label);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_append_continue     (ScParseState *st, char *user_label);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static struct SwitchHead *sc_switch_head_new(ScParseState *st, AST_t *disc);
+static struct SwitchHead *sc_switch_head_new(ScParseState *st, tree_t *disc);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void     sc_switch_case_label   (ScParseState *st, AST_t *value);
+static void     sc_switch_case_label   (ScParseState *st, tree_t *value);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_switch_default_label(ScParseState *st);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -184,7 +222,7 @@ static void     sc_emit_struct         (ScParseState *st, char *name, char *fiel
 %parse-param { ScParseState *st }
 %lex-param   { ScParseState *st }
 %union {
-    AST_t *expr;
+    tree_t *expr;
     char   *str;
     long    ival;
     double  dval;
@@ -375,29 +413,24 @@ block_stmt  : T_LBRACE stmt_list T_RBRACE      { }
 expr0       : expr1 T_2EQUAL    expr0
                                 { $$ = expr_binary(AST_ASSIGN, $1, $3); }
             | expr1 T_2EQUAL
-                                { AST_t *empty = expr_new(AST_QLIT);
+                                { tree_t *empty = expr_new(AST_QLIT);
                                   empty->sval = strdup("");
                                   $$ = expr_binary(AST_ASSIGN, $1, empty); }
             | expr1 T_PLUS_ASSIGN   expr0
-                                { AST_t *cl = sc_clone_expr_simple($1);
-                                  AST_t *rhs = expr_binary(AST_ADD, cl, $3);
-                                  $$ = expr_binary(AST_ASSIGN, $1, rhs); }
+                                { tree_t *a = ast_node_new(TT_AUGOP); a->ival = TK_AUGPLUS;
+                                  ast_push(a, $1); ast_push(a, $3); $$ = a; }
             | expr1 T_MINUS_ASSIGN  expr0
-                                { AST_t *cl = sc_clone_expr_simple($1);
-                                  AST_t *rhs = expr_binary(AST_SUB, cl, $3);
-                                  $$ = expr_binary(AST_ASSIGN, $1, rhs); }
+                                { tree_t *a = ast_node_new(TT_AUGOP); a->ival = TK_AUGMINUS;
+                                  ast_push(a, $1); ast_push(a, $3); $$ = a; }
             | expr1 T_STAR_ASSIGN   expr0
-                                { AST_t *cl = sc_clone_expr_simple($1);
-                                  AST_t *rhs = expr_binary(AST_MUL, cl, $3);
-                                  $$ = expr_binary(AST_ASSIGN, $1, rhs); }
+                                { tree_t *a = ast_node_new(TT_AUGOP); a->ival = TK_AUGSTAR;
+                                  ast_push(a, $1); ast_push(a, $3); $$ = a; }
             | expr1 T_SLASH_ASSIGN  expr0
-                                { AST_t *cl = sc_clone_expr_simple($1);
-                                  AST_t *rhs = expr_binary(AST_DIV, cl, $3);
-                                  $$ = expr_binary(AST_ASSIGN, $1, rhs); }
+                                { tree_t *a = ast_node_new(TT_AUGOP); a->ival = TK_AUGSLASH;
+                                  ast_push(a, $1); ast_push(a, $3); $$ = a; }
             | expr1 T_CARET_ASSIGN  expr0
-                                { AST_t *cl = sc_clone_expr_simple($1);
-                                  AST_t *rhs = expr_binary(AST_POW, cl, $3);
-                                  $$ = expr_binary(AST_ASSIGN, $1, rhs); }
+                                { tree_t *a = ast_node_new(TT_AUGOP); a->ival = TK_AUGPOW;
+                                  ast_push(a, $1); ast_push(a, $3); $$ = a; }
             | expr1
                                 { $$ = $1; }
             ;
@@ -408,7 +441,7 @@ expr1       : expr3 T_2QUEST expr1
             ;
 expr3       : expr3 T_2PIPE expr4
                                 { if ($1->kind == AST_ALT) { expr_add_child($1, $3); $$ = $1; }
-                                  else { AST_t *a = expr_new(AST_ALT);
+                                  else { tree_t *a = expr_new(AST_ALT);
                                          expr_add_child(a, $1); expr_add_child(a, $3);
                                          $$ = a; } }
             | expr4
@@ -416,53 +449,53 @@ expr3       : expr3 T_2PIPE expr4
             ;
 expr4       : expr4 T_CONCAT expr5
                                 { if ($1->kind == AST_SEQ) { expr_add_child($1, $3); $$ = $1; }
-                                  else { AST_t *s = expr_new(AST_SEQ);
+                                  else { tree_t *s = expr_new(AST_SEQ);
                                          expr_add_child(s, $1); expr_add_child(s, $3);
                                          $$ = s; } }
             | expr5
                                 { $$ = $1; }
             ;
 expr5       : expr5 T_EQ        expr6
-                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("EQ");
+                                { tree_t *e = expr_new(AST_FNC); e->sval = strdup("EQ");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr5 T_NE        expr6
-                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("NE");
+                                { tree_t *e = expr_new(AST_FNC); e->sval = strdup("NE");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr5 T_LT        expr6
-                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("LT");
+                                { tree_t *e = expr_new(AST_FNC); e->sval = strdup("LT");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr5 T_GT        expr6
-                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("GT");
+                                { tree_t *e = expr_new(AST_FNC); e->sval = strdup("GT");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr5 T_LE        expr6
-                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("LE");
+                                { tree_t *e = expr_new(AST_FNC); e->sval = strdup("LE");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr5 T_GE        expr6
-                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("GE");
+                                { tree_t *e = expr_new(AST_FNC); e->sval = strdup("GE");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr5 T_LEQ       expr6
-                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("LEQ");
+                                { tree_t *e = expr_new(AST_FNC); e->sval = strdup("LEQ");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr5 T_LNE       expr6
-                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("LNE");
+                                { tree_t *e = expr_new(AST_FNC); e->sval = strdup("LNE");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr5 T_LLT       expr6
-                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("LLT");
+                                { tree_t *e = expr_new(AST_FNC); e->sval = strdup("LLT");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr5 T_LGT       expr6
-                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("LGT");
+                                { tree_t *e = expr_new(AST_FNC); e->sval = strdup("LGT");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr5 T_LLE       expr6
-                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("LLE");
+                                { tree_t *e = expr_new(AST_FNC); e->sval = strdup("LLE");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr5 T_LGE       expr6
-                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("LGE");
+                                { tree_t *e = expr_new(AST_FNC); e->sval = strdup("LGE");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr5 T_IDENT_OP  expr6
-                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("IDENT");
+                                { tree_t *e = expr_new(AST_FNC); e->sval = strdup("IDENT");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr5 T_DIFFER    expr6
-                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("DIFFER");
+                                { tree_t *e = expr_new(AST_FNC); e->sval = strdup("DIFFER");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr6
                                 { $$ = $1; }
@@ -494,7 +527,7 @@ expr12      : expr12 T_2DOLLAR expr15
                                 { $$ = $1; }
             ;
 expr15      : expr15 T_LBRACK exprlist T_RBRACK
-                                { AST_t *idx = expr_new(AST_IDX);
+                                { tree_t *idx = expr_new(AST_IDX);
                                   expr_add_child(idx, $1);
                                   for (int i = 0; i < $3->nchildren; i++)
                                       expr_add_child(idx, $3->children[i]);
@@ -511,21 +544,21 @@ exprlist    : exprlist_ne
 exprlist_ne : exprlist_ne T_COMMA expr0
                                 { expr_add_child($1, $3); $$ = $1; }
             | expr0
-                                { AST_t *l = expr_new(AST_NUL); expr_add_child(l, $1); $$ = l; }
+                                { tree_t *l = expr_new(AST_NUL); expr_add_child(l, $1); $$ = l; }
             ;
 expr17      : T_CALL exprlist T_RPAREN
-                                { AST_t *e = expr_new(AST_FNC);
+                                { tree_t *e = expr_new(AST_FNC);
                                   e->sval = $1;
                                   for (int i = 0; i < $2->nchildren; i++)
                                       expr_add_child(e, $2->children[i]);
                                   free($2->children); free($2);
                                   $$ = e; }
             | T_IDENT
-                                { AST_t *e = expr_new(AST_VAR);
+                                { tree_t *e = expr_new(AST_VAR);
                                   e->sval = $1;
                                   $$ = e; }
             | T_KEYWORD
-                                { AST_t *e = expr_new(AST_KEYWORD);
+                                { tree_t *e = expr_new(AST_KEYWORD);
                                   e->sval = $1;
                                   $$ = e; }
             | T_INT
@@ -537,7 +570,7 @@ expr17      : T_CALL exprlist T_RPAREN
             | T_LPAREN expr0 T_RPAREN
                                 { $$ = $2; }
             | T_LPAREN expr0 T_COMMA exprlist_ne T_RPAREN
-                                { AST_t *a = expr_new(AST_VLIST);
+                                { tree_t *a = expr_new(AST_VLIST);
                                   expr_add_child(a, $2);
                                   for (int i = 0; i < $4->nchildren; i++)
                                       expr_add_child(a, $4->children[i]);
@@ -555,19 +588,19 @@ expr17      : T_CALL exprlist T_RPAREN
             | T_1AT     expr17  { $$ = expr_unary(AST_CAPT_CURSOR, $2); }
             | T_1TILDE  expr17  { $$ = expr_unary(AST_NOT,         $2); }
             | T_1QUEST  expr17  { $$ = expr_unary(AST_INTERROGATE, $2); }
-            | T_1AMP    expr17  { AST_t *_e = expr_unary(AST_OPSYN, $2);
+            | T_1AMP    expr17  { tree_t *_e = expr_unary(AST_OPSYN, $2);
                                   _e->sval = strdup("&"); $$ = _e; }
-            | T_1PERCENT expr17 { AST_t *_e = expr_unary(AST_OPSYN, $2);
+            | T_1PERCENT expr17 { tree_t *_e = expr_unary(AST_OPSYN, $2);
                                   _e->sval = strdup("%"); $$ = _e; }
-            | T_1SLASH   expr17 { AST_t *_e = expr_unary(AST_OPSYN, $2);
+            | T_1SLASH   expr17 { tree_t *_e = expr_unary(AST_OPSYN, $2);
                                   _e->sval = strdup("/"); $$ = _e; }
-            | T_1POUND   expr17 { AST_t *_e = expr_unary(AST_OPSYN, $2);
+            | T_1POUND   expr17 { tree_t *_e = expr_unary(AST_OPSYN, $2);
                                   _e->sval = strdup("#"); $$ = _e; }
-            | T_1PIPE    expr17 { AST_t *_e = expr_unary(AST_OPSYN, $2);
+            | T_1PIPE    expr17 { tree_t *_e = expr_unary(AST_OPSYN, $2);
                                   _e->sval = strdup("|"); $$ = _e; }
-            | T_1EQUAL   expr17 { AST_t *_e = expr_unary(AST_OPSYN, $2);
+            | T_1EQUAL   expr17 { tree_t *_e = expr_unary(AST_OPSYN, $2);
                                   _e->sval = strdup("="); $$ = _e; }
-            | T_1BANG    expr17 { AST_t *_e = expr_unary(AST_OPSYN, $2);
+            | T_1BANG    expr17 { tree_t *_e = expr_unary(AST_OPSYN, $2);
                                   _e->sval = strdup("!"); $$ = _e; }
             ;
 %%
@@ -580,12 +613,12 @@ void sc_error(ScParseState *st, const char *msg) {
     st->nerrors++;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void sc_split_subject_pattern(AST_t **subj_io, AST_t **pat_io) {
-    AST_t *subj = *subj_io;
+static void sc_split_subject_pattern(tree_t **subj_io, tree_t **pat_io) {
+    tree_t *subj = *subj_io;
     if (*pat_io || !subj) return;
     if (subj->kind == AST_SCAN && subj->nchildren == 2) {
-        AST_t *new_subj = subj->children[0];
-        AST_t *new_pat  = subj->children[1];
+        tree_t *new_subj = subj->children[0];
+        tree_t *new_pat  = subj->children[1];
         free(subj->children);
         free(subj);
         *subj_io = new_subj;
@@ -593,11 +626,11 @@ static void sc_split_subject_pattern(AST_t **subj_io, AST_t **pat_io) {
         return;
     }
     if (subj->kind == AST_SEQ && subj->nchildren >= 2) {
-        AST_t *first = subj->children[0];
+        tree_t *first = subj->children[0];
         if (first->kind == AST_VAR || first->kind == AST_KEYWORD ||
             first->kind == AST_QLIT || first->kind == AST_INDIRECT) {
             int nc = subj->nchildren - 1;
-            AST_t *rest;
+            tree_t *rest;
             if (nc == 1) {
                 rest = subj->children[1];
             } else {
@@ -614,7 +647,7 @@ static void sc_split_subject_pattern(AST_t **subj_io, AST_t **pat_io) {
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void sc_append_stmt(ScParseState *st, AST_t *top) {
+static void sc_append_stmt(ScParseState *st, tree_t *top) {
     if (!top) return;
     sc_pending_label_clear(st);
     STMT_t *s = stmt_new();
@@ -634,34 +667,22 @@ static void sc_append_stmt(ScParseState *st, AST_t *top) {
     else { st->code->tail->next = s; st->code->tail = s; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static AST_t *sc_int_literal(const char *txt) {
-    AST_t *e = expr_new(AST_ILIT);
+static tree_t *sc_int_literal(const char *txt) {
+    tree_t *e = expr_new(AST_ILIT);
     e->ival = strtol(txt, NULL, 10);
     return e;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static AST_t *sc_real_literal(const char *txt) {
-    AST_t *e = expr_new(AST_FLIT);
+static tree_t *sc_real_literal(const char *txt) {
+    tree_t *e = expr_new(AST_FLIT);
     e->dval = strtod(txt, NULL);
     return e;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static AST_t *sc_str_literal(const char *txt) {
-    AST_t *e = expr_new(AST_QLIT);
+static tree_t *sc_str_literal(const char *txt) {
+    tree_t *e = expr_new(AST_QLIT);
     e->sval = strdup(txt);
     return e;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static AST_t *sc_clone_expr_simple(AST_t *e) {
-    if (!e) return NULL;
-    AST_t *c = expr_new(e->kind);
-    c->ival = e->ival;
-    c->dval = e->dval;
-    if (e->sval) c->sval = strdup(e->sval);
-    for (int i = 0; i < e->nchildren; i++) {
-        expr_add_child(c, sc_clone_expr_simple(e->children[i]));
-    }
-    return c;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static char *sc_label_new(ScParseState *st, const char *prefix) {
@@ -672,7 +693,7 @@ static char *sc_label_new(ScParseState *st, const char *prefix) {
     return strdup(buf);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static struct IfHead *sc_if_head_new(ScParseState *st, AST_t *cond) {
+static struct IfHead *sc_if_head_new(ScParseState *st, tree_t *cond) {
     struct IfHead *h = calloc(1, sizeof *h);
     h->cond        = cond;
     h->before_body = st->code->tail;
@@ -680,7 +701,7 @@ static struct IfHead *sc_if_head_new(ScParseState *st, AST_t *cond) {
     return h;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static struct WhileHead *sc_while_head_new(ScParseState *st, AST_t *cond) {
+static struct WhileHead *sc_while_head_new(ScParseState *st, tree_t *cond) {
     struct WhileHead *h = calloc(1, sizeof *h);
     h->cond        = cond;
     h->before_body = st->code->tail;
@@ -701,7 +722,7 @@ static struct DoHead *sc_do_head_new(ScParseState *st) {
     return h;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static struct ForHead *sc_for_head_new(ScParseState *st, AST_t *cond, AST_t *step) {
+static struct ForHead *sc_for_head_new(ScParseState *st, tree_t *cond, tree_t *step) {
     struct ForHead *h = calloc(1, sizeof *h);
     h->before_loop = st->code->tail;
     h->cond        = cond;
@@ -724,9 +745,9 @@ static struct FuncHead *sc_func_head_new(ScParseState *st, char *name, char *arg
     int slen = strlen(name) + 1 + strlen(argstr) + 2;
     char *defarg = malloc(slen);
     snprintf(defarg, slen, "%s(%s)", name, argstr);
-    AST_t *qarg = expr_new(AST_QLIT);
+    tree_t *qarg = expr_new(AST_QLIT);
     qarg->sval   = defarg;
-    AST_t *def_call = expr_new(AST_FNC);
+    tree_t *def_call = expr_new(AST_FNC);
     def_call->sval   = strdup("DEFINE");
     expr_add_child(def_call, qarg);
     sc_append_stmt(st, def_call);
@@ -748,13 +769,13 @@ static void sc_finalize_function(ScParseState *st, struct FuncHead *h) {
     free(h);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void sc_append_return(ScParseState *st, AST_t *retval) {
+static void sc_append_return(ScParseState *st, tree_t *retval) {
     sc_pending_label_clear(st);
     STMT_t *s = stmt_new();
     s->lineno = st->ctx ? st->ctx->line : 0;
     s->stno   = ++st->code->nstmts;
     if (retval && st->cur_func_name) {
-        AST_t *lhs = expr_new(AST_VAR);
+        tree_t *lhs = expr_new(AST_VAR);
         lhs->sval   = strdup(st->cur_func_name);
         s->subject     = lhs;
         s->replacement = retval;
@@ -795,7 +816,7 @@ static STMT_t *sc_make_label_stmt(ScParseState *st, char *label) {
     return s;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static STMT_t *sc_make_cond_fail_stmt(ScParseState *st, AST_t *cond, char *fail_target, int lineno) {
+static STMT_t *sc_make_cond_fail_stmt(ScParseState *st, tree_t *cond, char *fail_target, int lineno) {
     STMT_t *s = stmt_new();
     s->lineno = lineno;
     s->stno   = ++st->code->nstmts;
@@ -895,7 +916,7 @@ static void sc_finalize_while(ScParseState *st, struct WhileHead *h) {
     free(h);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static STMT_t *sc_make_cond_succ_stmt(ScParseState *st, AST_t *cond, char *succ_target, int lineno) {
+static STMT_t *sc_make_cond_succ_stmt(ScParseState *st, tree_t *cond, char *succ_target, int lineno) {
     STMT_t *s = stmt_new();
     s->lineno  = lineno;
     s->stno    = ++st->code->nstmts;
@@ -905,7 +926,7 @@ static STMT_t *sc_make_cond_succ_stmt(ScParseState *st, AST_t *cond, char *succ_
     return s;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void sc_finalize_do_while(ScParseState *st, struct DoHead *h, AST_t *cond) {
+static void sc_finalize_do_while(ScParseState *st, struct DoHead *h, tree_t *cond) {
     char   *Ltop      = sc_label_new(st, "_Ltop");
     char   *Lcont     = h->cont_label;
     char   *Lend      = h->end_label;
@@ -1082,7 +1103,7 @@ static void sc_switch_cases_grow(struct SwitchHead *h) {
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static struct SwitchHead *sc_switch_head_new(ScParseState *st, AST_t *disc) {
+static struct SwitchHead *sc_switch_head_new(ScParseState *st, tree_t *disc) {
     struct SwitchHead *h = calloc(1, sizeof *h);
     h->disc          = disc;
     h->lineno        = st->ctx ? st->ctx->line : 0;
@@ -1091,9 +1112,9 @@ static struct SwitchHead *sc_switch_head_new(ScParseState *st, AST_t *disc) {
     h->end_label     = sc_label_new(st, "_Lend");
     h->default_label = sc_label_new(st, "_Ldefault");
     h->has_default   = 0;
-    AST_t *lhs = expr_new(AST_VAR);
+    tree_t *lhs = expr_new(AST_VAR);
     lhs->sval   = strdup(h->tmp_name);
-    AST_t *assign = expr_new(AST_ASSIGN);
+    tree_t *assign = expr_new(AST_ASSIGN);
     expr_add_child(assign, lhs);
     expr_add_child(assign, disc);
     sc_append_stmt(st, assign);
@@ -1112,7 +1133,7 @@ static void sc_switch_emit_implicit_break(ScParseState *st, struct SwitchHead *h
     sc_append_chain(st, g, g);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void sc_switch_case_label(ScParseState *st, AST_t *value) {
+static void sc_switch_case_label(ScParseState *st, tree_t *value) {
     struct SwitchHead *h = st->cur_switch;
     if (!h) {
         sc_error(st, "case label outside of switch");
@@ -1158,9 +1179,9 @@ static void sc_finalize_switch(ScParseState *st, struct SwitchHead *h) {
     STMT_t *chain_tail = NULL;
     for (int i = 0; i < h->cases_count; i++) {
         if (!h->cases[i].value) continue;
-        AST_t *probe = expr_new(AST_FNC);
+        tree_t *probe = expr_new(AST_FNC);
         probe->sval   = strdup("IDENT");
-        AST_t *tmp_ref = expr_new(AST_VAR);
+        tree_t *tmp_ref = expr_new(AST_VAR);
         tmp_ref->sval   = strdup(h->tmp_name);
         expr_add_child(probe, tmp_ref);
         expr_add_child(probe, h->cases[i].value);
@@ -1195,9 +1216,9 @@ static void sc_emit_struct(ScParseState *st, char *name, char *fields) {
     int slen = strlen(name) + 1 + strlen(fields) + 2;
     char *spec = malloc(slen);
     snprintf(spec, slen, "%s(%s)", name, fields);
-    AST_t *qarg = expr_new(AST_QLIT);
+    tree_t *qarg = expr_new(AST_QLIT);
     qarg->sval   = spec;
-    AST_t *data_call = expr_new(AST_FNC);
+    tree_t *data_call = expr_new(AST_FNC);
     data_call->sval   = strdup("DATA");
     expr_add_child(data_call, qarg);
     sc_append_stmt(st, data_call);
