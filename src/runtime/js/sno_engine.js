@@ -410,6 +410,10 @@ function engine_ζ(S, n, Π, startPos) {
             }
             break;
         }
+        case 'DEFERRED/succeed':
+            ζ = ζ_up(ζ);
+            action = 'succeed';
+            break;
         case 'DEFERRED/concede':
         case 'DEFERRED/recede': {
             ζ = ζ_up(ζ);

@@ -337,6 +337,15 @@ const _builtins = {
     OUTPUT(args)  { if(args[0]!==undefined) _vars['OUTPUT']=args[0]; return args[0]; },
     CHAR(args)    { return String.fromCharCode(_num(args[0])); },
     CODE(args)    { const s=_str(args[0]); return s.length ? s.charCodeAt(0) : _FAIL; },
+    ORD(args)     { const s=_str(args[0]); return s.length ? s.charCodeAt(0) : _FAIL; },
+    VDIFFER(args) {
+        const a = args[0], b = args[1];
+        if (b === undefined) return a;
+        const eq = (_is_numeric(a) && _is_numeric(b))
+            ? _num(a) === _num(b)
+            : _str(a) === _str(b);
+        return eq ? _FAIL : a;
+    },
     LPAD(args)    { const s=_str(args[0]),n=_num(args[1]),c=args[2]!=null?_str(args[2]):''; return s.padStart(n,c[0]||' '); },
     RPAD(args)    { const s=_str(args[0]),n=_num(args[1]),c=args[2]!=null?_str(args[2]):''; return s.padEnd(n,c[0]||' '); },
     REPLACE(args) { /* REPLACE(s, from, to) */ const s=_str(args[0]),f=_str(args[1]),t=_str(args[2]); let r=''; for(let i=0;i<s.length;i++){const fi=f.indexOf(s[i]);r+=fi>=0?(t[fi]??''):s[i];}return r; },
