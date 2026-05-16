@@ -64,6 +64,18 @@ Pl_PredEntry_BB *pl_dcg_register(const char *name, int arity, IR_block_t *ir_bod
     e->lower_sc.n = 0;
     return e;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* pl_bb_once_proc_by_name — build bb_node_t for a Prolog predicate call (BB_ONCE mode).       */
+/* Mirrors icn_bb_pump_proc_by_name.  Returns {NULL,NULL,0} when predicate not in dcg_table    */
+/* or ir_body is NULL (caller falls through to [NO-AST] stub until PJ-4 fills IR).             */
+bb_node_t pl_bb_once_proc_by_name(const char *name, int arity) {
+    Pl_PredEntry_BB *bb = pl_dcg_lookup(name, arity);
+    if (!bb || !bb->ir_body) return (bb_node_t){ NULL, NULL, 0 };
+    pl_dcg_state_t *dz = calloc(1, sizeof(*dz));
+    dz->cfg   = bb->ir_body;
+    dz->first = 1;
+    return (bb_node_t){ pl_bb_dcg, dz, 0 };
+}
 #define PL_NB_STORE_SIZE 64
 typedef struct { char *key; Term *val; } Pl_NbEntry;
 static Pl_NbEntry g_pl_nb_store[PL_NB_STORE_SIZE];

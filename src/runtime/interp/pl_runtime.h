@@ -49,4 +49,5 @@ DESCR_t pl_bb_dcg(void *zeta, int entry);
 Pl_PredEntry_BB *pl_dcg_lookup(const char *name, int arity);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 Pl_PredEntry_BB *pl_dcg_register(const char *name, int arity, IR_block_t *ir_body);
+bb_node_t pl_bb_once_proc_by_name(const char *name, int arity);
 #endif

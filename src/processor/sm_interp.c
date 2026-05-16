@@ -669,9 +669,16 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             break;
         }
         case SM_BB_ONCE_PROC: {
-            (void)ins;
-            fprintf(stderr, "[NO-AST] SM_BB_ONCE_PROC stub: needs fresh SM/BB lowering\n");
-            st->last_ok = 0;
+            const char *name  = ins->a[0].s;
+            int         arity = (int)ins->a[1].i;
+            bb_node_t node = pl_bb_once_proc_by_name(name, arity);
+            if (node.fn) {
+                int ok = bb_broker(node, BB_ONCE, NULL, NULL);
+                st->last_ok = (ok > 0);
+            } else {
+                fprintf(stderr, "[NO-AST] SM_BB_ONCE_PROC stub: needs fresh SM/BB lowering\n");
+                st->last_ok = 0;
+            }
             break;
         }
         case SM_BB_PUMP_PROC: {
