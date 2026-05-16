@@ -69,6 +69,9 @@ Pl_PredEntry_BB *pl_dcg_register(const char *name, int arity, IR_block_t *ir_bod
 /* Mirrors icn_bb_pump_proc_by_name.  Returns {NULL,NULL,0} when predicate not in dcg_table    */
 /* or ir_body is NULL (caller falls through to [NO-AST] stub until PJ-4 fills IR).             */
 bb_node_t pl_bb_once_proc_by_name(const char *name, int arity) {
+    if (!name) return (bb_node_t){ NULL, NULL, 0 };
+    const char *sl = strrchr(name, '/');
+    if (sl && arity == 0) arity = atoi(sl + 1);
     Pl_PredEntry_BB *bb = pl_dcg_lookup(name, arity);
     if (!bb || !bb->ir_body) return (bb_node_t){ NULL, NULL, 0 };
     pl_dcg_state_t *dz = calloc(1, sizeof(*dz));

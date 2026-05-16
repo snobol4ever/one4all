@@ -2,6 +2,7 @@
 #include "../../frontend/prolog/term.h"
 #include "../../frontend/prolog/prolog_runtime.h"
 #include "../../frontend/prolog/prolog_atom.h"
+#include "../../runtime/interp/pl_runtime.h"
 #include <stddef.h>
 #include <string.h>
 #include <stdio.h>
@@ -773,6 +774,54 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->state = 1;
         nd->value = v;
         return nd->γ;
+    }
+    case IR_PL_CHOICE: {
+        extern Trail g_pl_trail; extern Term **g_pl_env;
+        if (!nd->c || nd->n == 0) { nd->value = FAILDESCR; return nd->ω; }
+        for (int ci = 0; ci < nd->n; ci++) {
+            int mark = trail_mark(&g_pl_trail);
+            IR_block_t *body = nd->c[ci] ? (IR_block_t *)nd->c[ci]->opaque : NULL;
+            Term **saved_for_retry = g_pl_env;
+            DESCR_t res = body ? IR_exec_once(body) : FAILDESCR;
+            if (!IS_FAIL_fn(res)) { nd->value = res; return nd->γ; }
+            trail_unwind(&g_pl_trail, mark);
+            g_pl_env = saved_for_retry;
+        }
+        nd->value = FAILDESCR; return nd->ω;
+    }
+    case IR_PL_CALL: {
+        extern Term **g_pl_env; extern Trail g_pl_trail;
+        const char *callee = nd->sval; int carity = (int)nd->ival;
+        if (!callee) { nd->value = FAILDESCR; return nd->ω; }
+        char key[128]; snprintf(key, sizeof key, "%s/%d", callee, carity);
+        Pl_PredEntry_BB *bb = pl_dcg_lookup(key, carity);
+        if (!bb || !bb->ir_body) { nd->value = FAILDESCR; return nd->ω; }
+        int nslots = carity + 16;
+        Term **callee_env = calloc((size_t)nslots, sizeof(Term *));
+        for (int ai = 0; ai < nd->n && ai < carity; ai++) {
+            if (!nd->c[ai]) continue;
+            IR_exec_node(nd->c[ai]); DESCR_t av = nd->c[ai]->value;
+            Term *at = term_new_var(ai);
+            if (av.v == DT_I) { Term *vt = term_new_int((long)av.i); unify(at, vt, &g_pl_trail); }
+            else if ((av.v == DT_S || av.v == DT_SNUL) && av.s) { Term *vt = term_new_atom(prolog_atom_intern(av.s)); unify(at, vt, &g_pl_trail); }
+            callee_env[ai] = at;
+        }
+        Term **saved_env = g_pl_env;
+        g_pl_env = callee_env;
+        int mark = trail_mark(&g_pl_trail);
+        DESCR_t res = IR_exec_once(bb->ir_body);
+        if (IS_FAIL_fn(res)) { trail_unwind(&g_pl_trail, mark); g_pl_env = saved_env; free(callee_env); nd->value = FAILDESCR; return nd->ω; }
+        for (int ai = 0; ai < nd->n && ai < carity; ai++) {
+            if (!nd->c[ai] || nd->c[ai]->t != IR_PL_VAR) continue;
+            int caller_slot = (int)nd->c[ai]->ival;
+            Term *bound = callee_env[ai] ? term_deref(callee_env[ai]) : NULL;
+            if (bound && saved_env && caller_slot >= 0) saved_env[caller_slot] = bound;
+        }
+        g_pl_env = saved_env; free(callee_env);
+        nd->value = INTVAL(1); return nd->γ;
+    }
+    case IR_PL_CUT: {
+        nd->value = INTVAL(1); return nd->γ;
     }
     case IR_PL_ATOM: {
         nd->value = nd->sval ? STRVAL(nd->sval) : NULVCL;
