@@ -291,7 +291,14 @@ void emit_bb_xstar(bb_label_t *s, bb_label_t *f, bb_label_t *b) {
         emit_label_define(b);
         char jmp_fail[128]; snprintf(jmp_fail, sizeof(jmp_fail), "%s", f->name);
         bb3c_format(out, "", "jmp", jmp_fail);
+        return;
     }
+    insn_mov_rcx_i64(TEMPLATE_ADDR_SIGLEN);
+    insn_mov_eax_rcxmem();
+    emit_store_delta();
+    emit_jmp(s, JMP_JMP);
+    emit_label_define(b);
+    emit_jmp(f, JMP_JMP);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_bb_xlnth(long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
