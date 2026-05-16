@@ -252,6 +252,13 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         nd->sval = e->v.sval ? e->v.sval : "";
         return nd;
     }
+    case TT_CSET: {
+        /* Icon 'aeiou' cset literal.  Runtime represents csets as strings (one char per member). */
+        IR_t *nd = IR_node_alloc(cfg, IR_LIT_S);
+        if (!nd) return NULL;
+        nd->sval = e->v.sval ? e->v.sval : "";
+        return nd;
+    }
     case TT_VAR: {
         if (!e->v.sval) return NULL;
         if (e->v.sval[0] == '&') return NULL;
