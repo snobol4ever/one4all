@@ -1097,14 +1097,76 @@ IR_t * IR_exec_node(IR_t * nd) {
         return nd->γ;
     }
     case IR_PL_SEQ: {
-        /* Prolog conjunction body. Short-circuit on first failure; succeed if all goals succeed. */
-        /* On cut (IR_PL_CUT in subtree), g_pl_cut_flag is raised; SEQ ignores it (CHOICE checks). */
-        for (int j = 0; j < nd->n; j++) {
-            if (!nd->c[j]) continue;
-            IR_exec_node(nd->c[j]);
-            DESCR_t cv = nd->c[j]->value;
-            if (IS_FAIL_fn(cv)) { nd->value = FAILDESCR; return nd->ω; }
-            if (frame_depth > 0 && FRAME.returning) break;
+        /* Prolog conjunction with backtracking pump.                                                */
+        /* Forward: run goals left-to-right; on success advance, on failure trigger backtrack.       */
+        /* Backtrack: scan leftward for a resumable IR_PL_CALL (state==1) or IR_PL_ALT (state==1).   */
+        /*   - If resume yields a new solution: restart forward execution at found+1.                */
+        /*   - If resume is exhausted: continue scanning leftward from found-1 (don't restart goal). */
+        /*   - If no resumable goal remains to the left: fail the whole SEQ outward.                 */
+        extern Trail g_pl_trail; extern Term **g_pl_env; extern int g_pl_cut_flag;
+        typedef struct { Term **callee_env; Term **saved_env; int trail_mark; int nslots; } PlCallSt;
+        int j = 0;
+        int backtrack_from = -1;
+        while (j < nd->n) {
+            if (backtrack_from < 0) {
+                if (!nd->c[j]) { j++; continue; }
+                IR_exec_node(nd->c[j]);
+                DESCR_t cv = nd->c[j]->value;
+                if (!IS_FAIL_fn(cv)) {
+                    if (frame_depth > 0 && FRAME.returning) break;
+                    j++;
+                    continue;
+                }
+                backtrack_from = j;
+            }
+            /* Backtrack: search left of backtrack_from for a resumable goal */
+            int found = -1;
+            for (int k = backtrack_from - 1; k >= 0; k--) {
+                IR_t *gk = nd->c[k];
+                if (!gk) continue;
+                if (gk->t == IR_PL_CALL && gk->state == 1 && gk->opaque) { found = k; break; }
+                if (gk->t == IR_PL_ALT && gk->state == 1) { found = k; break; }
+            }
+            if (found < 0) { nd->value = FAILDESCR; return nd->ω; }
+            IR_t *gen = nd->c[found];
+            if (gen->t == IR_PL_CALL) {
+                PlCallSt *cs = (PlCallSt *)gen->opaque;
+                char rkey[128]; snprintf(rkey, sizeof rkey, "%s/%d", gen->sval, (int)gen->ival2);
+                Pl_PredEntry_BB *rbb = pl_dcg_lookup(rkey, (int)gen->ival2);
+                if (!rbb || !rbb->ir_body) { free(cs); gen->opaque = NULL; gen->state = 0; backtrack_from = found; continue; }
+                trail_unwind(&g_pl_trail, cs->trail_mark);
+                g_pl_env = cs->callee_env;
+                cs->trail_mark = trail_mark(&g_pl_trail);
+                DESCR_t res2 = IR_exec_resume(rbb->ir_body);
+                if (IS_FAIL_fn(res2)) {
+                    g_pl_env = cs->saved_env;
+                    free(cs); gen->opaque = NULL; gen->state = 0;
+                    backtrack_from = found;
+                    continue;
+                }
+                for (int ai = 0; ai < gen->n && ai < (int)gen->ival2; ai++) {
+                    if (!gen->c[ai] || gen->c[ai]->t != IR_PL_VAR) continue;
+                    int caller_slot = (int)gen->c[ai]->ival2;
+                    Term *shared = cs->callee_env[ai];
+                    if (shared && cs->saved_env && caller_slot >= 0) cs->saved_env[caller_slot] = shared;
+                }
+                g_pl_env = cs->saved_env;
+                gen->value = INTVAL(1);
+                j = found + 1;
+                backtrack_from = -1;
+                continue;
+            }
+            if (gen->t == IR_PL_ALT) {
+                gen->state = 2;
+                IR_exec_node(gen->c[1]); DESCR_t ra = gen->c[1]->value;
+                gen->state = 0;
+                if (IS_FAIL_fn(ra)) { backtrack_from = found; continue; }
+                gen->value = ra;
+                j = found + 1;
+                backtrack_from = -1;
+                continue;
+            }
+            nd->value = FAILDESCR; return nd->ω;
         }
         nd->value = INTVAL(1);
         return nd->γ;
@@ -1112,68 +1174,106 @@ IR_t * IR_exec_node(IR_t * nd) {
     case IR_PL_ALT: {
         extern Trail g_pl_trail; extern Term **g_pl_env;
         if (!nd->c || nd->n < 2) { nd->value = FAILDESCR; return nd->ω; }
+        /* state==2 means: skip left, run right directly (called from SEQ backtrack pump) */
+        if (nd->state == 2) {
+            int mark = trail_mark(&g_pl_trail); Term **saved_env = g_pl_env;
+            IR_exec_node(nd->c[1]); DESCR_t r1 = nd->c[1]->value;
+            if (!IS_FAIL_fn(r1)) { nd->value = r1; nd->state = 0; return nd->γ; }
+            trail_unwind(&g_pl_trail, mark); g_pl_env = saved_env;
+            nd->value = FAILDESCR; nd->state = 0; return nd->ω;
+        }
         int mark = trail_mark(&g_pl_trail); Term **saved_env = g_pl_env;
         IR_exec_node(nd->c[0]); DESCR_t r0 = nd->c[0]->value;
-        if (!IS_FAIL_fn(r0)) { nd->value = r0; return nd->γ; }
+        if (!IS_FAIL_fn(r0)) { nd->state = 1; nd->value = r0; return nd->γ; }
         trail_unwind(&g_pl_trail, mark); g_pl_env = saved_env;
         IR_exec_node(nd->c[1]); DESCR_t r1 = nd->c[1]->value;
-        if (!IS_FAIL_fn(r1)) { nd->value = r1; return nd->γ; }
-        nd->value = FAILDESCR; return nd->ω;
+        if (!IS_FAIL_fn(r1)) { nd->state = 0; nd->value = r1; return nd->γ; }
+        nd->state = 0; nd->value = FAILDESCR; return nd->ω;
     }
     case IR_PL_CHOICE: {
+        /* Stateful multi-clause choice point. nd->state = next clause to try (0=fresh).            */
+        /* On first entry state==0 resets and tries from clause 0.                                  */
+        /* IR_exec_resume re-enters here with state already advanced by previous successful call.   */
         extern Trail g_pl_trail; extern Term **g_pl_env; extern int g_pl_cut_flag;
         if (!nd->c || nd->n == 0) { nd->value = FAILDESCR; return nd->ω; }
         int saved_cut = g_pl_cut_flag;
         g_pl_cut_flag = 0;
-        for (int ci = 0; ci < nd->n; ci++) {
+        int start = nd->state;
+        for (int ci = start; ci < nd->n; ci++) {
             int mark = trail_mark(&g_pl_trail);
             IR_block_t *body = nd->c[ci] ? (IR_block_t *)nd->c[ci]->opaque : NULL;
             Term **saved_for_retry = g_pl_env;
             DESCR_t res = body ? IR_exec_once(body) : FAILDESCR;
             if (!IS_FAIL_fn(res)) {
                 g_pl_cut_flag = saved_cut;
+                nd->state = ci + 1;
+                nd->counter = (int64_t)mark;
+                nd->opaque = (void *)saved_for_retry;
                 nd->value = res; return nd->γ;
             }
             if (g_pl_cut_flag) {
                 g_pl_cut_flag = saved_cut;
-                nd->value = FAILDESCR; return nd->ω;
+                nd->state = 0; nd->value = FAILDESCR; return nd->ω;
             }
             trail_unwind(&g_pl_trail, mark);
             g_pl_env = saved_for_retry;
         }
         g_pl_cut_flag = saved_cut;
-        nd->value = FAILDESCR; return nd->ω;
+        nd->state = 0; nd->value = FAILDESCR; return nd->ω;
     }
     case IR_PL_CALL: {
+        /* Resumable predicate call. state==0: fresh call. state==1: has live callee_env in opaque. */
         extern Term **g_pl_env; extern Trail g_pl_trail;
         const char *callee = nd->sval; int carity = (int)nd->ival2;
         if (!callee) { nd->value = FAILDESCR; return nd->ω; }
         char key[128]; snprintf(key, sizeof key, "%s/%d", callee, carity);
         Pl_PredEntry_BB *bb = pl_dcg_lookup(key, carity);
         if (!bb || !bb->ir_body) { nd->value = FAILDESCR; return nd->ω; }
-        int nslots = carity + 16;
-        Term **callee_env = calloc((size_t)nslots, sizeof(Term *));
-        for (int ai = 0; ai < nd->n && ai < carity; ai++) {
-            if (!nd->c[ai]) continue;
-            IR_exec_node(nd->c[ai]); DESCR_t av = nd->c[ai]->value;
-            Term *at = term_new_var(ai);
-            if (av.v == DT_I) { Term *vt = term_new_int((long)av.i); unify(at, vt, &g_pl_trail); }
-            else if ((av.v == DT_S || av.v == DT_SNUL) && av.s) { Term *vt = term_new_atom(prolog_atom_intern(av.s)); unify(at, vt, &g_pl_trail); }
-            callee_env[ai] = at;
+        typedef struct { Term **callee_env; Term **saved_env; int trail_mark; int nslots; } PlCallSt;
+        if (nd->state == 0) {
+            /* Fresh call: allocate env, bind args, call once */
+            int nslots = carity + 16;
+            Term **callee_env = calloc((size_t)nslots, sizeof(Term *));
+            Term **saved_env_pre = g_pl_env;
+            for (int ai = 0; ai < nd->n && ai < carity; ai++) {
+                if (!nd->c[ai]) continue;
+                Term *at = term_new_var(ai);
+                callee_env[ai] = at;
+                /* If caller arg is an IR_PL_VAR, check whether the caller slot is bound; only unify if so. */
+                if (nd->c[ai]->t == IR_PL_VAR) {
+                    int caller_slot = (int)nd->c[ai]->ival2;
+                    Term *cv = (saved_env_pre && caller_slot >= 0) ? saved_env_pre[caller_slot] : NULL;
+                    if (cv) {
+                        Term *cdt = term_deref(cv);
+                        if (cdt && cdt->tag != TERM_VAR) unify(at, cdt, &g_pl_trail);
+                    }
+                    continue;
+                }
+                IR_exec_node(nd->c[ai]); DESCR_t av = nd->c[ai]->value;
+                if (av.v == DT_I) { Term *vt = term_new_int((long)av.i); unify(at, vt, &g_pl_trail); }
+                else if (av.v == DT_S && av.s && av.s[0]) { Term *vt = term_new_atom(prolog_atom_intern(av.s)); unify(at, vt, &g_pl_trail); }
+            }
+            Term **saved_env = g_pl_env;
+            g_pl_env = callee_env;
+            int mark = trail_mark(&g_pl_trail);
+            IR_reset(bb->ir_body);
+            DESCR_t res = IR_exec_once(bb->ir_body);
+            if (IS_FAIL_fn(res)) { trail_unwind(&g_pl_trail, mark); g_pl_env = saved_env; free(callee_env); nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+            PlCallSt *cs = malloc(sizeof(PlCallSt));
+            cs->callee_env = callee_env; cs->saved_env = saved_env; cs->trail_mark = mark; cs->nslots = nslots;
+            nd->opaque = cs;
+            nd->state = 1;
+            for (int ai = 0; ai < nd->n && ai < carity; ai++) {
+                if (!nd->c[ai] || nd->c[ai]->t != IR_PL_VAR) continue;
+                int caller_slot = (int)nd->c[ai]->ival2;
+                Term *shared = callee_env[ai];
+                if (shared && saved_env && caller_slot >= 0) saved_env[caller_slot] = shared;
+            }
+            g_pl_env = saved_env;
+            nd->value = INTVAL(1); return nd->γ;
         }
-        Term **saved_env = g_pl_env;
-        g_pl_env = callee_env;
-        int mark = trail_mark(&g_pl_trail);
-        DESCR_t res = IR_exec_once(bb->ir_body);
-        if (IS_FAIL_fn(res)) { trail_unwind(&g_pl_trail, mark); g_pl_env = saved_env; free(callee_env); nd->value = FAILDESCR; return nd->ω; }
-        for (int ai = 0; ai < nd->n && ai < carity; ai++) {
-            if (!nd->c[ai] || nd->c[ai]->t != IR_PL_VAR) continue;
-            int caller_slot = (int)nd->c[ai]->ival2;
-            Term *bound = callee_env[ai] ? term_deref(callee_env[ai]) : NULL;
-            if (bound && saved_env && caller_slot >= 0) saved_env[caller_slot] = bound;
-        }
-        g_pl_env = saved_env; free(callee_env);
-        nd->value = INTVAL(1); return nd->γ;
+        /* Resume path: driven by IR_PL_SEQ backtracking pump — should not reach here directly */
+        nd->value = FAILDESCR; return nd->ω;
     }
     case IR_PL_CUT: {
         extern int g_pl_cut_flag;
