@@ -8,6 +8,7 @@
 #include "../../frontend/prolog/prolog_runtime.h"
 #include "../../frontend/prolog/prolog_atom.h"
 #include "../../frontend/prolog/prolog_builtin.h"
+#include "../../lower/ir_exec.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern tree_t *pl_assert_term(Term *t, int *functor_out, int *arity_out);
 #include "../../frontend/prolog/pl_broker.h"
@@ -23,6 +24,46 @@ Trail         g_pl_trail;
 int           g_pl_cut_flag = 0;
 Term        **g_pl_env      = NULL;
 int           g_pl_active   = 0;
+Pl_PredEntry_BB g_dcg_table[PL_DCG_TABLE_MAX];
+int             g_dcg_count = 0;
+typedef struct { IR_block_t *cfg; int first; } pl_dcg_state_t;
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* pl_bb_dcg — Prolog BB-land DCG driver.  Infrastructure bridge mirror of icn_bb_dcg.        */
+/* Not a Byrd box: it dispatches to IR_exec_once / IR_exec_resume which own the four-port      */
+/* logic.  α-entry resets the run-once flag; subsequent calls invoke IR_exec_resume for        */
+/* clause-by-clause retry with trail unwind handled inside the IR_t executors.                 */
+DESCR_t pl_bb_dcg(void *zeta, int entry) {
+    pl_dcg_state_t *z = (pl_dcg_state_t *)zeta;
+    if (!z || !z->cfg) return FAILDESCR;
+    if (entry == α) { z->first = 1; }
+    DESCR_t v = z->first ? (z->first = 0, IR_exec_once(z->cfg)) : IR_exec_resume(z->cfg);
+    return v;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* pl_dcg_lookup — find a predicate by name+arity in the BB-land registry.  Modes 2/3/4 use   */
+/* this exclusively; the AST-bearing g_pl_pred_table is mode-1-only after PJ-8.               */
+Pl_PredEntry_BB *pl_dcg_lookup(const char *name, int arity) {
+    if (!name) return NULL;
+    for (int i = 0; i < g_dcg_count; i++)
+        if (g_dcg_table[i].arity == arity && g_dcg_table[i].name && strcmp(g_dcg_table[i].name, name) == 0)
+            return &g_dcg_table[i];
+    return NULL;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* pl_dcg_register — add or update an entry in the BB-land predicate registry.  Returns the   */
+/* entry pointer on success, NULL on capacity exhaustion.  Idempotent on (name, arity).        */
+Pl_PredEntry_BB *pl_dcg_register(const char *name, int arity, IR_block_t *ir_body) {
+    if (!name) return NULL;
+    Pl_PredEntry_BB *existing = pl_dcg_lookup(name, arity);
+    if (existing) { existing->ir_body = ir_body; return existing; }
+    if (g_dcg_count >= PL_DCG_TABLE_MAX) return NULL;
+    Pl_PredEntry_BB *e = &g_dcg_table[g_dcg_count++];
+    e->name = strdup(name);
+    e->arity = arity;
+    e->ir_body = ir_body;
+    e->lower_sc.n = 0;
+    return e;
+}
 #define PL_NB_STORE_SIZE 64
 typedef struct { char *key; Term *val; } Pl_NbEntry;
 static Pl_NbEntry g_pl_nb_store[PL_NB_STORE_SIZE];
