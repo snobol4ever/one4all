@@ -1112,6 +1112,25 @@ bb_node_t icn_bb_pump_proc_by_name(const char *name, DESCR_t *args, int nargs) {
     if (!name) return (bb_node_t){ NULL, NULL, 0 };
     for (int i = 0; i < proc_count; i++) {
         if (strcmp(proc_table[i].name, name) != 0) continue;
+        /* AST → IR → BB path: when an IR_block_t body exists, drive it via icn_bb_dcg.   */
+        /* This bypasses SM entirely: no proc_table_call, no sm_call_expression.            */
+        if (proc_table[i].ir_body) {
+            if (frame_depth < FRAME_STACK_MAX) {
+                IcnFrame *f = &frame_stack[frame_depth++];
+                memset(f, 0, sizeof *f);
+                IcnScope sc_local = proc_table[i].lower_sc;
+                f->sc       = sc_local;
+                int nslots = sc_local.n > 0 ? sc_local.n : 1;
+                if (nslots > FRAME_SLOT_MAX) nslots = FRAME_SLOT_MAX;
+                f->env_n    = nslots;
+                for (int k = 0; k < proc_table[i].nparams && k < nargs && k < FRAME_SLOT_MAX; k++)
+                    f->env[k] = args[k];
+            }
+            icn_dcg_state_t *dz = calloc(1, sizeof(*dz));
+            dz->cfg = proc_table[i].ir_body;
+            dz->first = 1;
+            return (bb_node_t){ icn_bb_dcg, dz, 0 };
+        }
         icn_bb_oneshot_state_t *oshot1 = calloc(1, sizeof(*oshot1));
         oshot1->val = proc_table_call(i, args, nargs);
         return (bb_node_t){ icn_bb_oneshot, oshot1, 0 };

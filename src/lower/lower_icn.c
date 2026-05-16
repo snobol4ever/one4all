@@ -2,7 +2,9 @@
 #include "IR.h"
 #include "snobol4.h"
 #include "coerce.h"
+#include "ast.h"
 #include <string.h>
+#include <stdlib.h>
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 IR_block_t *lower_icn_upto(const char *cset, const char *hay) {
     if (!cset || !hay) return NULL;
@@ -207,5 +209,103 @@ IR_block_t *lower_icn_proc_gen(GeneratorState *gs) {
     nd->γ      = NULL;
     nd->ω      = NULL;
     cfg->entry = nd;
+    return cfg;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* lower_icn_expr_node — recursively lower a single Icon AST expr to an IR_t* inside cfg.                                                                                                                  */
+/* Returns NULL when the expression kind isn't yet supported.  Caller is responsible for falling back.                                                                                                     */
+static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
+    if (!cfg || !e) return NULL;
+    switch (e->t) {
+    case TT_ILIT: {
+        IR_t *nd = IR_node_alloc(cfg, IR_LIT_I);
+        if (!nd) return NULL;
+        nd->ival = e->v.ival;
+        return nd;
+    }
+    case TT_QLIT: {
+        IR_t *nd = IR_node_alloc(cfg, IR_LIT_S);
+        if (!nd) return NULL;
+        nd->sval = e->v.sval ? e->v.sval : "";
+        return nd;
+    }
+    case TT_VAR: {
+        if (!e->v.sval) return NULL;
+        if (e->v.sval[0] == '&') return NULL;
+        IR_t *nd = IR_node_alloc(cfg, IR_VAR);
+        if (!nd) return NULL;
+        nd->sval = e->v.sval;
+        return nd;
+    }
+    case TT_ASSIGN: {
+        if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
+        if (e->c[0]->t != TT_VAR) return NULL;
+        if (e->c[0]->v.sval && e->c[0]->v.sval[0] == '&') return NULL;
+        IR_t *lhs = lower_icn_expr_node(cfg, e->c[0]);
+        if (!lhs) return NULL;
+        IR_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
+        if (!rhs) return NULL;
+        IR_t *nd = IR_node_alloc(cfg, IR_ASSIGN);
+        if (!nd) return NULL;
+        nd->c = calloc(2, sizeof(IR_t *));
+        if (!nd->c) return NULL;
+        nd->c[0] = lhs;
+        nd->c[1] = rhs;
+        nd->n    = 2;
+        return nd;
+    }
+    case TT_FNC: {
+        if (e->n < 1 || !e->c[0] || e->c[0]->t != TT_VAR || !e->c[0]->v.sval) return NULL;
+        int nargs = e->n - 1;
+        IR_t **args = NULL;
+        if (nargs > 0) {
+            args = calloc((size_t)nargs, sizeof(IR_t *));
+            if (!args) return NULL;
+            for (int j = 0; j < nargs; j++) {
+                args[j] = lower_icn_expr_node(cfg, e->c[1+j]);
+                if (!args[j]) { free(args); return NULL; }
+            }
+        }
+        IR_t *nd = IR_node_alloc(cfg, IR_CALL);
+        if (!nd) { if (args) free(args); return NULL; }
+        nd->sval = e->c[0]->v.sval;
+        nd->c    = args;
+        nd->n    = nargs;
+        return nd;
+    }
+    default:
+        return NULL;
+    }
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* lower_icn_proc_body — build IR_block_t* for an Icon procedure body.                                                                                                                                     */
+/* Input: the TT_PROC AST node. Children [0]=name-or-formals, [1..nparams]=params, [body_start..] = body statements.                                                                                       */
+/* Returns NULL if any statement cannot be lowered yet — caller falls back to legacy SM path.                                                                                                              */
+/* The resulting block: IR_SEQ over the body statements; body fails (FAILDESCR) so bb_broker exits after one tick.                                                                                         */
+IR_block_t *lower_icn_proc_body(tree_t *proc) {
+    if (!proc || proc->t != TT_FNC) return NULL;
+    int nparams    = proc->_id;
+    int body_start = 1 + nparams;
+    int n_stmts    = proc->n - body_start;
+    if (n_stmts <= 0) return NULL;
+    IR_block_t *cfg = IR_alloc(128, IR_LANG_ICN);
+    if (!cfg) return NULL;
+    IR_t **stmt_nodes = calloc((size_t)n_stmts, sizeof(IR_t *));
+    if (!stmt_nodes) { IR_free(cfg); return NULL; }
+    int built = 0;
+    for (int i = 0; i < n_stmts; i++) {
+        tree_t *st = proc->c[body_start + i];
+        if (!st) continue;
+        IR_t *nd = lower_icn_expr_node(cfg, st);
+        if (!nd) { free(stmt_nodes); IR_free(cfg); return NULL; }
+        stmt_nodes[built++] = nd;
+    }
+    IR_t *seq = IR_node_alloc(cfg, IR_SEQ);
+    if (!seq) { free(stmt_nodes); IR_free(cfg); return NULL; }
+    seq->c = stmt_nodes;
+    seq->n = built;
+    cfg->entry = seq;
     return cfg;
 }

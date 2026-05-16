@@ -4,6 +4,7 @@
 #include "../../frontend/snobol4/scrip_cc.h"
 #include "bb_broker.h"
 #include "../../frontend/icon/icon_gen.h"
+#include "IR.h"
 #define FRAME_SLOT_MAX        64
 #define CORO_STACK_SZ         (1024 * 1024)
 #define PROC_TABLE_MAX       256
@@ -16,7 +17,7 @@ struct GeneratorState;
 typedef struct { tree_t *node; long cur; const char *sval; } IcnGenEntry_d;
 typedef struct { const char *name; int slot; } IcnScopeEnt;
 typedef struct { IcnScopeEnt e[FRAME_SLOT_MAX]; int n; } IcnScope;
-typedef struct { const char *name; tree_t *proc; int entry_pc; int nparams; IcnScope lower_sc; } IcnProcEntry;
+typedef struct { const char *name; tree_t *proc; int entry_pc; int nparams; IcnScope lower_sc; IR_block_t *ir_body; } IcnProcEntry;
 typedef struct {
     DESCR_t       env[FRAME_SLOT_MAX];
     int           env_n;

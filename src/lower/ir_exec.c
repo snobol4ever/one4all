@@ -15,6 +15,8 @@ extern int         Σlen;
 #include "snobol4.h"
 #include "lower_icn.h"
 #include "sm_interp.h"
+#include "../runtime/interp/icn_runtime.h"
+extern int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR_t *out);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void bb_exec_stmt(void *e);
 #include "bb_box.h"
@@ -28,6 +30,78 @@ IR_t * IR_exec_node(IR_t * nd) {
     case IR_LIT_I:
         nd->value = INTVAL(nd->ival);
         return nd->γ;
+    case IR_VAR: {
+        /* Icon variable read. nd->sval = name. Resolve frame slot at exec time via FRAME.sc.        */
+        if (frame_depth > 0 && nd->sval) {
+            int slot = scope_get(&FRAME.sc, nd->sval);
+            if (slot >= 0 && slot < FRAME.env_n) {
+                DESCR_t sv = FRAME.env[slot];
+                if (sv.v != 0) { nd->value = sv; return nd->γ; }
+            }
+        }
+        if (nd->sval) {
+            DESCR_t gv = NV_GET_fn(nd->sval);
+            nd->value = gv;
+            return IS_FAIL_fn(gv) ? nd->ω : nd->γ;
+        }
+        nd->value = NULVCL;
+        return nd->γ;
+    }
+    case IR_ASSIGN: {
+        /* c[0] = LHS (IR_VAR), c[1] = RHS. Evaluate RHS, store into LHS slot (resolved by name).   */
+        if (nd->n < 2 || !nd->c[0] || !nd->c[1]) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[1]);
+        DESCR_t val = nd->c[1]->value;
+        if (IS_FAIL_fn(val)) { nd->value = FAILDESCR; return nd->ω; }
+        IR_t *lhs = nd->c[0];
+        if (lhs->t == IR_VAR && lhs->sval) {
+            if (frame_depth > 0) {
+                int slot = scope_get(&FRAME.sc, lhs->sval);
+                if (slot >= 0 && slot < FRAME.env_n) {
+                    FRAME.env[slot] = val;
+                    nd->value = val;
+                    return nd->γ;
+                }
+            }
+            NV_SET_fn(lhs->sval, val);
+            nd->value = val;
+            return nd->γ;
+        }
+        nd->value = FAILDESCR;
+        return nd->ω;
+    }
+    case IR_CALL: {
+        /* Builtin call by name. nd->sval = function name; nd->c[0..n-1] = arg subexprs.            */
+        if (!nd->sval) { nd->value = FAILDESCR; return nd->ω; }
+        int nargs = nd->n;
+        DESCR_t *args = NULL;
+        if (nargs > 0) {
+            args = (DESCR_t *)GC_malloc((size_t)nargs * sizeof(DESCR_t));
+            for (int j = 0; j < nargs; j++) {
+                if (!nd->c[j]) { nd->value = FAILDESCR; return nd->ω; }
+                IR_exec_node(nd->c[j]);
+                args[j] = nd->c[j]->value;
+                if (IS_FAIL_fn(args[j])) { nd->value = FAILDESCR; return nd->ω; }
+            }
+        }
+        DESCR_t out = FAILDESCR;
+        if (icn_try_call_builtin_by_name(nd->sval, args, nargs, &out)) {
+            nd->value = out;
+            return IS_FAIL_fn(out) ? nd->ω : nd->γ;
+        }
+        nd->value = FAILDESCR;
+        return nd->ω;
+    }
+    case IR_SEQ: {
+        /* Sequence: evaluate each child for side effects. Body fails (FAILDESCR) so bb_broker exits */
+        /* after a single pump tick — matches Icon procedure-falls-off-end semantics.                */
+        for (int j = 0; j < nd->n; j++) {
+            if (!nd->c[j]) continue;
+            IR_exec_node(nd->c[j]);
+        }
+        nd->value = FAILDESCR;
+        return nd->ω;
+    }
     case IR_LIT_F:
         nd->value = REALVAL(nd->dval);
         return nd->γ;

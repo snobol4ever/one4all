@@ -1196,6 +1196,9 @@ static void lower_proc_skeletons(void)
             int body_start = 1 + proc->_id;
             IcnScope sc; build_proc_scope(&sc, proc, body_start);
             proc_table[pi].lower_sc = sc;
+            /* Attempt to lower body to an IR_block_t DCG.  When successful, runtime icn_bb_pump_proc_by_name */
+            /* uses it directly via icn_bb_dcg, bypassing SM entirely.  When NULL, legacy SM path runs.        */
+            proc_table[pi].ir_body = lower_icn_proc_body(proc);
             g_proc_scope = &sc; g_in_proc_body = 1;
             g_lang = LANG_ICN;
             for (int i = body_start; i < proc->n; i++) {
