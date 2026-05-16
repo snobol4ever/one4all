@@ -992,7 +992,7 @@ void lower_stmt(const tree_t *s)
     if (lang == LANG_ICN) return;
     if (lang == LANG_PL) {
         if (subject && subject->t == TT_CHOICE && subject->v.sval) {
-            emit_prolog_call_arity0(subject->v.sval);
+            emit_prolog_call(subject->v.sval);
             goto emit_gotos;
         }
         if (subject && subject->t == TT_FNC && subject->v.sval

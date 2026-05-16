@@ -894,6 +894,17 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->value = v;
         return nd->γ;
     }
+    case IR_PL_ALT: {
+        extern Trail g_pl_trail; extern Term **g_pl_env;
+        if (!nd->c || nd->n < 2) { nd->value = FAILDESCR; return nd->ω; }
+        int mark = trail_mark(&g_pl_trail); Term **saved_env = g_pl_env;
+        IR_exec_node(nd->c[0]); DESCR_t r0 = nd->c[0]->value;
+        if (!IS_FAIL_fn(r0)) { nd->value = r0; return nd->γ; }
+        trail_unwind(&g_pl_trail, mark); g_pl_env = saved_env;
+        IR_exec_node(nd->c[1]); DESCR_t r1 = nd->c[1]->value;
+        if (!IS_FAIL_fn(r1)) { nd->value = r1; return nd->γ; }
+        nd->value = FAILDESCR; return nd->ω;
+    }
     case IR_PL_CHOICE: {
         extern Trail g_pl_trail; extern Term **g_pl_env;
         if (!nd->c || nd->n == 0) { nd->value = FAILDESCR; return nd->ω; }
@@ -910,7 +921,7 @@ IR_t * IR_exec_node(IR_t * nd) {
     }
     case IR_PL_CALL: {
         extern Term **g_pl_env; extern Trail g_pl_trail;
-        const char *callee = nd->sval; int carity = (int)nd->ival;
+        const char *callee = nd->sval; int carity = (int)nd->ival2;
         if (!callee) { nd->value = FAILDESCR; return nd->ω; }
         char key[128]; snprintf(key, sizeof key, "%s/%d", callee, carity);
         Pl_PredEntry_BB *bb = pl_dcg_lookup(key, carity);
@@ -932,7 +943,7 @@ IR_t * IR_exec_node(IR_t * nd) {
         if (IS_FAIL_fn(res)) { trail_unwind(&g_pl_trail, mark); g_pl_env = saved_env; free(callee_env); nd->value = FAILDESCR; return nd->ω; }
         for (int ai = 0; ai < nd->n && ai < carity; ai++) {
             if (!nd->c[ai] || nd->c[ai]->t != IR_PL_VAR) continue;
-            int caller_slot = (int)nd->c[ai]->ival;
+            int caller_slot = (int)nd->c[ai]->ival2;
             Term *bound = callee_env[ai] ? term_deref(callee_env[ai]) : NULL;
             if (bound && saved_env && caller_slot >= 0) saved_env[caller_slot] = bound;
         }
@@ -948,7 +959,7 @@ IR_t * IR_exec_node(IR_t * nd) {
     }
     case IR_PL_VAR: {
         extern Term **g_pl_env;
-        int slot = (int)nd->ival;
+        int slot = (int)nd->ival2;
         if (!g_pl_env || slot < 0) { nd->value = NULVCL; return nd->γ; }
         Term *t = g_pl_env[slot] ? term_deref(g_pl_env[slot]) : NULL;
         if (!t) { nd->value = NULVCL; return nd->γ; }
@@ -1003,6 +1014,16 @@ IR_t * IR_exec_node(IR_t * nd) {
     case IR_PL_BUILTIN: {
         const char *fn = nd->sval ? nd->sval : "";
         if (strcmp(fn, "nl") == 0) { putchar('\n'); nd->value = INTVAL(1); return nd->γ; }
+        if (nd->n >= 2 && nd->c[0] && nd->c[1] &&
+            (strcmp(fn,">")==0||strcmp(fn,"<")==0||strcmp(fn,">=")==0||strcmp(fn,"<=")==0||strcmp(fn,"=:=")==0||strcmp(fn,"=\\=")==0)) {
+            IR_exec_node(nd->c[0]); DESCR_t lv = nd->c[0]->value;
+            IR_exec_node(nd->c[1]); DESCR_t rv = nd->c[1]->value;
+            double l = (lv.v == DT_I) ? (double)lv.i : lv.r;
+            double r = (rv.v == DT_I) ? (double)rv.i : rv.r;
+            int ok = (strcmp(fn,">")==0)?(l>r):(strcmp(fn,"<")==0)?(l<r):(strcmp(fn,">=")==0)?(l>=r):(strcmp(fn,"<=")==0)?(l<=r):(strcmp(fn,"=:=")==0)?(l==r):(l!=r);
+            if (ok) { nd->value = INTVAL(1); return nd->γ; }
+            nd->value = FAILDESCR; return nd->ω;
+        }
         if (nd->n >= 1 && nd->c[0]) {
             IR_exec_node(nd->c[0]); DESCR_t av = nd->c[0]->value;
             if (strcmp(fn, "write") == 0 || strcmp(fn, "writeln") == 0) {
@@ -1017,7 +1038,7 @@ IR_t * IR_exec_node(IR_t * nd) {
                 IR_exec_node(nd->c[1]); DESCR_t rv = nd->c[1]->value;
                 if (IS_FAIL_fn(rv)) { nd->value = FAILDESCR; return nd->ω; }
                 if (nd->c[0]->t == IR_PL_VAR) {
-                    int slot = (int)nd->c[0]->ival;
+                    int slot = (int)nd->c[0]->ival2;
                     Term *vt = (rv.v == DT_I) ? term_new_int((long)rv.i) : term_new_float(rv.r);
                     if (g_pl_env && slot >= 0) g_pl_env[slot] = vt;
                 }
