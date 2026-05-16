@@ -384,7 +384,7 @@ void lex_destroy(Lex *lx) { flex_lex_destroy(lx); }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern CODE_t *parse_program_tokens(Lex *stream);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-extern CODE_t *parse_program_tokens_ast(Lex *stream, AST_t **ast_out);
+extern CODE_t *parse_program_tokens_ast(Lex *stream, tree_t **ast_out);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 CODE_t *sno_parse(FILE *f, const char *fname) {
     Lex lx; memset(&lx,0,sizeof lx);
@@ -394,10 +394,10 @@ CODE_t *sno_parse(FILE *f, const char *fname) {
     return prog;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-AST_t *sno_parse_ast(FILE *f, const char *fname, CODE_t **code_out) {
+tree_t *sno_parse_ast(FILE *f, const char *fname, CODE_t **code_out) {
     Lex lx; memset(&lx,0,sizeof lx);
     flex_lex_open(&lx,f,fname);
-    AST_t *ast = NULL;
+    tree_t *ast = NULL;
     CODE_t *prog = parse_program_tokens_ast(&lx, &ast);
     flex_lex_destroy(&lx);
     if (code_out) *code_out = prog;
