@@ -477,6 +477,30 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->value = FAILDESCR;
         return nd->ω;
     }
+    case IR_NEG: {
+        /* Icon -E unary minus.  Evaluate c[0]; reuse icn_binop_apply(SUB, 0, v) for coercion.       */
+        if (nd->n < 1 || !nd->c[0]) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[0]);
+        DESCR_t v = nd->c[0]->value;
+        if (IS_FAIL_fn(v)) { nd->value = FAILDESCR; return nd->ω; }
+        int rel_fail = 0;
+        DESCR_t result = icn_binop_apply(ICN_BINOP_SUB, INTVAL(0), v, &rel_fail);
+        if (IS_FAIL_fn(result)) { nd->value = FAILDESCR; return nd->ω; }
+        nd->value = result;
+        return nd->γ;
+    }
+    case IR_POS: {
+        /* Icon +E unary plus.  Numeric coerce via icn_binop_apply(ADD, 0, v).                       */
+        if (nd->n < 1 || !nd->c[0]) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[0]);
+        DESCR_t v = nd->c[0]->value;
+        if (IS_FAIL_fn(v)) { nd->value = FAILDESCR; return nd->ω; }
+        int rel_fail = 0;
+        DESCR_t result = icn_binop_apply(ICN_BINOP_ADD, INTVAL(0), v, &rel_fail);
+        if (IS_FAIL_fn(result)) { nd->value = FAILDESCR; return nd->ω; }
+        nd->value = result;
+        return nd->γ;
+    }
     case IR_SIZE: {
         /* Icon *E — size of string/list/table. One child c[0]=E. Returns integer length.       */
         if (nd->n < 1 || !nd->c[0]) { nd->value = INTVAL(0); return nd->γ; }

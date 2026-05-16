@@ -97,6 +97,8 @@ typedef enum {
     IR_IDENTICAL,       /* Icon === — c[0]=lhs, c[1]=rhs; succeed with rhs if identical, else ω                     */
     IR_NULL_TEST,       /* Icon \x null-test — c[0]=operand; succeed with &null if null, else ω                     */
     IR_RANDOM,          /* Icon ?E random element — c[0]=operand; succeed with random value, else ω                 */
+    IR_NEG,             /* Icon -E unary minus — c[0]=operand; succeed with -E (numeric coerce), else ω             */
+    IR_POS,             /* Icon +E unary plus  — c[0]=operand; succeed with +E (numeric coerce), else ω             */
     IR_E_COUNT
 } IR_e;
 typedef struct IR_t IR_t;
