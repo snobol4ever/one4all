@@ -680,17 +680,65 @@ static void lower_if(const tree_t *t)
     sm_patch_jump(g_p, jend, sm_label(g_p));
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PST-SC-4c (2026-05-16): lower_if_stmt handles TT_IF(cond, TT_PROGRAM(then), TT_PROGRAM(else?)).
+ * Bodies are executed for effect (lower_stmt iteration); break inside body jumps to the
+ * enclosing while's exit label, bypassing the if entirely — no stack value left behind. */
+static void lower_if_stmt(const tree_t *t)
+{
+    if (t->n < 1) return;
+    lower_expr(t->c[0]);
+    int jf = sm_emit_i(g_p, SM_JUMP_F, 0);
+    sm_emit(g_p, SM_VOID_POP);
+    /* then body */
+    const tree_t *then_b = (t->n > 1) ? t->c[1] : NULL;
+    if (then_b && then_b->t == TT_PROGRAM) {
+        for (int i = 0; i < then_b->n; i++) if (then_b->c[i]) lower_stmt(then_b->c[i]);
+    } else if (then_b) { lower_expr(then_b); sm_emit(g_p, SM_VOID_POP); }
+    int jend = sm_emit_i(g_p, SM_JUMP, 0);
+    sm_patch_jump(g_p, jf, sm_label(g_p));
+    sm_emit(g_p, SM_VOID_POP);
+    /* else body */
+    const tree_t *else_b = (t->n > 2) ? t->c[2] : NULL;
+    if (else_b && else_b->t == TT_PROGRAM) {
+        for (int i = 0; i < else_b->n; i++) if (else_b->c[i]) lower_stmt(else_b->c[i]);
+    } else if (else_b) { lower_expr(else_b); sm_emit(g_p, SM_VOID_POP); }
+    sm_patch_jump(g_p, jend, sm_label(g_p));
+    /* push null so lower_stmt's surrounding SM_VOID_POP has something to consume */
+    sm_emit(g_p, SM_PUSH_NULL);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PST-SC-4c (2026-05-16): lower_while_until handles TT_WHILE(cond, TT_PROGRAM(body), QLIT(cont), QLIT(end)).
+ * When the body is TT_PROGRAM, iterate via lower_stmt (no stack value) so break jumping out
+ * mid-body doesn't leave the SM_VOID_POP at the exit position with nothing on the stack. */
 static void lower_while_until(const tree_t *t, int exit_on_success)
 {
-    int top = sm_label(g_p);
+    LabelTable *tbl   = &g_labtab;
+    const char *lbl_cont = (t->n > 2 && t->c[2]) ? t->c[2]->v.sval : NULL;
+    const char *lbl_end  = (t->n > 3 && t->c[3]) ? t->c[3]->v.sval : NULL;
+    int top = g_p->count;
+    if (lbl_cont && lbl_cont[0]) labtab_define(tbl, lbl_cont, top);
     if (t->n < 1) { sm_emit(g_p, SM_PUSH_NULL); return; }
     lower_expr(t->c[0]);
     int jx = exit_on_success ? sm_emit_i(g_p, SM_JUMP_S, 0) : sm_emit_i(g_p, SM_JUMP_F, 0);
     sm_emit(g_p, SM_VOID_POP);
-    if (t->n > 1) { lower_expr(t->c[1]); sm_emit(g_p, SM_VOID_POP); }
+    const tree_t *body = (t->n > 1) ? t->c[1] : NULL;
+    if (body && body->t == TT_PROGRAM) {
+        /* Snocone stmt block — iterate for effect; break can jump out before block ends */
+        for (int i = 0; i < body->n; i++)
+            if (body->c[i]) lower_stmt(body->c[i]);
+    } else if (body) {
+        /* Icon/expression body — evaluates to a value */
+        lower_expr(body); sm_emit(g_p, SM_VOID_POP);
+    }
     sm_emit_i(g_p, SM_JUMP, top);
-    sm_patch_jump(g_p, jx, sm_label(g_p));
-    sm_emit(g_p, SM_VOID_POP); sm_emit(g_p, SM_PUSH_NULL);
+    int exit_pos = g_p->count;
+    sm_patch_jump(g_p, jx, exit_pos);
+    if (lbl_end && lbl_end[0]) labtab_define(tbl, lbl_end, exit_pos);
+    /* TT_PROGRAM path: break jumps here with nothing on stack — no VOID_POP */
+    if (!body || body->t != TT_PROGRAM) {
+        sm_emit(g_p, SM_VOID_POP);
+    }
+    sm_emit(g_p, SM_PUSH_NULL);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_while(const tree_t *t) { lower_while_until(t, 0); }
@@ -1146,7 +1194,13 @@ static void lower_expr_inner(const tree_t *t)
     case TT_IDENTICAL:                        lower_identical(t);     return;
     case TT_AUGOP:                            lower_augop(t);         return;
     case TT_SEQ_EXPR:                         lower_seq_expr(t);      return;
-    case TT_IF:                               lower_if(t);            return;
+    case TT_IF:
+        /* PST-SC-4c: Snocone if bodies are TT_PROGRAM (stmt blocks); use lower_if_stmt */
+        if (t->n > 1 && t->c[1] && t->c[1]->t == TT_PROGRAM)
+            lower_if_stmt(t);
+        else
+            lower_if(t);
+        return;
     case TT_WHILE:                            lower_while(t);         return;
     /* PST-SC-4b (2026-05-16): TT_PROGRAM used as a block body inside TT_IF then/else slots.
      * Lower each child statement for effect (VOID_POP after each), push null as block value. */
