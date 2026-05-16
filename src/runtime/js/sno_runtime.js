@@ -22,6 +22,28 @@ const _FAIL = Object.freeze({ _sno_fail: true });
 function _is_fail(v) { return v === _FAIL; }
 
 /* -----------------------------------------------------------------------
+ * Byte-oriented stdout — SNOBOL4 strings are byte sequences. JS strings
+ * are UTF-16 code units. For strings containing only chars 0..127, plain
+ * stdout.write is fine. For chars 128..255 (e.g. &ALPHABET tail), we need
+ * raw byte output via Buffer to avoid UTF-8 re-encoding.
+ * ----------------------------------------------------------------------- */
+function _write_raw(s) {
+    /* Fast path: pure 7-bit. */
+    let high = false;
+    for (let i = 0; i < s.length; i++) {
+        if (s.charCodeAt(i) > 0x7f) { high = true; break; }
+    }
+    if (!high) { process.stdout.write(s); return; }
+    /* Slow path: latin-1 byte encoding. */
+    const buf = Buffer.alloc(s.length);
+    for (let i = 0; i < s.length; i++) {
+        buf[i] = s.charCodeAt(i) & 0xff;
+    }
+    process.stdout.write(buf);
+}
+function _write_line(s) { _write_raw(s); process.stdout.write('\n'); }
+
+/* -----------------------------------------------------------------------
  * _vars — SNOBOL4 variable store with IO trapping
  * ----------------------------------------------------------------------- */
 const _store = {};
@@ -33,7 +55,7 @@ const _vars = new Proxy(_store, {
         if (typeof k === 'string') k = k.toUpperCase();
         o[k] = v;
         if (k === 'OUTPUT') {
-            process.stdout.write(_str(v) + '\n');
+            _write_line(_str(v));
         }
         return true;
     },
@@ -179,19 +201,37 @@ function _cat(...args) {
 
 const _kw_store = {
     STCOUNT: 0,
+    STNO: 0,
     STLIMIT: -1,
+    ANCHOR: 0,
     ALPHABET: (function() { let s=''; for(let i=0;i<256;i++) s+=String.fromCharCode(i); return s; })(),
     DIGITS: '0123456789',
     MAXINT: 2147483647,
     MAXLNGTH: 5000,
     TRIM: 0,
+    FTRACE: 0,
+    DUMP: 0,
+    CODE: 0,
+    FULLSCAN: 0,
+    ABEND: 0,
+    ABORT: '',
+    ARB: '',
+    BAL: '',
+    FAIL: '',
+    REM: '',
+    SUCCEED: '',
+    FENCE: '',
     RTNTYPE: '',
     ERRTEXT: '',
+    ERRTYPE: 0,
     ERRLIMIT: 0,
+    FNAME: '',
+    FNCLEVEL: 0,
     FNNAME: '',
     LASTNO: 0,
-    UCASE: (function() { let s=''; for(let i=65;i<=90;i++) s+=String.fromCharCode(i); return s; })(),
+    PARM: '',
     LCASE: (function() { let s=''; for(let i=97;i<=122;i++) s+=String.fromCharCode(i); return s; })(),
+    UCASE: (function() { let s=''; for(let i=65;i<=90;i++) s+=String.fromCharCode(i); return s; })(),
 };
 
 function _kw(name) {
@@ -269,8 +309,15 @@ const _builtins = {
         const params = m[2] ? m[2].split(',').map(s => s.trim()).filter(s => s) : [];
         const locals = m[3] ? m[3].split(',').map(s => s.trim()).filter(s => s) : [];
         const entry_name = entry_override || name;
-        const entry_pc = _label_pcs[entry_name];
-        if (entry_pc === undefined) return null;  /* no entry label found — silently fail */
+        /* Case-insensitive entry-PC lookup. */
+        let entry_pc = _label_pcs[entry_name];
+        if (entry_pc === undefined) {
+            const un = entry_name.toUpperCase();
+            for (const k in _label_pcs) {
+                if (k.toUpperCase() === un) { entry_pc = _label_pcs[k]; break; }
+            }
+        }
+        if (entry_pc === undefined) return null;
         _user_fns[name] = { entry_pc, params, locals, retname: name };
         return name;
     },
@@ -436,6 +483,11 @@ function store_var(name) {
         _last_ok = false;
         return;
     }
+    /* Keyword assignment: bare names like ANCHOR, TRIM, etc. (without &) when
+     * those names match a keyword. SNOBOL4 conventionally writes &ANCHOR = 0
+     * but the parser strips the &. */
+    const uk = (name || '').toUpperCase();
+    if (uk in _kw_store) _kw_store[uk] = v;
     _vars[name] = v;
     _last_ok = true;
 }
@@ -524,8 +576,8 @@ function lcomp(op) {
 
 function last_ok()    { return _last_ok; }
 function set_last_ok(v) { _last_ok = v ? true : false; }
-function set_stno(n)  { _stno = n; }
-function halt_tos()   { if (_stack.length > 0) { const v = _stack.pop(); if (v !== _FAIL) process.stdout.write(_str(v) + '\n'); } }
+function set_stno(n)  { _stno = n; _kw_store.STNO = n; _kw_store.STCOUNT = (_kw_store.STCOUNT|0) + 1; }
+function halt_tos()   { if (_stack.length > 0) { const v = _stack.pop(); if (v !== _FAIL) _write_line(_str(v)); } }
 
 function call(name, nargs) {
     if (_stack.length < nargs) throw new Error('SNOBOL4: call underflow');
@@ -556,8 +608,18 @@ function _register_label_pcs(map) {
  * Returns -1 if call was a builtin and result is already on stack. */
 function call_or_jump(name, nargs, ret_pc) {
     if (_stack.length < nargs) throw new Error('SNOBOL4: call_or_jump underflow: ' + name);
-    if (name && _user_fns.hasOwnProperty(name)) {
-        const fn = _user_fns[name];
+    /* Case-insensitive user-fn lookup (SNOBOL4 / SPITBOL fold names). */
+    let fn = null;
+    if (name) {
+        if (_user_fns.hasOwnProperty(name)) fn = _user_fns[name];
+        else {
+            const un = name.toUpperCase();
+            for (const k in _user_fns) {
+                if (k.toUpperCase() === un) { fn = _user_fns[k]; break; }
+            }
+        }
+    }
+    if (fn) {
         const args = _stack.splice(_stack.length - nargs, nargs);
         const saved = [];
         /* Save and clear the return-value variable (retname). */
@@ -675,6 +737,119 @@ const {
 
 function _peek() { return _stack.length > 0 ? _stack[_stack.length - 1] : null; }
 
+/* -----------------------------------------------------------------------
+ * SM_PAT_* stack-machine operations (SJ4-JS-5)
+ *
+ * Each pat_* function pops operands from _stack and pushes a pattern node
+ * (an opaque object understood by sno_engine.engine).  Pattern construction
+ * is left-to-right at compile time; the resulting tree is consumed by
+ * exec_stmt() to perform the actual match.
+ * ----------------------------------------------------------------------- */
+function pat_lit(s)     { _stack.push(_engine.PAT_lit(s != null ? _str(s) : '')); }
+function pat_span()     { const cs = _str(_stack.pop()); _stack.push(_engine.PAT_span(cs)); }
+function pat_break()    { const cs = _str(_stack.pop()); _stack.push(_engine.PAT_break(cs)); }
+function pat_any()      { const cs = _str(_stack.pop()); _stack.push(_engine.PAT_any(cs)); }
+function pat_notany()   { const cs = _str(_stack.pop()); _stack.push(_engine.PAT_notany(cs)); }
+function pat_len()      { const n  = _num(_stack.pop()); _stack.push(_engine.PAT_len(n)); }
+function pat_pos()      { const n  = _num(_stack.pop()); _stack.push(_engine.PAT_pos(n)); }
+function pat_rpos()     { const n  = _num(_stack.pop()); _stack.push(_engine.PAT_rpos(n)); }
+function pat_tab()      { const n  = _num(_stack.pop()); _stack.push(_engine.PAT_tab(n)); }
+function pat_rtab()     { const n  = _num(_stack.pop()); _stack.push(_engine.PAT_rtab(n)); }
+function pat_rem()      { _stack.push(_engine.PAT_rem()); }
+function pat_arb()      { _stack.push(_engine.PAT_arb()); }
+function pat_arbno()    { const p  = _stack.pop(); _stack.push(_engine.PAT_arbno(p)); }
+function pat_bal()      { _stack.push(_engine.PAT_bal()); }
+function pat_fail()     { _stack.push(_engine.PAT_fail()); }
+function pat_succeed()  { _stack.push(_engine.PAT_succeed()); }
+function pat_abort()    { _stack.push(_engine.PAT_abort()); }
+function pat_fence()    { _stack.push(_engine.PAT_fence()); }
+function pat_eps()      { _stack.push(''); /* epsilon = empty literal */ }
+function pat_cat()      { const r = _stack.pop(); const l = _stack.pop();
+                          _stack.push(_engine.PAT_seq(l, r)); }
+function pat_alt()      { const r = _stack.pop(); const l = _stack.pop();
+                          _stack.push(_engine.PAT_alt(l, r)); }
+function pat_deref()    {
+    const v = _stack.pop();
+    if (v && typeof v === 'object' && v.__pat) { _stack.push(v); return; }
+    if (typeof v === 'string') { _stack.push(_engine.PAT_lit(v)); return; }
+    _stack.push(_engine.PAT_lit(_str(v)));
+}
+function pat_refname(name) {
+    /* Deferred variable reference — at match time, look up the variable's
+     * current value as a pattern.  Modeled via PAT_deferred. */
+    _stack.push(_engine.PAT_deferred(() => {
+        const v = _vars[name];
+        if (v && typeof v === 'object' && v.__pat) return v;
+        return _engine.PAT_lit(_str(v));
+    }));
+}
+function pat_capture(vname, kind) {
+    /* Pop child pattern, wrap in capture node:
+     * kind 0 = conditional (. operator), kind 1 = immediate ($ operator) */
+    const child = _stack.pop();
+    if (kind === 1) _stack.push(_engine.PAT_capt_imm(child, vname));
+    else            _stack.push(_engine.PAT_capt_cond(child, vname));
+}
+function pat_capture_fn(fname, kind, namelist) {
+    /* . *func() / $ *func() — call func on matched text, assign to vars. */
+    const child = _stack.pop();
+    const names = namelist ? namelist.split('\t').filter(s => s) : [];
+    /* Wrap: capture matched text, then call func with named vars set. */
+    const tmp = '__cap_' + (_capture_seq++);
+    const wrap = _engine.PAT_capt_cond(child, tmp);
+    /* On success, schedule the call.  For now, simple wrapper. */
+    _stack.push({__pat:1, t:'CAPT_FN', child: wrap, fname, names, kind, tmp});
+}
+let _capture_seq = 0;
+function pat_capture_fn_args(fname, kind, nargs) {
+    const argv = [];
+    for (let i = 0; i < nargs; i++) argv.unshift(_stack.pop());
+    const child = _stack.pop();
+    _stack.push({__pat:1, t:'CAPT_FN_ARGS', child, fname, argv, kind});
+}
+function pat_usercall(fname) {
+    _stack.push({__pat:1, t:'USERCALL', fname, argv: []});
+}
+function pat_usercall_args(fname, nargs) {
+    const argv = [];
+    for (let i = 0; i < nargs; i++) argv.unshift(_stack.pop());
+    _stack.push({__pat:1, t:'USERCALL', fname, argv});
+}
+
+/* -----------------------------------------------------------------------
+ * exec_stmt — execute a pattern statement (SUBJ PAT [= REPL])
+ *
+ * Stack before: [..., pat, subj, repl]  (repl is 0 when has_repl=0)
+ * has_repl: 0=match only, 1=match-and-replace
+ * subj_name: variable name to update with replacement (or empty/null)
+ * Sets _last_ok to match success/failure.
+ * ----------------------------------------------------------------------- */
+function exec_stmt(subj_name, has_repl) {
+    const repl    = _stack.pop();
+    const subject = _stack.pop();
+    const pattern = _stack.pop();
+    const s = _str(subject);
+    let result;
+    try {
+        const anchor = !!(_kw_store.ANCHOR);
+        result = anchor ? _engine.sno_match(s, pattern)
+                        : _engine.sno_search(s, pattern);
+    } catch (e) {
+        result = null;
+    }
+    if (!result || !result.matched) {
+        _last_ok = false;
+        return;
+    }
+    _last_ok = true;
+    /* Replacement: subj_name <- subj[0:start] + repl + subj[end:] */
+    if (has_repl && subj_name) {
+        const r = _str(repl);
+        const newsubj = s.slice(0, result.start) + r + s.slice(result.end);
+        _vars[subj_name] = newsubj;
+    }
+}
+
 module.exports = {
     /* Core runtime */
     _vars, _FAIL, _is_fail, _str, _num, _cat,
@@ -694,5 +869,14 @@ module.exports = {
     halt_tos, call, do_return,
     /* User-fn dispatch (SJ4-JS-4c) */
     _register_label_pcs, call_or_jump, fn_return,
+    /* SM-level pattern stack ops (SJ4-JS-5) */
+    pat_lit, pat_span, pat_break, pat_any, pat_notany,
+    pat_len, pat_pos, pat_rpos, pat_tab, pat_rtab,
+    pat_rem, pat_arb, pat_arbno, pat_bal,
+    pat_fail, pat_succeed, pat_abort, pat_fence, pat_eps,
+    pat_cat, pat_alt, pat_deref, pat_refname,
+    pat_capture, pat_capture_fn, pat_capture_fn_args,
+    pat_usercall, pat_usercall_args,
+    exec_stmt,
     MatchState,
 };

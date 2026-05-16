@@ -277,14 +277,17 @@ int emit_js_program(const tree_t * ast_prog, FILE * out) {
     fprintf(out, "'use strict';\n");
     fprintf(out, "const rt = require('/home/claude/one4all/src/runtime/js/sno_runtime.js');\n");
     fprintf(out, "rt._init();\n");
-    /* Pre-scan: emit user-fn entry-PC registration for all SM_LABEL with define_entry=1. */
+    /* Pre-scan: emit user-fn entry-PC registration for all SM_LABEL with a name.
+     * This includes both define_entry labels and plain labels (for alt-entry
+     * forms like DEFINE("FOO(X)", "ALT") where ALT is a plain SM_LABEL). */
     fprintf(out, "rt._register_label_pcs({");
     int first = 1;
     for (int i = 0; i < sm->count; i++) {
         SM_Instr *in = &sm->instrs[i];
-        if (in->op == SM_LABEL && in->a[2].i && in->a[0].s) {
+        if (in->op == SM_LABEL && in->a[0].s && in->a[0].s[0]) {
             if (!first) fprintf(out, ",");
-            fprintf(out, "\"%s\":%d", in->a[0].s, i);
+            js_escape_string(out, in->a[0].s);
+            fprintf(out, ":%d", i);
             first = 0;
         }
     }
@@ -326,10 +329,14 @@ int emit_js_from_sm(SM_Program * sm, FILE * out) {
             fprintf(out, "rt.push_null(); ");
             break;
         case SM_PUSH_VAR:
-            fprintf(out, "rt.push_var(\"%s\"); ", instr->a[0].s ? instr->a[0].s : "");
+            fprintf(out, "rt.push_var(");
+            js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
+            fprintf(out, "); ");
             break;
         case SM_STORE_VAR:
-            fprintf(out, "rt.store_var(\"%s\"); ", instr->a[0].s ? instr->a[0].s : "");
+            fprintf(out, "rt.store_var(");
+            js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
+            fprintf(out, "); ");
             break;
         case SM_VOID_POP:
             fprintf(out, "rt.pop_void(); ");
@@ -378,13 +385,15 @@ int emit_js_from_sm(SM_Program * sm, FILE * out) {
             has_continue = 1;
             break;
         case SM_SUSPEND_VALUE:
-            fprintf(out, "{ let _r = rt.call_or_jump(\"%s\", %lld, %d); if (_r >= 0) { _pc = _r; continue; } } ",
-                    instr->a[0].s ? instr->a[0].s : "", instr->a[1].i, i + 1);
+            fprintf(out, "{ let _r = rt.call_or_jump(");
+            js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
+            fprintf(out, ", %lld, %d); if (_r >= 0) { _pc = _r; continue; } } ", instr->a[1].i, i + 1);
             fprintf(out, "rt.set_last_ok(!rt._is_fail(rt._peek())); ");
             break;
         case SM_CALL_FN:
-            fprintf(out, "{ let _r = rt.call_or_jump(\"%s\", %lld, %d); if (_r >= 0) { _pc = _r; continue; } } ",
-                    instr->a[0].s ? instr->a[0].s : "", instr->a[1].i, i + 1);
+            fprintf(out, "{ let _r = rt.call_or_jump(");
+            js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
+            fprintf(out, ", %lld, %d); if (_r >= 0) { _pc = _r; continue; } } ", instr->a[1].i, i + 1);
             break;
         case SM_RETURN:
             fprintf(out, "{ let _r = rt.fn_return(0, 0); if (_r === -2) { break loop; } _pc = _r; continue; } ");
@@ -425,29 +434,71 @@ int emit_js_from_sm(SM_Program * sm, FILE * out) {
         case SM_DEFINE_ENTRY:
             /* Marker after a define_entry label; no runtime action (registration done by DEFINE builtin). */
             break;
-        case SM_EXEC_STMT:
         case SM_PUSH_EXPRESSION:
+            fprintf(out, "rt.push_null(); ");  /* expression-thunk stub */
+            break;
         case SM_PAT_LIT:
-        case SM_PAT_SPAN:
-        case SM_PAT_BREAK:
-        case SM_PAT_ANY:
-        case SM_PAT_NOTANY:
-        case SM_PAT_LEN:
-        case SM_PAT_POS:
-        case SM_PAT_RPOS:
-        case SM_PAT_TAB:
-        case SM_PAT_RTAB:
-        case SM_PAT_REM:
-        case SM_PAT_ARB:
-        case SM_PAT_ARBNO:
-        case SM_PAT_CAT:
-        case SM_PAT_ALT:
+            fprintf(out, "rt.pat_lit(");
+            js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
+            fprintf(out, "); ");
+            break;
+        case SM_PAT_SPAN:    fprintf(out, "rt.pat_span(); ");    break;
+        case SM_PAT_BREAK:   fprintf(out, "rt.pat_break(); ");   break;
+        case SM_PAT_ANY:     fprintf(out, "rt.pat_any(); ");     break;
+        case SM_PAT_NOTANY:  fprintf(out, "rt.pat_notany(); ");  break;
+        case SM_PAT_LEN:     fprintf(out, "rt.pat_len(); ");     break;
+        case SM_PAT_POS:     fprintf(out, "rt.pat_pos(); ");     break;
+        case SM_PAT_RPOS:    fprintf(out, "rt.pat_rpos(); ");    break;
+        case SM_PAT_TAB:     fprintf(out, "rt.pat_tab(); ");     break;
+        case SM_PAT_RTAB:    fprintf(out, "rt.pat_rtab(); ");    break;
+        case SM_PAT_REM:     fprintf(out, "rt.pat_rem(); ");     break;
+        case SM_PAT_ARB:     fprintf(out, "rt.pat_arb(); ");     break;
+        case SM_PAT_ARBNO:   fprintf(out, "rt.pat_arbno(); ");   break;
+        case SM_PAT_BAL:     fprintf(out, "rt.pat_bal(); ");     break;
+        case SM_PAT_FAIL:    fprintf(out, "rt.pat_fail(); ");    break;
+        case SM_PAT_SUCCEED: fprintf(out, "rt.pat_succeed(); "); break;
+        case SM_PAT_ABORT:   fprintf(out, "rt.pat_abort(); ");   break;
+        case SM_PAT_FENCE0:  fprintf(out, "rt.pat_fence(); ");   break;
+        case SM_PAT_EPS:     fprintf(out, "rt.pat_eps(); ");     break;
+        case SM_PAT_CAT:     fprintf(out, "rt.pat_cat(); ");     break;
+        case SM_PAT_ALT:     fprintf(out, "rt.pat_alt(); ");     break;
+        case SM_PAT_DEREF:   fprintf(out, "rt.pat_deref(); ");   break;
+        case SM_PAT_REFNAME:
+            fprintf(out, "rt.pat_refname(");
+            js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
+            fprintf(out, "); ");
+            break;
         case SM_PAT_CAPTURE:
+            fprintf(out, "rt.pat_capture(");
+            js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
+            fprintf(out, ", %lld); ", instr->a[1].i);
+            break;
         case SM_PAT_CAPTURE_FN:
+            fprintf(out, "rt.pat_capture_fn(");
+            js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
+            fprintf(out, ", %lld, ", instr->a[1].i);
+            js_escape_string(out, instr->a[2].s ? instr->a[2].s : "");
+            fprintf(out, "); ");
+            break;
         case SM_PAT_CAPTURE_FN_ARGS:
+            fprintf(out, "rt.pat_capture_fn_args(");
+            js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
+            fprintf(out, ", %lld, %lld); ", instr->a[1].i, instr->a[2].i);
+            break;
         case SM_PAT_USERCALL:
+            fprintf(out, "rt.pat_usercall(");
+            js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
+            fprintf(out, "); ");
+            break;
         case SM_PAT_USERCALL_ARGS:
-            fprintf(out, "rt.call(\"%s\", %lld); rt.set_last_ok(!rt._is_fail(rt._peek())); ", instr->a[0].s ? instr->a[0].s : "", instr->a[1].i);
+            fprintf(out, "rt.pat_usercall_args(");
+            js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
+            fprintf(out, ", %lld); ", instr->a[1].i);
+            break;
+        case SM_EXEC_STMT:
+            fprintf(out, "rt.exec_stmt(");
+            js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
+            fprintf(out, ", %lld); ", instr->a[1].i);
             break;
         default:
             break;
