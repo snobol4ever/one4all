@@ -1,4 +1,7 @@
 #include "ir_exec.h"
+#include "../../frontend/prolog/term.h"
+#include "../../frontend/prolog/prolog_runtime.h"
+#include "../../frontend/prolog/prolog_atom.h"
 #include <stddef.h>
 #include <string.h>
 #include <stdio.h>
@@ -706,6 +709,90 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->state = 1;
         nd->value = v;
         return nd->γ;
+    }
+    case IR_PL_ATOM: {
+        nd->value = nd->sval ? STRVAL(nd->sval) : NULVCL;
+        return nd->γ;
+    }
+    case IR_PL_VAR: {
+        extern Term **g_pl_env;
+        int slot = (int)nd->ival;
+        if (!g_pl_env || slot < 0) { nd->value = NULVCL; return nd->γ; }
+        Term *t = g_pl_env[slot] ? term_deref(g_pl_env[slot]) : NULL;
+        if (!t) { nd->value = NULVCL; return nd->γ; }
+        if (t->tag == TERM_INT)   { nd->value = INTVAL(t->ival);  return nd->γ; }
+        if (t->tag == TERM_FLOAT) { nd->value = REALVAL(t->fval); return nd->γ; }
+        if (t->tag == TERM_ATOM)  { const char *nm = prolog_atom_name(t->atom_id); nd->value = nm ? STRVAL(nm) : NULVCL; return nd->γ; }
+        nd->value = NULVCL;
+        return nd->γ;
+    }
+    case IR_PL_ARITH: {
+        if (nd->n < 2 || !nd->c[0] || !nd->c[1]) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[0]); DESCR_t lv = nd->c[0]->value;
+        IR_exec_node(nd->c[1]); DESCR_t rv = nd->c[1]->value;
+        if (IS_FAIL_fn(lv) || IS_FAIL_fn(rv)) { nd->value = FAILDESCR; return nd->ω; }
+        long li = (lv.v == DT_I) ? (long)lv.i : (long)lv.r;
+        long ri = (rv.v == DT_I) ? (long)rv.i : (long)rv.r;
+        const char *op = nd->sval ? nd->sval : "+";
+        long res = (op[0]=='+') ? li+ri : (op[0]=='-') ? li-ri : (op[0]=='*') ? li*ri : (ri ? li/ri : 0);
+        nd->value = INTVAL(res);
+        return nd->γ;
+    }
+    case IR_PL_UNIFY: {
+        extern Term **g_pl_env; extern Trail g_pl_trail;
+        if (nd->n < 2 || !nd->c[0] || !nd->c[1]) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[0]); DESCR_t lv = nd->c[0]->value;
+        IR_exec_node(nd->c[1]); DESCR_t rv = nd->c[1]->value;
+        Term *lt = NULL, *rt = NULL;
+        if (nd->c[0]->t == IR_PL_VAR) {
+            int slot = (int)nd->c[0]->ival;
+            lt = (g_pl_env && slot >= 0 && g_pl_env[slot]) ? term_deref(g_pl_env[slot]) : NULL;
+            if (!lt) { lt = term_new_var(slot); if (g_pl_env && slot >= 0) g_pl_env[slot] = lt; }
+        } else {
+            if (lv.v == DT_I)   lt = term_new_int((long)lv.i);
+            else if (lv.v == DT_S && lv.s) { int aid = prolog_atom_intern(lv.s); lt = term_new_atom(aid); }
+            else lt = term_new_atom(prolog_atom_intern("[]"));
+        }
+        if (nd->c[1]->t == IR_PL_VAR) {
+            int slot = (int)nd->c[1]->ival;
+            rt = (g_pl_env && slot >= 0 && g_pl_env[slot]) ? term_deref(g_pl_env[slot]) : NULL;
+            if (!rt) { rt = term_new_var(slot); if (g_pl_env && slot >= 0) g_pl_env[slot] = rt; }
+        } else {
+            if (rv.v == DT_I)   rt = term_new_int((long)rv.i);
+            else if (rv.v == DT_S && rv.s) { int aid = prolog_atom_intern(rv.s); rt = term_new_atom(aid); }
+            else rt = term_new_atom(prolog_atom_intern("[]"));
+        }
+        if (!lt || !rt) { nd->value = FAILDESCR; return nd->ω; }
+        int mark = trail_mark(&g_pl_trail);
+        if (!unify(lt, rt, &g_pl_trail)) { trail_unwind(&g_pl_trail, mark); nd->value = FAILDESCR; return nd->ω; }
+        nd->value = INTVAL(1);
+        return nd->γ;
+    }
+    case IR_PL_BUILTIN: {
+        const char *fn = nd->sval ? nd->sval : "";
+        if (strcmp(fn, "nl") == 0) { putchar('\n'); nd->value = INTVAL(1); return nd->γ; }
+        if (nd->n >= 1 && nd->c[0]) {
+            IR_exec_node(nd->c[0]); DESCR_t av = nd->c[0]->value;
+            if (strcmp(fn, "write") == 0 || strcmp(fn, "writeln") == 0) {
+                if (av.v == DT_I) printf("%ld", (long)av.i);
+                else if (av.v == DT_R) printf("%g", av.r);
+                else if ((av.v == DT_S || av.v == DT_SNUL) && av.s) fputs(av.s, stdout);
+                if (strcmp(fn, "writeln") == 0) putchar('\n');
+                nd->value = INTVAL(1); return nd->γ;
+            }
+            if (strcmp(fn, "is") == 0 && nd->n >= 2 && nd->c[1]) {
+                extern Term **g_pl_env;
+                IR_exec_node(nd->c[1]); DESCR_t rv = nd->c[1]->value;
+                if (IS_FAIL_fn(rv)) { nd->value = FAILDESCR; return nd->ω; }
+                if (nd->c[0]->t == IR_PL_VAR) {
+                    int slot = (int)nd->c[0]->ival;
+                    Term *vt = (rv.v == DT_I) ? term_new_int((long)rv.i) : term_new_float(rv.r);
+                    if (g_pl_env && slot >= 0) g_pl_env[slot] = vt;
+                }
+                nd->value = INTVAL(1); return nd->γ;
+            }
+        }
+        nd->value = FAILDESCR; return nd->ω;
     }
     default:
         nd->value = FAILDESCR;

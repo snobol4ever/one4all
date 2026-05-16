@@ -673,7 +673,11 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             int         arity = (int)ins->a[1].i;
             bb_node_t node = pl_bb_once_proc_by_name(name, arity);
             if (node.fn) {
+                extern Term **g_pl_env;
+                Term **saved_env = g_pl_env;
+                pl_bb_env_push(16);
                 int ok = bb_broker(node, BB_ONCE, NULL, NULL);
+                pl_bb_env_pop(saved_env);
                 st->last_ok = (ok > 0);
             } else {
                 fprintf(stderr, "[NO-AST] SM_BB_ONCE_PROC stub: needs fresh SM/BB lowering\n");

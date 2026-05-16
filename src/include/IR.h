@@ -75,6 +75,10 @@ typedef enum {
     IR_PL_UNIFY,
     IR_PL_CUT,
     IR_PL_CALL,
+    IR_PL_BUILTIN,      /* Prolog builtin call: sval=name, c[0..n-1]=arg IR nodes                  */
+    IR_PL_VAR,          /* Prolog variable read: ival=slot index into g_pl_env[]                   */
+    IR_PL_ATOM,         /* Prolog atom literal: sval=atom name                                     */
+    IR_PL_ARITH,        /* Prolog arithmetic: sval=op, c[0]=lhs, c[1]=rhs                         */
     IR_ICN_TO,
     IR_ICN_UPTO,
     IR_ICN_EVERY,

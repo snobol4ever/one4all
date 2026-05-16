@@ -76,6 +76,13 @@ bb_node_t pl_bb_once_proc_by_name(const char *name, int arity) {
     dz->first = 1;
     return (bb_node_t){ pl_bb_dcg, dz, 0 };
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+void pl_bb_env_push(int nslots) {
+    int n = nslots > 0 ? nslots : 16;
+    g_pl_env = calloc((size_t)n, sizeof(Term *));
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+void pl_bb_env_pop(Term **saved) { free(g_pl_env); g_pl_env = saved; }
 #define PL_NB_STORE_SIZE 64
 typedef struct { char *key; Term *val; } Pl_NbEntry;
 static Pl_NbEntry g_pl_nb_store[PL_NB_STORE_SIZE];
