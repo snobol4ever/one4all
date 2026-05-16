@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "emit_ir.h"
 #include "sm_prog.h"
@@ -618,12 +619,29 @@ static int emit_jvm_generator(IR_t * nd, FILE * out) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_jvm_from_sm(SM_Program * sm, FILE * out) {
     if (!sm || !out) return 0;
-    if (sm->count == 0) {
-        fprintf(out, "    invokestatic rt/SnoRt/halt_tos()V\n");
-        return 0;
+    int n = sm->count;
+    if (n == 0) { fprintf(out, "    invokestatic rt/SnoRt/halt_tos()V\n"); return 0; }
+    /* pre-scan: build (name → entry_pc) table for user-defined functions */
+    int * fn_pcs = (int *)calloc((size_t)n, sizeof(int));
+    const char ** fn_names = (const char **)calloc((size_t)n, sizeof(const char *));
+    int fn_count = 0;
+    /* pre-scan: collect all call-site PCs (return addresses) */
+    int * call_sites = (int *)calloc((size_t)n, sizeof(int));
+    int call_site_count = 0;
+    for (int i = 0; i < n; i++) {
+        SM_Instr * ins = &sm->instrs[i];
+        if (ins->op == SM_LABEL && ins->a[2].i && ins->a[0].s) {
+            fn_pcs[fn_count] = i;
+            fn_names[fn_count] = ins->a[0].s;
+            fn_count++;
+        }
+        if ((ins->op == SM_CALL_FN || ins->op == SM_SUSPEND_VALUE) && i + 1 < n && ins->a[0].s && ins->a[0].s[0]) {
+            /* check if this is a user function call — will be resolved per instr below */
+            call_sites[call_site_count++] = i + 1;
+        }
     }
     fprintf(out, "    ; ── SM Program instructions ──\n");
-    for (int i = 0; i < sm->count; i++) {
+    for (int i = 0; i < n; i++) {
         SM_Instr * instr = &sm->instrs[i];
         fprintf(out, "sm_pc_%d:\n", i);
         switch (instr->op) {
@@ -699,16 +717,13 @@ static int emit_jvm_from_sm(SM_Program * sm, FILE * out) {
             break;
         case SM_JUMP: {
             int target = (int)instr->a[0].i;
-            if (target >= 0 && target < sm->count) {
-                fprintf(out, "    goto_w sm_pc_%d\n", target);
-            } else {
-                fprintf(out, "    goto_w sm_pc_end\n");
-            }
+            if (target >= 0 && target < n) fprintf(out, "    goto_w sm_pc_%d\n", target);
+            else fprintf(out, "    goto_w sm_pc_end\n");
             break;
         }
         case SM_JUMP_S: {
             int target = (int)instr->a[0].i;
-            if (target >= 0 && target < sm->count) {
+            if (target >= 0 && target < n) {
                 fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n");
                 fprintf(out, "    ifeq sm_pc_%d_skip\n", i);
                 fprintf(out, "    goto_w sm_pc_%d\n", target);
@@ -718,7 +733,7 @@ static int emit_jvm_from_sm(SM_Program * sm, FILE * out) {
         }
         case SM_JUMP_F: {
             int target = (int)instr->a[0].i;
-            if (target >= 0 && target < sm->count) {
+            if (target >= 0 && target < n) {
                 fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n");
                 fprintf(out, "    ifne sm_pc_%d_skip\n", i);
                 fprintf(out, "    goto_w sm_pc_%d\n", target);
@@ -727,14 +742,111 @@ static int emit_jvm_from_sm(SM_Program * sm, FILE * out) {
             break;
         }
         case SM_CALL_FN:
-            jvm_emit_ldc_string(out, instr->a[0].s ? instr->a[0].s : "");
-            jvm_push_int(out, instr->a[1].i);
-            fprintf(out, "    invokestatic rt/SnoRt/call(Ljava/lang/String;I)V\n");
+        case SM_SUSPEND_VALUE: {
+            const char * cname = instr->a[0].s ? instr->a[0].s : "";
+            /* empty name = :(RETURN) — unconditional function return */
+            if (!cname[0]) {
+                jvm_push_int2(out, 0); jvm_push_int2(out, 1);
+                fprintf(out, "    invokestatic rt/SnoRt/do_return(II)I\n    pop\n");
+                fprintf(out, "    invokestatic rt/SnoRt/fn_return_push()V\n");
+            fprintf(out, "    invokestatic rt/SnoRt/pop_ret_pc()I\n    goto_w sm_ret_dispatch\n");
+                break;
+            }
+            int entry_pc = -1;
+            for (int k = 0; k < fn_count; k++) {
+                if (fn_names[k] && strcmp(fn_names[k], cname) == 0) { entry_pc = fn_pcs[k]; break; }
+            }
+            if (entry_pc >= 0) {
+                /* user function: bind params, push return address, jump to entry */
+                jvm_emit_ldc_string(out, cname);
+                jvm_push_int2(out, (long)instr->a[1].i);
+                fprintf(out, "    invokestatic rt/SnoRt/bind_params(Ljava/lang/String;I)V\n");
+                jvm_push_int2(out, i + 1);
+                fprintf(out, "    invokestatic rt/SnoRt/push_ret_pc(I)V\n");
+                fprintf(out, "    goto_w sm_pc_%d\n", entry_pc);
+            } else {
+                /* builtin: dispatch via SnoRt.call */
+                jvm_emit_ldc_string(out, cname);
+                jvm_push_int2(out, (long)instr->a[1].i);
+                fprintf(out, "    invokestatic rt/SnoRt/call(Ljava/lang/String;I)V\n");
+            }
             break;
-        case SM_SUSPEND_VALUE:
-            jvm_emit_ldc_string(out, instr->a[0].s ? instr->a[0].s : "");
-            jvm_push_int(out, instr->a[1].i);
-            fprintf(out, "    invokestatic rt/SnoRt/call(Ljava/lang/String;I)V\n");
+        }
+        case SM_RETURN:
+            jvm_push_int2(out, 0); jvm_push_int2(out, 1);
+            fprintf(out, "    invokestatic rt/SnoRt/do_return(II)I\n    pop\n");
+            fprintf(out, "    invokestatic rt/SnoRt/fn_return_push()V\n");
+            fprintf(out, "    invokestatic rt/SnoRt/pop_ret_pc()I\n    goto_w sm_ret_dispatch\n");
+            break;
+        case SM_RETURN_S:
+            fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n    ifeq sm_pc_%d_rs_skip\n", i);
+            jvm_push_int2(out, 0); jvm_push_int2(out, 1);
+            fprintf(out, "    invokestatic rt/SnoRt/do_return(II)I\n    pop\n");
+            fprintf(out, "    invokestatic rt/SnoRt/fn_return_push()V\n");
+            fprintf(out, "    invokestatic rt/SnoRt/pop_ret_pc()I\n    goto_w sm_ret_dispatch\n");
+            fprintf(out, "sm_pc_%d_rs_skip:\n", i);
+            break;
+        case SM_RETURN_F:
+            fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n    ifne sm_pc_%d_rf_skip\n", i);
+            jvm_push_int2(out, 0); jvm_push_int2(out, 1);
+            fprintf(out, "    invokestatic rt/SnoRt/do_return(II)I\n    pop\n");
+            fprintf(out, "    invokestatic rt/SnoRt/fn_return_push()V\n");
+            fprintf(out, "    invokestatic rt/SnoRt/pop_ret_pc()I\n    goto_w sm_ret_dispatch\n");
+            fprintf(out, "sm_pc_%d_rf_skip:\n", i);
+            break;
+        case SM_FRETURN:
+            jvm_push_int2(out, 1); jvm_push_int2(out, 0);
+            fprintf(out, "    invokestatic rt/SnoRt/do_return(II)I\n    pop\n");
+            fprintf(out, "    invokestatic rt/SnoRt/fn_return_push()V\n");
+            fprintf(out, "    invokestatic rt/SnoRt/pop_ret_pc()I\n    goto_w sm_ret_dispatch\n");
+            break;
+        case SM_FRETURN_S:
+            fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n    ifeq sm_pc_%d_fs_skip\n", i);
+            jvm_push_int2(out, 1); jvm_push_int2(out, 0);
+            fprintf(out, "    invokestatic rt/SnoRt/do_return(II)I\n    pop\n");
+            fprintf(out, "    invokestatic rt/SnoRt/fn_return_push()V\n");
+            fprintf(out, "    invokestatic rt/SnoRt/pop_ret_pc()I\n    goto_w sm_ret_dispatch\n");
+            fprintf(out, "sm_pc_%d_fs_skip:\n", i);
+            break;
+        case SM_FRETURN_F:
+            fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n    ifne sm_pc_%d_ff_skip\n", i);
+            jvm_push_int2(out, 1); jvm_push_int2(out, 0);
+            fprintf(out, "    invokestatic rt/SnoRt/do_return(II)I\n    pop\n");
+            fprintf(out, "    invokestatic rt/SnoRt/fn_return_push()V\n");
+            fprintf(out, "    invokestatic rt/SnoRt/pop_ret_pc()I\n    goto_w sm_ret_dispatch\n");
+            fprintf(out, "sm_pc_%d_ff_skip:\n", i);
+            break;
+        case SM_NRETURN:
+            jvm_push_int2(out, 2); jvm_push_int2(out, 0);
+            fprintf(out, "    invokestatic rt/SnoRt/do_return(II)I\n    pop\n");
+            fprintf(out, "    invokestatic rt/SnoRt/fn_return_push()V\n");
+            fprintf(out, "    invokestatic rt/SnoRt/pop_ret_pc()I\n    goto_w sm_ret_dispatch\n");
+            break;
+        case SM_NRETURN_S:
+            fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n    ifeq sm_pc_%d_ns_skip\n", i);
+            jvm_push_int2(out, 2); jvm_push_int2(out, 0);
+            fprintf(out, "    invokestatic rt/SnoRt/do_return(II)I\n    pop\n");
+            fprintf(out, "    invokestatic rt/SnoRt/fn_return_push()V\n");
+            fprintf(out, "    invokestatic rt/SnoRt/pop_ret_pc()I\n    goto_w sm_ret_dispatch\n");
+            fprintf(out, "sm_pc_%d_ns_skip:\n", i);
+            break;
+        case SM_NRETURN_F:
+            fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n    ifne sm_pc_%d_nf_skip\n", i);
+            jvm_push_int2(out, 2); jvm_push_int2(out, 0);
+            fprintf(out, "    invokestatic rt/SnoRt/do_return(II)I\n    pop\n");
+            fprintf(out, "    invokestatic rt/SnoRt/fn_return_push()V\n");
+            fprintf(out, "    invokestatic rt/SnoRt/pop_ret_pc()I\n    goto_w sm_ret_dispatch\n");
+            fprintf(out, "sm_pc_%d_nf_skip:\n", i);
+            break;
+        case SM_DEFINE_ENTRY:
+        case SM_DEFINE:
+            /* no-op: function entries are handled by SM_LABEL with define_entry=1 */
+            break;
+        case SM_EXEC_STMT:
+            /* stub: pattern statement execution not yet implemented */
+            fprintf(out, "    ; [SM_EXEC_STMT stub — pattern matching pending]\n");
+            fprintf(out, "    iconst_0\n");
+            fprintf(out, "    invokestatic rt/SnoRt/set_last_ok(Z)V\n");
             break;
         case SM_HALT:
             fprintf(out, "    invokestatic rt/SnoRt/halt_tos()V\n");
@@ -744,7 +856,22 @@ static int emit_jvm_from_sm(SM_Program * sm, FILE * out) {
             break;
         }
     }
+    /* return dispatch: int on stack is the return PC; tableswitch to sm_pc_N */
+    if (call_site_count > 0) {
+        fprintf(out, "sm_ret_dispatch:\n");
+        fprintf(out, "    tableswitch 0 %d\n", n - 1);
+        for (int i = 0; i < n; i++) {
+            int is_site = 0;
+            for (int k = 0; k < call_site_count; k++) { if (call_sites[k] == i) { is_site = 1; break; } }
+            if (is_site) fprintf(out, "        sm_pc_%d\n", i);
+            else         fprintf(out, "        sm_pc_end\n");
+        }
+        fprintf(out, "      default: sm_pc_end\n");
+    }
     fprintf(out, "sm_pc_end:\n");
+    free(fn_pcs);
+    free(fn_names);
+    free(call_sites);
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/

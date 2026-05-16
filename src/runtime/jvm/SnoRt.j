@@ -21,12 +21,21 @@
 ; variable store (name → Object)
 .field private static final vars Ljava/util/HashMap;
 
+; call stack for user-function dispatch (stores return PCs as Integer)
+.field private static final ret_stack Ljava/util/ArrayDeque;
+
+; function parameter registry: fn name → param name array (from DEFINE)
+.field private static final fn_params Ljava/util/HashMap;
+
+; current function name for return value dispatch
+.field private static _ret_fn Ljava/lang/String;
+
 ; stdin reader for INPUT
 .field private static reader Ljava/io/BufferedReader;
 
 ; static initialiser
 .method static <clinit>()V
-    .limit stack 6
+    .limit stack 8
     .limit locals 0
     new java/util/ArrayDeque
     dup
@@ -36,6 +45,14 @@
     dup
     invokespecial java/util/HashMap/<init>()V
     putstatic rt/SnoRt/vars Ljava/util/HashMap;
+    new java/util/ArrayDeque
+    dup
+    invokespecial java/util/ArrayDeque/<init>()V
+    putstatic rt/SnoRt/ret_stack Ljava/util/ArrayDeque;
+    new java/util/HashMap
+    dup
+    invokespecial java/util/HashMap/<init>()V
+    putstatic rt/SnoRt/fn_params Ljava/util/HashMap;
     new java/io/BufferedReader
     dup
     new java/io/InputStreamReader
@@ -709,9 +726,194 @@ halt_tos_print:
 
 ; ── call — invoke a named SNOBOL4 built-in or user function ──────────────────
 ; Dispatches to built-in methods by name. Unknown names set last_ok=false.
+; builtin_DEFINE: pop prototype string, store in fn_params keyed by fn name
+.method private static builtin_DEFINE()V
+    .limit stack 4
+    .limit locals 3
+    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;
+    astore_0
+    aload_0
+    ifnonnull define_notnull
+    iconst_1
+    putstatic rt/SnoRt/last_ok Z
+    return
+define_notnull:
+    aload_0
+    invokevirtual java/lang/Object/toString()Ljava/lang/String;
+    astore_0
+    bipush 40
+    istore_1
+    aload_0
+    iload_1
+    invokevirtual java/lang/String/indexOf(I)I
+    istore_1
+    iload_1
+    ifge define_hasparen
+    iconst_1
+    putstatic rt/SnoRt/last_ok Z
+    ldc ""
+    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V
+    return
+define_hasparen:
+    aload_0
+    iconst_0
+    iload_1
+    invokevirtual java/lang/String/substring(II)Ljava/lang/String;
+    astore_2
+    getstatic rt/SnoRt/fn_params Ljava/util/HashMap;
+    aload_2
+    aload_0
+    invokevirtual java/util/HashMap/put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+    pop
+    iconst_1
+    putstatic rt/SnoRt/last_ok Z
+    ldc ""
+    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V
+    return
+.end method
+
+; bind_params: given fn name and nargs, bind stack values to param vars
+; Reads prototype from fn_params, extracts param names, stores to vars.
+.method public static bind_params(Ljava/lang/String;I)V
+    .limit stack 8
+    .limit locals 8
+    getstatic rt/SnoRt/fn_params Ljava/util/HashMap;
+    aload_0
+    invokevirtual java/util/HashMap/get(Ljava/lang/Object;)Ljava/lang/Object;
+    astore_2
+    aload_2
+    ifnonnull bind_have_proto
+    iload_1
+    istore_3
+bind_pop_noreg:
+    iload_3
+    ifle bind_return
+    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;
+    pop
+    iinc 3 -1
+    goto bind_pop_noreg
+bind_have_proto:
+    aload_2
+    checkcast java/lang/String
+    astore_2
+    iload_1
+    anewarray java/lang/Object
+    astore_3
+    iload_1
+    iconst_1
+    isub
+    istore 4
+bind_collect:
+    iload 4
+    iflt bind_bind
+    aload_3
+    iload 4
+    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;
+    aastore
+    iinc 4 -1
+    goto bind_collect
+bind_bind:
+    aload_2
+    bipush 40
+    invokevirtual java/lang/String/indexOf(I)I
+    iconst_1
+    iadd
+    istore 4
+    iconst_0
+    istore 5
+bind_parse_loop:
+    iload 5
+    iload_1
+    if_icmpge bind_return
+    aload_2
+    invokevirtual java/lang/String/length()I
+    istore 6
+    iload 4
+    iload 6
+    if_icmpge bind_return
+    iload 4
+    istore 7
+bind_find_sep:
+    iload 7
+    iload 6
+    if_icmpge bind_use_sep
+    aload_2
+    iload 7
+    invokevirtual java/lang/String/charAt(I)C
+    bipush 44
+    if_icmpne bind_not_comma
+    goto bind_use_sep
+bind_not_comma:
+    aload_2
+    iload 7
+    invokevirtual java/lang/String/charAt(I)C
+    bipush 41
+    if_icmpne bind_next_char
+    goto bind_use_sep
+bind_next_char:
+    iinc 7 1
+    goto bind_find_sep
+bind_use_sep:
+    getstatic rt/SnoRt/vars Ljava/util/HashMap;
+    aload_2
+    iload 4
+    iload 7
+    invokevirtual java/lang/String/substring(II)Ljava/lang/String;
+    aload_3
+    iload 5
+    aaload
+    invokevirtual java/util/HashMap/put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+    pop
+    iload 7
+    iconst_1
+    iadd
+    istore 4
+    iinc 5 1
+    goto bind_parse_loop
+bind_return:
+    aload_0
+    putstatic rt/SnoRt/_ret_fn Ljava/lang/String;
+    return
+.end method
+
+; fn_return_push: push the return value (vars[_ret_fn]) onto the value stack
+.method public static fn_return_push()V
+    .limit stack 3
+    .limit locals 1
+    getstatic rt/SnoRt/vars Ljava/util/HashMap;
+    getstatic rt/SnoRt/_ret_fn Ljava/lang/String;
+    astore_0
+    aload_0
+    ifnonnull fn_ret_have_name
+    ldc ""
+    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V
+    return
+fn_ret_have_name:
+    getstatic rt/SnoRt/vars Ljava/util/HashMap;
+    aload_0
+    invokevirtual java/util/HashMap/get(Ljava/lang/Object;)Ljava/lang/Object;
+    astore_0
+    aload_0
+    ifnonnull fn_ret_push_val
+    ldc ""
+    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V
+    return
+fn_ret_push_val:
+    aload_0
+    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V
+    return
+.end method
+
 .method public static call(Ljava/lang/String;I)V
     .limit stack 4
     .limit locals 2
+    aload_0
+    ldc "DEFINE"
+    invokevirtual java/lang/String/equals(Ljava/lang/Object;)Z
+    ifeq call_not_DEFINE
+    invokestatic rt/SnoRt/builtin_DEFINE()V
+    return
+call_not_DEFINE:
     aload_0
     ldc "SIZE"
     invokevirtual java/lang/String/equals(Ljava/lang/Object;)Z
@@ -953,6 +1155,28 @@ do_return_ok:
     iconst_1
     putstatic rt/SnoRt/last_ok Z
     iconst_1
+    ireturn
+.end method
+
+; ── push_ret_pc — push a return PC (int) onto the call stack ─────────────────
+.method public static push_ret_pc(I)V
+    .limit stack 4
+    .limit locals 1
+    getstatic rt/SnoRt/ret_stack Ljava/util/ArrayDeque;
+    iload_0
+    invokestatic java/lang/Integer/valueOf(I)Ljava/lang/Integer;
+    invokevirtual java/util/ArrayDeque/push(Ljava/lang/Object;)V
+    return
+.end method
+
+; ── pop_ret_pc — pop a return PC (int) from the call stack ───────────────────
+.method public static pop_ret_pc()I
+    .limit stack 2
+    .limit locals 1
+    getstatic rt/SnoRt/ret_stack Ljava/util/ArrayDeque;
+    invokevirtual java/util/ArrayDeque/pop()Ljava/lang/Object;
+    checkcast java/lang/Integer
+    invokevirtual java/lang/Integer/intValue()I
     ireturn
 .end method
 
