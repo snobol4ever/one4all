@@ -31,6 +31,40 @@ static DESCR_t g_ir_return_val;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t IR_exec_once(IR_block_t * cfg);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* Recursive classifier: returns 1 iff e is structurally guaranteed to yield exactly one value (no generator suspension). */
+/* Generator IR kinds (IR_ICN_*, IR_BINOP_GEN, IR_ALT, IR_SUSPEND, IR_REPEAT, IR_TO_BY, IR_ALTERNATE, IR_LIMIT) → 0.   */
+/* IR_CALL: user proc with is_generator==0 AND ir_body set AND all args single-shot → 1; known generator builtins → 0;  */
+/* other builtins → single-shot iff all args single-shot.                                                                */
+static int ir_is_single_shot(IR_t * e) {
+    if (!e) return 1;
+    switch (e->t) {
+    case IR_ICN_TO: case IR_ICN_TO_BY: case IR_ICN_UPTO: case IR_ICN_ITERATE:
+    case IR_ICN_ALTERNATE: case IR_ICN_LIMIT: case IR_ICN_BINOP: case IR_ICN_TO_NESTED:
+    case IR_ICN_PROC_GEN: case IR_BINOP_GEN: case IR_ALT: case IR_ALTERNATE:
+    case IR_SUSPEND: case IR_REPEAT: case IR_TO_BY: case IR_LIMIT: case IR_ICN_SCAN:
+        return 0;
+    case IR_CALL: {
+        if (!e->sval) return 1;
+        for (int _pi = 0; _pi < proc_count; _pi++) {
+            if (!proc_table[_pi].name || strcmp(proc_table[_pi].name, e->sval) != 0) continue;
+            if (!proc_table[_pi].ir_body) return 0;
+            if (proc_table[_pi].is_generator) return 0;
+            for (int _j = 0; _j < e->n; _j++) if (!ir_is_single_shot(e->c[_j])) return 0;
+            return 1;
+        }
+        if (!strcmp(e->sval, "find") || !strcmp(e->sval, "upto") || !strcmp(e->sval, "any")
+            || !strcmp(e->sval, "many") || !strcmp(e->sval, "bal") || !strcmp(e->sval, "key")
+            || !strcmp(e->sval, "seq")) return 0;
+        for (int _j = 0; _j < e->n; _j++) if (!ir_is_single_shot(e->c[_j])) return 0;
+        return 1;
+    }
+    default: {
+        for (int _j = 0; _j < e->n; _j++) if (e->c[_j] && !ir_is_single_shot(e->c[_j])) return 0;
+        return 1;
+    }
+    }
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 IR_t * IR_exec_node(IR_t * nd) {
     switch (nd->t) {
     case IR_LIT_I:
@@ -261,7 +295,10 @@ IR_t * IR_exec_node(IR_t * nd) {
         /* Icon every E [do B].  c[0]=generator expr (mandatory), c[1]=optional body.                                                                                                                       */
         /* Statement consumer: drive c[0] to exhaustion within ONE outer IR_exec_node call.  c[0]'s state (counter, etc.) persists across the inner IR_exec_node calls because IR_reset is not invoked.   */
         /* every-loop in statement context always "succeeds" with &null after exhaustion — never propagates the generator's final FAIL upward.                                                              */
+        /* Single-shot fast path: when c[0] is a structurally non-generator expression (recursive walk: generator IR kinds disqualify; IR_CALL to user proc with is_generator==0; IR_CALL to non-gen      */
+        /* builtin with all-single-shot args), fire once.  Covers every fact(5) and every write(fact(5)) without naive TT_FNC blanket.  Generator IR kinds bail out (IR_ICN_*, IR_BINOP_GEN, IR_ALT,...).  */
         if (nd->n < 1 || !nd->c[0]) { nd->value = NULVCL; return nd->γ; }
+        int single_shot_call = ir_is_single_shot(nd->c[0]);
         int saved_brk = frame_depth > 0 ? FRAME.loop_break : 0;
         int saved_nxt = frame_depth > 0 ? FRAME.loop_next  : 0;
         if (frame_depth > 0) { FRAME.loop_break = 0; FRAME.loop_next = 0; }
@@ -274,6 +311,7 @@ IR_t * IR_exec_node(IR_t * nd) {
             if (nd->n >= 2 && nd->c[1]) { IR_exec_node(nd->c[1]); }
             if (frame_depth > 0 && (FRAME.loop_break || FRAME.returning)) break;
             if (frame_depth > 0) FRAME.loop_next = 0;
+            if (single_shot_call) break;
         }
         if (frame_depth > 0) { FRAME.loop_break = saved_brk; FRAME.loop_next = saved_nxt; }
         nd->value = NULVCL;

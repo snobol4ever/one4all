@@ -1235,6 +1235,14 @@ static void lower_proc_skeletons(void)
             /* Attempt to lower body to an IR_block_t DCG.  When successful, runtime icn_bb_pump_proc_by_name */
             /* uses it directly via icn_bb_dcg, bypassing SM entirely.  When NULL, legacy SM path runs.        */
             proc_table[pi].ir_body = lower_icn_proc_body(proc);
+            /* Detect generator procs: any IR_SUSPEND in the lowered body marks the proc as a generator. IR_EVERY consults this bit at IR_CALL time to decide whether to pump-to-exhaustion or fire once. */
+            proc_table[pi].is_generator = 0;
+            if (proc_table[pi].ir_body) {
+                IR_block_t *_irb = proc_table[pi].ir_body;
+                for (int _k = 0; _k < _irb->n; _k++) {
+                    if (_irb->all[_k] && _irb->all[_k]->t == IR_SUSPEND) { proc_table[pi].is_generator = 1; break; }
+                }
+            }
             g_proc_scope = &sc; g_in_proc_body = 1;
             g_lang = LANG_ICN;
             for (int i = body_start; i < proc->n; i++) {
