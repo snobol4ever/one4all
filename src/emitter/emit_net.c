@@ -1038,6 +1038,33 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
         case SM_DEFINE_ENTRY:
         case SM_DEFINE:
         case SM_EXEC_STMT:
+            {
+                int has_repl = (int)instr->a[1].i;
+                const char * subj_name = instr->a[0].s ? instr->a[0].s : "";
+                /*
+                   Stack at SM_EXEC_STMT: [... pat, subj, repl (if has_repl)]
+                   Pop repl (if needed), pop subj, pop pattern.
+                   Fetch subject string from _vars[subj_name].
+                   Set Σ = subject string, Δ = 0, Ω = length.
+                */
+                if (has_repl) {
+                    fprintf(out, "    // pop repl for later\n");
+                    fprintf(out, "    pop        // discard repl for now (TODO: pattern matching not yet wired)\n");
+                }
+                fprintf(out, "    pop        // discard subj descriptor\n");
+                fprintf(out, "    pop        // discard pattern descriptor\n");
+                net_escape_ldstr(out, subj_name);
+                fprintf(out, "    call       void SnoRt::push_var(string)\n");
+                fprintf(out, "    dup        // duplicate subject for length calc\n");
+                fprintf(out, "    call       int32 [mscorlib]System.String::get_Length()\n");
+                fprintf(out, "    call       void SnoRt::set_omega(int32)\n");
+                fprintf(out, "    call       void SnoRt::set_sigma(string)\n");
+                fprintf(out, "    ldc.i4.0\n");
+                fprintf(out, "    call       void SnoRt::set_delta(int32)\n");
+                fprintf(out, "    ldc.i4.0\n");
+                fprintf(out, "    call       void SnoRt::set_last_ok(bool)  // fail until pattern runs\n");
+            }
+            break;
         case SM_PUSH_EXPRESSION:
         case SM_CALL_EXPRESSION:
         case SM_PUSH_EXPR:
