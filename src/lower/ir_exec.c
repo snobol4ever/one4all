@@ -501,6 +501,62 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->value = result;
         return nd->γ;
     }
+    case IR_ICN_SCAN: {
+        /* Icon subj ? body.  c[0]=subj, c[1]=body.  Push scan_subj/scan_pos, eval body, restore.    */
+        if (nd->n < 1 || !nd->c[0]) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[0]);
+        DESCR_t sv = nd->c[0]->value;
+        if (IS_FAIL_fn(sv)) { nd->value = FAILDESCR; return nd->ω; }
+        const char *s = VARVAL_fn(sv);
+        if (!s) s = "";
+        if (scan_depth < SCAN_STACK_MAX) {
+            scan_stack[scan_depth].subj = scan_subj;
+            scan_stack[scan_depth].pos  = scan_pos;
+            scan_depth++;
+        }
+        scan_subj = s;
+        scan_pos  = 1;
+        DESCR_t body_val = NULVCL;
+        int body_ok = 1;
+        if (nd->n >= 2 && nd->c[1]) {
+            IR_exec_node(nd->c[1]);
+            body_val = nd->c[1]->value;
+            if (IS_FAIL_fn(body_val)) body_ok = 0;
+        }
+        if (scan_depth > 0) {
+            scan_depth--;
+            scan_subj = scan_stack[scan_depth].subj;
+            scan_pos  = scan_stack[scan_depth].pos;
+        }
+        if (!body_ok) { nd->value = FAILDESCR; return nd->ω; }
+        nd->value = body_val;
+        return nd->γ;
+    }
+    case IR_ICN_KEYWORD: {
+        /* Icon &name keyword read.  sval = "&subject", "&pos", "&null", "&fail", etc.               */
+        if (!nd->sval) { nd->value = NULVCL; return nd->γ; }
+        const char *kw = nd->sval[0] == '&' ? nd->sval + 1 : nd->sval;
+        if (!strcmp(kw, "subject")) {
+            nd->value = scan_subj ? STRVAL(scan_subj) : NULVCL;
+            return nd->γ;
+        }
+        if (!strcmp(kw, "pos")) {
+            nd->value = INTVAL((int64_t)scan_pos);
+            return nd->γ;
+        }
+        if (!strcmp(kw, "null")) {
+            nd->value = NULVCL;
+            return nd->γ;
+        }
+        if (!strcmp(kw, "fail")) {
+            nd->value = FAILDESCR;
+            return nd->ω;
+        }
+        /* Unknown keyword: fall back to global var lookup with leading '&'. */
+        DESCR_t gv = NV_GET_fn(nd->sval);
+        nd->value = gv;
+        return IS_FAIL_fn(gv) ? nd->ω : nd->γ;
+    }
     case IR_SIZE: {
         /* Icon *E — size of string/list/table. One child c[0]=E. Returns integer length.       */
         if (nd->n < 1 || !nd->c[0]) { nd->value = INTVAL(0); return nd->γ; }

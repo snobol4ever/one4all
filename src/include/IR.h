@@ -99,6 +99,8 @@ typedef enum {
     IR_RANDOM,          /* Icon ?E random element — c[0]=operand; succeed with random value, else ω                 */
     IR_NEG,             /* Icon -E unary minus — c[0]=operand; succeed with -E (numeric coerce), else ω             */
     IR_POS,             /* Icon +E unary plus  — c[0]=operand; succeed with +E (numeric coerce), else ω             */
+    IR_ICN_SCAN,        /* Icon subj ? body — c[0]=subj, c[1]=body; saves+sets scan_subj/scan_pos, restores on exit */
+    IR_ICN_KEYWORD,     /* Icon &name keyword read — sval=full name with leading '&' (e.g. "&subject", "&pos")      */
     IR_E_COUNT
 } IR_e;
 typedef struct IR_t IR_t;

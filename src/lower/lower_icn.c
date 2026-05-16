@@ -261,10 +261,41 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     }
     case TT_VAR: {
         if (!e->v.sval) return NULL;
-        if (e->v.sval[0] == '&') return NULL;
+        if (e->v.sval[0] == '&') {
+            IR_t *nd = IR_node_alloc(cfg, IR_ICN_KEYWORD);
+            if (!nd) return NULL;
+            nd->sval = e->v.sval;
+            return nd;
+        }
         IR_t *nd = IR_node_alloc(cfg, IR_VAR);
         if (!nd) return NULL;
         nd->sval = e->v.sval;
+        return nd;
+    }
+    case TT_KEYWORD: {
+        if (!e->v.sval) return NULL;
+        IR_t *nd = IR_node_alloc(cfg, IR_ICN_KEYWORD);
+        if (!nd) return NULL;
+        nd->sval = e->v.sval;
+        return nd;
+    }
+    case TT_SCAN: {
+        if (e->n < 1 || !e->c[0]) return NULL;
+        IR_t *subj = lower_icn_expr_node(cfg, e->c[0]);
+        if (!subj) return NULL;
+        IR_t *body = NULL;
+        if (e->n >= 2 && e->c[1]) {
+            body = lower_icn_expr_node(cfg, e->c[1]);
+            if (!body) return NULL;
+        }
+        IR_t *nd = IR_node_alloc(cfg, IR_ICN_SCAN);
+        if (!nd) return NULL;
+        int nc = body ? 2 : 1;
+        nd->c = calloc((size_t)nc, sizeof(IR_t *));
+        if (!nd->c) return NULL;
+        nd->c[0] = subj;
+        if (body) nd->c[1] = body;
+        nd->n = nc;
         return nd;
     }
     case TT_ASSIGN: {
