@@ -36,8 +36,8 @@ IR_t * IR_node_alloc(IR_block_t * cfg, IR_e t) {
     IR_t * nd = calloc(1, sizeof(IR_t));
     if (!nd) return NULL;
     nd->t       = t;
-    nd->α       = NULL;
-    nd->β       = NULL;
+    nd->α       = nd;
+    nd->β       = nd;
     nd->γ       = NULL;
     nd->ω       = NULL;
     nd->c       = NULL;
