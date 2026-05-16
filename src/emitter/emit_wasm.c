@@ -20,7 +20,7 @@ extern SM_Program * sm_preamble(const tree_t * ast_prog);
    Strings are placed starting at STR_DATA_BASE = 0x100000 (1MB).  This is high enough to be safe
    above all runtime regions: stack (0x00000..0x0FFFF), var table (0x20000..0x2FFFF), static
    literals (0x30000..0x3FFFF), output buffer (0x40000..0x4FFFF), BB arena (0x50000..0x5FFFF),
-   and the dynamic string heap (which bumps upward from 0x60000).  The memory is 32 pages (2MB)
+   and the dynamic string heap (which bumps upward from 0x60000).  The memory is 64 pages (4MB)
    total, so we have 1MB headroom for program literals.
    We keep a flat list of (sval, address, length) triples. */
 #define STRTAB_MAX 4096
@@ -515,6 +515,32 @@ int emit_wasm_from_sm(SM_Program * sm, FILE * out) {
                     /* Drop any extra args (nargs > nparams). */
                     for (int k = fn->nparams; k < nargs; k++) {
                         fprintf(out, "          (call $sno_pop_to_null)\n");
+    fprintf(out, "  ;; Pattern matching functions (SN4-WASM-5g)\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_lit\"     (func $sno_pat_lit     (param i32 i32)))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_any\"     (func $sno_pat_any))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_notany\"  (func $sno_pat_notany))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_span\"    (func $sno_pat_span))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_break\"   (func $sno_pat_break))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_len\"     (func $sno_pat_len))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_pos\"     (func $sno_pat_pos))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_rpos\"    (func $sno_pat_rpos))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_tab\"     (func $sno_pat_tab))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_rtab\"    (func $sno_pat_rtab))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_rem\"     (func $sno_pat_rem))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_arb\"     (func $sno_pat_arb))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_arbno\"   (func $sno_pat_arbno))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_bal\"     (func $sno_pat_bal))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_fail\"    (func $sno_pat_fail))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_succeed\" (func $sno_pat_succeed))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_abort\"   (func $sno_pat_abort))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_fence\"   (func $sno_pat_fence))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_eps\"     (func $sno_pat_eps))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_cat\"     (func $sno_pat_cat))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_alt\"     (func $sno_pat_alt))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_deref\"   (func $sno_pat_deref))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_refname\" (func $sno_pat_refname (param i32 i32)))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_capture\" (func $sno_pat_capture (param i32 i32 i32)))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_exec_stmt\"   (func $sno_exec_stmt   (param i32 i32 i32)))\\n");
                     }
                     /* Clear locals not yet supported (would need scanning DEFINE 3rd-arg signature). */
                     /* Commit the frame. */
@@ -572,6 +598,32 @@ int emit_wasm_from_sm(SM_Program * sm, FILE * out) {
                     }
                     for (int k = fn->nparams; k < nargs; k++) {
                         fprintf(out, "          (call $sno_pop_to_null)\n");
+    fprintf(out, "  ;; Pattern matching functions (SN4-WASM-5g)\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_lit\"     (func $sno_pat_lit     (param i32 i32)))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_any\"     (func $sno_pat_any))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_notany\"  (func $sno_pat_notany))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_span\"    (func $sno_pat_span))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_break\"   (func $sno_pat_break))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_len\"     (func $sno_pat_len))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_pos\"     (func $sno_pat_pos))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_rpos\"    (func $sno_pat_rpos))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_tab\"     (func $sno_pat_tab))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_rtab\"    (func $sno_pat_rtab))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_rem\"     (func $sno_pat_rem))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_arb\"     (func $sno_pat_arb))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_arbno\"   (func $sno_pat_arbno))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_bal\"     (func $sno_pat_bal))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_fail\"    (func $sno_pat_fail))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_succeed\" (func $sno_pat_succeed))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_abort\"   (func $sno_pat_abort))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_fence\"   (func $sno_pat_fence))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_eps\"     (func $sno_pat_eps))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_cat\"     (func $sno_pat_cat))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_alt\"     (func $sno_pat_alt))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_deref\"   (func $sno_pat_deref))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_refname\" (func $sno_pat_refname (param i32 i32)))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_capture\" (func $sno_pat_capture (param i32 i32 i32)))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_exec_stmt\"   (func $sno_exec_stmt   (param i32 i32 i32)))\\n");
                     }
                     fprintf(out, "          (call $sno_call_frame_close)\n");
                     fprintf(out, "          (i32.const %d) (local.set $pc) (br $lp)\n", fn->entry_pc);
@@ -630,6 +682,101 @@ int emit_wasm_from_sm(SM_Program * sm, FILE * out) {
         case SM_DECR:
             fprintf(out, "          (call $sno_arith (i32.const %d))\n", ins->op == SM_INCR ? 0 : 1);
             break;
+        /* Pattern matching opcodes (SN4-WASM-5g) */
+        case SM_PAT_LIT: {
+            int addr = intern_str(ins->a[0].s ? ins->a[0].s : "");
+            fprintf(out, "          (call $sno_pat_lit (i32.const 0x%x) (i32.const %lld))\n", addr, (long long)ins->a[1].i);
+            break;
+        }
+        case SM_PAT_ANY:
+            fprintf(out, "          (call $sno_pat_any)\n");
+            break;
+        case SM_PAT_NOTANY:
+            fprintf(out, "          (call $sno_pat_notany)\n");
+            break;
+        case SM_PAT_SPAN:
+            fprintf(out, "          (call $sno_pat_span)\n");
+            break;
+        case SM_PAT_BREAK:
+            fprintf(out, "          (call $sno_pat_break)\n");
+            break;
+        case SM_PAT_LEN:
+            fprintf(out, "          (call $sno_pat_len)\n");
+            break;
+        case SM_PAT_POS:
+            fprintf(out, "          (call $sno_pat_pos)\n");
+            break;
+        case SM_PAT_RPOS:
+            fprintf(out, "          (call $sno_pat_rpos)\n");
+            break;
+        case SM_PAT_TAB:
+            fprintf(out, "          (call $sno_pat_tab)\n");
+            break;
+        case SM_PAT_RTAB:
+            fprintf(out, "          (call $sno_pat_rtab)\n");
+            break;
+        case SM_PAT_REM:
+            fprintf(out, "          (call $sno_pat_rem)\n");
+            break;
+        case SM_PAT_ARB:
+            fprintf(out, "          (call $sno_pat_arb)\n");
+            break;
+        case SM_PAT_ARBNO:
+            fprintf(out, "          (call $sno_pat_arbno)\n");
+            break;
+        case SM_PAT_BAL:
+            fprintf(out, "          (call $sno_pat_bal)\n");
+            break;
+        case SM_PAT_FAIL:
+            fprintf(out, "          (call $sno_pat_fail)\n");
+            break;
+        case SM_PAT_SUCCEED:
+            fprintf(out, "          (call $sno_pat_succeed)\n");
+            break;
+        case SM_PAT_ABORT:
+            fprintf(out, "          (call $sno_pat_abort)\n");
+            break;
+        case SM_PAT_FENCE0:
+        case SM_PAT_FENCE1:
+            fprintf(out, "          (call $sno_pat_fence)\n");
+            break;
+        case SM_PAT_EPS:
+            fprintf(out, "          (call $sno_pat_eps)\n");
+            break;
+        case SM_PAT_CAT:
+            fprintf(out, "          (call $sno_pat_cat)\n");
+            break;
+        case SM_PAT_ALT:
+            fprintf(out, "          (call $sno_pat_alt)\n");
+            break;
+        case SM_PAT_DEREF:
+            fprintf(out, "          (call $sno_pat_deref)\n");
+            break;
+        case SM_PAT_REFNAME: {
+            int addr = intern_name(ins->a[0].s ? ins->a[0].s : "");
+            fprintf(out, "          (call $sno_pat_refname (i32.const 0x%x) (i32.const %lld))\n", addr, (long long)ins->a[1].i);
+            break;
+        }
+        case SM_PAT_CAPTURE: {
+            int addr = intern_name(ins->a[0].s ? ins->a[0].s : "");
+            fprintf(out, "          (call $sno_pat_capture (i32.const 0x%x) (i32.const %lld) (i32.const %lld))\n", addr, (long long)ins->a[1].i, (long long)ins->a[2].i);
+            break;
+        }
+        case SM_PAT_CAPTURE_FN:
+            fprintf(out, "          ;; SM_PAT_CAPTURE_FN not yet implemented\n");
+            break;
+        case SM_PAT_CAPTURE_FN_ARGS:
+            fprintf(out, "          ;; SM_PAT_CAPTURE_FN_ARGS not yet implemented\n");
+            break;
+        case SM_PAT_USERCALL:
+            fprintf(out, "          ;; SM_PAT_USERCALL not yet implemented\n");
+            break;
+        case SM_PAT_USERCALL_ARGS:
+            fprintf(out, "          ;; SM_PAT_USERCALL_ARGS not yet implemented\n");
+            break;
+        case SM_EXEC_STMT:
+            fprintf(out, "          (call $sno_exec_stmt (i32.const 0) (i32.const 0) (i32.const 0))\n");
+            break;
         default:
             fprintf(out, "          ;; unhandled SM opcode %d\n", ins->op);
             break;
@@ -651,7 +798,7 @@ int emit_wasm_from_sm(SM_Program * sm, FILE * out) {
 static int emit_wasm_prologue(FILE * out, SM_Program * sm) {
     fprintf(out, "(module\n");
     fprintf(out, "  ;; imports from sno_runtime\n");
-    fprintf(out, "  (import \"sno\" \"memory\"          (memory 32))\n");
+    fprintf(out, "  (import \"sno\" \"memory\"          (memory 64))\n");
     fprintf(out, "  (import \"sno\" \"sno_init\"         (func $sno_init))\n");
     fprintf(out, "  (import \"sno\" \"sno_finalize\"     (func $sno_finalize))\n");
     fprintf(out, "  (import \"sno\" \"sno_push_int\"     (func $sno_push_int    (param i32)))\n");
@@ -681,6 +828,32 @@ static int emit_wasm_prologue(FILE * out, SM_Program * sm) {
     fprintf(out, "  (import \"sno\" \"sno_clear_var\"    (func $sno_clear_var   (param i32 i32)))\n");
     fprintf(out, "  (import \"sno\" \"sno_set_var_from_tos\" (func $sno_set_var_from_tos (param i32 i32)))\n");
     fprintf(out, "  (import \"sno\" \"sno_pop_to_null\"  (func $sno_pop_to_null))\n");
+    fprintf(out, "  ;; Pattern matching functions (SN4-WASM-5g)\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_lit\"     (func $sno_pat_lit     (param i32 i32)))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_any\"     (func $sno_pat_any))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_notany\"  (func $sno_pat_notany))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_span\"    (func $sno_pat_span))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_break\"   (func $sno_pat_break))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_len\"     (func $sno_pat_len))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_pos\"     (func $sno_pat_pos))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_rpos\"    (func $sno_pat_rpos))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_tab\"     (func $sno_pat_tab))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_rtab\"    (func $sno_pat_rtab))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_rem\"     (func $sno_pat_rem))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_arb\"     (func $sno_pat_arb))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_arbno\"   (func $sno_pat_arbno))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_bal\"     (func $sno_pat_bal))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_fail\"    (func $sno_pat_fail))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_succeed\" (func $sno_pat_succeed))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_abort\"   (func $sno_pat_abort))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_fence\"   (func $sno_pat_fence))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_eps\"     (func $sno_pat_eps))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_cat\"     (func $sno_pat_cat))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_alt\"     (func $sno_pat_alt))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_deref\"   (func $sno_pat_deref))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_refname\" (func $sno_pat_refname (param i32 i32)))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_pat_capture\" (func $sno_pat_capture (param i32 i32 i32)))\\n");
+    fprintf(out, "  (import \"sno\" \"sno_exec_stmt\"   (func $sno_exec_stmt   (param i32 i32 i32)))\\n");
     fprintf(out, "  ;; arena allocator (from bb_boxes.wat)\n");
     fprintf(out, "  (import \"bb\"  \"arena_alloc\"      (func $arena_alloc     (result i32)))\n");
     (void)sm;
@@ -721,6 +894,9 @@ int emit_wasm_program(const tree_t * ast_prog, FILE * out) {
         else if (ins->op == SM_STORE_VAR && ins->a[0].s) intern_name(ins->a[0].s);
         else if (ins->op == SM_CALL_FN   && ins->a[0].s) intern_name(ins->a[0].s);
         else if (ins->op == SM_SUSPEND_VALUE && ins->a[0].s) intern_name(ins->a[0].s);
+        else if (ins->op == SM_PAT_LIT && ins->a[0].s) intern_str(ins->a[0].s);
+        else if (ins->op == SM_PAT_REFNAME && ins->a[0].s) intern_name(ins->a[0].s);
+        else if (ins->op == SM_PAT_CAPTURE && ins->a[0].s) intern_name(ins->a[0].s);
     }
     /* intern fixed keyword strings */
     intern_str("OUTPUT");
