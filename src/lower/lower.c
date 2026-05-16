@@ -28,10 +28,14 @@ void lower_pat_expr(const tree_t *t);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void lower_stmt    (const tree_t *s);
 #define LOWER_UNHANDLED_WORDS 4
-#define ICN_BB_EVAL(t) do { if (g_lang == LANG_ICN) { sm_emit_i(g_p, SM_BB_EVAL, (int64_t)every_table_register((tree_t *)(t))); return; } } while(0)
+/* ICN_BB_EVAL: shortcut for Icon expressions outside generator proc bodies. Generator procs run via */
+/* GeneratorState and need REAL SM instructions (their SM body is re-entered on each pump); when     */
+/* g_in_gen_proc_body is set, fall through to the standard lowering path that emits actual SM ops.   */
+#define ICN_BB_EVAL(t) do { if (g_lang == LANG_ICN && !g_in_gen_proc_body) { sm_emit_i(g_p, SM_BB_EVAL, (int64_t)every_table_register((tree_t *)(t))); return; } } while(0)
 static SM_Program  *g_p;
 static LabelTable   g_labtab;
 static int          g_in_proc_body;
+static int          g_in_gen_proc_body;  /* IJ-SUSPEND: set during lowering of TT_SUSPEND-bearing procs */
 static IcnScope    *g_proc_scope;
 static unsigned long long g_unhandled_kinds[LOWER_UNHANDLED_WORDS];
 static int          g_in_value_ctx;
@@ -1363,6 +1367,9 @@ static void lower_proc_skeletons(void)
             /* uses it directly via icn_bb_dcg, bypassing SM entirely.  When NULL, legacy SM path runs.        */
             proc_table[pi].ir_body = lower_icn_proc_body(proc);
             /* Detect generator procs: any IR_SUSPEND in the lowered body marks the proc as a generator. IR_EVERY consults this bit at IR_CALL time to decide whether to pump-to-exhaustion or fire once. */
+            /* IJ-SUSPEND-PUMP-WIRE: also walk the AST for TT_SUSPEND so suspend-bearing procs whose ir_body  */
+            /* lowering returns NULL (e.g. because lower_icn_expr_node has no TT_SUSPEND case) are still      */
+            /* marked as generators.  icn_bb_pump_proc_by_name then routes them through GeneratorState.       */
             proc_table[pi].is_generator = 0;
             if (proc_table[pi].ir_body) {
                 IR_block_t *_irb = proc_table[pi].ir_body;
@@ -1370,7 +1377,20 @@ static void lower_proc_skeletons(void)
                     if (_irb->all[_k] && _irb->all[_k]->t == IR_SUSPEND) { proc_table[pi].is_generator = 1; break; }
                 }
             }
+            if (!proc_table[pi].is_generator) {
+                /* AST walk: this runs at lower time, NOT in mode 2/3/4. The bit is consumed by runtime */
+                /* paths that need a synchronous read of "is this a generator proc?" without re-walking. */
+                tree_t *stack[256]; int sp = 0;
+                stack[sp++] = proc;
+                while (sp > 0) {
+                    tree_t *n = stack[--sp];
+                    if (!n) continue;
+                    if (n->t == TT_SUSPEND) { proc_table[pi].is_generator = 1; break; }
+                    for (int _ci = 0; _ci < n->n && sp < 254; _ci++) if (n->c[_ci]) stack[sp++] = n->c[_ci];
+                }
+            }
             g_proc_scope = &sc; g_in_proc_body = 1;
+            g_in_gen_proc_body = proc_table[pi].is_generator;  /* IJ-SUSPEND: emit real SM for gen procs */
             g_lang = LANG_ICN;
             for (int i = body_start; i < proc->n; i++) {
                 if (!proc->c[i]) continue;
@@ -1378,6 +1398,7 @@ static void lower_proc_skeletons(void)
             }
             g_lang = 0;
             g_in_proc_body = 0; g_proc_scope = NULL;
+            g_in_gen_proc_body = 0;
         }
         sm_emit(g_p, SM_RETURN);
         sm_patch_jump(g_p, skip, sm_label(g_p));

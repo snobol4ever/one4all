@@ -113,6 +113,17 @@ IR_t * IR_exec_node(IR_t * nd) {
     case IR_CALL: {
         /* Builtin call by name. nd->sval = function name; nd->c[0..n-1] = arg subexprs.            */
         if (!nd->sval) { nd->value = FAILDESCR; return nd->ω; }
+        /* IJ-SUSPEND-IR-CALL-GEN: if this node is mid-pump of a generator proc, advance it.        */
+        /* nd->opaque holds the GeneratorState; nd->state==1 means in-flight.                       */
+        /* Args are not re-evaluated on resume — they were captured into the GeneratorState frame.  */
+        if (nd->state == 1 && nd->opaque) {
+            GeneratorState *gs = (GeneratorState *)nd->opaque;
+            DESCR_t v;
+            int ok = bb_broker_drive_sm_one(gs, &v);
+            if (!ok) { nd->state = 0; nd->opaque = NULL; nd->value = FAILDESCR; return nd->ω; }
+            nd->value = v;
+            return nd->γ;
+        }
         int nargs = nd->n;
         DESCR_t *args = NULL;
         if (nargs > 0) {
@@ -123,6 +134,25 @@ IR_t * IR_exec_node(IR_t * nd) {
                 args[j] = nd->c[j]->value;
                 if (IS_FAIL_fn(args[j])) { nd->value = FAILDESCR; return nd->ω; }
             }
+        }
+        /* IJ-SUSPEND-IR-CALL-GEN: check user-defined generator procs BEFORE builtins.              */
+        /* The "upto" builtin's scan-context guard (`scan_pos > 0 || nargs >= 2`) was true by       */
+        /* default (polyglot.c initializes scan_pos=1), so user-defined upto was shadowed.          */
+        /* User generator procs take priority — they correspond to source-level `procedure upto`.   */
+        for (int _pi0 = 0; _pi0 < proc_count; _pi0++) {
+            if (!proc_table[_pi0].name || strcmp(proc_table[_pi0].name, nd->sval) != 0) continue;
+            if (!proc_table[_pi0].is_generator) break;  /* fall through to builtins/standard path */
+            if (proc_table[_pi0].ir_body) break;        /* let ir_body path handle it (standard) */
+            if (proc_table[_pi0].entry_pc < 0 || !g_current_sm_prog) break;
+            GeneratorState *pgs = generator_state_new_proc(_pi0, args, nargs);
+            if (!pgs) break;
+            DESCR_t v;
+            int ok = bb_broker_drive_sm_one(pgs, &v);
+            if (!ok) { nd->value = FAILDESCR; return nd->ω; }
+            nd->opaque = pgs;
+            nd->state  = 1;
+            nd->value  = v;
+            return nd->γ;
         }
         DESCR_t out = FAILDESCR;
         if (icn_try_call_builtin_by_name(nd->sval, args, nargs, &out)) {

@@ -1131,6 +1131,20 @@ bb_node_t icn_bb_pump_proc_by_name(const char *name, DESCR_t *args, int nargs) {
             dz->first = 1;
             return (bb_node_t){ icn_bb_dcg, dz, 0 };
         }
+        /* IJ-SUSPEND-PUMP-WIRE: generator proc (TT_SUSPEND present) without ir_body — route through */
+        /* GeneratorState + IR_ICN_PROC_GEN, the same mechanism icn_bb_build uses on the AST path.   */
+        /* is_generator was set at lower time (lower.c lower_proc_skeletons) so no AST walk here.    */
+        if (proc_table[i].is_generator && proc_table[i].entry_pc >= 0 && g_current_sm_prog) {
+            GeneratorState *pgs = generator_state_new_proc(i, args, nargs);
+            if (pgs) {
+                IR_block_t *pcfg = lower_icn_proc_gen(pgs);
+                if (pcfg) {
+                    icn_dcg_state_t *pdz = calloc(1, sizeof(*pdz));
+                    pdz->cfg = pcfg; pdz->first = 1;
+                    return (bb_node_t){ icn_bb_dcg, pdz, 0 };
+                }
+            }
+        }
         icn_bb_oneshot_state_t *oshot1 = calloc(1, sizeof(*oshot1));
         oshot1->val = proc_table_call(i, args, nargs);
         return (bb_node_t){ icn_bb_oneshot, oshot1, 0 };
