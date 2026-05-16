@@ -646,66 +646,28 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             break;
         }
         case SM_BB_PUMP: {
-            DESCR_t expr_d = sm_pop(st);
-            tree_t *expr   = (tree_t *)expr_d.ptr;
-            if (!expr) { st->last_ok = 0; break; }
-            bb_node_t node = icn_bb_build(expr);
-            int ticks = bb_broker(node, BB_PUMP, pump_print, NULL);
-            st->last_ok = (ticks > 0);
+            sm_pop(st);
+            fprintf(stderr, "[NO-AST] SM_BB_PUMP stub: needs fresh SM/BB lowering\n");
+            st->last_ok = 0;
             break;
         }
         case SM_BB_ONCE: {
-            DESCR_t expr_d = sm_pop(st);
-            tree_t *expr   = (tree_t *)expr_d.ptr;
-            if (!expr) { st->last_ok = 0; break; }
-            bb_node_t node = icn_bb_build(expr);
-            int ticks = bb_broker(node, BB_ONCE, NULL, NULL);
-            st->last_ok = (ticks > 0);
+            sm_pop(st);
+            fprintf(stderr, "[NO-AST] SM_BB_ONCE stub: needs fresh SM/BB lowering\n");
+            st->last_ok = 0;
             break;
         }
         case SM_BB_EVAL: {
-            int eval_id    = (int)ins->a[0].i;
-            tree_t *expr   = every_table_lookup(eval_id);
-            if (!expr) { st->last_ok = 0; sm_push(st, FAILDESCR); break; }
-            g_ast_pump_active++;
-            DESCR_t val = bb_eval_value(expr);
-            g_ast_pump_active--;
-            if (frame_depth > 0 && FRAME.returning) {
-                FRAME.returning = 0;
-                if (st->call_depth > 0) {
-                    SmCallFrame *fr = &st->call_stack[--st->call_depth];
-                    for (int k = fr->nsaved - 1; k >= 0; k--)
-                        NV_SET_fn(fr->saved_names[k], fr->saved_vals[k]);
-                    if (fr->caller_sp > 0 && fr->caller_stack) {
-                        if (fr->caller_sp > st->stack_cap) {
-                            st->stack = GC_realloc(st->stack, fr->caller_sp * sizeof(DESCR_t));
-                            st->stack_cap = fr->caller_sp;
-                        }
-                        memcpy(st->stack, fr->caller_stack, fr->caller_sp * sizeof(DESCR_t));
-                    }
-                    st->sp = fr->caller_sp;
-                    sm_push(st, FAILDESCR);
-                    st->last_ok = 0;
-                    strncpy(kw_rtntype, "FRETURN", sizeof(kw_rtntype)-1);
-                    st->pc = fr->ret_pc;
-                } else {
-                    strncpy(kw_rtntype, "FRETURN", sizeof(kw_rtntype)-1);
-                    return 0;
-                }
-                break;
-            }
-            st->last_ok = !IS_FAIL_fn(val);
-            sm_push(st, val);
+            (void)ins;
+            fprintf(stderr, "[NO-AST] SM_BB_EVAL stub: needs fresh SM/BB lowering\n");
+            st->last_ok = 0;
+            sm_push(st, FAILDESCR);
             break;
         }
         case SM_BB_ONCE_PROC: {
-            const char *key   = ins->a[0].s;
-            int         arity = (int)ins->a[1].i;
-            tree_t *choice = key ? pl_pred_table_lookup_global(key) : NULL;
-            bb_node_t node = choice ? pl_box_choice(choice, g_pl_env, arity)
-                                    : pl_box_fail();
-            int ticks = bb_broker(node, BB_ONCE, NULL, NULL);
-            st->last_ok = (ticks > 0);
+            (void)ins;
+            fprintf(stderr, "[NO-AST] SM_BB_ONCE_PROC stub: needs fresh SM/BB lowering\n");
+            st->last_ok = 0;
             break;
         }
         case SM_BB_PUMP_PROC: {
@@ -802,18 +764,9 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             break;
         }
         case SM_BB_PUMP_EVERY: {
-            int every_id = (int)ins->a[0].i;
-            tree_t *every_ast = every_table_lookup(every_id);
-            if (!every_ast) {
-                st->last_ok = 0;
-                sm_push(st, NULVCL);
-                break;
-            }
-            g_ast_pump_active++;
-            bb_node_t node = icn_bb_build(every_ast);
-            int ticks = bb_broker(node, BB_PUMP, NULL, NULL);
-            g_ast_pump_active--;
-            st->last_ok = (ticks > 0);
+            (void)ins;
+            fprintf(stderr, "[NO-AST] SM_BB_PUMP_EVERY stub: needs fresh SM/BB lowering\n");
+            st->last_ok = 0;
             sm_push(st, NULVCL);
             break;
         }
@@ -1294,12 +1247,9 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 break;
             }
             if (name && strcmp(name, "PL_UNIFY") == 0 && nargs == 0) {
-                DESCR_t expr_d = sm_pop(st);
-                tree_t *node   = (tree_t *)expr_d.ptr;
-                if (!node || node->n < 2) { st->last_ok = 0; break; }
-                Term *t1 = pl_unified_term_from_expr(node->c[0], g_pl_env);
-                Term *t2 = pl_unified_term_from_expr(node->c[1], g_pl_env);
-                st->last_ok = unify(t1, t2, &g_pl_trail);
+                sm_pop(st);
+                fprintf(stderr, "[NO-AST] PL_UNIFY stub: needs fresh SM/BB lowering\n");
+                st->last_ok = 0;
                 break;
             }
             if (name && strcmp(name, "PL_CUT") == 0 && nargs == 0) {
@@ -1321,10 +1271,9 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 break;
             }
             if (name && strcmp(name, "PL_BUILTIN") == 0 && nargs == 0) {
-                DESCR_t expr_d = sm_pop(st);
-                tree_t *goal   = (tree_t *)expr_d.ptr;
-                if (!goal) { st->last_ok = 0; break; }
-                st->last_ok = interp_exec_pl_builtin(goal, g_pl_env);
+                sm_pop(st);
+                fprintf(stderr, "[NO-AST] PL_BUILTIN stub: needs fresh SM/BB lowering\n");
+                st->last_ok = 0;
                 break;
             }
             for (int k = 0; k < nargs; k++) {
@@ -1778,15 +1727,10 @@ GeneratorState *generator_state_new_proc(int pi, DESCR_t *args, int nargs)
     if (nslots > FRAME_SLOT_MAX) nslots = FRAME_SLOT_MAX;
     f->env_n = nslots;
     for (int i = 0; i < nparams && i < nargs && i < FRAME_SLOT_MAX; i++) f->env[i] = args[i];
-    tree_t *proc = proc_table[pi].proc;
-    if (proc) {
-        int nparams_p = proc->_id;
-        int body_start = 1 + nparams_p;
-        for (int bi = body_start; bi < proc->n; bi++) icn_scope_patch(&proc_table[pi].lower_sc, proc->c[bi]);
-        int total_slots = proc_table[pi].lower_sc.n;
-        if (total_slots > f->env_n) f->env_n = total_slots;
-        f->sc = proc_table[pi].lower_sc;
-    }
+    fprintf(stderr, "[NO-AST] sm_call_proc tree walk removed: scope must be prebuilt at lower time\n");
+    f->sc = proc_table[pi].lower_sc;
+    int total_slots = proc_table[pi].lower_sc.n;
+    if (total_slots > f->env_n) f->env_n = total_slots;
     GeneratorState *gs = GC_malloc(sizeof(GeneratorState));
     memset(gs, 0, sizeof *gs);
     gs->entry_pc          = entry_pc;

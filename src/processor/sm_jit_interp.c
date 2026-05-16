@@ -271,35 +271,24 @@ static void jit_pump_print(DESCR_t val, void *arg)
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void h_bb_pump(void)
 {
-    DESCR_t expr_d = POP();
-    tree_t *expr   = (tree_t *)expr_d.ptr;
-    if (!expr) { STATE->last_ok = 0; return; }
-    bb_node_t node = icn_bb_build(expr);
-    int ticks = bb_broker(node, BB_PUMP, jit_pump_print, NULL);
-    STATE->last_ok = (ticks > 0);
+    POP();
+    fprintf(stderr, "[NO-AST] h_bb_pump stub: needs fresh SM/BB lowering\n");
+    STATE->last_ok = 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void h_bb_once(void)
 {
-    DESCR_t expr_d = POP();
-    tree_t *expr   = (tree_t *)expr_d.ptr;
-    if (!expr) { STATE->last_ok = 0; return; }
-    bb_node_t node = icn_bb_build(expr);
-    int ticks = bb_broker(node, BB_ONCE, NULL, NULL);
-    STATE->last_ok = (ticks > 0);
+    POP();
+    fprintf(stderr, "[NO-AST] h_bb_once stub: needs fresh SM/BB lowering\n");
+    STATE->last_ok = 0;
 }
 #include "../../frontend/prolog/pl_broker.h"
 #include "../../runtime/interp/pl_runtime.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void h_bb_once_proc(void)
 {
-    const char   *key   = CUR_INS->a[0].s;
-    int           arity = (int)CUR_INS->a[1].i;
-    tree_t       *choice = key ? pl_pred_table_lookup_global(key) : NULL;
-    bb_node_t     node   = choice ? pl_box_choice(choice, g_pl_env, arity)
-                                  : pl_box_fail();
-    int ticks = bb_broker(node, BB_ONCE, NULL, NULL);
-    STATE->last_ok = (ticks > 0);
+    fprintf(stderr, "[NO-AST] h_bb_once_proc stub: needs fresh SM/BB lowering\n");
+    STATE->last_ok = 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern bb_node_t icn_bb_pump_proc_by_name(const char *name, DESCR_t *args, int nargs);
@@ -401,18 +390,8 @@ static void h_bb_pump_sm(void)
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void h_bb_pump_every(void)
 {
-    int every_id = (int)CUR_INS->a[0].i;
-    tree_t *every_ast = every_table_lookup(every_id);
-    if (!every_ast) {
-        STATE->last_ok = 0;
-        PUSH(NULVCL);
-        return;
-    }
-    g_ast_pump_active++;
-    bb_node_t node = icn_bb_build(every_ast);
-    int ticks = bb_broker(node, BB_PUMP, NULL, NULL);
-    g_ast_pump_active--;
-    STATE->last_ok = (ticks > 0);
+    fprintf(stderr, "[NO-AST] h_bb_pump_every stub: needs fresh SM/BB lowering\n");
+    STATE->last_ok = 0;
     PUSH(NULVCL);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -805,12 +784,9 @@ static void h_call(void)
         return;
     }
     if (name && strcmp(name, "PL_UNIFY") == 0 && nargs == 0) {
-        DESCR_t expr_d = POP();
-        tree_t *node   = (tree_t *)expr_d.ptr;
-        if (!node || node->n < 2) { STATE->last_ok = 0; return; }
-        Term *t1 = pl_unified_term_from_expr(node->c[0], g_pl_env);
-        Term *t2 = pl_unified_term_from_expr(node->c[1], g_pl_env);
-        STATE->last_ok = unify(t1, t2, &g_pl_trail);
+        POP();
+        fprintf(stderr, "[NO-AST] PL_UNIFY stub: needs fresh SM/BB lowering\n");
+        STATE->last_ok = 0;
         return;
     }
     if (name && strcmp(name, "PL_CUT") == 0 && nargs == 0) {
@@ -832,10 +808,9 @@ static void h_call(void)
         return;
     }
     if (name && strcmp(name, "PL_BUILTIN") == 0 && nargs == 0) {
-        DESCR_t expr_d = POP();
-        tree_t *goal   = (tree_t *)expr_d.ptr;
-        if (!goal) { STATE->last_ok = 0; return; }
-        STATE->last_ok = interp_exec_pl_builtin(goal, g_pl_env);
+        POP();
+        fprintf(stderr, "[NO-AST] PL_BUILTIN stub: needs fresh SM/BB lowering\n");
+        STATE->last_ok = 0;
         return;
     }
     DESCR_t args[32];
