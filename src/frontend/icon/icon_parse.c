@@ -457,7 +457,34 @@ static tree_t *parse_assign(IcnParser *p) {
         IcnTkKind aug = p->cur.kind; advance(p);
         tree_t *rhs = parse_assign(p);
         tree_t *op = ast_node_new(TT_AUGOP);
-        op->v.ival = (long)aug;
+        AugOp_e aop = AUGOP_ADD;
+        switch (aug) {
+        case TK_AUGPLUS:        aop = AUGOP_ADD;       break;
+        case TK_AUGMINUS:       aop = AUGOP_SUB;       break;
+        case TK_AUGSTAR:        aop = AUGOP_MUL;       break;
+        case TK_AUGSLASH:       aop = AUGOP_DIV;       break;
+        case TK_AUGMOD:         aop = AUGOP_MOD;       break;
+        case TK_AUGPOW:         aop = AUGOP_POW;       break;
+        case TK_AUGCONCAT:      aop = AUGOP_CONCAT;    break;
+        case TK_AUGCSET_UNION:  aop = AUGOP_CSET_UNION; break;
+        case TK_AUGCSET_DIFF:   aop = AUGOP_CSET_DIFF;  break;
+        case TK_AUGCSET_INTER:  aop = AUGOP_CSET_INTER; break;
+        case TK_AUGSCAN:        aop = AUGOP_SCAN;      break;
+        case TK_AUGEQ:          aop = AUGOP_EQ;        break;
+        case TK_AUGSEQ:         aop = AUGOP_SEQ;       break;
+        case TK_AUGLT:          aop = AUGOP_LT;        break;
+        case TK_AUGLE:          aop = AUGOP_LE;        break;
+        case TK_AUGGT:          aop = AUGOP_GT;        break;
+        case TK_AUGGE:          aop = AUGOP_GE;        break;
+        case TK_AUGNE:          aop = AUGOP_NE;        break;
+        case TK_AUGSLT:         aop = AUGOP_SLT;       break;
+        case TK_AUGSLE:         aop = AUGOP_SLE;       break;
+        case TK_AUGSGT:         aop = AUGOP_SGT;       break;
+        case TK_AUGSGE:         aop = AUGOP_SGE;       break;
+        case TK_AUGSNE:         aop = AUGOP_SNE;       break;
+        default:                aop = AUGOP_ADD;       break;
+        }
+        op->v.ival = (long)aop;
         push_child(op, n); push_child(op, rhs);
         return op;
     }
@@ -571,12 +598,7 @@ static tree_t *parse_block_or_expr(IcnParser *p) {
         nc++;
     }
     expect(p, TK_RBRACE, "compound block");
-    if (nc == 1) {
-        tree_t *only = seq->c[0];
-        seq->n = 0;
-        free(seq);
-        return only;
-    }
+    if (nc == 1) return seq->c[0];
     return seq;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -668,8 +690,7 @@ static tree_t *parse_stmt(IcnParser *p) {
     if (check(p, TK_LOCAL) || check(p, TK_STATIC)) {
         int is_static = check(p, TK_STATIC);
         advance(p);
-        tree_t *e = ast_node_new(TT_GLOBAL);
-        e->v.ival = is_static ? 1 : 0;
+        tree_t *e = ast_node_new(is_static ? TT_STATIC_DECL : TT_LOCAL);
         while (!check(p, TK_SEMICOL) && !check(p, TK_EOF)) {
             if (p->cur.kind == TK_IDENT) {
                 push_child(e, e_leaf_sval(TT_VAR, p->cur.val.sval.data, (int)p->cur.val.sval.len));
@@ -754,8 +775,7 @@ void icn_parse_init(IcnParser *p, IcnLexer *lex) {
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 CODE_t *icn_parse_file(IcnParser *p, tree_t **out_ast) {
-    CODE_t *prog     = calloc(1, sizeof(CODE_t));
-    tree_t  *ast_prog = ast_stmt_new(TT_PROGRAM);
+    tree_t *ast_prog = ast_stmt_new(TT_PROGRAM);
     while (!check(p, TK_EOF) && !p->had_error) {
         tree_t *top = NULL;
         if (check(p, TK_PROCEDURE)) {
@@ -778,25 +798,16 @@ CODE_t *icn_parse_file(IcnParser *p, tree_t **out_ast) {
             break;
         }
         if (top) {
-            STMT_t *st = calloc(1, sizeof(STMT_t));
-            st->subject = top;
-            st->lineno  = 0;
-            st->lang    = LANG_ICN;
-            if (!prog->head) prog->head = prog->tail = st;
-            else           { prog->tail->next = st; prog->tail = st; }
-            prog->nstmts++;
-            {
-                tree_t *ast_st = ast_stmt_new(TT_STMT);
-                push_child(ast_st, ast_attr_int(":lang", LANG_ICN));
-                push_child(ast_st, ast_attr_int(":line", 0));
-                push_child(ast_st, ast_attr_int(":stno", 0));
-                push_child(ast_st, ast_attr_expr(":subj", top));
-                push_child(ast_prog, ast_st);
-            }
+            tree_t *ast_st = ast_stmt_new(TT_STMT);
+            push_child(ast_st, ast_attr_int(":lang", LANG_ICN));
+            push_child(ast_st, ast_attr_int(":line", 0));
+            push_child(ast_st, ast_attr_int(":stno", 0));
+            push_child(ast_st, ast_attr_expr(":subj", top));
+            push_child(ast_prog, ast_st);
         }
     }
     if (out_ast) *out_ast = ast_prog;
-    return prog;
+    return NULL;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 tree_t *icn_parse_expr(IcnParser *p) {

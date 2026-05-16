@@ -488,6 +488,8 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         return nd;
     }
     case TT_GLOBAL:
+    case TT_LOCAL:
+    case TT_STATIC_DECL:
     case TT_INITIAL: {
         /* `local x;`, `static x;`, `global x;`, `initial expr;` — scope/init declarations.                                                                                                                   */
         /* Scope is built at lower time (proc_table[i].lower_sc); these are no-ops at IR exec time.                                                                                                            */
@@ -631,19 +633,19 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         if (!rhs) return NULL;
         IcnBinopKind op = ICN_BINOP_ADD;
         int is_relop = 0;
-        switch ((IcnTkKind)e->v.ival) {
-        case TK_AUGPLUS:   op = ICN_BINOP_ADD;    break;
-        case TK_AUGMINUS:  op = ICN_BINOP_SUB;    break;
-        case TK_AUGSTAR:   op = ICN_BINOP_MUL;    break;
-        case TK_AUGSLASH:  op = ICN_BINOP_DIV;    break;
-        case TK_AUGMOD:    op = ICN_BINOP_MOD;    break;
-        case TK_AUGCONCAT: op = ICN_BINOP_CONCAT; break;
-        case TK_AUGEQ:     op = ICN_BINOP_EQ;  is_relop = 1; break;
-        case TK_AUGLT:     op = ICN_BINOP_LT;  is_relop = 1; break;
-        case TK_AUGLE:     op = ICN_BINOP_LE;  is_relop = 1; break;
-        case TK_AUGGT:     op = ICN_BINOP_GT;  is_relop = 1; break;
-        case TK_AUGGE:     op = ICN_BINOP_GE;  is_relop = 1; break;
-        case TK_AUGNE:     op = ICN_BINOP_NE;  is_relop = 1; break;
+        switch ((AugOp_e)e->v.ival) {
+        case AUGOP_ADD:    op = ICN_BINOP_ADD;    break;
+        case AUGOP_SUB:    op = ICN_BINOP_SUB;    break;
+        case AUGOP_MUL:    op = ICN_BINOP_MUL;    break;
+        case AUGOP_DIV:    op = ICN_BINOP_DIV;    break;
+        case AUGOP_MOD:    op = ICN_BINOP_MOD;    break;
+        case AUGOP_CONCAT: op = ICN_BINOP_CONCAT; break;
+        case AUGOP_EQ:     op = ICN_BINOP_EQ;  is_relop = 1; break;
+        case AUGOP_LT:     op = ICN_BINOP_LT;  is_relop = 1; break;
+        case AUGOP_LE:     op = ICN_BINOP_LE;  is_relop = 1; break;
+        case AUGOP_GT:     op = ICN_BINOP_GT;  is_relop = 1; break;
+        case AUGOP_GE:     op = ICN_BINOP_GE;  is_relop = 1; break;
+        case AUGOP_NE:     op = ICN_BINOP_NE;  is_relop = 1; break;
         default:           return NULL;
         }
         IR_t *binop = IR_node_alloc(cfg, IR_BINOP);

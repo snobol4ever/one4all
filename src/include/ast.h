@@ -26,7 +26,7 @@ typedef enum tree_e {
     TT_SEQ_EXPR,          TT_EVERY,             TT_WHILE,             TT_UNTIL,             TT_REPEAT,
     TT_IF,                TT_CASE,              TT_RETURN,            TT_PROC_FAIL,         TT_LOOP_BREAK,        TT_LOOP_NEXT,         TT_BANG_BINARY,
     TT_SECTION,           TT_SECTION_PLUS,      TT_SECTION_MINUS,
-    TT_RECORD,            TT_FIELD,             TT_GLOBAL,            TT_INITIAL,           TT_REVASSIGN,         TT_REVSWAP,
+    TT_RECORD,            TT_FIELD,             TT_GLOBAL,            TT_LOCAL,             TT_STATIC_DECL,       TT_INITIAL,           TT_REVASSIGN,         TT_REVSWAP,
     TT_PROGRAM,           TT_STMT,              TT_END,               TT_ATTR,
     TT_GOTO_S,            TT_GOTO_F,            TT_GOTO_U,
     TT_KIND_COUNT
@@ -143,6 +143,7 @@ static const char * const tt_e_name[TT_KIND_COUNT] = {
     [TT_LOOP_BREAK]       = "TT_LOOP_BREAK",     [TT_LOOP_NEXT]        = "TT_LOOP_NEXT",       [TT_BANG_BINARY]      = "TT_BANG_BINARY",
     [TT_SECTION]          = "TT_SECTION",        [TT_SECTION_PLUS]     = "TT_SECTION_PLUS",    [TT_SECTION_MINUS]    = "TT_SECTION_MINUS",
     [TT_RECORD]           = "TT_RECORD",         [TT_FIELD]            = "TT_FIELD",           [TT_GLOBAL]           = "TT_GLOBAL",
+    [TT_LOCAL]            = "TT_LOCAL",          [TT_STATIC_DECL]      = "TT_STATIC_DECL",
     [TT_INITIAL]          = "TT_INITIAL",        [TT_REVASSIGN]        = "TT_REVASSIGN",       [TT_REVSWAP]          = "TT_REVSWAP",
     [TT_PROGRAM]          = "TT_PROGRAM",        [TT_STMT]             = "TT_STMT",            [TT_END]              = "TT_END",
     [TT_ATTR]             = "TT_ATTR",           [TT_GOTO_S]           = "TT_GOTO_S",          [TT_GOTO_F]           = "TT_GOTO_F",

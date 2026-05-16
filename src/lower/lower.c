@@ -624,28 +624,28 @@ static void lower_augop(const tree_t *t)
         else                 sm_emit_s(g_p, SM_PUSH_VAR, lname);
         lower_expr(rhs);
         switch (op) {
-        case TK_AUGPLUS:   sm_emit(g_p, SM_ADD);    emit_augop_store(lslot, is_kw, lname); return;
-        case TK_AUGMINUS:  sm_emit(g_p, SM_SUB);    emit_augop_store(lslot, is_kw, lname); return;
-        case TK_AUGSTAR:   sm_emit(g_p, SM_MUL);    emit_augop_store(lslot, is_kw, lname); return;
-        case TK_AUGSLASH:  sm_emit(g_p, SM_DIV);    emit_augop_store(lslot, is_kw, lname); return;
-        case TK_AUGMOD:    sm_emit(g_p, SM_MOD);    emit_augop_store(lslot, is_kw, lname); return;
-        case TK_AUGCONCAT: sm_emit(g_p, SM_CONCAT); emit_augop_store(lslot, is_kw, lname); return;
-        case TK_AUGPOW:    sm_emit(g_p, SM_EXP);    emit_augop_store(lslot, is_kw, lname); return;
-        case TK_AUGEQ: sm_emit_i(g_p, SM_ACOMP, TT_EQ); emit_augop_store(lslot, is_kw, lname); return;
-        case TK_AUGNE: sm_emit_i(g_p, SM_ACOMP, TT_NE); emit_augop_store(lslot, is_kw, lname); return;
-        case TK_AUGLT: sm_emit_i(g_p, SM_ACOMP, TT_LT); emit_augop_store(lslot, is_kw, lname); return;
-        case TK_AUGLE: sm_emit_i(g_p, SM_ACOMP, TT_LE); emit_augop_store(lslot, is_kw, lname); return;
-        case TK_AUGGT: sm_emit_i(g_p, SM_ACOMP, TT_GT); emit_augop_store(lslot, is_kw, lname); return;
-        case TK_AUGGE: sm_emit_i(g_p, SM_ACOMP, TT_GE); emit_augop_store(lslot, is_kw, lname); return;
-        case TK_AUGSEQ:  sm_emit_i(g_p, SM_LCOMP, TT_LEQ); emit_augop_store(lslot, is_kw, lname); return;
-        case TK_AUGSNE:  sm_emit_i(g_p, SM_LCOMP, TT_LNE); emit_augop_store(lslot, is_kw, lname); return;
-        case TK_AUGSLT:  sm_emit_i(g_p, SM_LCOMP, TT_LLT); emit_augop_store(lslot, is_kw, lname); return;
-        case TK_AUGSLE:  sm_emit_i(g_p, SM_LCOMP, TT_LLE); emit_augop_store(lslot, is_kw, lname); return;
-        case TK_AUGSGT:  sm_emit_i(g_p, SM_LCOMP, TT_LGT); emit_augop_store(lslot, is_kw, lname); return;
-        case TK_AUGSGE:  sm_emit_i(g_p, SM_LCOMP, TT_LGE); emit_augop_store(lslot, is_kw, lname); return;
-        case TK_AUGCSET_UNION: sm_emit_si(g_p, SM_CALL_FN, "++", 2); emit_augop_store(lslot, is_kw, lname); return;
-        case TK_AUGCSET_DIFF:  sm_emit_si(g_p, SM_CALL_FN, "--", 2); emit_augop_store(lslot, is_kw, lname); return;
-        case TK_AUGCSET_INTER: sm_emit_si(g_p, SM_CALL_FN, "**", 2); emit_augop_store(lslot, is_kw, lname); return;
+        case AUGOP_ADD:        sm_emit(g_p, SM_ADD);    emit_augop_store(lslot, is_kw, lname); return;
+        case AUGOP_SUB:        sm_emit(g_p, SM_SUB);    emit_augop_store(lslot, is_kw, lname); return;
+        case AUGOP_MUL:        sm_emit(g_p, SM_MUL);    emit_augop_store(lslot, is_kw, lname); return;
+        case AUGOP_DIV:        sm_emit(g_p, SM_DIV);    emit_augop_store(lslot, is_kw, lname); return;
+        case AUGOP_MOD:        sm_emit(g_p, SM_MOD);    emit_augop_store(lslot, is_kw, lname); return;
+        case AUGOP_CONCAT:     sm_emit(g_p, SM_CONCAT); emit_augop_store(lslot, is_kw, lname); return;
+        case AUGOP_POW:        sm_emit(g_p, SM_EXP);    emit_augop_store(lslot, is_kw, lname); return;
+        case AUGOP_EQ:  sm_emit_i(g_p, SM_ACOMP, TT_EQ); emit_augop_store(lslot, is_kw, lname); return;
+        case AUGOP_NE:  sm_emit_i(g_p, SM_ACOMP, TT_NE); emit_augop_store(lslot, is_kw, lname); return;
+        case AUGOP_LT:  sm_emit_i(g_p, SM_ACOMP, TT_LT); emit_augop_store(lslot, is_kw, lname); return;
+        case AUGOP_LE:  sm_emit_i(g_p, SM_ACOMP, TT_LE); emit_augop_store(lslot, is_kw, lname); return;
+        case AUGOP_GT:  sm_emit_i(g_p, SM_ACOMP, TT_GT); emit_augop_store(lslot, is_kw, lname); return;
+        case AUGOP_GE:  sm_emit_i(g_p, SM_ACOMP, TT_GE); emit_augop_store(lslot, is_kw, lname); return;
+        case AUGOP_SEQ: sm_emit_i(g_p, SM_LCOMP, TT_LEQ); emit_augop_store(lslot, is_kw, lname); return;
+        case AUGOP_SNE: sm_emit_i(g_p, SM_LCOMP, TT_LNE); emit_augop_store(lslot, is_kw, lname); return;
+        case AUGOP_SLT: sm_emit_i(g_p, SM_LCOMP, TT_LLT); emit_augop_store(lslot, is_kw, lname); return;
+        case AUGOP_SLE: sm_emit_i(g_p, SM_LCOMP, TT_LLE); emit_augop_store(lslot, is_kw, lname); return;
+        case AUGOP_SGT: sm_emit_i(g_p, SM_LCOMP, TT_LGT); emit_augop_store(lslot, is_kw, lname); return;
+        case AUGOP_SGE: sm_emit_i(g_p, SM_LCOMP, TT_LGE); emit_augop_store(lslot, is_kw, lname); return;
+        case AUGOP_CSET_UNION: sm_emit_si(g_p, SM_CALL_FN, "++", 2); emit_augop_store(lslot, is_kw, lname); return;
+        case AUGOP_CSET_DIFF:  sm_emit_si(g_p, SM_CALL_FN, "--", 2); emit_augop_store(lslot, is_kw, lname); return;
+        case AUGOP_CSET_INTER: sm_emit_si(g_p, SM_CALL_FN, "**", 2); emit_augop_store(lslot, is_kw, lname); return;
         default:
             sm_emit_i(g_p, SM_PUSH_LIT_I, (int64_t)op);
             sm_emit_si(g_p, SM_CALL_FN, "AUGOP", 3);
@@ -1158,7 +1158,7 @@ static void lower_expr_inner(const tree_t *t)
     case TT_MAKELIST:                         lower_makelist(t);      return;
     case TT_RECORD:                           lower_record(t);        return;
     case TT_FIELD:                            lower_field(t);         return;
-    case TT_GLOBAL:                           lower_global(t);        return;
+    case TT_GLOBAL: case TT_LOCAL: case TT_STATIC_DECL:    lower_global(t);        return;
     case TT_INITIAL:                          lower_initial(t);       return;
     case TT_SECTION:       { ICN_BB_EVAL(t); lower_section_3(t, "ICN_SECTION_RANGE"); return; }
     case TT_SECTION_PLUS:  { ICN_BB_EVAL(t); lower_section_3(t, "ICN_SECTION_PLUS");  return; }

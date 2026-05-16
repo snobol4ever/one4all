@@ -3858,13 +3858,13 @@ DESCR_t interp_eval(tree_t *e)
             long _li = IS_INT_fn(_lv)?_lv.i:(long)_lv.r; \
             long _ri = IS_INT_fn(_rv)?_rv.i:(long)_rv.r; \
             DESCR_t _res = NULVCL; \
-            switch((IcnTkKind)e->v.ival){ \
-                case TK_AUGPLUS:   _res=INTVAL(_li+_ri); break; \
-                case TK_AUGMINUS:  _res=INTVAL(_li-_ri); break; \
-                case TK_AUGSTAR:   _res=INTVAL(_li*_ri); break; \
-                case TK_AUGSLASH:  _res=_ri?INTVAL(_li/_ri):FAILDESCR; break; \
-                case TK_AUGMOD:    _res=_ri?INTVAL(_li%_ri):FAILDESCR; break; \
-                case TK_AUGCONCAT: { \
+            switch((AugOp_e)e->v.ival){ \
+                case AUGOP_ADD:    _res=INTVAL(_li+_ri); break; \
+                case AUGOP_SUB:    _res=INTVAL(_li-_ri); break; \
+                case AUGOP_MUL:    _res=INTVAL(_li*_ri); break; \
+                case AUGOP_DIV:    _res=_ri?INTVAL(_li/_ri):FAILDESCR; break; \
+                case AUGOP_MOD:    _res=_ri?INTVAL(_li%_ri):FAILDESCR; break; \
+                case AUGOP_CONCAT: { \
                     const char *_ls=VARVAL_fn(_lv),*_rs=VARVAL_fn(_rv); \
                     if(!_ls)_ls="";if(!_rs)_rs=""; \
                     size_t _ll=strlen(_ls),_rl=strlen(_rs); \
@@ -3872,24 +3872,24 @@ DESCR_t interp_eval(tree_t *e)
                     memcpy(_buf,_ls,_ll);memcpy(_buf+_ll,_rs,_rl);_buf[_ll+_rl]='\0'; \
                     _res=STRVAL(_buf); break; \
                 } \
-                case TK_AUGEQ:   _res = (_li == _ri) ? _rv : FAILDESCR; break; \
-                case TK_AUGNE:   _res = (_li != _ri) ? _rv : FAILDESCR; break; \
-                case TK_AUGLT:   _res = (_li <  _ri) ? _rv : FAILDESCR; break; \
-                case TK_AUGLE:   _res = (_li <= _ri) ? _rv : FAILDESCR; break; \
-                case TK_AUGGT:   _res = (_li >  _ri) ? _rv : FAILDESCR; break; \
-                case TK_AUGGE:   _res = (_li >= _ri) ? _rv : FAILDESCR; break; \
-                case TK_AUGSEQ: case TK_AUGSNE: \
-                case TK_AUGSLT: case TK_AUGSLE: case TK_AUGSGT: case TK_AUGSGE: { \
+                case AUGOP_EQ:  _res = (_li == _ri) ? _rv : FAILDESCR; break; \
+                case AUGOP_NE:  _res = (_li != _ri) ? _rv : FAILDESCR; break; \
+                case AUGOP_LT:  _res = (_li <  _ri) ? _rv : FAILDESCR; break; \
+                case AUGOP_LE:  _res = (_li <= _ri) ? _rv : FAILDESCR; break; \
+                case AUGOP_GT:  _res = (_li >  _ri) ? _rv : FAILDESCR; break; \
+                case AUGOP_GE:  _res = (_li >= _ri) ? _rv : FAILDESCR; break; \
+                case AUGOP_SEQ: case AUGOP_SNE: \
+                case AUGOP_SLT: case AUGOP_SLE: case AUGOP_SGT: case AUGOP_SGE: { \
                     const char *_lcs=VARVAL_fn(_lv),*_rcs=VARVAL_fn(_rv); \
                     if(!_lcs)_lcs="";if(!_rcs)_rcs=""; \
                     int _cmp = strcmp(_lcs, _rcs); int _ok = 0; \
-                    switch ((IcnTkKind)e->v.ival) { \
-                        case TK_AUGSEQ: _ok = (_cmp == 0); break; \
-                        case TK_AUGSNE: _ok = (_cmp != 0); break; \
-                        case TK_AUGSLT: _ok = (_cmp <  0); break; \
-                        case TK_AUGSLE: _ok = (_cmp <= 0); break; \
-                        case TK_AUGSGT: _ok = (_cmp >  0); break; \
-                        case TK_AUGSGE: _ok = (_cmp >= 0); break; \
+                    switch ((AugOp_e)e->v.ival) { \
+                        case AUGOP_SEQ: _ok = (_cmp == 0); break; \
+                        case AUGOP_SNE: _ok = (_cmp != 0); break; \
+                        case AUGOP_SLT: _ok = (_cmp <  0); break; \
+                        case AUGOP_SLE: _ok = (_cmp <= 0); break; \
+                        case AUGOP_SGT: _ok = (_cmp >  0); break; \
+                        case AUGOP_SGE: _ok = (_cmp >= 0); break; \
                         default: break; \
                     } \
                     _res = _ok ? _rv : FAILDESCR; break; \
@@ -4260,7 +4260,7 @@ DESCR_t interp_eval(tree_t *e)
         if (!cell) return FAILDESCR;
         return *cell;
     }
-    case TT_GLOBAL:
+    case TT_GLOBAL: case TT_LOCAL: case TT_STATIC_DECL:
         return NULVCL;
     default:
         return NULVCL;

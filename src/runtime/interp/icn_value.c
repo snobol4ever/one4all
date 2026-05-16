@@ -169,7 +169,7 @@ static DESCR_t bb_section(tree_t *e, bb_section_t kind)
     return STRVAL(buf);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static DESCR_t bb_augop_compute(DESCR_t lv, DESCR_t rv, IcnTkKind op)
+static DESCR_t bb_augop_compute(DESCR_t lv, DESCR_t rv, AugOp_e op)
 {
     if (IS_FAIL_fn(lv) || IS_FAIL_fn(rv)) return FAILDESCR;
     int lv_real = IS_REAL_fn(lv), rv_real = IS_REAL_fn(rv);
@@ -178,17 +178,17 @@ static DESCR_t bb_augop_compute(DESCR_t lv, DESCR_t rv, IcnTkKind op)
     long li = (long)ld, ri = (long)rd;
     int use_real = lv_real || rv_real;
     switch (op) {
-    case TK_AUGPLUS:   return use_real ? REALVAL(ld+rd) : INTVAL(li+ri);
-    case TK_AUGMINUS:  return use_real ? REALVAL(ld-rd) : INTVAL(li-ri);
-    case TK_AUGSTAR:   return use_real ? REALVAL(ld*rd) : INTVAL(li*ri);
-    case TK_AUGSLASH:  return use_real ? (rd!=0.0?REALVAL(ld/rd):FAILDESCR) : (ri?INTVAL(li/ri):FAILDESCR);
-    case TK_AUGMOD:    return ri ? INTVAL(li % ri) : FAILDESCR;
-    case TK_AUGPOW: {
+    case AUGOP_ADD:    return use_real ? REALVAL(ld+rd) : INTVAL(li+ri);
+    case AUGOP_SUB:    return use_real ? REALVAL(ld-rd) : INTVAL(li-ri);
+    case AUGOP_MUL:    return use_real ? REALVAL(ld*rd) : INTVAL(li*ri);
+    case AUGOP_DIV:    return use_real ? (rd!=0.0?REALVAL(ld/rd):FAILDESCR) : (ri?INTVAL(li/ri):FAILDESCR);
+    case AUGOP_MOD:    return ri ? INTVAL(li % ri) : FAILDESCR;
+    case AUGOP_POW: {
         double result = pow(ld, rd);
         if (!lv_real && !rv_real && rd >= 0 && (double)(long long)result == result) return INTVAL((long long)result);
         return REALVAL(result);
     }
-    case TK_AUGCONCAT: {
+    case AUGOP_CONCAT: {
         const char *ls = VARVAL_fn(lv), *rs = VARVAL_fn(rv);
         if (!ls) ls = ""; if (!rs) rs = "";
         size_t ll = strlen(ls), rl = strlen(rs);
@@ -196,25 +196,25 @@ static DESCR_t bb_augop_compute(DESCR_t lv, DESCR_t rv, IcnTkKind op)
         memcpy(buf, ls, ll); memcpy(buf + ll, rs, rl); buf[ll + rl] = '\0';
         return STRVAL(buf);
     }
-    case TK_AUGEQ: return (li == ri) ? rv : FAILDESCR;
-    case TK_AUGNE: return (li != ri) ? rv : FAILDESCR;
-    case TK_AUGLT: return (li <  ri) ? rv : FAILDESCR;
-    case TK_AUGLE: return (li <= ri) ? rv : FAILDESCR;
-    case TK_AUGGT: return (li >  ri) ? rv : FAILDESCR;
-    case TK_AUGGE: return (li >= ri) ? rv : FAILDESCR;
-    case TK_AUGSEQ: case TK_AUGSNE:
-    case TK_AUGSLT: case TK_AUGSLE: case TK_AUGSGT: case TK_AUGSGE: {
+    case AUGOP_EQ: return (li == ri) ? rv : FAILDESCR;
+    case AUGOP_NE: return (li != ri) ? rv : FAILDESCR;
+    case AUGOP_LT: return (li <  ri) ? rv : FAILDESCR;
+    case AUGOP_LE: return (li <= ri) ? rv : FAILDESCR;
+    case AUGOP_GT: return (li >  ri) ? rv : FAILDESCR;
+    case AUGOP_GE: return (li >= ri) ? rv : FAILDESCR;
+    case AUGOP_SEQ: case AUGOP_SNE:
+    case AUGOP_SLT: case AUGOP_SLE: case AUGOP_SGT: case AUGOP_SGE: {
         const char *ls = VARVAL_fn(lv), *rs = VARVAL_fn(rv);
         if (!ls) ls = ""; if (!rs) rs = "";
         int cmp = strcmp(ls, rs);
         int ok = 0;
         switch (op) {
-        case TK_AUGSEQ: ok = (cmp == 0); break;
-        case TK_AUGSNE: ok = (cmp != 0); break;
-        case TK_AUGSLT: ok = (cmp <  0); break;
-        case TK_AUGSLE: ok = (cmp <= 0); break;
-        case TK_AUGSGT: ok = (cmp >  0); break;
-        case TK_AUGSGE: ok = (cmp >= 0); break;
+        case AUGOP_SEQ: ok = (cmp == 0); break;
+        case AUGOP_SNE: ok = (cmp != 0); break;
+        case AUGOP_SLT: ok = (cmp <  0); break;
+        case AUGOP_SLE: ok = (cmp <= 0); break;
+        case AUGOP_SGT: ok = (cmp >  0); break;
+        case AUGOP_SGE: ok = (cmp >= 0); break;
         default:        break;
         }
         return ok ? rv : FAILDESCR;
@@ -690,7 +690,7 @@ DESCR_t cv = bb_eval_value(lhs->c[0]);
         if (e->n < 2) return NULVCL;
         tree_t *lhs = e->c[0];
         tree_t *rhs = e->c[1];
-        IcnTkKind op = (IcnTkKind)e->v.ival;
+        AugOp_e op = (AugOp_e)e->v.ival;
         DESCR_t result = NULVCL;
         if (lhs && lhs->t == TT_ITERATE && lhs->n >= 1) {
             DESCR_t cv = bb_eval_value(lhs->c[0]);

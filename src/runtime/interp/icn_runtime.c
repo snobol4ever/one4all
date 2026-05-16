@@ -218,7 +218,7 @@ DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs)
             IcnFrame *parent_f = (frame_depth >= 2) ? &frame_stack[frame_depth - 2] : NULL;
             for (int bi = body_start; bi < found_proc->n; bi++) {
                 tree_t *st = found_proc->c[bi];
-                if (!st || st->t != TT_GLOBAL || st->v.ival != 1) continue;
+                if (!st || st->t != TT_STATIC_DECL) continue;
                 for (int j = 0; j < st->n; j++) {
                     tree_t *vn = st->c[j];
                     if (!vn || !vn->v.sval) continue;
@@ -242,7 +242,7 @@ DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs)
         int body_start = 1 + nparams_p;
         for (int bi = body_start; bi < found_proc->n; bi++) {
             tree_t *st = found_proc->c[bi];
-            if (!st || st->t != TT_GLOBAL || st->v.ival != 1) continue;
+            if (!st || st->t != TT_STATIC_DECL) continue;
             for (int j = 0; j < st->n; j++) {
                 tree_t *vn = st->c[j];
                 if (!vn || !vn->v.sval) continue;
