@@ -231,13 +231,11 @@ const _kw_store = {
     CODE: 0,
     FULLSCAN: 0,
     ABEND: 0,
-    ABORT: '',
-    ARB: '',
-    BAL: '',
-    FAIL: '',
-    REM: '',
-    SUCCEED: '',
-    FENCE: '',
+    /* ABORT/ARB/BAL/FAIL/REM/SUCCEED/FENCE are NOT keywords — they are
+     * pre-bound pattern globals.  Resolved in push_var via the
+     * _builtin_pat_global() fallback, not via &kw lookup.  Listing them
+     * here as zero-length strings was masking them with '' on every
+     * push_var, defeating capture (BAL .  B bound an empty BAL pattern). */
     RTNTYPE: '',
     ERRTEXT: '',
     ERRTYPE: 0,
