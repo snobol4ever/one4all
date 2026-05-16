@@ -460,10 +460,14 @@ static void h_concat(void)
 static void h_coerce_num(void)
 {
     DESCR_t v = POP();
-    if (v.v == DT_S) {
-        int64_t iv = to_int(v);
-        if (iv != 0 || (v.s && v.s[0] == '0')) PUSH(INTVAL(iv));
-        else PUSH(REALVAL(to_real(v)));
+    if (v.v == DT_S || v.v == DT_SNUL) {
+        const char *s = v.s ? v.s : "";
+        int is_real = 0;
+        for (const char *p = s; *p; p++) {
+            if (*p == '.' || *p == 'e' || *p == 'E' || *p == 'd' || *p == 'D') { is_real = 1; break; }
+        }
+        if (is_real) PUSH(REALVAL(to_real(v)));
+        else         PUSH(INTVAL(to_int(v)));
     } else { PUSH(v); }
     STATE->last_ok = 1;
 }

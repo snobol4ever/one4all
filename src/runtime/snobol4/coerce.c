@@ -45,11 +45,12 @@ DESCR_t shared_arith(DESCR_t l, DESCR_t r, sm_opcode_t op)
         case SM_EXP:
             if (r.i >= 0) {
                 extern int g_icn_jcon;
+                extern int g_lang;
                 int64_t base = l.i, exp = r.i, res = 1;
                 while (exp-- > 0) res *= base;
-                return g_icn_jcon ? INTVAL(res) : REALVAL((double)res);
+                return (g_lang != 1 || g_icn_jcon) ? INTVAL(res) : REALVAL((double)res);
             }
-            return INTVAL((int64_t)pow((double)l.i, (double)r.i));
+            return REALVAL(pow((double)l.i, (double)r.i));
         default: break;
         }
     }

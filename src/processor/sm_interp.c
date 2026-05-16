@@ -447,10 +447,14 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
         }
         case SM_COERCE_NUM: {
             DESCR_t v = sm_pop(st);
-            if (v.v == DT_S) {
-                int64_t iv = to_int(v);
-                if (iv != 0 || (v.s && v.s[0] == '0')) { sm_push(st, INTVAL(iv)); }
-                else { double rv = to_real(v); sm_push(st, REALVAL(rv)); }
+            if (v.v == DT_S || v.v == DT_SNUL) {
+                const char *s = v.s ? v.s : "";
+                int is_real = 0;
+                for (const char *p = s; *p; p++) {
+                    if (*p == '.' || *p == 'e' || *p == 'E' || *p == 'd' || *p == 'D') { is_real = 1; break; }
+                }
+                if (is_real) sm_push(st, REALVAL(to_real(v)));
+                else         sm_push(st, INTVAL(to_int(v)));
             } else { sm_push(st, v); }
             st->last_ok = 1;
             break;

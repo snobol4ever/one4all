@@ -7,6 +7,7 @@
 #include "../../processor/bb_pool.h"
 #include "bb_build.h"
 #include "../../ast/ast.h"                  /* TT_EQ/TT_NE/TT_LT/TT_LE/TT_GT/TT_GE/TT_L* for rt_acomp/rt_lcomp */
+#include "../../include/sm_prog.h"          /* SM_EXP for rt_exp delegation to shared_arith */
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -672,14 +673,14 @@ void rt_coerce_num(void)
 {
     DESCR_t v = vstack_pop();
     if (v.v == DT_FAIL) { vstack_push(FAILDESCR); LAST_OK_SET(0); return; }
-    if (v.v == DT_S) {
-        int64_t iv = to_int(v);
-        if (iv != 0 || (v.s && v.s[0] == '0')) {
-            vstack_push(INTVAL(iv));
-        } else {
-            double rv = to_real(v);
-            vstack_push(REALVAL(rv));
+    if (v.v == DT_S || v.v == DT_SNUL) {
+        const char *s = v.s ? v.s : "";
+        int is_real = 0;
+        for (const char *p = s; *p; p++) {
+            if (*p == '.' || *p == 'e' || *p == 'E' || *p == 'd' || *p == 'D') { is_real = 1; break; }
         }
+        if (is_real) vstack_push(REALVAL(to_real(v)));
+        else         vstack_push(INTVAL(to_int(v)));
     } else {
         vstack_push(v);
     }
@@ -722,11 +723,14 @@ void rt_exp(void)
     if (l.v == DT_FAIL || r.v == DT_FAIL) {
         vstack_push(FAILDESCR); LAST_OK_SET(0); return;
     }
-    double base = (l.v == DT_R) ? l.r : (double)l.i;
-    double expo = (r.v == DT_R) ? r.r : (double)r.i;
-    double res  = pow(base, expo);
-    vstack_push(REALVAL(res));
-    LAST_OK_SET(1);
+    if (l.v == DT_S) l = INTVAL(to_int(l));
+    if (r.v == DT_S) r = INTVAL(to_int(r));
+    if (l.v == DT_SNUL) l = INTVAL(0);
+    if (r.v == DT_SNUL) r = INTVAL(0);
+    extern DESCR_t shared_arith(DESCR_t l, DESCR_t r, int op);
+    DESCR_t result = shared_arith(l, r, SM_EXP);
+    vstack_push(result);
+    LAST_OK_SET(result.v != DT_FAIL);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_neg(void)
