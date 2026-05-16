@@ -204,6 +204,10 @@ IR_t * IR_exec_node(IR_t * nd) {
         } else {
             /* β: advance — try inner generator first. If only one side is a generator, the other is */
             /* single-shot and we exhaust after one pair (relop-driven exception handled in loop).   */
+            /* When the non-generator side is a pure variable read (IR_VAR / IR_ICN_KEYWORD), re-eval */
+            /* it on each pump: this is what makes `every total := total + (1 to 5)` accumulate as a */
+            /* user would expect (matches augop +:= semantics).  Side-effecting nodes (IR_CALL etc.)  */
+            /* are NOT re-evaluated — only cheap pure reads.                                          */
             if (r_gen) {
                 IR_exec_node(nd->c[1]);
                 if (IS_FAIL_fn(nd->c[1]->value)) {
@@ -214,10 +218,18 @@ IR_t * IR_exec_node(IR_t * nd) {
                     IR_exec_node(nd->c[1]);
                     if (IS_FAIL_fn(nd->c[1]->value)) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
                 }
+                if (!l_gen && (nd->c[0]->t == IR_VAR || nd->c[0]->t == IR_ICN_KEYWORD)) {
+                    IR_exec_node(nd->c[0]);
+                    if (IS_FAIL_fn(nd->c[0]->value)) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+                }
             } else if (l_gen) {
                 /* Only left is a generator: advance left, keep right value (right is single-shot). */
                 IR_exec_node(nd->c[0]);
                 if (IS_FAIL_fn(nd->c[0]->value)) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+                if (nd->c[1]->t == IR_VAR || nd->c[1]->t == IR_ICN_KEYWORD) {
+                    IR_exec_node(nd->c[1]);
+                    if (IS_FAIL_fn(nd->c[1]->value)) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+                }
             } else {
                 /* Neither side a generator — single-shot, already returned the pair, exhaust now. */
                 nd->state = 0; nd->value = FAILDESCR; return nd->ω;
