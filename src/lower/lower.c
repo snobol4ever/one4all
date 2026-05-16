@@ -1148,7 +1148,15 @@ static void lower_expr_inner(const tree_t *t)
     case TT_SEQ_EXPR:                         lower_seq_expr(t);      return;
     case TT_IF:                               lower_if(t);            return;
     case TT_WHILE:                            lower_while(t);         return;
-    case TT_UNTIL:                            lower_until(t);         return;
+    /* PST-SC-4b (2026-05-16): TT_PROGRAM used as a block body inside TT_IF then/else slots.
+     * Lower each child statement for effect (VOID_POP after each), push null as block value. */
+    case TT_PROGRAM: {
+        for (int i = 0; i < t->n; i++) {
+            if (t->c[i]) { lower_stmt(t->c[i]); }
+        }
+        sm_emit(g_p, SM_PUSH_NULL);
+        return;
+    }    case TT_UNTIL:                            lower_until(t);         return;
     case TT_REPEAT:                           lower_repeat(t);        return;
     case TT_LOOP_BREAK:                       lower_loop_break(t);    return;
     case TT_LOOP_NEXT:                        lower_loop_next(t);     return;

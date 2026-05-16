@@ -29,6 +29,7 @@ typedef struct ScParseState {
     char        **stash_for_pending_labels;
     int           stash_for_pending_labels_count;
     struct SwitchHead *cur_switch;
+    STMT_t            *if_before_body;   /* PST-SC-4b: CODE_t tail snapshot taken at if_head */
 } ScParseState;
 }
 %code {
@@ -83,6 +84,12 @@ int  sc_lex  (SC_STYPE *yylval, ScParseState *st);
 void sc_error(ScParseState *st, const char *msg);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_append_stmt        (ScParseState *st, tree_t *top);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static tree_t  *sc_collect_body       (ScParseState *st, STMT_t *snapshot);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static void     sc_finalize_if_no_else_pst(ScParseState *st, tree_t *cond);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static void     sc_finalize_if_else_pst(ScParseState *st, tree_t *cond, STMT_t *before_else);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_split_subject_pattern(tree_t **subj_io, tree_t **pat_io);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -274,7 +281,7 @@ static void     sc_emit_struct         (ScParseState *st, char *name, char *fiel
 %token T_LBRACE T_RBRACE
 %token T_IF T_ELSE T_WHILE
 %type <expr> expr0 expr1 expr3 expr4 expr5 expr6 expr9 expr11 expr12 expr15 expr17 exprlist exprlist_ne
-%type <ifhead>    if_head
+%type <expr>      if_head
 %type <whilehead> while_head
 %type <dohead>    do_head
 %type <stmt_ptr>  else_keyword
@@ -297,7 +304,7 @@ matched_stmt
             : simple_stmt
             | block_stmt
             | if_head matched_stmt else_keyword matched_stmt
-                                        { sc_finalize_if_else(st, $1, $3); }
+                                        { sc_finalize_if_else_pst(st, $1, $3); }
             | while_head matched_stmt
                                         { sc_finalize_while(st, $1); }
             | do_head do_body T_WHILE T_LPAREN expr0 T_RPAREN T_SEMICOLON
@@ -320,9 +327,9 @@ matched_stmt
             ;
 unmatched_stmt
             : if_head stmt
-                                        { sc_finalize_if_no_else(st, $1); }
+                                        { sc_finalize_if_no_else_pst(st, $1); }
             | if_head matched_stmt else_keyword unmatched_stmt
-                                        { sc_finalize_if_else(st, $1, $3); }
+                                        { sc_finalize_if_else_pst(st, $1, $3); }
             | while_head unmatched_stmt
                                         { sc_finalize_while(st, $1); }
             | for_head unmatched_stmt
@@ -330,7 +337,7 @@ unmatched_stmt
             | label_decl unmatched_stmt
             ;
 if_head     : T_IF T_LPAREN expr0 T_RPAREN opt_head_sep
-                                        { $$ = sc_if_head_new(st, $3); }
+                                        { st->if_before_body = st->code->tail; $$ = $3; }
             ;
 while_head  : T_WHILE T_LPAREN expr0 T_RPAREN opt_head_sep
                                         { $$ = sc_while_head_new(st, $3); }
@@ -440,18 +447,16 @@ expr1       : expr3 T_2QUEST expr1
                                 { $$ = $1; }
             ;
 expr3       : expr3 T_2PIPE expr4
-                                { if ($1->kind == AST_ALT) { expr_add_child($1, $3); $$ = $1; }
-                                  else { tree_t *a = expr_new(AST_ALT);
-                                         expr_add_child(a, $1); expr_add_child(a, $3);
-                                         $$ = a; } }
+                                { tree_t *a = ast_node_new(TT_ALT);
+                                  expr_add_child(a, $1); expr_add_child(a, $3);
+                                  $$ = a; }
             | expr4
                                 { $$ = $1; }
             ;
 expr4       : expr4 T_CONCAT expr5
-                                { if ($1->kind == AST_SEQ) { expr_add_child($1, $3); $$ = $1; }
-                                  else { tree_t *s = expr_new(AST_SEQ);
-                                         expr_add_child(s, $1); expr_add_child(s, $3);
-                                         $$ = s; } }
+                                { tree_t *s = ast_node_new(TT_SEQ);
+                                  expr_add_child(s, $1); expr_add_child(s, $3);
+                                  $$ = s; }
             | expr5
                                 { $$ = $1; }
             ;
@@ -899,6 +904,64 @@ static void sc_finalize_if_else(ScParseState *st, struct IfHead *h, STMT_t *befo
     sc_splice_after(st, anchor, goto_end, else_pad);
     sc_append_chain(st, end_pad, end_pad);
     free(h);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PST-SC-4b (2026-05-16): collect stmts appended to CODE_t after `snapshot` into a TT_PROGRAM
+ * tree node, removing them from CODE_t.  Returns a TT_PROGRAM whose children are
+ * stmt_to_ast(s) for each collected STMT_t.  The collected STMT_t chain is freed.
+ * If no stmts were added after snapshot, returns an empty TT_PROGRAM. */
+static tree_t *sc_collect_body(ScParseState *st, STMT_t *snapshot)
+{
+    tree_t *block = ast_node_new(TT_PROGRAM);
+    /* body starts at snapshot->next (or head if snapshot==NULL) */
+    STMT_t *first = snapshot ? snapshot->next : st->code->head;
+    if (!first) return block;                   /* nothing to collect */
+    /* detach body from CODE_t */
+    if (snapshot) snapshot->next = NULL;
+    else          st->code->head = NULL;
+    st->code->tail = snapshot;                  /* restore tail to snapshot */
+    /* convert each STMT_t to a tree node and push into block */
+    for (STMT_t *s = first; s; ) {
+        STMT_t *nxt = s->next;
+        ast_push(block, stmt_to_ast(s));        /* stmt_to_ast allocates; we keep result */
+        free(s);                                /* free the STMT_t shell (not its tree fields) */
+        s = nxt;
+    }
+    return block;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PST-SC-4b: Emit TT_IF(cond, then_block) as a single statement in CODE_t.
+ * `cond` is the raw expression from if_head.
+ * `before_then` is the CODE_t tail snapshot taken BEFORE the then-body was parsed. */
+static void sc_finalize_if_no_else_pst(ScParseState *st, tree_t *cond)
+{
+    /* before_then == NULL means nothing was in CODE_t before; then-body is everything */
+    /* We need the snapshot that was taken when if_head fired.  Since if_head now just
+     * returns the cond expr and no longer captures a snapshot, we capture it here using
+     * the current CODE_t tail (the body was already appended by the sub-rules). */
+    /* NOTE: this approach requires that the snapshot be taken BEFORE the body rules run.
+     * We do this by storing it in a local we compute at the call site.
+     * For now, we re-implement by snapshotting at if_head time via sc_if_before_body
+     * stored in ScParseState.  See header changes below. */
+    tree_t *then_block = sc_collect_body(st, st->if_before_body);
+    tree_t *if_node    = ast_node_new(TT_IF);
+    ast_push(if_node, cond);
+    ast_push(if_node, then_block);
+    /* wrap TT_IF in a STMT_t so it reaches lower() via the normal CODE_t → TT_PROGRAM path */
+    sc_append_stmt(st, if_node);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PST-SC-4b: Emit TT_IF(cond, then_block, else_block) as a single statement.
+ * `before_else` is the CODE_t tail snapshot taken at the T_ELSE token. */
+static void sc_finalize_if_else_pst(ScParseState *st, tree_t *cond, STMT_t *before_else)
+{
+    tree_t *else_block = sc_collect_body(st, before_else);
+    tree_t *then_block = sc_collect_body(st, st->if_before_body);
+    tree_t *if_node    = ast_node_new(TT_IF);
+    ast_push(if_node, cond);
+    ast_push(if_node, then_block);
+    ast_push(if_node, else_block);
+    sc_append_stmt(st, if_node);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void sc_finalize_while(ScParseState *st, struct WhileHead *h) {
