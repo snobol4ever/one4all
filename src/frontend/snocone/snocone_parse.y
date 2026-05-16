@@ -30,6 +30,7 @@ typedef struct ScParseState {
     struct SwitchHead *cur_switch;
     STMT_t            *if_before_body;    /* PST-SC-4b: CODE_t tail snapshot taken at if_head */
     STMT_t            *while_before_body; /* PST-SC-4c: CODE_t tail snapshot taken at while_head */
+    STMT_t            *do_before_body;    /* PST-SC-4d: CODE_t tail snapshot taken at do_head */
 } ScParseState;
 }
 %code {
@@ -105,12 +106,6 @@ struct IfHead {
                               before_body->next or st->code->head if NULL.     */
     int     lineno;
 };
-struct DoHead {
-    STMT_t *before_body;
-    int     lineno;
-    char   *cont_label;
-    char   *end_label;
-};
 struct ForHead {
     STMT_t *before_loop;
     tree_t *cond;
@@ -155,7 +150,7 @@ static struct IfHead    *sc_if_head_new    (ScParseState *st, tree_t *cond);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_finalize_while_pst  (ScParseState *st, tree_t *cond);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static struct DoHead    *sc_do_head_new    (ScParseState *st);
+static void     sc_finalize_do_while_pst(ScParseState *st, tree_t *cond);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static struct ForHead   *sc_for_head_new   (ScParseState *st, tree_t *cond, tree_t *step);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -176,8 +171,6 @@ static void     sc_append_chain       (ScParseState *st, STMT_t *chain_head, STM
 static void     sc_finalize_if_no_else(ScParseState *st, struct IfHead *h);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_finalize_if_else   (ScParseState *st, struct IfHead *h, STMT_t *before_else);
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void     sc_finalize_do_while  (ScParseState *st, struct DoHead *h, tree_t *cond);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_finalize_for       (ScParseState *st, struct ForHead *h);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -225,7 +218,6 @@ static void     sc_emit_struct         (ScParseState *st, char *name, char *fiel
     long    ival;
     double  dval;
     struct IfHead    *ifhead;
-    struct DoHead    *dohead;
     struct ForHead   *forhead;
     struct FuncHead  *funchead;
     struct SwitchHead *switchhead;
@@ -272,7 +264,7 @@ static void     sc_emit_struct         (ScParseState *st, char *name, char *fiel
 %token T_IF T_ELSE T_WHILE
 %type <expr> expr0 expr1 expr3 expr4 expr5 expr6 expr9 expr11 expr12 expr15 expr17 exprlist exprlist_ne
 %type <expr>      if_head while_head
-%type <dohead>    do_head
+/* do_head has no semantic value (PST-SC-4d: snapshot taken into st->do_before_body) */
 %type <stmt_ptr>  else_keyword
 %type <forhead>   for_head
 %type <funchead>  func_head
@@ -297,7 +289,7 @@ matched_stmt
             | while_head matched_stmt
                                         { sc_finalize_while_pst(st, $1); }
             | do_head do_body T_WHILE T_LPAREN expr0 T_RPAREN T_SEMICOLON
-                                        { sc_finalize_do_while(st, $1, $5); }
+                                        { sc_finalize_do_while_pst(st, $5); }
             | for_head matched_stmt
                                         { sc_finalize_for(st, $1); }
             | func_head T_LBRACE stmt_list T_RBRACE
@@ -335,7 +327,10 @@ while_head  : T_WHILE T_LPAREN expr0 T_RPAREN opt_head_sep
                                           st->while_before_body = st->code->tail;
                                           $$ = $3; }
             ;
-do_head     : T_DO                  { $$ = sc_do_head_new(st); }
+do_head     : T_DO                  { char *lc = sc_label_new(st, "_Lcont");
+                                      char *le = sc_label_new(st, "_Lend");
+                                      sc_loop_push(st, lc, le, 1, 0);
+                                      st->do_before_body = st->code->tail; }
             ;
 do_body     : T_LBRACE stmt_list T_RBRACE
             | T_LBRACE T_RBRACE
@@ -700,15 +695,6 @@ static struct IfHead *sc_if_head_new(ScParseState *st, tree_t *cond) {
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static struct DoHead *sc_do_head_new(ScParseState *st) {
-    struct DoHead *h = calloc(1, sizeof *h);
-    h->before_body = st->code->tail;
-    h->lineno      = st->ctx ? st->ctx->line : 0;
-    h->cont_label  = sc_label_new(st, "_Lcont");
-    h->end_label   = sc_label_new(st, "_Lend");
-    sc_loop_push(st, strdup(h->cont_label), strdup(h->end_label), 1, 0);
-    return h;
-}
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static struct ForHead *sc_for_head_new(ScParseState *st, tree_t *cond, tree_t *step) {
     struct ForHead *h = calloc(1, sizeof *h);
@@ -979,27 +965,26 @@ static STMT_t *sc_make_cond_succ_stmt(ScParseState *st, tree_t *cond, char *succ
     return s;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void sc_finalize_do_while(ScParseState *st, struct DoHead *h, tree_t *cond) {
-    char   *Ltop      = sc_label_new(st, "_Ltop");
-    char   *Lcont     = h->cont_label;
-    char   *Lend      = h->end_label;
-    int     cont_used = st->loop_top ? st->loop_top->cont_used : 0;
-    STMT_t *top_pad   = sc_make_label_stmt(st, Ltop);
-    STMT_t *cond_stmt = sc_make_cond_succ_stmt(st, cond, strdup(Ltop), h->lineno);
-    STMT_t *end_pad   = sc_make_label_stmt(st, Lend);
-    sc_splice_after(st, h->before_body, top_pad, top_pad);
-    if (cont_used) {
-        STMT_t *cont_pad = sc_make_label_stmt(st, Lcont);
-        cont_pad->next  = cond_stmt;
-        cond_stmt->next = end_pad;
-        sc_append_chain(st, cont_pad, end_pad);
-    } else {
-        free(Lcont);
-        cond_stmt->next = end_pad;
-        sc_append_chain(st, cond_stmt, end_pad);
-    }
+/* PST-SC-4d (2026-05-16): pure-syntax do-while finalizer.
+ * Builds TT_DO_WHILE(TT_PROGRAM(body), cond, TT_QLIT(cont_lbl), TT_QLIT(end_lbl)).
+ * Body is child 0 (executed first); cond is child 1 (tested at loop bottom).
+ * Label QLITs in c[2]/c[3] let lower.c call labtab_define without emitting SM_LABEL.
+ * sc_loop_push was called in do_head; sc_loop_pop resolves break/continue here. */
+static void sc_finalize_do_while_pst(ScParseState *st, tree_t *cond)
+{
+    LoopFrame *lf     = st->loop_top;
+    char      *Lcont  = lf ? strdup(lf->cont_label) : sc_label_new(st, "_Lcont");
+    char      *Lend   = lf ? strdup(lf->end_label)  : sc_label_new(st, "_Lend");
+    tree_t    *body   = sc_collect_body(st, st->do_before_body);
+    tree_t    *qlit_c = ast_node_new(TT_QLIT); qlit_c->sval = Lcont;
+    tree_t    *qlit_e = ast_node_new(TT_QLIT); qlit_e->sval = Lend;
+    tree_t    *dw     = ast_node_new(TT_DO_WHILE);
+    ast_push(dw, body);
+    ast_push(dw, cond);
+    ast_push(dw, qlit_c);
+    ast_push(dw, qlit_e);
     sc_loop_pop(st);
-    free(h);
+    sc_append_stmt(st, dw);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void sc_finalize_for(ScParseState *st, struct ForHead *h) {

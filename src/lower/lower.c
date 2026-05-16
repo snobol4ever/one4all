@@ -745,6 +745,37 @@ static void lower_while(const tree_t *t) { lower_while_until(t, 0); }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_until(const tree_t *t) { lower_while_until(t, 1); }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PST-SC-4d (2026-05-16): lower TT_DO_WHILE(TT_PROGRAM(body), cond, QLIT(cont), QLIT(end)).
+ * Executes body first (stmt iteration), then tests cond — jumps back to top if true.
+ * cont label defined before cond test; end label defined at exit. */
+static void lower_do_while(const tree_t *t)
+{
+    LabelTable *tbl   = &g_labtab;
+    const char *lbl_cont = (t->n > 2 && t->c[2]) ? t->c[2]->v.sval : NULL;
+    const char *lbl_end  = (t->n > 3 && t->c[3]) ? t->c[3]->v.sval : NULL;
+    int top = g_p->count;
+    /* body */
+    const tree_t *body = (t->n > 0) ? t->c[0] : NULL;
+    if (body && body->t == TT_PROGRAM) {
+        for (int i = 0; i < body->n; i++)
+            if (body->c[i]) lower_stmt(body->c[i]);
+    } else if (body) {
+        lower_expr(body); sm_emit(g_p, SM_VOID_POP);
+    }
+    /* cont label goes here — before the cond test (continue target) */
+    if (lbl_cont && lbl_cont[0]) labtab_define(tbl, lbl_cont, g_p->count);
+    /* cond */
+    if (t->n > 1 && t->c[1]) {
+        lower_expr(t->c[1]);
+        int jback = sm_emit_i(g_p, SM_JUMP_S, 0);
+        sm_emit(g_p, SM_VOID_POP);    /* cond false path: fall through to exit */
+        sm_patch_jump(g_p, jback, top);
+    }
+    int exit_pos = g_p->count;
+    if (lbl_end && lbl_end[0]) labtab_define(tbl, lbl_end, exit_pos);
+    sm_emit(g_p, SM_PUSH_NULL);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_repeat(const tree_t *t)
 {
     int top = sm_label(g_p);
@@ -1202,6 +1233,7 @@ static void lower_expr_inner(const tree_t *t)
             lower_if(t);
         return;
     case TT_WHILE:                            lower_while(t);         return;
+    case TT_DO_WHILE:                         lower_do_while(t);      return;
     /* PST-SC-4b (2026-05-16): TT_PROGRAM used as a block body inside TT_IF then/else slots.
      * Lower each child statement for effect (VOID_POP after each), push null as block value. */
     case TT_PROGRAM: {
