@@ -118,13 +118,20 @@ function _str(v) {
     return String(v);  /* plain strings (including '1.0' quoted literals) unchanged */
 }
 
-/** Coerce to number; throws if not numeric */
+/** Coerce to number; returns NaN if not numeric (caller checks isFinite). */
 function _num(v) {
     if (v === null || v === undefined || v === '') return 0;
+    if (v === _FAIL) return NaN;
     if (_is_real(v)) return v.v;
     const n = Number(v);
-    if (!isFinite(n)) throw new Error('SNOBOL4 type error: not a number: ' + String(v));
     return n;
+}
+/* Return true if value can be coerced to a finite number. */
+function _num_ok(v) {
+    if (v === null || v === undefined || v === '') return true;
+    if (v === _FAIL) return false;
+    if (_is_real(v)) return isFinite(v.v);
+    return isFinite(Number(v));
 }
 
 /* Return true if value is an integer (not real) */
@@ -160,36 +167,41 @@ function _real_result(r) { return _mkreal(typeof r === 'number' ? r : Number(r))
 
 function _add(a, b) {
     if (a === _FAIL || b === _FAIL) return _FAIL;
+    if (!_num_ok(a) || !_num_ok(b)) return _FAIL;
     const an = _num(a), bn = _num(b);
     const r = an + bn;
     return (_is_int(a) && _is_int(b)) ? Math.trunc(r) : _real_result(r);
 }
 function _sub(a, b) {
     if (a === _FAIL || b === _FAIL) return _FAIL;
+    if (!_num_ok(a) || !_num_ok(b)) return _FAIL;
     const an = _num(a), bn = _num(b);
     const r = an - bn;
     return (_is_int(a) && _is_int(b)) ? Math.trunc(r) : _real_result(r);
 }
 function _mul(a, b) {
     if (a === _FAIL || b === _FAIL) return _FAIL;
+    if (!_num_ok(a) || !_num_ok(b)) return _FAIL;
     const an = _num(a), bn = _num(b);
     const r = an * bn;
     return (_is_int(a) && _is_int(b)) ? Math.trunc(r) : _real_result(r);
 }
 function _div(a, b) {
     if (a === _FAIL || b === _FAIL) return _FAIL;
+    if (!_num_ok(a) || !_num_ok(b)) return _FAIL;
     const an = _num(a), bn = _num(b);
-    if (bn === 0) throw new Error('SNOBOL4: division by zero');
+    if (bn === 0) return _FAIL;  /* SNOBOL4: division by zero fails, doesn't throw */
     if (_is_int(a) && _is_int(b)) return Math.trunc(an / bn);
     return _real_result(an / bn);
 }
 function _pow(a, b) {
     if (a === _FAIL || b === _FAIL) return _FAIL;
+    if (!_num_ok(a) || !_num_ok(b)) return _FAIL;
     const r = Math.pow(_num(a), _num(b));
     if (_is_int(a) && _is_int(b)) return r;  /* int ** int → int (may be non-integer JS num) */
     return _real_result(r);  /* real base or real exponent → real result */
 }
-function _uplus(a)  { return _num(a); }
+function _uplus(a)  { return _num_ok(a) ? _num(a) : _FAIL; }
 
 /* -----------------------------------------------------------------------
  * String concatenation (n-ary)
@@ -552,10 +564,14 @@ function arith(op) {
         case 'sub': r = _sub(a, b); break;
         case 'mul': r = _mul(a, b); break;
         case 'div': r = _div(a, b); break;
-        case 'mod': r = _num(a) % _num(b); break;
+        case 'mod':
+            if (a === _FAIL || b === _FAIL || !_num_ok(a) || !_num_ok(b)) { r = _FAIL; break; }
+            { const bn = _num(b); r = (bn === 0) ? _FAIL : (_num(a) % bn); }
+            break;
         default: throw new Error('SNOBOL4: unknown arith op: ' + op);
     }
     _stack.push(r);
+    _last_ok = (r !== _FAIL);
 }
 
 function acomp(op) {
