@@ -820,6 +820,103 @@ function MatchState(subject) {
 }
 
 /* -----------------------------------------------------------------------
+ * Pattern Execution Harness (SJ4-JS-BB1a)
+ *
+ * Byrd-box-driven pattern matching: factories return {α, β} ports.
+ * Reference: bb_boxes.js — inlined here for now.
+ * ----------------------------------------------------------------------- */
+
+/* Match state — module-level, shared across pattern operations */
+let _bb_Σ = '';   /* subject string */
+let _bb_Δ = 0;    /* cursor position */
+let _bb_Ω = 0;    /* subject length */
+let _bb_pending = [];  /* [{varname, value}] conditional captures */
+
+function bb_set_subject(subj) {
+    _bb_Σ = subj;
+    _bb_Δ = 0;
+    _bb_Ω = subj.length;
+}
+
+function bb_reset_captures() {
+    _bb_pending = [];
+}
+
+function bb_get_pending() {
+    return _bb_pending;
+}
+
+/**
+ * search_pattern(pat) — try to match pattern at every position.
+ * Returns {start, end} on match, null on failure.
+ * pat.α() mutates _bb_Δ internally.
+ */
+function search_pattern(pat) {
+    /* &ANCHOR = 1: match only at position 0 */
+    if (_kw_store.ANCHOR) {
+        _bb_Δ = 0;
+        const result = pat.α();
+        if (result !== null) {
+            return { start: 0, end: _bb_Δ };
+        }
+        return null;
+    }
+    
+    /* Otherwise: search from position 0 to len */
+    for (_bb_Δ = 0; _bb_Δ <= _bb_Ω; _bb_Δ++) {
+        const start = _bb_Δ;
+        const result = pat.α();
+        if (result !== null) {
+            return { start: start, end: _bb_Δ };
+        }
+    }
+    
+    return null;
+}
+
+/**
+ * exec_pattern_stmt — execute a pattern match ± replacement.
+ * Stack: [..., pattern_factory, subject, replacement]
+ */
+function exec_pattern_stmt(subj_name, has_repl) {
+    const replacement = has_repl ? _stack.pop() : 0;
+    const subject = _stack.pop();
+    const pat_factory = _stack.pop();
+    
+    if (!pat_factory || typeof pat_factory !== 'function') {
+        _last_ok = false;
+        return;
+    }
+    
+    const pat = pat_factory();
+    const subj = _str(subject);
+    
+    bb_set_subject(subj);
+    bb_reset_captures();
+    
+    const result = search_pattern(pat);
+    if (!result) {
+        _last_ok = false;
+        return;
+    }
+    
+    /* Commit captures */
+    const caps = bb_get_pending();
+    for (const cap of caps) {
+        _vars[cap.varname] = cap.value;
+    }
+    
+    /* Replacement */
+    if (has_repl && subj_name) {
+        const repl = _str(replacement);
+        const newsubj = subj.slice(0, result.start) + repl + subj.slice(result.end);
+        _vars[subj_name] = newsubj;
+    }
+    
+    _last_ok = true;
+}
+
+/* -----------------------------------------------------------------------
  * Exports
  * ----------------------------------------------------------------------- */
 
@@ -831,35 +928,427 @@ function _stub_not_implemented(name) {
     throw new Error(`SNOBOL4 pattern operation NOT IMPLEMENTED: ${name} (Byrd-box pattern factories not yet emitted by emit_js.c).`);
 }
 
-function pat_lit(s) { _stub_not_implemented('pat_lit'); }
-function pat_span() { _stub_not_implemented('pat_span'); }
-function pat_break() { _stub_not_implemented('pat_break'); }
-function pat_any() { _stub_not_implemented('pat_any'); }
-function pat_notany() { _stub_not_implemented('pat_notany'); }
-function pat_len() { _stub_not_implemented('pat_len'); }
-function pat_pos() { _stub_not_implemented('pat_pos'); }
-function pat_rpos() { _stub_not_implemented('pat_rpos'); }
-function pat_tab() { _stub_not_implemented('pat_tab'); }
-function pat_rtab() { _stub_not_implemented('pat_rtab'); }
-function pat_rem() { _stub_not_implemented('pat_rem'); }
-function pat_arb() { _stub_not_implemented('pat_arb'); }
-function pat_arbno() { _stub_not_implemented('pat_arbno'); }
-function pat_bal() { _stub_not_implemented('pat_bal'); }
-function pat_fail() { _stub_not_implemented('pat_fail'); }
-function pat_succeed() { _stub_not_implemented('pat_succeed'); }
+/* -----------------------------------------------------------------------
+ * Pattern Factory Builders (SJ4-JS-BB2a)
+ *
+ * Each pat_* function pops operands, builds a factory, pushes it on stack.
+ * Factory is a function returning {α, β} port pair.
+ * ----------------------------------------------------------------------- */
+
+/**
+ * bb_lit_factory(lit) — returns {α, β} port pair for literal matching.
+ * α: if Σ[Δ..Δ+len] == lit → advance Δ, return matched text; else null
+ * β: backtrack — decrement Δ, return null
+ */
+function bb_lit_factory(lit) {
+    const len = lit.length;
+    return {
+        α() {
+            if (_bb_Δ + len > _bb_Ω) return null;
+            if (_bb_Σ.slice(_bb_Δ, _bb_Δ + len) !== lit) return null;
+            const r = (len === 0) ? '' : _bb_Σ.slice(_bb_Δ, _bb_Δ + len);
+            _bb_Δ += len;
+            return r;
+        },
+        β() { _bb_Δ -= len; return null; }
+    };
+}
+
+/**
+ * bb_any_factory(chars) — match one char from charset.
+ */
+function bb_any_factory(chars) {
+    return {
+        α() {
+            if (_bb_Δ >= _bb_Ω || chars.indexOf(_bb_Σ[_bb_Δ]) < 0) return null;
+            const r = _bb_Σ[_bb_Δ];
+            _bb_Δ++;
+            return r;
+        },
+        β() { _bb_Δ--; return null; }
+    };
+}
+
+/**
+ * bb_notany_factory(chars) — match one char NOT in charset.
+ */
+function bb_notany_factory(chars) {
+    return {
+        α() {
+            if (_bb_Δ >= _bb_Ω || chars.indexOf(_bb_Σ[_bb_Δ]) >= 0) return null;
+            const r = _bb_Σ[_bb_Δ];
+            _bb_Δ++;
+            return r;
+        },
+        β() { _bb_Δ--; return null; }
+    };
+}
+
+/**
+ * bb_span_factory(chars) — match zero or more chars from charset (greedy).
+ */
+function bb_span_factory(chars) {
+    return {
+        α() {
+            const start = _bb_Δ;
+            while (_bb_Δ < _bb_Ω && chars.indexOf(_bb_Σ[_bb_Δ]) >= 0) {
+                _bb_Δ++;
+            }
+            return (_bb_Δ === start) ? '' : _bb_Σ.slice(start, _bb_Δ);
+        },
+        β() { return null; }
+    };
+}
+
+/**
+ * bb_break_factory(chars) — match until char from charset found.
+ */
+function bb_break_factory(chars) {
+    return {
+        α() {
+            const start = _bb_Δ;
+            while (_bb_Δ < _bb_Ω && chars.indexOf(_bb_Σ[_bb_Δ]) < 0) {
+                _bb_Δ++;
+            }
+            return (_bb_Δ === start) ? '' : _bb_Σ.slice(start, _bb_Δ);
+        },
+        β() { return null; }
+    };
+}
+
+/**
+ * bb_len_factory(n) — match exactly n chars.
+ */
+function bb_len_factory(n) {
+    return {
+        α() {
+            if (_bb_Δ + n > _bb_Ω) return null;
+            const r = (n === 0) ? '' : _bb_Σ.slice(_bb_Δ, _bb_Δ + n);
+            _bb_Δ += n;
+            return r;
+        },
+        β() { _bb_Δ -= n; return null; }
+    };
+}
+
+/**
+ * bb_pos_factory(n) — match if cursor is at position n, zero-width.
+ */
+function bb_pos_factory(n) {
+    return {
+        α() {
+            if (_bb_Δ !== n) return null;
+            return '';  /* zero-width match */
+        },
+        β() { return null; }
+    };
+}
+
+/**
+ * bb_rpos_factory(n) — match if cursor is n chars from end, zero-width.
+ */
+function bb_rpos_factory(n) {
+    return {
+        α() {
+            if (_bb_Δ !== _bb_Ω - n) return null;
+            return '';
+        },
+        β() { return null; }
+    };
+}
+
+/**
+ * bb_tab_factory(n) — match from current pos to position n.
+ */
+function bb_tab_factory(n) {
+    return {
+        α() {
+            if (n < _bb_Δ || n > _bb_Ω) return null;
+            const len = n - _bb_Δ;
+            const r = (len === 0) ? '' : _bb_Σ.slice(_bb_Δ, n);
+            _bb_Δ = n;
+            return r;
+        },
+        β() { return null; }
+    };
+}
+
+/**
+ * bb_rtab_factory(n) — match from current pos to n chars from end.
+ */
+function bb_rtab_factory(n) {
+    return {
+        α() {
+            const target = _bb_Ω - n;
+            if (target < _bb_Δ || target > _bb_Ω) return null;
+            const len = target - _bb_Δ;
+            const r = (len === 0) ? '' : _bb_Σ.slice(_bb_Δ, target);
+            _bb_Δ = target;
+            return r;
+        },
+        β() { return null; }
+    };
+}
+
+/**
+ * bb_rem_factory() — match rest of string (REM).
+ */
+function bb_rem_factory() {
+    return {
+        α() {
+            const start = _bb_Δ;
+            const r = _bb_Σ.slice(start);
+            _bb_Δ = _bb_Ω;
+            return r;
+        },
+        β() { return null; }
+    };
+}
+
+/**
+ * bb_seq_factory(left_factory, right_factory) — concatenation.
+ * Try left; if succeeds, try right starting at new cursor.
+ */
+function bb_seq_factory(left_factory, right_factory) {
+    return {
+        α() {
+            const left = left_factory();
+            const lr = left.α();
+            if (lr === null) return null;  /* left failed */
+            
+            const right = right_factory();
+            const rr = right.α();
+            if (rr === null) {
+                left.β();  /* backtrack left */
+                return null;
+            }
+            
+            return lr + rr;  /* concatenate matches */
+        },
+        β() { return null; }
+    };
+}
+
+/**
+ * bb_alt_factory(children) — alternation (choice).
+ * Try each child in order; backtrack on failure.
+ */
+function bb_alt_factory(children) {
+    let choice_idx = 0;
+    const children_list = Array.isArray(children) ? children : [children];
+    
+    return {
+        α() {
+            for (choice_idx = 0; choice_idx < children_list.length; choice_idx++) {
+                const child = children_list[choice_idx]();
+                const r = child.α();
+                if (r !== null) return r;
+            }
+            return null;
+        },
+        β() {
+            if (choice_idx > 0) choice_idx--;
+            return null;
+        }
+    };
+}
+
+/**
+ * bb_arb_factory() — match zero or more of anything (arbitrary).
+ */
+function bb_arb_factory() {
+    return {
+        α() {
+            /* Greedy: try to match as much as possible */
+            const start = _bb_Δ;
+            _bb_Δ = _bb_Ω;
+            return _bb_Σ.slice(start);
+        },
+        β() {
+            /* Backtrack one char on β */
+            if (_bb_Δ > 0) _bb_Δ--;
+            return null;
+        }
+    };
+}
+
+/**
+ * bb_arbno_factory(body_factory) — zero or more repetitions of body.
+ */
+function bb_arbno_factory(body_factory) {
+    return {
+        α() {
+            let result = '';
+            while (true) {
+                const body = body_factory();
+                const br = body.α();
+                if (br === null) break;
+                result += br;
+            }
+            return result;
+        },
+        β() { return null; }
+    };
+}
+
+/**
+ * bb_fail_factory() — always fails.
+ */
+function bb_fail_factory() {
+    return {
+        α() { return null; },
+        β() { return null; }
+    };
+}
+
+/**
+ * bb_succeed_factory() — always succeeds, zero-width.
+ */
+function bb_succeed_factory() {
+    return {
+        α() { return ''; },
+        β() { return null; }
+    };
+}
+
+/* -----------------------------------------------------------------------
+ * Stack-Machine Pattern Operations (SJ4-JS-BB2)
+ *
+ * Each SM_PAT_* opcode handler:
+ * - Pops operands from _stack (if needed)
+ * - Creates a factory function
+ * - Pushes factory back onto _stack
+ * ----------------------------------------------------------------------- */
+
+function pat_lit(s) {
+    _stack.push(function() { return bb_lit_factory(s); });
+}
+
+function pat_span() {
+    const chars = _str(_stack.pop());
+    _stack.push(function() { return bb_span_factory(chars); });
+}
+
+function pat_break() {
+    const chars = _str(_stack.pop());
+    _stack.push(function() { return bb_break_factory(chars); });
+}
+
+function pat_any() {
+    const chars = _str(_stack.pop());
+    _stack.push(function() { return bb_any_factory(chars); });
+}
+
+function pat_notany() {
+    const chars = _str(_stack.pop());
+    _stack.push(function() { return bb_notany_factory(chars); });
+}
+
+function pat_len() {
+    const n = _num(_stack.pop());
+    _stack.push(function() { return bb_len_factory(n); });
+}
+
+function pat_pos() {
+    const n = _num(_stack.pop());
+    _stack.push(function() { return bb_pos_factory(n); });
+}
+
+function pat_rpos() {
+    const n = _num(_stack.pop());
+    _stack.push(function() { return bb_rpos_factory(n); });
+}
+
+function pat_tab() {
+    const n = _num(_stack.pop());
+    _stack.push(function() { return bb_tab_factory(n); });
+}
+
+function pat_rtab() {
+    const n = _num(_stack.pop());
+    _stack.push(function() { return bb_rtab_factory(n); });
+}
+
+function pat_rem() {
+    _stack.push(function() { return bb_rem_factory(); });
+}
+
+function pat_arb() {
+    _stack.push(function() { return bb_arb_factory(); });
+}
+
+function pat_arbno() {
+    const body = _stack.pop();
+    _stack.push(function() { return bb_arbno_factory(body); });
+}
+
+function pat_cat() {
+    const right = _stack.pop();
+    const left = _stack.pop();
+    _stack.push(function() { return bb_seq_factory(left, right); });
+}
+
+function pat_alt() {
+    const right = _stack.pop();
+    const left = _stack.pop();
+    _stack.push(function() { return bb_alt_factory([left, right]); });
+}
+
+function pat_fail() {
+    _stack.push(function() { return bb_fail_factory(); });
+}
+
+function pat_succeed() {
+    _stack.push(function() { return bb_succeed_factory(); });
+}
+
+/* Stubs for unimplemented pattern ops */
 function pat_abort() { _stub_not_implemented('pat_abort'); }
 function pat_fence() { _stub_not_implemented('pat_fence'); }
-function pat_eps() { _stub_not_implemented('pat_eps'); }
-function pat_cat() { _stub_not_implemented('pat_cat'); }
-function pat_alt() { _stub_not_implemented('pat_alt'); }
+function pat_eps() { _stack.push(function() { return bb_succeed_factory(); }); }  /* epsilon = empty match */
+function pat_bal() { _stub_not_implemented('pat_bal'); }
 function pat_deref() { _stub_not_implemented('pat_deref'); }
 function pat_refname(name) { _stub_not_implemented('pat_refname'); }
-function pat_capture(vname, kind) { _stub_not_implemented('pat_capture'); }
+/**
+ * bb_capture_factory(child_factory, varname, immediate) — wrap pattern with capture.
+ * child_factory is a function that returns {α, β} when called.
+ */
+function bb_capture_factory(child_factory, varname, immediate) {
+    return {
+        α() {
+            const child = child_factory();  /* instantiate child to get {α, β} */
+            const cr = child.α();
+            if (cr === null) return null;
+            
+            if (immediate) {
+                _vars[varname] = cr;
+            } else {
+                _bb_pending.push({ varname, value: cr });
+            }
+            
+            return cr;
+        },
+        β() {
+            const child = child_factory();
+            return child.β();
+        }
+    };
+}
+
+function pat_capture(vname, kind) {
+    const child = _stack.pop();
+    /* kind: 0 = conditional (.), 1 = immediate ($) */
+    _stack.push(function() {
+        return bb_capture_factory(child, vname, kind === 1);
+    });
+}
 function pat_capture_fn(fname, kind, namelist) { _stub_not_implemented('pat_capture_fn'); }
 function pat_capture_fn_args(fname, kind, nargs) { _stub_not_implemented('pat_capture_fn_args'); }
 function pat_usercall(fname) { _stub_not_implemented('pat_usercall'); }
 function pat_usercall_args(fname, nargs) { _stub_not_implemented('pat_usercall_args'); }
-function exec_stmt(subj_name, has_repl) { _stub_not_implemented('exec_stmt'); }
+function exec_stmt(subj_name, has_repl) {
+    exec_pattern_stmt(subj_name, has_repl);
+}
 
 function _peek() { throw new Error('_peek deleted'); }
 
@@ -876,6 +1365,8 @@ module.exports = {
     halt_tos, call, do_return,
     /* User-fn dispatch (SJ4-JS-4c) */
     _register_label_pcs, call_or_jump, fn_return,
+    /* Pattern execution (SJ4-JS-BB1a) */
+    exec_pattern_stmt, search_pattern,
     /* SM-level pattern stack ops — STUBS ONLY (see SJ4-JS-BB1 for real impl) */
     pat_lit, pat_span, pat_break, pat_any, pat_notany,
     pat_len, pat_pos, pat_rpos, pat_tab, pat_rtab,
