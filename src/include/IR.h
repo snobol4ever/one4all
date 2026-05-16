@@ -46,6 +46,8 @@ typedef enum {
     IR_UNTIL,
     IR_REPEAT,
     IR_ALT,
+    IR_SIZE,
+    IR_CASE,
     IR_LIMIT,
     IR_SUSPEND,
     IR_PROC,

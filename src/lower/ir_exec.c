@@ -26,6 +26,8 @@ extern void bb_exec_stmt(void *e);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t icn_binop_apply(IcnBinopKind op, DESCR_t lv, DESCR_t rv, int *rel_fail);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static DESCR_t g_ir_return_val;
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t IR_exec_once(IR_block_t * cfg);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 IR_t * IR_exec_node(IR_t * nd) {
@@ -107,6 +109,7 @@ IR_t * IR_exec_node(IR_t * nd) {
                 _f->env[_k] = args[_k];
             IR_reset(proc_table[_pi].ir_body);
             out = IR_exec_once(proc_table[_pi].ir_body);
+            if (frame_depth > 0 && FRAME.returning) { out = g_ir_return_val; FRAME.returning = 0; }
             frame_depth--;
             nd->value = out;
             return IS_FAIL_fn(out) ? nd->ω : nd->γ;
@@ -120,6 +123,7 @@ IR_t * IR_exec_node(IR_t * nd) {
         for (int j = 0; j < nd->n; j++) {
             if (!nd->c[j]) continue;
             IR_exec_node(nd->c[j]);
+            if (frame_depth > 0 && FRAME.returning) break;
         }
         nd->value = FAILDESCR;
         return nd->ω;
@@ -149,6 +153,15 @@ IR_t * IR_exec_node(IR_t * nd) {
     case IR_SUCCEED:
         nd->value = NULVCL;
         return nd->γ;
+    case IR_RETURN: {
+        /* Icon return [E]. Set return value; signal early exit via FRAME.returning.                 */
+        DESCR_t rv = NULVCL;
+        if (nd->n >= 1 && nd->c[0]) { IR_exec_node(nd->c[0]); rv = nd->c[0]->value; }
+        g_ir_return_val = IS_FAIL_fn(rv) ? NULVCL : rv;
+        if (frame_depth > 0) FRAME.returning = 1;
+        nd->value = g_ir_return_val;
+        return nd->ω;
+    }
     case IR_FAIL:
         nd->value = FAILDESCR;
         return nd->ω;
@@ -341,6 +354,57 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->c[0]->state = 0;
         IR_exec_node(nd->c[0]);
         if (IS_FAIL_fn(nd->c[0]->value)) { nd->value = NULVCL; return nd->γ; }
+        nd->value = FAILDESCR;
+        return nd->ω;
+    }
+    case IR_SIZE: {
+        /* Icon *E — size of string/list/table. One child c[0]=E. Returns integer length.       */
+        if (nd->n < 1 || !nd->c[0]) { nd->value = INTVAL(0); return nd->γ; }
+        IR_exec_node(nd->c[0]);
+        DESCR_t v = nd->c[0]->value;
+        if (IS_FAIL_fn(v)) { nd->value = FAILDESCR; return nd->ω; }
+        if (IS_INT_fn(v) || IS_REAL_fn(v)) { nd->value = INTVAL(0); return nd->γ; }
+        const char *s = VARVAL_fn(v);
+        long len = s ? (long)strlen(s) : 0;
+        nd->value = INTVAL(len);
+        return nd->γ;
+    }
+    case IR_CASE: {
+        /* Icon case E of { K1: V1; K2: V2; ...; default: VD }.                                  */
+        /* c[0]=selector; c[1],c[2]=key1,val1; c[3],c[4]=key2,val2; ... last child=default.      */
+        /* Selector compared with keys using string equality (Icon case uses === then string eq). */
+        if (nd->n < 1 || !nd->c[0]) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[0]);
+        DESCR_t sel = nd->c[0]->value;
+        if (IS_FAIL_fn(sel)) { nd->value = FAILDESCR; return nd->ω; }
+        /* Determine if last child is a default (odd number of children after selector). */
+        int npairs = (nd->n - 1) / 2;
+        int has_default = ((nd->n - 1) % 2 == 1);
+        for (int i = 0; i < npairs; i++) {
+            IR_t *key_nd = nd->c[1 + i * 2];
+            IR_t *val_nd = nd->c[2 + i * 2];
+            if (!key_nd || !val_nd) continue;
+            IR_exec_node(key_nd);
+            DESCR_t kv = key_nd->value;
+            /* Compare selector to key: numeric equality first, then string. */
+            int match = 0;
+            if (IS_INT_fn(sel) && IS_INT_fn(kv)) match = (sel.i == kv.i);
+            else {
+                const char *ss = VARVAL_fn(sel); if (!ss) ss = "";
+                const char *ks = VARVAL_fn(kv);  if (!ks) ks = "";
+                match = (strcmp(ss, ks) == 0);
+            }
+            if (match) {
+                IR_exec_node(val_nd);
+                nd->value = val_nd->value;
+                return IS_FAIL_fn(nd->value) ? nd->ω : nd->γ;
+            }
+        }
+        if (has_default && nd->c[nd->n - 1]) {
+            IR_exec_node(nd->c[nd->n - 1]);
+            nd->value = nd->c[nd->n - 1]->value;
+            return IS_FAIL_fn(nd->value) ? nd->ω : nd->γ;
+        }
         nd->value = FAILDESCR;
         return nd->ω;
     }

@@ -193,6 +193,26 @@ DESCR_t icn_binop_apply(IcnBinopKind op, DESCR_t lv, DESCR_t rv, int *rel_fail) 
             memcpy(buf, ls, ll); memcpy(buf + ll, rs, rl); buf[ll + rl] = '\0';
             { DESCR_t r2; r2.v = DT_S; r2.slen = (int)(ll + rl); r2.s = buf; return r2; }
         }
+        case ICN_BINOP_SLT: case ICN_BINOP_SLE: case ICN_BINOP_SGT:
+        case ICN_BINOP_SGE: case ICN_BINOP_SEQ: case ICN_BINOP_SNE: {
+            DESCR_t ls_d = descr_to_str_icn(lv);
+            DESCR_t rs_d = descr_to_str_icn(rv);
+            const char *ls = (!IS_FAIL_fn(ls_d) && ls_d.s) ? ls_d.s : "";
+            const char *rs = (!IS_FAIL_fn(rs_d) && rs_d.s) ? rs_d.s : "";
+            int cmp = strcmp(ls, rs);
+            int ok;
+            switch (op) {
+            case ICN_BINOP_SLT: ok = (cmp <  0); break;
+            case ICN_BINOP_SLE: ok = (cmp <= 0); break;
+            case ICN_BINOP_SGT: ok = (cmp >  0); break;
+            case ICN_BINOP_SGE: ok = (cmp >= 0); break;
+            case ICN_BINOP_SEQ: ok = (cmp == 0); break;
+            case ICN_BINOP_SNE: ok = (cmp != 0); break;
+            default:            ok = 0;           break;
+            }
+            *rel_fail = !ok;
+            return ok ? rv : FAILDESCR;
+        }
         default: return FAILDESCR;
     }
 }
@@ -432,6 +452,90 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         /* Emit IR_SUCCEED which returns NULVCL via nd->γ.                                                                                                                                                    */
         IR_t *nd = IR_node_alloc(cfg, IR_SUCCEED);
         if (!nd) return NULL;
+        return nd;
+    }
+    case TT_RETURN: {
+        /* Icon return [E]. One optional child c[0]=return expression.                               */
+        IR_t *nd = IR_node_alloc(cfg, IR_RETURN);
+        if (!nd) return NULL;
+        if (e->n >= 1 && e->c[0]) {
+            IR_t *retval = lower_icn_expr_node(cfg, e->c[0]);
+            if (!retval) return NULL;
+            nd->c = calloc(1, sizeof(IR_t *));
+            if (!nd->c) return NULL;
+            nd->c[0] = retval;
+            nd->n = 1;
+        }
+        return nd;
+    }
+    case TT_SEQ: {
+        /* Icon E1 & E2 conjunction. Both must succeed; if E1 fails whole expr fails; returns E2.   */
+        /* Lower as IR_IF(cond=E1, then=E2): succeeds with E2's value only when E1 succeeds.        */
+        if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
+        IR_t *e1 = lower_icn_expr_node(cfg, e->c[0]);
+        if (!e1) return NULL;
+        IR_t *e2 = lower_icn_expr_node(cfg, e->c[1]);
+        if (!e2) return NULL;
+        IR_t *nd = IR_node_alloc(cfg, IR_IF);
+        if (!nd) return NULL;
+        nd->c = calloc(2, sizeof(IR_t *));
+        if (!nd->c) return NULL;
+        nd->c[0] = e1; nd->c[1] = e2; nd->n = 2;
+        return nd;
+    }
+    case TT_SIZE: {
+        /* Icon *E — string/list/table size. One child: the expression.                              */
+        if (e->n < 1 || !e->c[0]) return NULL;
+        IR_t *inner = lower_icn_expr_node(cfg, e->c[0]);
+        if (!inner) return NULL;
+        IR_t *nd = IR_node_alloc(cfg, IR_SIZE);
+        if (!nd) return NULL;
+        nd->c = calloc(1, sizeof(IR_t *));
+        if (!nd->c) return NULL;
+        nd->c[0] = inner;
+        nd->n = 1;
+        return nd;
+    }
+    case TT_CASE: {
+        /* Icon case E of { K1: V1; ...; default: VD }. c[0]=sel, then key/val pairs, opt default. */
+        if (e->n < 1 || !e->c[0]) return NULL;
+        IR_t **children = calloc((size_t)e->n, sizeof(IR_t *));
+        if (!children) return NULL;
+        for (int j = 0; j < e->n; j++) {
+            if (!e->c[j]) { free(children); return NULL; }
+            children[j] = lower_icn_expr_node(cfg, e->c[j]);
+            if (!children[j]) { free(children); return NULL; }
+        }
+        IR_t *nd = IR_node_alloc(cfg, IR_CASE);
+        if (!nd) { free(children); return NULL; }
+        nd->c = children;
+        nd->n = e->n;
+        return nd;
+    }
+    case TT_LLT: case TT_LLE: case TT_LGT: case TT_LGE: case TT_LEQ: case TT_LNE: {
+        /* Icon string relational operators: <<  <<=  >>  >>=  ==  ~=                               */
+        if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
+        IR_t *lhs = lower_icn_expr_node(cfg, e->c[0]);
+        if (!lhs) return NULL;
+        IR_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
+        if (!rhs) return NULL;
+        IR_t *nd = IR_node_alloc(cfg, IR_BINOP);
+        if (!nd) return NULL;
+        nd->c = calloc(2, sizeof(IR_t *));
+        if (!nd->c) return NULL;
+        nd->c[0] = lhs; nd->c[1] = rhs; nd->n = 2;
+        IcnBinopKind op;
+        switch (e->t) {
+        case TT_LLT: op = ICN_BINOP_SLT; break;
+        case TT_LLE: op = ICN_BINOP_SLE; break;
+        case TT_LGT: op = ICN_BINOP_SGT; break;
+        case TT_LGE: op = ICN_BINOP_SGE; break;
+        case TT_LEQ: op = ICN_BINOP_SEQ; break;
+        case TT_LNE: op = ICN_BINOP_SNE; break;
+        default:     op = ICN_BINOP_SEQ; break;
+        }
+        nd->ival  = (int64_t)op;
+        nd->ival2 = 1;
         return nd;
     }
     case TT_NOT: {
