@@ -1011,6 +1011,28 @@ void lower_stmt(const tree_t *s)
         }
         goto emit_gotos;
     }
+    /* PST-SN4-1b (2026-05-16): subject/pattern split moved from sno4_stmt_commit_go.
+     * Parser now emits TT_SCAN(subj,pat) and TT_SEQ(subj,pat,...) as pure syntax;
+     * lower is responsible for splitting them into separate subject/pattern slots. */
+    if (!pattern && subject && subject->t == TT_SCAN && subject->n == 2) {
+        pattern = subject->c[1];
+        subject = subject->c[0];
+    }
+    if (!pattern && subject && subject->t == TT_SEQ && subject->n >= 2) {
+        tree_t *first = subject->c[0];
+        if (first->t == TT_VAR || first->t == TT_KEYWORD || first->t == TT_QLIT || first->t == TT_INDIRECT) {
+            int nc = subject->n - 1;
+            tree_t *rest;
+            if (nc == 1) {
+                rest = subject->c[1];
+            } else {
+                rest = ast_node_new(TT_SEQ);
+                for (int i = 1; i < subject->n; i++) expr_add_child(rest, subject->c[i]);
+            }
+            pattern = rest;
+            subject = first;
+        }
+    }
     if (pattern) {
         lower_pat_expr(pattern);
         if (subject) lower_expr(subject); else sm_emit(g_p, SM_PUSH_NULL);

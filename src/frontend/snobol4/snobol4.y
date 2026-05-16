@@ -224,26 +224,8 @@ static void sno4_stmt_commit_go(void *param,Token lbl,tree_t *subj,tree_t *pat,i
     s->lineno = lbl.lineno ? lbl.lineno : snobol4_get_stmt_lineno();
     s->stno = ++pp->prog->nstmts;
     if(lbl.sval){s->label=strdup(lbl.sval);s->is_end=lbl.ival||(strcmp(lbl.sval,"END")==0);}
-    if(!pat && subj && subj->t==TT_SCAN && subj->n==2) {
-        tree_t *orig = subj;
-        subj = orig->c[0];
-        pat  = orig->c[1];
-    }
-    if(!pat && subj && (subj->t==TT_SEQ) && subj->n>=2) {
-        tree_t *first = subj->c[0];
-        if(first->t==TT_VAR || first->t==TT_KEYWORD || first->t==TT_QLIT || first->t==TT_INDIRECT) {
-            int nc = subj->n - 1;
-            tree_t *rest;
-            if(nc == 1) {
-                rest = subj->c[1];
-            } else {
-                rest = ast_node_new(TT_SEQ);
-                for(int i=1;i<subj->n;i++) expr_add_child(rest,subj->c[i]);
-            }
-            subj = first;
-            pat  = rest;
-        }
-    }
+    /* PST-SN4-1b (2026-05-16): TT_SCAN-unpacking and TT_SEQ-splitting removed.
+     * Parser emits pure syntax tree; lower.c performs the split. */
     s->subject=subj; s->pattern=pat;
     if(s->subject) fixup_val(s->subject);
     if(has_eq){s->has_eq=1;s->replacement=repl;if(repl&&!is_pat(repl))fixup_val(repl);}
