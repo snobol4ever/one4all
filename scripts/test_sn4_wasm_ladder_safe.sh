@@ -42,8 +42,15 @@ if [ -f "$WASM_BB_WAT" ] && { [ ! -f "$WASM_BB_WASM" ] || [ "$WASM_BB_WAT" -nt "
     wat2wasm "$WASM_BB_WAT" -o "$WASM_BB_WASM" 2>/dev/null || true
 fi
 
-PASS=0; FAIL=0
+PASS=0; FAIL=0; SKIP=0
 TMPD=$(mktemp -d); trap "rm -rf $TMPD" EXIT
+
+# Skip list — programs that segfault in the scrip frontend (not WASM-specific).
+# scanerr.sno: SIGSEGV in lower.c:304 (emit_pat_capture) on deferred-expr capture
+# *TAB(X) / *ANY(X) / *LEN(X) — var_node->v.sval is 0x1 (uninit) for the unary-*
+# operand.  Crashes on ALL targets and on --sm-run / --ir-run (frontend bug).
+# To be fixed in a separate upstream session; tracked in PLAN.md.
+SKIP_LIST=" scanerr "
 
 run_one() {
     local sno="$1"
@@ -52,6 +59,11 @@ run_one() {
     local dir;  dir=$(dirname "$sno")
     local ref="$dir/$base.ref"
     [ -f "$ref" ] || return 0
+    case " $SKIP_LIST " in
+        *" $base "*)
+            [[ "$VERBOSE" == "--verbose" ]] && echo "SKIP $base [upstream frontend bug]"
+            SKIP=$((SKIP+1)); return 0 ;;
+    esac
     local wat="$TMPD/$base.wat"
     local wasm="$TMPD/$base.wasm"
     local out="$TMPD/$base.out"
@@ -86,6 +98,6 @@ for sno in "$CORPUS/programs/csnobol4-suite/"*.sno; do run_one "$sno"; done
 for sno in "$CORPUS/programs/snobol4/demo/"*.sno; do run_one "$sno"; done
 for sno in "$CORPUS/programs/snobol4/feat/"*.sno; do run_one "$sno"; done
 
-TOTAL=$((PASS+FAIL))
-echo "PASS=$PASS FAIL=$FAIL TOTAL=$TOTAL"
+TOTAL=$((PASS+FAIL+SKIP))
+echo "PASS=$PASS FAIL=$FAIL SKIP=$SKIP TOTAL=$TOTAL"
 [ "$PASS" -ge "$MIN_PASS" ] && exit 0 || exit 1

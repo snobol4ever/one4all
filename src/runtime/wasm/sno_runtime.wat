@@ -50,6 +50,33 @@
   (data (i32.const 0x3110f) "LE")
   (data (i32.const 0x31112) "IDENT")
   (data (i32.const 0x31118) "DIFFER")
+  ;; 1-arg builtins
+  (data (i32.const 0x31130) "SIZE")
+  (data (i32.const 0x31135) "INTEGER")
+  (data (i32.const 0x3113d) "STRING")
+  (data (i32.const 0x31144) "TRIM")
+  (data (i32.const 0x31149) "REVERSE")
+  (data (i32.const 0x31151) "DATATYPE")
+  (data (i32.const 0x3115a) "CHAR")
+  (data (i32.const 0x3115f) "ORD")
+  (data (i32.const 0x31163) "CONVERT")
+  ;; 2-arg builtins (in addition to LT/GT/EQ/NE/GE/LE/IDENT/DIFFER above)
+  (data (i32.const 0x3116b) "DUPL")
+  (data (i32.const 0x31170) "REPLACE")
+  (data (i32.const 0x31178) "REMDR")
+  ;; 3-arg builtins
+  (data (i32.const 0x3117e) "SUBSTR")
+  ;; keyword names (without leading &) at known addresses for $sno_push_var fast-path
+  (data (i32.const 0x31200) "MAXINT")
+  (data (i32.const 0x31208) "STCOUNT")
+  (data (i32.const 0x31210) "STLIMIT")
+  (data (i32.const 0x31218) "MAXLNGTH")
+  (data (i32.const 0x31220) "TRIM")
+  (data (i32.const 0x31228) "ERRLIMIT")
+  (data (i32.const 0x31230) "ALPHABET")
+  (data (i32.const 0x31238) "DIGITS")
+  (data (i32.const 0x31240) "UCASE")
+  (data (i32.const 0x31248) "LCASE")
 
   ;; ── memory helpers ───────────────────────────────────────────────────────
   (func $memcpy (param $dst i32) (param $src i32) (param $len i32)
@@ -251,6 +278,24 @@
 
   (func $sno_push_var (export "sno_push_var") (param $name_ptr i32) (param $name_len i32)
     (local $saddr i32) (local $snl i32) (local $tag i32) (local $ival i32) (local $len i32)
+    ;; Keyword fast-path: known &KW names push their well-known values directly.
+    ;; (The emitter doesn't strip the leading &; it passes the name unchanged.  But
+    ;; the lowering convention is that the SM only ever stores into the keyword
+    ;; namespace via &KW assignments, so a plain push_var "MAXINT" comes ONLY from
+    ;; &MAXINT.  This won't conflict with a user var named MAXINT in normal code.)
+    (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31200) (i32.const 6))
+      (then (call $push3 (global.get $TAG_INT) (i32.const 2147483647) (i32.const 0)) (return)))
+    (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31218) (i32.const 8))
+      (then (call $push3 (global.get $TAG_INT) (i32.const 5000) (i32.const 0)) (return)))
+    ;; STCOUNT, STLIMIT, ERRLIMIT, TRIM: defaults of 0/-1/0/0; emit as int 0/-1
+    (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31208) (i32.const 7))
+      (then (call $push3 (global.get $TAG_INT) (global.get $stno) (i32.const 0)) (return)))
+    (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31210) (i32.const 7))
+      (then (call $push3 (global.get $TAG_INT) (i32.const -1) (i32.const 0)) (return)))
+    (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31228) (i32.const 8))
+      (then (call $push3 (global.get $TAG_INT) (i32.const 0) (i32.const 0)) (return)))
+    (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31220) (i32.const 4))
+      (then (call $push3 (global.get $TAG_INT) (i32.const 0) (i32.const 0)) (return)))
     (local.set $saddr (call $var_slot_addr (local.get $name_ptr) (local.get $name_len)))
     (local.set $snl (i32.load (i32.add (local.get $saddr) (i32.const 4))))
     (if (i32.eqz (local.get $snl))
@@ -463,16 +508,12 @@
   (func $sno_set_stno    (export "sno_set_stno") (param $v i32) (global.set $stno (local.get $v)))
 
   (func $sno_halt_tos (export "sno_halt_tos")
-    (local $tag i32) (local $p i32) (local $l i32)
-    (if (i32.le_s (global.get $sp) (i32.const 0)) (then (return)))
-    (local.set $tag (call $peek_tag))
-    (if (i32.eq (local.get $tag) (global.get $TAG_FAIL)) (then (return)))
-    (if (i32.eq (local.get $tag) (global.get $TAG_NULL)) (then (return)))
-    (call $tos_to_str)
-    (local.set $l)
-    (local.set $p)
-    (call $host_write_line (local.get $p) (local.get $l))
-    (global.set $sp (i32.sub (global.get $sp) (i32.const 16)))
+    ;; SNOBOL4 halt: do nothing.  Earlier draft printed the TOS for smoke-test
+    ;; debugging, but real SNOBOL4 halt is silent.  Programs that need to print
+    ;; do so explicitly via OUTPUT = ... .  Printing here causes spurious lines
+    ;; like "0" or "" to appear after pattern-match statements whose result is
+    ;; left on the stack by the (still-stubbed) SM_PAT_* / SM_EXEC_GEN opcodes.
+    (return)
   )
 
   ;; sno_call: dispatch by builtin name; for now handle the numeric comparators
@@ -551,6 +592,165 @@
                 (call $push3 (global.get $TAG_NULL) (i32.const 0) (i32.const 0))
                 (global.set $last_ok (i32.const 0))))
             (return)))))
+    ;; ---- 1-arg builtins ----
+    ;; If exactly 1 arg, peek it.
+    (if (i32.eq (local.get $nargs) (i32.const 1))
+      (then
+        (local.set $a_off (i32.sub (global.get $sp) (i32.const 16)))
+        (local.set $a_tag  (i32.load (local.get $a_off)))
+        (local.set $a_ival (i32.load (i32.add (local.get $a_off) (i32.const 4))))
+        (local.set $a_len  (i32.load (i32.add (local.get $a_off) (i32.const 8))))
+        ;; SIZE(s): if string, len; if int, length of decimal representation.
+        (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31130) (i32.const 4))
+          (then
+            (local.set $matched (i32.const 1))
+            (global.set $sp (i32.sub (global.get $sp) (i32.const 16)))
+            (if (i32.eq (local.get $a_tag) (global.get $TAG_STR))
+              (then (call $push3 (global.get $TAG_INT) (local.get $a_len) (i32.const 0)))
+              (else
+                (if (i32.eq (local.get $a_tag) (global.get $TAG_INT))
+                  (then
+                    ;; Count digits of |ival|; if negative add 1 for '-'.
+                    (local.set $b_ival (local.get $a_ival))
+                    (local.set $i (i32.const 0))
+                    (if (i32.lt_s (local.get $b_ival) (i32.const 0))
+                      (then (local.set $b_ival (i32.sub (i32.const 0) (local.get $b_ival)))
+                            (local.set $i (i32.const 1))))
+                    (if (i32.eqz (local.get $b_ival))
+                      (then (local.set $i (i32.add (local.get $i) (i32.const 1)))))
+                    (block $B (loop $L
+                      (br_if $B (i32.eqz (local.get $b_ival)))
+                      (local.set $i (i32.add (local.get $i) (i32.const 1)))
+                      (local.set $b_ival (i32.div_u (local.get $b_ival) (i32.const 10)))
+                      (br $L)
+                    ))
+                    (call $push3 (global.get $TAG_INT) (local.get $i) (i32.const 0)))
+                  (else (call $push3 (global.get $TAG_INT) (i32.const 0) (i32.const 0))))))
+            (global.set $last_ok (i32.const 1))
+            (return)))
+        ;; INTEGER(s): succeed iff s can be parsed as int; push 0 (it's a predicate that returns "")
+        (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31135) (i32.const 7))
+          (then
+            (local.set $matched (i32.const 1))
+            (global.set $sp (i32.sub (global.get $sp) (i32.const 16)))
+            (if (i32.eq (local.get $a_tag) (global.get $TAG_INT))
+              (then (call $push3 (global.get $TAG_STR) (i32.const 0) (i32.const 0))
+                    (global.set $last_ok (i32.const 1)))
+              (else
+                ;; Check string parses as int (digits only, optional leading -)
+                (local.set $i (i32.const 0))
+                (local.set $cmp (i32.const 1))
+                (if (i32.and (i32.gt_u (local.get $a_len) (i32.const 0))
+                             (i32.eq (i32.load8_u (local.get $a_ival)) (i32.const 45)))
+                  (then (local.set $i (i32.const 1))))
+                (if (i32.eq (local.get $i) (local.get $a_len)) (then (local.set $cmp (i32.const 0))))
+                (block $B (loop $L
+                  (br_if $B (i32.ge_u (local.get $i) (local.get $a_len)))
+                  (local.set $b_tag (i32.load8_u (i32.add (local.get $a_ival) (local.get $i))))
+                  (if (i32.or (i32.lt_u (local.get $b_tag) (i32.const 48)) (i32.gt_u (local.get $b_tag) (i32.const 57)))
+                    (then (local.set $cmp (i32.const 0)) (br $B)))
+                  (local.set $i (i32.add (local.get $i) (i32.const 1)))
+                  (br $L)
+                ))
+                (if (local.get $cmp)
+                  (then (call $push3 (global.get $TAG_STR) (i32.const 0) (i32.const 0))
+                        (global.set $last_ok (i32.const 1)))
+                  (else (call $push3 (global.get $TAG_NULL) (i32.const 0) (i32.const 0))
+                        (global.set $last_ok (i32.const 0))))))
+            (return)))
+        ;; CHAR(n): single-byte string with code n. We need a heap byte.
+        (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x3115a) (i32.const 4))
+          (then
+            (local.set $matched (i32.const 1))
+            (local.set $i (global.get $str_ptr))
+            (i32.store8 (local.get $i) (i32.and (local.get $a_ival) (i32.const 255)))
+            (global.set $str_ptr (i32.add (local.get $i) (i32.const 1)))
+            (global.set $sp (i32.sub (global.get $sp) (i32.const 16)))
+            (call $push3 (global.get $TAG_STR) (local.get $i) (i32.const 1))
+            (global.set $last_ok (i32.const 1))
+            (return)))
+        ;; ORD(s): first byte's code, or fail if empty.
+        (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x3115f) (i32.const 3))
+          (then
+            (local.set $matched (i32.const 1))
+            (global.set $sp (i32.sub (global.get $sp) (i32.const 16)))
+            (if (i32.and (i32.eq (local.get $a_tag) (global.get $TAG_STR)) (i32.gt_u (local.get $a_len) (i32.const 0)))
+              (then (call $push3 (global.get $TAG_INT) (i32.load8_u (local.get $a_ival)) (i32.const 0))
+                    (global.set $last_ok (i32.const 1)))
+              (else (call $push3 (global.get $TAG_NULL) (i32.const 0) (i32.const 0))
+                    (global.set $last_ok (i32.const 0))))
+            (return)))
+        ;; TRIM(s): strip trailing spaces. Modifies length only.
+        (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31144) (i32.const 4))
+          (then
+            (local.set $matched (i32.const 1))
+            (global.set $sp (i32.sub (global.get $sp) (i32.const 16)))
+            (if (i32.eq (local.get $a_tag) (global.get $TAG_STR))
+              (then
+                ;; walk back while last byte is space/tab
+                (local.set $i (local.get $a_len))
+                (block $B (loop $L
+                  (br_if $B (i32.eqz (local.get $i)))
+                  (local.set $b_tag (i32.load8_u (i32.add (local.get $a_ival) (i32.sub (local.get $i) (i32.const 1)))))
+                  (br_if $B (i32.and (i32.ne (local.get $b_tag) (i32.const 32))
+                                     (i32.ne (local.get $b_tag) (i32.const 9))))
+                  (local.set $i (i32.sub (local.get $i) (i32.const 1)))
+                  (br $L)
+                ))
+                (call $push3 (global.get $TAG_STR) (local.get $a_ival) (local.get $i)))
+              (else (call $push3 (local.get $a_tag) (local.get $a_ival) (local.get $a_len))))
+            (global.set $last_ok (i32.const 1))
+            (return)))
+        ;; REVERSE(s): allocate new str, copy bytes in reverse.
+        (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x31149) (i32.const 7))
+          (then
+            (local.set $matched (i32.const 1))
+            (global.set $sp (i32.sub (global.get $sp) (i32.const 16)))
+            (if (i32.eq (local.get $a_tag) (global.get $TAG_STR))
+              (then
+                (local.set $b_off (call $alloc_str (local.get $a_len)))
+                (local.set $i (i32.const 0))
+                (block $B (loop $L
+                  (br_if $B (i32.ge_u (local.get $i) (local.get $a_len)))
+                  (i32.store8
+                    (i32.add (local.get $b_off) (i32.sub (i32.sub (local.get $a_len) (i32.const 1)) (local.get $i)))
+                    (i32.load8_u (i32.add (local.get $a_ival) (local.get $i))))
+                  (local.set $i (i32.add (local.get $i) (i32.const 1)))
+                  (br $L)
+                ))
+                (call $push3 (global.get $TAG_STR) (local.get $b_off) (local.get $a_len)))
+              (else (call $push3 (local.get $a_tag) (local.get $a_ival) (local.get $a_len))))
+            (global.set $last_ok (i32.const 1))
+            (return)))
+      ))
+    ;; ---- 3-arg builtins ----
+    (if (i32.eq (local.get $nargs) (i32.const 3))
+      (then
+        (local.set $a_off (i32.sub (global.get $sp) (i32.const 48)))
+        (local.set $a_tag  (i32.load (local.get $a_off)))
+        (local.set $a_ival (i32.load (i32.add (local.get $a_off) (i32.const 4))))
+        (local.set $a_len  (i32.load (i32.add (local.get $a_off) (i32.const 8))))
+        (local.set $b_off (i32.sub (global.get $sp) (i32.const 32)))
+        (local.set $b_ival (i32.load (i32.add (local.get $b_off) (i32.const 4))))
+        ;; The 3rd arg's value is the length to copy.
+        (local.set $cmp (i32.load (i32.add (i32.sub (global.get $sp) (i32.const 16)) (i32.const 4))))
+        ;; SUBSTR(s, start, len): 1-based start.  Failure if out-of-bounds.
+        (if (call $str_eq (local.get $name_ptr) (local.get $name_len) (i32.const 0x3117e) (i32.const 6))
+          (then
+            (local.set $matched (i32.const 1))
+            (global.set $sp (i32.sub (global.get $sp) (i32.const 48)))
+            (if (i32.and (i32.eq (local.get $a_tag) (global.get $TAG_STR))
+                         (i32.and (i32.ge_s (local.get $b_ival) (i32.const 1))
+                                  (i32.le_s (i32.add (i32.sub (local.get $b_ival) (i32.const 1)) (local.get $cmp))
+                                            (local.get $a_len))))
+              (then (call $push3 (global.get $TAG_STR)
+                          (i32.add (local.get $a_ival) (i32.sub (local.get $b_ival) (i32.const 1)))
+                          (local.get $cmp))
+                    (global.set $last_ok (i32.const 1)))
+              (else (call $push3 (global.get $TAG_NULL) (i32.const 0) (i32.const 0))
+                    (global.set $last_ok (i32.const 0))))
+            (return)))
+      ))
     ;; Fallback stub: pop nargs, push null, leave last_ok unchanged.
     (local.set $i (i32.const 0))
     (block $B (loop $L
