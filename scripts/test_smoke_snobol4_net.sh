@@ -50,6 +50,10 @@ run_smoke "arith_add" "               OUTPUT = 3 + 4"$'\nEND'
 run_smoke "arith_sub" "               OUTPUT = 10 - 3"$'\nEND'
 run_smoke "arith_mul" "               OUTPUT = 6 * 7"$'\nEND'
 run_smoke "arith_div" "               OUTPUT = 20 / 4"$'\nEND'
+run_smoke "define_simple" "        DEFINE('Greet(who)')                          :(end_g)
+Greet   Greet = 'Hello, ' who                         :(RETURN)
+end_g   OUTPUT = Greet('World')
+END"
 echo "---"
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]

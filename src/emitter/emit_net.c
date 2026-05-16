@@ -736,11 +736,18 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
                 fn_count++;
             }
         }
-        /* Second pass: scan for SUSPEND_VALUE "DEFINE" with preceding PUSH_LIT_S,
-         * parse the prototype, and link param lists to function entries by name. */
+        /* Second pass: scan for SM_CALL_FN "DEFINE" with preceding PUSH_LIT_S,
+         * parse the prototype, and link param lists to function entries by name.
+         * Note: scrip's SNOBOL4 lowering emits all named calls as SM_CALL_FN — the
+         * SM_SUSPEND_VALUE opcode is reserved for generator-style yields and is not
+         * used by the SNOBOL4 frontend.  (The sm_prog.c dump names[] array contains
+         * an extra "SM_GEN_TICK" entry not in the header enum, causing the dump to
+         * print SM_CALL_FN instructions as "SM_SUSPEND_VALUE" and SM_RETURN
+         * instructions as "SM_CALL_FN" — a cosmetic mismatch that does not change
+         * the actual enum value.) */
         for (int i = 1; i < n; i++) {
             SM_Instr * ins = &sm->instrs[i];
-            if (ins->op != SM_SUSPEND_VALUE) continue;
+            if (ins->op != SM_CALL_FN && ins->op != SM_SUSPEND_VALUE) continue;
             if (!ins->a[0].s || strcmp(ins->a[0].s, "DEFINE") != 0) continue;
             SM_Instr * prev = &sm->instrs[i - 1];
             if (prev->op != SM_PUSH_LIT_S && prev->op != SM_PUSH_LIT_CS) continue;
@@ -752,7 +759,7 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
                     if (fn_names[k] && strcmp(fn_names[k], fname) == 0) {
                         fn_params[k] = pars;
                         fn_nparams[k] = npar;
-                        pars = NULL;   /* ownership transferred */
+                        pars = NULL;
                         break;
                     }
                 }
