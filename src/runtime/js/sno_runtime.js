@@ -338,6 +338,11 @@ const _builtins = {
     CHAR(args)    { return String.fromCharCode(_num(args[0])); },
     CODE(args)    { const s=_str(args[0]); return s.length ? s.charCodeAt(0) : _FAIL; },
     ORD(args)     { const s=_str(args[0]); return s.length ? s.charCodeAt(0) : _FAIL; },
+    LABEL(args)   {
+        const name = _str(args[0]);
+        if (name in _label_pcs || name.toUpperCase() in _user_fns) return name;
+        return _FAIL;
+    },
     VDIFFER(args) {
         const a = args[0], b = args[1];
         if (b === undefined) return a;
