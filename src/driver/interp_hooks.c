@@ -79,6 +79,11 @@ DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
             }
         }
         if (g_pl_active) {
+            extern int g_sm_dispatch_active; extern int g_ast_pump_active;
+            if (g_sm_dispatch_active && !g_ast_pump_active) {
+                fprintf(stderr, "[NO-AST] _usercall_hook prolog branch: needs fresh SM/BB lowering (PJ-8)\n");
+                return FAILDESCR;
+            }
             char pl_key[256];
             snprintf(pl_key, sizeof pl_key, "%s/%d", name, nargs);
             tree_t *choice = pl_pred_table_lookup(&g_pl_pred_table, pl_key);
