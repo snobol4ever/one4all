@@ -481,7 +481,8 @@ static int pt_args(Parser *p, TreeScope *ts, tree_t *parent) {
     return n;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* Build TT_FNC(op, lhs, rhs) for binary op. op is the operator name. */
+/* Pure reduce action: wrap lhs and rhs as children of TT_FNC(op).
+ * No structural reasoning — just node(kind, children-in-source-order). */
 static tree_t *pt_binop(const char *op, tree_t *lhs, tree_t *rhs) {
     tree_t *n = ast_node_new(TT_FNC);
     n->v.sval = strdup(op);
@@ -490,28 +491,19 @@ static tree_t *pt_binop(const char *op, tree_t *lhs, tree_t *rhs) {
     return n;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* Detect and collapse ;(->(Cond,Then),Else) into TT_IF(cond,then,else).
- * Also handle ;(->(Cond,Then)) — if-then without else — as TT_IF(cond,then).
- * Input: a TT_FNC(";") node with children already added.
- * Returns TT_IF node if pattern matches, else returns the original node. */
-static tree_t *pt_maybe_ifthenelse(tree_t *semi_node) {
-    /* semi_node is TT_FNC(";") with 2 children */
-    if (semi_node->n != 2) return semi_node;
-    tree_t *left = semi_node->c[0];
-    tree_t *right = semi_node->c[1];
-    /* left must be TT_FNC("->") */
-    if (!left || left->t != TT_FNC || !left->v.sval) return semi_node;
-    if (strcmp(left->v.sval, "->") != 0) return semi_node;
-    if (left->n < 2) return semi_node;
-    tree_t *cond = left->c[0];
-    tree_t *then = left->c[1];
-    tree_t *iff = ast_node_new(TT_IF);
-    ast_push(iff, cond);
-    ast_push(iff, then);
-    ast_push(iff, right);   /* else branch */
-    /* Note: we do NOT free semi_node / left — arena or GC handles it
-     * (or in this parallel path, leaking is acceptable until 6f cleanup). */
-    return iff;
+/* Pure reduce action: wrap head and body into TT_CLAUSE(head, body).
+ * Children in source order. NO conjunction flattening, NO if-then-else
+ * detection — those are lower's job. The tree is a geometric record of
+ * the token stream; lower interprets it. */
+static tree_t *pt_make_clause(tree_t *head_tr, tree_t *body_tr) {
+    tree_t *cl = ast_node_new(TT_CLAUSE);
+    if (head_tr) {
+        ast_push(cl, head_tr);
+    } else {
+        ast_push(cl, ast_node_new(TT_NUL));   /* directive: head is TT_NUL */
+    }
+    if (body_tr) ast_push(cl, body_tr);        /* raw body — no flattening */
+    return cl;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static tree_t *pt_primary(Parser *p, TreeScope *ts) {
@@ -716,55 +708,11 @@ static tree_t *pt_term(Parser *p, TreeScope *ts, int max_prec) {
         tree_t *rhs = pt_term(p, ts, rprec);
         if (!rhs) break;
         tree_t *node = pt_binop(op->name, lhs, rhs);
-        /* Detect ;(->(Cond,Then),Else) and collapse to TT_IF */
-        if (strcmp(op->name, ";") == 0)
-            node = pt_maybe_ifthenelse(node);
+        /* Pure reduce: no structural rewriting here.
+         * ';'('->'(C,T),E) stays as-is — prolog_lower.c detects it. */
         lhs = node;
     }
     return lhs;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* pt_parse_clause: runs the parallel tree_t path on a clone of the lexer.
- * Called AFTER the Term* clause parse has fully consumed its tokens.
- * We replay the same source text through a fresh lexer. */
-static tree_t *pt_parse_clause_from_src(const char *src, int start_offset,
-                                        int end_offset, TreeScope *ts,
-                                        Parser *p_orig) {
-    /* We cannot easily slice the source. Instead we use a saved Lexer
-     * snapshot taken at clause start (see pt_parse_clause below). */
-    (void)src; (void)start_offset; (void)end_offset; (void)p_orig;
-    return NULL; /* placeholder — real impl below uses saved Lexer */
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* Flatten a tree_t conjunction (TT_FNC(",", ...)) into flat TT_PROGRAM.
- * Mirrors flatten_conj() for the Term* path. */
-static void pt_flatten_conj(tree_t *t, tree_t *prog) {
-    if (!t) return;
-    if (t->t == TT_FNC && t->v.sval && strcmp(t->v.sval, ",") == 0) {
-        for (int i = 0; i < t->n; i++)
-            pt_flatten_conj(t->c[i], prog);
-        return;
-    }
-    ast_push(prog, t);
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* Build a TT_CLAUSE tree_t for one clause.
- * head_tr: the head tree (NULL for directives → TT_NUL child).
- * body_tr: the raw body term (conjunction or single goal), or NULL for facts.
- * Returns TT_CLAUSE(head, body_prog) where body_prog is TT_PROGRAM. */
-static tree_t *pt_make_clause(tree_t *head_tr, tree_t *body_tr) {
-    tree_t *cl = ast_node_new(TT_CLAUSE);
-    /* c[0] = head */
-    if (head_tr) {
-        ast_push(cl, head_tr);
-    } else {
-        ast_push(cl, ast_node_new(TT_NUL));
-    }
-    /* c[1] = body as TT_PROGRAM (flat conjunction) */
-    tree_t *prog = ast_node_new(TT_PROGRAM);
-    if (body_tr) pt_flatten_conj(body_tr, prog);
-    ast_push(cl, prog);
-    return cl;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static Term *dcg_fresh_var(VarScope *sc) {
