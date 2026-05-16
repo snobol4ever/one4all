@@ -8,6 +8,7 @@
 #include "ast_clone.h"
 #include "lower_pat_dcg.h"
 #include "lower_icn.h"
+#include "lower_pl.h"
 #include "../../runtime/interp/icn_runtime.h"
 #include "../../runtime/interp/pl_runtime.h"
 #include "../../frontend/icon/icon_lex.h"
@@ -1211,9 +1212,20 @@ static void lower_proc_skeletons(void)
         sm_emit(g_p, SM_RETURN);
         sm_patch_jump(g_p, skip, sm_label(g_p));
     }
-    for (int b = 0; b < PL_PRED_TABLE_SIZE_FWD; b++)
-        for (Pl_PredEntry *e = g_pl_pred_table.buckets[b]; e; e = e->next)
-            if (e->key && *e->key) emit_proc_stub(e->key);
+    for (int b = 0; b < PL_PRED_TABLE_SIZE_FWD; b++) {
+        for (Pl_PredEntry *e = g_pl_pred_table.buckets[b]; e; e = e->next) {
+            if (!e->key || !*e->key) continue;
+            emit_proc_stub(e->key);
+            const char *slash = strrchr(e->key, '/');
+            int arity = slash ? atoi(slash + 1) : 0;
+            IR_block_t *ir_body = lower_pl_predicate(e->choice);
+            Pl_PredEntry_BB *bb = pl_dcg_register(e->key, arity, ir_body);
+            if (bb && e->choice) {
+                PlScope sc; sc.n = 0;
+                bb->lower_sc = sc;
+            }
+        }
+    }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 SM_Program *lower(const tree_t *prog)
