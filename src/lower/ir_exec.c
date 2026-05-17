@@ -1034,9 +1034,18 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->state = 0; nd->value = FAILDESCR; return nd->ω;
     }
     case IR_ICN_TO: {
+        /* Gen-kind check for operand re-pumping (mirrors IR_BINOP_GEN logic).                    */
+        #define IR_IS_GEN_KIND_TO(k) ( \
+            (k) == IR_ICN_TO || (k) == IR_ICN_TO_BY || (k) == IR_ICN_UPTO || \
+            (k) == IR_ALT || (k) == IR_ALTERNATE || (k) == IR_BINOP_GEN || \
+            (k) == IR_ICN_ITERATE || (k) == IR_ICN_LIMIT || (k) == IR_ICN_PROC_GEN || \
+            (k) == IR_TO_BY)
+        int has_dyn = (nd->n >= 2 && nd->c[0] && nd->c[1]);
+        int lo_gen  = has_dyn && IR_IS_GEN_KIND_TO(nd->c[0]->t);
+        int hi_gen  = has_dyn && IR_IS_GEN_KIND_TO(nd->c[1]->t);
         if (nd->state == 0) {
             /* α path: if c[0]/c[1] present, evaluate them now to seed ival/ival2 (dynamic bounds). */
-            if (nd->n >= 2 && nd->c[0] && nd->c[1]) {
+            if (has_dyn) {
                 IR_exec_node(nd->c[0]);
                 if (IS_FAIL_fn(nd->c[0]->value)) { nd->value = FAILDESCR; return nd->ω; }
                 IR_exec_node(nd->c[1]);
@@ -1048,9 +1057,38 @@ IR_t * IR_exec_node(IR_t * nd) {
         }
         else nd->counter++;
         nd->state = 1;
-        if (nd->counter > nd->ival2) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+        if (nd->counter > nd->ival2) {
+            /* Counter exhausted. If hi is a generator, advance it. If hi also exhausts and lo is a */
+            /* generator, reset hi and advance lo. If both exhaust (or neither is a generator),    */
+            /* fail. This is the cross-product semantics from Icon's paper §2 example 3:           */
+            /*   every write((1 to 2) to (2 to 3))  →  1,2,1,2,3,2,2,3                              */
+            if (hi_gen) {
+                IR_exec_node(nd->c[1]);
+                if (IS_FAIL_fn(nd->c[1]->value)) {
+                    if (!lo_gen) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+                    IR_exec_node(nd->c[0]);
+                    if (IS_FAIL_fn(nd->c[0]->value)) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+                    nd->c[1]->state = 0;
+                    IR_exec_node(nd->c[1]);
+                    if (IS_FAIL_fn(nd->c[1]->value)) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+                    nd->ival = nd->c[0]->value.i;
+                }
+                nd->ival2 = nd->c[1]->value.i;
+                nd->counter = nd->ival;
+                if (nd->counter > nd->ival2) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+            } else if (lo_gen) {
+                IR_exec_node(nd->c[0]);
+                if (IS_FAIL_fn(nd->c[0]->value)) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+                nd->ival = nd->c[0]->value.i;
+                nd->counter = nd->ival;
+                if (nd->counter > nd->ival2) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+            } else {
+                nd->state = 0; nd->value = FAILDESCR; return nd->ω;
+            }
+        }
         nd->value = INTVAL(nd->counter);
         return nd->γ;
+        #undef IR_IS_GEN_KIND_TO
     }
     case IR_ICN_TO_BY: {
         int64_t step = nd->ival3 ? nd->ival3 : 1;
