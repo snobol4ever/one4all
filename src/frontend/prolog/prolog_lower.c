@@ -252,7 +252,103 @@ static tree_t *lower_clause(PlClause *cl, PredKey key) {
     return ec;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-CODE_t *prolog_lower(PlProgram *pl_prog) {
+/* PST-PL-6d — lower_clause_from_tree: consume cl->tr (tree_t from parser)
+ * directly instead of converting Term* via lower_term.
+ *
+ * Includes the pre-lower slot-assignment pass (6e preview):
+ * walk all TT_VAR nodes, assign sequential v.ival by name.
+ * Anonymous vars ("_") each get a unique slot.
+ */
+#define TR_SLOT_MAX 256
+typedef struct { const char *name; int slot; } TRSlot;
+typedef struct { TRSlot e[TR_SLOT_MAX]; int n; int next; } TRSlotMap;
+
+static void trslot_reset(TRSlotMap *m) { m->n = 0; m->next = 0; }
+
+static int trslot_get(TRSlotMap *m, const char *name) {
+    if (!name || strcmp(name, "_") == 0)
+        return m->next++;           /* anonymous: always fresh */
+    for (int i = 0; i < m->n; i++)
+        if (strcmp(m->e[i].name, name) == 0)
+            return m->e[i].slot;
+    if (m->n >= TR_SLOT_MAX) return m->next++;
+    int s = m->next++;
+    m->e[m->n].name = name;
+    m->e[m->n].slot = s;
+    m->n++;
+    return s;
+}
+
+/* Walk tree_t and assign v.ival slot to every TT_VAR node. */
+static void tr_assign_slots(tree_t *t, TRSlotMap *m) {
+    if (!t) return;
+    if (t->t == TT_VAR) {
+        t->v.ival = trslot_get(m, t->v.sval);
+        return;
+    }
+    for (int i = 0; i < t->n; i++)
+        tr_assign_slots(t->c[i], m);
+}
+
+/* Extract functor name and arity from a TT_CLAUSE head child (c[0]). */
+static void tr_head_key(tree_t *head, const char **fn_out, int *arity_out) {
+    *fn_out    = NULL;
+    *arity_out = 0;
+    if (!head) return;
+    if (head->t == TT_FNC) {
+        *fn_out    = head->v.sval;
+        *arity_out = head->n;
+    } else if (head->t == TT_QLIT) {
+        *fn_out    = head->v.sval;
+        *arity_out = 0;
+    }
+}
+
+/* Build the lowered TT_CLAUSE from the parser's tree_t.
+ * Mirrors lower_clause() output structure exactly. */
+static tree_t *lower_clause_from_tree(tree_t *tr, PredKey key) {
+    /* Slot assignment pre-pass */
+    TRSlotMap sm; trslot_reset(&sm);
+    tr_assign_slots(tr, &sm);
+    int n_vars = sm.next;
+
+    tree_t *ec = ast_node_new(TT_CLAUSE);
+    ec->v.sval = pred_str(key.functor, key.arity);
+    ec->v.dval = (double)key.arity;
+    ec->v.ival = n_vars;
+
+    /* c[0] of tr = head; c[1] = TT_PROGRAM body */
+    tree_t *head = (tr->n > 0) ? tr->c[0] : NULL;
+    tree_t *body = (tr->n > 1) ? tr->c[1] : NULL;
+
+    /* Add head arguments as direct children of ec (not the head node itself) */
+    if (head && head->t == TT_FNC) {
+        for (int i = 0; i < head->n; i++)
+            expr_add_child(ec, head->c[i]);
+    }
+    /* else: 0-arity head (TT_QLIT) — no args to add */
+
+    /* Add body goals */
+    if (body && body->t == TT_PROGRAM) {
+        for (int i = 0; i < body->n; i++)
+            expr_add_child(ec, body->c[i]);
+    }
+
+    return ec;
+}
+
+/* Derive PredKey from tree_t head (c[0] of TT_CLAUSE). */
+static PredKey key_of_head_tree(tree_t *head) {
+    PredKey k = {-1, 0};
+    if (!head) return k;
+    const char *fn = NULL;
+    int arity = 0;
+    tr_head_key(head, &fn, &arity);
+    if (!fn) return k;
+    k.functor = prolog_atom_intern(fn);
+    k.arity   = arity;
+    return k;
+}
     CODE_t *prog = calloc(1, sizeof(CODE_t));
     #define PL_MAX_CLAUSES 2048
     char plunit_suite[PL_MAX_CLAUSES][64];
@@ -287,7 +383,15 @@ CODE_t *prolog_lower(PlProgram *pl_prog) {
     int      clause_idx = 0;
     for (PlClause *cl = pl_prog->head; cl; cl = cl->next, clause_idx++) {
         if (!cl->head) continue;
-        PredKey k = key_of_head(cl->head);
+        /* PST-PL-6d: use tree_t path when cl->tr is available (non-DCG clauses).
+         * DCG clauses have cl->tr == NULL — fall back to Term* path. */
+        PredKey k;
+        if (cl->tr) {
+            tree_t *tr_head = (cl->tr->n > 0) ? cl->tr->c[0] : NULL;
+            k = key_of_head_tree(tr_head);
+        } else {
+            k = key_of_head(cl->head);
+        }
         if (k.functor < 0) continue;
         if (clause_idx < PL_MAX_CLAUSES && plunit_suite[clause_idx][0] != '\0') {
             const char *fn = prolog_atom_name(k.functor);
@@ -340,11 +444,18 @@ CODE_t *prolog_lower(PlProgram *pl_prog) {
             choices[nkeys]->v.sval = pred_str(k.functor, k.arity);
             found = nkeys++;
         }
-        tree_t *ec = lower_clause(cl, k);
+        tree_t *ec = cl->tr ? lower_clause_from_tree(cl->tr, k)
+                            : lower_clause(cl, k);
         expr_add_child(choices[found], ec);
     }
     for (PlClause *cl = pl_prog->head; cl; cl = cl->next) {
         if (!cl->head && cl->nbody > 0) {
+            /* PST-PL-6d: use tree_t body goal when available */
+            tree_t *goal_tr = NULL;
+            if (cl->tr && cl->tr->n > 1 && cl->tr->c[1]->t == TT_PROGRAM
+                    && cl->tr->c[1]->n > 0) {
+                goal_tr = cl->tr->c[1]->c[0];   /* first body goal from tree */
+            }
             Term *goal = cl->body[0];
             Term *dg   = term_deref(goal);
             int is_export = 0;
@@ -374,7 +485,8 @@ CODE_t *prolog_lower(PlProgram *pl_prog) {
             }
             if (!is_export) {
                 STMT_t *s = stmt_new();
-                s->subject = lower_term(goal);
+                /* PST-PL-6d: use tree_t goal when available */
+                s->subject = goal_tr ? goal_tr : lower_term(goal);
                 s->lineno  = cl->lineno;
                 s->lang    = LANG_PL;
                 if (!prog->head) prog->head = s;
