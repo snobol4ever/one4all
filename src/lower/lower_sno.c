@@ -19,11 +19,30 @@
  * State for the emitter — line counter, indent depth (for readability of
  * function bodies; SNOBOL4 doesn't care about column past col 1, but humans do).
  *---------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------------
+ * SCT-1b: loop-label stack for break/continue resolution.
+ *
+ * When emit_stmt encounters TT_WHILE/TT_FOR/TT_DO_WHILE, it pushes the
+ * pre-allocated break/continue labels (carried as TT_QLIT children on the
+ * loop node by the C frontend) onto this stack.  When emit_stmt encounters
+ * TT_LOOP_BREAK / TT_LOOP_NEXT, it reads the top of the stack to emit the
+ * corresponding `:(Lend)` / `:(Ltop|Lcont)` jump.
+ *
+ * The if-label counter is for synthesizing _Lelse_NNNN/_Lendif_NNNN labels;
+ * IF labels are NOT pre-allocated by the C frontend (the PST mode keeps
+ * TT_IF as a tree without lowering through labels), unlike loops.
+ *---------------------------------------------------------------------------*/
+#define SNO_LOOP_STACK_MAX 64
 typedef struct {
     FILE *out;
     int   lines;
     int   in_stmt;        /* are we mid-statement (no newline yet)? */
     const char *pending_label; /* if non-NULL, next stmt emits this as col-1 label */
+    /* SCT-1b: loop-label stack */
+    const char *break_lbl[SNO_LOOP_STACK_MAX];
+    const char *cont_lbl [SNO_LOOP_STACK_MAX];
+    int   loop_top;       /* index of next free slot; 0 = empty */
+    int   if_seq;         /* monotonic counter for synthesized IF labels */
 } sno_ctx_t;
 
 static void emit(sno_ctx_t *c, const char *fmt, ...);
@@ -55,6 +74,64 @@ static const char *sval_or(const tree_t *n, const char *fallback) {
     if (!n) return fallback;
     if (n->v.sval) return n->v.sval;
     return fallback;
+}
+
+/*-----------------------------------------------------------------------------
+ * SCT-1b: label-name reader.
+ *
+ * Several node shapes hold their textual label payload in different places:
+ *   - `:lbl` attr (TT_ATTR with v.sval=":lbl") has the label name in c[0]->v.sval
+ *   - TT_GOTO_U has its target label in c[0]->v.sval (a TT_QLIT)
+ *   - `:go` / `:goS` / `:goF` (older .sc-parser shape) hold label in own v.sval
+ *   - Loop nodes' Ltop/Lend/Lcont children are TT_QLITs — label in c[i]->v.sval
+ *
+ * This helper picks whichever is available.  Tries c[0]->v.sval first (the
+ * payload-as-child shape), falls back to the node's own v.sval (the
+ * payload-in-self shape), then the fallback string.
+ *---------------------------------------------------------------------------*/
+static const char *label_of(const tree_t *n, const char *fallback) {
+    if (!n) return fallback;
+    if (n->n > 0 && n->c[0] && n->c[0]->v.sval) return n->c[0]->v.sval;
+    if (n->v.sval) return n->v.sval;
+    return fallback;
+}
+
+/*-----------------------------------------------------------------------------
+ * SCT-1b: label-name sanitizer.
+ *
+ * SPITBOL Manual Ch.14 line 9335: "Labels must begin with a letter or digit."
+ * The Snocone PST mode pre-allocates labels of the form `_Ltop_NNNN`,
+ * `_Lend_NNNN`, `_Lcont_NNNN`, etc. — leading underscore is illegal in
+ * SPITBOL.  SCRIP's own SNOBOL4 parser also rejects them (it silently strips
+ * the leading underscore, then complains the label is undefined when the
+ * goto-side keeps it).  Fix: strip a single leading underscore on every
+ * label emission.  Caller is responsible for not passing a name that would
+ * collide after stripping (parser pre-allocates with a sequence counter, so
+ * `_Ltop_0001` → `Ltop_0001` is collision-free).
+ *
+ * Returns a pointer to either the input or a static thread-unsafe buffer.
+ * --dump-sno is single-shot so thread safety doesn't matter here.
+ *---------------------------------------------------------------------------*/
+static const char *label_sanitize(const char *raw) {
+    if (!raw || !*raw) return raw;
+    if (raw[0] != '_') return raw;
+    /* Strip ONE leading underscore.  If the remainder still starts with
+     * a non-letter/digit (e.g. `__foo`), fall back to a single 'L' prefix.
+     * Use a 4-deep buffer ring so two label_sanitize() calls in a single
+     * printf-style format string don't clobber each other. */
+    static char ring[4][256];
+    static int  idx = 0;
+    char *buf = ring[idx]; idx = (idx + 1) & 3;
+    const char *rest = raw + 1;
+    if (!*rest) { return "L"; }
+    if (((*rest >= 'A' && *rest <= 'Z') ||
+         (*rest >= 'a' && *rest <= 'z') ||
+         (*rest >= '0' && *rest <= '9'))) {
+        snprintf(buf, 256, "%s", rest);
+    } else {
+        snprintf(buf, 256, "L%s", rest);
+    }
+    return buf;
 }
 
 /*-----------------------------------------------------------------------------
@@ -319,7 +396,7 @@ static void emit_stmt(sno_ctx_t *c, const tree_t *s) {
              * statement (e.g. empty body).  Force-emit a no-op so the
              * label has a host line. */
             if (c->pending_label) {
-                emit(c, "%s\tOUTPUT =", c->pending_label);
+                emit(c, "%s\tOUTPUT =", label_sanitize(c->pending_label));
                 emit_nl(c);
                 c->pending_label = NULL;
             }
@@ -335,14 +412,278 @@ static void emit_stmt(sno_ctx_t *c, const tree_t *s) {
         return;
     }
 
+    /*=========================================================================
+     * SCT-1b: structured-control dispatch.
+     *
+     * Per ARCH-SNOCONE.md "Lowering map", each structured form lowers to a
+     * fixed pattern of labeled SPITBOL statements.  Loops (TT_WHILE,
+     * TT_DO_WHILE, TT_FOR) carry their pre-allocated _Ltop/_Lcont/_Lend
+     * labels as trailing TT_QLIT children — emit reads them straight off.
+     *
+     * TT_IF allocates its own labels (parser doesn't pre-alloc IF labels in
+     * PST mode) via c->if_seq.
+     *
+     * TT_LOOP_BREAK / TT_LOOP_NEXT read the top of the loop-label stack.
+     *
+     * TT_RETURN / TT_PROC_FAIL / TT_NRETURN may appear as a stmt :subj when
+     * inside a function body — emit the corresponding :(RETURN/FRETURN/NRETURN).
+     *
+     * IMPORTANT: a label on the enclosing TT_STMT must precede the FIRST
+     * emitted SNOBOL4 line of the lowered structure.  We thread c->pending_label
+     * into the first emission so the label attaches correctly.
+     *=======================================================================*/
+    if (subj) {
+        const char *outer_label = NULL;
+        /* If this STMT has a :lbl attr, the structured form's first emitted
+         * line must carry it as a column-1 label.  Convert to pending_label so
+         * the recursion picks it up.  (pending_label from a previous DEFINE
+         * takes precedence — that's already-pending and should fire first.) */
+        if (lbl && !c->pending_label) {
+            const char *lname = label_of(lbl, NULL);
+            if (lname) {
+                c->pending_label = lname;
+                outer_label = lname; /* not used; tracked for debugging */
+            }
+        }
+        (void)outer_label;
+
+        /*-- TT_IF ------------------------------------------------------------
+         * children: c[0]=cond, c[1]=then_block(TT_PROGRAM) [, c[2]=else_block]
+         * no-else: cond  :F(Lendif) / then / Lendif OUTPUT =
+         * with-else: cond  :F(Lelse) / then  :(Lendif) / Lelse else / Lendif OUTPUT = */
+        if (subj->t == TT_IF && subj->n >= 2) {
+            int has_else = (subj->n >= 3 && subj->c[2]);
+            int seq = ++c->if_seq;
+            char Lelse[32], Lendif[32];
+            snprintf(Lelse,  sizeof Lelse,  "_Lelse_%04d",  seq);
+            snprintf(Lendif, sizeof Lendif, "_Lendif_%04d", seq);
+
+            /* cond-line — gets the pending label if any */
+            if (c->pending_label) { emit(c, "%s\t", label_sanitize(c->pending_label)); c->pending_label = NULL; }
+            else                  { emit(c, "\t"); }
+            emit_expr(c, subj->c[0]);
+            emit(c, "\t:F(%s)", label_sanitize(has_else ? Lelse : Lendif));
+            emit_nl(c);
+
+            /* then-block */
+            if (subj->c[1] && subj->c[1]->t == TT_PROGRAM) {
+                int j;
+                for (j = 0; j < subj->c[1]->n; j++) emit_node(c, subj->c[1]->c[j]);
+            } else if (subj->c[1]) {
+                emit_node(c, subj->c[1]);
+            }
+
+            if (has_else) {
+                /* jump past else */
+                emit(c, "\t:(%s)", label_sanitize(Lendif));
+                emit_nl(c);
+                /* Lelse — must carry a body line.  Pad if else_block is empty;
+                 * otherwise inject Lelse as pending_label on first else stmt. */
+                if (subj->c[2] && subj->c[2]->t == TT_PROGRAM && subj->c[2]->n > 0) {
+                    int j;
+                    c->pending_label = Lelse;
+                    for (j = 0; j < subj->c[2]->n; j++) emit_node(c, subj->c[2]->c[j]);
+                    if (c->pending_label) {
+                        emit(c, "%s\tOUTPUT =", label_sanitize(c->pending_label));
+                        emit_nl(c);
+                        c->pending_label = NULL;
+                    }
+                } else {
+                    emit(c, "%s\tOUTPUT =", label_sanitize(Lelse));
+                    emit_nl(c);
+                }
+            }
+            /* Lendif — pad with OUTPUT = so SCRIP's SNOBOL4 parser accepts it. */
+            emit(c, "%s\tOUTPUT =", label_sanitize(Lendif));
+            emit_nl(c);
+            return;
+        }
+
+        /*-- TT_WHILE ---------------------------------------------------------
+         * children: c[0]=cond, c[1]=body, c[2]=TT_QLIT(Ltop), c[3]=TT_QLIT(Lend)
+         * Ltop cond  :F(Lend) / body / :(Ltop) / Lend OUTPUT = */
+        if (subj->t == TT_WHILE && subj->n >= 4) {
+            const char *Ltop = sval_or(subj->c[2], "_Ltop");
+            const char *Lend = sval_or(subj->c[3], "_Lend");
+
+            /* cond-line carries Ltop as column-1 label.  If there's an outer
+             * pending_label, emit it on its own pad first (rare). */
+            if (c->pending_label) {
+                emit(c, "%s\tOUTPUT =", label_sanitize(c->pending_label)); emit_nl(c);
+                c->pending_label = NULL;
+            }
+            emit(c, "%s\t", label_sanitize(Ltop));
+            emit_expr(c, subj->c[0]);
+            emit(c, "\t:F(%s)", label_sanitize(Lend));
+            emit_nl(c);
+
+            /* loop body — push break/cont labels for nested break/continue */
+            if (c->loop_top < SNO_LOOP_STACK_MAX) {
+                c->break_lbl[c->loop_top] = Lend;
+                c->cont_lbl [c->loop_top] = Ltop;
+                c->loop_top++;
+            }
+            if (subj->c[1] && subj->c[1]->t == TT_PROGRAM) {
+                int j;
+                for (j = 0; j < subj->c[1]->n; j++) emit_node(c, subj->c[1]->c[j]);
+            } else if (subj->c[1]) {
+                emit_node(c, subj->c[1]);
+            }
+            if (c->loop_top > 0) c->loop_top--;
+
+            /* jump back, then Lend pad */
+            emit(c, "\t:(%s)", label_sanitize(Ltop)); emit_nl(c);
+            emit(c, "%s\tOUTPUT =", label_sanitize(Lend)); emit_nl(c);
+            return;
+        }
+
+        /*-- TT_DO_WHILE ------------------------------------------------------
+         * children: c[0]=body, c[1]=cond, c[2]=TT_QLIT(Lcont), c[3]=TT_QLIT(Lend)
+         * Body runs at least once.  We need an inner Ltop label too since the
+         * back-edge is :S(Ltop) on cond.  Synthesize Ltop from c->if_seq.
+         * Ltop first_body / rest_body / Lcont cond :S(Ltop) / Lend OUTPUT = */
+        if (subj->t == TT_DO_WHILE && subj->n >= 4) {
+            const char *Lcont = sval_or(subj->c[2], "_Lcont");
+            const char *Lend  = sval_or(subj->c[3], "_Lend");
+            int seq = ++c->if_seq;
+            char Ltop[32];
+            snprintf(Ltop, sizeof Ltop, "_Ldotop_%04d", seq);
+
+            if (c->pending_label) {
+                emit(c, "%s\tOUTPUT =", label_sanitize(c->pending_label)); emit_nl(c);
+                c->pending_label = NULL;
+            }
+            /* Body first — Ltop must attach to the first body stmt. */
+            c->pending_label = NULL; /* clear before pushing Ltop */
+            if (c->loop_top < SNO_LOOP_STACK_MAX) {
+                c->break_lbl[c->loop_top] = Lend;
+                c->cont_lbl [c->loop_top] = Lcont;
+                c->loop_top++;
+            }
+            {
+                /* Inject Ltop as pending_label for first body stmt */
+                const char *Ltop_dup = strdup(Ltop);  /* short-lived alloc */
+                c->pending_label = Ltop_dup;
+                if (subj->c[0] && subj->c[0]->t == TT_PROGRAM && subj->c[0]->n > 0) {
+                    int j;
+                    for (j = 0; j < subj->c[0]->n; j++) emit_node(c, subj->c[0]->c[j]);
+                } else if (subj->c[0]) {
+                    emit_node(c, subj->c[0]);
+                }
+                if (c->pending_label) {
+                    /* Body was empty — emit a stub line carrying Ltop. */
+                    emit(c, "%s\tOUTPUT =", label_sanitize(c->pending_label));
+                    emit_nl(c);
+                    c->pending_label = NULL;
+                }
+                /* NOTE: Ltop_dup leaks; the file-scope emission is short and
+                 * one-shot per --dump-sno invocation.  Not worth a free-list. */
+            }
+            if (c->loop_top > 0) c->loop_top--;
+
+            /* Lcont cond :S(Ltop) */
+            emit(c, "%s\t", label_sanitize(Lcont));
+            emit_expr(c, subj->c[1]);
+            emit(c, "\t:S(%s)", label_sanitize(Ltop));
+            emit_nl(c);
+            emit(c, "%s\tOUTPUT =", label_sanitize(Lend)); emit_nl(c);
+            return;
+        }
+
+        /*-- TT_FOR -----------------------------------------------------------
+         * children: c[0]=cond, c[1]=step, c[2]=body, c[3]=TT_QLIT(Lcont), c[4]=TT_QLIT(Lend)
+         * NOTE: the init expression has already been lowered as a preceding
+         * stmt by the C frontend — we don't see it here.
+         * Ltop_inner cond :F(Lend) / body / Lcont step / :(Ltop_inner) / Lend OUTPUT = */
+        if (subj->t == TT_FOR && subj->n >= 5) {
+            const tree_t *cond = subj->c[0];
+            const tree_t *step = subj->c[1];
+            const tree_t *body = subj->c[2];
+            const char *Lcont = sval_or(subj->c[3], "_Lcont");
+            const char *Lend  = sval_or(subj->c[4], "_Lend");
+            int seq = ++c->if_seq;
+            char Ltop[32];
+            snprintf(Ltop, sizeof Ltop, "_Lfortop_%04d", seq);
+
+            if (c->pending_label) {
+                emit(c, "%s\tOUTPUT =", label_sanitize(c->pending_label)); emit_nl(c);
+                c->pending_label = NULL;
+            }
+
+            /* Ltop cond :F(Lend) */
+            emit(c, "%s\t", label_sanitize(Ltop));
+            emit_expr(c, cond);
+            emit(c, "\t:F(%s)", label_sanitize(Lend));
+            emit_nl(c);
+
+            /* body */
+            if (c->loop_top < SNO_LOOP_STACK_MAX) {
+                c->break_lbl[c->loop_top] = Lend;
+                c->cont_lbl [c->loop_top] = Lcont;
+                c->loop_top++;
+            }
+            if (body && body->t == TT_PROGRAM) {
+                int j;
+                for (j = 0; j < body->n; j++) emit_node(c, body->c[j]);
+            } else if (body) {
+                emit_node(c, body);
+            }
+            if (c->loop_top > 0) c->loop_top--;
+
+            /* Lcont step :(Ltop) — Lcont attaches to the step stmt */
+            emit(c, "%s\t", label_sanitize(Lcont));
+            emit_expr(c, step);
+            emit(c, "\t:(%s)", label_sanitize(Ltop));
+            emit_nl(c);
+            emit(c, "%s\tOUTPUT =", label_sanitize(Lend)); emit_nl(c);
+            return;
+        }
+
+        /*-- TT_RETURN / TT_PROC_FAIL / TT_NRETURN as :subj -------------------
+         * Per parser_snocone.sc emit_return_value, `return E;` already lowers
+         * to TWO stmts (assignment + bare TT_RETURN).  Here we only see the
+         * bare form as the stmt subject.  Emit the corresponding goto. */
+        if (subj->t == TT_RETURN || subj->t == TT_PROC_FAIL || subj->t == TT_NRETURN) {
+            const char *tgt = (subj->t == TT_RETURN)    ? "RETURN"
+                            : (subj->t == TT_PROC_FAIL) ? "FRETURN"
+                                                        : "NRETURN";
+            if (c->pending_label) { emit(c, "%s\t", label_sanitize(c->pending_label)); c->pending_label = NULL; }
+            else                  { emit(c, "\t"); }
+            emit(c, ":(%s)", label_sanitize(tgt));
+            emit_nl(c);
+            return;
+        }
+
+        /*-- TT_LOOP_BREAK / TT_LOOP_NEXT as :subj ----------------------------
+         * Read top-of-loop-stack and emit unconditional goto. */
+        if (subj->t == TT_LOOP_BREAK || subj->t == TT_LOOP_NEXT) {
+            const char *tgt = NULL;
+            if (c->loop_top > 0) {
+                tgt = (subj->t == TT_LOOP_BREAK)
+                    ? c->break_lbl[c->loop_top - 1]
+                    : c->cont_lbl [c->loop_top - 1];
+            }
+            if (!tgt) tgt = (subj->t == TT_LOOP_BREAK) ? "BREAK_NOLOOP" : "CONT_NOLOOP";
+            if (c->pending_label) { emit(c, "%s\t", label_sanitize(c->pending_label)); c->pending_label = NULL; }
+            else                  { emit(c, "\t"); }
+            emit(c, ":(%s)", label_sanitize(tgt));
+            emit_nl(c);
+            return;
+        }
+    }
+    /*=========================================================================
+     * End SCT-1b structured-control dispatch.  Fall through to generic emission.
+     *=======================================================================*/
+
     /* Column-1 label, if any.  pending_label from the context takes
      * precedence over a :lbl child (used to inject the function-name
      * label onto the first body statement in the Gimpel template). */
     if (c->pending_label) {
-        emit(c, "%s\t", c->pending_label);
+        emit(c, "%s\t", label_sanitize(c->pending_label));
         c->pending_label = NULL;
     } else if (lbl) {
-        emit(c, "%s\t", sval_or(lbl, "L"));
+        /* SCT-1b fix: :lbl's payload lives in c[0]->v.sval, not the attr's own v.sval. */
+        emit(c, "%s\t", label_sanitize(label_of(lbl, "L")));
     } else {
         emit(c, "\t");
     }
@@ -360,12 +701,20 @@ static void emit_stmt(sno_ctx_t *c, const tree_t *s) {
         emit(c, " = "); emit_expr(c, repl);
     }
 
+    /* SCT-1b: label-only stmt — pad with OUTPUT = so SCRIP's SNOBOL4 parser
+     * accepts it.  Detect: had a :lbl, no :subj, no goto field. */
+    if (lbl && !subj && !go_s && !go_f && !go_u) {
+        emit(c, "OUTPUT =");
+    }
+
     /* Goto field. */
     if (go_s || go_f || go_u) {
         emit(c, "\t:");
-        if (go_s) emit(c, "S(%s)", sval_or(go_s, "L"));
-        if (go_f) emit(c, "F(%s)", sval_or(go_f, "L"));
-        if (go_u) emit(c, "(%s)",  sval_or(go_u, "L"));
+        /* SCT-1b fix: for TT_GOTO_U the label lives in c[0]; for :goS/:goF
+         * (older .sc-parser shape) the label is in the attr's own v.sval. */
+        if (go_s) emit(c, "S(%s)", label_sanitize(label_of(go_s, "L")));
+        if (go_f) emit(c, "F(%s)", label_sanitize(label_of(go_f, "L")));
+        if (go_u) emit(c, "(%s)",  label_sanitize(label_of(go_u, "L")));
     }
     emit_nl(c);
 }
@@ -419,7 +768,7 @@ static void emit_node(sno_ctx_t *c, const tree_t *n) {
          * label and no goto.  Bare-expr statements may fail silently per
          * ARCH-SNOCONE.md. */
         if (c->pending_label) {
-            emit(c, "%s\t", c->pending_label);
+            emit(c, "%s\t", label_sanitize(c->pending_label));
             c->pending_label = NULL;
         } else {
             emit(c, "\t");
@@ -442,7 +791,9 @@ static void emit_program(sno_ctx_t *c, const tree_t *prog) {
  * statement required by SPITBOL Ch.14.
  *---------------------------------------------------------------------------*/
 int tree_to_sno(const tree_t *ast, FILE *out) {
-    sno_ctx_t c = { out, 0, 0, NULL };
+    sno_ctx_t c;
+    memset(&c, 0, sizeof c);   /* SCT-1b: clears loop stack, if_seq, etc. */
+    c.out = out;
     if (!ast || !out) return -1;
     /* Prelude — Snocone parser_*.sc files all expect &FULLSCAN nonzero.
      * SPITBOL accepts this as a no-op; standard SNOBOL4 requires it for
