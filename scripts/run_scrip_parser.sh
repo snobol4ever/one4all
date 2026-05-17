@@ -49,8 +49,14 @@ LOWER=(
 DRIVER="$SD/parser_${LANG}.sc"
 if [ ! -f "$DRIVER" ]; then echo "SKIP no driver: $DRIVER"; exit 0; fi
 
+# Load language-specific helpers (defined outside parser file per PST rules)
+HELPERS=()
+if [ -f "$SD/${LANG}_helpers.sc" ]; then
+    HELPERS=("$SD/${LANG}_helpers.sc")
+fi
+
 if [ -n "$SRC" ]; then
-    timeout 30 "$SCRIP" --ir-run "${RUNTIME[@]}" "${LOWER[@]}" "$DRIVER" < "$SRC"
+    timeout 30 "$SCRIP" --ir-run "${RUNTIME[@]}" "${LOWER[@]}" "${HELPERS[@]}" "$DRIVER" < "$SRC"
 else
-    timeout 30 "$SCRIP" --ir-run "${RUNTIME[@]}" "${LOWER[@]}" "$DRIVER"
+    timeout 30 "$SCRIP" --ir-run "${RUNTIME[@]}" "${LOWER[@]}" "${HELPERS[@]}" "$DRIVER"
 fi
