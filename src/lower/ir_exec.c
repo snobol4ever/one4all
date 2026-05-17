@@ -49,7 +49,7 @@ static int ir_is_single_shot(IR_t * e) {
     case IR_ICN_ALTERNATE: case IR_ICN_LIMIT: case IR_ICN_BINOP: case IR_ICN_TO_NESTED:
     case IR_ICN_PROC_GEN: case IR_BINOP_GEN: case IR_ALT: case IR_ALTERNATE:
     case IR_SUSPEND: case IR_REPEAT: case IR_TO_BY: case IR_LIMIT: case IR_ICN_SCAN:
-    case IR_ICN_LIST_BANG:
+    case IR_ICN_LIST_BANG: case IR_ICN_KEY_GEN:
         return 0;
     case IR_CALL: {
         if (!e->sval) return 1;
@@ -228,7 +228,7 @@ IR_t * IR_exec_node(IR_t * nd) {
             (k) == IR_ICN_TO || (k) == IR_ICN_TO_BY || (k) == IR_ICN_UPTO || \
             (k) == IR_ALT || (k) == IR_ALTERNATE || (k) == IR_BINOP_GEN || \
             (k) == IR_ICN_ITERATE || (k) == IR_ICN_LIMIT || (k) == IR_ICN_PROC_GEN || \
-            (k) == IR_ICN_LIST_BANG || (k) == IR_TO_BY)
+            (k) == IR_ICN_LIST_BANG || (k) == IR_ICN_KEY_GEN || (k) == IR_TO_BY)
         int l_gen = IR_IS_GEN_KIND(nd->c[0]->t);
         int r_gen = IR_IS_GEN_KIND(nd->c[1]->t);
         if (nd->state == 0) {
@@ -468,7 +468,7 @@ IR_t * IR_exec_node(IR_t * nd) {
             (k) == IR_ICN_TO || (k) == IR_ICN_TO_BY || (k) == IR_ICN_UPTO || \
             (k) == IR_ALT    || (k) == IR_ALTERNATE  || (k) == IR_BINOP_GEN || \
             (k) == IR_ICN_ITERATE || (k) == IR_ICN_LIMIT || (k) == IR_ICN_PROC_GEN || \
-            (k) == IR_ICN_LIST_BANG || (k) == IR_TO_BY  || (k) == IR_ICN_ALTERNATE)
+            (k) == IR_ICN_LIST_BANG || (k) == IR_ICN_KEY_GEN || (k) == IR_TO_BY  || (k) == IR_ICN_ALTERNATE)
         if (nd->n < 1) { nd->value = FAILDESCR; return nd->ω; }
         if (nd->state == 0) {
             for (int i = 0; i < nd->n; i++) {
@@ -1011,6 +1011,56 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->value = rhs;
         return nd->γ;
     }
+    case IR_ICN_IDX_SET: {
+        /* Icon base[idx] := rhs.  c[0]=base, c[1]=index, c[2]=rhs; calls subscript_set.         */
+        /* Returns the rhs value on success (Icon assignment expression semantics).                */
+        if (nd->n < 3 || !nd->c[0] || !nd->c[1] || !nd->c[2]) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[0]);
+        DESCR_t base = nd->c[0]->value;
+        if (IS_FAIL_fn(base)) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[1]);
+        DESCR_t idx = nd->c[1]->value;
+        if (IS_FAIL_fn(idx)) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[2]);
+        DESCR_t rhs = nd->c[2]->value;
+        if (IS_FAIL_fn(rhs)) { nd->value = FAILDESCR; return nd->ω; }
+        if (!subscript_set(base, idx, rhs)) { nd->value = FAILDESCR; return nd->ω; }
+        nd->value = rhs;
+        return nd->γ;
+    }
+    case IR_ICN_KEY_GEN: {
+        /* key(t) generator.  c[0]=table expr.  Yields each key in bucket order.                  */
+        /* α (state==0): evaluate table, cache in opaque, reset bucket+entry pointers.             */
+        /* β (state==1): advance to next entry.  γ on hit, ω when all buckets exhausted.          */
+        if (nd->n < 1 || !nd->c[0]) { nd->value = FAILDESCR; return nd->ω; }
+        TBBLK_t *tbl = NULL;
+        if (nd->state == 0) {
+            IR_exec_node(nd->c[0]);
+            DESCR_t tv = nd->c[0]->value;
+            if (IS_FAIL_fn(tv) || tv.v != DT_T || !tv.tbl) { nd->value = FAILDESCR; return nd->ω; }
+            tbl = tv.tbl;
+            nd->opaque  = (void *)tbl;
+            nd->counter = 0;   /* current bucket index */
+            nd->ival    = 0;   /* entry index within all entries (flat) */
+            nd->state   = 1;
+        } else {
+            tbl = (TBBLK_t *)nd->opaque;
+            nd->ival++;        /* advance to next entry */
+        }
+        if (!tbl) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+        /* Walk entries in order to find the nd->ival-th one. */
+        int64_t target = nd->ival, seen = 0;
+        for (int b = 0; b < TABLE_BUCKETS; b++) {
+            for (TBPAIR_t *ep = tbl->buckets[b]; ep; ep = ep->next) {
+                if (seen == target) {
+                    nd->value = ep->key_descr;
+                    return nd->γ;
+                }
+                seen++;
+            }
+        }
+        nd->state = 0; nd->opaque = NULL; nd->value = FAILDESCR; return nd->ω;
+    }
     case IR_CASE: {
         /* Icon case E of { K1: V1; K2: V2; ...; default: VD }.                                  */
         /* c[0]=selector; c[1],c[2]=key1,val1; c[3],c[4]=key2,val2; ... last child=default.      */
@@ -1275,7 +1325,7 @@ IR_t * IR_exec_node(IR_t * nd) {
             (k) == IR_ICN_TO || (k) == IR_ICN_TO_BY || (k) == IR_ICN_UPTO || \
             (k) == IR_ALT || (k) == IR_ALTERNATE || (k) == IR_BINOP_GEN || \
             (k) == IR_ICN_ITERATE || (k) == IR_ICN_LIMIT || (k) == IR_ICN_PROC_GEN || \
-            (k) == IR_ICN_LIST_BANG || (k) == IR_TO_BY)
+            (k) == IR_ICN_LIST_BANG || (k) == IR_ICN_KEY_GEN || (k) == IR_TO_BY)
         int has_dyn = (nd->n >= 2 && nd->c[0] && nd->c[1]);
         int lo_gen  = has_dyn && IR_IS_GEN_KIND_TO(nd->c[0]->t);
         int hi_gen  = has_dyn && IR_IS_GEN_KIND_TO(nd->c[1]->t);

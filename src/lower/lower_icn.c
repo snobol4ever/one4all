@@ -328,6 +328,25 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
             nd->n    = 2;
             return nd;
         }
+        /* TT_IDX lhs: base[idx] := rhs  → IR_ICN_IDX_SET                                         */
+        if (e->c[0]->t == TT_IDX) {
+            if (e->c[0]->n < 2 || !e->c[0]->c[0] || !e->c[0]->c[1]) return NULL;
+            IR_t *base = lower_icn_expr_node(cfg, e->c[0]->c[0]);
+            if (!base) return NULL;
+            IR_t *idx  = lower_icn_expr_node(cfg, e->c[0]->c[1]);
+            if (!idx) return NULL;
+            IR_t *rhs  = lower_icn_expr_node(cfg, e->c[1]);
+            if (!rhs) return NULL;
+            IR_t *nd = IR_node_alloc(cfg, IR_ICN_IDX_SET);
+            if (!nd) return NULL;
+            nd->c = calloc(3, sizeof(IR_t *));
+            if (!nd->c) return NULL;
+            nd->c[0] = base;
+            nd->c[1] = idx;
+            nd->c[2] = rhs;
+            nd->n    = 3;
+            return nd;
+        }
         if (e->c[0]->t != TT_VAR) return NULL;
         if (e->c[0]->v.sval && e->c[0]->v.sval[0] == '&') return NULL;
         IR_t *lhs = lower_icn_expr_node(cfg, e->c[0]);
@@ -346,6 +365,18 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     case TT_FNC: {
         if (e->n < 1 || !e->c[0] || e->c[0]->t != TT_VAR || !e->c[0]->v.sval) return NULL;
         int nargs = e->n - 1;
+        /* key(t) — lower to IR_ICN_KEY_GEN, a true generator yielding every key.                  */
+        if (nargs == 1 && strcmp(e->c[0]->v.sval, "key") == 0 && e->c[1]) {
+            IR_t *tbl = lower_icn_expr_node(cfg, e->c[1]);
+            if (!tbl) return NULL;
+            IR_t *nd = IR_node_alloc(cfg, IR_ICN_KEY_GEN);
+            if (!nd) return NULL;
+            nd->c = calloc(1, sizeof(IR_t *));
+            if (!nd->c) return NULL;
+            nd->c[0] = tbl;
+            nd->n    = 1;
+            return nd;
+        }
         IR_t **args = NULL;
         if (nargs > 0) {
             args = calloc((size_t)nargs, sizeof(IR_t *));

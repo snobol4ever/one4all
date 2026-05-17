@@ -115,6 +115,8 @@ typedef enum {
     IR_ICN_RECORD_DEF,  /* Icon `record T(f1,f2,...)` — sval=spec string; α runs DEFDAT+sc_dat_register once          */
     IR_ICN_FIELD_GET,   /* Icon obj.field read  — c[0]=object expr, sval=field name; calls data_field_ptr            */
     IR_ICN_FIELD_SET,   /* Icon obj.field := rhs — c[0]=object expr, c[1]=rhs expr, sval=field name; data_field_ptr  */
+    IR_ICN_IDX_SET,     /* Icon base[idx] := rhs — c[0]=base, c[1]=index, c[2]=rhs; calls subscript_set              */
+    IR_ICN_KEY_GEN,     /* Icon key(t) generator — c[0]=table expr; yields each key in bucket order                   */
     IR_E_COUNT
 } IR_e;
 typedef struct IR_t IR_t;
