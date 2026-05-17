@@ -559,7 +559,7 @@ static const sm_op_template_t g_sm_templates[] = {
     { SM_BB_PUMP         , "BB_PUMP"         , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_BB_PUMP      , 0 },
     { SM_BB_ONCE         , "BB_ONCE"         , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_BB_ONCE      , 0 },
     { SM_BB_EVAL         , "BB_EVAL"         , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_BB_EVAL      , 0 },
-    { SM_BB_ONCE_PROC    , "BB_ONCE_PROC"    , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_BB_ONCE_PROC , 0 },
+    { SM_BB_ONCE_PROC    , "BB_ONCE_PROC"    , "rt_bb_once_proc"    , SM_TPL_LBL_INT32 , 0               , 0 },
     { SM_BB_PUMP_PROC    , "BB_PUMP_PROC"    , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_BB_PUMP_PROC , 0 },
     { SM_BB_PUMP_CASE    , "BB_PUMP_CASE"    , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_BB_PUMP_CASE , 0 },
     { SM_BB_PUMP_SM      , "BB_PUMP_SM"      , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_BB_PUMP_SM   , 0 },
@@ -2155,6 +2155,21 @@ static int emit_sm_call_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return emit_sm_lbl_int32(out, sm_template_lookup(SM_CALL_FN),
                              lbl, nargs, anno);
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PJ-9c: emit Mode-4 dispatch for SM_BB_ONCE_PROC (Prolog predicate invocation).                                        */
+/* Mirrors emit_sm_call_dispatch — operands are (name string, arity int), template is SM_TPL_LBL_INT32                  */
+/* in g_sm_templates[] mapped to rt_bb_once_proc (defined in src/runtime/rt/rt.c).                                       */
+static int emit_sm_bb_once_proc_dispatch(FILE *out, const SM_Instr *ins, int pc)
+{
+    (void)pc;
+    const char *name  = ins->a[0].s ? ins->a[0].s : "";
+    int         arity = (int)ins->a[1].i;
+    char lbl[32], anno[80];
+    strtab_label(lbl, sizeof(lbl), name);
+    snprintf(anno, sizeof(anno), "# %s/%d", name, arity);
+    return emit_sm_lbl_int32(out, sm_template_lookup(SM_BB_ONCE_PROC),
+                             lbl, arity, anno);
+}
 __attribute__((unused))
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_call_legacy(FILE *out, const SM_Instr *ins, int pc)
@@ -2954,6 +2969,7 @@ int emit_walk_codegen(SM_Program *prog, FILE *out, const char *src_path)
             case SM_DEFINE_ENTRY: rc = emit_sm_define_entry_dispatch(out, ins, pc, prog); break;
             case SM_DEFINE:       rc = emit_sm_define_dispatch(out, ins, pc);              break;
             case SM_CALL_FN:         rc = emit_sm_call_dispatch(out, ins, pc); break;
+            case SM_BB_ONCE_PROC:    rc = emit_sm_bb_once_proc_dispatch(out, ins, pc); break;
             case SM_CONCAT:       rc = emit_sm_concat_dispatch(out, pc);      break;
             case SM_PUSH_NULL:    rc = emit_sm_push_null_dispatch(out, pc);   break;
             case SM_PUSH_NULL_NOFLIP: rc = emit_sm_push_null_noflip_dispatch(out, pc); break;

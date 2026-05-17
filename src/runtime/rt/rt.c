@@ -818,6 +818,24 @@ void rt_unhandled_sm(int op)
     abort();
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* rt_bb_once_proc — Mode 4 runtime helper for SM_BB_ONCE_PROC (PJ-9c).                                                  */
+/* Mirrors `case SM_BB_ONCE_PROC` in src/processor/sm_interp.c:671 (the Mode 2 body).                                    */
+/* Looks up Prolog predicate by name/arity in g_dcg_table, drives via bb_broker(node, BB_ONCE, ...).                     */
+/* On miss: print [NO-AST] fingerprint to match Modes 2/3 (RULES.md stub-fingerprint convention).                        */
+#include "../interp/pl_runtime.h"
+void rt_bb_once_proc(const char *name, int arity)
+{
+    bb_node_t node = pl_bb_once_proc_by_name(name, arity);
+    if (node.fn) {
+        Term **saved_env = g_pl_env;
+        pl_bb_env_push(16);
+        (void)bb_broker(node, BB_ONCE, NULL, NULL);
+        pl_bb_env_pop(saved_env);
+    } else {
+        fprintf(stderr, "[NO-AST] SM_BB_ONCE_PROC stub: needs fresh SM/BB lowering\n");
+    }
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t subscript_get(DESCR_t arr, DESCR_t idx);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t subscript_get2(DESCR_t arr, DESCR_t i, DESCR_t j);
