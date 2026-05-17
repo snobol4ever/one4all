@@ -272,13 +272,12 @@ int main(int argc, char **argv)
                    parser_*.sc validation has a reference). */
                 ir_dump_program(sub_ast, stdout); return 0;
             }
-            if (dump_sno && sub_ast) {
-                /* SCT-1: transpile tree_t to portable SNOBOL4. Same shape as
-                   --dump-ast above; the producer (any of the six frontends)
-                   feeds the same tree_to_sno() walker. */
-                extern int tree_to_sno(const tree_t *ast, FILE *out);
-                tree_to_sno(sub_ast, stdout); return 0;
-            }
+            /* SCT-1c (2026-05-17, was SCT-1): --dump-sno previously returned
+             * after the first file.  Now it merges into ast_prog so the
+             * runtime prelude (global.sc + tree.sc + stack.sc + counter.sc +
+             * ShiftReduce.sc + semantic.sc + tdump.sc) can be passed ahead
+             * of the parser_*.sc file.  Actual dump fires after the multi-
+             * file loop completes (search for "dump_sno &&" below). */
             MERGE_AST(sub_ast);
         } else if (dump_ir) {
             FILE *f = fopen(input_path, "r");
@@ -289,18 +288,15 @@ int main(int argc, char **argv)
             ir_dump_program(sub_ast, stdout);
             return 0;
         } else if (dump_sno) {
-            /* SCT-1: same path as --dump-ast for SNOBOL4 input, but emit
-               SNOBOL4 source instead of an AST dump. */
+            /* SCT-1c: SNOBOL4 input case.  Accumulate (mirror of the
+             * snocone/rebus/etc. case above) — actual dump fires after the
+             * multi-file loop completes. */
             FILE *f = fopen(input_path, "r");
             if (!f) { fprintf(stderr, "scrip: cannot open '%s'\n", input_path); return 1; }
             if (opt_bench) clock_gettime(CLOCK_MONOTONIC, &_t1);
             tree_t *sub_ast = sno_parse_ast(f, input_path, NULL);
             fclose(f);
-            {
-                extern int tree_to_sno(const tree_t *ast, FILE *out);
-                tree_to_sno(sub_ast, stdout);
-            }
-            return 0;
+            MERGE_AST(sub_ast);
         } else {
             FILE *f = fopen(input_path, "r");
             if (!f) { fprintf(stderr, "scrip: cannot open '%s'\n", input_path); return 1; }
@@ -357,6 +353,18 @@ int main(int argc, char **argv)
         if (!sm0) { fprintf(stderr, "scrip: sm_lower failed\n"); return 1; }
         sm_prog_print(sm0, stdout);
         sm_prog_free(sm0);
+        return 0;
+    }
+    if (dump_sno) {
+        /* SCT-1c: emit the accumulated multi-file AST as portable SNOBOL4.
+         * Mirrors the dump_sm shape above — runs at end of the multi-file
+         * loop, after MERGE_AST has built ast_prog from every input.
+         *
+         * Use case: `scrip --dump-sno global.sc tree.sc ... parser_*.sc > p.sno`
+         * yields a single self-contained .sno that SPITBOL/SCRIP can run
+         * without external dependencies. */
+        extern int tree_to_sno(const tree_t *ast, FILE *out);
+        tree_to_sno(ast_prog, stdout);
         return 0;
     }
     if (mode_jit_emit_x64) {
