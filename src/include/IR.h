@@ -100,6 +100,10 @@ typedef enum {
     IR_RANDOM,          /* Icon ?E random element — c[0]=operand; succeed with random value, else ω                 */
     IR_NEG,             /* Icon -E unary minus — c[0]=operand; succeed with -E (numeric coerce), else ω             */
     IR_POS,             /* Icon +E unary plus  — c[0]=operand; succeed with +E (numeric coerce), else ω             */
+    IR_CSET_COMPL,      /* Icon ~E cset complement — c[0]=operand; coerce to string, complement vs &cset (256 chars) */
+    IR_CSET_UNION,      /* Icon E1++E2 cset union — c[0]/c[1]=operands; coerce to strings, canonical(union(a,b))    */
+    IR_CSET_DIFF,       /* Icon E1--E2 cset difference — c[0]/c[1]=operands; coerce to strings, canonical(diff(a,b))*/
+    IR_CSET_INTER,      /* Icon E1**E2 cset intersection — c[0]/c[1]=operands; coerce to strings, canonical(inter)  */
     IR_ICN_SCAN,        /* Icon subj ? body — c[0]=subj, c[1]=body; saves+sets scan_subj/scan_pos, restores on exit */
     IR_ICN_KEYWORD,     /* Icon &name keyword read — sval=full name with leading '&' (e.g. "&subject", "&pos")      */
     IR_BINOP_GEN,       /* Generator-aware binop — same encoding as IR_BINOP (ival=op, ival2=is_relop, c[0]/c[1]   */

@@ -776,6 +776,42 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         nd->n    = 1;
         return nd;
     }
+    case TT_CSET_COMPL: {
+        /* Icon ~E cset complement.  Lowered IR node coerces operand to string at runtime and        */
+        /* invokes icn_cset_complement against the 256-char universal cset.                          */
+        if (e->n < 1 || !e->c[0]) return NULL;
+        IR_t *inner = lower_icn_expr_node(cfg, e->c[0]);
+        if (!inner) return NULL;
+        IR_t *nd = IR_node_alloc(cfg, IR_CSET_COMPL);
+        if (!nd) return NULL;
+        nd->c = calloc(1, sizeof(IR_t *));
+        if (!nd->c) return NULL;
+        nd->c[0] = inner;
+        nd->n    = 1;
+        return nd;
+    }
+    case TT_CSET_UNION:
+    case TT_CSET_DIFF:
+    case TT_CSET_INTER: {
+        /* Icon cset binops E1++E2 / E1--E2 / E1**E2.  Lower both operands, allocate matching IR     */
+        /* node.  Executor coerces operands to strings and merges via icn_cset_{union,diff,inter}.   */
+        if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
+        IR_t *lhs = lower_icn_expr_node(cfg, e->c[0]);
+        if (!lhs) return NULL;
+        IR_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
+        if (!rhs) return NULL;
+        IR_e kind = (e->t == TT_CSET_UNION) ? IR_CSET_UNION
+                  : (e->t == TT_CSET_DIFF)  ? IR_CSET_DIFF
+                                            : IR_CSET_INTER;
+        IR_t *nd = IR_node_alloc(cfg, kind);
+        if (!nd) return NULL;
+        nd->c = calloc(2, sizeof(IR_t *));
+        if (!nd->c) return NULL;
+        nd->c[0] = lhs;
+        nd->c[1] = rhs;
+        nd->n    = 2;
+        return nd;
+    }
     default:
         return NULL;
     }

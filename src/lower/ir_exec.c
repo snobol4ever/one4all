@@ -20,6 +20,7 @@ extern int         Σlen;
 #include "lower_icn.h"
 #include "sm_interp.h"
 #include "../runtime/interp/icn_runtime.h"
+#include "coerce.h"
 extern int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR_t *out);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void bb_exec_stmt(void *e);
@@ -653,6 +654,40 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->value = result;
         return nd->γ;
     }
+    case IR_CSET_COMPL: {
+        /* Icon ~E cset complement.  Evaluate c[0]; coerce int/real → string; complement against     */
+        /* the 256-char universal cset via icn_cset_complement.  Mirrors TT_CSET_COMPL in icn_value.c. */
+        if (nd->n < 1 || !nd->c[0]) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[0]);
+        DESCR_t v = nd->c[0]->value;
+        if (IS_FAIL_fn(v)) { nd->value = FAILDESCR; return nd->ω; }
+        if (IS_INT_fn(v) || IS_REAL_fn(v)) v = descr_to_str_icn(v);
+        const char *cs = IS_NULL_fn(v) ? "" : VARVAL_fn(v);
+        nd->value = CSETVAL(icn_cset_complement(cs ? cs : ""));
+        return nd->γ;
+    }
+    case IR_CSET_UNION:
+    case IR_CSET_DIFF:
+    case IR_CSET_INTER: {
+        /* Icon cset binops: E1++E2 / E1--E2 / E1**E2.  Both operands coerced to strings, then       */
+        /* canonical-form-merged via icn_cset_{union,diff,inter}.  Mirrors TT_CSET_* in icn_value.c. */
+        if (nd->n < 2 || !nd->c[0] || !nd->c[1]) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[0]);
+        DESCR_t lv = nd->c[0]->value;
+        if (IS_FAIL_fn(lv)) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[1]);
+        DESCR_t rv = nd->c[1]->value;
+        if (IS_FAIL_fn(rv)) { nd->value = FAILDESCR; return nd->ω; }
+        if (IS_INT_fn(lv) || IS_REAL_fn(lv)) lv = descr_to_str_icn(lv);
+        if (IS_INT_fn(rv) || IS_REAL_fn(rv)) rv = descr_to_str_icn(rv);
+        const char *a = IS_NULL_fn(lv) ? "" : VARVAL_fn(lv); if (!a) a = "";
+        const char *b = IS_NULL_fn(rv) ? "" : VARVAL_fn(rv); if (!b) b = "";
+        const char *raw = (nd->t == IR_CSET_UNION) ? icn_cset_union(a, b)
+                        : (nd->t == IR_CSET_DIFF)  ? icn_cset_diff (a, b)
+                                                   : icn_cset_inter(a, b);
+        nd->value = CSETVAL(icn_cset_canonical(raw));
+        return nd->γ;
+    }
     case IR_ICN_SCAN: {
         /* Icon subj ? body.  c[0]=subj, c[1]=body.  Push scan_subj/scan_pos, eval body, restore.    */
         if (nd->n < 1 || !nd->c[0]) { nd->value = FAILDESCR; return nd->ω; }
@@ -704,6 +739,16 @@ IR_t * IR_exec_node(IR_t * nd) {
             nd->value = FAILDESCR;
             return nd->ω;
         }
+        /* Delegate to the central keyword dispatcher: handles &cset, &ascii, &lcase, &ucase,         */
+        /* &letters, &digits, &e, &pi, &phi, &error, &trace, &dump, &random, &level, &date, &time,   */
+        /* &clock, &dateline, &version, &input/&output/&errout, &main/&source/&current, and the      */
+        /* mouse-event keywords.  Returns FAILDESCR only for genuinely-unknown keywords, at which    */
+        /* point we fall through to the global-var lookup (handles user '&'-prefixed globals).      */
+        DESCR_t kv = icn_kw_read(kw);
+        if (!IS_FAIL_fn(kv)) {
+            nd->value = kv;
+            return nd->γ;
+        }
         /* Unknown keyword: fall back to global var lookup with leading '&'. */
         DESCR_t gv = NV_GET_fn(nd->sval);
         nd->value = gv;
@@ -711,13 +756,22 @@ IR_t * IR_exec_node(IR_t * nd) {
     }
     case IR_SIZE: {
         /* Icon *E — size of string/list/table. One child c[0]=E. Returns integer length.       */
+        /* For csets, mirrors icn_value.c::TT_SIZE: use icn_kw_cset_len(ptr) for keyword csets   */
+        /* (&cset/&ascii/&lcase/...) since their canonical-form buffer is null-prefixed and     */
+        /* would otherwise read as length 0 via strlen.                                          */
         if (nd->n < 1 || !nd->c[0]) { nd->value = INTVAL(0); return nd->γ; }
         IR_exec_node(nd->c[0]);
         DESCR_t v = nd->c[0]->value;
         if (IS_FAIL_fn(v)) { nd->value = FAILDESCR; return nd->ω; }
         if (IS_INT_fn(v) || IS_REAL_fn(v)) { nd->value = INTVAL(0); return nd->γ; }
-        const char *s = VARVAL_fn(v);
-        long len = s ? (long)strlen(s) : 0;
+        long len;
+        if (IS_CSET_fn(v)) {
+            int klen = icn_kw_cset_len(v.s);
+            len = klen >= 0 ? (long)klen : (v.s ? (long)strlen(v.s) : 0);
+        } else {
+            const char *s = VARVAL_fn(v);
+            len = s ? (long)strlen(s) : 0;
+        }
         nd->value = INTVAL(len);
         return nd->γ;
     }
