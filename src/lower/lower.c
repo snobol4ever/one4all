@@ -28,10 +28,14 @@ void lower_pat_expr(const tree_t *t);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void lower_stmt    (const tree_t *s);
 #define LOWER_UNHANDLED_WORDS 4
-/* ICN_BB_EVAL: shortcut for Icon expressions outside generator proc bodies. Generator procs run via */
-/* GeneratorState and need REAL SM instructions (their SM body is re-entered on each pump); when     */
-/* g_in_gen_proc_body is set, fall through to the standard lowering path that emits actual SM ops.   */
-#define ICN_BB_EVAL(t) do { if (g_lang == LANG_ICN && !g_in_gen_proc_body) { sm_emit_i(g_p, SM_BB_EVAL, (int64_t)every_table_register((tree_t *)(t))); return; } } while(0)
+/* ICN_BB_EVAL: was a shortcut emitting SM_BB_EVAL <every_table_index> for Icon expressions */
+/* outside generator proc bodies; runtime then called icn_bb_build(tree_t*) to construct a   */
+/* BB graph from the deferred AST.  Disabled in DAI-3 (IJ-DEL-ICN-AST cont., 2026-05-17f):    */
+/* (a) icn_bb_build was amputated to a [DAI-BOMB] stub; (b) the SM_BB_EVAL handler in         */
+/* sm_jit_interp.c was already NULL, so the opcode was emitted but never executed.  Falling    */
+/* through to the standard SM lowering lets Icon expressions emit the same SM ops as every    */
+/* other language.  Outer comment retained for archaeology.                                    */
+#define ICN_BB_EVAL(t) do { (void)(t); } while(0)
 static SM_Program  *g_p;
 static LabelTable   g_labtab;
 static int          g_in_proc_body;
