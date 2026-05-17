@@ -6,6 +6,7 @@
 #include "../frontend/icon/icon_lex.h"
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern int is_suspendable(tree_t *e);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -177,6 +178,7 @@ DESCR_t icn_binop_apply(IcnBinopKind op, DESCR_t lv, DESCR_t rv, int *rel_fail) 
         case ICN_BINOP_MUL: if (either_real) { real_result.v=DT_R; real_result.r=ld*rd; return real_result; } return INTVAL(li * ri);
         case ICN_BINOP_DIV: if (either_real) { if (rd == 0.0) return FAILDESCR; real_result.v=DT_R; real_result.r=ld/rd; return real_result; } return ri ? INTVAL(li / ri) : FAILDESCR;
         case ICN_BINOP_MOD: return ri ? INTVAL(li % ri) : FAILDESCR;
+        case ICN_BINOP_POW: { double base = either_real ? ld : (double)li; double exp2 = either_real ? rd : (double)ri; double r = pow(base, exp2); real_result.v = DT_R; real_result.r = r; return real_result; }
         case ICN_BINOP_LT: *rel_fail = !(either_real ? ld <  rd : li <  ri); return *rel_fail ? FAILDESCR : rv;
         case ICN_BINOP_LE: *rel_fail = !(either_real ? ld <= rd : li <= ri); return *rel_fail ? FAILDESCR : rv;
         case ICN_BINOP_GT: *rel_fail = !(either_real ? ld >  rd : li >  ri); return *rel_fail ? FAILDESCR : rv;
@@ -394,6 +396,27 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         nd->state = 0;
         return nd;
     }
+    case TT_TO_BY: {
+        /* Icon `lo to hi by step` generator — IJ-TOBY-REAL: supports integer and real-typed bounds.        */
+        /* n=2: lo to hi (step defaults to +1). n=3: lo to hi by step.                                      */
+        /* Emit IR_TO_BY with c[0]=lo, c[1]=hi, c[2]=step (if n>=3). The executor reads DT_R bounds.        */
+        if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
+        IR_t *nd = IR_node_alloc(cfg, IR_TO_BY);
+        if (!nd) return NULL;
+        int nc = (e->n >= 3 && e->c[2]) ? 3 : 2;
+        nd->c = calloc((size_t)nc, sizeof(IR_t *));
+        if (!nd->c) return NULL;
+        nd->c[0] = lower_icn_expr_node(cfg, e->c[0]);
+        nd->c[1] = lower_icn_expr_node(cfg, e->c[1]);
+        if (!nd->c[0] || !nd->c[1]) return NULL;
+        if (nc == 3) {
+            nd->c[2] = lower_icn_expr_node(cfg, e->c[2]);
+            if (!nd->c[2]) return NULL;
+        }
+        nd->n     = nc;
+        nd->state = 0;
+        return nd;
+    }
     case TT_EVERY: {
         /* every E [do B].  c[0]=generator expr (required), c[1]=body (optional).                                                                                                                            */
         /* Statement consumer: IR_EVERY drives c[0] to exhaustion in a single outer IR_exec_node call.                                                                                                       */
@@ -453,7 +476,7 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         nd->n = e->n;
         return nd;
     }
-    case TT_ADD: case TT_SUB: case TT_MUL: case TT_DIV: case TT_MOD:
+    case TT_ADD: case TT_SUB: case TT_MUL: case TT_DIV: case TT_MOD: case TT_POW:
     case TT_LT:  case TT_LE:  case TT_GT:  case TT_GE:  case TT_EQ:  case TT_NE:
     case TT_CAT: {
         /* Plain or generator-aware binop. If either operand is suspendable (a generator), emit       */
@@ -480,6 +503,7 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         case TT_MUL: op = ICN_BINOP_MUL;    break;
         case TT_DIV: op = ICN_BINOP_DIV;    break;
         case TT_MOD: op = ICN_BINOP_MOD;    break;
+        case TT_POW: op = ICN_BINOP_POW;    break;
         case TT_LT:  op = ICN_BINOP_LT; is_relop = 1; break;
         case TT_LE:  op = ICN_BINOP_LE; is_relop = 1; break;
         case TT_GT:  op = ICN_BINOP_GT; is_relop = 1; break;
@@ -645,6 +669,7 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         case AUGOP_MUL:    op = ICN_BINOP_MUL;    break;
         case AUGOP_DIV:    op = ICN_BINOP_DIV;    break;
         case AUGOP_MOD:    op = ICN_BINOP_MOD;    break;
+        case AUGOP_POW:    op = ICN_BINOP_POW;    break;
         case AUGOP_CONCAT: op = ICN_BINOP_CONCAT; break;
         case AUGOP_EQ:     op = ICN_BINOP_EQ;  is_relop = 1; break;
         case AUGOP_LT:     op = ICN_BINOP_LT;  is_relop = 1; break;
