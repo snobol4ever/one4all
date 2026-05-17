@@ -43,6 +43,10 @@ typedef struct {
     const char *cont_lbl [SNO_LOOP_STACK_MAX];
     int   loop_top;       /* index of next free slot; 0 = empty */
     int   if_seq;         /* monotonic counter for synthesized IF labels */
+    /* SCT-1c: line-buffered emission for >1024-char continuation handling.
+     * Forward-declared SNO_LINEBUF; the buffer is sized below the struct. */
+    char  linebuf[16384];
+    int   linelen;
 } sno_ctx_t;
 
 static void emit(sno_ctx_t *c, const char *fmt, ...);
@@ -52,14 +56,138 @@ static void emit_stmt(sno_ctx_t *c, const tree_t *stmt);
 static void emit_program(sno_ctx_t *c, const tree_t *prog);
 
 #include <stdarg.h>
+/*-----------------------------------------------------------------------------
+ * SCT-1c: line-buffered emit + continuation-aware emit_nl.
+ *
+ * SPITBOL Manual Ch.14 line 9456+ requires:
+ *   "Program lines may be up to 1,024 characters long—characters beyond
+ *    the 1,024th are ignored."
+ *   "A SPITBOL statement may be divided across several lines by placing
+ *    a plus (+) or period (.) in character position one of the successive
+ *    lines. ... The statement must be divided at a point where a blank or
+ *    tab could appear as an operator or separator; it cannot be split in
+ *    the middle of a name or quoted string."
+ *
+ * Strategy: emit() accumulates the current statement into c->linebuf
+ * (max SNO_LINEBUF — well above 1024).  emit_nl() flushes:
+ *   - If the line is short, write as-is + newline.
+ *   - If long, find safe split points (spaces outside quoted strings)
+ *     under SNO_LINE_SPLIT_AT and emit chunks separated by `\n+\t`.
+ *
+ * The lower_sno.c emitter parenthesises every binary op (TT_ADD wraps in
+ * `(...)`, alternation in `(...|...)`, etc.) so every space between
+ * tokens IS a safe split point — precedence is preserved by the parens.
+ *---------------------------------------------------------------------------*/
+#define SNO_LINEBUF       16384
+#define SNO_LINE_SPLIT_AT   900   /* leave headroom under the 1024 hard cap */
+
+/* Forward declaration of sno_ctx_t fields used below — full struct already
+ * defined above with linebuf/linelen members; this comment is just a marker. */
+
 static void emit(sno_ctx_t *c, const char *fmt, ...) {
     va_list ap; va_start(ap, fmt);
-    vfprintf(c->out, fmt, ap);
+    /* Append into c->linebuf rather than directly to FILE.  vsnprintf
+     * returns the number of chars it WOULD have written; clamp on overflow. */
+    int remaining = SNO_LINEBUF - c->linelen - 1;
+    if (remaining < 0) remaining = 0;
+    int n = vsnprintf(c->linebuf + c->linelen, remaining, fmt, ap);
     va_end(ap);
+    if (n > 0) {
+        if (n > remaining) n = remaining;
+        c->linelen += n;
+    }
 }
+
+/* Detect whether index `i` in `buf` lies inside a single- or double-quoted
+ * SNOBOL4 string.  Walks from start because SNOBOL4 has no escape character —
+ * every quote is structural.  O(n) per query but called only for line-split
+ * decisions on overlong lines (rare). */
+static int sno_in_quoted(const char *buf, int upto) {
+    int in_sq = 0, in_dq = 0;
+    for (int i = 0; i < upto; i++) {
+        char ch = buf[i];
+        if (in_sq) { if (ch == '\'') in_sq = 0; continue; }
+        if (in_dq) { if (ch == '"')  in_dq = 0; continue; }
+        if (ch == '\'') in_sq = 1;
+        else if (ch == '"') in_dq = 1;
+    }
+    return in_sq || in_dq;
+}
+
+/* Find a safe split point at or before `target` in `buf` of length `len`.
+ * Returns the index of the space (or tab) to split AT — caller flushes
+ * buf[0..idx], emits "\n+\t", and continues with buf[idx+1..len].
+ * Returns -1 if no safe split point exists (caller emits the long line as-is
+ * and accepts the SPITBOL truncation/error). */
+static int sno_find_split(const char *buf, int len, int target) {
+    if (target > len) target = len;
+    /* Scan backward from target for a space/tab outside quoted strings.
+     * Stop at column 8 minimum (don't put the split before the actual
+     * statement starts — leave the leading tab + label/subj prefix). */
+    for (int i = target; i >= 8; i--) {
+        char ch = buf[i];
+        if (ch == ' ' || ch == '\t') {
+            if (!sno_in_quoted(buf, i)) return i;
+        }
+    }
+    /* Forward scan from target — accept overshoot if no backward split. */
+    for (int i = target + 1; i < len; i++) {
+        char ch = buf[i];
+        if (ch == ' ' || ch == '\t') {
+            if (!sno_in_quoted(buf, i)) return i;
+        }
+    }
+    return -1;
+}
+
 static void emit_nl(sno_ctx_t *c) {
-    fputc('\n', c->out);
-    c->lines++;
+    /* Flush c->linebuf to c->out, splitting at safe points if needed. */
+    int len = c->linelen;
+    const char *buf = c->linebuf;
+    if (len == 0) {
+        fputc('\n', c->out);
+        c->lines++;
+        c->in_stmt = 0;
+        return;
+    }
+    if (len <= SNO_LINE_SPLIT_AT) {
+        fwrite(buf, 1, len, c->out);
+        fputc('\n', c->out);
+        c->lines++;
+    } else {
+        /* Need continuation.  Split into chunks of <= SNO_LINE_SPLIT_AT. */
+        int start = 0;
+        while (len - start > SNO_LINE_SPLIT_AT) {
+            int sub_len = len - start;
+            /* Find split AT (relative to buf) so chunk [start..idx] is the
+             * piece to emit; everything after gets a '+'-prefix on next line. */
+            int idx = sno_find_split(buf, len, start + SNO_LINE_SPLIT_AT);
+            if (idx < 0 || idx <= start) {
+                /* No safe split found — emit the remainder as-is and accept
+                 * the truncation risk.  This shouldn't happen because the
+                 * Snocone emitter parenthesises everything, so spaces are
+                 * plentiful.  Diagnostic for future debugging. */
+                break;
+            }
+            /* Emit buf[start..idx-1] (excluding the splitting space). */
+            fwrite(buf + start, 1, idx - start, c->out);
+            fputc('\n', c->out);
+            c->lines++;
+            /* Continuation marker.  Use '+' (Manual Ch.14 line 9457).
+             * Skip the splitting space itself: idx -> idx+1.
+             * The leading '\t' here is just for human readability — '+' at
+             * column 1 is what SPITBOL requires; any whitespace follows. */
+            fputc('+', c->out);
+            start = idx + 1;
+        }
+        if (start < len) {
+            fwrite(buf + start, 1, len - start, c->out);
+        }
+        fputc('\n', c->out);
+        c->lines++;
+    }
+    c->linelen = 0;
+    c->linebuf[0] = '\0';
     c->in_stmt = 0;
 }
 
@@ -797,14 +925,17 @@ int tree_to_sno(const tree_t *ast, FILE *out) {
     if (!ast || !out) return -1;
     /* Prelude — Snocone parser_*.sc files all expect &FULLSCAN nonzero.
      * SPITBOL accepts this as a no-op; standard SNOBOL4 requires it for
-     * deferred-pattern semantics to work the Snocone way. */
-    emit(&c, "* Generated by scrip --dump-sno  (SCT-1, lower_sno.c)\n");
-    emit(&c, "\t&FULLSCAN = 1\n");
-    c.lines += 2;
+     * deferred-pattern semantics to work the Snocone way.
+     * SCT-1c: use emit + emit_nl pairs (no embedded \n) so the line buffer
+     * stays consistent. */
+    emit(&c, "* Generated by scrip --dump-sno  (SCT-1c, lower_sno.c)");
+    emit_nl(&c);
+    emit(&c, "\t&FULLSCAN = 1");
+    emit_nl(&c);
     /* The AST root is normally TT_PROGRAM.  If it's a bare node, wrap it. */
     if (ast->t == TT_PROGRAM) emit_program(&c, ast);
     else                      emit_node(&c, ast);
-    emit(&c, "END\n");
-    c.lines++;
+    emit(&c, "END");
+    emit_nl(&c);
     return c.lines;
 }
