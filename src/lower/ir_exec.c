@@ -808,6 +808,21 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->value = INTVAL(len);
         return nd->γ;
     }
+    case IR_ICN_IDX: {
+        /* Icon s[i] string/list/table subscript. c[0]=base, c[1]=index. Calls subscript_get for         */
+        /* type-dispatched subscript: strings (1-based, negative-OK), lists, tables. FAIL on OOB.        */
+        if (nd->n < 2 || !nd->c[0] || !nd->c[1]) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[0]);
+        DESCR_t base = nd->c[0]->value;
+        if (IS_FAIL_fn(base)) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[1]);
+        DESCR_t idx = nd->c[1]->value;
+        if (IS_FAIL_fn(idx)) { nd->value = FAILDESCR; return nd->ω; }
+        DESCR_t r = subscript_get(base, idx);
+        if (IS_FAIL_fn(r)) { nd->value = FAILDESCR; return nd->ω; }
+        nd->value = r;
+        return nd->γ;
+    }
     case IR_CASE: {
         /* Icon case E of { K1: V1; K2: V2; ...; default: VD }.                                  */
         /* c[0]=selector; c[1],c[2]=key1,val1; c[3],c[4]=key2,val2; ... last child=default.      */

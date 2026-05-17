@@ -109,6 +109,7 @@ typedef enum {
     IR_BINOP_GEN,       /* Generator-aware binop — same encoding as IR_BINOP (ival=op, ival2=is_relop, c[0]/c[1]   */
                         /* = lhs/rhs) but yields the cross-product when either operand is a generator. state==0   */
                         /* fresh, state==1 active; on beta resumes c[1] first, then advances c[0] and re-seeds c[1] */
+    IR_ICN_IDX,         /* Icon s[i] subscript — c[0]=base, c[1]=index; calls subscript_get(base,idx); FAIL on OOB  */
     IR_E_COUNT
 } IR_e;
 typedef struct IR_t IR_t;

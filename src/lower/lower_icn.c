@@ -570,6 +570,23 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         nd->n = 1;
         return nd;
     }
+    case TT_IDX: {
+        /* Icon s[i] subscript. c[0]=base, c[1]=index. Always 2-arg (icon_parse e_binary).              */
+        /* Executor calls subscript_get for type-dispatched access (strings/lists/tables).              */
+        if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
+        IR_t *base = lower_icn_expr_node(cfg, e->c[0]);
+        if (!base) return NULL;
+        IR_t *idx  = lower_icn_expr_node(cfg, e->c[1]);
+        if (!idx) return NULL;
+        IR_t *nd = IR_node_alloc(cfg, IR_ICN_IDX);
+        if (!nd) return NULL;
+        nd->c = calloc(2, sizeof(IR_t *));
+        if (!nd->c) return NULL;
+        nd->c[0] = base;
+        nd->c[1] = idx;
+        nd->n    = 2;
+        return nd;
+    }
     case TT_CASE: {
         /* Icon case E of { K1: V1; ...; default: VD }. c[0]=sel, then key/val pairs, opt default. */
         if (e->n < 1 || !e->c[0]) return NULL;
