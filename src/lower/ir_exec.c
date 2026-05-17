@@ -30,7 +30,7 @@ extern ScDatType *sc_dat_register(const char *spec);
 extern ScDatType *sc_dat_find_type(const char *name);
 extern DESCR_t    sc_dat_construct(ScDatType *t, DESCR_t *args, int nargs);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-extern void bb_exec_stmt(void *e);
+/* bb_exec_stmt extern removed (DAI-1, IJ-DEL-ICN-AST). */
 #include "bb_box.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t icn_binop_apply(IcnBinopKind op, DESCR_t lv, DESCR_t rv, int *rel_fail);
@@ -1702,19 +1702,9 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->value = v;
         return nd->γ;
     }
-    case IR_ICN_EVERY: {
-        bb_node_t *gen = (bb_node_t *)nd->opaque;
-        if (!gen) { nd->value = FAILDESCR; return nd->ω; }
-        int tick = (nd->state == 0) ? α : β;
-        nd->state = 1;
-        DESCR_t v = gen->fn(gen->ζ, tick);
-        if (IS_FAIL_fn(v)) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
-        icn_every_body_pre();
-        if (nd->sval2) bb_exec_stmt((void *)nd->sval2);
-        if (icn_every_body_broke()) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
-        nd->value = v;
-        return nd->γ;
-    }
+    /* IR_ICN_EVERY case removed (DAI-1, IJ-DEL-ICN-AST): kind was reachable only via the Icon */
+    /* AST walker (icn_bb_build/bb_exec_stmt). Mode-2/3/4 use language-agnostic IR_EVERY whose */
+    /* body is pre-lowered to IR at lower time. See GOAL-ICON-BB-JCON.md.                       */
     case IR_ICN_PROC_GEN: {
         GeneratorState *gs = (GeneratorState *)nd->opaque;
         if (!gs) { nd->value = FAILDESCR; return nd->ω; }

@@ -85,7 +85,7 @@ typedef enum {
     IR_PL_SEQ,          /* Prolog conjunction body: short-circuit on first failure; succeed if all succeed.       */
     IR_ICN_TO,
     IR_ICN_UPTO,
-    IR_ICN_EVERY,
+    /* IR_ICN_EVERY removed (DAI-1, IJ-DEL-ICN-AST). Mode-2/3/4 use IR_EVERY. */
     IR_ICN_TO_BY,
     IR_ICN_ITERATE,
     IR_ICN_ALTERNATE,   /* A|B — opaque=icn_alt_dcg_t*{gen[2],which}; left first then right              */

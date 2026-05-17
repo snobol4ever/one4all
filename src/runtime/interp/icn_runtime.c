@@ -1563,13 +1563,10 @@ bb_node_t icn_bb_build(tree_t *e) {
         return (bb_node_t){ icn_bb_dcg, lim_dz, 0 };
     }
     if (e->t == TT_EVERY && e->n >= 1) {
-        bb_node_t *gen = calloc(1, sizeof(*gen));
-        *gen = icn_bb_build(e->c[0]);
-        tree_t *body = (e->n >= 2) ? e->c[1] : NULL;
-        IR_block_t *cfg = lower_icn_every(gen, body);
-        icn_dcg_state_t *dz = calloc(1, sizeof(*dz));
-        dz->cfg = cfg; dz->first = 1;
-        return (bb_node_t){ icn_bb_dcg, dz, 0 };
+        /* DAI-1, IJ-DEL-ICN-AST: AST-walker every-build stub.  Mode-1 for Icon is being severed; */
+        /* use --sm-run/--jit-run/--sm-native for every-statements.                                  */
+        (void)e;
+        return (bb_node_t){ NULL, NULL, 0 };
     }
     if (e->t == TT_BANG_BINARY && e->n >= 2) {
         icn_bang_binary_state_t *z = calloc(1, sizeof(*z));
@@ -1601,12 +1598,10 @@ bb_node_t icn_bb_build(tree_t *e) {
             z->a_started = 0;
             return (bb_node_t){ icn_bb_mutual, z, 0 };
         }
-        bb_node_t *gen = calloc(1, sizeof(*gen));
-        *gen = icn_bb_build(e->c[0]);
-        IR_block_t *cfg = lower_icn_every(gen, e->c[1]);
-        icn_dcg_state_t *dz = calloc(1, sizeof(*dz));
-        dz->cfg = cfg; dz->first = 1;
-        return (bb_node_t){ icn_bb_dcg, dz, 0 };
+        /* DAI-1, IJ-DEL-ICN-AST: second AST-walker every-build (TT_SEQ chained-generator path). */
+        /* Stubbed; use --sm-run/--jit-run/--sm-native instead.                                      */
+        (void)e;
+        return (bb_node_t){ NULL, NULL, 0 };
     }
     if (e->t == TT_CSET_COMPL && e->n >= 1 && is_suspendable(e->c[0])) {
         icn_limit_state_t *z = calloc(1, sizeof(*z));

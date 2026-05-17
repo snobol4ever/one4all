@@ -58,21 +58,8 @@ IR_block_t *lower_icn_to_nested(icn_to_nested_state_t *z) {
     return cfg;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-IR_block_t *lower_icn_every(bb_node_t *gen, void *body) {
-    if (!gen) return NULL;
-    IR_block_t *cfg = IR_alloc(4, IR_LANG_ICN);
-    if (!cfg) return NULL;
-    IR_t *nd = IR_node_alloc(cfg, IR_ICN_EVERY);
-    if (!nd) return NULL;
-    nd->opaque = (void *)gen;
-    nd->sval2  = (const char *)body;
-    nd->α = nd;
-    nd->β = nd;
-    nd->γ = NULL;
-    nd->ω = NULL;
-    cfg->entry = nd;
-    return cfg;
-}
+/* lower_icn_every removed (DAI-1, IJ-DEL-ICN-AST): callers lived inside icn_bb_build (AST walker).  */
+/* Mode-2/3/4 use language-agnostic IR_EVERY in this file's TT_EVERY lowering case (~line 529).      */
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 IR_block_t *lower_icn_to_by(int64_t lo, int64_t hi, int64_t step) {
     IR_block_t *cfg = IR_alloc(4, IR_LANG_ICN);
