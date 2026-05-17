@@ -2843,6 +2843,14 @@ DESCR_t interp_eval(tree_t *e)
             { DESCR_t _sv; if (shadow_get(e->v.sval, &_sv)) return _sv; }
             DESCR_t _vr = NV_GET_fn(e->v.sval);
             if (!IS_NULL(_vr)) return _vr;
+            /* Don't fall through to function-call if the TT_VAR refers to a
+             * current-frame parameter or local. This guards the SNOBOL4
+             * `DEFINE('upr(upr)')` idiom where the function name shadows
+             * its parameter: when the parameter is NULVCL (empty arg),
+             * APPLY_fn(name, NULL, 0) would recursively call the outer
+             * function with no args → stack overflow.
+             * Added by PST-RB-PRE-BEAUTY (Opus 4.7, 2026-05-17). */
+            if (is_current_frame_local(e->v.sval)) return _vr;
             if (FNCEX_fn(e->v.sval)) {
                 DESCR_t _fr = APPLY_fn(e->v.sval, NULL, 0);
                 if (!IS_FAIL_fn(_fr) && !IS_NULL(_fr)) return _fr;

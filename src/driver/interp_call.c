@@ -65,6 +65,26 @@ int shadow_has(const char *name) {
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* is_current_frame_local: returns 1 if `name` is bound as the current frame's
+ * function-return slot, a parameter, or a local. Used to suppress the TT_VAR
+ * fallback in interp_eval that would otherwise treat a parameter named the
+ * same as the function (e.g. `DEFINE('upr(upr)')` SNOBOL4 idiom) as a
+ * recursive function call when its value is NULVCL.
+ *
+ * Walks `saved_names[]` which the call setup pre-populates with the
+ * retname (index 0) + parameter names (indices 1..np) + local names
+ * (indices np+1..np+nl). */
+int is_current_frame_local(const char *name) {
+    if (call_depth <= 0 || !name) return 0;
+    CallFrame *fr = &call_stack[call_depth - 1];
+    if (!fr->saved_names) return 0;
+    for (int i = 0; i < fr->nsaved; i++) {
+        if (fr->saved_names[i] && strcmp(fr->saved_names[i], name) == 0)
+            return 1;
+    }
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
 {
     NO_AST_WALK_GUARD("call_user_function");

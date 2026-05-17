@@ -99,6 +99,8 @@ int  shadow_get(const char *name, DESCR_t *out);
 void shadow_set_cur(const char *name, DESCR_t val);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int  shadow_has(const char *name);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+int  is_current_frame_local(const char *name);
 #define ICN_INIT_MAX   64
 #define ICN_INIT_SLOTS  8
 typedef struct { char nm[64]; DESCR_t val; } IcnInitSlot;
