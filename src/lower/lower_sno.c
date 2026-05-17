@@ -243,39 +243,60 @@ static const char *label_of(const tree_t *n, const char *fallback) {
 }
 
 /*-----------------------------------------------------------------------------
- * SCT-1b: label-name sanitizer.
+ * SCT-1b: label-name sanitizer (also reused for ordinary identifiers).
  *
  * SPITBOL Manual Ch.14 line 9335: "Labels must begin with a letter or digit."
+ * The same letter/digit-first constraint applies to identifiers used in
+ * DEFINE() prototypes (SCT-1d's `_qtag` → `qtag` corpus rename) and to
+ * variable references in pattern-capture positions (SCT-2 follow-up:
+ * `parser_prolog.sc` uses `_op_name` as a pattern capture target, which
+ * SPITBOL rejects with ERROR 230 at the use site).
+ *
  * The Snocone PST mode pre-allocates labels of the form `_Ltop_NNNN`,
  * `_Lend_NNNN`, `_Lcont_NNNN`, etc. — leading underscore is illegal in
  * SPITBOL.  SCRIP's own SNOBOL4 parser also rejects them (it silently strips
  * the leading underscore, then complains the label is undefined when the
- * goto-side keeps it).  Fix: strip a single leading underscore on every
- * label emission.  Caller is responsible for not passing a name that would
- * collide after stripping (parser pre-allocates with a sequence counter, so
- * `_Ltop_0001` → `Ltop_0001` is collision-free).
+ * goto-side keeps it).
+ *
+ * Strategy (Lon directive 2026-05-17): strip ALL leading underscores AND
+ * append ONE trailing underscore.  Rationale:
+ *   - SPITBOL allows trailing `_` in identifiers; verified by direct test.
+ *   - Almost nobody hangs an underscore on the end of a user-written name,
+ *     so `_op_name` → `op_name_` is essentially collision-free with any
+ *     user-written `op_name_` (which would have to exist in the same
+ *     source for collision to matter).
+ *   - Better than "strip-and-pray": with the previous strip-only rule,
+ *     `_op_name` collided with user-written `op_name` if both appeared.
+ *     With the strip-and-append rule, the sanitized form is reliably
+ *     unique because it ends with a marker character no normal name uses.
+ *   - Works for double-leading-underscore too: `__foo` → `foo_` (strip
+ *     all leading, append one trailing).
+ *   - Lone `_` → `_` would still be invalid; we still fall back to `L_`
+ *     in that degenerate case.
  *
  * Returns a pointer to either the input or a static thread-unsafe buffer.
  * --dump-sno is single-shot so thread safety doesn't matter here.
+ * 4-deep buffer ring so multiple label_sanitize() calls in one printf
+ * format string don't clobber each other.
  *---------------------------------------------------------------------------*/
 static const char *label_sanitize(const char *raw) {
     if (!raw || !*raw) return raw;
     if (raw[0] != '_') return raw;
-    /* Strip ONE leading underscore.  If the remainder still starts with
-     * a non-letter/digit (e.g. `__foo`), fall back to a single 'L' prefix.
-     * Use a 4-deep buffer ring so two label_sanitize() calls in a single
-     * printf-style format string don't clobber each other. */
     static char ring[4][256];
     static int  idx = 0;
     char *buf = ring[idx]; idx = (idx + 1) & 3;
-    const char *rest = raw + 1;
-    if (!*rest) { return "L"; }
+    const char *rest = raw;
+    while (*rest == '_') rest++;
+    if (!*rest) {
+        snprintf(buf, 256, "L_");
+        return buf;
+    }
     if (((*rest >= 'A' && *rest <= 'Z') ||
          (*rest >= 'a' && *rest <= 'z') ||
          (*rest >= '0' && *rest <= '9'))) {
-        snprintf(buf, 256, "%s", rest);
+        snprintf(buf, 256, "%s_", rest);
     } else {
-        snprintf(buf, 256, "L%s", rest);
+        snprintf(buf, 256, "L%s_", rest);
     }
     return buf;
 }
@@ -315,7 +336,10 @@ static void emit_expr(sno_ctx_t *c, const tree_t *e) {
         emit(c, "%s", sval_or(e, "0.0"));
         break;
     case TT_VAR:
-        emit(c, "%s", sval_or(e, "?VAR?"));
+        /* SCT-2 follow-up: strip leading underscore so SPITBOL accepts.
+         * parser_prolog.sc uses `_op_name` as a pattern capture target;
+         * SPITBOL hits ERROR 230 at every reference site without this. */
+        emit(c, "%s", label_sanitize(sval_or(e, "?VAR?")));
         break;
     case TT_KEYWORD:
         /* The parser stores the name without the leading '&'; restore it. */
