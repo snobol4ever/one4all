@@ -11,7 +11,7 @@ Wires the Icon-builtin dispatch helper extracted in bridge-1 into
 `SM_CALL_FN`'s execution path in `sm_interp.c`.  After this rung:
 
 ```
-$ ./scrip --sm-run /tmp/probe.icn
+$ ./scrip --interp /tmp/probe.icn
 hello from icon proc
 ```
 
@@ -81,10 +81,10 @@ end
 
 $ ./scrip --ir-run /tmp/probe.icn
 hello from icon proc
-$ ./scrip --sm-run /tmp/probe.icn
+$ ./scrip --interp /tmp/probe.icn
 hello from icon proc
 
-$ diff <(./scrip --ir-run /tmp/probe.icn) <(./scrip --sm-run /tmp/probe.icn)
+$ diff <(./scrip --ir-run /tmp/probe.icn) <(./scrip --interp /tmp/probe.icn)
 $ # BYTE-IDENTICAL
 ```
 
@@ -99,12 +99,12 @@ procedure main()
    write(42);
 end
 
-$ ./scrip --sm-run /tmp/probe2.icn
+$ ./scrip --interp /tmp/probe2.icn
 hello
 no newline — has newline now
 42
 
-$ diff <(./scrip --ir-run /tmp/probe2.icn) <(./scrip --sm-run /tmp/probe2.icn)
+$ diff <(./scrip --ir-run /tmp/probe2.icn) <(./scrip --interp /tmp/probe2.icn)
 $ # BYTE-IDENTICAL
 ```
 
@@ -116,7 +116,7 @@ that `--ir-run` uses.
 
 ## What still doesn't work
 
-`--sm-run` of any Icon program that calls a builtin not yet covered
+`--interp` of any Icon program that calls a builtin not yet covered
 by `icn_try_call_builtin_by_name` (initial scope: `write`, `writes`)
 will FATAL or `longjmp` out.  The corpus has 263 Icon programs;
 many use `read`, `integer`, `string`, `type`, `copy`, `list`,
@@ -124,7 +124,7 @@ many use `read`, `integer`, `string`, `type`, `copy`, `list`,
 rungs add branches to the helper.
 
 `--ir-run` execution is unchanged for all Icon programs.  This rung
-adds capability to `--sm-run`; it does not regress `--ir-run`.
+adds capability to `--interp`; it does not regress `--ir-run`.
 
 ## Files touched
 
@@ -148,11 +148,11 @@ No new opcodes, no IR fields, no `sm_lower.c` changes.
 | unified_broker | PASS=49 FAIL=0 |
 | scrip_all_modes | PASS=2 FAIL=0 |
 | Icon corpus `--ir-run` (`test_icon_ir_all_rungs.sh`) | PASS=186 FAIL=47 XFAIL=30 TOTAL=263 |
-| `./scrip --sm-run /tmp/probe.icn` (`procedure main() write("hello from icon proc") end`) | byte-identical to `--ir-run` |
+| `./scrip --interp /tmp/probe.icn` (`procedure main() write("hello from icon proc") end`) | byte-identical to `--ir-run` |
 | Multi-call Icon program (`/tmp/probe2.icn`, four calls to write/writes) | byte-identical to `--ir-run` |
 
 Standard set byte-identical to baseline.  The new gate (Icon
-`--sm-run` of trivial program produces correct output) was the
+`--interp` of trivial program produces correct output) was the
 explicit success criterion in the bridge plan; it now passes.
 
 ## Next rung
@@ -161,7 +161,7 @@ Two options:
 
 - **CH-17g-runtime-bridge-3** — Raku/SCAN bridges.  Add similar helpers
   for Raku and SCAN-context dispatch if corpus crosscheck reveals
-  programs that fail under `--sm-run` and would benefit.
+  programs that fail under `--interp` and would benefit.
 
 - **CH-17g-irrun-lowers** — invoke `sm_lower` /
   `sm_resolve_proc_entry_pcs` from `--ir-run` so `entry_pc >= 0`
@@ -176,4 +176,4 @@ Recommendation: extend the helper to cover more Icon builtins
 (integer, string, real, char, type, copy, list, table, read, repl,
 upto, find, any, many, tab, move, match, …) before tackling
 irrun-lowers — each new branch lights up another slice of the
-corpus under `--sm-run`.
+corpus under `--interp`.

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # test_gate_em8_snocone_jit_emit.sh — EM-8 gate:
-# five Snocone smoke programs compiled via --jit-emit --x64 produce correct output.
+# five Snocone smoke programs compiled via --compile produce correct output.
 # Gate: PASS=5 FAIL=0.
 #
 # Self-contained per RULES.md: paths derived from $0; no env deps.
@@ -29,7 +29,7 @@ emit_test() {
     local label="$1" expected="$2"
     local src="$TMP/${label}.sc"
     cat > "$src"
-    "$SCRIP" --jit-emit --x64 "$src" > "$TMP/${label}.s" 2>"$TMP/${label}.emit.err" < /dev/null
+    "$SCRIP" --compile "$src" > "$TMP/${label}.s" 2>"$TMP/${label}.emit.err" < /dev/null
     if [ $? -ne 0 ] || [ ! -s "$TMP/${label}.s" ]; then
         echo "  FAIL $label (emit failed: $(head -1 "$TMP/${label}.emit.err"))"
         FAIL=$((FAIL+1)); FAILS="$FAILS $label(emit)"; return

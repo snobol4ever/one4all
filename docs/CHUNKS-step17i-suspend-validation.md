@@ -130,7 +130,7 @@ dispatch loop.
 ### Pre-rung baseline (commit `8a85285e`)
 
 ```
-$ ./scrip --sm-run rung03_suspend_gen.icn
+$ ./scrip --interp rung03_suspend_gen.icn
 FATAL bb_eval_value: unhandled kind 50 (RS-23e isolation breach)
 Aborted
 ```
@@ -154,25 +154,25 @@ which has no AST_SUSPEND case → FATAL.
 ### Post-rung — 3 programs flip from FATAL to PASS
 
 ```
-$ ./scrip --sm-run rung03_suspend_gen.icn
+$ ./scrip --interp rung03_suspend_gen.icn
 1
 2
 3
 4
-$ ./scrip --sm-run rung03_suspend_gen_compose.icn
+$ ./scrip --interp rung03_suspend_gen_compose.icn
 1
 2
 3
 1
 2
-$ ./scrip --sm-run rung03_suspend_gen_filter.icn
+$ ./scrip --interp rung03_suspend_gen_filter.icn
 4
 3
 2
 1
 ```
 
-All match `.expected`.  `--jit-run` PASSes the same three programs
+All match `.expected`.  `--run` PASSes the same three programs
 (JIT mirror `h_suspend_value` exercises the same `sm_yield_to_caller`
 helper).
 
@@ -180,8 +180,8 @@ helper).
 
 |              | pre-rung | post-rung |
 | ------------ | -------: | --------: |
-| `--sm-run`   |    17/24 |     20/24 |
-| `--jit-run`  |    17/24 |     20/24 |
+| `--interp`   |    17/24 |     20/24 |
+| `--run`  |    17/24 |     20/24 |
 
 Gain: +3.  The 3 flipped programs are exactly
 `rung03_suspend_gen{,_compose,_filter}.icn`.  The 4 remaining FAILs
@@ -192,8 +192,8 @@ rebuilding, and observing the same 4 FAILs:
   failure mode pre-rung: stack smashing detection; both crash
   pre/post — same root cause, unrelated to AST_SUSPEND).
 - `rung03_suspend_fail`, `rung03_suspend_return` — both use
-  `return E` not `suspend E`; pre-existing `--sm-run` and
-  `--jit-run` gaps in proc return-value handling, separate
+  `return E` not `suspend E`; pre-existing `--interp` and
+  `--run` gaps in proc return-value handling, separate
   territory.
 - one further unrelated rung01–02 program.
 
@@ -215,7 +215,7 @@ rebuilding, and observing the same 4 FAILs:
 | scrip_all_modes                     |    2/0 |
 
 Zero regressions.  All gates byte-identical to the `8a85285e`
-baseline except for the +3 gain on `--sm-run` and `--jit-run`
+baseline except for the +3 gain on `--interp` and `--run`
 rung01–04.
 
 ---

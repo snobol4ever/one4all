@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/test_mode4_broad_corpus_snobol4.sh — M4SN-4a: broad corpus SNOBOL4 mode-4 parity
 # Runs the same set as test_interp_broad_corpus_and_beauty.sh but via
-# emit->assemble->link->run (mode-4 ELF pipeline) instead of --sm-run.
+# emit->assemble->link->run (mode-4 ELF pipeline) instead of --interp.
 # Compares output against .ref files.
 # Target: PASS >= sm-run PASS count (128/280). No regression vs sm-run.
 #
@@ -30,7 +30,7 @@ trap 'rm -rf "$WORKDIR"' EXIT
 compile_mode4() {
     local sno="$1" out="$2"
     local tmp; tmp="$(mktemp -d)"
-    SNO_LIB="$INC" "$SCRIP" --jit-emit --x64 "$sno" > "$tmp/p.s" 2>/dev/null || { rm -rf "$tmp"; return 1; }
+    SNO_LIB="$INC" "$SCRIP" --compile "$sno" > "$tmp/p.s" 2>/dev/null || { rm -rf "$tmp"; return 1; }
     (cd "$HERE/.." && gcc -c "$tmp/p.s" -o "$tmp/p.o" 2>/dev/null) || { rm -rf "$tmp"; return 1; }
     gcc "$tmp/p.o" -L"$RT_DIR" -lscrip_rt -lgc -lm \
         -Wl,-rpath,"$RT_DIR" -o "$out" 2>/dev/null || { rm -rf "$tmp"; return 1; }

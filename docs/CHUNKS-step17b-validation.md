@@ -43,7 +43,7 @@ which runs before `sm_lower`).
 ## Empirical reach
 
 ```
-$ ./scrip --sm-run --dump-sm test/icon/hello.icn
+$ ./scrip --interp --dump-sm test/icon/hello.icn
 ; SM_Program  count=6
    0  SM_JUMP              -> 3
    1  SM_LABEL
@@ -52,13 +52,13 @@ $ ./scrip --sm-run --dump-sm test/icon/hello.icn
    4  SM_BB_PUMP_PROC
    5  SM_HALT
 
-$ SCRIP_PROC_ENTRY_PCS=1 ./scrip --sm-run test/icon/hello.icn
+$ SCRIP_PROC_ENTRY_PCS=1 ./scrip --interp test/icon/hello.icn
 [CH-17a] resolve entry_pcs (proc_table=1 procs, pl_pred_table=hash)
 [CH-17a]   proc[0] name=main                 entry_pc=1
 [CH-17a] summary: pl_total=0 pl_resolved=0 ...
 Hello, World!
 
-$ SCRIP_PROC_ENTRY_PCS=1 ./scrip --sm-run test/raku/rk_given.raku
+$ SCRIP_PROC_ENTRY_PCS=1 ./scrip --interp test/raku/rk_given.raku
 [CH-17a] resolve entry_pcs (proc_table=3 procs, pl_pred_table=hash)
 [CH-17a]   proc[0] name=day_type             entry_pc=1
 [CH-17a]   proc[1] name=season               entry_pc=5
@@ -69,7 +69,7 @@ CH-17a's resolver — the half-API laid down last rung — now finds
 entry_pcs for every Icon and Raku proc.  The resolver-to-emitter
 end-to-end is verified.
 
-The `--dump-sm` (without `--sm-run`) path doesn't invoke
+The `--dump-sm` (without `--interp`) path doesn't invoke
 `polyglot_init` and so doesn't see `proc_table` populated; the
 skeleton emission is conditional on what `proc_table` contains.
 This is correct: emission keys off the existing `polyglot_init` →

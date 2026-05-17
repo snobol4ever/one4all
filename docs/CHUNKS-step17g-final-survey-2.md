@@ -47,10 +47,10 @@ Results:
 | Mode        | Without probe                | With proc=NULL probe          |
 |-------------|------------------------------|-------------------------------|
 | `--ir-run`  | `hello from icon\n` (rc=0)   | **SIGSEGV** (rc=139)          |
-| `--sm-run`  | `hello from icon\n` (rc=0)   | empty output (rc=0)           |
+| `--interp`  | `hello from icon\n` (rc=0)   | empty output (rc=0)           |
 | `--dump-sm` | (multi-instr chunk)          | 2 instrs: `SM_BB_PUMP_PROC`, `SM_HALT` |
 
-The `--sm-run` empty-output result is the more telling failure:
+The `--interp` empty-output result is the more telling failure:
 the SM_Program is structurally truncated.  No FATAL, no abort —
 the program runs end-to-end, but the chunk is empty.
 
@@ -153,7 +153,7 @@ entire 186/47/30 Icon corpus and Prolog corpus baseline.
 CH-17g-final-SURVEY (2026-05-09, the original) caught the
 runtime-side gap and recommended splitting the precondition
 into runtime-bridge + irrun-lowers.  The runtime-bridge half
-was about making `--sm-run` produce correct output (delivered:
+was about making `--interp` produce correct output (delivered:
 27 builtin names bridged + SM_ACOMP/SM_LCOMP).  The irrun-lowers
 half was framed as "make `entry_pc` resolve in `--ir-run`" — but
 *resolving the value* is necessary, not sufficient.  *Executing
@@ -165,10 +165,10 @@ To delete `proc_table[i].proc` without breaking `--ir-run`,
 `--ir-run` non-SNO must run on chunks, not on `coro_call`'s
 legacy body.  That means one of:
 
-### Option A — `--ir-run` becomes an alias for `--sm-run` for non-SNO
+### Option A — `--ir-run` becomes an alias for `--interp` for non-SNO
 
 Simplest.  Drops a user-visible mode contract that today exists
-(non-SNO `--ir-run` → `polyglot_execute` walks IR; `--sm-run`
+(non-SNO `--ir-run` → `polyglot_execute` walks IR; `--interp`
 → chunks via `sm_call_proc`).  The two outputs are already
 byte-identical for bridged programs, so the alias is observable
 only in failure modes (a chunk gap that the IR path doesn't have).
@@ -193,7 +193,7 @@ Risk: anything in `polyglot_execute`'s BB engine that today
 walks live IR (E_VAR.ival mutation in `icn_scope_patch`, the
 proc tables) must continue to work.  The SM dispatch path is
 already proven to handle hello-world; it has not been proven to
-handle every Icon corpus program — `--sm-run`'s known gaps
+handle every Icon corpus program — `--interp`'s known gaps
 (meander.icn `tab()`, queens.icn array references, etc.) would
 become `--ir-run`'s gaps too unless bridged.
 
@@ -231,7 +231,7 @@ I recommend deferring this decision until Option A/B/C is chosen.
 With `proc_table[proc_count].proc = NULL`:
 
   - `--ir-run` /tmp/probe.icn: SIGSEGV
-  - `--sm-run` /tmp/probe.icn: empty output, rc=0 (chunk truncated to SM_BB_PUMP_PROC + SM_HALT)
+  - `--interp` /tmp/probe.icn: empty output, rc=0 (chunk truncated to SM_BB_PUMP_PROC + SM_HALT)
 
 Probe reverted before commit.
 
@@ -245,7 +245,7 @@ the legacy AST walker indefinitely and likewise violates it.
 Option A is the only path that ends with one execution mode,
 one set of consumers, and IR/SM both freed between phases.
 
-User-facing impact: `--ir-run` and `--sm-run` produce identical
+User-facing impact: `--ir-run` and `--interp` produce identical
 output for non-SNO programs; the flag distinction collapses.
 SNOBOL4 retains both because SNOBOL4 has its own non-SM
 interpreter (`execute_program`) that is an entirely separate
@@ -257,7 +257,7 @@ Distinct from CH-17g-irrun-lowers (which delivered observability:
 entry_pcs visible).  Scope:
 
   - `scrip.c` non-SNO `--ir-run` dispatch: route to the same
-    `sm_preamble` + `sm_run_with_recovery` path as `--sm-run`.
+    `sm_preamble` + `sm_run_with_recovery` path as `--interp`.
   - Drop `g_irrun_lowers` flag and `sm_resolve_irrun_entry_pcs`
     helper — superseded; the SM_Program now lives across
     execution under `--ir-run` non-SNO via the standard
@@ -288,4 +288,4 @@ Then CH-17g-final closes Step 17.
   - smoke icon: PASS=5 FAIL=0 (clean baseline, post-revert)
   - build: clean
   - --ir-run hello.icn: PASS
-  - --sm-run hello.icn: PASS
+  - --interp hello.icn: PASS

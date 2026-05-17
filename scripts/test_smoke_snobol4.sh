@@ -46,6 +46,6 @@ DOUBLE  DOUBLE = X + X
 END" "42"
 
 run_file "arith_sm" "        OUTPUT = 2 + 3
-END" "5" "--sm-run"
+END" "5" "--interp"
 
 echo ""; echo "PASS=$PASS FAIL=$FAIL"; [ "$FAIL" -eq 0 ]

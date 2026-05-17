@@ -30,13 +30,13 @@ Short form: at end of every session touching the emitter --
 
     cd /home/claude/one4all
     DEMO=/home/claude/corpus/programs/snobol4/demo
-    ./scrip --jit-emit --x64 $DEMO/roman.sno    > $DEMO/roman.s    2>/dev/null
-    ./scrip --jit-emit --x64 $DEMO/wordcount.sno > $DEMO/wordcount.s 2>/dev/null
+    ./scrip --compile $DEMO/roman.sno    > $DEMO/roman.s    2>/dev/null
+    ./scrip --compile $DEMO/wordcount.sno > $DEMO/wordcount.s 2>/dev/null
     # verify both assemble, then commit corpus if changed
 
 ## EM-7 beauty check
 
-    ./scrip --jit-emit --x64 /home/claude/corpus/programs/snobol4/demo/beauty.sno \
+    ./scrip --compile /home/claude/corpus/programs/snobol4/demo/beauty.sno \
         > artifacts/x64/beauty_prog.s 2>/dev/null
     gcc -c artifacts/x64/beauty_prog.s -o /dev/null   # must be clean
     grep -c "UNHANDLED_OP" artifacts/x64/beauty_prog.s  # must be 0 at EM-7

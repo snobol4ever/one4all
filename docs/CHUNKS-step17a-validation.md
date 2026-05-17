@@ -49,20 +49,20 @@ consumer flips, no observable behaviour change.
    resolution summary per program.  Empirical output:
 
    ```
-   $ SCRIP_PROC_ENTRY_PCS=1 ./scrip --sm-run test/icon/hello.icn
+   $ SCRIP_PROC_ENTRY_PCS=1 ./scrip --interp test/icon/hello.icn
    [CH-17a] resolve entry_pcs (proc_table=1 procs, pl_pred_table=hash)
    [CH-17a]   proc[0] name=main                 entry_pc=-1
    [CH-17a] summary: pl_total=0 pl_resolved=0 (others=-1 are CH-17b/d territory)
    Hello, World!
 
-   $ SCRIP_PROC_ENTRY_PCS=1 ./scrip --sm-run /tmp/simple.pl
+   $ SCRIP_PROC_ENTRY_PCS=1 ./scrip --interp /tmp/simple.pl
    [CH-17a] resolve entry_pcs (proc_table=0 procs, pl_pred_table=hash)
    [CH-17a]   pred  key=fact/1               entry_pc=-1
    [CH-17a]   pred  key=main/0               entry_pc=-1
    [CH-17a] summary: pl_total=2 pl_resolved=0 ...
    <pre-existing CH-16-SURVEY FATAL still fires here>
 
-   $ SCRIP_PROC_ENTRY_PCS=1 ./scrip --sm-run test/snobol4/hello/hello.sno
+   $ SCRIP_PROC_ENTRY_PCS=1 ./scrip --interp test/snobol4/hello/hello.sno
    [CH-17a] resolve entry_pcs (proc_table=0 procs, pl_pred_table=hash)
    [CH-17a] summary: pl_total=0 pl_resolved=0 ...
    HELLO WORLD
@@ -95,7 +95,7 @@ existing code paths altered.
 - Does NOT delete the `EXPR_t *proc` field.  CH-17g does that
   after every consumer is on entry_pcs.
 - Does NOT lift the `code_free` gate.  CH-17g handles that too.
-- Does NOT fix the broken `--sm-run` Prolog path documented in
+- Does NOT fix the broken `--interp` Prolog path documented in
   CH-16-SURVEY.  That requires CH-17e (consumer-side migration
   for Prolog).
 

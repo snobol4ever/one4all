@@ -11,10 +11,10 @@ array-composition under chunks").
 ## What this rung does
 
 Closes the runtime gap surfaced by `test/icon/queens.icn` under
-`--sm-run` after bridge-4 widened Icon builtin reach.  Probe sequence:
+`--interp` after bridge-4 widened Icon builtin reach.  Probe sequence:
 
 ```
-$ ./scrip --sm-run test/icon/queens.icn
+$ ./scrip --interp test/icon/queens.icn
 sm_interp: unhandled opcode 82 (SM_ACOMP) at pc=92
 -Queens:
 ```
@@ -34,7 +34,7 @@ Two coupled changes — neither is sufficient alone:
 
 ## Mechanism investigated
 
-Probe under `--sm-run --dump-sm` for `if i = 0 then write("eq")`
+Probe under `--interp --dump-sm` for `if i = 0 then write("eq")`
 followed by `if i < 1 then write("lt")`:
 
 ```
@@ -54,7 +54,7 @@ because Icon "bypasses sm_lower and goes through icn_runtime.c
 directly" was accurate at the time of writing but is now stale:
 CH-17b' (sess #78) made sm_lower walk Icon proc bodies, and
 chunk-side dispatch (CH-17c, CH-17g-runtime-bridge-1..4) routes
-Icon execution through `--sm-run`.
+Icon execution through `--interp`.
 
 ## Implementation
 
@@ -131,7 +131,7 @@ about to be wrong about SM_LCOMP too — comment refreshed to remove
 SM_ACOMP from the stubbed list, narrow the SM_LCOMP entry, and
 note SM_LCOMP as a follow-on rung.  JIT codegen for SM_ACOMP is M5
 territory (named-FATAL pattern) — still h_unimpl in the JIT,
-intentional, the interpreter handler is what unblocks `--sm-run`.
+intentional, the interpreter handler is what unblocks `--interp`.
 
 ## Why SM_LCOMP was NOT migrated in this rung
 
@@ -142,19 +142,19 @@ Bridge-acomp is scoped to numeric — string relops are a separate
 follow-on (call it bridge-lcomp).  Discipline: small contained
 rung, one observable problem at a time.  No corpus test surfaces
 SM_LCOMP today (no Icon program in `test/icon` reaches a string
-relop under `--sm-run` after the bridge family); when one does it
+relop under `--interp` after the bridge family); when one does it
 will arrive as the next surface.
 
 ## What this does and does not unblock
 
 **Unblocks immediately:**
-- `queens.icn` under `--sm-run` no longer FATALs on opcode 82
+- `queens.icn` under `--interp` no longer FATALs on opcode 82
   (now runs to "0 solutions total." — a different correctness
   surface, not a SM_ACOMP issue; queens.icn under `--ir-run`
   ALSO produces wrong output, "Error 3 ... Erroneous array or
   table reference" — pre-existing).
 - Any Icon proc body using `=`, `~=`, `<`, `<=`, `>`, `>=` between
-  numerics dispatches correctly under `--sm-run`.
+  numerics dispatches correctly under `--interp`.
 - Trivial probes:
   ```
   $ cat /tmp/probe_eq.icn
@@ -163,14 +163,14 @@ will arrive as the next surface.
       if i = 0 then write("eq");
       if i < 1 then write("lt");
   end
-  $ ./scrip --sm-run /tmp/probe_eq.icn
+  $ ./scrip --interp /tmp/probe_eq.icn
   eq
   lt
   ```
 
 **Does NOT unblock (out of scope):**
 - String relops via SM_LCOMP — same shape bug, deferred.
-- `if`-statement value leak under `--sm-run` (a stray operand
+- `if`-statement value leak under `--interp` (a stray operand
   appears on stdout after `if-then` cases) — pre-existing,
   reproducible without any SM_ACOMP path; unrelated to this rung.
 - queens.icn correctness — independent issue (array indexing).
@@ -189,9 +189,9 @@ All gates byte-identical to baseline (CH-17g-runtime-bridge-4 @ `5e526155`):
 | `test_smoke_scrip_all_modes.sh` | PASS=2 FAIL=0 |
 | Icon `--ir-run` corpus (test_icon_ir_all_rungs.sh) | PASS=186 FAIL=47 XFAIL=30 TOTAL=263 |
 
-**New gate:** `queens.icn --sm-run` no longer FATALs on opcode 82 — PASS.
+**New gate:** `queens.icn --interp` no longer FATALs on opcode 82 — PASS.
 
-**New gate:** `if i = 0` / `if i < 1` probe under `--sm-run`
+**New gate:** `if i = 0` / `if i < 1` probe under `--interp`
 produces `eq\nlt\n` (matches `--ir-run` modulo the pre-existing
 if-then trailing-value leak) — PASS.
 

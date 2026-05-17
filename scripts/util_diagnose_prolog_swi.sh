@@ -4,7 +4,7 @@
 #
 # Usage:
 #   bash scripts/util_diagnose_prolog_swi.sh test_bips
-#   bash scripts/util_diagnose_prolog_swi.sh test_arith --mode --sm-run
+#   bash scripts/util_diagnose_prolog_swi.sh test_arith --mode --interp
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIP="${HERE}/../scrip"
@@ -20,7 +20,7 @@ shift || true
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --mode) MODE="$2"; shift 2 ;;
-        --ir-run|--sm-run|--jit-run) MODE="$1"; shift ;;
+        --ir-run|--interp|--run) MODE="$1"; shift ;;
         *) echo "Unknown arg: $1"; exit 1 ;;
     esac
 done

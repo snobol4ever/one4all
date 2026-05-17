@@ -5,7 +5,7 @@
 ## Summary
 
 Attempted CH-17g-irrun-execution Step 2 (route `--ir-run` non-SNO
-through `sm_preamble` + `sm_run_with_recovery`, mirroring `--sm-run`).
+through `sm_preamble` + `sm_run_with_recovery`, mirroring `--interp`).
 The dispatch arm flip was a one-line edit; build clean.  Probe.icn
 remained byte-identical.  But three gates regressed against the
 pre-rung baseline:
@@ -44,7 +44,7 @@ in stmt context.  SM dispatch leaks the descriptor onto the value
 stack and `write` (or stmt-end flushing) emits it.  This is a
 **producer gap or pop-discipline gap** — `lower_stmt`/`lower_expr`
 for `if`-condition slots needs an `SM_POP` after the value-test
-that `--sm-run` already needs but currently lacks for the if/while
+that `--interp` already needs but currently lacks for the if/while
 condition path.
 
 ```icon
@@ -101,7 +101,7 @@ Two valid paths forward:
 Run CH-17i-survey-mode3 BEFORE attempting CH-17g-irrun-execution
 again.  The survey doc enumerates every bucket; CH-17i-mode3-completeness
 sub-rungs land each bucket; once the Icon and Prolog `--ir-run`
-PASS subsets pass byte-identical under `--sm-run` (i.e., the gates
+PASS subsets pass byte-identical under `--interp` (i.e., the gates
 CH-17g-irrun-execution wants are achievable), THEN flip the
 dispatch arm.  Step 2 of CH-17g-irrun-execution becomes the
 *last* step of the umbrella — the act that converts mode 2 from
@@ -144,7 +144,7 @@ capture).
 | Prolog corpus (`test/prolog/*.pl`) `--ir-run` PASS subset | hello, palindrome, roman, sentences, wordcount (5/6) |
 | Prolog corpus `--ir-run` FAIL   | queens.pl (kind 59 / E_CHOICE) |
 | `/tmp/probe.icn --ir-run` md5   | `883a26c5abfd0b454cb149c88ca26fe6` |
-| `/tmp/probe.icn --sm-run` md5   | `883a26c5abfd0b454cb149c88ca26fe6` |
+| `/tmp/probe.icn --interp` md5   | `883a26c5abfd0b454cb149c88ca26fe6` |
 | smoke Icon                      | PASS=5 FAIL=0 |
 | smoke Prolog                    | PASS=5 FAIL=0 |
 | unified_broker                  | PASS=49 FAIL=0 |
@@ -165,8 +165,8 @@ From this session's evidence:
 |--------|---------|--------|
 | stmt-context value leak | `if x > 5 then ...` printing `5` | add SM_POP after if/while/until condition value |
 | generator producer/consumer mismatch | `every write(1 to 3)` stack underflow | finish CH-15b Icon generator migrations OR back-port consumer to expect SM_BB_PUMP_SM |
-| unhandled clause kind in `--sm-run` | queens.pl kind 59 / E_CHOICE | CH-17f reactivation (E_CHOICE/E_CLAUSE chunk bodies) |
+| unhandled clause kind in `--interp` | queens.pl kind 59 / E_CHOICE | CH-17f reactivation (E_CHOICE/E_CLAUSE chunk bodies) |
 
 This is a starter list, not the full survey.  The full survey runs
 the Icon corpus PASS subset and the Prolog corpus PASS subset
-under `--sm-run` and enumerates every divergence.
+under `--interp` and enumerates every divergence.

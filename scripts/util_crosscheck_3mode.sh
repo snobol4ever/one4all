@@ -3,7 +3,7 @@
 #
 # Usage: bash util_crosscheck_3mode.sh <file> [oracle_ref]
 #
-# Runs <file> under --ir-run, --sm-run, --jit-run.
+# Runs <file> under --ir-run, --interp, --run.
 # If oracle_ref given: diffs each mode vs ref.
 # If no ref: diffs sm-run and jit-run against ir-run (ir-run is authoritative).
 # Prints PASS/FAIL per mode. Exits 0 if all agree, 1 if any diverge.
@@ -27,8 +27,8 @@ run_mode() {
 }
 
 IR=$(run_mode --ir-run  "ir-run")
-SM=$(run_mode --sm-run  "sm-run")
-JIT=$(run_mode --jit-run "jit-run")
+SM=$(run_mode --interp  "sm-run")
+JIT=$(run_mode --run "jit-run")
 
 check() {
     local label="$1" got="$2" want="$3"

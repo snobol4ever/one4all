@@ -14,7 +14,7 @@ Pre-rung, `AST_ALTERNATE` had no `case` in `sm_lower.c`'s
 `lower_expr` switch. Lowering hit the `default:` arm at
 `sm_lower.c:1621`, which emits `SM_PUSH_NULL` and prints a stderr
 warning when `g_expression_body_lowering` is false. Consequence:
-in value context, `x := 1 | 2 | 3` under `--sm-run` assigned
+in value context, `x := 1 | 2 | 3` under `--interp` assigned
 `&null` to `x` and `write(x)` printed a blank line, while
 `--ir-run` correctly assigned `1` and printed `1`.
 
@@ -31,7 +31,7 @@ end
 | Mode | Output |
 |------|--------|
 | `--ir-run` | `1` / `1` |
-| `--sm-run` (pre-rung) | blank / `&null` |
+| `--interp` (pre-rung) | blank / `&null` |
 
 In `every` context this same expression already worked, because
 `AST_EVERY`'s SM lowering at `sm_lower.c:1317` pumps its body
@@ -100,8 +100,8 @@ end
 ```
 
 - `--ir-run` → `1`
-- `--sm-run` → `1`
-- `SCRIP_NO_AST_WALK=1 --sm-run` → `1`
+- `--interp` → `1`
+- `SCRIP_NO_AST_WALK=1 --interp` → `1`
 
 All three modes produce identical output. The honest mode-3 run
 no longer falls back to the AST walker for the alternation.

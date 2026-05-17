@@ -1,4 +1,4 @@
-# CHUNKS-step17i-survey-mode3 — Icon + Prolog `--sm-run` gap audit
+# CHUNKS-step17i-survey-mode3 — Icon + Prolog `--interp` gap audit
 
 **Rung:** CH-17i-survey-mode3  
 **Date:** 2026-05-09  
@@ -16,7 +16,7 @@ Survey: 4 programs produce non-empty `--ir-run` output (hello, palindrome, roman
 
 ---
 
-## Icon results: 177 PASS, 111 diverge under `--sm-run`, 30 XFAIL
+## Icon results: 177 PASS, 111 diverge under `--interp`, 30 XFAIL
 
 Zero missing builtins. Zero missing opcodes. All 111 failures are **semantic**.
 
@@ -51,7 +51,7 @@ is incompatible with SM dispatch.**
 
 ---
 
-## Prolog results: 4 PASS, 1 diverges under `--sm-run`
+## Prolog results: 4 PASS, 1 diverges under `--interp`
 
 `coverage_net_gaps.pl` — FAIL.  
 Cause: `:- initialization(main, main)` directive emits `SM_CALL_FN s="initialization" nargs=2`.
@@ -80,7 +80,7 @@ pattern). Each kind needs: (a) a chunk-side producer in `sm_lower.c` that emits 
 named-proc opcode instead of `SM_PUSH_EXPR + SM_BB_PUMP`; (b) a consumer handler in
 `sm_interp.c`. This is CH-17h's work (which was surveyed as dead-code-on-real-corpora
 under `--ir-run` because the generator kinds inside proc bodies were never reachable
-via `coro_call` in `--ir-run` mode — but they ARE reachable under `--sm-run` once
+via `coro_call` in `--ir-run` mode — but they ARE reachable under `--interp` once
 `sm_call_proc` dispatches into the chunk). Sub-rungs per kind:
 
 | Sub-rung | Kind(s) | Programs unblocked |

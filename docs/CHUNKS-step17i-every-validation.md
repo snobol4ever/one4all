@@ -22,7 +22,7 @@ every yielded value (verified empirically — first attempt produced
 Stack discipline: handler pushes `NULVCL` so the trailing
 `SM_VOID_POP` from proc-body lowering's `lower_expr(body); SM_VOID_POP`
 loop is balanced. The legacy `emit_push_expr + SM_BB_PUMP` shape was
-net-stack-zero (push 1, pop 1) — root cause of the 111 `--sm-run`
+net-stack-zero (push 1, pop 1) — root cause of the 111 `--interp`
 divergences in the CH-17i survey (sess 2026-05-09 `dfe68c5b`).
 
 `AST_SUSPEND` deferred to follow-on sub-rung **CH-17i-suspend** —
@@ -56,7 +56,7 @@ yields to a coroutine caller, different stack discipline.
 | broad_unified_broker          | PASS=6 FAIL=0 | PASS=6 FAIL=0 |
 | scrip_all_modes               | PASS=2 FAIL=0 | PASS=2 FAIL=0 |
 | Icon `--ir-run` corpus        | 177/56/30/263 | 177/56/30/263 |
-| **Icon `--sm-run` rung01–04** | **5/24**      | **17/24**     |
+| **Icon `--interp` rung01–04** | **5/24**      | **17/24**     |
 
 ## Rung01 byte-identical to expected (all six)
 

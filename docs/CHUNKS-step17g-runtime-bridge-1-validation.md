@@ -99,7 +99,7 @@ The legacy IR-walker path still routes through `icn_call_builtin` →
 `icn_try_call_builtin_by_name` for `write`, producing the same
 output as before the refactor.
 
-`--sm-run` of the same program still FATALs with "Undefined function
+`--interp` of the same program still FATALs with "Undefined function
 or operation" — the helper is defined but not yet wired into
 `SM_CALL_FN`.  That's CH-17g-runtime-bridge-2's work.
 
@@ -107,6 +107,6 @@ or operation" — the helper is defined but not yet wired into
 
 **CH-17g-runtime-bridge-2** — wire `icn_try_call_builtin_by_name`
 into `SM_CALL_FN`.  In `sm_interp.c`, after the existing `INVOKE_fn`
-fallback returns FAIL, call the helper.  Gate: `--sm-run` of the
+fallback returns FAIL, call the helper.  Gate: `--interp` of the
 trivial Icon proc produces output identical to `--ir-run`; standard
 set byte-identical.

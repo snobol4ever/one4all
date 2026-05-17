@@ -35,5 +35,5 @@ Steps 15 (Icon generators per-kind) and 16 (Prolog clauses) will be the first re
 producers. The JIT codegen path (sm_codegen.c) is intentionally left as named-FATAL
 stubs until M5 (Step 19 / EM-10).
 
-bb_broker_drive_sm drives an SM chunk via the interpreter (--sm-run path only).
-The JIT path (--jit-run) will need EM-10+ to support generators in emitted code.
+bb_broker_drive_sm drives an SM chunk via the interpreter (--interp path only).
+The JIT path (--run) will need EM-10+ to support generators in emitted code.

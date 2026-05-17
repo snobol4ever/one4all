@@ -65,16 +65,16 @@ body fill (lowering E_CLAUSE head-unify + body goals into SM ops) is a
 follow-on rung that requires dedicated SM opcodes for unification and trail
 management; scoped out of CH-17f.
 
-**`--sm-run` Prolog programs now produce correct output:**
+**`--interp` Prolog programs now produce correct output:**
 
-| Program     | `--ir-run` | `--sm-run` (before) | `--sm-run` (after) |
+| Program     | `--ir-run` | `--interp` (before) | `--interp` (after) |
 |-------------|:----------:|:-------------------:|:------------------:|
 | hello.pl    | Hello, World! | FATAL abort | Hello, World! ✅ |
 | roman.pl    | correct    | FATAL abort         | correct ✅          |
 | queens.pl   | (hangs/abort) | FATAL abort      | same pre-existing ✅|
 | palindrome  | no/no/no   | FATAL abort         | no/no/no ✅ (pre-existing bug in ir-run too) |
 
-The "Error 5 / statement 0" message in `--sm-run` Prolog output comes from
+The "Error 5 / statement 0" message in `--interp` Prolog output comes from
 the `initialization/2` directive stmt which has no user-predicate entry —
 it falls to `pl_box_fail()`.  Same behavior as IR mode (directive is silently
 skipped there via the builtin path).  This is a pre-existing divergence,
@@ -86,11 +86,11 @@ not introduced by CH-17f.
 
 | Gate | Result |
 |------|--------|
-| smoke SNOBOL4 --sm-run 7/7 | PASS |
-| smoke Icon --sm-run 5/5 | PASS |
-| smoke Prolog --sm-run 5/5 | PASS |
-| smoke Raku --sm-run 5/5 | PASS |
-| smoke Snocone --sm-run 5/5 | PASS |
+| smoke SNOBOL4 --interp 7/7 | PASS |
+| smoke Icon --interp 5/5 | PASS |
+| smoke Prolog --interp 5/5 | PASS |
+| smoke Raku --interp 5/5 | PASS |
+| smoke Snocone --interp 5/5 | PASS |
 | smoke Rebus 4/4 | PASS |
 | isolation gate | PASS |
 | csnobol4 Budne PASS=61 | PASS |

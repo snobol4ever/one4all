@@ -94,15 +94,15 @@ real
 42
 "hello"
 
-$ diff <(./scrip --ir-run /tmp/probe2.icn) <(./scrip --sm-run /tmp/probe2.icn)
+$ diff <(./scrip --ir-run /tmp/probe2.icn) <(./scrip --interp /tmp/probe2.icn)
 $ # (empty — byte-identical)
 ```
 
 Cross-check against existing test/icon programs that exercise these
 builtins: `test/icon/generators.icn` is now byte-identical between
-`--ir-run` and `--sm-run` (it uses `integer` and other now-bridged
+`--ir-run` and `--interp` (it uses `integer` and other now-bridged
 names).  `test/icon/meander.icn` and `test/icon/queens.icn` still
-diverge under `--sm-run` because they use unbridged builtins
+diverge under `--interp` because they use unbridged builtins
 (`read`, `tab`, `find`, `move`, `repl`, `list`); coverage extension
 will pick those up in follow-on rungs.
 
@@ -132,10 +132,10 @@ back with a `setjmp` wrapper around `INVOKE_fn`.
 | scrip_all_modes | PASS=2 FAIL=0 |
 | Icon corpus `--ir-run` (test_icon_ir_all_rungs) | PASS=186 FAIL=47 XFAIL=30 TOTAL=263 (byte-identical to baseline) |
 | csnobol4 Budne suite | PASS=50 FAIL=100 SKIP=8 (matches CH-17g-call-sites baseline; environmental variance vs CH-17f's recorded 61) |
-| **NEW: trivial Icon proc using new builtins, `--sm-run` byte-identical to `--ir-run`** | PASS — 11 calls covering all eight names |
-| **NEW: test/icon/generators.icn `--sm-run` byte-identical to `--ir-run`** | PASS (was diverging pre-bridge-3) |
+| **NEW: trivial Icon proc using new builtins, `--interp` byte-identical to `--ir-run`** | PASS — 11 calls covering all eight names |
+| **NEW: test/icon/generators.icn `--interp` byte-identical to `--ir-run`** | PASS (was diverging pre-bridge-3) |
 
-## What still doesn't work under `--sm-run`
+## What still doesn't work under `--interp`
 
 Programs using Icon builtins not yet in the helper still surface
 `Error 5: Undefined function or operation`:

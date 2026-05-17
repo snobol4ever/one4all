@@ -94,13 +94,13 @@ end
 | Mode | Pre-rung | Post-rung |
 |------|----------|-----------|
 | `--ir-run`  | PASS (output: `hello world`) | PASS unchanged |
-| `--sm-run`  | FAIL (rc=134 SIGABRT, "sm_interp: stack underflow") | **PASS** byte-identical to ir-run |
-| `--jit-run` | FAIL (rc=134 SIGABRT, same stack underflow) | **PASS** byte-identical to ir-run |
+| `--interp`  | FAIL (rc=134 SIGABRT, "sm_interp: stack underflow") | **PASS** byte-identical to ir-run |
+| `--run` | FAIL (rc=134 SIGABRT, same stack underflow) | **PASS** byte-identical to ir-run |
 
 Audit-counter sweep with `SCRIP_EXPRS_AUDIT=1`:
 
 ```
-$ SCRIP_EXPRS_AUDIT=1 ./scrip --sm-run rung15_real_swap_lconcat.icn
+$ SCRIP_EXPRS_AUDIT=1 ./scrip --interp rung15_real_swap_lconcat.icn
 [CHUNKS-AUDIT] summary: SM_PUSH_EXPRESSION=0  SM_PUSH_EXPR=0  out_of_range=0
 hello world
 ```
@@ -116,7 +116,7 @@ takes over.
 
 The legacy fallthrough remains for `is_suspendable(child) == 1` cases
 (Phase 2 territory).  Sweep of Icon corpus (271 programs) under
-`--sm-run` with `SCRIP_EXPRS_AUDIT=1`: zero programs fire `SM_PUSH_EXPR`
+`--interp` with `SCRIP_EXPRS_AUDIT=1`: zero programs fire `SM_PUSH_EXPR`
 post-rung.  This means the AST_LCONCAT generative case (`gen ||| gen`,
 `gen ||| str`, etc.) is **not exercised by the current Icon corpus**.
 
@@ -141,10 +141,10 @@ CH-15-SURVEY's deferral of CH-15b.
 | `test_smoke_unified_broker.sh` | 49/0 | 49/0 | byte-identical |
 | `test_smoke_scrip_all_modes.sh` | 2/0 | 2/0 | byte-identical |
 | `test_icon_ir_all_rungs.sh` | 177/56/30 | 177/56/30 | byte-identical |
-| Icon corpus `--sm-run` | 100/163 | 101/162 | **+1 PASS** (rung15_real_swap_lconcat) |
-| `--sm-run` rung01–04 | 20/24 | 20/24 | unchanged (the 4 FAILs are pre-existing: rung02_proc_fact, rung02_proc_locals, rung03_suspend_fail, rung03_suspend_return) |
+| Icon corpus `--interp` | 100/163 | 101/162 | **+1 PASS** (rung15_real_swap_lconcat) |
+| `--interp` rung01–04 | 20/24 | 20/24 | unchanged (the 4 FAILs are pre-existing: rung02_proc_fact, rung02_proc_locals, rung03_suspend_fail, rung03_suspend_return) |
 
-The +1 in the broad `--sm-run` Icon corpus is exactly
+The +1 in the broad `--interp` Icon corpus is exactly
 `rung15_real_swap_lconcat`.  The four other rung15 programs
 (rung15_real_swap_real_literal, _real_var, _swap_basic, _swap_str)
 were already at their final state pre-rung — _real_literal and _real_var
@@ -164,7 +164,7 @@ not LCONCAT).
     sweep above, the Icon corpus does not exercise this case today;
     Phase 2 is deferred until a corpus program forces the issue.
   - **Does not unblock rung11_bang_augconcat_*.**  Those programs FAIL
-    under `--sm-run` via a different mechanism (no `SM_PUSH_EXPR` fire
+    under `--interp` via a different mechanism (no `SM_PUSH_EXPR` fire
     in pre-rung audit) — likely augmented-concat (`||:=`) lowering.
     Separate territory; deferred per the goal note.
   - **Does not flip rung15_real_swap_swap_basic / _swap_str.**  Those
@@ -184,7 +184,7 @@ SM_BB_PUMP path when any child is is_suspendable (Phase 2 territory,
 empirically not exercised by current Icon corpus — deferred).
 
 Headline gain: rung15_real_swap_lconcat (`s := "hello" ||| " world"`)
-flips --sm-run / --jit-run FAIL→PASS byte-identical to --ir-run output.
+flips --interp / --run FAIL→PASS byte-identical to --ir-run output.
 Pre-rung the program SIGABRTed with "sm_interp: stack underflow" because
 the legacy fallthrough was net-stack-zero — AST_ASSIGN's SM_STORE_VAR
 underflowed when popping the absent RHS value.
@@ -194,7 +194,7 @@ No new opcodes, no runtime additions, no JIT codegen changes.
 
 Gates byte-identical: smoke ×6 (7/5/5/5/5/4), isolation, unified_broker
 49/0, scrip_all_modes 2/0, Icon --ir-run 177/56/30.
-Icon --sm-run corpus: 100/163 → 101/162 (+1 = rung15_real_swap_lconcat).
+Icon --interp corpus: 100/163 → 101/162 (+1 = rung15_real_swap_lconcat).
 
 Documented: docs/CHUNKS-step17i-bang-concat-phase1-validation.md
 ```

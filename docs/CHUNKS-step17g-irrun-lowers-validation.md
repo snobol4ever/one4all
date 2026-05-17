@@ -56,7 +56,7 @@ SCRIP_PROC_ENTRY_PCS=1 ./scrip --ir-run hello.pl
 # Hello, World!
 ```
 
-Both `--ir-run` and `--sm-run` produce identical output; entry_pcs
+Both `--ir-run` and `--interp` produce identical output; entry_pcs
 visible under SCRIP_PROC_ENTRY_PCS=1 in both modes.
 
 ## Gates

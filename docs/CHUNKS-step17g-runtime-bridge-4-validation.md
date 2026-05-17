@@ -109,7 +109,7 @@ hi....
 record
 table(0)
 
-$ diff <(./scrip --ir-run /tmp/probe3.icn) <(./scrip --sm-run /tmp/probe3.icn)
+$ diff <(./scrip --ir-run /tmp/probe3.icn) <(./scrip --interp /tmp/probe3.icn)
 $ # (empty — byte-identical)
 ```
 
@@ -124,7 +124,7 @@ $ echo "hello stdin" | ./scrip --ir-run /tmp/probe_read.icn
 got: hello stdin
 
 $ diff <(echo "hello stdin" | ./scrip --ir-run /tmp/probe_read.icn) \
-       <(echo "hello stdin" | ./scrip --sm-run /tmp/probe_read.icn)
+       <(echo "hello stdin" | ./scrip --interp /tmp/probe_read.icn)
 $ # (empty — byte-identical)
 ```
 
@@ -154,8 +154,8 @@ builtin, `tab` (which is scan-context, the next bridge family).
 | unified_broker | PASS=49 FAIL=0 (byte-identical to baseline) |
 | scrip_all_modes | PASS=2 FAIL=0 |
 | Icon corpus `--ir-run` (test_icon_ir_all_rungs) | PASS=186 FAIL=47 XFAIL=30 TOTAL=263 (byte-identical to baseline) |
-| **NEW: trivial Icon proc using all 14 multi-arg names, `--sm-run` byte-identical to `--ir-run`** | PASS — 14 calls covering repl, reverse, map (×2 forms), trim, left, right, center, abs, max, min, sqrt, image(list(...)), image(table()) |
-| **NEW: read() under `--sm-run` byte-identical to `--ir-run`** | PASS |
+| **NEW: trivial Icon proc using all 14 multi-arg names, `--interp` byte-identical to `--ir-run`** | PASS — 14 calls covering repl, reverse, map (×2 forms), trim, left, right, center, abs, max, min, sqrt, image(list(...)), image(table()) |
+| **NEW: read() under `--interp` byte-identical to `--ir-run`** | PASS |
 
 ## Scan-context family deferred
 
@@ -186,7 +186,7 @@ No new opcodes, no IR fields, no `sm_lower.c` changes, no
 `sm_interp.c` changes (bridge-2's wire-up at SM_CALL_FN already
 routes every name through the helper).
 
-## What still doesn't work under `--sm-run`
+## What still doesn't work under `--interp`
 
 Programs using:
 - **Scan-context builtins**: `tab`, `move`, `find`, `upto`, `match`,

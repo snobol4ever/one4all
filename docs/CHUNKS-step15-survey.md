@@ -15,7 +15,7 @@ E_RANDOM, E_SECTION, E_SECTION_PLUS, E_SECTION_MINUS through
 audited today.  Two surveys ran:
 
 **`test/` corpus** (per-frontend smoke fixtures): 46 audited programs,
-**0 fire `SM_PUSH_EXPR`** under `--sm-run` with `SCRIP_CHUNKS_AUDIT=1`.
+**0 fire `SM_PUSH_EXPR`** under `--interp` with `SCRIP_CHUNKS_AUDIT=1`.
 2 programs hit `SM_PUSH_CHUNK=20` (Raku CASE per CH-13); the rest
 hit `SM_PUSH_CHUNK=0`.
 
@@ -32,7 +32,7 @@ prolog              4          0          0
 ```
 
 (Most Prolog corpus programs error before reaching audit-summary
-under `--sm-run`; that itself is consistent with the broader
+under `--interp`; that itself is consistent with the broader
 picture — Prolog clauses reach `sm_lower` only for the small subset
 that the current dispatcher handles.  Step 16's territory.)
 
@@ -42,7 +42,7 @@ authoritative corpus, every one audits `SM_PUSH_EXPR=0`**.  Of the
 operators (per a separate keyword survey
 `grep -lE "every |\\\\|!" *.icn`), every audited program shows
 `SM_PUSH_EXPR=0` — those programs don't exercise the dispatcher
-arm in `--sm-run` mode.
+arm in `--interp` mode.
 
 ## Why
 
@@ -145,6 +145,6 @@ exercises.
 Empirical audit reach: 46 `test/` programs + 317 cross-corpus
 programs (200 Icon + 47 snocone + 39 Raku + 21 scrip + 6 SNOBOL4
 + 4 Prolog) = **363 audited programs, zero `SM_PUSH_EXPR` fires**
-in `--sm-run`.
+in `--interp`.
 
 one4all @ HEAD pre-rung: `dd673da1`.  Session #74, 2026-05-07.

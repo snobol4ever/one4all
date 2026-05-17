@@ -12,13 +12,13 @@
 # 5 bytes by routing through the template + binary emitter +
 # capture-and-flush adapter.  We verify this two ways:
 #
-# 1. **Behavioral equivalence (this script).**  Mode-3 (`--jit-run`)
+# 1. **Behavioral equivalence (this script).**  Mode-3 (`--run`)
 #    is the in-process JIT.  If SM_HALT's bytes were wrong, the JIT
 #    would either crash (illegal instruction, garbled jump) or produce
 #    different output (wrong pc value at halt time, wrong return
 #    address).  We run a small fixture of SNOBOL4 programs that
-#    terminate normally via SM_HALT and require `--jit-run` output
-#    to match `--sm-run` (the interpreter, which doesn't use SEG_CODE
+#    terminate normally via SM_HALT and require `--run` output
+#    to match `--interp` (the interpreter, which doesn't use SEG_CODE
 #    at all and is the byte-identity oracle).
 #
 # 2. **Static defensive check.**  The template adapter
@@ -87,15 +87,15 @@ FAILS=""
 for f in "$TMP"/*.sno; do
     name=$(basename "$f" .sno)
 
-    # Run --sm-run (the byte-identity oracle: pure interpreter, no
+    # Run --interp (the byte-identity oracle: pure interpreter, no
     # SEG_CODE involved).
-    sm_out=$(timeout "$TIMEOUT" "$SCRIP" --sm-run "$f" < /dev/null 2>/dev/null)
+    sm_out=$(timeout "$TIMEOUT" "$SCRIP" --interp "$f" < /dev/null 2>/dev/null)
     sm_rc=$?
 
-    # Run --jit-run (mode-3: walks SEG_CODE, including the SM_HALT
+    # Run --run (mode-3: walks SEG_CODE, including the SM_HALT
     # blob produced by the template).  If the template emits bad
-    # bytes, --jit-run will either crash or produce different output.
-    jit_out=$(timeout "$TIMEOUT" "$SCRIP" --jit-run "$f" < /dev/null 2>/dev/null)
+    # bytes, --run will either crash or produce different output.
+    jit_out=$(timeout "$TIMEOUT" "$SCRIP" --run "$f" < /dev/null 2>/dev/null)
     jit_rc=$?
 
     if [ "$sm_rc" -eq 0 ] && [ "$jit_rc" -eq 0 ] && [ "$sm_out" = "$jit_out" ]; then

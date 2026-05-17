@@ -11,7 +11,7 @@ EXPR kind, immediate-caller symbol, and BB-ancestor symbol once per
 unique tuple to `/tmp/rs23_diag.log` (env: `RS23_DIAG_LOG`).
 
 Ran across:
-- `test_smoke_snobol4.sh` (7 tests, --sm-run / --jit-run / --ir-run)
+- `test_smoke_snobol4.sh` (7 tests, --interp / --run / --ir-run)
 - `test_smoke_icon.sh` (5 tests, --ir-run)
 - `test_smoke_prolog.sh` (5 tests)
 - `test_smoke_raku.sh` (5 tests)

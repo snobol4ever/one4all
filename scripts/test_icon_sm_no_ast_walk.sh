@@ -1,5 +1,5 @@
 #!/bin/bash
-# test_icon_sm_no_ast_walk.sh — run Icon corpus under SCRIP_NO_AST_WALK=1 --sm-run.
+# test_icon_sm_no_ast_walk.sh — run Icon corpus under SCRIP_NO_AST_WALK=1 --interp.
 # Reports PASS=N where N grows as GOAL-ICON-BB-COMPLETE Phase A/B/C rungs land.
 # A PASS here means "honest mode 3": SM dispatch did not fall back to the AST walker.
 # A FAIL/ABORT here means the program still cheats (coro_eval reached from SM dispatch).
@@ -25,7 +25,7 @@ for f in "$CORPUS"/rung*.icn; do
     # Only test programs that pass --ir-run (the oracle)
     [ $ir_rc -ne 0 ] && continue
 
-    sm_out=$(timeout 8 bash -c "SCRIP_NO_AST_WALK=1 '$SCRIP' --sm-run '$f' < /dev/null 2>&1")
+    sm_out=$(timeout 8 bash -c "SCRIP_NO_AST_WALK=1 '$SCRIP' --interp '$f' < /dev/null 2>&1")
     sm_rc=$?
 
     if [ $sm_rc -eq 134 ] || echo "$sm_out" | grep -q "FATAL: .*reached from SM dispatch"; then
@@ -37,7 +37,7 @@ for f in "$CORPUS"/rung*.icn; do
     fi
 done
 
-echo "=== honest mode-3 (SCRIP_NO_AST_WALK=1 --sm-run) ==="
+echo "=== honest mode-3 (SCRIP_NO_AST_WALK=1 --interp) ==="
 echo "PASS=$pass FAIL=$fail ABORT=$abort"
 echo "(PASS = honest; ABORT = cheating via AST walker; FAIL = wrong output)"
 [ $fail -eq 0 ] && [ $abort -eq 0 ] && exit 0 || exit 1

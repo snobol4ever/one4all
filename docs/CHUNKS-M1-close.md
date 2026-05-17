@@ -52,14 +52,14 @@ The structural rule only covers `snobol4_invoke.c` and `snobol4_argval.c` (both 
 
 ### 2. Three-mode parity on broad corpus is RED — pre-existing
 
-The `test_smoke_snobol4_jit.sh` gate runs ~150 crosscheck programs in `--ir-run` / `--sm-run` / `--jit-run` and requires the SM and JIT PASS counts match the IR PASS count. Current state at M1 close:
+The `test_smoke_snobol4_jit.sh` gate runs ~150 crosscheck programs in `--ir-run` / `--interp` / `--run` and requires the SM and JIT PASS counts match the IR PASS count. Current state at M1 close:
 
 ```
-FAIL  --sm-run  PASS (101) < --ir-run PASS (139)
-FAIL  --jit-run PASS (101) < --ir-run PASS (139)
+FAIL  --interp  PASS (101) < --ir-run PASS (139)
+FAIL  --run PASS (101) < --ir-run PASS (139)
 ```
 
-**38 programs** PASS under `--ir-run` but FAIL under `--sm-run` and `--jit-run`. Verified pre-existing: at commit `c6862096` (pre-Step-4) the same gate showed `--sm-run 102 / --jit-run 101`. The CHUNKS Steps 2–6 are net-flat on this gate — no regression and no improvement.
+**38 programs** PASS under `--ir-run` but FAIL under `--interp` and `--run`. Verified pre-existing: at commit `c6862096` (pre-Step-4) the same gate showed `--interp 102 / --run 101`. The CHUNKS Steps 2–6 are net-flat on this gate — no regression and no improvement.
 
 The 38-program gap is therefore independent of CHUNKS work — it predates this goal. It represents real IR-vs-SM divergences in the SM-mode pattern engine that the shallow smoke ×6 does not catch. M1's empirical proof (Step 5) was scoped to the migrated `emit_push_expr` sites; it did not, and could not, prove broad three-mode parity.
 

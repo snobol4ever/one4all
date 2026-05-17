@@ -8,7 +8,7 @@
 # Options:
 #   --verbose       show raw scrip output for failing files
 #   --file NAME     run only NAME.pl  (e.g. --file test_bips)
-#   --mode MODE     --ir-run | --sm-run | --jit-run  (default: --ir-run)
+#   --mode MODE     --ir-run | --interp | --run  (default: --ir-run)
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIP="${HERE}/../scrip"
@@ -27,7 +27,7 @@ while [[ $# -gt 0 ]]; do
         --verbose)  VERBOSE=1; shift ;;
         --file)     ONLY_FILE="$2"; shift 2 ;;
         --mode)     MODE="$2"; shift 2 ;;
-        --ir-run|--sm-run|--jit-run) MODE="$1"; shift ;;
+        --ir-run|--interp|--run) MODE="$1"; shift ;;
         *) echo "Unknown arg: $1"; exit 1 ;;
     esac
 done

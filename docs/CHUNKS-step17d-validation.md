@@ -38,7 +38,7 @@ reaches them at runtime.
 ## Empirical proof — SCRIP_PROC_ENTRY_PCS=1
 
 ```
-$ SCRIP_PROC_ENTRY_PCS=1 ./scrip --sm-run /home/claude/corpus/programs/prolog/palindrome.pl
+$ SCRIP_PROC_ENTRY_PCS=1 ./scrip --interp /home/claude/corpus/programs/prolog/palindrome.pl
 [CH-17a] resolve entry_pcs (proc_table=0 procs, pl_pred_table=hash)
 [CH-17a]   pred  key=palindrome/2         entry_pc=1
 [CH-17a]   pred  key=main/0               entry_pc=5
@@ -48,7 +48,7 @@ $ SCRIP_PROC_ENTRY_PCS=1 ./scrip --sm-run /home/claude/corpus/programs/prolog/pa
 Before CH-17d all Prolog entry_pcs were -1 (noted in CH-17a summary comment:
 "others=-1 are CH-17b/d territory").  After CH-17d every predicate in the
 table resolves to a valid pc.  The abort that follows is the pre-existing
---sm-run Prolog crash (consumer still dormant — expected).
+--interp Prolog crash (consumer still dormant — expected).
 
 ---
 
@@ -72,5 +72,5 @@ table resolves to a valid pc.  The abort that follows is the pre-existing
 
 **CH-17e** — flip Prolog consumers: add `pl_box_choice_pc`, `pl_box_clause_pc`,
 `pl_box_builtin_pc`; flip `pl_pred_table_lookup` to return entry_pc; flip each
-consumer site.  After CH-17e, `--sm-run` Prolog should work end-to-end for
+consumer site.  After CH-17e, `--interp` Prolog should work end-to-end for
 the first time.

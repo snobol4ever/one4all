@@ -117,7 +117,7 @@ of the following hold:
 
 1. The chunk path produces correct output for every Icon/Raku/Prolog
    program in the corpus (currently the chunks are skeleton-or-stub:
-   `--sm-run /tmp/probe.icn` returns FATAL "Undefined function" on
+   `--interp /tmp/probe.icn` returns FATAL "Undefined function" on
    `write()` even though `entry_pc` resolves to 1).
 2. `--ir-run` invokes `sm_lower` (and therefore
    `sm_resolve_proc_entry_pcs`) before dispatch, so `entry_pc >= 0`
@@ -125,10 +125,10 @@ of the following hold:
 
 Today, neither holds.
 
-### Verifying (1): `--sm-run` of trivial Icon proc fails
+### Verifying (1): `--interp` of trivial Icon proc fails
 
 ```
-$ ./scrip --sm-run /tmp/probe.icn < /dev/null
+$ ./scrip --interp /tmp/probe.icn < /dev/null
 ** Error 5 in statement 0
    Undefined function or operation
 ```
@@ -153,7 +153,7 @@ in `GOAL-CHUNKS-STEP17.md` should be amended with two new rungs:
   add `SM_CALL_BUILTIN` opcode that walks the same `coro_value.c`
   builtin table the IR walker uses; **or** extend `sm_call_chunk` to
   dispatch a chunk-internal call by name through a lookup that hits
-  both proc_table and the builtin registry.  Gate: `--sm-run` of
+  both proc_table and the builtin registry.  Gate: `--interp` of
   every Icon hello-world variant produces output identical to
   `--ir-run`.
 - **CH-17g-irrun-lowers** — invoke `sm_lower` (or at minimum

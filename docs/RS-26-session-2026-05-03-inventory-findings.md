@@ -159,7 +159,7 @@ the registry-based per-module dispatch — keep that branch but tighten
 its predicate from `has_non_sno` to `g_polyglot` (the multi-module flag
 that `polyglot_execute` itself already checks).
 
-After these three changes, `--sm-run /path/to/factorial.icn` should:
+After these three changes, `--interp /path/to/factorial.icn` should:
 
 1. Parse Icon source (frontend dispatch in scrip.c, unchanged).
 2. `sm_preamble` runs `polyglot_init` (Icon branch fires; `proc_table`
@@ -213,12 +213,12 @@ RS-26 (this work)
 After RS-26 lands:
 
 ```bash
-# Force --sm-run on Icon and confirm SM_BB_PUMP shape
-./scrip --sm-run --dump-sm /home/claude/corpus/programs/icon/rung01_paper_mult.icn
+# Force --interp on Icon and confirm SM_BB_PUMP shape
+./scrip --interp --dump-sm /home/claude/corpus/programs/icon/rung01_paper_mult.icn
 # Expected output: dominated by SM_PUSH_EXPR / SM_BB_PUMP / SM_STNO / SM_HALT
 
 # Confirm runtime behavior unchanged
-./scrip --sm-run /home/claude/corpus/programs/icon/rung01_paper_mult.icn
+./scrip --interp /home/claude/corpus/programs/icon/rung01_paper_mult.icn
 # Expected: 1 / 2 / 2 / 4 / 3 / 6  (unchanged from polyglot_execute path)
 
 # Run the existing smoke

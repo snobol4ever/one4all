@@ -48,7 +48,7 @@ TMPD=$(mktemp -d); trap "rm -rf $TMPD" EXIT
 # Skip list — programs that segfault in the scrip frontend (not WASM-specific).
 # scanerr.sno: SIGSEGV in lower.c:304 (emit_pat_capture) on deferred-expr capture
 # *TAB(X) / *ANY(X) / *LEN(X) — var_node->v.sval is 0x1 (uninit) for the unary-*
-# operand.  Crashes on ALL targets and on --sm-run / --ir-run (frontend bug).
+# operand.  Crashes on ALL targets and on --interp / --ir-run (frontend bug).
 # To be fixed in a separate upstream session; tracked in PLAN.md.
 SKIP_LIST=" scanerr "
 

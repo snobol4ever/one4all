@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # scripts/test_gate_em_beauty_subsystems_mode4.sh — EM-7d-prep gate:
 # every *_driver.sno in corpus/programs/snobol4/beauty/, under
-#   --jit-emit --x64    (mode 4: emit .s, link to libscrip_rt.so, run binary)
+#   --compile    (mode 4: emit .s, link to libscrip_rt.so, run binary)
 # produces output byte-identical to the same driver under
-#   --sm-run            (mode 2: proven SM interpreter)
+#   --interp            (mode 2: proven SM interpreter)
 #
 # This is a PARITY gate, not a correctness gate.  The beauty drivers'
 # own .ref files belong to GOAL-PARSER-SNOBOL4 (rung SN-7-8) and may be
@@ -50,16 +50,16 @@ for sno in "$BEAUTY"/*_driver.sno; do
     [ ! -f "$sno" ] && continue
     name=$(basename "$sno" .sno)
 
-    # mode-3 oracle: --sm-run on the same source.  Don't gate on its
+    # mode-3 oracle: --interp on the same source.  Don't gate on its
     # rc; just capture what it produces.  If it segfaults, mode-4
     # parity means mode-4 should produce the same (empty) output.
     # bash -c runs the child in a fresh shell so SIGSEGV trap message
     # (printed by the parent's job-control) doesn't reach our stderr.
-    bash -c "SNO_LIB='$BEAUTY' timeout '$TIMEOUT' '$SCRIP' --sm-run '$sno' < /dev/null" \
+    bash -c "SNO_LIB='$BEAUTY' timeout '$TIMEOUT' '$SCRIP' --interp '$sno' < /dev/null" \
         > "$name.sm.out" 2>/dev/null || true
 
     # mode-4: emit -> assemble+link -> run.
-    SNO_LIB="$BEAUTY" "$SCRIP" --jit-emit --x64 "$sno" \
+    SNO_LIB="$BEAUTY" "$SCRIP" --compile "$sno" \
         > "$name.s" 2> "$name.emit.err"
     if [ $? -ne 0 ] || [ ! -s "$name.s" ]; then
         FAIL_EMIT=$((FAIL_EMIT + 1))

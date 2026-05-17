@@ -14,7 +14,7 @@
 # Options:
 #   --input FILE       SNOBOL4 source to beautify
 #                      (default: corpus/programs/snobol4/demo/beauty/beauty.sno)
-#   --mode MODE        scrip mode: --ir-run | --sm-run | --jit-run
+#   --mode MODE        scrip mode: --ir-run | --interp | --run
 #                      (default: --ir-run)
 #   --timeout N        seconds for scrip run (default: 30)
 #   --diff             also run SPITBOL oracle and diff (default: off)

@@ -72,7 +72,7 @@ run_sno() {
             SNO_LIB="$INC" timeout "$TIMEOUT" "$SCRIP" --ir-run "$sno" 2>/dev/null || true ;;
         x86)
             local t; t=$(mktemp -d)
-            "$SCRIP" --jit-emit --x64 "$sno" > "$t/p.s" 2>/dev/null &&
+            "$SCRIP" --compile "$sno" > "$t/p.s" 2>/dev/null &&
             nasm -f elf64 "$t/p.s" -o "$t/p.o" 2>/dev/null &&
             gcc "$t/p.o" -lgc -lm -o "$t/p" 2>/dev/null &&
             timeout "$TIMEOUT" "$t/p" 2>/dev/null || true

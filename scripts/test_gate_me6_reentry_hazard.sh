@@ -3,11 +3,11 @@
 #
 # Validates that SM_DEFINE_ENTRY does NOT re-push rbp when a user-function
 # body jumps back to its own define-entry label (the icase hazard).
-# Prior to ME-6a this pattern segfaulted under --jit-run because every
+# Prior to ME-6a this pattern segfaulted under --run because every
 # :(self) goto caused an additional `push rbp` without a paired pop.
 #
 # Gate criterion:
-#   --jit-run produces the correct output for both test patterns.
+#   --run produces the correct output for both test patterns.
 #   No segfault. Exit 0.
 
 set -e
@@ -19,7 +19,7 @@ run_test() {
     local tmp; tmp=$(mktemp /tmp/me6b_XXXXXX.sno)
     printf '%s' "$src" > "$tmp"
     local got
-    got=$("$SCRIP" --jit-run "$tmp" 2>/dev/null)
+    got=$("$SCRIP" --run "$tmp" 2>/dev/null)
     rm -f "$tmp"
     if [ "$got" = "$expected" ]; then
         echo "  PASS $name"

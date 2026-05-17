@@ -81,7 +81,7 @@ to the other.
 
 ### Audit-counter sweep
 
-`SCRIP_CHUNKS_AUDIT=1 ./scrip --sm-run test/raku/rk_given.raku`:
+`SCRIP_CHUNKS_AUDIT=1 ./scrip --interp test/raku/rk_given.raku`:
 
 ```
 [CHUNKS-AUDIT] summary: SM_PUSH_CHUNK=20  SM_PUSH_EXPR=0  out_of_range=0
@@ -104,11 +104,11 @@ wrapper-level synthesis is now EXPR_t-free for the Raku CASE path.
 | Mode | Pre-CH-13 | Post-CH-13 |
 |------|-----------|------------|
 | `--ir-run` | `Mon: weekday\nSat: weekend\nweekday\nhot\ncold\nunknown` (PASS) | unchanged (PASS) |
-| `--sm-run` | `sm_interp: stack underflow` (Aborted) | reaches default branch in all 6 calls; outputs "weekday" twice (broken at deeper Raku-SM-mode level — the surrounding `say`/sub infrastructure is broken; this is pre-existing per the Raku full-suite baseline 29/0/0 across IR/SM/JIT) |
-| `--jit-run` | `sm_interp: stack underflow` (Aborted) | same as `--sm-run` — no longer underflows |
+| `--interp` | `sm_interp: stack underflow` (Aborted) | reaches default branch in all 6 calls; outputs "weekday" twice (broken at deeper Raku-SM-mode level — the surrounding `say`/sub infrastructure is broken; this is pre-existing per the Raku full-suite baseline 29/0/0 across IR/SM/JIT) |
+| `--run` | `sm_interp: stack underflow` (Aborted) | same as `--interp` — no longer underflows |
 
-The CASE wrapper itself no longer underflows.  Full Raku --sm-run /
---jit-run remains broken at the surrounding-infrastructure level
+The CASE wrapper itself no longer underflows.  Full Raku --interp /
+--run remains broken at the surrounding-infrastructure level
 (`say(1+2)` already fails the same way pre-CH-13); fixing that is
 NOT CH-13's scope and is consistent with the Raku full-suite baseline.
 

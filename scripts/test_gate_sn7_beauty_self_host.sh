@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/test_gate_sn7_beauty_self_host.sh — SN-7 gate:
 # every *_driver.sno in corpus/programs/snobol4/beauty/, under --ir-run,
-# --sm-run, --jit-run,
+# --interp, --run,
 # diff=0 vs its pre-baked .ref file (SPITBOL ground truth where valid; some
 # drivers have .ref files that reflect correct behavior SPITBOL itself fails
 # on — see RULES.md on .ref authority).
@@ -32,7 +32,7 @@ for sno in "$BEAUTY"/*_driver.sno; do
     name=$(basename "$sno" .sno)
     ref="$BEAUTY/${name}.ref"
     [ ! -f "$ref" ] && continue
-    for mode in --ir-run --sm-run --jit-run; do
+    for mode in --ir-run --interp --run; do
         got=$(SNO_LIB="$BEAUTY" timeout "$TIMEOUT" "$SCRIP" $mode "$sno" < /dev/null 2>/dev/null || true)
         if diff <(printf '%s\n' "$got") "$ref" > /dev/null 2>&1; then
             PASS=$((PASS + 1))

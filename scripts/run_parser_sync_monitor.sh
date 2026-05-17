@@ -3,7 +3,7 @@
 #
 # Transpiles a parser_<lang>.sc to portable SNOBOL4 via `scrip --dump-sno`,
 # then drives the existing 2-way IPC sync-step monitor with the resulting
-# .sno file as input.  Both SPITBOL x64 and SCRIP --sm-run execute the
+# .sno file as input.  Both SPITBOL x64 and SCRIP --interp execute the
 # SAME transpiled .sno; the monitor reports the first divergence.
 #
 # The transpiler is the new piece; the monitor harness was built earlier
@@ -102,8 +102,8 @@ if [[ "$OVERLEN" -gt 0 ]]; then
 fi
 
 # The actual sync-step is delegated to the existing harness (which knows
-# how to launch SPITBOL and SCRIP --sm-run with the IPC monitor wired up).
+# how to launch SPITBOL and SCRIP --interp with the IPC monitor wired up).
 # That script takes the .sno as its argument and reads SAMPLE from stdin.
-echo "[run_parser_sync_monitor] driving 2-way monitor: SPITBOL vs SCRIP --sm-run"
+echo "[run_parser_sync_monitor] driving 2-way monitor: SPITBOL vs SCRIP --interp"
 echo "[run_parser_sync_monitor] sample: $SAMPLE"
 exec bash "$HERE/test_monitor_2way_spitbol_vs_sm.sh" "$SNO_OUT" < "$SAMPLE"

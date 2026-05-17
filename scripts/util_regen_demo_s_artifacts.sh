@@ -15,7 +15,7 @@ cd "$DEMO"
 
 echo "Emitting .s artifacts..."
 for f in roman wordcount claws5 treebank-list treebank-array; do
-    timeout 30 "$SCRIP" --jit-emit --x64 "$f.sno" > "$f.s" 2>/dev/null \
+    timeout 30 "$SCRIP" --compile "$f.sno" > "$f.s" 2>/dev/null \
         && echo "  emit OK   $f.s" \
         || { echo "  emit FAIL $f.s"; exit 1; }
 done

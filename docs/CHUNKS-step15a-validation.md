@@ -98,9 +98,9 @@ CH-14b accommodates them.
 
 Producer-side: a Raku range expression `say 1..3` (which lowers to
 `E_TO(1, 3)` in expression context) audits as
-`SM_PUSH_CHUNK=1, SM_PUSH_EXPR=0` under `--sm-run` with
+`SM_PUSH_CHUNK=1, SM_PUSH_EXPR=0` under `--interp` with
 `SCRIP_CHUNKS_AUDIT=1`.  The chunk produces yields 1, 2, 3 in both
-`--sm-run` and `--jit-run`.
+`--interp` and `--run`.
 
 Why Icon `every i := 1 to 5 do …` does NOT audit a chunk emission today:
 that path runs entirely through `coro_pump_proc_by_name(\"main\", …)` →

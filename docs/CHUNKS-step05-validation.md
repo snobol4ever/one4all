@@ -44,7 +44,7 @@ do not lower through those sites.
 
 Therefore the invariant for Step 5 is:
 
-> When `--sm-run` executes a pure SNOBOL4 or Snocone program,
+> When `--interp` executes a pure SNOBOL4 or Snocone program,
 > `g_chunks_audit_push_expr == 0` and `g_chunks_audit_chunk_oor == 0` at
 > process exit.
 

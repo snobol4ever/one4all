@@ -75,7 +75,7 @@ the equivalent SM lowering forwards, ready for CH-17c.
 
 ## Producer-side empirical proof
 
-`./scrip --dump-sm --sm-run test/icon/palindrome.icn` shows:
+`./scrip --dump-sm --interp test/icon/palindrome.icn` shows:
 
 ```
 ; SM_Program  count=78
@@ -122,7 +122,7 @@ The execution path is unchanged: pc=0 jumps to 53, then 53 jumps to
 IR proc body, not the chunk).  pc 1–52 and 55–74 are forward-jumped
 over.
 
-`SCRIP_PROC_ENTRY_PCS=1 ./scrip --sm-run test/icon/palindrome.icn`
+`SCRIP_PROC_ENTRY_PCS=1 ./scrip --interp test/icon/palindrome.icn`
 confirms resolver finds non-(-1) entry_pcs:
 
 ```
@@ -137,7 +137,7 @@ program text but unreachable as program flow.  Hello.icn confirms
 the same: chunks contain a real `SM_PUSH_VAR write / SM_PUSH_LIT_S
 "Hello, World!" / SM_CALL "" nargs=2 / SM_POP / SM_RETURN` body.
 
-For Raku: `SCRIP_PROC_ENTRY_PCS=1 ./scrip --sm-run test/raku/rk_given.raku`
+For Raku: `SCRIP_PROC_ENTRY_PCS=1 ./scrip --interp test/raku/rk_given.raku`
 shows three procs with three substantial chunk bodies:
 
 ```
@@ -222,7 +222,7 @@ scrip_all_modes       PASS=2 FAIL=0
 
 Pre-suppression-flag observation worth recording: when first
 implemented, the `lower_expr` default case fired for `queens.icn`'s
-`args[1] | 6` (E_ALTERNATE, kind 54) under `--sm-run`, printing
+`args[1] | 6` (E_ALTERNATE, kind 54) under `--interp`, printing
 `sm_lower: unhandled expr kind 54` to stderr while the chunk emitted
 a harmless `SM_PUSH_NULL`.  Output was unchanged (queens fails with
 Error 3 at baseline for unrelated reasons), but the new stderr noise

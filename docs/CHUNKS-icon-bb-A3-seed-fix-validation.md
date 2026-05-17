@@ -2,7 +2,7 @@
 
 **Rung:** GOAL-ICON-BB-COMPLETE A3-seed-fix — unify `ICN_RANDOM` LCG seed
 across the three independent `_rnd_seed` sites (`coro_value.c`,
-`sm_interp.c`, `interp_eval.c`) so `--ir-run`, `--sm-run`, and the
+`sm_interp.c`, `interp_eval.c`) so `--ir-run`, `--interp`, and the
 SNOBOL4-evaluator fallback advance one shared sequence.
 
 **Session:** 2026-05-10 (Claude).
@@ -22,7 +22,7 @@ SNOBOL4-evaluator fallback advance one shared sequence.
 sites held its own `static unsigned long _rnd_seed = 12345UL;` with
 identical Knuth-MMIX constants. Initial values matched but
 consumption patterns differed across modes: `--ir-run` of an Icon
-program advanced only `coro_value.c::_rnd_seed`; `--sm-run` of the
+program advanced only `coro_value.c::_rnd_seed`; `--interp` of the
 same program advanced `sm_interp.c::sm_rnd_seed` for the
 `ICN_RANDOM` opcode but also advanced `coro_value.c::_rnd_seed`
 whenever a child sub-expression was driven through `bb_eval_value`
@@ -67,21 +67,21 @@ procedure main()
 end
 ```
 
-- Pre-rung: `--ir-run` produced `65 / 84`; `--sm-run` produced
+- Pre-rung: `--ir-run` produced `65 / 84`; `--interp` produced
   different values because `sm_rnd_seed` advanced independently.
 - Post-rung: both modes produce `65 / 84` — bit-identical.
 
 ## What this rung does NOT fix
 
 `rung36_jcon_random.icn` still diverges between `--ir-run` and
-`--sm-run`. After A3-seed-fix the divergence is no longer
+`--interp`. After A3-seed-fix the divergence is no longer
 seed-driven; it is caused by two unrelated SM-mode gaps:
 
 1. `&lcase` / `&ucase` keyword evaluation returns empty under
-   `--sm-run` (verified with a minimal `write(&lcase)` probe —
-   `--ir-run` prints `abcdefghijklmnopqrstuvwxyz`, `--sm-run`
+   `--interp` (verified with a minimal `write(&lcase)` probe —
+   `--ir-run` prints `abcdefghijklmnopqrstuvwxyz`, `--interp`
    prints nothing).
-2. `?L` (random element of a list) under `--sm-run` raises
+2. `?L` (random element of a list) under `--interp` raises
    "Error 5 in statement 0 / Undefined function or operation"
    (verified with a minimal `L := [10,20,30,40,50]; write(?L)`
    probe).
