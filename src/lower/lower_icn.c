@@ -248,6 +248,12 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         nd->ival = e->v.ival;
         return nd;
     }
+    case TT_FLIT: {
+        IR_t *nd = IR_node_alloc(cfg, IR_LIT_F);
+        if (!nd) return NULL;
+        nd->dval = e->v.dval;
+        return nd;
+    }
     case TT_QLIT: {
         IR_t *nd = IR_node_alloc(cfg, IR_LIT_S);
         if (!nd) return NULL;
