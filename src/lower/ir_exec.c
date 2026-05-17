@@ -425,8 +425,16 @@ IR_t * IR_exec_node(IR_t * nd) {
     }
     case IR_ALT: {
         /* Icon alternation A|B|C... n-ary. On alpha: try children left to right; on beta: */
-        /* resume current child; if it exhausts, advance to next child.                     */
+        /* resume current child only if it is a generator kind (can yield multiple values); */
+        /* single-shot children (literals, vars) are exhausted after their alpha yield and  */
+        /* must NOT be re-pumped on beta — doing so would cause them to re-yield the same   */
+        /* value forever (IJ-ALT-BETA-SINGLESHOT fix).                                     */
         /* nd->counter holds current child index (0..n-1). nd->state: 0=fresh, 1=active.   */
+        #define ALT_IS_GEN(k) ( \
+            (k) == IR_ICN_TO || (k) == IR_ICN_TO_BY || (k) == IR_ICN_UPTO || \
+            (k) == IR_ALT    || (k) == IR_ALTERNATE  || (k) == IR_BINOP_GEN || \
+            (k) == IR_ICN_ITERATE || (k) == IR_ICN_LIMIT || (k) == IR_ICN_PROC_GEN || \
+            (k) == IR_TO_BY  || (k) == IR_ICN_ALTERNATE)
         if (nd->n < 1) { nd->value = FAILDESCR; return nd->ω; }
         if (nd->state == 0) {
             for (int i = 0; i < nd->n; i++) {
@@ -434,58 +442,83 @@ IR_t * IR_exec_node(IR_t * nd) {
                 nd->c[i]->state = 0;
                 IR_exec_node(nd->c[i]);
                 if (!IS_FAIL_fn(nd->c[i]->value)) {
-                    nd->value = nd->c[i]->value;
+                    nd->value   = nd->c[i]->value;
                     nd->counter = i;
-                    nd->state = 1;
+                    nd->state   = 1;
                     return nd->γ;
                 }
             }
             nd->value = FAILDESCR;
             return nd->ω;
         }
-        /* beta: resume current child */
+        /* beta: resume current child only if it is a generator kind */
         int ci = (int)nd->counter;
-        if (ci < nd->n && nd->c[ci]) {
+        if (ci < nd->n && nd->c[ci] && ALT_IS_GEN(nd->c[ci]->t)) {
             IR_exec_node(nd->c[ci]);
             if (!IS_FAIL_fn(nd->c[ci]->value)) { nd->value = nd->c[ci]->value; return nd->γ; }
         }
-        /* current exhausted: try next children from fresh */
+        /* current child exhausted (or single-shot): try next children from fresh */
         for (int i = ci + 1; i < nd->n; i++) {
             if (!nd->c[i]) continue;
             nd->c[i]->state = 0;
             IR_exec_node(nd->c[i]);
             if (!IS_FAIL_fn(nd->c[i]->value)) {
-                nd->value = nd->c[i]->value;
+                nd->value   = nd->c[i]->value;
                 nd->counter = i;
                 return nd->γ;
             }
         }
         nd->state = 0;
         nd->value = FAILDESCR;
+        #undef ALT_IS_GEN
         return nd->ω;
     }
     case IR_TO_BY: {
+        /* IJ-TOBY-REAL: integer and real-typed `lo to hi by step`. Real path uses dval/ival3 storage. */
+        /* nd->ival2 flag: 0=int mode, 1=real mode (set on α). nd->dval=real counter; nd->ival=int step; */
+        /* nd->ival3 stores real step bits via memcpy (double in int64_t). nd->c[1]=hi, c[2]=step.      */
         if (nd->state == 0) {
-            int64_t from = 0, by = 1;
-            if (nd->n > 0 && nd->c[0]) { IR_exec_node(nd->c[0]); from = nd->c[0]->value.i; }
-            if (nd->n > 2 && nd->c[2]) { IR_exec_node(nd->c[2]); by   = nd->c[2]->value.i; }
-            if (by == 0) by = 1;
-            nd->counter = from;
-            nd->ival    = by;
-            nd->state   = 1;
+            int64_t from_i = 0; double from_r = 0.0;
+            int64_t by_i = 1;   double by_r = 1.0;
+            int is_real = 0;
+            if (nd->n > 0 && nd->c[0]) {
+                IR_exec_node(nd->c[0]);
+                DESCR_t lv = nd->c[0]->value;
+                if (lv.v == DT_R) { is_real = 1; from_r = lv.r; }
+                else               from_i = IS_INT_fn(lv) ? lv.i : 0;
+            }
+            if (nd->n > 2 && nd->c[2]) {
+                IR_exec_node(nd->c[2]);
+                DESCR_t sv = nd->c[2]->value;
+                if (sv.v == DT_R) { is_real = 1; by_r = sv.r; }
+                else               by_i = IS_INT_fn(sv) ? sv.i : 1;
+            }
+            if (is_real) {
+                if (by_r == 0.0) by_r = 1.0;
+                nd->ival2 = 1;
+                nd->dval  = from_r;
+                memcpy(&nd->ival3, &by_r, sizeof(double));
+            } else {
+                if (by_i == 0) by_i = 1;
+                nd->ival2 = 0;
+                nd->counter = from_i;
+                nd->ival    = by_i;
+            }
+            nd->state = 1;
         }
-        if (nd->state == 2) {
-            nd->value = FAILDESCR;
-            return nd->ω;
+        if (nd->ival2) {
+            double by_r; memcpy(&by_r, &nd->ival3, sizeof(double));
+            double to_r = 0.0;
+            if (nd->n > 1 && nd->c[1]) { IR_exec_node(nd->c[1]); DESCR_t hv = nd->c[1]->value; to_r = (hv.v == DT_R) ? hv.r : (double)(IS_INT_fn(hv) ? hv.i : 0); }
+            if (by_r >= 0.0 ? nd->dval > to_r + 1e-12 : nd->dval < to_r - 1e-12) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+            DESCR_t rv; rv.v = DT_R; rv.r = nd->dval; nd->value = rv;
+            nd->dval += by_r;
+            return nd->γ;
         }
         int64_t to_val = 0;
         if (nd->n > 1 && nd->c[1]) { IR_exec_node(nd->c[1]); to_val = nd->c[1]->value.i; }
         int64_t by = nd->ival;
-        if (by >= 0 ? nd->counter > to_val : nd->counter < to_val) {
-            nd->state = 2;
-            nd->value = FAILDESCR;
-            return nd->ω;
-        }
+        if (by >= 0 ? nd->counter > to_val : nd->counter < to_val) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
         nd->value    = INTVAL(nd->counter);
         nd->counter += by;
         return nd->γ;
