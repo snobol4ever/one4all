@@ -125,6 +125,7 @@ struct FuncHead {
 struct CaseEntry {
     char   *case_label;
     tree_t *value;
+    STMT_t *before_body;  /* PST-SC-4f: CODE_t tail snapshot taken just before this arm's stmts */
 };
 struct SwitchHead {
     tree_t *disc;
@@ -201,7 +202,7 @@ static void     sc_switch_case_label   (ScParseState *st, tree_t *value);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_switch_default_label(ScParseState *st);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void     sc_finalize_switch     (ScParseState *st, struct SwitchHead *h);
+static void     sc_finalize_switch_pst (ScParseState *st, struct SwitchHead *h);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_emit_struct         (ScParseState *st, char *name, char *fields);
 }
@@ -294,9 +295,9 @@ matched_stmt
             | func_head T_LBRACE T_RBRACE
                                         { sc_finalize_function(st, $1); }
             | switch_head T_LBRACE switch_body T_RBRACE
-                                        { sc_finalize_switch(st, $1); }
+                                        { sc_finalize_switch_pst(st, $1); }
             | switch_head T_LBRACE T_RBRACE
-                                        { sc_finalize_switch(st, $1); }
+                                        { sc_finalize_switch_pst(st, $1); }
             | T_STRUCT T_IDENT T_LBRACE struct_field_list T_RBRACE
                                         { sc_emit_struct(st, $2, $4); free($2); free($4); }
             | T_STRUCT T_IDENT T_LBRACE T_RBRACE
@@ -1131,113 +1132,91 @@ static void sc_switch_cases_grow(struct SwitchHead *h) {
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PST-SC-4f (2026-05-16): switch head records disc and labels; no tmp-assign emitted.
+ * lower.c will handle the IDENT comparisons directly from TT_CASE children. */
 static struct SwitchHead *sc_switch_head_new(ScParseState *st, tree_t *disc) {
     struct SwitchHead *h = calloc(1, sizeof *h);
     h->disc          = disc;
     h->lineno        = st->ctx ? st->ctx->line : 0;
     h->prev_switch   = st->cur_switch;
-    h->tmp_name      = sc_label_new(st, "_Lswitch_t");
     h->end_label     = sc_label_new(st, "_Lend");
     h->default_label = sc_label_new(st, "_Ldefault");
     h->has_default   = 0;
-    tree_t *lhs = expr_new(AST_VAR);
-    lhs->sval   = strdup(h->tmp_name);
-    tree_t *assign = expr_new(AST_ASSIGN);
-    expr_add_child(assign, lhs);
-    expr_add_child(assign, disc);
-    sc_append_stmt(st, assign);
-    h->after_tmp_assign     = st->code->tail;
+    h->tmp_name      = NULL;
+    h->after_tmp_assign     = NULL;
     h->last_case_label_tail = NULL;
-    sc_loop_push(st, strdup(h->end_label),
-                 strdup(h->end_label), 0, 0);
+    sc_loop_push(st, strdup(h->end_label), strdup(h->end_label), 0, 0);
     st->cur_switch = h;
     return h;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PST-SC-4f: no implicit break gotos in the pure syntax tree — lower handles fallthrough */
 static void sc_switch_emit_implicit_break(ScParseState *st, struct SwitchHead *h) {
-    if (!h->last_case_label_tail) return;
-    if (st->code->tail == h->last_case_label_tail) return;
-    STMT_t *g = sc_make_goto_uncond_stmt(st, strdup(h->end_label));
-    sc_append_chain(st, g, g);
+    (void)st; (void)h;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PST-SC-4f: record (value, before_body snapshot) — no label STMT_t emitted */
 static void sc_switch_case_label(ScParseState *st, tree_t *value) {
     struct SwitchHead *h = st->cur_switch;
-    if (!h) {
-        sc_error(st, "case label outside of switch");
-        (void)value;
-        return;
-    }
-    sc_switch_emit_implicit_break(st, h);
-    char *case_label = sc_label_new(st, "_Lcase");
-    STMT_t *pad      = sc_make_label_stmt(st, strdup(case_label));
-    sc_append_chain(st, pad, pad);
+    if (!h) { sc_error(st, "case label outside of switch"); (void)value; return; }
     sc_switch_cases_grow(h);
-    h->cases[h->cases_count].case_label = case_label;
-    h->cases[h->cases_count].value      = value;
+    h->cases[h->cases_count].value       = value;
+    h->cases[h->cases_count].case_label  = NULL;
+    h->cases[h->cases_count].before_body = st->code->tail;
     h->cases_count++;
-    h->last_case_label_tail = st->code->tail;
     sc_pending_label_clear(st);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PST-SC-4f: record default arm with NULL value and before_body snapshot */
 static void sc_switch_default_label(ScParseState *st) {
     struct SwitchHead *h = st->cur_switch;
-    if (!h) {
-        sc_error(st, "default label outside of switch");
-        return;
-    }
-    if (h->has_default) {
-        sc_error(st, "duplicate default label in switch");
-        return;
-    }
+    if (!h) { sc_error(st, "default label outside of switch"); return; }
+    if (h->has_default) { sc_error(st, "duplicate default label in switch"); return; }
     h->has_default = 1;
-    sc_switch_emit_implicit_break(st, h);
-    STMT_t *pad = sc_make_label_stmt(st, strdup(h->default_label));
-    sc_append_chain(st, pad, pad);
     sc_switch_cases_grow(h);
-    h->cases[h->cases_count].case_label = strdup(h->default_label);
-    h->cases[h->cases_count].value      = NULL;
+    h->cases[h->cases_count].value       = NULL;
+    h->cases[h->cases_count].case_label  = NULL;
+    h->cases[h->cases_count].before_body = st->code->tail;
     h->cases_count++;
-    h->last_case_label_tail = st->code->tail;
     sc_pending_label_clear(st);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void sc_finalize_switch(ScParseState *st, struct SwitchHead *h) {
-    STMT_t *chain_head = NULL;
-    STMT_t *chain_tail = NULL;
-    for (int i = 0; i < h->cases_count; i++) {
-        if (!h->cases[i].value) continue;
-        tree_t *probe = expr_new(AST_FNC);
-        probe->sval   = strdup("IDENT");
-        tree_t *tmp_ref = expr_new(AST_VAR);
-        tmp_ref->sval   = strdup(h->tmp_name);
-        expr_add_child(probe, tmp_ref);
-        expr_add_child(probe, h->cases[i].value);
-        h->cases[i].value = NULL;
-        STMT_t *s = sc_make_cond_succ_stmt(st, probe,
-                                           strdup(h->cases[i].case_label),
-                                           h->lineno);
-        if (!chain_head) chain_head = chain_tail = s;
-        else { chain_tail->next = s; chain_tail = s; }
+/* PST-SC-4f (2026-05-16): pure-syntax switch finalizer.
+ * Builds TT_CASE(disc, val1, TT_PROGRAM(body1), val2, TT_PROGRAM(body2), ..., [TT_PROGRAM(default)]).
+ * Bodies collected in reverse order (last arm first) so sc_collect_body's forward-scan works.
+ * NULL value child marks the default arm. QLIT(end_lbl) is last child for lower.c.
+ * lower_case already handles TT_CASE n-ary flat structure; Snocone bodies are TT_PROGRAM. */
+static void sc_finalize_switch_pst(ScParseState *st, struct SwitchHead *h)
+{
+    int nc = h->cases_count;
+    /* Collect bodies in reverse — each sc_collect_body shortens CODE_t tail */
+    tree_t **bodies = calloc((size_t)(nc > 0 ? nc : 1), sizeof *bodies);
+    for (int i = nc - 1; i >= 0; i--)
+        bodies[i] = sc_collect_body(st, h->cases[i].before_body);
+    /* Build TT_CASE node */
+    tree_t *node   = ast_node_new(TT_CASE);
+    tree_t *qlit_e = ast_node_new(TT_QLIT); qlit_e->sval = strdup(h->end_label);
+    ast_push(node, h->disc);
+    for (int i = 0; i < nc; i++) {
+        /* value: NULL for default → push TT_NUL placeholder */
+        if (h->cases[i].value)
+            ast_push(node, h->cases[i].value);
+        else {
+            tree_t *nul = ast_node_new(TT_NUL); ast_push(node, nul);
+        }
+        ast_push(node, bodies[i]);
     }
-    char *catchall = h->has_default ? strdup(h->default_label) : strdup(h->end_label);
-    STMT_t *catchgo = sc_make_goto_uncond_stmt(st, catchall);
-    if (!chain_head) chain_head = chain_tail = catchgo;
-    else { chain_tail->next = catchgo; chain_tail = catchgo; }
-    sc_splice_after(st, h->after_tmp_assign, chain_head, chain_tail);
-    STMT_t *end_pad = sc_make_label_stmt(st, strdup(h->end_label));
-    sc_append_chain(st, end_pad, end_pad);
+    ast_push(node, qlit_e);
+    free(bodies);
     sc_loop_pop(st);
     st->cur_switch = h->prev_switch;
-    for (int i = 0; i < h->cases_count; i++) {
-        free(h->cases[i].case_label);
-        (void)h->cases[i].value;
-    }
+    for (int i = 0; i < nc; i++) free(h->cases[i].case_label);
     free(h->cases);
-    free(h->tmp_name);
     free(h->end_label);
     free(h->default_label);
+    free(h->tmp_name);
     free(h);
+    sc_append_stmt(st, node);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void sc_emit_struct(ScParseState *st, char *name, char *fields) {
