@@ -860,15 +860,27 @@ static void lower_loop_next(const tree_t *t)
     (void)t; sm_emit(g_p, SM_PUSH_NULL);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PST-SC-4j: TT_RETURN — emits SM_JUMP to "RETURN" label (Snocone epilogue convention).
+ * Optional child c[0] is a return-value expression; lower_expr pushes it before jumping.
+ * Note: SM_RETURN (the opcode) is distinct — it implements the actual function-return
+ * mechanism in the interpreter. Snocone uses a named label "RETURN" as the epilogue
+ * target; jumping to it lets the function epilogue handle the actual return. */
 static void lower_return(const tree_t *t)
 {
-    if (t->n > 0) lower_expr(t->c[0]); else sm_emit(g_p, SM_PUSH_NULL);
-    sm_emit(g_p, SM_RETURN);
+    if (t->n > 0 && t->c[0]) { lower_expr(t->c[0]); sm_emit(g_p, SM_VOID_POP); }
+    emit_goto(SM_JUMP, "RETURN");
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PST-SC-4j: TT_PROC_FAIL — freturn; in Snocone */
 static void lower_proc_fail(const tree_t *t)
 {
-    (void)t; sm_emit(g_p, SM_PUSH_NULL); sm_emit(g_p, SM_FRETURN);
+    (void)t; emit_goto(SM_JUMP, "FRETURN");
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PST-SC-4j: TT_NRETURN — nreturn; in Snocone */
+static void lower_nreturn(const tree_t *t)
+{
+    (void)t; emit_goto(SM_JUMP, "NRETURN");
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_case(const tree_t *t)
@@ -1291,7 +1303,10 @@ void lower_stmt(const tree_t *s)
         goto emit_gotos;
     }
     if (subject) {
-        if (subject->t == TT_DEFINE) { lower_stmt(subject); goto emit_gotos; }
+        if (subject->t == TT_DEFINE   ||
+            subject->t == TT_RETURN   ||
+            subject->t == TT_PROC_FAIL||
+            subject->t == TT_NRETURN) { lower_stmt(subject); goto emit_gotos; }
         if (has_eq) {
             if (replacement) lower_expr(replacement); else sm_emit(g_p, SM_PUSH_NULL);
             emit_lhs_store(subject);
@@ -1403,6 +1418,7 @@ static void lower_expr_inner(const tree_t *t)
     case TT_LOOP_NEXT:                        lower_loop_next(t);     return;
     case TT_RETURN:                           lower_return(t);        return;
     case TT_PROC_FAIL:                        lower_proc_fail(t);     return;
+    case TT_NRETURN:                          lower_nreturn(t);       return;
     case TT_CASE:                             lower_case(t);          return;
     case TT_MAKELIST:                         lower_makelist(t);      return;
     case TT_RECORD:                           lower_record(t);        return;

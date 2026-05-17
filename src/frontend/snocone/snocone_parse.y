@@ -147,12 +147,6 @@ static void     sc_finalize_do_while_pst(ScParseState *st, struct DoHead *h, tre
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static struct ForHead   *sc_for_head_new_pst(ScParseState *st, tree_t *cond, tree_t *step, STMT_t *before_body);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void     sc_append_return      (ScParseState *st, tree_t *retval);
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void     sc_append_freturn     (ScParseState *st);
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void     sc_append_nreturn     (ScParseState *st);
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static STMT_t  *sc_make_label_stmt    (ScParseState *st, char *label);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static STMT_t  *sc_make_goto_uncond_stmt(ScParseState *st, char *target);
@@ -390,10 +384,15 @@ label_decl
             ;
 simple_stmt : expr0 T_SEMICOLON                { sc_append_stmt(st, $1); }
             | T_SEMICOLON                      {         }
-            | T_RETURN expr0 T_SEMICOLON    { sc_append_return(st, $2); }
-            | T_RETURN T_SEMICOLON          { sc_append_return(st, NULL); }
-            | T_FRETURN T_SEMICOLON         { sc_append_freturn(st); }
-            | T_NRETURN T_SEMICOLON         { sc_append_nreturn(st); }
+            | T_RETURN expr0 T_SEMICOLON    { if (st->cur_func_name) {
+                                               tree_t *lhs = ast_node_new(TT_VAR); lhs->sval = strdup(st->cur_func_name);
+                                               tree_t *asgn = ast_node_new(TT_ASSIGN); ast_push(asgn, lhs); ast_push(asgn, $2);
+                                               sc_append_stmt(st, asgn);
+                                             } else { sc_append_stmt(st, $2); }
+                                             sc_append_stmt(st, ast_node_new(TT_RETURN)); }
+            | T_RETURN T_SEMICOLON          { sc_append_stmt(st, ast_node_new(TT_RETURN)); }
+            | T_FRETURN T_SEMICOLON         { sc_append_stmt(st, ast_node_new(TT_PROC_FAIL)); }
+            | T_NRETURN T_SEMICOLON         { sc_append_stmt(st, ast_node_new(TT_NRETURN)); }
             | T_GOTO T_IDENT T_SEMICOLON    { sc_append_goto_label(st, $2); free($2); }
             | T_BREAK T_SEMICOLON           { sc_append_break(st, NULL); }
             | T_BREAK T_IDENT T_SEMICOLON   { sc_append_break(st, $2); free($2); }
@@ -732,42 +731,6 @@ static void sc_finalize_function_pst(ScParseState *st, struct FuncHead *h)
     st->cur_func_name = h->prev_func;
     free(h->name); free(h->argstr); free(h);
     sc_append_stmt(st, def);
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void sc_append_return(ScParseState *st, tree_t *retval) {
-    STMT_t *s = stmt_new();
-    s->lineno = st->ctx ? st->ctx->line : 0;
-    s->stno   = ++st->code->nstmts;
-    if (retval && st->cur_func_name) {
-        tree_t *lhs = expr_new(AST_VAR);
-        lhs->sval   = strdup(st->cur_func_name);
-        s->subject     = lhs;
-        s->replacement = retval;
-        s->has_eq      = 1;
-    } else if (retval) {
-        s->subject = retval;
-    }
-    s->goto_u = strdup("RETURN");
-    if (!st->code->head) st->code->head = st->code->tail = s;
-    else { st->code->tail->next = s; st->code->tail = s; }
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void sc_append_freturn(ScParseState *st) {
-    STMT_t *s = stmt_new();
-    s->lineno = st->ctx ? st->ctx->line : 0;
-    s->stno   = ++st->code->nstmts;
-    s->goto_u = strdup("FRETURN");
-    if (!st->code->head) st->code->head = st->code->tail = s;
-    else { st->code->tail->next = s; st->code->tail = s; }
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void sc_append_nreturn(ScParseState *st) {
-    STMT_t *s = stmt_new();
-    s->lineno = st->ctx ? st->ctx->line : 0;
-    s->stno   = ++st->code->nstmts;
-    s->goto_u = strdup("NRETURN");
-    if (!st->code->head) st->code->head = st->code->tail = s;
-    else { st->code->tail->next = s; st->code->tail = s; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static STMT_t *sc_make_label_stmt(ScParseState *st, char *label) {
