@@ -43,6 +43,7 @@ static int ir_is_single_shot(IR_t * e) {
     case IR_ICN_ALTERNATE: case IR_ICN_LIMIT: case IR_ICN_BINOP: case IR_ICN_TO_NESTED:
     case IR_ICN_PROC_GEN: case IR_BINOP_GEN: case IR_ALT: case IR_ALTERNATE:
     case IR_SUSPEND: case IR_REPEAT: case IR_TO_BY: case IR_LIMIT: case IR_ICN_SCAN:
+    case IR_ICN_LIST_BANG:
         return 0;
     case IR_CALL: {
         if (!e->sval) return 1;
@@ -221,7 +222,7 @@ IR_t * IR_exec_node(IR_t * nd) {
             (k) == IR_ICN_TO || (k) == IR_ICN_TO_BY || (k) == IR_ICN_UPTO || \
             (k) == IR_ALT || (k) == IR_ALTERNATE || (k) == IR_BINOP_GEN || \
             (k) == IR_ICN_ITERATE || (k) == IR_ICN_LIMIT || (k) == IR_ICN_PROC_GEN || \
-            (k) == IR_TO_BY)
+            (k) == IR_ICN_LIST_BANG || (k) == IR_TO_BY)
         int l_gen = IR_IS_GEN_KIND(nd->c[0]->t);
         int r_gen = IR_IS_GEN_KIND(nd->c[1]->t);
         if (nd->state == 0) {
@@ -461,7 +462,7 @@ IR_t * IR_exec_node(IR_t * nd) {
             (k) == IR_ICN_TO || (k) == IR_ICN_TO_BY || (k) == IR_ICN_UPTO || \
             (k) == IR_ALT    || (k) == IR_ALTERNATE  || (k) == IR_BINOP_GEN || \
             (k) == IR_ICN_ITERATE || (k) == IR_ICN_LIMIT || (k) == IR_ICN_PROC_GEN || \
-            (k) == IR_TO_BY  || (k) == IR_ICN_ALTERNATE)
+            (k) == IR_ICN_LIST_BANG || (k) == IR_TO_BY  || (k) == IR_ICN_ALTERNATE)
         if (nd->n < 1) { nd->value = FAILDESCR; return nd->ω; }
         if (nd->state == 0) {
             for (int i = 0; i < nd->n; i++) {
@@ -824,6 +825,23 @@ IR_t * IR_exec_node(IR_t * nd) {
         DESCR_t v = nd->c[0]->value;
         if (IS_FAIL_fn(v)) { nd->value = FAILDESCR; return nd->ω; }
         if (IS_INT_fn(v) || IS_REAL_fn(v)) { nd->value = INTVAL(0); return nd->γ; }
+        /* DT_DATA: list (icn_type="list") → frame_size field; record → nfields. */
+        if (v.v == DT_DATA) {
+            DESCR_t tag = FIELD_GET_fn(v, "icn_type");
+            if (tag.v == DT_S && tag.s && strcmp(tag.s, "list") == 0) {
+                nd->value = INTVAL((int)FIELD_GET_fn(v, "frame_size").i);
+                return nd->γ;
+            }
+            if (v.u && v.u->type) { nd->value = INTVAL(v.u->type->nfields); return nd->γ; }
+            nd->value = INTVAL(0); return nd->γ;
+        }
+        /* DT_T: table → count entries across all buckets. */
+        if (v.v == DT_T && v.tbl) {
+            long cnt = 0;
+            for (int b = 0; b < TABLE_BUCKETS; b++)
+                for (TBPAIR_t *ep = v.tbl->buckets[b]; ep; ep = ep->next) cnt++;
+            nd->value = INTVAL(cnt); return nd->γ;
+        }
         long len;
         if (IS_CSET_fn(v)) {
             int klen = icn_kw_cset_len(v.s);
@@ -875,6 +893,79 @@ IR_t * IR_exec_node(IR_t * nd) {
         if (IS_FAIL_fn(r)) { nd->value = FAILDESCR; return nd->ω; }
         nd->value = r;
         return nd->γ;
+    }
+    case IR_ICN_LIST_BANG: {
+        /* Icon !L generator.  c[0]=iterable expr (list, table, or string).                          */
+        /* On α (state==0): evaluate c[0] once and cache the DT_DATA descriptor in opaque.           */
+        /* On β (state==1): advance pos. γ on hit, ω on exhaustion.                                  */
+        /* Supports DT_DATA lists (icn_type="list") and DT_T tables (yield values).                  */
+        if (nd->n < 1 || !nd->c[0]) { nd->value = FAILDESCR; return nd->ω; }
+        if (nd->state == 0) {
+            /* α path: evaluate the iterable and cache it. */
+            IR_exec_node(nd->c[0]);
+            DESCR_t obj = nd->c[0]->value;
+            if (IS_FAIL_fn(obj)) { nd->value = FAILDESCR; return nd->ω; }
+            /* Cache the collection descriptor in opaque so β doesn't re-evaluate. */
+            DESCR_t *cached = GC_malloc(sizeof(DESCR_t));
+            *cached = obj;
+            nd->opaque  = (void *)cached;
+            nd->counter = 0;       /* element index */
+            nd->state   = 1;
+        } else {
+            nd->counter++;
+        }
+        DESCR_t obj = *(DESCR_t *)nd->opaque;
+        /* DT_DATA path: list (icn_type="list") or record. */
+        if (obj.v == DT_DATA) {
+            DESCR_t tag = FIELD_GET_fn(obj, "icn_type");
+            if (tag.v == DT_S && tag.s && strcmp(tag.s, "list") == 0) {
+                int n       = (int)FIELD_GET_fn(obj, "frame_size").i;
+                DESCR_t ea  = FIELD_GET_fn(obj, "frame_elems");
+                DESCR_t *elems = (ea.v == DT_DATA) ? (DESCR_t *)ea.ptr : NULL;
+                if (!elems || nd->counter >= n) {
+                    nd->state = 0; nd->opaque = NULL; nd->value = FAILDESCR; return nd->ω;
+                }
+                nd->value = elems[nd->counter];
+                return nd->γ;
+            }
+            /* Record iteration: yield each field value in order. */
+            if (obj.u && obj.u->type && obj.u->type->nfields > 0) {
+                int nf = obj.u->type->nfields;
+                if (nd->counter >= nf) {
+                    nd->state = 0; nd->opaque = NULL; nd->value = FAILDESCR; return nd->ω;
+                }
+                nd->value = obj.u->fields[nd->counter];
+                return nd->γ;
+            }
+        }
+        /* DT_T path: table — yield entry values in bucket order. */
+        if (obj.v == DT_T && obj.tbl) {
+            TBBLK_t *tbl = obj.tbl;
+            /* Walk bucket+chain to find the nd->counter-th entry. */
+            int64_t target = nd->counter;
+            int64_t seen   = 0;
+            for (int b = 0; b < TABLE_BUCKETS; b++) {
+                for (TBPAIR_t *ep = tbl->buckets[b]; ep; ep = ep->next) {
+                    if (seen == target) { nd->value = ep->val; return nd->γ; }
+                    seen++;
+                }
+            }
+            nd->state = 0; nd->opaque = NULL; nd->value = FAILDESCR; return nd->ω;
+        }
+        /* Fallback: string iteration — each character. */
+        {
+            DESCR_t sv = obj;
+            const char *s = (sv.v == DT_S) ? sv.s : NULL;
+            int64_t slen  = s ? (int64_t)(sv.slen > 0 ? sv.slen : strlen(s)) : 0;
+            if (!s || nd->counter >= slen) {
+                nd->state = 0; nd->opaque = NULL; nd->value = FAILDESCR; return nd->ω;
+            }
+            char *ch = GC_malloc(2);
+            ch[0] = s[nd->counter];
+            ch[1] = '\0';
+            nd->value = (DESCR_t){ .v = DT_S, .slen = 1, .s = ch };
+            return nd->γ;
+        }
     }
     case IR_CASE: {
         /* Icon case E of { K1: V1; K2: V2; ...; default: VD }.                                  */
@@ -1140,7 +1231,7 @@ IR_t * IR_exec_node(IR_t * nd) {
             (k) == IR_ICN_TO || (k) == IR_ICN_TO_BY || (k) == IR_ICN_UPTO || \
             (k) == IR_ALT || (k) == IR_ALTERNATE || (k) == IR_BINOP_GEN || \
             (k) == IR_ICN_ITERATE || (k) == IR_ICN_LIMIT || (k) == IR_ICN_PROC_GEN || \
-            (k) == IR_TO_BY)
+            (k) == IR_ICN_LIST_BANG || (k) == IR_TO_BY)
         int has_dyn = (nd->n >= 2 && nd->c[0] && nd->c[1]);
         int lo_gen  = has_dyn && IR_IS_GEN_KIND_TO(nd->c[0]->t);
         int hi_gen  = has_dyn && IR_IS_GEN_KIND_TO(nd->c[1]->t);

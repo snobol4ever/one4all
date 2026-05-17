@@ -902,6 +902,39 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         nd->n    = 2;
         return nd;
     }
+    case TT_MAKELIST: {
+        /* Icon [e1, e2, ..., eN] list constructor.  Lower each element as an IR_CALL arg child,      */
+        /* then route through IR_CALL("MAKELIST", n_args) → icn_try_call_builtin_by_name which         */
+        /* allocates the DATINST_t with icn_type="list", frame_elems, and frame_size fields.           */
+        int n = e->n;
+        IR_t **args = (n > 0) ? calloc((size_t)n, sizeof(IR_t *)) : NULL;
+        for (int j = 0; j < n; j++) {
+            if (!e->c[j]) { if (args) free(args); return NULL; }
+            args[j] = lower_icn_expr_node(cfg, e->c[j]);
+            if (!args[j]) { free(args); return NULL; }
+        }
+        IR_t *nd = IR_node_alloc(cfg, IR_CALL);
+        if (!nd) { if (args) free(args); return NULL; }
+        nd->sval = "MAKELIST";
+        nd->c    = args;
+        nd->n    = n;
+        return nd;
+    }
+    case TT_ITERATE: {
+        /* Icon !L list/string/structure iteration.  c[0] is the iterable expression.                  */
+        /* Lower to IR_ICN_LIST_BANG: α resets pos to 0, β advances, γ on success, ω on exhaustion.  */
+        /* Supports DT_DATA lists (icn_type="list") and falls through to IR_ICN_ITERATE for strings.  */
+        if (e->n < 1 || !e->c[0]) return NULL;
+        IR_t *inner = lower_icn_expr_node(cfg, e->c[0]);
+        if (!inner) return NULL;
+        IR_t *nd = IR_node_alloc(cfg, IR_ICN_LIST_BANG);
+        if (!nd) return NULL;
+        nd->c = calloc(1, sizeof(IR_t *));
+        if (!nd->c) return NULL;
+        nd->c[0] = inner;
+        nd->n    = 1;
+        return nd;
+    }
     default:
         return NULL;
     }

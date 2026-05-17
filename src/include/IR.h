@@ -111,6 +111,7 @@ typedef enum {
                         /* fresh, state==1 active; on beta resumes c[1] first, then advances c[0] and re-seeds c[1] */
     IR_ICN_IDX,         /* Icon s[i] subscript — c[0]=base, c[1]=index; calls subscript_get(base,idx); FAIL on OOB  */
     IR_ICN_SECTION,     /* Icon s[i:j] / s[i+:n] / s[i-:n] section — c[0]=base,c[1]=i,c[2]=j; ival=section-kind     */
+    IR_ICN_LIST_BANG,   /* Icon !L list/table/record generator — c[0]=iterable expr; state=pos; α resets, β advances  */
     IR_E_COUNT
 } IR_e;
 typedef struct IR_t IR_t;
