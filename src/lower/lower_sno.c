@@ -441,12 +441,14 @@ static void emit_expr(sno_ctx_t *c, const tree_t *e) {
         emit(c, "("); emit_expr(c, e->c[0]); emit(c, " = "); emit_expr(c, e->c[1]); emit(c, ")");
         break;
     case TT_SCAN:
-        /* Embedded pattern match: (subj ? pat) — SPITBOL extension.
-         * Note: the explicit `?` form is SPITBOL-only.  For maximum portability
-         * a future rung may rewrite (subj ? pat) into an inline SUBJ PAT
-         * statement, but inside an expression there is no portable form.
-         * Emit as space-match in parens to keep standard-SNOBOL4 compatibility. */
-        emit(c, "("); emit_expr(c, e->c[0]); emit(c, " "); emit_expr(c, e->c[1]); emit(c, ")");
+        /* Embedded pattern match: (subj ? pat) — explicit SPITBOL/SCRIP form.
+         * Inside an expression context, SPACE between two operands is the
+         * binary CONCAT operator (Ch.15 priority 4), NOT pattern match.  The
+         * pattern-match operator at expression level is the explicit `?`
+         * (Ch.15 priority 1, accepted by SPITBOL and by SCRIP's SNOBOL4
+         * frontend via T_2QUEST — see snobol4.y line 114).
+         * Whitespace on both sides is required (lexer rule: `{W}"?"{W}`). */
+        emit(c, "("); emit_expr(c, e->c[0]); emit(c, " ? "); emit_expr(c, e->c[1]); emit(c, ")");
         break;
     /*--- Default: emit a diagnostic so the missing node-kind is visible -----
      * NOTE: This emits a valid SNOBOL4 expression (a string literal) so the
