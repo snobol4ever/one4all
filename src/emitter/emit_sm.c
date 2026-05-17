@@ -1628,6 +1628,209 @@ static int emit_expression_registry(FILE *out, const SM_Program *prog)
     if (emit_three_column_line(out, "", ".text", "",  NULL)        != 0) return -1;
     return n;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PJ-9d: emit Mode-4 Prolog predicate-registry — one builder fn per predicate + a registry table.            */
+/* Reads g_dcg_table (populated by lower_proc_skeletons at scrip-compile-time) and emits the assembly that    */
+/* reconstructs each IR_block_t* graph at standalone-binary startup. Layout per rt_predicate_entry_t:         */
+/*   { const char *name; int arity; rt_pl_builder_fn builder; } — 24 bytes (8 + 4 + 4 pad + 8).               */
+/* Builder fn calls rt_pl_b_begin / rt_pl_b_node / rt_pl_b_kids / rt_pl_b_entry / rt_pl_b_end_register.       */
+#include "../runtime/interp/pl_runtime.h"
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* IR_t's first union holds {ival, dval, sval} — same storage. Only some kinds put a real string ptr in it; */
+/* others put an integer or double. Touching nd->sval as a char* when the kind doesn't use it dereferences */
+/* whatever bits ival left there, which segfaults. The kinds below are the ones lower_pl.c sets sval on    */
+/* with a real string pointer. IR_PL_VAR is excluded: lower_pl.c:16 copies e->v.sval but e->v is a tree_t   */
+/* union holding the slot integer, so sval is garbage; the runtime never reads it for IR_PL_VAR anyway.    */
+static int pl_ir_kind_uses_sval(int kind)
+{
+    switch (kind) {
+        case IR_PL_ATOM:
+        case IR_PL_BUILTIN:
+        case IR_PL_ARITH:
+        case IR_PL_CALL:
+            return 1;
+        default:
+            return 0;
+    }
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static int emit_pl_b_node_call(FILE *out, int kind, int64_t ival, const char *sval, int64_t ival2)
+{
+    char arg[160];
+    snprintf(arg, sizeof(arg), "edi, %d", kind);
+    if (emit_three_column_line(out, "", "mov", arg, NULL) != 0) return -1;
+    if (sval && *sval) {
+        char slbl[64]; strtab_label(slbl, sizeof(slbl), sval);
+        snprintf(arg, sizeof(arg), "rdx, [rip + %s]", slbl);
+        if (emit_three_column_line(out, "", "xor",  "esi, esi", NULL) != 0) return -1;
+        if (emit_three_column_line(out, "", "lea",  arg, NULL) != 0) return -1;
+    } else {
+        snprintf(arg, sizeof(arg), "rsi, %lld", (long long)ival);
+        if (emit_three_column_line(out, "", "mov", arg, NULL) != 0) return -1;
+        if (emit_three_column_line(out, "", "xor", "edx, edx", NULL) != 0) return -1;
+    }
+    snprintf(arg, sizeof(arg), "rcx, %lld", (long long)ival2);
+    if (emit_three_column_line(out, "", "mov",  arg, NULL) != 0) return -1;
+    if (emit_three_column_line(out, "", "call", "rt_pl_b_node@PLT", NULL) != 0) return -1;
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static int emit_pl_b_kids_call(FILE *out, int pred_idx, int node_idx, const char *kids_data_label, int nkids)
+{
+    char arg[160];
+    snprintf(arg, sizeof(arg), "edi, %d", node_idx);
+    if (emit_three_column_line(out, "", "mov", arg, NULL) != 0) return -1;
+    snprintf(arg, sizeof(arg), "rsi, [rip + %s]", kids_data_label);
+    if (emit_three_column_line(out, "", "lea", arg, NULL) != 0) return -1;
+    snprintf(arg, sizeof(arg), "edx, %d", nkids);
+    if (emit_three_column_line(out, "", "mov",  arg, NULL) != 0) return -1;
+    if (emit_three_column_line(out, "", "call", "rt_pl_b_kids@PLT", NULL) != 0) return -1;
+    (void)pred_idx;
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* Pre-emit a .rodata block holding the kids-index arrays for one predicate. Returns 0 on success.            */
+/* For each node with c[]!=NULL emits .Lpl_kids_<pred>_<node>: .int k0,k1,... and remembers the label.        */
+static int emit_pl_kids_rodata_for_pred(FILE *out, int pred_idx, const IR_block_t *cfg)
+{
+    if (!cfg) return 0;
+    int any = 0;
+    for (int i = 0; i < cfg->n; i++) {
+        const IR_t *nd = cfg->all[i];
+        if (!nd || !nd->c || nd->n <= 0) continue;
+        any = 1; break;
+    }
+    if (!any) return 0;
+    if (emit_three_column_line(out, "", ".section", ".rodata", NULL) != 0) return -1;
+    if (emit_three_column_line(out, "", ".align",   "4",       NULL) != 0) return -1;
+    for (int i = 0; i < cfg->n; i++) {
+        const IR_t *nd = cfg->all[i];
+        if (!nd || !nd->c || nd->n <= 0) continue;
+        char lbl[64];
+        snprintf(lbl, sizeof(lbl), ".Lpl_kids_%d_%d:", pred_idx, i);
+        if (emit_three_column_line(out, lbl, "", "", NULL) != 0) return -1;
+        for (int k = 0; k < nd->n; k++) {
+            int kid_idx = -1;
+            if (nd->c[k]) {
+                for (int j = 0; j < cfg->n; j++) {
+                    if (cfg->all[j] == nd->c[k]) { kid_idx = j; break; }
+                }
+            }
+            char arg[32]; snprintf(arg, sizeof(arg), "%d", kid_idx);
+            if (emit_three_column_line(out, "", ".int", arg, NULL) != 0) return -1;
+        }
+    }
+    if (emit_three_column_line(out, "", ".text", "", NULL) != 0) return -1;
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* Emit one builder function: .Lpl_builder_<pred_idx>: replays the cfg via runtime builder helpers. */
+static int emit_pl_builder_fn(FILE *out, int pred_idx, const Pl_PredEntry_BB *entry)
+{
+    if (!entry || !entry->ir_body) return 0;
+    const IR_block_t *cfg = entry->ir_body;
+    if (emit_pl_kids_rodata_for_pred(out, pred_idx, cfg) != 0) return -1;
+    char lbl[64];
+    snprintf(lbl, sizeof(lbl), ".Lpl_builder_%d:", pred_idx);
+    if (emit_three_column_line(out, lbl, "", "", NULL) != 0) return -1;
+    if (emit_three_column_line(out, "", "push", "rbp", NULL) != 0) return -1;
+    if (emit_three_column_line(out, "", "mov",  "rbp, rsp", NULL) != 0) return -1;
+    char arg[160];
+    snprintf(arg, sizeof(arg), "edi, %d", cfg->n > 0 ? cfg->n : 1);
+    if (emit_three_column_line(out, "", "mov",  arg, NULL) != 0) return -1;
+    if (emit_three_column_line(out, "", "call", "rt_pl_b_begin@PLT", NULL) != 0) return -1;
+    for (int i = 0; i < cfg->n; i++) {
+        const IR_t *nd = cfg->all[i];
+        if (!nd) {
+            if (emit_pl_b_node_call(out, 0, 0, NULL, 0) != 0) return -1;
+            continue;
+        }
+        int uses_sval = pl_ir_kind_uses_sval((int)nd->t);
+        int64_t       ival = uses_sval ? 0          : nd->ival;
+        const char *  sval = uses_sval ? nd->sval   : NULL;
+        if (emit_pl_b_node_call(out, (int)nd->t, ival, sval, nd->ival2) != 0) return -1;
+    }
+    for (int i = 0; i < cfg->n; i++) {
+        const IR_t *nd = cfg->all[i];
+        if (!nd || !nd->c || nd->n <= 0) continue;
+        char kids_lbl[64];
+        snprintf(kids_lbl, sizeof(kids_lbl), ".Lpl_kids_%d_%d", pred_idx, i);
+        if (emit_pl_b_kids_call(out, pred_idx, i, kids_lbl, nd->n) != 0) return -1;
+    }
+    int entry_idx = -1;
+    if (cfg->entry) {
+        for (int j = 0; j < cfg->n; j++) {
+            if (cfg->all[j] == cfg->entry) { entry_idx = j; break; }
+        }
+    }
+    snprintf(arg, sizeof(arg), "edi, %d", entry_idx);
+    if (emit_three_column_line(out, "", "mov",  arg, NULL) != 0) return -1;
+    if (emit_three_column_line(out, "", "call", "rt_pl_b_entry@PLT", NULL) != 0) return -1;
+    char nlbl[64]; strtab_label(nlbl, sizeof(nlbl), entry->name ? entry->name : "");
+    snprintf(arg, sizeof(arg), "rdi, [rip + %s]", nlbl);
+    if (emit_three_column_line(out, "", "lea",  arg, NULL) != 0) return -1;
+    snprintf(arg, sizeof(arg), "esi, %d", entry->arity);
+    if (emit_three_column_line(out, "", "mov",  arg, NULL) != 0) return -1;
+    if (emit_three_column_line(out, "", "call", "rt_pl_b_end_register@PLT", NULL) != 0) return -1;
+    if (emit_three_column_line(out, "", "pop",  "rbp", NULL) != 0) return -1;
+    if (emit_three_column_line(out, "", "ret",  "",    NULL) != 0) return -1;
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PJ-9d two-phase split: pl_pre_intern_pred_names runs BEFORE strtab_emit_rodata so that .S<n> labels    */
+/* are created for every predicate name and every IR_t.sval string. emit_pl_predicate_registry runs AFTER */
+/* and just emits the registry table + builder fns referencing those .S<n> labels.                        */
+static void pl_pre_intern_pred_names(void)
+{
+    for (int i = 0; i < g_dcg_count; i++) {
+        const Pl_PredEntry_BB *e = &g_dcg_table[i];
+        if (!e->name) continue;
+        strtab_intern(e->name);
+        if (!e->ir_body) continue;
+        for (int j = 0; j < e->ir_body->n; j++) {
+            const IR_t *nd = e->ir_body->all[j];
+            if (!nd) continue;
+            if (pl_ir_kind_uses_sval((int)nd->t) && nd->sval) strtab_intern(nd->sval);
+        }
+    }
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* Emit the per-program predicate registry. Returns count of entries emitted (0 if no Prolog predicates).     */
+/* Names + sval strings have already been interned by pl_pre_intern_pred_names() so strtab_label works.       */
+static int emit_pl_predicate_registry(FILE *out)
+{
+    int n = 0;
+    for (int i = 0; i < g_dcg_count; i++) {
+        if (g_dcg_table[i].name && g_dcg_table[i].ir_body) n++;
+    }
+    if (n == 0) return 0;
+    for (int i = 0; i < g_dcg_count; i++) {
+        const Pl_PredEntry_BB *e = &g_dcg_table[i];
+        if (!e->name || !e->ir_body) continue;
+        if (emit_pl_builder_fn(out, i, e) != 0) return -1;
+    }
+    if (emit_three_column_line(out, "", ".section", ".data", NULL) != 0) return -1;
+    if (emit_three_column_line(out, "", ".align",   "8",     NULL) != 0) return -1;
+    if (emit_three_column_line(out, ".Lpl_registry:", "", "", NULL) != 0) return -1;
+    for (int i = 0; i < g_dcg_count; i++) {
+        const Pl_PredEntry_BB *e = &g_dcg_table[i];
+        if (!e->name || !e->ir_body) continue;
+        char name_arg[64], arity_arg[32], fn_arg[64];
+        strtab_label(name_arg, sizeof(name_arg), e->name);
+        snprintf(arity_arg, sizeof(arity_arg), "%d", e->arity);
+        snprintf(fn_arg, sizeof(fn_arg), ".Lpl_builder_%d", i);
+        if (emit_three_column_line(out, "", ".quad", name_arg, NULL) != 0) return -1;
+        if (emit_three_column_line(out, "", ".int",  arity_arg, NULL) != 0) return -1;
+        if (emit_three_column_line(out, "", ".int",  "0", NULL) != 0) return -1;
+        if (emit_three_column_line(out, "", ".quad", fn_arg, NULL) != 0) return -1;
+    }
+    if (emit_three_column_line(out, "", ".quad", "0", NULL) != 0) return -1;
+    if (emit_three_column_line(out, "", ".int",  "0", NULL) != 0) return -1;
+    if (emit_three_column_line(out, "", ".int",  "0", NULL) != 0) return -1;
+    if (emit_three_column_line(out, "", ".quad", "0", NULL) != 0) return -1;
+    if (emit_three_column_line(out, "", ".text", "", NULL) != 0) return -1;
+    return n;
+}
 #define MAX_CAP_FIXUPS 1024
 typedef struct {
     void       *cap_ptr;
@@ -1693,7 +1896,7 @@ static void cap_fixup_add(void *cap_ptr, const char *child_label)
     g_cap_fixups_n++;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_file_header(FILE *out, int count, int has_expression_registry)
+static int emit_file_header(FILE *out, int count, int has_expression_registry, int has_pl_registry)
 {
     if (emit_three_column_line(out, "", ".intel_syntax", "noprefix", NULL) != 0) return -1;
     if (emit_three_column_line(out, "", ".globl",  "main",          NULL) != 0) return -1;
@@ -1706,6 +1909,10 @@ static int emit_file_header(FILE *out, int count, int has_expression_registry)
     } else {
         if (emit_three_column_line(out, "", "xor",  "edi, edi", NULL) != 0) return -1;
         if (emit_three_column_line(out, "", "call", "rt_register_expressions@PLT", NULL) != 0) return -1;
+    }
+    if (has_pl_registry) {
+        if (emit_three_column_line(out, "", "lea",  "rdi, [rip + .Lpl_registry]", NULL) != 0) return -1;
+        if (emit_three_column_line(out, "", "call", "rt_register_predicates_pl@PLT", NULL) != 0) return -1;
     }
     for (int i = 0; i < g_cap_fixups_n; i++) {
         const char *α     = g_cap_fixups[i].child_label;
@@ -2898,14 +3105,17 @@ int emit_walk_codegen(SM_Program *prog, FILE *out, const char *src_path)
         if (emit_three_column_line(out, "", ".include", "\"bb_macros.s\"", NULL) != 0) return -1;
     }
     strtab_collect(prog);
+    pl_pre_intern_pred_names();
     if (strtab_emit_rodata(out) != 0) return -1;
     int expression_reg_count = emit_expression_registry(out, prog);
     if (expression_reg_count < 0) return -1;
+    int pl_reg_count = emit_pl_predicate_registry(out);
+    if (pl_reg_count < 0) return -1;
     pattern_windows_collect(prog);
     if (emit_pattern_blobs(out) != 0) return -1;
     SrcLines sl;
     int sl_loaded = (srclines_load(&sl, src_path) == 0);
-    if (emit_file_header(out, prog->count, expression_reg_count > 0) != 0) {
+    if (emit_file_header(out, prog->count, expression_reg_count > 0, pl_reg_count > 0) != 0) {
         if (sl_loaded) srclines_free(&sl);
         return -1;
     }

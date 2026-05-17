@@ -215,6 +215,87 @@ void rt_register_expressions(const rt_expression_entry *tbl)
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PJ-9d: Mode-4 Prolog predicate registry — populates g_dcg_table at standalone-binary startup. */
+/* The emitter walks each populated entry of g_dcg_table at scrip-emit time and emits a builder fn per predicate, */
+/* plus a .Lpl_registry table (name, arity, builder_fn). Right after rt_register_expressions, main calls          */
+/* rt_register_predicates_pl(.Lpl_registry) — that helper invokes each builder, which calls back into             */
+/* rt_pl_b_begin / rt_pl_b_node / rt_pl_b_kids / rt_pl_b_entry / rt_pl_b_end_register to reconstruct the          */
+/* IR_block_t graph and hand it off to pl_dcg_register. Once registered, rt_bb_once_proc finds the predicate.    */
+#include "../../include/IR.h"
+#include "../interp/pl_runtime.h"
+static IR_block_t * g_pl_b_cfg     = NULL;
+static IR_t      ** g_pl_b_nodes   = NULL;
+static int          g_pl_b_node_n  = 0;
+static int          g_pl_b_max     = 0;
+static int          g_pl_b_entry_i = -1;
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+void rt_register_predicates_pl(const rt_predicate_entry_t *tbl)
+{
+    if (!tbl) return;
+    for (; tbl->name && tbl->builder; tbl++) {
+        tbl->builder();
+    }
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+void rt_pl_b_begin(int max_nodes)
+{
+    if (max_nodes <= 0) max_nodes = 1;
+    g_pl_b_cfg     = IR_alloc(max_nodes, IR_LANG_PL);
+    g_pl_b_nodes   = (IR_t **)calloc((size_t)max_nodes, sizeof(IR_t *));
+    g_pl_b_node_n  = 0;
+    g_pl_b_max     = max_nodes;
+    g_pl_b_entry_i = -1;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+int rt_pl_b_node(int kind, int64_t ival, const char *sval, int64_t ival2)
+{
+    if (!g_pl_b_cfg || g_pl_b_node_n >= g_pl_b_max) return -1;
+    IR_t *nd = IR_node_alloc(g_pl_b_cfg, (IR_e)kind);
+    if (!nd) return -1;
+    if (sval) nd->sval = sval;
+    else      nd->ival = ival;
+    nd->ival2 = ival2;
+    int idx = g_pl_b_node_n++;
+    g_pl_b_nodes[idx] = nd;
+    return idx;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+void rt_pl_b_kids(int node_idx, const int *kid_idxs, int n)
+{
+    if (node_idx < 0 || node_idx >= g_pl_b_node_n || n <= 0 || !kid_idxs) return;
+    IR_t *parent = g_pl_b_nodes[node_idx];
+    if (!parent) return;
+    IR_t **kids = (IR_t **)calloc((size_t)n, sizeof(IR_t *));
+    if (!kids) return;
+    for (int i = 0; i < n; i++) {
+        int ki = kid_idxs[i];
+        kids[i] = (ki >= 0 && ki < g_pl_b_node_n) ? g_pl_b_nodes[ki] : NULL;
+    }
+    parent->c = kids;
+    parent->n = n;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+void rt_pl_b_entry(int node_idx)
+{
+    g_pl_b_entry_i = node_idx;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+void rt_pl_b_end_register(const char *name, int arity)
+{
+    if (!g_pl_b_cfg) return;
+    if (g_pl_b_entry_i >= 0 && g_pl_b_entry_i < g_pl_b_node_n)
+        g_pl_b_cfg->entry = g_pl_b_nodes[g_pl_b_entry_i];
+    else if (g_pl_b_node_n > 0)
+        g_pl_b_cfg->entry = g_pl_b_nodes[0];
+    (void)pl_dcg_register(name, arity, g_pl_b_cfg);
+    free(g_pl_b_nodes);
+    g_pl_b_cfg     = NULL;
+    g_pl_b_nodes   = NULL;
+    g_pl_b_node_n  = 0;
+    g_pl_b_max     = 0;
+    g_pl_b_entry_i = -1;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_patch_cap_fn(void *cap_ptr, void *child_fn)
 {
     if (!cap_ptr || !child_fn) return;

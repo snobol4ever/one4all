@@ -151,6 +151,30 @@ typedef struct {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_register_expressions(const rt_expression_entry *tbl);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PJ-9d: Mode-4 Prolog predicate registry — populates g_dcg_table at standalone-binary startup. */
+/* Each entry names a predicate and its builder fn; the builder reconstructs the IR_block_t at first call. */
+typedef void (*rt_pl_builder_fn)(void);
+typedef struct { const char *name; int arity; rt_pl_builder_fn builder; } rt_predicate_entry_t;
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+void rt_register_predicates_pl(const rt_predicate_entry_t *tbl);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PJ-9d builder helpers — minimal API the per-predicate builder fns call to reconstruct IR_block_t graphs. */
+/* The current predicate-under-construction is a single hidden global owned by rt.c. Builders interleave:   */
+/*   rt_pl_b_begin(N)  → allocate IR_block_t with capacity N                                                */
+/*   rt_pl_b_node(...) → allocate one IR_t node, set scalar fields, return its index                       */
+/*   rt_pl_b_kids(...) → attach child-pointer array to a node (kids identified by their indices)            */
+/*   rt_pl_b_entry(i)  → mark node i as the entry of the cfg                                                */
+/*   rt_pl_b_end_register(name, arity) → register completed cfg into g_dcg_table and clear builder state    */
+void rt_pl_b_begin(int max_nodes);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+int  rt_pl_b_node(int kind, int64_t ival, const char *sval, int64_t ival2);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+void rt_pl_b_kids(int node_idx, const int *kid_idxs, int n);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+void rt_pl_b_entry(int node_idx);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+void rt_pl_b_end_register(const char *name, int arity);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_patch_cap_fn(void *cap_ptr, void *child_fn);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_init_arbno(void **slot_ptr, void *child_fn);
