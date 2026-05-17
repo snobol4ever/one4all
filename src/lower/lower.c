@@ -529,14 +529,37 @@ static void lower_assign(const tree_t *t)
     emit_lhs_store(T0(t));
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PST-RB-5h: TT_SCAN(subj, pat) in expression position. Two dialects share TT_SCAN because both parsers
+ * reduce '?' to the same tag, but the semantics diverge:
+ *   - Icon  's ? expr'  opens a SCANNING ENVIRONMENT in which expr runs with &subject/&pos available;
+ *           its value is the value of expr (or fails if expr fails). Emit ICN_SCAN_PUSH / ICN_SCAN_POP.
+ *   - SNOBOL4 / Snocone / Rebus 's ? pat' performs PATTERN MATCHING per SPITBOL Ch. 18 — sets last_ok,
+ *           so a following SM_JUMP_F/S can branch on success/failure. The expression must still leave
+ *           one value on the stack (lower_if_stmt's SM_VOID_POP consumes it); push an empty string as
+ *           a placeholder (the value-of-match in expression position is rarely consulted; full SPITBOL
+ *           '(X ? Y)' yields the matched substring, but for `if (s ? p)` only success/failure matters).
+ * The pattern path mirrors the statement-level match at lower_stmt line ~1306. */
 static void lower_scan(const tree_t *t)
 {
     if (t->n < 1) { sm_emit(g_p, SM_PUSH_NULL); return; }
-    lower_expr(t->c[0]);
-    sm_emit_si(g_p, SM_CALL_FN, "ICN_SCAN_PUSH", 1);
-    sm_emit(g_p, SM_VOID_POP);
-    if (t->n > 1) lower_expr(t->c[1]); else sm_emit(g_p, SM_PUSH_NULL);
-    sm_emit_si(g_p, SM_CALL_FN, "ICN_SCAN_POP", 1);
+    if (g_lang == LANG_ICN) {
+        lower_expr(t->c[0]);
+        sm_emit_si(g_p, SM_CALL_FN, "ICN_SCAN_PUSH", 1);
+        sm_emit(g_p, SM_VOID_POP);
+        if (t->n > 1) lower_expr(t->c[1]); else sm_emit(g_p, SM_PUSH_NULL);
+        sm_emit_si(g_p, SM_CALL_FN, "ICN_SCAN_POP", 1);
+        return;
+    }
+    const tree_t *subject = t->c[0];
+    const tree_t *pattern = (t->n > 1) ? t->c[1] : NULL;
+    if (!pattern) { lower_expr(subject); return; }
+    lower_pat_expr(pattern);
+    lower_expr(subject);
+    sm_emit_i(g_p, SM_PUSH_LIT_I, 0);
+    const char *sname = (subject->t == TT_VAR || subject->t == TT_KEYWORD) ? subject->v.sval : NULL;
+    IR_block_t *pat_dcg = IR_lower_pat(pattern);
+    sm_emit_sii(g_p, SM_EXEC_STMT, sname, 0, (int64_t)sm_prog_dcg_add(g_p, pat_dcg));
+    sm_emit_si(g_p, SM_PUSH_LIT_S, "", 0);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_swap(const tree_t *t)
