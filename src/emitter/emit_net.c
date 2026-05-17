@@ -740,11 +740,7 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
          * parse the prototype, and link param lists to function entries by name.
          * Note: scrip's SNOBOL4 lowering emits all named calls as SM_CALL_FN — the
          * SM_SUSPEND_VALUE opcode is reserved for generator-style yields and is not
-         * used by the SNOBOL4 frontend.  (The sm_prog.c dump names[] array contains
-         * an extra "SM_GEN_TICK" entry not in the header enum, causing the dump to
-         * print SM_CALL_FN instructions as "SM_SUSPEND_VALUE" and SM_RETURN
-         * instructions as "SM_CALL_FN" — a cosmetic mismatch that does not change
-         * the actual enum value.) */
+         * used by the SNOBOL4 frontend. */
         for (int i = 1; i < n; i++) {
             SM_Instr * ins = &sm->instrs[i];
             if (ins->op != SM_CALL_FN && ins->op != SM_SUSPEND_VALUE) continue;

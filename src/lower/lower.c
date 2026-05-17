@@ -187,7 +187,20 @@ static void lower_interrogate(const tree_t *t) { ICN_BB_EVAL(t); lower_expr(T0(t
 static void lower_name(const tree_t *t)
 {
     ICN_BB_EVAL(t);
-    const char *vname = (T0(t) && T0(t)->v.sval) ? T0(t)->v.sval : "";
+    const tree_t *child = T0(t);
+    /* .fn(args) form — the unary-dot before a function call.
+     * In classic SNOBOL4 this builds a name handle to the field/slot the function
+     * accesses (so $-deref or ASGN_INDIR can act on the underlying slot).  The
+     * runtime currently has no encoding for a function-result name handle, so
+     * lower as a plain call: the test patterns (Top = .value(x); nreturn) all
+     * route through nreturn's deref logic which simply pushes the returned value.
+     * This keeps the observable behavior right for the common Snocone idiom
+     * while leaving room for a richer name-handle encoding later. */
+    if (child && child->t == TT_FNC) {
+        lower_expr(child);
+        return;
+    }
+    const char *vname = (child && child->v.sval) ? child->v.sval : "";
     sm_emit_s(g_p, SM_PUSH_LIT_S, vname);
     sm_emit_si(g_p, SM_CALL_FN, "NAME_PUSH", 1);
 }
