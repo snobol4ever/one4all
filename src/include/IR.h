@@ -127,6 +127,10 @@ typedef enum {
     IR_INITIAL,         /* Icon `initial expr` — run c[0] on first ever entry to this procedure, no-op on subsequent.  */
                         /* has-run flag stored in nd->ival3 (NOT cleared by IR_reset or IR_snapshot_state, so survives */
                         /* recursive re-entry and the per-call IR_reset of the proc body). Always succeeds via γ.      */
+    IR_ICN_LCONCAT,     /* Icon E1 ||| E2 list concat — c[0]/c[1] operands. If both args are icnlist values, builds a  */
+                        /* fresh icnlist by appending all elements; otherwise falls back to string concat with         */
+                        /* numeric coercion (matches TT_LCONCAT spec in legacy bb_eval_value). Dispatches via helper   */
+                        /* icn_lconcat_d in icn_value.c so AST-walk and IR paths stay in lock-step.                    */
     IR_E_COUNT
 } IR_e;
 typedef struct IR_t IR_t;

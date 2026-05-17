@@ -592,6 +592,27 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         nd->ival2 = (int64_t)is_relop;
         return nd;
     }
+    case TT_LCONCAT: {
+        /* Icon E1 ||| E2 list concat.  Single-shot binop with dual-mode dispatch (list-list →       */
+        /* fresh icnlist; otherwise → string concat with coercion).  Mirrors the AST-walking         */
+        /* TT_LCONCAT case in icn_value.c::bb_eval_value which routes through icn_lconcat_d.  We     */
+        /* do NOT use IR_BINOP_GEN because lconcat is not a generator — even with generative         */
+        /* operands the result is a single value (cross-product semantics are not Icon's spec for    */
+        /* this operator).                                                                           */
+        if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
+        IR_t *lhs = lower_icn_expr_node(cfg, e->c[0]);
+        if (!lhs) return NULL;
+        IR_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
+        if (!rhs) return NULL;
+        IR_t *nd = IR_node_alloc(cfg, IR_ICN_LCONCAT);
+        if (!nd) return NULL;
+        nd->c = calloc(2, sizeof(IR_t *));
+        if (!nd->c) return NULL;
+        nd->c[0] = lhs;
+        nd->c[1] = rhs;
+        nd->n    = 2;
+        return nd;
+    }
     case TT_GLOBAL:
     case TT_LOCAL:
     case TT_STATIC_DECL: {

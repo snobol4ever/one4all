@@ -20,6 +20,7 @@ extern int         Σlen;
 #include "lower_icn.h"
 #include "sm_interp.h"
 #include "../runtime/interp/icn_runtime.h"
+#include "../runtime/interp/icn_value.h"
 #include "coerce.h"
 extern int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR_t *out);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -409,6 +410,22 @@ IR_t * IR_exec_node(IR_t * nd) {
             }
         }
         nd->value = NULVCL;
+        return nd->γ;
+    }
+    case IR_ICN_LCONCAT: {
+        /* Icon E1 ||| E2.  Evaluate both operands; if either FAILs, propagate.  Then dispatch to    */
+        /* icn_lconcat_d which handles list-list (build fresh icnlist) and string-string (coerce +  */
+        /* concat) cases identically to the legacy AST-walking TT_LCONCAT path.                     */
+        if (nd->n < 2 || !nd->c[0] || !nd->c[1]) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[0]);
+        DESCR_t a = nd->c[0]->value;
+        if (IS_FAIL_fn(a)) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[1]);
+        DESCR_t b = nd->c[1]->value;
+        if (IS_FAIL_fn(b)) { nd->value = FAILDESCR; return nd->ω; }
+        DESCR_t r = icn_lconcat_d(a, b);
+        if (IS_FAIL_fn(r)) { nd->value = FAILDESCR; return nd->ω; }
+        nd->value = r;
         return nd->γ;
     }
     case IR_RETURN: {
