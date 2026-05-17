@@ -94,6 +94,7 @@ $(SRC)/emitter/emit_jvm.c \
     $(SRC)/lower/lower_pat_dcg.c \
     $(SRC)/lower/lower_icn.c \
     $(SRC)/lower/lower_pl.c \
+    $(SRC)/lower/lower_sno.c \
     $(SRC)/processor/sm_image.c \
     $(SRC)/processor/sm_jit_interp.c \
     $(SRC)/runtime/interp/icn_runtime.c \
@@ -284,6 +285,7 @@ scrip:
 	$(CC) $(CRT)   -c $(SRC)/lower/lower_pat_dcg.c -o $(OBJ)/lower_pat_dcg.o
 	$(CC) $(CRT)   -c $(SRC)/lower/lower_icn.c     -o $(OBJ)/lower_icn.o
 	$(CC) $(CRT)   -c $(SRC)/lower/lower_pl.c      -o $(OBJ)/lower_pl.o
+	$(CC) $(CRT)   -c $(SRC)/lower/lower_sno.c     -o $(OBJ)/lower_sno.o
 	$(CC) $(CRT)   -c $(SRC)/processor/sm_image.c   -o $(OBJ)/sm_image.o
 	$(CC) $(CRT)   -c $(SRC)/processor/sm_jit_interp.c -o $(OBJ)/sm_jit_interp.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/emit_sm.c -o $(OBJ)/emit_sm.o

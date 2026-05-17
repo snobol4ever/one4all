@@ -81,6 +81,7 @@ int main(int argc, char **argv)
     int dump_ir_bison      = 0;
     int dump_sm            = 0;
     int dump_bb            = 0;
+    int dump_sno           = 0;
     int opt_trace          = 0;
     int opt_bench          = 0;
     const char * target_name = NULL;
@@ -105,6 +106,7 @@ int main(int argc, char **argv)
         else if (strcmp(argv[argi], "--dump-ir-bison")   == 0) { dump_ir_bison   = 1; argi++; }
         else if (strcmp(argv[argi], "--dump-sm")         == 0) { dump_sm         = 1; argi++; }
         else if (strcmp(argv[argi], "--dump-bb")         == 0) { dump_bb         = 1; argi++; }
+        else if (strcmp(argv[argi], "--dump-sno")        == 0) { dump_sno        = 1; argi++; }
         else if (strcmp(argv[argi], "--trace")           == 0) { opt_trace       = 1; argi++; }
         else if (strcmp(argv[argi], "--bench")           == 0) { opt_bench       = 1; argi++; }
         else if (strcmp(argv[argi], "--case-sensitive")  == 0) { argi++; }
@@ -158,6 +160,7 @@ int main(int argc, char **argv)
             "  --dump-ast       print AST after frontend\n"
             "  --dump-sm        print SM_Program after lowering\n"
             "  --dump-bb        print BB-GRAPH for each statement\n"
+            "  --dump-sno       transpile AST to portable SNOBOL4 source (GOAL-PARSER-SC-TRANSPILE.md SCT-1)\n"
             "  --trace          MONITOR trace output (diff vs CSNOBOL4)\n"
             "  --bench          print wall-clock time after execution\n"
             "  --dump-ast-bison dump AST via old Bison/Flex parser\n"
@@ -269,6 +272,13 @@ int main(int argc, char **argv)
                    parser_*.sc validation has a reference). */
                 ir_dump_program(sub_ast, stdout); return 0;
             }
+            if (dump_sno && sub_ast) {
+                /* SCT-1: transpile tree_t to portable SNOBOL4. Same shape as
+                   --dump-ast above; the producer (any of the six frontends)
+                   feeds the same tree_to_sno() walker. */
+                extern int tree_to_sno(const tree_t *ast, FILE *out);
+                tree_to_sno(sub_ast, stdout); return 0;
+            }
             MERGE_AST(sub_ast);
         } else if (dump_ir) {
             FILE *f = fopen(input_path, "r");
@@ -277,6 +287,19 @@ int main(int argc, char **argv)
             tree_t *sub_ast = sno_parse_ast(f, input_path, NULL);
             fclose(f);
             ir_dump_program(sub_ast, stdout);
+            return 0;
+        } else if (dump_sno) {
+            /* SCT-1: same path as --dump-ast for SNOBOL4 input, but emit
+               SNOBOL4 source instead of an AST dump. */
+            FILE *f = fopen(input_path, "r");
+            if (!f) { fprintf(stderr, "scrip: cannot open '%s'\n", input_path); return 1; }
+            if (opt_bench) clock_gettime(CLOCK_MONOTONIC, &_t1);
+            tree_t *sub_ast = sno_parse_ast(f, input_path, NULL);
+            fclose(f);
+            {
+                extern int tree_to_sno(const tree_t *ast, FILE *out);
+                tree_to_sno(sub_ast, stdout);
+            }
             return 0;
         } else {
             FILE *f = fopen(input_path, "r");
