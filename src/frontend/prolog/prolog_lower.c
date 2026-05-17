@@ -448,7 +448,7 @@ CODE_t *prolog_lower(PlProgram *pl_prog) {
                 && dg->compound.arity == 1) {
                 int fn = dg->compound.functor;
                 const char *fname = prolog_atom_name(fn);
-                if (fname && strcasecmp(fname, "export") == 0) {
+                if (fname && strcmp(fname, "export") == 0) {
                     is_export = 1;
                     Term *arg = term_deref(dg->compound.args[0]);
                     const char *ename = NULL;

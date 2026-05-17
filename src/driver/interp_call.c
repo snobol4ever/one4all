@@ -9,7 +9,7 @@ void icn_init_update_snapshot(char **snames, DESCR_t *svals, int nsaved) {
         IcnInitEnt *ent = &init_tab[ei];
         for (int si = 0; si < ent->ns; si++) {
             for (int ni = 0; ni < nsaved; ni++) {
-                if (snames[ni] && strcasecmp(snames[ni], ent->s[si].nm) == 0) {
+                if (snames[ni] && strcmp(snames[ni], ent->s[si].nm) == 0) {
                     ent->s[si].val = NV_GET_fn(ent->s[si].nm);
                     break;
                 }
@@ -86,7 +86,6 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
         size_t flen = strlen(fname);
         if (flen >= sizeof(ufname)) flen = sizeof(ufname)-1;
         for (size_t i = 0; i <= flen; i++) ufname[i] = fname[i];
-        sno_fold_name(ufname);
     }
     const char *entry_pre = FUNC_ENTRY_fn(fname);
     const char *retname = fname;
@@ -201,7 +200,7 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                             subj_name = VARVAL_fn(nd);
                         }
                         if (subj_name) {
-                            char *fn = GC_strdup(subj_name); sno_fold_name(fn);
+                            char *fn = GC_strdup(subj_name);
                             subj_name = fn;
                         }
                         if (subj_name && s_pattern) {
@@ -318,7 +317,7 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                             const char *nm0 = VARVAL_fn(ind_val);
                             if (!nm0 || !*nm0) { succeeded = 0; }
                             else {
-                                char *nm = GC_strdup(nm0); sno_fold_name(nm);
+                                char *nm = GC_strdup(nm0);
                                 DESCR_t named = NV_GET_fn(nm);
                                 if (IS_NAMEPTR(named)) {
                                     NAME_DEREF_PTR(named) = repl_val;

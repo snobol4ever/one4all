@@ -60,13 +60,6 @@ DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
     if (!g_current_sm_prog) {
         _body = _entry ? label_lookup(_entry) : NULL;
         if (!_body) _body = label_lookup(name);
-        if (!_body) {
-            char _uf[128]; size_t _fl = strlen(name);
-            if (_fl >= sizeof(_uf)) _fl = sizeof(_uf) - 1;
-            for (size_t _i = 0; _i <= _fl; _i++)
-                _uf[_i] = (char)toupper((unsigned char)name[_i]);
-            _body = label_lookup(_uf);
-        }
     }
     if (!_body && FNCEX_fn(name)) {
         if (!g_current_sm_prog || sm_label_pc_lookup(g_current_sm_prog, name) < 0)

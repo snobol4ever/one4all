@@ -45,14 +45,14 @@ void icn_record_register(const char *spec) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 ScDatType *sc_dat_find_type(const char *name) {
     for (int i = 0; i < sc_dat_ntypes; i++)
-        if (strcasecmp(sc_dat_types[i].name, name) == 0) return &sc_dat_types[i];
+        if (strcmp(sc_dat_types[i].name, name) == 0) return &sc_dat_types[i];
     return NULL;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 ScDatType *sc_dat_find_field(const char *name, int *fidx) {
     for (int i = 0; i < sc_dat_ntypes; i++)
         for (int j = 0; j < sc_dat_types[i].nfields; j++)
-            if (strcasecmp(sc_dat_types[i].fields[j], name) == 0) {
+            if (strcmp(sc_dat_types[i].fields[j], name) == 0) {
                 if (fidx) *fidx = j;
                 return &sc_dat_types[i];
             }
@@ -92,7 +92,7 @@ DESCR_t sc_dat_field_call(const char *name, DESCR_t *args, int nargs) {
     ScDatType *_ft = sc_dat_find_field(name, &_fi);
     if (_ft) return sc_dat_field_get(name, args[0]);
     size_t _nlen = strlen(name);
-    if (_nlen > 4 && strcasecmp(name + _nlen - 4, "_SET") == 0 && nargs >= 2) {
+    if (_nlen > 4 && strcmp(name + _nlen - 4, "_SET") == 0 && nargs >= 2) {
         char _fname[128];
         size_t _flen = _nlen - 4;
         if (_flen >= sizeof(_fname)) _flen = sizeof(_fname) - 1;

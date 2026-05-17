@@ -3,7 +3,6 @@
 #include <string.h>
 #include <gc.h>
 #include "frontend/snobol4/scrip_cc.h"
-extern int64_t kw_case;
 #include "frontend/prolog/prolog_driver.h"
 #include "frontend/prolog/prolog_atom.h"
 #include "frontend/icon/icon_driver.h"
@@ -45,7 +44,6 @@ void polyglot_init(const tree_t *prog, uint32_t lang_mask)
     if (!prog) return;
     label_table_build(prog);
     prescan_defines(prog);
-    kw_case = 1;
     if (lang_mask & ((1u << LANG_ICN) | (1u << LANG_RAKU))) {
         g_fi8_icn_init_count++;
         proc_count = 0; global_count = 0;
@@ -185,13 +183,13 @@ tree_t *parse_scrip_polyglot(const char *src, const char *filename)
         while (*p && *p != '\n') p++;
         if (*p == '\n') p++;
         int lang = -1;
-        if      (tag_len == 7 && strncasecmp(tag_start, "SNOBOL4", 7) == 0) lang = LANG_SNO;
-        else if (tag_len == 4 && strncasecmp(tag_start, "Icon",    4) == 0) lang = LANG_ICN;
-        else if (tag_len == 6 && strncasecmp(tag_start, "Prolog",  6) == 0) lang = LANG_PL;
-        else if (tag_len == 4 && strncasecmp(tag_start, "Raku",    4) == 0) lang = LANG_RAKU;
-        else if (tag_len == 5 && strncasecmp(tag_start, "Scrip",   5) == 0) lang = LANG_SCRIP;
-        else if (tag_len == 6 && strncasecmp(tag_start, "SCRIP",   5) == 0) lang = LANG_SCRIP;
-        else if (tag_len == 5 && strncasecmp(tag_start, "Rebus",   5) == 0) lang = LANG_REB;
+        if      (tag_len == 7 && strncmp(tag_start, "SNOBOL4", 7) == 0) lang = LANG_SNO;
+        else if (tag_len == 4 && strncmp(tag_start, "Icon",    4) == 0) lang = LANG_ICN;
+        else if (tag_len == 6 && strncmp(tag_start, "Prolog",  6) == 0) lang = LANG_PL;
+        else if (tag_len == 4 && strncmp(tag_start, "Raku",    4) == 0) lang = LANG_RAKU;
+        else if (tag_len == 5 && strncmp(tag_start, "Scrip",   5) == 0) lang = LANG_SCRIP;
+        else if (tag_len == 5 && strncmp(tag_start, "SCRIP",   5) == 0) lang = LANG_SCRIP;
+        else if (tag_len == 5 && strncmp(tag_start, "Rebus",   5) == 0) lang = LANG_REB;
         const char *block_start = p;
         const char *close = strstr(p, "```");
         if (!close) break;

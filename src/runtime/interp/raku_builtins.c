@@ -490,7 +490,7 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
                     const char *kname = VARVAL_fn(kD);
                     if (!kname) continue;
                     for (int fi=0;fi<t->nfields;fi++) {
-                        if (strcasecmp(t->fields[fi], kname)==0) { fvals[fi]=vD; break; }
+                        if (strcmp(t->fields[fi], kname)==0) { fvals[fi]=vD; break; }
                     }
                 }
                 { *__rk_out = sc_dat_construct(t, fvals, t->nfields); return 1; }

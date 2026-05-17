@@ -700,12 +700,12 @@ static void h_call(void)
         if (IS_NAMEPTR(name_d)) {
             val = NAME_DEREF_PTR(name_d);
         } else if (IS_NAMEVAL(name_d)) {
-            char *fn = GC_strdup(name_d.s); sno_fold_name(fn);
+            char *fn = GC_strdup(name_d.s);
             val = NV_GET_fn(fn);
         } else {
             const char *vn0 = VARVAL_fn(name_d);
             char *vn = (vn0 && *vn0) ? GC_strdup(vn0) : NULL;
-            if (vn) sno_fold_name(vn);
+            if (vn)
             val = (vn && *vn) ? NV_GET_fn(vn) : NULVCL;
         }
         PUSH(val); STATE->last_ok = 1; return;
@@ -714,7 +714,6 @@ static void h_call(void)
         DESCR_t nd = POP();
         const char *vn0 = VARVAL_fn(nd);
         char *vn = GC_strdup(vn0 ? vn0 : "");
-        sno_fold_name(vn);
         PUSH(NAMEVAL(vn)); STATE->last_ok = 1; return;
     }
     if (name && strcmp(name, "ASGN_INDIR") == 0) {
@@ -723,12 +722,12 @@ static void h_call(void)
         if (IS_NAMEPTR(nd)) {
             *(DESCR_t*)nd.ptr = val; ok = 1;
         } else if (IS_NAMEVAL(nd)) {
-            char *fn = GC_strdup(nd.s); sno_fold_name(fn);
+            char *fn = GC_strdup(nd.s);
             NV_SET_fn(fn, val); ok = 1;
         } else {
             const char *vn0 = VARVAL_fn(nd);
             char *vn = (vn0 && *vn0) ? GC_strdup(vn0) : NULL;
-            if (vn) sno_fold_name(vn);
+            if (vn)
             if (vn && *vn) { NV_SET_fn(vn, val); ok = 1; }
         }
         PUSH(val); STATE->last_ok = ok; return;
@@ -740,7 +739,7 @@ static void h_call(void)
         int ok = 0;
         if (IS_NAMEPTR(fres)) { NAME_DEREF_PTR(fres) = rhs; ok = 1; }
         else if (IS_NAMEVAL(fres)) {
-            char *fn = GC_strdup(fres.s); sno_fold_name(fn);
+            char *fn = GC_strdup(fres.s);
             NV_SET_fn(fn, rhs); ok = 1;
         }
         else {
@@ -847,7 +846,7 @@ static void h_call(void)
     int _data_first = (nargs >= 1 && args[0].v == DT_DATA);
     int _data_set   = (nargs >= 2 && args[1].v == DT_DATA && name &&
                        strlen(name) > 4 &&
-                       strcasecmp(name + strlen(name) - 4, "_SET") == 0);
+                       strcmp(name + strlen(name) - 4, "_SET") == 0);
     if (_data_first || _data_set)
         result = sc_dat_field_call(name, args, nargs);
     if (result.v == DT_FAIL || (!_data_first && !_data_set)) {

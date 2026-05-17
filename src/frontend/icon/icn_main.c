@@ -16,10 +16,10 @@ ImportEntry *icn_prescan_imports(const char *src) {
         const char *lp = line;
         while (*lp == ' ' || *lp == '\t') lp++;
         int is_import = 0;
-        if (*lp == '$' && strncasecmp(lp+1, "import", 6) == 0 &&
+        if (*lp == '$' && strncmp(lp+1, "import", 6) == 0 &&
             (lp[7] == ' ' || lp[7] == '\t' || lp[7] == '\0' || lp[7] == '\n'))
             { is_import = 1; lp += 7; }
-        else if (*lp == '-' && strncasecmp(lp+1, "IMPORT", 6) == 0 &&
+        else if (*lp == '-' && strncmp(lp+1, "IMPORT", 6) == 0 &&
             (lp[7] == ' ' || lp[7] == '\t' || lp[7] == '\0' || lp[7] == '\n'))
             { is_import = 1; lp += 7; }
         if (is_import) {

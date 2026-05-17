@@ -402,7 +402,6 @@ CODE_t *rebus_lower(RProgram *rp) {
 void rebus_compile(const char *src, const char *filename, tree_t **out_ast) {
     if (!filename) filename = "<stdin>";
     if (out_ast) *out_ast = NULL;
-    sno_set_case_sensitive(1);
     FILE *f = fmemopen((void *)src, strlen(src), "r");
     if (!f) {
         fprintf(stderr, "rebus_compile: fmemopen failed\n");

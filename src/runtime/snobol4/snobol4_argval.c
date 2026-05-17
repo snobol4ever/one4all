@@ -85,12 +85,5 @@ DESCR_t VARVUP_fn(DESCR_t d)
 {
     d = VARVAL_d_fn(d);
     if (d.v == DT_FAIL) return FAILDESCR;
-    extern int64_t kw_case;
-    if (kw_case != 0) return d;
-    const char *s = (d.v == DT_SNUL || !d.s) ? "" : d.s;
-    size_t len = strlen(s);
-    char *up = GC_malloc(len + 1);
-    for (size_t i = 0; i <= len; i++)
-        up[i] = (char)toupper((unsigned char)s[i]);
-    return STRVAL(up);
+    return d;
 }

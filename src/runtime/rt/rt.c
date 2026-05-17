@@ -925,19 +925,18 @@ extern int     subscript_set(DESCR_t arr, DESCR_t idx, DESCR_t val);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern int     subscript_set2(DESCR_t arr, DESCR_t i, DESCR_t j, DESCR_t val);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-extern void    sno_fold_name(char *name);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static DESCR_t _rt_nv_fold_get(const char *raw)
 {
     if (!raw || !*raw) return NULVCL;
-    char *n = GC_strdup(raw); sno_fold_name(n);
+    char *n = GC_strdup(raw);
     return NV_GET_fn(n);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void _rt_nv_fold_set(const char *raw, DESCR_t val)
 {
     if (!raw || !*raw) return;
-    char *n = GC_strdup(raw); sno_fold_name(n);
+    char *n = GC_strdup(raw);
     NV_SET_fn(n, val);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -959,7 +958,7 @@ void rt_call(const char *name, int nargs)
     if (name && strcmp(name, "NAME_PUSH") == 0) {
         DESCR_t name_d = args[0];
         const char *vname0 = VARVAL_fn(name_d);
-        char *vname = GC_strdup(vname0 ? vname0 : ""); sno_fold_name(vname);
+        char *vname = GC_strdup(vname0 ? vname0 : "");
         vstack_push(NAMEVAL(vname));
         LAST_OK_SET(1);
         return;
@@ -973,7 +972,7 @@ void rt_call(const char *name, int nargs)
         if (!IS_FAIL_fn(fres)) {
             if (IS_NAMEPTR(fres))      { NAME_DEREF_PTR(fres) = rhs; ok = 1; }
             else if (IS_NAMEVAL(fres)) {
-                char *fn = GC_strdup(fres.s); sno_fold_name(fn);
+                char *fn = GC_strdup(fres.s);
                 NV_SET_fn(fn, rhs); ok = 1;
             }
             else {
@@ -1106,7 +1105,7 @@ int rt_do_return(int kind, int cond)
         if (v.v == DT_N) {
             vstack_push(v);
         } else if (v.v == DT_S && v.s) {
-            char *n = GC_strdup(v.s); sno_fold_name(n);
+            char *n = GC_strdup(v.s);
             vstack_push(NAMEVAL(n));
         } else {
             vstack_push(FAILDESCR);

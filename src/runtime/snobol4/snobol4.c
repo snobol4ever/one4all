@@ -506,7 +506,6 @@ int64_t kw_maxlngth = 524288;
 int64_t kw_anchor   = 0;
 int64_t kw_trim     = 1;
 int64_t kw_stlimit  = -1;
-int64_t kw_case     = 0;
 int64_t kw_ftrace   = 0;
 int64_t kw_trace    = 0;
 int64_t kw_errlimit = 0;
@@ -1503,7 +1502,6 @@ DESCR_t sno_DATA_register(DESCR_t *a, int n) {
     const char *raw_spec = VARVAL_fn(a[0]);
     if (!raw_spec || !*raw_spec) return NULVCL;
     char *spec = GC_strdup(raw_spec);
-    sno_fold_name(spec);
     DEFDAT_fn(spec);
     char *s = GC_strdup(spec);
     char *paren = strchr(s, '(');
@@ -1515,7 +1513,7 @@ DESCR_t sno_DATA_register(DESCR_t *a, int n) {
     if (close) *close = '\0';
     if (_data_ntypes >= DATA_MAX_TYPES) return NULVCL;
     int tidx = _data_ntypes++;
-    char *uname = GC_strdup(tname); sno_fold_name(uname);
+    char *uname = GC_strdup(tname);
     _data_types[tidx].typename = uname;
     int nf = 0;
     char *tmp = GC_strdup(fstr);
@@ -1524,7 +1522,7 @@ DESCR_t sno_DATA_register(DESCR_t *a, int n) {
         while (*tok == ' ') tok++;
         char *end = tok + strlen(tok) - 1;
         while (end > tok && *end == ' ') *end-- = '\0';
-        char *fld = GC_strdup(tok); sno_fold_name(fld);
+        char *fld = GC_strdup(tok);
         _data_types[tidx].fields[nf] = fld;
         nf++;
         tok = strtok(NULL, ",");
@@ -1672,7 +1670,7 @@ static DESCR_t _VALUE_(DESCR_t *a, int n) {
     if (n < 1) return FAILDESCR;
     const char *name = VARVAL_fn(a[0]);
     if (!name) return FAILDESCR;
-    char *fname = GC_strdup(name); sno_fold_name(fname);
+    char *fname = GC_strdup(name);
     return NV_GET_fn(fname);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -2428,7 +2426,7 @@ DESCR_t NV_GET_fn(const char *name) {
     if (strcmp(name, "ANCHOR")   == 0) return INTVAL(kw_anchor);
     if (strcmp(name, "TRIM")     == 0) return INTVAL(kw_trim);
     if (strcmp(name, "FULLSCAN") == 0) return INTVAL(kw_fullscan);
-    if (strcmp(name, "CASE")     == 0) return INTVAL(kw_case);
+    if (strcmp(name, "CASE")     == 0) return INTVAL(0);
     if (strcmp(name, "MAXLNGTH") == 0) return INTVAL(kw_maxlngth);
     if (strcmp(name, "FTRACE")   == 0) return INTVAL(kw_ftrace);
     if (strcmp(name, "TRACE")    == 0) return INTVAL(kw_trace);
@@ -2471,7 +2469,10 @@ DESCR_t NV_SET_fn(const char *name, DESCR_t val) {
     if (strcmp(name, "ANCHOR")   == 0) { kw_anchor   = (val.v==DT_I)?val.i:(int64_t)to_real(val); return val; }
     if (strcmp(name, "TRIM")     == 0) { kw_trim     = (val.v==DT_I)?val.i:(int64_t)to_real(val); return val; }
     if (strcmp(name, "FULLSCAN") == 0) { kw_fullscan = (val.v==DT_I)?val.i:(int64_t)to_real(val); return val; }
-    if (strcmp(name, "CASE")     == 0) { kw_case     = (val.v==DT_I)?val.i:(int64_t)to_real(val); return val; }
+    if (strcmp(name, "CASE")     == 0) {
+        sno_runtime_error(10, "&CASE is read-only; SCRIP is case-sensitive only");
+        return val;
+    }
     if (strcmp(name, "MAXLNGTH") == 0) { kw_maxlngth = (val.v==DT_I)?val.i:(int64_t)to_real(val); return val; }
     if (strcmp(name, "FTRACE")   == 0) { kw_ftrace   = (val.v==DT_I)?val.i:(int64_t)to_real(val); return val; }
     if (strcmp(name, "TRACE")    == 0) { kw_trace    = (val.v==DT_I)?val.i:(int64_t)to_real(val); return val; }
@@ -2615,22 +2616,22 @@ void INDR_SET_fn(const char *name, DESCR_t val) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t NAME_fn(const char *varname) {
     if (!varname || !*varname) return FAILDESCR;
-    if (strcasecmp(varname, "STLIMIT")  == 0 ||
-        strcasecmp(varname, "ANCHOR")   == 0 ||
-        strcasecmp(varname, "TRIM")     == 0 ||
-        strcasecmp(varname, "FULLSCAN") == 0 ||
-        strcasecmp(varname, "STCOUNT")  == 0 ||
-        strcasecmp(varname, "STNO")     == 0 ||
-        strcasecmp(varname, "ALPHABET") == 0 ||
-        strcasecmp(varname, "CASE")     == 0 ||
-        strcasecmp(varname, "MAXLNGTH") == 0 ||
-        strcasecmp(varname, "FTRACE")   == 0 ||
-        strcasecmp(varname, "ERRLIMIT") == 0 ||
-        strcasecmp(varname, "CODE")     == 0 ||
-        strcasecmp(varname, "FNCLEVEL") == 0 ||
-        strcasecmp(varname, "RTNTYPE")  == 0 ||
-        strcasecmp(varname, "INPUT")    == 0 ||
-        strcasecmp(varname, "OUTPUT")   == 0)
+    if (strcmp(varname, "STLIMIT")  == 0 ||
+        strcmp(varname, "ANCHOR")   == 0 ||
+        strcmp(varname, "TRIM")     == 0 ||
+        strcmp(varname, "FULLSCAN") == 0 ||
+        strcmp(varname, "STCOUNT")  == 0 ||
+        strcmp(varname, "STNO")     == 0 ||
+        strcmp(varname, "ALPHABET") == 0 ||
+        strcmp(varname, "CASE")     == 0 ||
+        strcmp(varname, "MAXLNGTH") == 0 ||
+        strcmp(varname, "FTRACE")   == 0 ||
+        strcmp(varname, "ERRLIMIT") == 0 ||
+        strcmp(varname, "CODE")     == 0 ||
+        strcmp(varname, "FNCLEVEL") == 0 ||
+        strcmp(varname, "RTNTYPE")  == 0 ||
+        strcmp(varname, "INPUT")    == 0 ||
+        strcmp(varname, "OUTPUT")   == 0)
         return NAMEVAL(GC_strdup(varname));
     DESCR_t *cell = NV_PTR_fn(varname);
     if (cell) return NAMEPTR(cell);
@@ -2640,20 +2641,24 @@ DESCR_t NAME_fn(const char *varname) {
 int ASGNIC_fn(const char *kw_name, DESCR_t val) {
     if (!kw_name) return 0;
     int64_t iv = IS_INT(val) ? val.i : (int64_t)to_real(val);
-    if (strcasecmp(kw_name, "STLIMIT")  == 0) { kw_stlimit  = iv; return 1; }
-    if (strcasecmp(kw_name, "ANCHOR")   == 0) { kw_anchor   = iv; return 1; }
-    if (strcasecmp(kw_name, "TRIM")     == 0) { kw_trim     = iv; return 1; }
-    if (strcasecmp(kw_name, "FULLSCAN") == 0) { kw_fullscan = iv; return 1; }
-    if (strcasecmp(kw_name, "CASE")     == 0) { kw_case     = iv; return 1; }
-    if (strcasecmp(kw_name, "MAXLNGTH") == 0) { kw_maxlngth = iv; return 1; }
-    if (strcasecmp(kw_name, "FTRACE")   == 0) { kw_ftrace   = iv; return 1; }
-    if (strcasecmp(kw_name, "ERRLIMIT") == 0) { kw_errlimit = iv; return 1; }
-    if (strcasecmp(kw_name, "CODE")     == 0) { kw_code     = iv; return 1; }
-    if (strcasecmp(kw_name, "STCOUNT")  == 0) return 1;
-    if (strcasecmp(kw_name, "STNO")     == 0) return 1;
-    if (strcasecmp(kw_name, "ALPHABET") == 0) return 1;
-    if (strcasecmp(kw_name, "FNCLEVEL") == 0) return 1;
-    if (strcasecmp(kw_name, "RTNTYPE")  == 0) return 1;
+    if (strcmp(kw_name, "STLIMIT")  == 0) { kw_stlimit  = iv; return 1; }
+    if (strcmp(kw_name, "ANCHOR")   == 0) { kw_anchor   = iv; return 1; }
+    if (strcmp(kw_name, "TRIM")     == 0) { kw_trim     = iv; return 1; }
+    if (strcmp(kw_name, "FULLSCAN") == 0) { kw_fullscan = iv; return 1; }
+    if (strcmp(kw_name, "CASE")     == 0) {
+        (void)iv;
+        sno_runtime_error(10, "&CASE is read-only; SCRIP is case-sensitive only");
+        return 1;
+    }
+    if (strcmp(kw_name, "MAXLNGTH") == 0) { kw_maxlngth = iv; return 1; }
+    if (strcmp(kw_name, "FTRACE")   == 0) { kw_ftrace   = iv; return 1; }
+    if (strcmp(kw_name, "ERRLIMIT") == 0) { kw_errlimit = iv; return 1; }
+    if (strcmp(kw_name, "CODE")     == 0) { kw_code     = iv; return 1; }
+    if (strcmp(kw_name, "STCOUNT")  == 0) return 1;
+    if (strcmp(kw_name, "STNO")     == 0) return 1;
+    if (strcmp(kw_name, "ALPHABET") == 0) return 1;
+    if (strcmp(kw_name, "FNCLEVEL") == 0) return 1;
+    if (strcmp(kw_name, "RTNTYPE")  == 0) return 1;
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -2794,7 +2799,7 @@ static FNCBLK_t *_parse_define_spec(const char *spec) {
         char *comma = strchr(s, ',');
         if (comma) {
             *comma = '\0';
-            fe->name = GC_strdup(s); sno_fold_name(fe->name);
+            fe->name = GC_strdup(s);
             fe->entry_label = fe->name;
             char *lstr = GC_strdup(comma + 1);
             int nl = 0;
@@ -2806,11 +2811,11 @@ static FNCBLK_t *_parse_define_spec(const char *spec) {
             tok  = strtok(lstr, ",");
             for (int i = 0; i < nl && tok; i++) {
                 while (*tok == ' ') tok++;
-                fe->locals[i] = GC_strdup(tok); sno_fold_name(fe->locals[i]);
+                fe->locals[i] = GC_strdup(tok);
                 tok = strtok(NULL, ",");
             }
         } else {
-            fe->name = GC_strdup(s); sno_fold_name(fe->name);
+            fe->name = GC_strdup(s);
             fe->entry_label = fe->name;
         }
         fe->nparams = 0;
@@ -2818,7 +2823,7 @@ static FNCBLK_t *_parse_define_spec(const char *spec) {
         return fe;
     }
     *paren = '\0';
-    fe->name = GC_strdup(s); sno_fold_name(fe->name);
+    fe->name = GC_strdup(s);
     fe->entry_label = fe->name;
     char *close = strchr(paren + 1, ')');
     char *locals_str = NULL;
@@ -2840,7 +2845,7 @@ static FNCBLK_t *_parse_define_spec(const char *spec) {
         char *tok = strtok(pstr, ",");
         for (int i = 0; i < np && tok; i++) {
             while (*tok == ' ') tok++;
-            fe->params[i] = GC_strdup(tok); sno_fold_name(fe->params[i]);
+            fe->params[i] = GC_strdup(tok);
             tok = strtok(NULL, ",");
         }
     }
@@ -2857,7 +2862,7 @@ static FNCBLK_t *_parse_define_spec(const char *spec) {
         tok  = strtok(lstr, ",");
         for (int i = 0; i < nl && tok; i++) {
             while (*tok == ' ') tok++;
-            fe->locals[i] = GC_strdup(tok); sno_fold_name(fe->locals[i]);
+            fe->locals[i] = GC_strdup(tok);
             tok = strtok(NULL, ",");
         }
     }
@@ -2892,7 +2897,7 @@ void DEFINE_fn_entry(const char *spec, FNCPTR_t fn, const char *entry_label) {
     unsigned h = _func_hash(fe->name);
     for (FNCBLK_t *e = _func_buckets[h]; e; e = e->next) {
         if (strcmp(e->name, fe->name) == 0) {
-            char *el = GC_strdup(entry_label); sno_fold_name(el);
+            char *el = GC_strdup(entry_label);
             e->entry_label = el;
             return;
         }
@@ -2901,8 +2906,8 @@ void DEFINE_fn_entry(const char *spec, FNCPTR_t fn, const char *entry_label) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void register_fn_alias(const char *newname, const char *oldname) {
     _func_init();
-    char *nn = GC_strdup(newname); sno_fold_name(nn);
-    char *on = GC_strdup(oldname); sno_fold_name(on);
+    char *nn = GC_strdup(newname);
+    char *on = GC_strdup(oldname);
     newname = nn; oldname = on;
     FNCBLK_t *old_entry = NULL;
     unsigned ho = _func_hash(oldname);

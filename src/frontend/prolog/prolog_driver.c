@@ -9,7 +9,6 @@ void prolog_compile(const char *source, const char *filename, tree_t **out_ast)
 {
     if (!filename) filename = "<stdin>";
     if (out_ast) *out_ast = NULL;
-    sno_set_case_sensitive(1);
     PlProgram *pl = prolog_parse(source, filename);
     if (!pl) { fprintf(stderr, "prolog_compile: parse failed for %s\n", filename); return; }
     CODE_t *prog = prolog_lower(pl);

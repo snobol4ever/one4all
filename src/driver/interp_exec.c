@@ -150,7 +150,7 @@ void execute_program(const tree_t *prog)
                     subj_name = VARVAL_fn(nd);
                 }
                 if (subj_name) {
-                    char *fn = GC_strdup(subj_name); sno_fold_name(fn);
+                    char *fn = GC_strdup(subj_name);
                     subj_name = fn;
                 }
                 if (subj_name && s_pattern) {
@@ -243,7 +243,7 @@ void execute_program(const tree_t *prog)
                 if (!nm0 || !*nm0) {
                     succeeded = 0;
                 } else {
-                    char *nm = GC_strdup(nm0); sno_fold_name(nm);
+                    char *nm = GC_strdup(nm0);
                     set_and_trace(nm, repl_val);
                     succeeded = 1;
                 }

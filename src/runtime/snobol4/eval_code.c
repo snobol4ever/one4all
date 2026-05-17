@@ -115,7 +115,7 @@ DESCR_t eval_node(tree_t *e)
             DESCR_t name_d = eval_node(lv->c[0]);
             const char *nm = VARVAL_fn(name_d);
             if (nm && *nm) {
-                char *fn = GC_strdup(nm); sno_fold_name(fn);
+                char *fn = GC_strdup(nm);
                 NV_SET_fn(fn, val);
             }
         }
@@ -126,7 +126,7 @@ DESCR_t eval_node(tree_t *e)
         DESCR_t name_d = eval_node(e->c[0]);
         const char *nm = VARVAL_fn(name_d);
         if (!nm || !*nm) return NULVCL;
-        char *fn = GC_strdup(nm); sno_fold_name(fn);
+        char *fn = GC_strdup(nm);
         return NV_GET_fn(fn);
     }
     case TT_FNC: {
@@ -236,7 +236,7 @@ DESCR_t eval_node(tree_t *e)
             else if (ic->t == TT_VAR  && ic->v.sval) { DESCR_t xv = NV_GET_fn(ic->v.sval); nm = VARVAL_fn(xv); }
             else                                      { DESCR_t nd = eval_node(ic);        nm = VARVAL_fn(nd); }
             if (!nm) return FAILDESCR;
-            char *fn = GC_strdup(nm); sno_fold_name(fn);
+            char *fn = GC_strdup(nm);
             name = NAME_fn(fn);
         } else {
             name = eval_node(tgt);
@@ -278,7 +278,7 @@ DESCR_t eval_node(tree_t *e)
             else if (ic->t == TT_VAR  && ic->v.sval) { DESCR_t xv = NV_GET_fn(ic->v.sval); nm = VARVAL_fn(xv); }
             else                                      { DESCR_t nd = eval_node(ic);        nm = VARVAL_fn(nd); }
             if (!nm) return FAILDESCR;
-            char *fn = GC_strdup(nm); sno_fold_name(fn);
+            char *fn = GC_strdup(nm);
             name = NAME_fn(fn);
         } else {
             name = eval_node(tgt);

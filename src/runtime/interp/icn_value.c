@@ -1011,7 +1011,7 @@ DESCR_t cv = bb_eval_value(lhs->c[0]);
                         if (!ch || ch->t != TT_ASSIGN || ch->n < 1) continue;
                         tree_t *lhs = ch->c[0];
                         if (!lhs || lhs->t != TT_VAR || !lhs->v.sval) continue;
-                        if (strcasecmp(lhs->v.sval, ent->s[si].nm) == 0
+                        if (strcmp(lhs->v.sval, ent->s[si].nm) == 0
                             && lhs->_id >= 0 && lhs->_id < FRAME.env_n) {
                             FRAME.env[lhs->_id] = ent->s[si].val;
                             restored = 1;

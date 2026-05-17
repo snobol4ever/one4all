@@ -1532,7 +1532,7 @@ retry:
         const char *name_start = p;
         while (*p && *p != ' ' && *p != '\t') p++;
         int namelen = (int)(p - name_start);
-        if (namelen == 7 && strncasecmp(name_start, "INCLUDE", 7) == 0) {
+        if (namelen == 7 && strncmp(name_start, "INCLUDE", 7) == 0) {
             while (*p == ' ' || *p == '\t') p++;
             if (*p) {
                 char *incpath = resolve_include_path(g_io_path, p);
@@ -1621,21 +1621,6 @@ static char *resolve_include_path(const char *base_path, const char *incname) {
     for (int i = 0; i < g_num_include_paths; i++) {
         snprintf(result, sizeof result, "%s/%s", g_include_paths[i], name);
         if (access(result, R_OK) == 0) return strdup(result);
-        {
-            DIR *d = opendir(g_include_paths[i]);
-            if (d) {
-                struct dirent *de;
-                while ((de = readdir(d)) != NULL) {
-                    if (strcasecmp(de->d_name, name) == 0) {
-                        snprintf(result, sizeof result, "%s/%s",
-                                 g_include_paths[i], de->d_name);
-                        closedir(d);
-                        return strdup(result);
-                    }
-                }
-                closedir(d);
-            }
-        }
     }
     snprintf(result, sizeof result, "%s/%s", base, name);
     return strdup(result);
@@ -1674,7 +1659,7 @@ static void cmpile_file_internal(FILE *f, const char *base_path, compile_state_t
             const char *ns = p;
             while (*p && *p != ' ' && *p != '\t') p++;
             int nlen = (int)(p - ns);
-            if (nlen == 7 && strncasecmp(ns, "INCLUDE", 7) == 0) {
+            if (nlen == 7 && strncmp(ns, "INCLUDE", 7) == 0) {
                 while (*p == ' ' || *p == '\t') p++;
                 if (*p) {
                     char *incpath = resolve_include_path(base_path, p);

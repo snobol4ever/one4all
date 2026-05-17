@@ -197,13 +197,13 @@ DESCR_t sm_peek(SM_State *st)
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static DESCR_t nv_fold_get(const char *raw) {
     if (!raw || !*raw) return NULVCL;
-    char *n = GC_strdup(raw); sno_fold_name(n);
+    char *n = GC_strdup(raw);
     return NV_GET_fn(n);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void nv_fold_set(const char *raw, DESCR_t val) {
     if (!raw || !*raw) return;
-    char *n = GC_strdup(raw); sno_fold_name(n);
+    char *n = GC_strdup(raw);
     NV_SET_fn(n, val);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -833,7 +833,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             if (name && strcmp(name, "NAME_PUSH") == 0) {
                 DESCR_t name_d = sm_pop(st);
                 const char *vname0 = VARVAL_fn(name_d);
-                char *vname = GC_strdup(vname0 ? vname0 : ""); sno_fold_name(vname);
+                char *vname = GC_strdup(vname0 ? vname0 : "");
                 sm_push(st, NAMEVAL(vname));
                 st->last_ok = 1;
                 break;

@@ -116,7 +116,7 @@ static void skip_ws(IcnLexer *lx) {
             lex_advance(lx);
             while (lex_cur(lx) == ' ' || lex_cur(lx) == '\t') lex_advance(lx);
             const char *rest = lx->src + lx->pos;
-            if (strncasecmp(rest, "IMPORT", 6) == 0 || strncasecmp(rest, "EXPORT", 6) == 0) {
+            if (strncmp(rest, "IMPORT", 6) == 0 || strncmp(rest, "EXPORT", 6) == 0) {
                 while (lex_cur(lx) && lex_cur(lx) != '\n') lex_advance(lx);
                 continue;
             }

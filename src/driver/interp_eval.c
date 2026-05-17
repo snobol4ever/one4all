@@ -3099,7 +3099,7 @@ DESCR_t interp_eval(tree_t *e)
                 nm = ichild->c[0]->v.sval;
             else { DESCR_t nd = interp_eval(ichild); nm = VARVAL_fn(nd); }
             if (nm && *nm) {
-                char *fn = GC_strdup(nm); sno_fold_name(fn);
+                char *fn = GC_strdup(nm);
                 NV_SET_fn(fn, val);
             }
         }
@@ -3186,7 +3186,7 @@ DESCR_t interp_eval(tree_t *e)
             if (IS_NAMEVAL(_xv)) return NV_GET_fn(_xv.s);
             const char *_xnm0 = VARVAL_fn(_xv);
             if (!_xnm0 || !*_xnm0) return NULVCL;
-            char *_xnm = GC_strdup(_xnm0); sno_fold_name(_xnm);
+            char *_xnm = GC_strdup(_xnm0);
             DESCR_t _xnamed = NV_GET_fn(_xnm);
             if (IS_NAMEPTR(_xnamed)) return NAME_DEREF_PTR(_xnamed);
             if (IS_NAMEVAL(_xnamed)) return NV_GET_fn(_xnamed.s);
@@ -3231,7 +3231,7 @@ DESCR_t interp_eval(tree_t *e)
                 if (IS_NAMEVAL(xval)) return NV_GET_fn(xval.s);
                 const char *nm2_0 = VARVAL_fn(xval);
                 if (!nm2_0 || !*nm2_0) return NULVCL;
-                char *nm2 = GC_strdup(nm2_0); sno_fold_name(nm2);
+                char *nm2 = GC_strdup(nm2_0);
                 DESCR_t named = NV_GET_fn(nm2);
                 if (IS_NAMEPTR(named)) return NAME_DEREF_PTR(named);
                 if (IS_NAMEVAL(named)) return NV_GET_fn(named.s);
@@ -3240,7 +3240,7 @@ DESCR_t interp_eval(tree_t *e)
             DESCR_t nd = interp_eval(inner);
             const char *nm2_0 = VARVAL_fn(nd);
             if (!nm2_0 || !*nm2_0) return NULVCL;
-            char *nm2 = GC_strdup(nm2_0); sno_fold_name(nm2);
+            char *nm2 = GC_strdup(nm2_0);
             DESCR_t named2 = NV_GET_fn(nm2);
             if (IS_NAMEPTR(named2)) return NAME_DEREF_PTR(named2);
             if (IS_NAMEVAL(named2)) return NV_GET_fn(named2.s);
@@ -3251,7 +3251,7 @@ DESCR_t interp_eval(tree_t *e)
         if (IS_NAMEVAL(nd)) return NV_GET_fn(nd.s);
         const char *nm0 = VARVAL_fn(nd);
         if (!nm0 || !*nm0) return NULVCL;
-        char *nm = GC_strdup(nm0); sno_fold_name(nm);
+        char *nm = GC_strdup(nm0);
         DESCR_t named = NV_GET_fn(nm);
         if (IS_NAMEPTR(named)) return NAME_DEREF_PTR(named);
         if (IS_NAMEVAL(named)) return NV_GET_fn(named.s);
@@ -4223,7 +4223,7 @@ DESCR_t interp_eval(tree_t *e)
                         if (!ch || ch->t != TT_ASSIGN || ch->n < 1) continue;
                         tree_t *lhs = ch->c[0];
                         if (!lhs || lhs->t != TT_VAR || !lhs->v.sval) continue;
-                        if (strcasecmp(lhs->v.sval, ent->s[si].nm) == 0
+                        if (strcmp(lhs->v.sval, ent->s[si].nm) == 0
                             && lhs->v.ival >= 0 && lhs->v.ival < FRAME.env_n) {
                             FRAME.env[lhs->v.ival] = ent->s[si].val;
                             restored = 1;

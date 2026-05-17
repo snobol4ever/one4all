@@ -26,7 +26,7 @@ static tree_e pat_prim_kind(const char *s) {
         {"ARB",TT_ARB},{"ARBNO",TT_ARBNO},{"REM",TT_REM},{"FAIL",TT_FAIL},{"SUCCEED",TT_SUCCEED},
         {"FENCE",TT_FENCE},{"ABORT",TT_ABORT},{"BAL",TT_BAL},{NULL,TT_VAR}
     };
-    for (int i = 0; m[i].n; i++) if (strcasecmp(s, m[i].n) == 0) return m[i].k;
+    for (int i = 0; m[i].n; i++) if (strcmp(s, m[i].n) == 0) return m[i].k;
     return TT_VAR;
 }
 }

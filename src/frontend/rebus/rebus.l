@@ -74,7 +74,7 @@ static int next_is_continuation(void) {
     static const char *kws[] = { "else", "do", "then", NULL };
     for (int i = 0; kws[i]; i++) {
         size_t klen = strlen(kws[i]);
-        if (p + klen <= rlen && strncasecmp(rbuf + p, kws[i], klen) == 0) {
+        if (p + klen <= rlen && strncmp(rbuf + p, kws[i], klen) == 0) {
             char after = (p + klen < rlen) ? rbuf[p + klen] : '\0';
             if (!isalnum((unsigned char)after) && after != '_') return 1;
         }

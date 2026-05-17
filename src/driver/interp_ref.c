@@ -48,7 +48,7 @@ DESCR_t *interp_eval_ref(tree_t *e)
             ? VARVAL_fn(NAME_DEREF_PTR(name_d))
             : VARVAL_fn(name_d);
         if (!nm0 || !*nm0) return NULL;
-        char *nm = GC_strdup(nm0); sno_fold_name(nm);
+        char *nm = GC_strdup(nm0);
         return NV_PTR_fn(nm);
     }
     default: return NULL;

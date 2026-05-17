@@ -8,7 +8,6 @@
 void icon_compile(const char *source, const char *filename, tree_t **out_ast) {
     if (!filename) filename = "<stdin>";
     if (out_ast) *out_ast = NULL;
-    sno_set_case_sensitive(1);
     IcnLexer lx;
     icn_lex_init(&lx, source);
     IcnParser parser;

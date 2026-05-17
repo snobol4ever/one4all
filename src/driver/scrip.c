@@ -77,15 +77,12 @@ int main(int argc, char **argv)
     int opt_bb_format       = 0;
     int bb_driver          = 0;
     int bb_live            = 0;
-    int dump_parse         = 0;
-    int dump_parse_flat    = 0;
     int dump_ir            = 0;
     int dump_ir_bison      = 0;
     int dump_sm            = 0;
     int dump_bb            = 0;
     int opt_trace          = 0;
     int opt_bench          = 0;
-    int opt_case_sensitive = 1;
     const char * target_name = NULL;
     int argi = 1;
     while (argi < argc && argv[argi][0] == '-' && argv[argi][1] == '-') {
@@ -102,8 +99,6 @@ int main(int argc, char **argv)
         else if (strcmp(argv[argi], "--bb-format")       == 0) { opt_bb_format       = 1; argi++; }
         else if (strcmp(argv[argi], "--bb-driver")     == 0) { bb_driver          = 1; argi++; }
         else if (strcmp(argv[argi], "--bb-live")       == 0) { bb_live            = 1; argi++; }
-        else if (strcmp(argv[argi], "--dump-parse")      == 0) { dump_parse      = 1; argi++; }
-        else if (strcmp(argv[argi], "--dump-parse-flat") == 0) { dump_parse_flat = 1; argi++; }
         else if (strcmp(argv[argi], "--dump-ast")        == 0) { dump_ir         = 1; argi++; }
         else if (strcmp(argv[argi], "--dump-ir")         == 0) { dump_ir         = 1; argi++; }
         else if (strcmp(argv[argi], "--dump-ast-bison")  == 0) { dump_ir_bison   = 1; argi++; }
@@ -112,11 +107,13 @@ int main(int argc, char **argv)
         else if (strcmp(argv[argi], "--dump-bb")         == 0) { dump_bb         = 1; argi++; }
         else if (strcmp(argv[argi], "--trace")           == 0) { opt_trace       = 1; argi++; }
         else if (strcmp(argv[argi], "--bench")           == 0) { opt_bench       = 1; argi++; }
-        else if (strcmp(argv[argi], "--case-sensitive")  == 0) { opt_case_sensitive = 1; argi++; }
-        else if (strcmp(argv[argi], "--fold-case")       == 0) { opt_case_sensitive = 0; argi++; }
+        else if (strcmp(argv[argi], "--case-sensitive")  == 0) { argi++; }
+        else if (strcmp(argv[argi], "--fold-case")       == 0) {
+            fprintf(stderr, "scrip: --fold-case is no longer supported; SCRIP is case-sensitive only\n");
+            return 1;
+        }
         else break;
     }
-    sno_set_case_sensitive(opt_case_sensitive);
     if (!target_name && opt_emit_x64) target_name = "x86";
     int mode_jit_emit_x64 = (opt_jit_emit && target_name && strcmp(target_name, "x86") == 0);
     if (opt_jit_emit && !target_name) {
@@ -163,17 +160,12 @@ int main(int argc, char **argv)
             "  --dump-bb        print BB-GRAPH for each statement\n"
             "  --trace          MONITOR trace output (diff vs CSNOBOL4)\n"
             "  --bench          print wall-clock time after execution\n"
-            "  --dump-parse     dump CMPILE parse tree\n"
-            "  --dump-parse-flat  dump CMPILE parse tree (one line)\n"
             "  --dump-ast-bison dump AST via old Bison/Flex parser\n"
             "\n"
             "Deprecated aliases (still accepted):\n"
             "  --ir-run         alias for --ast-run\n"
             "  --dump-ir        alias for --dump-ast\n"
             "  --dump-ir-bison  alias for --dump-ast-bison\n"
-            "\n"
-            "SNOBOL4 dialect options:\n"
-            "  --case-sensitive preserve identifier spelling (default; SN-31)\n"
             "\n"
             "Frontend inferred from file extension:\n"
             "  .sno=SNOBOL4  .icn=Icon  .pl=Prolog  .sc=Snocone  .reb=Rebus\n"
@@ -286,13 +278,6 @@ int main(int argc, char **argv)
             fclose(f);
             ir_dump_program(sub_ast, stdout);
             return 0;
-        } else if (dump_parse || dump_parse_flat) {
-            FILE *f = fopen(input_path, "r");
-            if (!f) { fprintf(stderr, "scrip: cannot open '%s'\n", input_path); return 1; }
-            if (opt_bench) clock_gettime(CLOCK_MONOTONIC, &_t1);
-            tree_t *sub_ast = sno_parse_ast(f, input_path, NULL);
-            fclose(f);
-            MERGE_AST(sub_ast);
         } else {
             FILE *f = fopen(input_path, "r");
             if (!f) { fprintf(stderr, "scrip: cannot open '%s'\n", input_path); return 1; }

@@ -90,7 +90,7 @@ static int emit_goto(sm_opcode_t op, const char *target)
         { "NRETURN", SM_NRETURN, SM_NRETURN_S, SM_NRETURN_F },
     };
     for (unsigned i = 0; i < sizeof ret_kinds / sizeof ret_kinds[0]; i++) {
-        if (strcasecmp(target, ret_kinds[i].name) == 0) {
+        if (strcmp(target, ret_kinds[i].name) == 0) {
             sm_opcode_t emit_op = (op == SM_JUMP_S) ? ret_kinds[i].succ
                                 : (op == SM_JUMP_F) ? ret_kinds[i].fail
                                 :                     ret_kinds[i].plain;
@@ -482,7 +482,7 @@ static void emit_lhs_store(const tree_t *lhs)
             char call_fn[256];
             snprintf(call_fn, sizeof(call_fn), "NRETURN_ASGN_%s", lhs->v.sval ? lhs->v.sval : "");
             sm_emit_si(g_p, SM_CALL_FN, call_fn, 1);
-        } else if (strcasecmp(lhs->v.sval, "ITEM") == 0) {
+        } else if (strcmp(lhs->v.sval, "ITEM") == 0) {
             for (int i = 0; i < lhs->n; i++) lower_expr(lhs->c[i]);
             sm_emit_si(g_p, SM_CALL_FN, "ITEM_SET", (int64_t)(lhs->n + 1));
         } else {
@@ -1348,9 +1348,9 @@ void lower_stmt(const tree_t *s)
             emit_lhs_store(subject);
         } else {
             if (subject->t == TT_VAR && subject->v.sval) {
-                if (strcasecmp(subject->v.sval, "RETURN")  == 0) { sm_emit(g_p, SM_RETURN);  goto emit_gotos; }
-                if (strcasecmp(subject->v.sval, "FRETURN") == 0) { sm_emit(g_p, SM_FRETURN); goto emit_gotos; }
-                if (strcasecmp(subject->v.sval, "NRETURN") == 0) { sm_emit(g_p, SM_NRETURN); goto emit_gotos; }
+                if (strcmp(subject->v.sval, "RETURN")  == 0) { sm_emit(g_p, SM_RETURN);  goto emit_gotos; }
+                if (strcmp(subject->v.sval, "FRETURN") == 0) { sm_emit(g_p, SM_FRETURN); goto emit_gotos; }
+                if (strcmp(subject->v.sval, "NRETURN") == 0) { sm_emit(g_p, SM_NRETURN); goto emit_gotos; }
             }
             lower_expr(subject); sm_emit(g_p, SM_VOID_POP);
         }

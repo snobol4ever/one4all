@@ -684,27 +684,6 @@ static char  strbuf[65536];
 static int   strpos;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int snobol4_get_stmt_lineno(void) { return g_stmt_lineno; }
-static int sno_fold_on = 0;  /* SN-31: case-sensitive is the one4all default.
-                              * Classic SNOBOL4 folds to upper; our .sno/.inc
-                              * corpus uses mixed-case identifiers (bSlash,
-                              * semicolon, snoLine, Push_list).  Ingress-at-lex
-                              * preserves source spelling.  Flip to 1 for
-                              * classic behavior via `scrip` (no flag is wired
-                              * back the other way today). */
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sno_set_case_sensitive(int on) { sno_fold_on = on ? 0 : 1; }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int  sno_get_case_sensitive(void)   { return sno_fold_on ? 0 : 1; }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sno_fold_name(char *name) {
-    if (!sno_fold_on || !name) return;
-    for (char *p = name; *p; p++) *p = (char)toupper((unsigned char)*p);
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void fold_strbuf(void) {
-    if (!sno_fold_on) return;
-    for (char *p = strbuf; *p; p++) *p = (char)toupper((unsigned char)*p);
-}
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static Token mktok(int k, const char *sv, long iv, double dv) {
     Token t; t.kind=k; t.sval=sv; t.ival=iv; t.dval=dv; t.lineno=lineno;
@@ -1366,11 +1345,11 @@ case 53:
 yyg->yy_c_buf_p = yy_cp -= 1;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
-{ strbuf[0]='\0'; strncat(strbuf,yytext,sizeof(strbuf)-1); fold_strbuf(); return T_FUNCTION; }
+{ strbuf[0]='\0'; strncat(strbuf,yytext,sizeof(strbuf)-1); return T_FUNCTION; }
 	YY_BREAK
 case 54:
 YY_RULE_SETUP
-{ strbuf[0]='\0'; strncat(strbuf,yytext,sizeof(strbuf)-1); fold_strbuf(); return strcmp(strbuf,"END")==0?T_END:T_IDENT; }
+{ strbuf[0]='\0'; strncat(strbuf,yytext,sizeof(strbuf)-1); return strcmp(strbuf,"END")==0?T_END:T_IDENT; }
 	YY_BREAK
 case 55:
 case 56:
@@ -2873,14 +2852,12 @@ Token flex_lex_next(Lex *lx) {
         case T_EOF:
             t.kind = T_EOF; return t;
         case T_LABEL:
-            fold_strbuf();
             t.sval = intern(strbuf);
             t.ival = strcmp(strbuf,"END")==0 ? 1 : 0;
             return t;
         case T_IDENT: case T_END: case T_KEYWORD:
         case T_FUNCTION:
         case T_GOTO_S: case T_GOTO_F:
-            fold_strbuf();
             t.sval = intern(strbuf);
             return t;
         case T_STR:

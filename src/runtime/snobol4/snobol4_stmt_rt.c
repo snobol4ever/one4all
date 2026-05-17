@@ -263,7 +263,7 @@ int stmt_goto_dispatch(DESCR_t label_val, const char **names, int n) {
     }
     buf[j] = '\0';
     for (int i = 0; i < n; i++) {
-        if (strcasecmp(buf, names[i]) == 0) return i;
+        if (strcmp(buf, names[i]) == 0) return i;
     }
     return -1;
 }
