@@ -92,16 +92,21 @@ int main(int argc, char **argv)
         if      (strcmp(argv[argi], "--ast-run")         == 0) { mode_ir_run        = 1; argi++; }
         else if (strcmp(argv[argi], "--ir-run")          == 0) { mode_ir_run        = 1; argi++; }
         else if (strcmp(argv[argi], "--sm-run")        == 0) { mode_sm_run        = 1; argi++; }
+        else if (strcmp(argv[argi], "--interp")        == 0) { mode_sm_run        = 1; argi++; }
         else if (strcmp(argv[argi], "--jit-run")       == 0) { mode_jit_run       = 1; argi++; }
+        else if (strcmp(argv[argi], "--run")           == 0) { mode_jit_run       = 1; argi++; }
         else if (strcmp(argv[argi], "--monitor")       == 0) { mode_monitor       = 1; argi++; }
         else if (strcmp(argv[argi], "--jit-emit")      == 0) { opt_jit_emit       = 1; argi++; }
         else if (strcmp(argv[argi], "--sm-emit")       == 0) { opt_jit_emit       = 1; argi++; }
+        else if (strcmp(argv[argi], "--compile")       == 0) { opt_jit_emit       = 1; if (!target_name) target_name = "x86"; opt_emit_x64 = 1; argi++; }
         else if (strcmp(argv[argi], "--x64")           == 0) { opt_emit_x64 = 1; target_name = "x86"; argi++; }
         else if (strncmp(argv[argi], "--target=", 9)   == 0) { target_name = argv[argi] + 9; opt_jit_emit = 1; argi++; }
         else if (strcmp(argv[argi], "--jit-emit-inline") == 0) { opt_jit_emit_inline = 1; opt_jit_emit = 1; argi++; }
         else if (strcmp(argv[argi], "--bb-format")       == 0) { opt_bb_format       = 1; argi++; }
         else if (strcmp(argv[argi], "--bb-driver")     == 0) { bb_driver          = 1; argi++; }
         else if (strcmp(argv[argi], "--bb-live")       == 0) { bb_live            = 1; argi++; }
+        else if (strcmp(argv[argi], "--bb=brokered")   == 0) { bb_driver          = 1; argi++; }
+        else if (strcmp(argv[argi], "--bb=wired")      == 0) { bb_live            = 1; argi++; }
         else if (strcmp(argv[argi], "--dump-ast")        == 0) { dump_ir         = 1; argi++; }
         else if (strcmp(argv[argi], "--dump-ir")         == 0) { dump_ir         = 1; argi++; }
         else if (strcmp(argv[argi], "--dump-ast-bison")  == 0) { dump_ir_bison   = 1; argi++; }
@@ -150,16 +155,15 @@ int main(int argc, char **argv)
         fprintf(stderr,
             "usage: scrip [mode] [bb] [options] <file> [-- program-args...]\n"
             "\n"
-            "Execution modes (default: --sm-run):\n"
-            "  --ast-run        interpret via AST tree-walk (correctness reference)\n"
-            "  --sm-run         interpret SM_Program via dispatch loop  [DEFAULT]\n"
-            "  --jit-run        SM_Program -> x86 bytes -> mmap slab -> jump in\n"
-            "  --jit-emit --x64 emit standalone x86-64 asm to stdout (links libscrip_rt.so)\n"
+            "Execution modes (default: --run):\n"
+            "  --interp         interpret SM_Program via dispatch loop\n"
+            "  --run            SM_Program -> x86 bytes -> mmap slab -> jump in  [DEFAULT]\n"
+            "  --compile        emit standalone x86-64 asm to stdout (links libscrip_rt.so)\n"
             "  --monitor        in-process sync comparator (AST vs SM vs JIT)\n"
             "\n"
-            "Byrd Box pattern mode (default: --bb-driver):\n"
-            "  --bb-driver      pattern matching via driver/broker\n"
-            "  --bb-live        live-wired BB blobs in exec memory (requires M-DYN-B* blobs)\n"
+            "Byrd Box mode (under --interp; --run and --compile force wired):\n"
+            "  --bb=brokered    pattern matching via driver/broker  [DEFAULT under --interp]\n"
+            "  --bb=wired       live-wired BB blobs in exec memory (requires M-DYN-B* blobs)\n"
             "\n"
             "Diagnostic options:\n"
             "  --dump-ast       print AST after frontend\n"
@@ -170,10 +174,15 @@ int main(int argc, char **argv)
             "  --bench          print wall-clock time after execution\n"
             "  --dump-ast-bison dump AST via old Bison/Flex parser\n"
             "\n"
-            "Deprecated aliases (still accepted):\n"
-            "  --ir-run         alias for --ast-run\n"
-            "  --dump-ir        alias for --dump-ast\n"
-            "  --dump-ir-bison  alias for --dump-ast-bison\n"
+            "Deprecated aliases (still accepted; will be removed):\n"
+            "  --ast-run, --ir-run    AST-interp mode (slated for deletion)\n"
+            "  --sm-run               alias for --interp\n"
+            "  --jit-run              alias for --run\n"
+            "  --jit-emit --x64       alias for --compile\n"
+            "  --bb-driver            alias for --bb=brokered\n"
+            "  --bb-live              alias for --bb=wired\n"
+            "  --dump-ir              alias for --dump-ast\n"
+            "  --dump-ir-bison        alias for --dump-ast-bison\n"
             "\n"
             "Frontend inferred from file extension:\n"
             "  .sno=SNOBOL4  .icn=Icon  .pl=Prolog  .sc=Snocone  .reb=Rebus\n"
