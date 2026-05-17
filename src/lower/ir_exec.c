@@ -118,6 +118,39 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->value = FAILDESCR;
         return nd->ω;
     }
+    case IR_SWAP: {
+        /* Icon x :=: y. c[0]=lhs IR_VAR, c[1]=rhs IR_VAR. Evaluate both; if either fails, FAIL.        */
+        /* Then store rhs-value into lhs-slot, lhs-value into rhs-slot.  Succeeds with new lhs value.   */
+        /* Resolution mirrors IR_ASSIGN: try frame-slot first, fall back to NV_SET_fn for globals.     */
+        if (nd->n < 2 || !nd->c[0] || !nd->c[1]) { nd->value = FAILDESCR; return nd->ω; }
+        IR_t *l_var = nd->c[0];
+        IR_t *r_var = nd->c[1];
+        if (l_var->t != IR_VAR || r_var->t != IR_VAR || !l_var->sval || !r_var->sval) {
+            nd->value = FAILDESCR; return nd->ω;
+        }
+        IR_exec_node(l_var);
+        DESCR_t lv = l_var->value;
+        if (IS_FAIL_fn(lv)) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(r_var);
+        DESCR_t rv = r_var->value;
+        if (IS_FAIL_fn(rv)) { nd->value = FAILDESCR; return nd->ω; }
+        /* Store rv into lhs-slot. */
+        int wrote_l = 0;
+        if (frame_depth > 0) {
+            int slot = scope_get(&FRAME.sc, l_var->sval);
+            if (slot >= 0 && slot < FRAME.env_n) { FRAME.env[slot] = rv; wrote_l = 1; }
+        }
+        if (!wrote_l) NV_SET_fn(l_var->sval, rv);
+        /* Store lv into rhs-slot. */
+        int wrote_r = 0;
+        if (frame_depth > 0) {
+            int slot = scope_get(&FRAME.sc, r_var->sval);
+            if (slot >= 0 && slot < FRAME.env_n) { FRAME.env[slot] = lv; wrote_r = 1; }
+        }
+        if (!wrote_r) NV_SET_fn(r_var->sval, lv);
+        nd->value = rv;
+        return nd->γ;
+    }
     case IR_CALL: {
         /* Builtin call by name. nd->sval = function name; nd->c[0..n-1] = arg subexprs.            */
         if (!nd->sval) { nd->value = FAILDESCR; return nd->ω; }

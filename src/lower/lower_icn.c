@@ -362,6 +362,27 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         nd->n    = 2;
         return nd;
     }
+    case TT_SWAP: {
+        /* Icon x :=: y swap. Two variable operands; lower both as IR_VAR (no recursion needed since   */
+        /* the executor reads slots directly).  Reject keyword vars (leading &) and non-TT_VAR forms   */
+        /* — those require lvalue forms that aren't supported yet (parallel to IR_ASSIGN restriction). */
+        if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
+        if (e->c[0]->t != TT_VAR || e->c[1]->t != TT_VAR) return NULL;
+        if (!e->c[0]->v.sval || !e->c[1]->v.sval) return NULL;
+        if (e->c[0]->v.sval[0] == '&' || e->c[1]->v.sval[0] == '&') return NULL;
+        IR_t *lhs = lower_icn_expr_node(cfg, e->c[0]);
+        if (!lhs) return NULL;
+        IR_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
+        if (!rhs) return NULL;
+        IR_t *nd = IR_node_alloc(cfg, IR_SWAP);
+        if (!nd) return NULL;
+        nd->c = calloc(2, sizeof(IR_t *));
+        if (!nd->c) return NULL;
+        nd->c[0] = lhs;
+        nd->c[1] = rhs;
+        nd->n    = 2;
+        return nd;
+    }
     case TT_FNC: {
         if (e->n < 1 || !e->c[0] || e->c[0]->t != TT_VAR || !e->c[0]->v.sval) return NULL;
         int nargs = e->n - 1;

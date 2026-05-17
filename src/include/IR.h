@@ -117,6 +117,9 @@ typedef enum {
     IR_ICN_FIELD_SET,   /* Icon obj.field := rhs — c[0]=object expr, c[1]=rhs expr, sval=field name; data_field_ptr  */
     IR_ICN_IDX_SET,     /* Icon base[idx] := rhs — c[0]=base, c[1]=index, c[2]=rhs; calls subscript_set              */
     IR_ICN_KEY_GEN,     /* Icon key(t) generator — c[0]=table expr; yields each key in bucket order                   */
+    IR_SWAP,            /* Icon x :=: y swap. c[0]=lhs var, c[1]=rhs var. Eval c[1], eval c[0], store rhs-value into  */
+                        /* lhs slot, lhs-value into rhs slot. Succeeds with the value that ended up in c[0]'s slot.   */
+                        /* Frame-slot path mirrors IR_ASSIGN (scope_get/FRAME.env[slot]); global-NV fallback for both. */
     IR_E_COUNT
 } IR_e;
 typedef struct IR_t IR_t;
