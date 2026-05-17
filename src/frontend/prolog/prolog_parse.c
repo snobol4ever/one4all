@@ -14,10 +14,9 @@ typedef struct {
 typedef struct {
     VarEntry entries[MAX_VARS];
     int      count;
-    int      next_slot;
 } VarScope;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void scope_reset(VarScope *sc) { sc->count = 0; sc->next_slot = 0; }
+static void scope_reset(VarScope *sc) { sc->count = 0; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static Term *scope_get(VarScope *sc, const char *name) {
     for (int i = 0; i < sc->count; i++)
@@ -27,7 +26,7 @@ static Term *scope_get(VarScope *sc, const char *name) {
         fprintf(stderr, "too many variables in one clause\n");
         return term_new_var(-1);
     }
-    Term *v = term_new_var(sc->next_slot++);
+    Term *v = term_new_var(-1);
     sc->entries[sc->count].name = strdup(name);
     sc->entries[sc->count].term = v;
     sc->count++;
@@ -1430,6 +1429,16 @@ static PlClause *parse_clause(Parser *p) {
     /* PST-PL-6c: verify (skipped when is_dcg, since cl->tr == NULL) */
     if (!pl_verify_clause_tree(cl, &p->sc, p->filename))
         p->tree_mismatches++;
+    /* PST-PL-6e: snapshot named-var name→Term* mapping for pre-lower slot pass in lower_clause */
+    if (p->sc.count > 0) {
+        cl->nvar      = p->sc.count;
+        cl->var_names = malloc((size_t)p->sc.count * sizeof(char *));
+        cl->var_terms = malloc((size_t)p->sc.count * sizeof(Term *));
+        for (int _vi = 0; _vi < p->sc.count; _vi++) {
+            cl->var_names[_vi] = p->sc.entries[_vi].name;
+            cl->var_terms[_vi] = p->sc.entries[_vi].term;
+        }
+    }
     return cl;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/

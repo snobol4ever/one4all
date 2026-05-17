@@ -13,6 +13,10 @@ struct PlClause {
     PlClause *next;
     /* PST-PL-6b: parallel tree_t path — pure syntax tree, no slot assignment */
     tree_t   *tr;
+    /* PST-PL-6e: snapshot of VarScope name→Term* mapping for pre-lower slot assignment */
+    char    **var_names;
+    Term    **var_terms;
+    int       nvar;
 };
 typedef struct {
     PlClause *head;

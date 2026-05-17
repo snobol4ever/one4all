@@ -35,20 +35,16 @@ static tree_t *lower_clause(PlClause *cl, PredKey key);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void assign_clause_anon_slots(PlClause *cl) {
     if (!cl) return;
+    int next_slot = 0;
+    for (int _vi = 0; _vi < cl->nvar; _vi++) {
+        Term *v = cl->var_terms[_vi];
+        if (v && v->tag == TERM_VAR && v->saved_slot < 0)
+            v->saved_slot = next_slot++;
+    }
     Term *stk[512]; int top = 0;
     #define PA_PUSH(t_) do { Term *_p = term_deref(t_); \
         if (_p && top < 512) stk[top++] = _p; } while(0)
-    int max_slot = -1;
-    #define PA_WALK_MAX(root_) do { top = 0; PA_PUSH(root_); \
-        while (top > 0) { Term *_c = stk[--top]; if (!_c) continue; \
-            if (_c->tag == TERM_VAR && _c->saved_slot > max_slot) \
-                max_slot = _c->saved_slot; \
-            if (_c->tag == TERM_COMPOUND) \
-                for (int _i = 0; _i < _c->compound.arity; _i++) \
-                    PA_PUSH(_c->compound.args[_i]); } } while(0)
-    if (cl->head) PA_WALK_MAX(cl->head);
-    for (int i = 0; i < cl->nbody; i++) if (cl->body[i]) PA_WALK_MAX(cl->body[i]);
-    int next_anon = max_slot + 1;
+    int next_anon = next_slot;
     #define PA_WALK_ASSIGN(root_) do { top = 0; PA_PUSH(root_); \
         while (top > 0) { Term *_c = stk[--top]; if (!_c) continue; \
             if (_c->tag == TERM_VAR && _c->saved_slot < 0) \
@@ -59,7 +55,6 @@ static void assign_clause_anon_slots(PlClause *cl) {
     if (cl->head) PA_WALK_ASSIGN(cl->head);
     for (int i = 0; i < cl->nbody; i++) if (cl->body[i]) PA_WALK_ASSIGN(cl->body[i]);
     #undef PA_PUSH
-    #undef PA_WALK_MAX
     #undef PA_WALK_ASSIGN
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -196,7 +191,12 @@ static tree_t *lower_term(Term *t) {
 static tree_t *lower_clause(PlClause *cl, PredKey key) {
     tree_t *ec = ast_node_new(TT_CLAUSE);
     ec->v.sval = pred_str(key.functor, key.arity);
-    int max_slot = -1;
+    int next_slot = 0;
+    for (int _vi = 0; _vi < cl->nvar; _vi++) {
+        Term *v = cl->var_terms[_vi];
+        if (v && v->tag == TERM_VAR && v->saved_slot < 0)
+            v->saved_slot = next_slot++;
+    }
     #define TERM_STACK_MAX 512
     Term *stk[TERM_STACK_MAX];
     int  stk_top = 0;
@@ -204,23 +204,7 @@ static tree_t *lower_clause(PlClause *cl, PredKey key) {
         Term *_pt = term_deref(t_); \
         if (_pt && stk_top < TERM_STACK_MAX) stk[stk_top++] = _pt; \
     } while(0)
-    #define WALK_ALL(root_) do { \
-        stk_top = 0; \
-        PUSH_TERM(root_); \
-        while (stk_top > 0) { \
-            Term *_cur = stk[--stk_top]; \
-            if (!_cur) continue; \
-            if (_cur->tag == TERM_VAR && _cur->saved_slot > max_slot) \
-                max_slot = _cur->saved_slot; \
-            if (_cur->tag == TERM_COMPOUND) \
-                for (int _wi = 0; _wi < _cur->compound.arity; _wi++) \
-                    PUSH_TERM(_cur->compound.args[_wi]); \
-        } \
-    } while(0)
-    if (cl->head) WALK_ALL(cl->head);
-    for (int i = 0; i < cl->nbody; i++)
-        if (cl->body[i]) WALK_ALL(cl->body[i]);
-    int next_anon = max_slot + 1;
+    int next_anon = next_slot;
     #define ASSIGN_ANON(root_) do { \
         stk_top = 0; \
         PUSH_TERM(root_); \
@@ -242,10 +226,9 @@ static tree_t *lower_clause(PlClause *cl, PredKey key) {
     ec->v.ival = n_vars;
     if (cl->head) {
         Term *h = term_deref(cl->head);
-        if (h && h->tag == TERM_COMPOUND) {
+        if (h && h->tag == TERM_COMPOUND)
             for (int i = 0; i < h->compound.arity; i++)
                 expr_add_child(ec, lower_term(h->compound.args[i]));
-        }
     }
     for (int i = 0; i < cl->nbody; i++)
         expr_add_child(ec, lower_term(cl->body[i]));
