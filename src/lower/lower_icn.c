@@ -845,7 +845,7 @@ IR_block_t *lower_icn_proc_body(tree_t *proc) {
     int body_start = 1 + nparams;
     int n_stmts    = proc->n - body_start;
     if (n_stmts <= 0) return NULL;
-    IR_block_t *cfg = IR_alloc(128, IR_LANG_ICN);
+    IR_block_t *cfg = IR_alloc(4096, IR_LANG_ICN);
     if (!cfg) return NULL;
     IR_t **stmt_nodes = calloc((size_t)n_stmts, sizeof(IR_t *));
     if (!stmt_nodes) { IR_free(cfg); return NULL; }

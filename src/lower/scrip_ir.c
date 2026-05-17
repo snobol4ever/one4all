@@ -27,6 +27,7 @@ IR_block_t * IR_alloc(int max_nodes, int lang) {
     cfg->all  = calloc((size_t)max_nodes, sizeof(IR_t *));
     if (!cfg->all) { free(cfg); return NULL; }
     cfg->n    = 0;
+    cfg->max  = max_nodes;
     cfg->lang = lang;
     cfg->entry = NULL;
     return cfg;
@@ -45,6 +46,7 @@ IR_t * IR_node_alloc(IR_block_t * cfg, IR_e t) {
     nd->value   = FAILDESCR;
     nd->counter = 0;
     nd->state   = 0;
+    if (cfg->n >= cfg->max) { free(nd); return NULL; }
     cfg->all[cfg->n++] = nd;
     return nd;
 }

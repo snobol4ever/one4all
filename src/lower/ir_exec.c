@@ -1152,6 +1152,7 @@ IR_t * IR_exec_node(IR_t * nd) {
                 z->left_val = lv;
                 z->right_val = z->right.fn(z->right.ζ, α);
                 if (!IS_FAIL_fn(z->right_val)) break;
+                nd->state = 0; nd->value = FAILDESCR; return nd->ω;
             }
         }
         for (;;) {
