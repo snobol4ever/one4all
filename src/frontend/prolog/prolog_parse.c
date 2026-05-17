@@ -46,6 +46,7 @@ typedef struct {
     const char *filename;
     int         nerrors;
     int         in_args;
+    int         tree_mismatches;   /* PST-PL-6c */
     IfFrame     ifst[IF_STACK_MAX];
     int         ifst_top;
 } Parser;
@@ -432,14 +433,17 @@ static tree_t *pt_primary(Parser *p, TreeScope *ts);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static tree_t *pt_list(Parser *p, TreeScope *ts) {
     /* Build TT_MAKELIST with flat children [e1..en, optional_tail].
+     * v.ival=1 means explicit | tail present (last child is the tail).
+     * v.ival=0 means proper list (no tail child).
      * Lowerer will reconstruct the '.'(H,T) cons chain. */
     Token tk = lexer_peek(&p->lx);
     if (tk.kind == TK_RBRACKET) {
         lexer_next(&p->lx);
-        tree_t *n = ast_node_new(TT_MAKELIST);   /* empty list */
+        tree_t *n = ast_node_new(TT_MAKELIST);   /* empty list, v.ival=0 */
         return n;
     }
     tree_t *lst = ast_node_new(TT_MAKELIST);
+    lst->v.ival = 0;   /* proper list by default */
     p->in_args++;
     for (;;) {
         tree_t *elem = pt_term(p, ts, 1200);
@@ -450,6 +454,7 @@ static tree_t *pt_list(Parser *p, TreeScope *ts) {
             lexer_next(&p->lx);
             tree_t *tail = pt_term(p, ts, 1200);
             if (tail) ast_push(lst, tail);
+            lst->v.ival = 1;   /* explicit tail */
             pk = lexer_peek(&p->lx);
             if (pk.kind == TK_RBRACKET) lexer_next(&p->lx);
         } else if (pk.kind == TK_RBRACKET) {
@@ -517,10 +522,16 @@ static tree_t *pt_maybe_ifthenelse(tree_t *semi_node) {
     tree_t *right = semi_node->c[1];
     if (!left || left->t != TT_FNC || !left->v.sval) return semi_node;
     if (strcmp(left->v.sval, "->") != 0 || left->n < 2) return semi_node;
+    /* Wrap then/else in TT_PROGRAM if they're conjunctions, mirroring
+     * flatten_conj on the Term* side. Cond is always a single goal. */
+    tree_t *then_prog = ast_node_new(TT_PROGRAM);
+    pt_flatten_conj(left->c[1], then_prog);
+    tree_t *else_prog = ast_node_new(TT_PROGRAM);
+    pt_flatten_conj(right, else_prog);
     tree_t *iff = ast_node_new(TT_IF);
-    ast_push(iff, left->c[0]);   /* cond */
-    ast_push(iff, left->c[1]);   /* then */
-    ast_push(iff, right);        /* else */
+    ast_push(iff, left->c[0]);   /* cond — single goal */
+    ast_push(iff, then_prog->n == 1 ? then_prog->c[0] : then_prog);  /* then */
+    ast_push(iff, else_prog->n == 1 ? else_prog->c[0] : else_prog);  /* else */
     return iff;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -593,6 +604,9 @@ static tree_t *pt_primary(Parser *p, TreeScope *ts) {
                     return fnc;
                 }
             }
+            /* [] is the empty list atom — mirror Term* ATOM_NIL → (list) */
+            if (strcmp(tk.text, "[]") == 0)
+                return ast_node_new(TT_MAKELIST);
             tree_t *n = ast_node_new(TT_QLIT);
             n->v.sval = strdup(tk.text);
             return n;
@@ -1016,6 +1030,313 @@ static int try_handle_if_directive(Parser *p, Term *goal, int lineno) {
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PST-PL-6c — Structural equivalence verifier: Term* ↔ tree_t
+ * Both trees are serialized to a canonical S-expression string and compared.
+ * Called from parse_clause for every non-directive clause.
+ *
+ * Normalization rules (same for both sides):
+ *   atom          → (atom "name")
+ *   integer       → (int N)
+ *   float         → (flt F)
+ *   variable      → (var "name")  — name comes from VarScope for Term*
+ *   cut           → (cut)
+ *   list [H|T]    → (list H ... T?)  — flattened, tail only if non-nil
+ *   compound f/n  → (fnc "f" c1 c2 ... cn)
+ *   if-then-else  → (if C T E)       — from both ';'/'->' and TT_IF
+ *   conjunction   → (seq g1 g2 ... gn)  — flattened from ',' chains / TT_PROGRAM
+ */
+
+#define PL_SER_MAX (1<<17)   /* 128 KB should be more than enough per clause */
+
+typedef struct { char *buf; int len; int cap; int err; } PLS;
+
+static void pls_init(PLS *s) {
+    s->cap = 256; s->buf = malloc(s->cap); s->len = 0; s->err = 0; s->buf[0] = 0;
+}
+static void pls_free(PLS *s) { free(s->buf); }
+static void pls_char(PLS *s, char c) {
+    if (s->err) return;
+    if (s->len + 2 >= PL_SER_MAX) { s->err = 1; return; }
+    if (s->len + 2 > s->cap) {
+        s->cap *= 2; s->buf = realloc(s->buf, s->cap);
+    }
+    s->buf[s->len++] = c; s->buf[s->len] = 0;
+}
+static void pls_str(PLS *s, const char *t) { for (; t && *t; t++) pls_char(s, *t); }
+static void pls_int(PLS *s, long v) { char tmp[32]; snprintf(tmp,32,"%ld",v); pls_str(s,tmp); }
+static void pls_flt(PLS *s, double v) { char tmp[32]; snprintf(tmp,32,"%.17g",v); pls_str(s,tmp); }
+
+/* Forward declarations */
+static void ser_term(PLS *s, Term *t, VarScope *sc);
+static void ser_tree(PLS *s, tree_t *t);
+
+/* Serialize Term* conjunction as flat (seq g1 g2 ...) */
+static void ser_term_conj_flat(PLS *s, Term *t, VarScope *sc) {
+    t = term_deref(t);
+    if (!t) return;
+    int comma_id = prolog_atom_intern(",");
+    if (t->tag == TERM_COMPOUND && t->compound.functor == comma_id && t->compound.arity == 2) {
+        ser_term_conj_flat(s, t->compound.args[0], sc);
+        pls_char(s, ' ');
+        ser_term_conj_flat(s, t->compound.args[1], sc);
+    } else {
+        ser_term(s, t, sc);
+    }
+}
+
+/* Serialize Term* list as flat (list e1 e2 ... [tail]) */
+static void ser_term_list(PLS *s, Term *t, VarScope *sc) {
+    /* t is the cons chain after '[' — i.e. '.'(H,T) or nil */
+    pls_str(s, "(list");
+    for (;;) {
+        t = term_deref(t);
+        if (!t) break;
+        if (t->tag == TERM_ATOM && t->atom_id == ATOM_NIL) break;
+        if (t->tag == TERM_COMPOUND && t->compound.functor == ATOM_DOT && t->compound.arity == 2) {
+            pls_char(s, ' ');
+            ser_term(s, t->compound.args[0], sc);
+            t = t->compound.args[1];
+        } else {
+            /* tail variable or non-nil atom */
+            pls_str(s, " |");
+            ser_term(s, t, sc);
+            break;
+        }
+    }
+    pls_char(s, ')');
+}
+
+/* Reverse-lookup variable name from VarScope by Term* pointer */
+static const char *sc_name_for(VarScope *sc, Term *t) {
+    t = term_deref(t);
+    for (int i = 0; i < sc->count; i++)
+        if (sc->entries[i].term == t) return sc->entries[i].name;
+    return "_";
+}
+
+static void ser_term(PLS *s, Term *t, VarScope *sc) {
+    t = term_deref(t);
+    if (!t) { pls_str(s, "(null)"); return; }
+    switch (t->tag) {
+        case TERM_VAR: {
+            const char *nm = sc_name_for(sc, t);
+            pls_str(s, "(var \""); pls_str(s, nm); pls_str(s, "\")");
+            return;
+        }
+        case TERM_INT:
+            pls_str(s, "(int "); pls_int(s, t->ival); pls_char(s, ')');
+            return;
+        case TERM_FLOAT:
+            pls_str(s, "(flt "); pls_flt(s, t->fval); pls_char(s, ')');
+            return;
+        case TERM_ATOM: {
+            const char *n = prolog_atom_name(t->atom_id);
+            if (!n) n = "?";
+            if (t->atom_id == ATOM_NIL)  { pls_str(s, "(list)"); return; }
+            if (t->atom_id == ATOM_CUT)  { pls_str(s, "(cut)");  return; }
+            pls_str(s, "(atom \""); pls_str(s, n); pls_str(s, "\")");
+            return;
+        }
+        case TERM_COMPOUND: {
+            const char *fn = prolog_atom_name(t->compound.functor);
+            if (!fn) fn = "?";
+            int arity = t->compound.arity;
+            /* list */
+            if (t->compound.functor == ATOM_DOT && arity == 2) {
+                ser_term_list(s, t, sc);
+                return;
+            }
+            /* cut atom (shouldn't reach here as compound, but guard) */
+            if (t->compound.functor == ATOM_CUT && arity == 0) {
+                pls_str(s, "(cut)"); return;
+            }
+            int comma_id  = prolog_atom_intern(",");
+            int semi_id   = prolog_atom_intern(";");
+            int arrow_id  = prolog_atom_intern("->");
+            /* if-then-else: ;(->(C,T),E) */
+            if (t->compound.functor == semi_id && arity == 2) {
+                Term *left = term_deref(t->compound.args[0]);
+                if (left && left->tag == TERM_COMPOUND &&
+                    left->compound.functor == arrow_id && left->compound.arity == 2) {
+                    pls_str(s, "(if ");
+                    ser_term(s, left->compound.args[0], sc);
+                    pls_char(s, ' ');
+                    ser_term(s, left->compound.args[1], sc);
+                    pls_char(s, ' ');
+                    ser_term(s, t->compound.args[1], sc);
+                    pls_char(s, ')');
+                    return;
+                }
+            }
+            /* conjunction as (seq ...) */
+            if (t->compound.functor == comma_id && arity == 2) {
+                pls_str(s, "(seq ");
+                ser_term_conj_flat(s, t, sc);
+                pls_char(s, ')');
+                return;
+            }
+            /* general compound */
+            pls_str(s, "(fnc \""); pls_str(s, fn); pls_str(s, "\"");
+            for (int i = 0; i < arity; i++) {
+                pls_char(s, ' ');
+                ser_term(s, t->compound.args[i], sc);
+            }
+            pls_char(s, ')');
+            return;
+        }
+        case TERM_REF:
+            ser_term(s, t->ref, sc);
+            return;
+    }
+}
+
+/* Serialize tree_t */
+static void ser_tree_list(PLS *s, tree_t *t);
+
+/* Flatten TT_FNC(",") chains into individual items for (seq ...) emission. */
+static void ser_tree_conj_flat(PLS *s, tree_t *t) {
+    if (!t) return;
+    if (t->t == TT_FNC && t->v.sval && strcmp(t->v.sval, ",") == 0) {
+        for (int i = 0; i < t->n; i++) ser_tree_conj_flat(s, t->c[i]);
+        return;
+    }
+    pls_char(s, ' '); ser_tree(s, t);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static void ser_tree(PLS *s, tree_t *t) {
+    if (!t) { pls_str(s, "(null)"); return; }
+    switch (t->t) {
+        case TT_VAR:
+            pls_str(s, "(var \"");
+            pls_str(s, t->v.sval ? t->v.sval : "_");
+            pls_str(s, "\")");
+            return;
+        case TT_ILIT:
+            pls_str(s, "(int "); pls_int(s, t->v.ival); pls_char(s, ')');
+            return;
+        case TT_FLIT:
+            pls_str(s, "(flt "); pls_flt(s, t->v.dval); pls_char(s, ')');
+            return;
+        case TT_QLIT:
+            pls_str(s, "(atom \"");
+            pls_str(s, t->v.sval ? t->v.sval : "");
+            pls_str(s, "\")");
+            return;
+        case TT_CUT:
+            pls_str(s, "(cut)");
+            return;
+        case TT_NUL:
+            pls_str(s, "(nul)");
+            return;
+        case TT_MAKELIST:
+            ser_tree_list(s, t);
+            return;
+        case TT_IF:
+            pls_str(s, "(if ");
+            for (int i = 0; i < t->n; i++) {
+                if (i) pls_char(s, ' ');
+                ser_tree(s, t->c[i]);
+            }
+            pls_char(s, ')');
+            return;
+        case TT_PROGRAM:
+            /* body conjunction — emit as (seq ...) */
+            pls_str(s, "(seq");
+            for (int i = 0; i < t->n; i++) {
+                pls_char(s, ' ');
+                ser_tree(s, t->c[i]);
+            }
+            pls_char(s, ')');
+            return;
+        case TT_FNC: {
+            const char *fn = t->v.sval ? t->v.sval : "?";
+            /* {} with no children is the empty-brace atom — match Term* (atom "{}") */
+            if (strcmp(fn, "{}") == 0 && t->n == 0) {
+                pls_str(s, "(atom \"{}\")");
+                return;
+            }
+            /* TT_FNC(",") is binary conjunction in body — serialize as (seq ...).
+             * But ','(X) used as a unary functor (e.g. call(','(A),B)) stays as (fnc ",").
+             * Only flatten when it has exactly 2 children (the standard binary form). */
+            if (strcmp(fn, ",") == 0 && t->n == 2) {
+                pls_str(s, "(seq");
+                ser_tree_conj_flat(s, t);
+                pls_char(s, ')');
+                return;
+            }
+            pls_str(s, "(fnc \""); pls_str(s, fn); pls_str(s, "\"");
+            for (int i = 0; i < t->n; i++) {
+                pls_char(s, ' ');
+                ser_tree(s, t->c[i]);
+            }
+            pls_char(s, ')');
+            return;
+        }
+        default:
+            pls_str(s, "(unk)");
+            return;
+    }
+}
+
+static void ser_tree_list(PLS *s, tree_t *t) {
+    /* TT_MAKELIST: v.ival=1 means last child is explicit tail (| Tail).
+     * v.ival=0 means proper list — all children are elements. */
+    int has_tail = (int)t->v.ival;
+    int nelems = has_tail ? t->n - 1 : t->n;
+    pls_str(s, "(list");
+    for (int i = 0; i < nelems; i++) {
+        pls_char(s, ' ');
+        ser_tree(s, t->c[i]);
+    }
+    if (has_tail && t->n > 0) {
+        pls_str(s, " |");
+        ser_tree(s, t->c[t->n - 1]);
+    }
+    pls_char(s, ')');
+}
+
+/* Serialize full clause: Term* side */
+static void ser_clause_term(PLS *s, PlClause *cl, VarScope *sc) {
+    pls_str(s, "(clause ");
+    if (cl->head) ser_term(s, cl->head, sc);
+    else          pls_str(s, "(nul)");
+    /* Use conj-flat for each body goal: directives store body[0] as a raw
+     * conjunction term (not pre-flattened), so flatten here to match tree_t. */
+    pls_str(s, " (seq");
+    for (int i = 0; i < cl->nbody; i++) {
+        pls_char(s, ' ');
+        ser_term_conj_flat(s, cl->body[i], sc);
+    }
+    pls_str(s, "))");
+}
+
+/* Serialize full clause: tree_t side (TT_CLAUSE node) */
+static void ser_clause_tree(PLS *s, tree_t *tr) {
+    if (!tr || tr->t != TT_CLAUSE) { pls_str(s, "(bad-clause)"); return; }
+    pls_str(s, "(clause ");
+    ser_tree(s, tr->n > 0 ? tr->c[0] : NULL);
+    pls_char(s, ' ');
+    ser_tree(s, tr->n > 1 ? tr->c[1] : NULL);
+    pls_char(s, ')');
+}
+
+/* The public verifier: compare Term* clause against its tree_t.
+ * Returns 1 if equivalent, 0 if mismatch (prints diff to stderr). */
+static int pl_verify_clause_tree(PlClause *cl, VarScope *sc, const char *filename) {
+    if (!cl->tr) return 1;   /* directives skipped */
+    PLS sa, sb;
+    pls_init(&sa); pls_init(&sb);
+    ser_clause_term(&sa, cl, sc);
+    ser_clause_tree(&sb, cl->tr);
+    int ok = (sa.err == 0 && sb.err == 0 && strcmp(sa.buf, sb.buf) == 0);
+    if (!ok) {
+        fprintf(stderr, "PST-PL-6c MISMATCH in %s line %d:\n  TERM: %s\n  TREE: %s\n",
+                filename ? filename : "?", cl->lineno, sa.buf, sb.buf);
+    }
+    pls_free(&sa); pls_free(&sb);
+    return ok;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static PlClause *parse_clause(Parser *p) {
     scope_reset(&p->sc);
     Token pk = lexer_peek(&p->lx);
@@ -1023,6 +1344,7 @@ static PlClause *parse_clause(Parser *p) {
     /* PST-PL-6b: save lexer + ifst_top before Term* parse so we can replay. */
     Lexer saved_lx  = p->lx;
     int   saved_ifst_top = p->ifst_top;
+    int   is_dcg = 0;   /* PST-PL-6c: DCG clauses skip verification */
     PlClause *cl = calloc(1, sizeof(PlClause));
     cl->lineno = pk.line;
     if (pk.kind == TK_NECK) {
@@ -1053,6 +1375,9 @@ static PlClause *parse_clause(Parser *p) {
             tree_t *body_tr = pt_term(&p2, &ts2, 1200);
             cl->tr = pt_make_clause(NULL, body_tr);
         }
+        /* PST-PL-6c: verify */
+        if (!pl_verify_clause_tree(cl, &p->sc, p->filename))
+            p->tree_mismatches++;
         return cl;
     }
     Term *head = parse_term(p, 1199);
@@ -1075,6 +1400,10 @@ static PlClause *parse_clause(Parser *p) {
             pushback = hd->compound.args[1];
         }
         dcg_expand_clause(cl, dcg_body, pushback, &p->sc);
+        /* DCG: Term* has been expanded; tree_t carries raw pre-expansion form.
+         * Shapes legitimately differ — skip 6c verification for DCG clauses. */
+        cl->tr = NULL;  /* NULL tr → verifier skips it */
+        is_dcg = 1;
     } else {
         cl->body  = NULL;
         cl->nbody = 0;
@@ -1082,8 +1411,8 @@ static PlClause *parse_clause(Parser *p) {
     Token dot = lexer_next(&p->lx);
     if (dot.kind != TK_DOT)
         perror_at(p, dot.line, "expected . at end of clause");
-    /* PST-PL-6b: replay entire clause through parallel path */
-    {
+    /* PST-PL-6b: replay clause through parallel path (skip DCG) */
+    if (!is_dcg) {
         Parser p2 = *p;
         p2.lx = saved_lx;
         p2.ifst_top = saved_ifst_top;
@@ -1095,14 +1424,12 @@ static PlClause *parse_clause(Parser *p) {
         if (pk2.kind == TK_NECK) {
             lexer_next(&p2.lx);
             body_tr = pt_term(&p2, &ts2, 1200);
-        } else if (pk2.kind == TK_OP && pk2.text && strcmp(pk2.text, "-->") == 0) {
-            /* DCG: skip for now — tree mirrors Term* result structurally;
-             * DCG expansion happens in lower, not parser, in the tree path. */
-            lexer_next(&p2.lx);
-            body_tr = pt_term(&p2, &ts2, 1200);
         }
         cl->tr = pt_make_clause(head_tr, body_tr);
     }
+    /* PST-PL-6c: verify (skipped when is_dcg, since cl->tr == NULL) */
+    if (!pl_verify_clause_tree(cl, &p->sc, p->filename))
+        p->tree_mismatches++;
     return cl;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -1114,6 +1441,7 @@ PlProgram *prolog_parse(const char *src, const char *filename) {
     p.nerrors  = 0;
     p.ifst_top = 0;
     p.in_args  = 0;
+    p.tree_mismatches = 0;
     scope_reset(&p.sc);
     PlProgram *prog = calloc(1, sizeof(PlProgram));
     for (;;) {
@@ -1148,6 +1476,7 @@ PlProgram *prolog_parse(const char *src, const char *filename) {
         p.nerrors++;
     }
     prog->nerrors = p.nerrors;
+    prog->tree_mismatches = p.tree_mismatches;
     return prog;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -1238,6 +1567,11 @@ void prolog_program_pretty(PlProgram *prog, FILE *out) {
         }
         fprintf(out, ".\n");
     }
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+int prolog_program_tree_mismatches(PlProgram *prog) {
+    return prog ? prog->tree_mismatches : 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void prolog_program_free(PlProgram *prog) {

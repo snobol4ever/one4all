@@ -19,6 +19,7 @@ typedef struct {
     PlClause *tail;
     int       nclauses;
     int       nerrors;
+    int       tree_mismatches;   /* PST-PL-6c: count of Term*↔tree_t shape mismatches */
 } PlProgram;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 PlProgram *prolog_parse(const char *src, const char *filename);
@@ -28,4 +29,6 @@ void prolog_program_pretty(PlProgram *prog, FILE *out);
 void prolog_program_free(PlProgram *prog);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void term_pretty(Term *t, FILE *out);
+/* PST-PL-6c: returns number of Term*↔tree_t mismatches found during parse. */
+int prolog_program_tree_mismatches(PlProgram *prog);
 #endif
