@@ -59,12 +59,11 @@ extern int sc_debug;
 struct LexCtx;
 struct IfHead;
 struct WhileHead;
+struct DoHead;
 struct FuncHead;
 typedef struct LoopFrame {
     char    *cont_label;
     char    *end_label;
-    char   **user_labels;
-    int      user_labels_count;
     int      is_loop;
     int      cont_used;
     struct LoopFrame *outer;
@@ -77,16 +76,12 @@ typedef struct ScParseState {
     int            label_seq;
     char          *cur_func_name;
     LoopFrame    *loop_top;
-    char        **pending_user_labels;
-    int           pending_user_labels_count;
-    int           pending_user_labels_cap;
-    char        **stash_for_pending_labels;
-    int           stash_for_pending_labels_count;
     struct SwitchHead *cur_switch;
-    STMT_t            *if_before_body;   /* PST-SC-4b: CODE_t tail snapshot taken at if_head */
+    STMT_t            *if_before_body;    /* PST-SC-4b */
+    STMT_t            *func_before_body;  /* PST-SC-4g */
 } ScParseState;
 
-#line 90 "snocone_parse.tab.h"
+#line 85 "snocone_parse.tab.h"
 
 /* Token kinds.  */
 #ifndef SC_TOKENTYPE
@@ -187,7 +182,7 @@ typedef struct ScParseState {
 #if ! defined SC_STYPE && ! defined SC_STYPE_IS_DECLARED
 union SC_STYPE
 {
-#line 231 "snocone_parse.y"
+#line 202 "snocone_parse.y"
 
     tree_t *expr;
     char   *str;
@@ -201,7 +196,7 @@ union SC_STYPE
     struct SwitchHead *switchhead;
     STMT_t           *stmt_ptr;
 
-#line 205 "snocone_parse.tab.h"
+#line 200 "snocone_parse.tab.h"
 
 };
 typedef union SC_STYPE SC_STYPE;

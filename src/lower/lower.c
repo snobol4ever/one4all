@@ -1291,6 +1291,7 @@ void lower_stmt(const tree_t *s)
         goto emit_gotos;
     }
     if (subject) {
+        if (subject->t == TT_DEFINE) { lower_stmt(subject); goto emit_gotos; }
         if (has_eq) {
             if (replacement) lower_expr(replacement); else sm_emit(g_p, SM_PUSH_NULL);
             emit_lhs_store(subject);
