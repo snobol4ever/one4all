@@ -1,0 +1,51 @@
+* Empirically probe SPITBOL operator associativity for SCT-9g.
+* Strategy: use non-commutative operations, or counters with side effects,
+* so that a (left-assoc) vs (right-assoc) parse produces different results.
+*
+*  ADD / SUB / MUL / DIV (pri 6/6/9/8): use integer subtraction's non-assoc.
+*    Left-assoc: a-b-c = (a-b)-c.  Right-assoc: a-b-c = a-(b-c).
+*    10-3-2: left=>5, right=>9.
+*  Same trick for DIV: 100/10/2: left=>5, right=>20.
+*  POW (pri 11): 2^3^2: left=>64, right=>512.
+*  Concat (space, pri 4): always associative (string concat),
+*    but we can compare 'a' 'b' 'c' against the same.
+*  Pattern alternation '|' (pri 3): semantically commutative for first match;
+*    but a | b | c tries a first then b then c — same with either parse.
+*    Test via FENCE side effects.
+*  '$' immediate-asgn (pri 12) and '.' cond-asgn (pri 12) are chained:
+*    LEN(1) $ A . B  — what does this even mean associated each way?
+*    Skip — semantics are too entangled for a clean probe.
+*  Assignment '=' (pri 0, right): A = B = 7. Right-assoc => A=7, B=7.
+
+  OUTPUT = '--- ADD/SUB (manual: pri 6, LEFT) ---'
+  T1 = 10 - 3 - 2
+  OUTPUT = '10 - 3 - 2 = ' T1 ' (left=5, right=9)'
+  T2 = 1 + 2 - 1
+  OUTPUT = '1 + 2 - 1 = ' T2 ' (left=2, right=0)'
+
+  OUTPUT = '--- MUL (manual: pri 9, LEFT) ---'
+* Use a*b in pattern-context vs arithmetic: arithmetic only here.
+  T3 = 2 * 3 * 4
+  OUTPUT = '2 * 3 * 4 = ' T3 ' (associative anyway: 24)'
+
+  OUTPUT = '--- DIV (manual: pri 8, LEFT) ---'
+  T4 = 100 / 10 / 2
+  OUTPUT = '100 / 10 / 2 = ' T4 ' (left=5, right=20)'
+  T5 = 64 / 4 / 2
+  OUTPUT = '64 / 4 / 2 = ' T5 ' (left=8, right=32)'
+
+  OUTPUT = '--- POW (manual: pri 11, RIGHT) ---'
+  T6 = 2 ^ 3 ^ 2
+  OUTPUT = '2 ^ 3 ^ 2 = ' T6 ' (left=64, right=512)'
+
+  OUTPUT = '--- ASSIGN (manual: pri 0, RIGHT) ---'
+  B = 99
+  A = B = 7
+  OUTPUT = 'A = ' A ' (right => A=7)'
+  OUTPUT = 'B = ' B ' (right => B=7)'
+
+  OUTPUT = '--- mixed pri 6/8: a + b / c ---'
+  T7 = 10 + 8 / 2
+  OUTPUT = '10 + 8 / 2 = ' T7 ' (DIV higher pri: 14; ADD higher: 9)'
+
+END

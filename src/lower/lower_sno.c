@@ -366,11 +366,38 @@ static void emit_expr(sno_ctx_t *c, const tree_t *e) {
         /* Unary `@` — cursor capture.  Used as `@var` in a pattern. */
         emit(c, "(@"); emit_expr(c, e->c[0]); emit(c, ")");
         break;
-    /*--- Binary arithmetic (Ch.15 priorities 6,8,9,11) -----------------------*/
-    case TT_ADD: emit(c, "("); emit_expr(c, e->c[0]); emit(c, " + "); emit_expr(c, e->c[1]); emit(c, ")"); break;
-    case TT_SUB: emit(c, "("); emit_expr(c, e->c[0]); emit(c, " - "); emit_expr(c, e->c[1]); emit(c, ")"); break;
-    case TT_MUL: emit(c, "("); emit_expr(c, e->c[0]); emit(c, " * "); emit_expr(c, e->c[1]); emit(c, ")"); break;
-    case TT_DIV: emit(c, "("); emit_expr(c, e->c[0]); emit(c, " / "); emit_expr(c, e->c[1]); emit(c, ")"); break;
+    /*--- Binary arithmetic (Ch.15 priorities 6,8,9,11) -----------------------
+     * SCT-9g (2026-05-17, Opus 4.7): the C frontend's sc_flatten_arith
+     * produces n-ary trees: (TT_ADD a b c d) for `a + b + c + d`.  Old code
+     * here emitted only c[0] and c[1], silently dropping c[2..n-1].  Emit
+     * n-ary as a left-folded chain — `((a + b) + c) + d`.  This matches
+     * SPITBOL Manual Ch.15: + - * / are LEFT-associative at priorities 6/6/9/8
+     * (verified empirically: live SPITBOL evaluates `100 - 30 + 10 - 5` as 75
+     * which is ((100-30)+10)-5, the left-fold).
+     *
+     * POW (Ch.15 pri 11) is RIGHT-associative and stays strictly binary in
+     * both grammars — no flattening — so its case keeps the 2-child form.
+     */
+    case TT_ADD: case TT_SUB: case TT_MUL: case TT_DIV: {
+        const char *op =
+            e->t == TT_ADD ? " + " :
+            e->t == TT_SUB ? " - " :
+            e->t == TT_MUL ? " * " :
+                             " / " ;
+        int i;
+        if (e->n == 0) { emit(c, "0"); break; }
+        if (e->n == 1) { emit_expr(c, e->c[0]); break; }
+        /* Wrap the whole left-fold in parens so we compose safely inside
+         * other operators.  For n=2 this just emits (a OP b). */
+        emit(c, "(");
+        emit_expr(c, e->c[0]);
+        for (i = 1; i < e->n; i++) {
+            emit(c, "%s", op);
+            emit_expr(c, e->c[i]);
+        }
+        emit(c, ")");
+        break;
+    }
     case TT_POW: emit(c, "("); emit_expr(c, e->c[0]); emit(c, " ** "); emit_expr(c, e->c[1]); emit(c, ")"); break;
     /*--- Pattern composition --------------------------------------------------
      * TT_SEQ → concatenation (space).  TT_ALT → alternation (|).

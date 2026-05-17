@@ -1,0 +1,10 @@
+  T = 10 + 8 - 3
+  OUTPUT = '10 + 8 - 3 = ' T '  (left=15, right=5)'
+
+  U = 20 - 5 + 2
+  OUTPUT = '20 - 5 + 2 = ' U '  (left=17, right=13)'
+
+  V = 100 - 30 + 10 - 5
+  OUTPUT = '100 - 30 + 10 - 5 = ' V '  (left=75, right=85)'
+
+END
