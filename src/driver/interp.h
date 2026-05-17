@@ -48,6 +48,8 @@ void    execute_program(const tree_t *prog);
 void    execute_program_steps(const tree_t *prog, int n);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void    ir_dump_program(const tree_t *prog, FILE *f);
+void    ir_set_print_width(int w);   /* set inline/multiline threshold (default 140, matches TDump) */
+int     ir_get_print_width(void);
 extern int     g_ir_step_limit;
 extern int     g_ir_steps_done;
 extern jmp_buf g_ir_step_jmp;

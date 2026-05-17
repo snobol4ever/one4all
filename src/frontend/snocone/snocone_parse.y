@@ -175,6 +175,8 @@ static void     sc_loop_pop            (ScParseState *st);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static LoopFrame *sc_loop_find_innermost    (ScParseState *st, int want_loop);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static tree_t  *sc_flatten_arith       (tree_e op, tree_t *left, tree_t *right);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_append_break        (ScParseState *st, char *user_label);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_append_continue     (ScParseState *st, char *user_label);
@@ -432,16 +434,12 @@ expr1       : expr3 T_2QUEST expr1
                                 { $$ = $1; }
             ;
 expr3       : expr3 T_2PIPE expr4
-                                { tree_t *a = ast_node_new(TT_ALT);
-                                  expr_add_child(a, $1); expr_add_child(a, $3);
-                                  $$ = a; }
+                                { $$ = sc_flatten_arith(TT_ALT, $1, $3); }
             | expr4
                                 { $$ = $1; }
             ;
 expr4       : expr4 T_CONCAT expr5
-                                { tree_t *s = ast_node_new(TT_SEQ);
-                                  expr_add_child(s, $1); expr_add_child(s, $3);
-                                  $$ = s; }
+                                { $$ = sc_flatten_arith(TT_SEQ, $1, $3); }
             | expr5
                                 { $$ = $1; }
             ;
@@ -491,16 +489,16 @@ expr5       : expr5 T_EQ        expr6
                                 { $$ = $1; }
             ;
 expr6       : expr6 T_2PLUS    expr9
-                                { $$ = expr_binary(TT_ADD, $1, $3); }
+                                { $$ = sc_flatten_arith(TT_ADD, $1, $3); }
             | expr6 T_2MINUS expr9
-                                { $$ = expr_binary(TT_SUB, $1, $3); }
+                                { $$ = sc_flatten_arith(TT_SUB, $1, $3); }
             | expr9
                                 { $$ = $1; }
             ;
 expr9       : expr9 T_2STAR expr11
-                                { $$ = expr_binary(TT_MUL, $1, $3); }
+                                { $$ = sc_flatten_arith(TT_MUL, $1, $3); }
             | expr9 T_2SLASH       expr11
-                                { $$ = expr_binary(TT_DIV, $1, $3); }
+                                { $$ = sc_flatten_arith(TT_DIV, $1, $3); }
             | expr11
                                 { $$ = $1; }
             ;
@@ -967,6 +965,21 @@ static void sc_finalize_for_pst(ScParseState *st, struct ForHead *h)
     sc_loop_pop(st);
     sc_append_stmt(st, f);
     free(h);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ * sc_flatten_arith — mirror of parser_snocone.sc's flatten_arith().
+ * When building (op left right) and left is already the same op, absorb its
+ * children rather than building a binary node.  E.g. a+b+c+d becomes
+ * (TT_ADD a b c d) not (TT_ADD (TT_ADD (TT_ADD a b) c) d).
+ * Only TT_ADD/TT_SUB/TT_MUL/TT_DIV are flattened (matches sc_flatten_ops).
+ *----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static tree_t *sc_flatten_arith(tree_e op, tree_t *left, tree_t *right) {
+    if (left && left->t == op && left->n >= 2) {
+        /* Absorb right into left in-place */
+        ast_push(left, right);
+        return left;
+    }
+    return expr_binary(op, left, right);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void sc_loop_push(ScParseState *st, char *cont_label, char *end_label, int is_loop) {

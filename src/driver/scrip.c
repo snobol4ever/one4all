@@ -22,6 +22,8 @@
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void ir_print_node   (const tree_t *e, FILE *f);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+extern void ir_set_print_width(int w);   /* --dump-width N: inline/multiline threshold */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void ir_print_node_nl(const tree_t *e, FILE *f);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern int emit_jvm_program(const tree_t * ast_prog, FILE * out);
@@ -107,6 +109,9 @@ int main(int argc, char **argv)
         else if (strcmp(argv[argi], "--dump-sm")         == 0) { dump_sm         = 1; argi++; }
         else if (strcmp(argv[argi], "--dump-bb")         == 0) { dump_bb         = 1; argi++; }
         else if (strcmp(argv[argi], "--dump-sno")        == 0) { dump_sno        = 1; argi++; }
+        else if (strcmp(argv[argi], "--dump-width")      == 0) {
+            if (argi + 1 < argc) { ir_set_print_width(atoi(argv[++argi])); argi++; }
+        }
         else if (strcmp(argv[argi], "--trace")           == 0) { opt_trace       = 1; argi++; }
         else if (strcmp(argv[argi], "--bench")           == 0) { opt_bench       = 1; argi++; }
         else if (strcmp(argv[argi], "--case-sensitive")  == 0) { argi++; }

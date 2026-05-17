@@ -2,6 +2,16 @@
 #include "scrip_cc.h"
 /*================================================================================================================================================================================*/
 #define AST_PRINT_MAX_DEPTH 64
+
+/*
+ * ast_print_width — the inline-vs-multiline threshold for ir_print_node / ir_dump_program.
+ * Mirrors TDump/TLump's budget parameter in corpus/SCRIP/tdump.sc:
+ *   TLump(x, 140 - GetLevel())  -- default 140 chars at depth 0.
+ * Set via ir_set_print_width(n) or the --dump-width N command-line flag.
+ */
+static int ast_print_width = 140;   /* default matches TDump */
+void ir_set_print_width(int w) { if (w > 0) ast_print_width = w; }
+int  ir_get_print_width(void)  { return ast_print_width; }
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void print_escaped(const char * s, FILE * f) {
     if (!s) { fputs("(null)", f); return; }
@@ -24,61 +34,86 @@ static void print_escaped(const char * s, FILE * f) {
 static void print_indent(int depth, FILE * f) {
     for (int i = 0; i < depth * 2; i++) fputc(' ', f);
 }
-/*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ * flat_length — compute the inline character width of a node.
+ * Returns FLAT_TOO_LONG if the subtree cannot fit within `budget` chars.
+ * Mirrors TDump/TLump's 140-char inline threshold from corpus/SCRIP/tdump.sc.
+ *--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+#define FLAT_TOO_LONG 99999
+static int flat_length(const tree_t *e, int budget) {
+    if (!e || budget <= 0) return FLAT_TOO_LONG;
+    const char *kname = (e->t >= 0 && e->t < TT_KIND_COUNT) ? tt_e_name[e->t] : "E_???";
+    int klen = (int)strlen(kname);
+    int total;
+    switch (e->t) {
+    case TT_QLIT: case TT_CSET: {
+        const char *s = e->v.sval ? e->v.sval : "";
+        int elen = 2; /* surrounding quotes */
+        for (const char *p = s; *p; p++) {
+            switch (*p) {
+            case '"': case '\\': case '\n': case '\r': case '\t': elen += 2; break;
+            default: elen += ((unsigned char)*p < 0x20) ? 4 : 1; break;
+            }
+        }
+        return 1 + klen + 1 + elen + 1;
+    }
+    case TT_ILIT: { char buf[32]; return 1 + klen + 1 + snprintf(buf,sizeof buf,"%lld",(long long)e->v.ival) + 1; }
+    case TT_FLIT: { char buf[32]; return 1 + klen + 1 + snprintf(buf,sizeof buf,"%g",e->v.dval) + 1; }
+    case TT_NUL:  return 1 + klen + 1;
+    default: break;
+    }
+    total = 1 + klen;
+    if (e->v.sval && e->t != TT_QLIT && e->t != TT_CSET)
+        total += 1 + (int)strlen(e->v.sval);
+    if (e->n == 0) return total + 1;
+    for (int i = 0; i < e->n; i++) {
+        total += 1 + flat_length(e->c[i], budget - total);
+        if (total > budget) return FLAT_TOO_LONG;
+    }
+    return total + 1;
+}
+/*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ * print_node — format matching TDump/TLump in corpus/SCRIP/tdump.sc.
+ *
+ * Rule: inline if the entire subtree fits within (140 - depth*2) characters.
+ * This replicates TLump(x, 140 - GetLevel()) where GetLevel() = depth*2.
+ * When a node exceeds the budget: each child on its own indented line.
+ *--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void print_node(const tree_t * e, FILE * f, int depth) {
     const char * kname;
     int i;
     if (!e)                          { fputs("(null)", f); return; }
-    if (depth > AST_PRINT_MAX_DEPTH) { fputs("(...)", f);  return; }
+    if (depth > AST_PRINT_MAX_DEPTH) { fputs("(...)",  f); return; }
     kname = (e->t >= 0 && e->t < TT_KIND_COUNT) ? tt_e_name[e->t] : "E_???";
-    switch (e->t) {
-    case TT_QLIT:
-    case TT_CSET:
-        fputc('(', f); fputs(kname, f); fputc(' ', f); print_escaped(e->v.sval, f); fputc(')', f);
-        return;
-    case TT_ILIT:
-        fprintf(f, "(%s %lld)", kname, (long long)e->v.ival);
-        return;
-    case TT_FLIT:
-        fprintf(f, "(%s %g)", kname, e->v.dval);
-        return;
-    case TT_NUL:
-        fprintf(f, "(%s)", kname);
-        return;
-    case TT_VAR: case TT_KEYWORD: case TT_FNC: case TT_IDX:
-    case TT_CAPT_COND_ASGN: case TT_CAPT_IMMED_ASGN: case TT_CAPT_CURSOR:
-        if (e->n == 0) {
-            fputc('(', f); fputs(kname, f);
-            if (e->v.sval) { fputc(' ', f); fputs(e->v.sval, f); }
-            fputc(')', f);
+
+    int budget    = ast_print_width - depth * 2;
+    int inline_ok = (flat_length(e, budget) <= budget);
+
+    if (inline_ok) {
+        switch (e->t) {
+        case TT_QLIT: case TT_CSET:
+            fputc('(', f); fputs(kname, f); fputc(' ', f); print_escaped(e->v.sval, f); fputc(')', f);
             return;
+        case TT_ILIT: fprintf(f, "(%s %lld)", kname, (long long)e->v.ival); return;
+        case TT_FLIT: fprintf(f, "(%s %g)",   kname, e->v.dval);             return;
+        case TT_NUL:  fprintf(f, "(%s)",      kname);                         return;
+        default: break;
         }
-        break;
-    case TT_ARB: case TT_REM: case TT_FAIL: case TT_SUCCEED:
-    case TT_FENCE: case TT_ABORT: case TT_BAL:
-        if (e->n == 0) { fprintf(f, "(%s)", kname); return; }
-        break;
-    default:
-        break;
+        fputc('(', f); fputs(kname, f);
+        if (e->v.sval && e->t != TT_QLIT && e->t != TT_CSET) { fputc(' ', f); fputs(e->v.sval, f); }
+        for (i = 0; i < e->n; i++) { fputc(' ', f); print_node(e->c[i], f, depth + 1); }
+        fputc(')', f);
+        return;
     }
-    fputc('(', f);
-    fputs(kname, f);
+
+    /* Multiline: open, each child indented, close */
+    fputc('(', f); fputs(kname, f);
     if (e->v.sval && e->t != TT_QLIT && e->t != TT_CSET) { fputc(' ', f); fputs(e->v.sval, f); }
     if (e->n == 0) { fputc(')', f); return; }
-    if (e->n == 1) {
-        fputc(' ', f);
-        print_node(e->c[0], f, depth + 1);
-        fputc(')', f);
-    } else {
-        for (i = 0; i < e->n; i++) {
-            fputc('\n', f);
-            print_indent(depth + 1, f);
-            print_node(e->c[i], f, depth + 1);
-        }
-        fputc('\n', f);
-        print_indent(depth, f);
-        fputc(')', f);
+    for (i = 0; i < e->n; i++) {
+        fputc('\n', f); print_indent(depth + 1, f); print_node(e->c[i], f, depth + 1);
     }
+    fputc('\n', f); print_indent(depth, f); fputc(')', f);
 }
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void ir_print_node(const tree_t * e, FILE * f)    { print_node(e, f, 0); }
