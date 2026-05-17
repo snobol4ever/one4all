@@ -5,6 +5,7 @@
 #include <ctype.h>
 #include <setjmp.h>
 #include <time.h>
+#include <unistd.h>
 #include <gc.h>
 #include "../frontend/snobol4/scrip_cc.h"
 #include "../frontend/snocone/snocone_driver.h"
@@ -88,29 +89,54 @@ int main(int argc, char **argv)
     int opt_bench          = 0;
     const char * target_name = NULL;
     int argi = 1;
+    /* CLI-3M-4: deprecation-warning helper.
+       Each legacy flag warns once per process to stderr.
+       Silenced when:
+         - SCRIP_NO_DEPRECATION env is set (any non-empty, non-"0" value), OR
+         - stderr is not a tty (i.e., redirected — tests capturing 2>&1
+           or 2>file should not see warnings polluting diffs).
+       To force warnings in scripted contexts (CI), set SCRIP_DEPRECATION=1. */
+    enum {
+        DEP_AST_RUN, DEP_IR_RUN, DEP_SM_RUN, DEP_JIT_RUN,
+        DEP_JIT_EMIT, DEP_SM_EMIT, DEP_X64_RAW, DEP_BB_DRIVER, DEP_BB_LIVE,
+        DEP_DUMP_IR, DEP_DUMP_IR_BISON,
+        DEP__COUNT
+    };
+    static char dep_warned[DEP__COUNT];
+    const char *no_dep_env    = getenv("SCRIP_NO_DEPRECATION");
+    const char *force_dep_env = getenv("SCRIP_DEPRECATION");
+    int dep_force  = (force_dep_env && force_dep_env[0] != '\0' && force_dep_env[0] != '0');
+    int dep_off    = (no_dep_env && no_dep_env[0] != '\0' && no_dep_env[0] != '0');
+    int dep_silent = dep_off || (!dep_force && !isatty(fileno(stderr)));
+    #define DEPRECATE(slot, old, neu) do { \
+        if (!dep_silent && !dep_warned[slot]) { \
+            fprintf(stderr, "scrip: warning: " old " is deprecated; use " neu "\n"); \
+            dep_warned[slot] = 1; \
+        } \
+    } while (0)
     while (argi < argc && argv[argi][0] == '-' && argv[argi][1] == '-') {
-        if      (strcmp(argv[argi], "--ast-run")         == 0) { mode_ir_run        = 1; argi++; }
-        else if (strcmp(argv[argi], "--ir-run")          == 0) { mode_ir_run        = 1; argi++; }
-        else if (strcmp(argv[argi], "--sm-run")        == 0) { mode_sm_run        = 1; argi++; }
+        if      (strcmp(argv[argi], "--ast-run")         == 0) { DEPRECATE(DEP_AST_RUN, "--ast-run", "--interp (note: --ast-run will be removed when AST-interp is deleted)"); mode_ir_run = 1; argi++; }
+        else if (strcmp(argv[argi], "--ir-run")          == 0) { DEPRECATE(DEP_IR_RUN, "--ir-run", "--interp (note: --ir-run will be removed when AST-interp is deleted)"); mode_ir_run = 1; argi++; }
+        else if (strcmp(argv[argi], "--sm-run")        == 0) { DEPRECATE(DEP_SM_RUN, "--sm-run", "--interp"); mode_sm_run = 1; argi++; }
         else if (strcmp(argv[argi], "--interp")        == 0) { mode_sm_run        = 1; argi++; }
-        else if (strcmp(argv[argi], "--jit-run")       == 0) { mode_jit_run       = 1; argi++; }
+        else if (strcmp(argv[argi], "--jit-run")       == 0) { DEPRECATE(DEP_JIT_RUN, "--jit-run", "--run"); mode_jit_run = 1; argi++; }
         else if (strcmp(argv[argi], "--run")           == 0) { mode_jit_run       = 1; argi++; }
         else if (strcmp(argv[argi], "--monitor")       == 0) { mode_monitor       = 1; argi++; }
-        else if (strcmp(argv[argi], "--jit-emit")      == 0) { opt_jit_emit       = 1; argi++; }
-        else if (strcmp(argv[argi], "--sm-emit")       == 0) { opt_jit_emit       = 1; argi++; }
+        else if (strcmp(argv[argi], "--jit-emit")      == 0) { DEPRECATE(DEP_JIT_EMIT, "--jit-emit", "--compile (for x64) or --target=jvm/js/wasm"); opt_jit_emit = 1; argi++; }
+        else if (strcmp(argv[argi], "--sm-emit")       == 0) { DEPRECATE(DEP_SM_EMIT, "--sm-emit", "--compile"); opt_jit_emit = 1; argi++; }
         else if (strcmp(argv[argi], "--compile")       == 0) { opt_jit_emit       = 1; if (!target_name) target_name = "x86"; opt_emit_x64 = 1; argi++; }
-        else if (strcmp(argv[argi], "--x64")           == 0) { opt_emit_x64 = 1; target_name = "x86"; argi++; }
+        else if (strcmp(argv[argi], "--x64")           == 0) { /* not deprecated by itself; paired with --compile internally */ opt_emit_x64 = 1; target_name = "x86"; argi++; }
         else if (strncmp(argv[argi], "--target=", 9)   == 0) { target_name = argv[argi] + 9; opt_jit_emit = 1; argi++; }
         else if (strcmp(argv[argi], "--jit-emit-inline") == 0) { opt_jit_emit_inline = 1; opt_jit_emit = 1; argi++; }
         else if (strcmp(argv[argi], "--bb-format")       == 0) { opt_bb_format       = 1; argi++; }
-        else if (strcmp(argv[argi], "--bb-driver")     == 0) { bb_driver          = 1; argi++; }
-        else if (strcmp(argv[argi], "--bb-live")       == 0) { bb_live            = 1; argi++; }
+        else if (strcmp(argv[argi], "--bb-driver")     == 0) { DEPRECATE(DEP_BB_DRIVER, "--bb-driver", "--bb=brokered"); bb_driver = 1; argi++; }
+        else if (strcmp(argv[argi], "--bb-live")       == 0) { DEPRECATE(DEP_BB_LIVE, "--bb-live", "--bb=wired"); bb_live = 1; argi++; }
         else if (strcmp(argv[argi], "--bb=brokered")   == 0) { bb_driver          = 1; argi++; }
         else if (strcmp(argv[argi], "--bb=wired")      == 0) { bb_live            = 1; argi++; }
         else if (strcmp(argv[argi], "--dump-ast")        == 0) { dump_ir         = 1; argi++; }
-        else if (strcmp(argv[argi], "--dump-ir")         == 0) { dump_ir         = 1; argi++; }
+        else if (strcmp(argv[argi], "--dump-ir")         == 0) { DEPRECATE(DEP_DUMP_IR, "--dump-ir", "--dump-ast"); dump_ir = 1; argi++; }
         else if (strcmp(argv[argi], "--dump-ast-bison")  == 0) { dump_ir_bison   = 1; argi++; }
-        else if (strcmp(argv[argi], "--dump-ir-bison")   == 0) { dump_ir_bison   = 1; argi++; }
+        else if (strcmp(argv[argi], "--dump-ir-bison")   == 0) { DEPRECATE(DEP_DUMP_IR_BISON, "--dump-ir-bison", "--dump-ast-bison"); dump_ir_bison = 1; argi++; }
         else if (strcmp(argv[argi], "--dump-sm")         == 0) { dump_sm         = 1; argi++; }
         else if (strcmp(argv[argi], "--dump-bb")         == 0) { dump_bb         = 1; argi++; }
         else if (strcmp(argv[argi], "--dump-sno")        == 0) { dump_sno        = 1; argi++; }
