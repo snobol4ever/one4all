@@ -349,7 +349,7 @@ static PredKey key_of_head_tree(tree_t *head) {
     k.arity   = arity;
     return k;
 }
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 CODE_t *prolog_lower(PlProgram *pl_prog) {
     CODE_t *prog = calloc(1, sizeof(CODE_t));
     #define PL_MAX_CLAUSES 2048

@@ -25,6 +25,22 @@ static IR_t *lower_pl_term_node(IR_block_t *cfg, const tree_t *e) {
     }
     case TT_FNC:
         if (e->n == 0) { IR_t *nd = IR_node_alloc(cfg, IR_PL_ATOM); if (!nd) return NULL; nd->sval = e->v.sval; return nd; }
+        if (e->n == 2 && e->v.sval && (strcmp(e->v.sval,"+")==0||strcmp(e->v.sval,"-")==0||
+                                        strcmp(e->v.sval,"*")==0||strcmp(e->v.sval,"/")==0||
+                                        strcmp(e->v.sval,"//")==0)) {
+            IR_t *lhs = lower_pl_term_node(cfg, e->c[0]); IR_t *rhs = lower_pl_term_node(cfg, e->c[1]);
+            if (!lhs || !rhs) return NULL;
+            IR_t *nd = IR_node_alloc(cfg, IR_PL_ARITH); if (!nd) return NULL;
+            nd->sval = e->v.sval;
+            nd->c = malloc(2*sizeof(IR_t*)); if (!nd->c) return NULL;
+            nd->c[0] = lhs; nd->c[1] = rhs; nd->n = 2; return nd;
+        }
+        if (e->n == 1 && e->v.sval && strcmp(e->v.sval,"-")==0) {
+            IR_t *operand = lower_pl_term_node(cfg, e->c[0]); if (!operand) return NULL;
+            IR_t *nd = IR_node_alloc(cfg, IR_PL_ARITH); if (!nd) return NULL;
+            nd->sval = "-"; nd->c = malloc(sizeof(IR_t*)); if (!nd->c) return NULL;
+            nd->c[0] = operand; nd->n = 1; return nd;
+        }
         return NULL;
     default: return NULL;
     }
@@ -65,6 +81,15 @@ static IR_t *lower_pl_stmt_node(IR_block_t *cfg, const tree_t *e) {
         nd->c[0] = lhs; nd->c[1] = rhs; nd->n = 2; return nd;
     }
     if (e->t == TT_CUT) { return IR_node_alloc(cfg, IR_PL_CUT); }
+    if (e->t == TT_QLIT && e->v.sval) {
+        const char *fn = e->v.sval;
+        if (strcmp(fn,"true")==0||strcmp(fn,"otherwise")==0) return IR_node_alloc(cfg, IR_SUCCEED);
+        if (strcmp(fn,"fail")==0||strcmp(fn,"false")==0)     return IR_node_alloc(cfg, IR_FAIL);
+        if (strcmp(fn,"nl")==0) { IR_t *nd = IR_node_alloc(cfg, IR_PL_BUILTIN); if (!nd) return NULL; nd->sval = fn; nd->n = 0; return nd; }
+        if (strcmp(fn,"!")==0)  { return IR_node_alloc(cfg, IR_PL_CUT); }
+        IR_t *nd = IR_node_alloc(cfg, IR_PL_CALL); if (!nd) return NULL;
+        nd->sval = fn; nd->ival2 = 0; nd->n = 0; return nd;
+    }
     if (e->t != TT_FNC || !e->v.sval) return NULL;
     const char *fn = e->v.sval;
     if (strcmp(fn, ",") == 0 && e->n == 2) return lower_pl_seq(cfg, e);
@@ -79,6 +104,13 @@ static IR_t *lower_pl_stmt_node(IR_block_t *cfg, const tree_t *e) {
     if (strcmp(fn,"true")==0||strcmp(fn,"otherwise")==0) return IR_node_alloc(cfg, IR_SUCCEED);
     if (strcmp(fn,"fail")==0||strcmp(fn,"false")==0)     return IR_node_alloc(cfg, IR_FAIL);
     if (strcmp(fn,"nl")==0) { IR_t *nd = IR_node_alloc(cfg, IR_PL_BUILTIN); if (!nd) return NULL; nd->sval = fn; nd->n = 0; return nd; }
+    if (strcmp(fn, "=") == 0 && e->n == 2) {
+        IR_t *lhs = lower_pl_term_node(cfg, e->c[0]); IR_t *rhs = lower_pl_term_node(cfg, e->c[1]);
+        if (!lhs || !rhs) return NULL;
+        IR_t *nd = IR_node_alloc(cfg, IR_PL_UNIFY); if (!nd) return NULL;
+        nd->c = malloc(2*sizeof(IR_t*)); if (!nd->c) return NULL;
+        nd->c[0] = lhs; nd->c[1] = rhs; nd->n = 2; return nd;
+    }
     if (strcmp(fn,"write")==0||strcmp(fn,"writeln")==0||strcmp(fn,"is")==0
         ||strcmp(fn,">")==0||strcmp(fn,"<")==0||strcmp(fn,">=")==0||strcmp(fn,"<=")==0
         ||strcmp(fn,"=:=")==0||strcmp(fn,"=\\=")==0) {
