@@ -6,14 +6,40 @@
 #include <stdlib.h>
 #include <stdio.h>
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* Resolve a cset-or-string argument to (ptr, len) honoring keyword-cset storage.                                                                                                                       */
+/* Keyword csets (&cset, &ascii, &lcase, ...) are null-prefixed buffers; their true length is tracked by icn_kw_cset_len(ptr). Regular cset values and plain strings use strlen.                          */
+/* Returns 1 on success (ptr/len written), 0 on null/unresolvable.                                                                                                                                       */
+static int cset_resolve(DESCR_t arg, const char **out_ptr, int *out_len) {
+    const char *cv;
+    int clen;
+    if (IS_CSET_fn(arg)) {
+        cv = arg.s;
+        if (!cv) return 0;
+        int klen = icn_kw_cset_len(cv);
+        clen = (klen >= 0) ? klen : (int)strlen(cv);
+    } else {
+        cv = VARVAL_fn(arg);
+        if (!cv) return 0;
+        clen = (int)strlen(cv);
+    }
+    *out_ptr = cv;
+    *out_len = clen;
+    return 1;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* \0-safe cset membership: returns 1 iff ch appears in cv[0..clen-1].                                                                                                                                  */
+static inline int cset_has(const char *cv, int clen, unsigned char ch) {
+    return cv && clen > 0 && memchr(cv, ch, (size_t)clen) != NULL;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int scan_try_call_builtin(tree_t *call, DESCR_t *args, int nargs, DESCR_t *out)
 {
     if (!call || call->n < 1 || !call->c[0]) return 0;
     const char *fn = call->c[0]->v.sval;
     if (!fn) return 0;
     if (!strcmp(fn, "any") && nargs >= 1 && (scan_pos > 0 || nargs >= 2)) {
-        const char *cv = VARVAL_fn(args[0]);
-        if (!cv) { *out = FAILDESCR; return 1; }
+        const char *cv; int clen;
+        if (!cset_resolve(args[0], &cv, &clen)) { *out = FAILDESCR; return 1; }
         const char *s; int p, slen, end;
         if (nargs >= 2) {
             s = VARVAL_fn(args[1]); if (!s) s = "";
@@ -27,14 +53,14 @@ int scan_try_call_builtin(tree_t *call, DESCR_t *args, int nargs, DESCR_t *out)
             s = scan_subj; if (!s) { *out = FAILDESCR; return 1; }
             slen = (int)strlen(s); p = scan_pos - 1; end = slen;
         }
-        if (p < 0 || p >= slen || p >= end || !strchr(cv, s[p])) { *out = FAILDESCR; return 1; }
+        if (p < 0 || p >= slen || p >= end || !cset_has(cv, clen, (unsigned char)s[p])) { *out = FAILDESCR; return 1; }
         if (nargs < 2) { *out = INTVAL(p + 2); return 1; }
         *out = INTVAL(p + 2);
         return 1;
     }
     if (!strcmp(fn, "many") && nargs >= 1 && (scan_pos > 0 || nargs >= 2)) {
-        const char *cv = VARVAL_fn(args[0]);
-        if (!cv) { *out = FAILDESCR; return 1; }
+        const char *cv; int clen;
+        if (!cset_resolve(args[0], &cv, &clen)) { *out = FAILDESCR; return 1; }
         const char *s; int p, slen, end;
         if (nargs >= 2) {
             s = VARVAL_fn(args[1]); if (!s) s = "";
@@ -48,14 +74,14 @@ int scan_try_call_builtin(tree_t *call, DESCR_t *args, int nargs, DESCR_t *out)
             s = scan_subj; if (!s) { *out = FAILDESCR; return 1; }
             slen = (int)strlen(s); p = scan_pos - 1; end = slen;
         }
-        if (p < 0 || p >= slen || p >= end || !strchr(cv, s[p])) { *out = FAILDESCR; return 1; }
-        while (p < end && p < slen && strchr(cv, s[p])) p++;
+        if (p < 0 || p >= slen || p >= end || !cset_has(cv, clen, (unsigned char)s[p])) { *out = FAILDESCR; return 1; }
+        while (p < end && p < slen && cset_has(cv, clen, (unsigned char)s[p])) p++;
         *out = INTVAL(p + 1);
         return 1;
     }
     if (!strcmp(fn, "upto") && nargs >= 1 && (scan_pos > 0 || nargs >= 2)) {
-        const char *cv = VARVAL_fn(args[0]);
-        if (!cv) { *out = FAILDESCR; return 1; }
+        const char *cv; int clen;
+        if (!cset_resolve(args[0], &cv, &clen)) { *out = FAILDESCR; return 1; }
         const char *s; int p, slen, end;
         if (nargs >= 2) {
             s = VARVAL_fn(args[1]); if (!s) s = "";
@@ -69,7 +95,7 @@ int scan_try_call_builtin(tree_t *call, DESCR_t *args, int nargs, DESCR_t *out)
             s = scan_subj; if (!s) { *out = FAILDESCR; return 1; }
             slen = (int)strlen(s); p = scan_pos - 1; end = slen;
         }
-        while (p < end && p < slen && !strchr(cv, s[p])) p++;
+        while (p < end && p < slen && !cset_has(cv, clen, (unsigned char)s[p])) p++;
         if (p >= end || p >= slen) { *out = FAILDESCR; return 1; }
         *out = INTVAL(p + 1);
         return 1;
@@ -125,10 +151,18 @@ int scan_try_call_builtin(tree_t *call, DESCR_t *args, int nargs, DESCR_t *out)
         return 1;
     }
     if (!strcmp(fn, "bal") && nargs >= 1) {
-        const char *c1 = VARVAL_fn(args[0]); if (!c1) { *out = FAILDESCR; return 1; }
+        const char *c1; int c1len;
+        if (!cset_resolve(args[0], &c1, &c1len)) { *out = FAILDESCR; return 1; }
         const char *c2 = "(", *c3 = ")";
-        if (nargs >= 2) { const char *v = VARVAL_fn(args[1]); if (v && v[0]) c2 = v; }
-        if (nargs >= 3) { const char *v = VARVAL_fn(args[2]); if (v && v[0]) c3 = v; }
+        int c2len = 1, c3len = 1;
+        if (nargs >= 2) {
+            const char *v; int vlen;
+            if (cset_resolve(args[1], &v, &vlen) && vlen > 0) { c2 = v; c2len = vlen; }
+        }
+        if (nargs >= 3) {
+            const char *v; int vlen;
+            if (cset_resolve(args[2], &v, &vlen) && vlen > 0) { c3 = v; c3len = vlen; }
+        }
         const char *s; int slen, p, end;
         if (nargs >= 4) {
             s = VARVAL_fn(args[3]); if (!s) s = "";
@@ -143,10 +177,10 @@ int scan_try_call_builtin(tree_t *call, DESCR_t *args, int nargs, DESCR_t *out)
         }
         int depth = 0;
         while (p < end && p < slen) {
-            char ch = s[p];
-            if (strchr(c2, ch)) depth++;
-            else if (strchr(c3, ch) && depth > 0) depth--;
-            else if (depth == 0 && strchr(c1, ch)) { *out = INTVAL(p + 1); return 1; }
+            unsigned char ch = (unsigned char)s[p];
+            if (cset_has(c2, c2len, ch)) depth++;
+            else if (cset_has(c3, c3len, ch) && depth > 0) depth--;
+            else if (depth == 0 && cset_has(c1, c1len, ch)) { *out = INTVAL(p + 1); return 1; }
             p++;
         }
         *out = FAILDESCR;
