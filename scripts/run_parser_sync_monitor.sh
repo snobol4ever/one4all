@@ -56,8 +56,31 @@ if [[ ! -x "$SCRIP" ]]; then
 fi
 
 SNO_OUT="/tmp/parser_${LANG}.sno"
-echo "[run_parser_sync_monitor] transpiling $PARSER_SC -> $SNO_OUT"
-if ! "$SCRIP" --dump-sno "$PARSER_SC" > "$SNO_OUT"; then
+
+# SCT-1c-2: dump the full Snocone runtime prelude alongside parser_<lang>.sc so
+# the resulting .sno is self-contained.  Order matches corpus/SCRIP/README.md:
+#   global → tree → stack → counter → ShiftReduce → semantic → tdump → parser
+# Without these, the transpiled parser fails immediately because `digits`,
+# `nl`, `Tree`, `Pop`, etc. aren't defined in the .sno's symbol environment.
+CORPUS_SCRIP="${CORPUS_ROOT:-$REPO_ROOT/../corpus}/SCRIP"
+RUNTIME=(
+    "$CORPUS_SCRIP/global.sc"
+    "$CORPUS_SCRIP/tree.sc"
+    "$CORPUS_SCRIP/stack.sc"
+    "$CORPUS_SCRIP/counter.sc"
+    "$CORPUS_SCRIP/ShiftReduce.sc"
+    "$CORPUS_SCRIP/semantic.sc"
+    "$CORPUS_SCRIP/tdump.sc"
+)
+for f in "${RUNTIME[@]}"; do
+    if [[ ! -f "$f" ]]; then
+        echo "run_parser_sync_monitor: missing runtime file '$f'" >&2
+        exit 2
+    fi
+done
+
+echo "[run_parser_sync_monitor] transpiling runtime + $PARSER_SC -> $SNO_OUT"
+if ! "$SCRIP" --dump-sno "${RUNTIME[@]}" "$PARSER_SC" > "$SNO_OUT"; then
     echo "run_parser_sync_monitor: --dump-sno failed for $PARSER_SC" >&2
     exit 2
 fi
@@ -68,6 +91,14 @@ PLACEHOLDERS=$(grep -c "?TT_\|BOTH-QUOTES" "$SNO_OUT" || true)
 if [[ "$PLACEHOLDERS" -gt 0 ]]; then
     echo "[run_parser_sync_monitor] WARNING: $PLACEHOLDERS unhandled-tag placeholder(s) in transpiled output"
     grep -n "?TT_\|BOTH-QUOTES" "$SNO_OUT" | head -5
+fi
+
+# Quick line-length sanity (SPITBOL Manual Ch.14 line 9022: 1024-char cap;
+# emitter splits at ~900 to leave headroom).  Hard-fail if exceeded — that
+# means a long quoted string had no safe split point.
+OVERLEN=$(awk 'length>1024' "$SNO_OUT" | wc -l)
+if [[ "$OVERLEN" -gt 0 ]]; then
+    echo "[run_parser_sync_monitor] WARNING: $OVERLEN line(s) exceed SPITBOL's 1024-char limit"
 fi
 
 # The actual sync-step is delegated to the existing harness (which knows
