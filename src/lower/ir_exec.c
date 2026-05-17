@@ -423,6 +423,33 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->value = NULVCL;
         return nd->γ;
     }
+    case IR_LIMIT: {
+        /* Icon gen \ N — limit a generator to N yields. c[0]=gen, c[1]=limit-expr.                       */
+        /* state==0 fresh: evaluate c[1] once to get max (integer-coerced); seed counter=0; eval c[0] α.  */
+        /* state==1 active: pump c[0] for next value (β-resume). Each successful yield bumps counter.     */
+        /* When counter >= max OR c[0] fails, return ω. N<=0 → immediate fail without pumping c[0].      */
+        /* IR_LIMIT is already classified as a generator kind by ir_is_single_shot (line 45) and by the   */
+        /* ALT_IS_GEN / IR_IS_GEN_KIND macros — so IR_EVERY drives it correctly to exhaustion.            */
+        if (nd->n < 2 || !nd->c[0] || !nd->c[1]) { nd->value = FAILDESCR; return nd->ω; }
+        if (nd->state == 0) {
+            IR_exec_node(nd->c[1]);
+            DESCR_t mv = nd->c[1]->value;
+            if (IS_FAIL_fn(mv)) { nd->value = FAILDESCR; return nd->ω; }
+            int64_t mx = IS_INT_fn(mv) ? mv.i : (mv.v == DT_R ? (int64_t)mv.r : 0);
+            if (mx <= 0) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+            nd->ival    = mx;
+            nd->counter = 0;
+            nd->c[0]->state = 0;
+            nd->state   = 1;
+        }
+        if (nd->counter >= nd->ival) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[0]);
+        DESCR_t gv = nd->c[0]->value;
+        if (IS_FAIL_fn(gv)) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+        nd->counter++;
+        nd->value = gv;
+        return nd->γ;
+    }
     case IR_ALT: {
         /* Icon alternation A|B|C... n-ary. On alpha: try children left to right; on beta: */
         /* resume current child only if it is a generator kind (can yield multiple values); */

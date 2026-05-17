@@ -694,6 +694,24 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         nd->n = e->n;
         return nd;
     }
+    case TT_LIMIT: {
+        /* Icon gen \ N — limit a generator to N yields. c[0]=gen, c[1]=N. Always 2-child binary node    */
+        /* (icon_parse e_binary at line 241). N may be a literal, var, or expression.  IR_LIMIT executor */
+        /* evaluates c[1] once on alpha, pumps c[0] up to N times via beta, then fails.                  */
+        if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
+        IR_t *gen = lower_icn_expr_node(cfg, e->c[0]);
+        if (!gen) return NULL;
+        IR_t *lim = lower_icn_expr_node(cfg, e->c[1]);
+        if (!lim) return NULL;
+        IR_t *nd = IR_node_alloc(cfg, IR_LIMIT);
+        if (!nd) return NULL;
+        nd->c = calloc(2, sizeof(IR_t *));
+        if (!nd->c) return NULL;
+        nd->c[0] = gen;
+        nd->c[1] = lim;
+        nd->n    = 2;
+        return nd;
+    }
     case TT_AUGOP: {
         /* Icon x +:= rhs etc.  TT_AUGOP: c[0]=lhs (var), c[1]=rhs. v.ival=IcnTkKind of augop.    */
         /* Lower as: tmp = lhs op rhs; lhs := tmp.  Use IR_BINOP + IR_ASSIGN.                      */
