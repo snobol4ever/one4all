@@ -131,6 +131,9 @@ typedef enum {
                         /* fresh icnlist by appending all elements; otherwise falls back to string concat with         */
                         /* numeric coercion (matches TT_LCONCAT spec in legacy bb_eval_value). Dispatches via helper   */
                         /* icn_lconcat_d in icn_value.c so AST-walk and IR paths stay in lock-step.                    */
+    IR_ICN_FIND_GEN,    /* Icon find(needle, hay [, start [, stop]]) generator. Yields each match position 1..N.       */
+                        /* c[0]=needle, c[1]=hay, optional c[2]=start, c[3]=stop. counter tracks last-yielded position */
+                        /* (1-based, 0 means fresh); opaque caches needle/hay strings. α resolves, β advances.         */
     IR_E_COUNT
 } IR_e;
 typedef struct IR_t IR_t;

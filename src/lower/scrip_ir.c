@@ -17,7 +17,8 @@ static const char * kind_names[IR_E_COUNT] = {
     [IR_SWAP] = "IR_SWAP",
     [IR_SEQ_EXPR] = "IR_SEQ_EXPR",
     [IR_INITIAL] = "IR_INITIAL",
-    [IR_ICN_LCONCAT] = "IR_ICN_LCONCAT"
+    [IR_ICN_LCONCAT] = "IR_ICN_LCONCAT",
+    [IR_ICN_FIND_GEN] = "IR_ICN_FIND_GEN"
 };
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 const char * IR_e_name(IR_e k) {

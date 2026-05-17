@@ -398,6 +398,25 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
             nd->n    = 1;
             return nd;
         }
+        /* find(needle, hay[, start[, stop]]) — lower to IR_ICN_FIND_GEN.  In Icon, find is a true */
+        /* generator that yields every match position. The 1-arg form (find(needle) — search in   */
+        /* &subject) is NOT lowered specially here because scan-context handling is downstream;    */
+        /* fall through to IR_CALL which routes through icn_try_call_builtin_by_name for that.    */
+        if ((nargs == 2 || nargs == 3 || nargs == 4)
+            && strcmp(e->c[0]->v.sval, "find") == 0
+            && e->c[1] && e->c[2]) {
+            IR_t **args2 = calloc((size_t)nargs, sizeof(IR_t *));
+            if (!args2) return NULL;
+            for (int j = 0; j < nargs; j++) {
+                args2[j] = lower_icn_expr_node(cfg, e->c[1+j]);
+                if (!args2[j]) { free(args2); return NULL; }
+            }
+            IR_t *nd = IR_node_alloc(cfg, IR_ICN_FIND_GEN);
+            if (!nd) { free(args2); return NULL; }
+            nd->c = args2;
+            nd->n = nargs;
+            return nd;
+        }
         IR_t **args = NULL;
         if (nargs > 0) {
             args = calloc((size_t)nargs, sizeof(IR_t *));

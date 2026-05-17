@@ -50,7 +50,7 @@ static int ir_is_single_shot(IR_t * e) {
     case IR_ICN_ALTERNATE: case IR_ICN_LIMIT: case IR_ICN_BINOP: case IR_ICN_TO_NESTED:
     case IR_ICN_PROC_GEN: case IR_BINOP_GEN: case IR_ALT: case IR_ALTERNATE:
     case IR_SUSPEND: case IR_REPEAT: case IR_TO_BY: case IR_LIMIT: case IR_ICN_SCAN:
-    case IR_ICN_LIST_BANG: case IR_ICN_KEY_GEN:
+    case IR_ICN_LIST_BANG: case IR_ICN_KEY_GEN: case IR_ICN_FIND_GEN:
         return 0;
     case IR_CALL: {
         if (!e->sval) return 1;
@@ -310,7 +310,7 @@ IR_t * IR_exec_node(IR_t * nd) {
             (k) == IR_ICN_TO || (k) == IR_ICN_TO_BY || (k) == IR_ICN_UPTO || \
             (k) == IR_ALT || (k) == IR_ALTERNATE || (k) == IR_BINOP_GEN || \
             (k) == IR_ICN_ITERATE || (k) == IR_ICN_LIMIT || (k) == IR_ICN_PROC_GEN || \
-            (k) == IR_ICN_LIST_BANG || (k) == IR_ICN_KEY_GEN || (k) == IR_TO_BY)
+            (k) == IR_ICN_LIST_BANG || (k) == IR_ICN_KEY_GEN || (k) == IR_ICN_FIND_GEN || (k) == IR_TO_BY)
         int l_gen = IR_IS_GEN_KIND(nd->c[0]->t);
         int r_gen = IR_IS_GEN_KIND(nd->c[1]->t);
         if (nd->state == 0) {
@@ -586,7 +586,7 @@ IR_t * IR_exec_node(IR_t * nd) {
             (k) == IR_ICN_TO || (k) == IR_ICN_TO_BY || (k) == IR_ICN_UPTO || \
             (k) == IR_ALT    || (k) == IR_ALTERNATE  || (k) == IR_BINOP_GEN || \
             (k) == IR_ICN_ITERATE || (k) == IR_ICN_LIMIT || (k) == IR_ICN_PROC_GEN || \
-            (k) == IR_ICN_LIST_BANG || (k) == IR_ICN_KEY_GEN || (k) == IR_TO_BY  || (k) == IR_ICN_ALTERNATE)
+            (k) == IR_ICN_LIST_BANG || (k) == IR_ICN_KEY_GEN || (k) == IR_ICN_FIND_GEN || (k) == IR_TO_BY  || (k) == IR_ICN_ALTERNATE)
         if (nd->n < 1) { nd->value = FAILDESCR; return nd->ω; }
         if (nd->state == 0) {
             for (int i = 0; i < nd->n; i++) {
@@ -1178,6 +1178,74 @@ IR_t * IR_exec_node(IR_t * nd) {
             }
         }
         nd->state = 0; nd->opaque = NULL; nd->value = FAILDESCR; return nd->ω;
+    }
+    case IR_ICN_FIND_GEN: {
+        /* find(needle, hay [, start [, stop]]) as a true generator. Yields each match position.    */
+        /* c[0]=needle, c[1]=hay, c[2]=optional start (1-based, default 1), c[3]=optional stop      */
+        /* (1-based exclusive, default len(hay)+1). counter holds the 1-based position of the LAST  */
+        /* yielded match (0 means fresh).  opaque is a small struct caching needle/hay strings so   */
+        /* β doesn't re-evaluate sub-expressions (which would re-fire any side effects).            */
+        typedef struct { const char *needle; const char *hay; int nlen; int hlen; int stop; } find_gen_state_t;
+        if (nd->n < 2 || !nd->c[0] || !nd->c[1]) { nd->value = FAILDESCR; return nd->ω; }
+        find_gen_state_t *st = (find_gen_state_t *)nd->opaque;
+        if (nd->state == 0) {
+            IR_exec_node(nd->c[0]);
+            DESCR_t nv = nd->c[0]->value;
+            if (IS_FAIL_fn(nv)) { nd->value = FAILDESCR; return nd->ω; }
+            IR_exec_node(nd->c[1]);
+            DESCR_t hv = nd->c[1]->value;
+            if (IS_FAIL_fn(hv)) { nd->value = FAILDESCR; return nd->ω; }
+            const char *ns = VARVAL_fn(nv); if (!ns) ns = "";
+            const char *hs = VARVAL_fn(hv); if (!hs) hs = "";
+            int start1 = 1;
+            if (nd->n >= 3 && nd->c[2]) {
+                IR_exec_node(nd->c[2]);
+                DESCR_t sv = nd->c[2]->value;
+                if (!IS_FAIL_fn(sv) && IS_INT_fn(sv)) start1 = (int)sv.i;
+            }
+            int hlen = (int)strlen(hs);
+            int stop1 = hlen + 1;
+            if (nd->n >= 4 && nd->c[3]) {
+                IR_exec_node(nd->c[3]);
+                DESCR_t sv = nd->c[3]->value;
+                if (!IS_FAIL_fn(sv) && IS_INT_fn(sv)) stop1 = (int)sv.i;
+            }
+            /* Icon range normalization: 0 means end, negatives count from end. */
+            if (start1 == 0) start1 = hlen + 1;
+            if (start1 < 0)  start1 = hlen + 1 + start1;
+            if (stop1  == 0) stop1  = hlen + 1;
+            if (stop1  < 0)  stop1  = hlen + 1 + stop1;
+            if (start1 < 1) start1 = 1;
+            if (stop1  > hlen + 1) stop1 = hlen + 1;
+            if (!st) { st = (find_gen_state_t *)GC_malloc(sizeof *st); nd->opaque = st; }
+            st->needle = ns;
+            st->hay    = hs;
+            st->nlen   = (int)strlen(ns);
+            st->hlen   = hlen;
+            st->stop   = stop1;
+            nd->counter = (int64_t)(start1 - 1);  /* counter holds 0-based position to search from. */
+            nd->state   = 1;
+        }
+        if (!st) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+        /* Empty needle: yield each integer position once then FAIL (Icon spec for find("", h)).    */
+        if (st->nlen == 0) {
+            int pos1 = (int)nd->counter + 1;  /* 1-based candidate */
+            if (pos1 > st->stop) { nd->state = 0; nd->opaque = NULL; nd->value = FAILDESCR; return nd->ω; }
+            nd->counter = (int64_t)pos1;
+            nd->value   = INTVAL(pos1);
+            return nd->γ;
+        }
+        /* Non-empty needle: search from nd->counter (0-based) for next occurrence. */
+        int search_from = (int)nd->counter;
+        if (search_from < 0) search_from = 0;
+        if (search_from + st->nlen > st->hlen) { nd->state = 0; nd->opaque = NULL; nd->value = FAILDESCR; return nd->ω; }
+        const char *hit = strstr(st->hay + search_from, st->needle);
+        if (!hit) { nd->state = 0; nd->opaque = NULL; nd->value = FAILDESCR; return nd->ω; }
+        int pos1 = (int)(hit - st->hay) + 1;  /* 1-based position of match */
+        if (pos1 + st->nlen - 1 >= st->stop) { nd->state = 0; nd->opaque = NULL; nd->value = FAILDESCR; return nd->ω; }
+        nd->counter = (int64_t)pos1;  /* next search starts one char past this match's 0-based start */
+        nd->value   = INTVAL(pos1);
+        return nd->γ;
     }
     case IR_CASE: {
         /* Icon case E of { K1: V1; K2: V2; ...; default: VD }.                                  */
