@@ -594,13 +594,33 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     }
     case TT_GLOBAL:
     case TT_LOCAL:
-    case TT_STATIC_DECL:
-    case TT_INITIAL: {
-        /* `local x;`, `static x;`, `global x;`, `initial expr;` — scope/init declarations.                                                                                                                   */
+    case TT_STATIC_DECL: {
+        /* `local x;`, `static x;`, `global x;` — scope declarations.                                                                                                                                          */
         /* Scope is built at lower time (proc_table[i].lower_sc); these are no-ops at IR exec time.                                                                                                            */
         /* Emit IR_SUCCEED which returns NULVCL via nd->γ.                                                                                                                                                    */
         IR_t *nd = IR_node_alloc(cfg, IR_SUCCEED);
         if (!nd) return NULL;
+        return nd;
+    }
+    case TT_INITIAL: {
+        /* Icon `initial expr` — body-of-proc one-shot.  Lower the child expression and wrap in       */
+        /* IR_INITIAL which uses nd->ival3 as a graph-persistent has-run flag.  If the AST has no      */
+        /* expr child (degenerate), behaves like IR_SUCCEED.  Common shapes:                          */
+        /*   initial x := 10;            → TT_INITIAL(c[0]=TT_ASSIGN(x,10))                            */
+        /*   initial { s1; s2; ... };    → TT_INITIAL(c[0]=TT_SEQ_EXPR(s1,s2,...))                     */
+        if (e->n < 1 || !e->c[0]) {
+            IR_t *nd = IR_node_alloc(cfg, IR_SUCCEED);
+            return nd;
+        }
+        IR_t *body = lower_icn_expr_node(cfg, e->c[0]);
+        if (!body) return NULL;
+        IR_t *nd = IR_node_alloc(cfg, IR_INITIAL);
+        if (!nd) return NULL;
+        nd->c = calloc(1, sizeof(IR_t *));
+        if (!nd->c) return NULL;
+        nd->c[0] = body;
+        nd->n = 1;
+        nd->ival3 = 0;
         return nd;
     }
     case TT_RETURN: {

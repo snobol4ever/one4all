@@ -391,6 +391,26 @@ IR_t * IR_exec_node(IR_t * nd) {
     case IR_SUCCEED:
         nd->value = NULVCL;
         return nd->γ;
+    case IR_INITIAL: {
+        /* Icon `initial expr` clause inside a procedure body. Executes c[0] only on the FIRST entry */
+        /* to the proc; subsequent entries (including recursive re-entry) are no-ops. The first-run */
+        /* flag lives in nd->ival3 which is unique among per-node mutable fields in that it is NOT  */
+        /* cleared by IR_reset or copied by IR_snapshot_state/IR_restore_state, so it survives both */
+        /* the per-call reset and any recursive snapshot/restore around an inner call.              */
+        /* Relies on existing build_proc_scope logic in lower.c which removes initial-assigned vars */
+        /* from the local scope, so subsequent reads/writes of the var route through global NV and  */
+        /* the value persists across calls — yielding the static-like 11/12/13 sequence in rung21. */
+        if (nd->ival3 == 0) {
+            nd->ival3 = 1;
+            if (nd->n >= 1 && nd->c[0]) {
+                IR_exec_node(nd->c[0]);
+                /* If the initial-clause expression itself fails, propagate that failure. */
+                if (IS_FAIL_fn(nd->c[0]->value)) { nd->value = FAILDESCR; return nd->ω; }
+            }
+        }
+        nd->value = NULVCL;
+        return nd->γ;
+    }
     case IR_RETURN: {
         /* Icon return [E]. Set return value; signal early exit via FRAME.returning.                 */
         DESCR_t rv = NULVCL;

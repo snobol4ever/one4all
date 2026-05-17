@@ -124,6 +124,9 @@ typedef enum {
                         /* models proc-body-falls-off-end (returns FAILDESCR). α: head statements once + drive tail   */
                         /* fresh; β: resume tail only (NEVER re-fire the head — preserves side-effect-once semantics  */
                         /* under every/while pumping). state==0 fresh, ==1 active.                                    */
+    IR_INITIAL,         /* Icon `initial expr` — run c[0] on first ever entry to this procedure, no-op on subsequent.  */
+                        /* has-run flag stored in nd->ival3 (NOT cleared by IR_reset or IR_snapshot_state, so survives */
+                        /* recursive re-entry and the per-call IR_reset of the proc body). Always succeeds via γ.      */
     IR_E_COUNT
 } IR_e;
 typedef struct IR_t IR_t;
