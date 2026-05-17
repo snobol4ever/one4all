@@ -28,10 +28,11 @@ typedef struct ScParseState {
     char        **stash_for_pending_labels;
     int           stash_for_pending_labels_count;
     struct SwitchHead *cur_switch;
-    STMT_t            *if_before_body;    /* PST-SC-4b: CODE_t tail snapshot taken at if_head */
-    STMT_t            *while_before_body; /* PST-SC-4c: CODE_t tail snapshot taken at while_head */
-    STMT_t            *do_before_body;    /* PST-SC-4d: CODE_t tail snapshot taken at do_head */
-    STMT_t            *for_before_body;   /* PST-SC-4e: CODE_t tail snapshot taken at for_head (after init) */
+    STMT_t            *if_before_body;    /* PST-SC-4b */
+    STMT_t            *while_before_body; /* PST-SC-4c */
+    STMT_t            *do_before_body;    /* PST-SC-4d */
+    STMT_t            *for_before_body;   /* PST-SC-4e */
+    STMT_t            *func_before_body;  /* PST-SC-4g: CODE_t tail snapshot taken at func_head */
 } ScParseState;
 }
 %code {
@@ -112,15 +113,9 @@ struct ForHead {
     tree_t *step;
 };
 struct FuncHead {
-    char   *name;          /* function name — used as entry-point label,
-                              and for the prefix of the end-skip label */
-    char   *end_label;
+    char   *name;
+    char   *argstr;
     char   *prev_func;
-    STMT_t *after_goto;    /* tail snapshot AFTER the DEFINE+goto stmts,
-                              before any body stmt is appended.  The
-                              entry-point label `NAME` is spliced just
-                              after this anchor. */
-    int     lineno;
 };
 struct CaseEntry {
     char   *case_label;
@@ -172,9 +167,9 @@ static void     sc_finalize_if_else   (ScParseState *st, struct IfHead *h, STMT_
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_finalize_for_pst   (ScParseState *st, struct ForHead *h);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static struct FuncHead *sc_func_head_new(ScParseState *st, char *name, char *argstr);
+static struct FuncHead *sc_func_head_new_pst(ScParseState *st, char *name, char *argstr);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void     sc_finalize_function  (ScParseState *st, struct FuncHead *h);
+static void     sc_finalize_function_pst(ScParseState *st, struct FuncHead *h);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_emit_label_pad     (ScParseState *st, char *label);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -291,9 +286,9 @@ matched_stmt
             | for_head matched_stmt
                                         { sc_finalize_for_pst(st, $1); }
             | func_head T_LBRACE stmt_list T_RBRACE
-                                        { sc_finalize_function(st, $1); }
+                                        { sc_finalize_function_pst(st, $1); }
             | func_head T_LBRACE T_RBRACE
-                                        { sc_finalize_function(st, $1); }
+                                        { sc_finalize_function_pst(st, $1); }
             | switch_head T_LBRACE switch_body T_RBRACE
                                         { sc_finalize_switch_pst(st, $1); }
             | switch_head T_LBRACE T_RBRACE
@@ -361,7 +356,7 @@ opt_head_sep
             | T_CONCAT
             ;
 func_head   : T_DEFINE T_IDENT T_LPAREN func_arglist opt_head_sep
-                                        { $$ = sc_func_head_new(st, $2, $4); free($2); free($4); }
+                                        { $$ = sc_func_head_new_pst(st, $2, $4); free($2); free($4); }
             ;
 func_arglist
             : T_RPAREN                 { $$ = strdup(""); }
@@ -707,39 +702,35 @@ static struct ForHead *sc_for_head_new_pst(ScParseState *st, tree_t *cond, tree_
     return h;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static struct FuncHead *sc_func_head_new(ScParseState *st, char *name, char *argstr) {
-    struct FuncHead *h = calloc(1, sizeof *h);
-    h->name      = strdup(name);
-    int elen = strlen(name) + 5;
-    h->end_label = malloc(elen);
-    snprintf(h->end_label, elen, "%s_end", name);
-    h->prev_func = st->cur_func_name;
-    h->lineno    = st->ctx ? st->ctx->line : 0;
-    int slen = strlen(name) + 1 + strlen(argstr) + 2;
-    char *defarg = malloc(slen);
-    snprintf(defarg, slen, "%s(%s)", name, argstr);
-    tree_t *qarg = expr_new(AST_QLIT);
-    qarg->sval   = defarg;
-    tree_t *def_call = expr_new(AST_FNC);
-    def_call->sval   = strdup("DEFINE");
-    expr_add_child(def_call, qarg);
-    sc_append_stmt(st, def_call);
-    STMT_t *skip = sc_make_goto_uncond_stmt(st, strdup(h->end_label));
-    sc_append_chain(st, skip, skip);
-    h->after_goto = st->code->tail;
-    st->cur_func_name = h->name;
+/* PST-SC-4g (2026-05-16): func_head records name+argstr; no DEFINE call or goto emitted.
+ * func_before_body snapshot taken so sc_finalize_function_pst can sc_collect_body. */
+static struct FuncHead *sc_func_head_new_pst(ScParseState *st, char *name, char *argstr) {
+    struct FuncHead *h  = calloc(1, sizeof *h);
+    h->name             = strdup(name);
+    h->argstr           = strdup(argstr);
+    h->prev_func        = st->cur_func_name;
+    st->cur_func_name   = h->name;
+    st->func_before_body = st->code->tail;
     return h;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void sc_finalize_function(ScParseState *st, struct FuncHead *h) {
-    STMT_t *entry = sc_make_label_stmt(st, strdup(h->name));
-    sc_splice_after(st, h->after_goto, entry, entry);
-    STMT_t *endpad = sc_make_label_stmt(st, strdup(h->end_label));
-    sc_append_chain(st, endpad, endpad);
+/* PST-SC-4g: build TT_DEFINE(QLIT(name), QLIT(argstr), TT_PROGRAM(body)).
+ * lower.c lower_define emits: DEFINE(name(args)) call, skip-goto, entry label, body, end. */
+static void sc_finalize_function_pst(ScParseState *st, struct FuncHead *h)
+{
+    tree_t *body  = sc_collect_body(st, st->func_before_body);
+    int slen = strlen(h->name) + 1 + strlen(h->argstr) + 2;
+    char *sig = malloc((size_t)slen);
+    snprintf(sig, (size_t)slen, "%s(%s)", h->name, h->argstr);
+    tree_t *qname = ast_node_new(TT_QLIT); qname->sval = strdup(h->name);
+    tree_t *qsig  = ast_node_new(TT_QLIT); qsig->sval  = sig;
+    tree_t *def   = ast_node_new(TT_DEFINE);
+    ast_push(def, qname);
+    ast_push(def, qsig);
+    ast_push(def, body);
     st->cur_func_name = h->prev_func;
-    free(h->name);
-    free(h->end_label);
-    free(h);
+    free(h->name); free(h->argstr); free(h);
+    sc_append_stmt(st, def);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void sc_append_return(ScParseState *st, tree_t *retval) {

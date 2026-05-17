@@ -1112,6 +1112,34 @@ static int attr_int_of(const tree_t *s, const char *tag)
 void lower_stmt(const tree_t *s)
 {
     LabelTable *tbl = &g_labtab;
+    /* PST-SC-4g: TT_DEFINE appears directly as a stmt child of TT_PROGRAM */
+    if (s->t == TT_DEFINE) {
+        /* TT_DEFINE(QLIT(name), QLIT(sig), TT_PROGRAM(body))
+         * Emit: DEFINE(sig) call; skip-jump over body; entry label; body stmts; end. */
+        const char *name = (s->n > 0 && s->c[0]) ? s->c[0]->v.sval : "";
+        const char *sig  = (s->n > 1 && s->c[1]) ? s->c[1]->v.sval : name;
+        /* DEFINE(sig) call — registers the function at runtime */
+        sm_emit_s(g_p, SM_PUSH_LIT_S, sig);
+        sm_emit_si(g_p, SM_CALL_FN, "DEFINE", 1);
+        sm_emit(g_p, SM_VOID_POP);
+        /* skip-jump over body */
+        int skip = sm_emit_i(g_p, SM_JUMP, 0);
+        /* entry label */
+        int entry_pos = g_p->count;
+        sm_label_named(g_p, name);
+        labtab_define(tbl, name, entry_pos);
+        /* body */
+        const tree_t *body = (s->n > 2) ? s->c[2] : NULL;
+        if (body && body->t == TT_PROGRAM) {
+            for (int i = 0; i < body->n; i++)
+                if (body->c[i]) lower_stmt(body->c[i]);
+        } else if (body) {
+            lower_expr(body); sm_emit(g_p, SM_VOID_POP);
+        }
+        /* patch skip */
+        sm_patch_jump(g_p, skip, g_p->count);
+        return;
+    }
     if (s->t == TT_END) {
         const char *lbl = attr_str_of(s, ":lbl");
         if (lbl && lbl[0]) {
