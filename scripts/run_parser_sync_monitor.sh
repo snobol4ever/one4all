@@ -58,19 +58,27 @@ fi
 SNO_OUT="/tmp/parser_${LANG}.sno"
 
 # SCT-1c-2: dump the full Snocone runtime prelude alongside parser_<lang>.sc so
-# the resulting .sno is self-contained.  Order matches corpus/SCRIP/README.md:
-#   global → tree → stack → counter → ShiftReduce → semantic → tdump → parser
-# Without these, the transpiled parser fails immediately because `digits`,
-# `nl`, `Tree`, `Pop`, etc. aren't defined in the .sno's symbol environment.
+# the resulting .sno is self-contained.  Order mirrors run_scrip_parser.sh exactly
+# (which mirrors the beauty.sno -INCLUDE chain).
+# PIVOT (2026-05-17, Claude Sonnet 4.6): include gen.sc and language-specific helpers
+# alongside the parser so all six languages transpile cleanly.  Helpers will be
+# eliminated in a later cleanup session (SCT-4/5/6); for now they are included.
 CORPUS_SCRIP="${CORPUS_ROOT:-$REPO_ROOT/../corpus}/SCRIP"
 RUNTIME=(
     "$CORPUS_SCRIP/global.sc"
-    "$CORPUS_SCRIP/tree.sc"
-    "$CORPUS_SCRIP/stack.sc"
+    "$CORPUS_SCRIP/case.sc"
+    "$CORPUS_SCRIP/assign.sc"
+    "$CORPUS_SCRIP/match.sc"
     "$CORPUS_SCRIP/counter.sc"
+    "$CORPUS_SCRIP/stack.sc"
+    "$CORPUS_SCRIP/tree.sc"
     "$CORPUS_SCRIP/ShiftReduce.sc"
-    "$CORPUS_SCRIP/semantic.sc"
     "$CORPUS_SCRIP/tdump.sc"
+    "$CORPUS_SCRIP/gen.sc"
+    "$CORPUS_SCRIP/qize.sc"
+    "$CORPUS_SCRIP/semantic.sc"
+    "$CORPUS_SCRIP/omega.sc"
+    "$CORPUS_SCRIP/trace.sc"
 )
 for f in "${RUNTIME[@]}"; do
     if [[ ! -f "$f" ]]; then
@@ -79,8 +87,17 @@ for f in "${RUNTIME[@]}"; do
     fi
 done
 
+# Load language-specific helpers if they exist (icon_helpers.sc, raku_helpers.sc).
+# These are loaded between runtime and parser, matching run_scrip_parser.sh behaviour.
+HELPERS=()
+HELPER_FILE="$CORPUS_SCRIP/${LANG}_helpers.sc"
+if [[ -f "$HELPER_FILE" ]]; then
+    HELPERS=("$HELPER_FILE")
+    echo "[run_parser_sync_monitor] including helpers: $HELPER_FILE"
+fi
+
 echo "[run_parser_sync_monitor] transpiling runtime + $PARSER_SC -> $SNO_OUT"
-if ! "$SCRIP" --dump-sno "${RUNTIME[@]}" "$PARSER_SC" > "$SNO_OUT"; then
+if ! "$SCRIP" --dump-sno "${RUNTIME[@]}" "${HELPERS[@]}" "$PARSER_SC" > "$SNO_OUT"; then
     echo "run_parser_sync_monitor: --dump-sno failed for $PARSER_SC" >&2
     exit 2
 fi
