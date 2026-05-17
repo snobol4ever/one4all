@@ -35,11 +35,19 @@ void lower_stmt    (const tree_t *s);
 static SM_Program  *g_p;
 static LabelTable   g_labtab;
 static int          g_in_proc_body;
-static int          g_in_gen_proc_body;  /* IJ-SUSPEND: set during lowering of TT_SUSPEND-bearing procs */
+static int          g_in_gen_proc_body;
 static IcnScope    *g_proc_scope;
 static unsigned long long g_unhandled_kinds[LOWER_UNHANDLED_WORDS];
 static int          g_in_value_ctx;
 static const tree_t *g_hoist_alt   = NULL;
+/* PST-SC-4h: loop-label stack for break/continue resolution in lower */
+#define LOWER_LOOP_STACK_MAX 64
+static struct { const char *cont; const char *end; } g_loop_stack[LOWER_LOOP_STACK_MAX];
+static int g_loop_sp = 0;
+static void loop_push(const char *cont, const char *end) {
+    if (g_loop_sp < LOWER_LOOP_STACK_MAX) { g_loop_stack[g_loop_sp].cont = cont; g_loop_stack[g_loop_sp].end = end; g_loop_sp++; }
+}
+static void loop_pop(void) { if (g_loop_sp > 0) g_loop_sp--; }
 static int           g_hoist_entry = -1;
 static int           g_hoist_slot  = -1;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -725,6 +733,7 @@ static void lower_while_until(const tree_t *t, int exit_on_success)
     lower_expr(t->c[0]);
     int jx = exit_on_success ? sm_emit_i(g_p, SM_JUMP_S, 0) : sm_emit_i(g_p, SM_JUMP_F, 0);
     sm_emit(g_p, SM_VOID_POP);
+    loop_push(lbl_cont, lbl_end);
     const tree_t *body = (t->n > 1) ? t->c[1] : NULL;
     if (body && body->t == TT_PROGRAM) {
         /* Snocone stmt block — iterate for effect; break can jump out before block ends */
@@ -734,6 +743,7 @@ static void lower_while_until(const tree_t *t, int exit_on_success)
         /* Icon/expression body — evaluates to a value */
         lower_expr(body); sm_emit(g_p, SM_VOID_POP);
     }
+    loop_pop();
     sm_emit_i(g_p, SM_JUMP, top);
     int exit_pos = g_p->count;
     sm_patch_jump(g_p, jx, exit_pos);
@@ -758,6 +768,7 @@ static void lower_do_while(const tree_t *t)
     const char *lbl_cont = (t->n > 2 && t->c[2]) ? t->c[2]->v.sval : NULL;
     const char *lbl_end  = (t->n > 3 && t->c[3]) ? t->c[3]->v.sval : NULL;
     int top = g_p->count;
+    loop_push(lbl_cont, lbl_end);
     /* body */
     const tree_t *body = (t->n > 0) ? t->c[0] : NULL;
     if (body && body->t == TT_PROGRAM) {
@@ -766,6 +777,7 @@ static void lower_do_while(const tree_t *t)
     } else if (body) {
         lower_expr(body); sm_emit(g_p, SM_VOID_POP);
     }
+    loop_pop();
     /* cont label goes here — before the cond test (continue target) */
     if (lbl_cont && lbl_cont[0]) labtab_define(tbl, lbl_cont, g_p->count);
     /* cond */
@@ -793,6 +805,7 @@ static void lower_for(const tree_t *t)
     lower_expr(t->c[0]);
     int jf = sm_emit_i(g_p, SM_JUMP_F, 0);
     sm_emit(g_p, SM_VOID_POP);
+    loop_push(lbl_cont, lbl_end);
     /* body */
     const tree_t *body = (t->n > 2) ? t->c[2] : NULL;
     if (body && body->t == TT_PROGRAM) {
@@ -801,6 +814,7 @@ static void lower_for(const tree_t *t)
     } else if (body) {
         lower_expr(body); sm_emit(g_p, SM_VOID_POP);
     }
+    loop_pop();
     /* cont: step expression */
     if (lbl_cont && lbl_cont[0]) labtab_define(tbl, lbl_cont, g_p->count);
     if (t->n > 1 && t->c[1]) { lower_expr(t->c[1]); sm_emit(g_p, SM_VOID_POP); }
@@ -820,13 +834,31 @@ static void lower_repeat(const tree_t *t)
     sm_emit(g_p, SM_PUSH_NULL);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PST-SC-4h: TT_LOOP_BREAK([QLIT(user_label)]). For Snocone PST: resolve against g_loop_stack.
+ * For Icon legacy path (t->n > 0 with non-QLIT child): old SM_JUMP+1 behavior preserved. */
 static void lower_loop_break(const tree_t *t)
 {
+    const char *user_lbl = (t->n > 0 && t->c[0] && t->c[0]->t == TT_QLIT) ? t->c[0]->v.sval : NULL;
+    if (g_loop_sp > 0) {
+        /* Snocone PST path — resolve via label table */
+        const char *end = user_lbl ? user_lbl : (g_loop_sp > 0 ? g_loop_stack[g_loop_sp-1].end : NULL);
+        if (end && end[0]) { emit_goto(SM_JUMP, end); return; }
+    }
+    /* Icon legacy path */
     if (t->n > 0) lower_expr(t->c[0]); else sm_emit(g_p, SM_PUSH_NULL);
     sm_emit_i(g_p, SM_JUMP, g_p->count + 1);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void lower_loop_next(const tree_t *t) { (void)t; sm_emit(g_p, SM_PUSH_NULL); }
+/* PST-SC-4h: TT_LOOP_NEXT([QLIT(user_label)]). Snocone: jump to cont label. */
+static void lower_loop_next(const tree_t *t)
+{
+    const char *user_lbl = (t->n > 0 && t->c[0] && t->c[0]->t == TT_QLIT) ? t->c[0]->v.sval : NULL;
+    if (g_loop_sp > 0) {
+        const char *cont = user_lbl ? user_lbl : (g_loop_sp > 0 ? g_loop_stack[g_loop_sp-1].cont : NULL);
+        if (cont && cont[0]) { emit_goto(SM_JUMP, cont); return; }
+    }
+    (void)t; sm_emit(g_p, SM_PUSH_NULL);
+}
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_return(const tree_t *t)
 {
@@ -1112,9 +1144,12 @@ static int attr_int_of(const tree_t *s, const char *tag)
 void lower_stmt(const tree_t *s)
 {
     LabelTable *tbl = &g_labtab;
+    /* PST-SC-4h: TT_LOOP_BREAK/NEXT appear directly as stmt children of TT_PROGRAM */
+    if (s->t == TT_LOOP_BREAK || s->t == TT_LOOP_NEXT) {
+        lower_expr(s); sm_emit(g_p, SM_VOID_POP); return;
+    }
     /* PST-SC-4g: TT_DEFINE appears directly as a stmt child of TT_PROGRAM */
-    if (s->t == TT_DEFINE) {
-        /* TT_DEFINE(QLIT(name), QLIT(sig), TT_PROGRAM(body))
+    if (s->t == TT_DEFINE) {        /* TT_DEFINE(QLIT(name), QLIT(sig), TT_PROGRAM(body))
          * Emit: DEFINE(sig) call; skip-jump over body; entry label; body stmts; end. */
         const char *name = (s->n > 0 && s->c[0]) ? s->c[0]->v.sval : "";
         const char *sig  = (s->n > 1 && s->c[1]) ? s->c[1]->v.sval : name;

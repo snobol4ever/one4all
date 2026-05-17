@@ -1074,45 +1074,35 @@ static LoopFrame *sc_loop_find_innermost(ScParseState *st, int want_loop) {
     return NULL;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PST-SC-4h (2026-05-16): emit TT_LOOP_BREAK([QLIT(user_label)]) — no goto STMT_t.
+ * lower.c resolves the target via g_loop_stack at lower time. */
 static void sc_append_break(ScParseState *st, char *user_label) {
-    LoopFrame *f = user_label
-        ? sc_loop_find_by_user_label(st, user_label, 0)
-        : sc_loop_find_innermost(st, 0);
-    if (!f) {
-        if (user_label) {
-            char buf[256];
-            snprintf(buf, sizeof buf, "break: no enclosing loop or switch labeled '%s'", user_label);
-            sc_error(st, buf);
-        } else {
-            sc_error(st, "break outside of loop or switch");
-        }
-        sc_pending_label_clear(st);
-        return;
+    if (!st->loop_top) {
+        sc_error(st, user_label ? "break: no enclosing loop or switch" : "break outside of loop or switch");
+        sc_pending_label_clear(st); return;
     }
     sc_pending_label_clear(st);
-    STMT_t *g = sc_make_goto_uncond_stmt(st, strdup(f->end_label));
-    sc_append_chain(st, g, g);
+    tree_t *brk = ast_node_new(TT_LOOP_BREAK);
+    if (user_label) {
+        tree_t *q = ast_node_new(TT_QLIT); q->sval = strdup(user_label);
+        ast_push(brk, q);
+    }
+    sc_append_stmt(st, brk);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PST-SC-4h (2026-05-16): emit TT_LOOP_NEXT([QLIT(user_label)]) — no goto STMT_t. */
 static void sc_append_continue(ScParseState *st, char *user_label) {
-    LoopFrame *f = user_label
-        ? sc_loop_find_by_user_label(st, user_label, 1)
-        : sc_loop_find_innermost(st, 1);
-    if (!f) {
-        if (user_label) {
-            char buf[256];
-            snprintf(buf, sizeof buf, "continue: no enclosing loop labeled '%s'", user_label);
-            sc_error(st, buf);
-        } else {
-            sc_error(st, "continue outside of loop");
-        }
-        sc_pending_label_clear(st);
-        return;
+    if (!st->loop_top) {
+        sc_error(st, user_label ? "continue: no enclosing loop" : "continue outside of loop");
+        sc_pending_label_clear(st); return;
     }
-    f->cont_used = 1;          /* tells finalize_* to emit the Lcont pad (do/for) */
     sc_pending_label_clear(st);
-    STMT_t *g = sc_make_goto_uncond_stmt(st, strdup(f->cont_label));
-    sc_append_chain(st, g, g);
+    tree_t *nxt = ast_node_new(TT_LOOP_NEXT);
+    if (user_label) {
+        tree_t *q = ast_node_new(TT_QLIT); q->sval = strdup(user_label);
+        ast_push(nxt, q);
+    }
+    sc_append_stmt(st, nxt);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void sc_switch_cases_grow(struct SwitchHead *h) {
