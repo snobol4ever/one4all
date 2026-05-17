@@ -82,9 +82,9 @@ static void     sc_append_stmt        (ScParseState *st, tree_t *top);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static tree_t  *sc_collect_body       (ScParseState *st, STMT_t *snapshot);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void     sc_finalize_if_no_else_pst(ScParseState *st, tree_t *cond);
+static void     sc_finalize_if_no_else_pst(ScParseState *st, struct IfHead *h);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void     sc_finalize_if_else_pst(ScParseState *st, tree_t *cond, STMT_t *before_else);
+static void     sc_finalize_if_else_pst(ScParseState *st, struct IfHead *h, STMT_t *before_else);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_split_subject_pattern(tree_t **subj_io, tree_t **pat_io);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -248,7 +248,7 @@ static void     sc_emit_struct         (ScParseState *st, char *name, char *fiel
 %type <expr> expr0 expr1 expr3 expr4 expr5 expr6 expr9 expr11 expr12 expr15 expr17 exprlist exprlist_ne
 %type <whilehead> while_head
 %type <dohead>    do_head
-%type <expr>      if_head
+%type <ifhead>    if_head
 /* do_head returns DoHead* (PST-SC-4i fix: per-instance before_body snapshot) */
 %type <stmt_ptr>  else_keyword
 %type <forhead>   for_head
@@ -303,7 +303,7 @@ unmatched_stmt
             | label_decl unmatched_stmt
             ;
 if_head     : T_IF T_LPAREN expr0 T_RPAREN opt_head_sep
-                                        { st->if_before_body = st->code->tail; $$ = $3; }
+                                        { $$ = sc_if_head_new(st, $3); }
             ;
 while_head  : T_WHILE T_LPAREN expr0 T_RPAREN opt_head_sep
                                         { char *lc = sc_label_new(st, "_Ltop");
@@ -854,37 +854,40 @@ static tree_t *sc_collect_body(ScParseState *st, STMT_t *snapshot)
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* PST-SC-4b: Emit TT_IF(cond, then_block) as a single statement in CODE_t.
- * `cond` is the raw expression from if_head.
- * `before_then` is the CODE_t tail snapshot taken BEFORE the then-body was parsed. */
-static void sc_finalize_if_no_else_pst(ScParseState *st, tree_t *cond)
+ * `h` carries the per-if cond + before_body snapshot (heap-allocated by sc_if_head_new),
+ * so nested ifs each carry their own snapshot — fixes use-after-free that occurred when
+ * a shared ScParseState field was overwritten by an inner if's reduction. */
+static void sc_finalize_if_no_else_pst(ScParseState *st, struct IfHead *h)
 {
-    /* before_then == NULL means nothing was in CODE_t before; then-body is everything */
-    /* We need the snapshot that was taken when if_head fired.  Since if_head now just
-     * returns the cond expr and no longer captures a snapshot, we capture it here using
-     * the current CODE_t tail (the body was already appended by the sub-rules). */
-    /* NOTE: this approach requires that the snapshot be taken BEFORE the body rules run.
-     * We do this by storing it in a local we compute at the call site.
-     * For now, we re-implement by snapshotting at if_head time via sc_if_before_body
-     * stored in ScParseState.  See header changes below. */
-    tree_t *then_block = sc_collect_body(st, st->if_before_body);
+    tree_t *then_block = sc_collect_body(st, h->before_body);
     tree_t *if_node    = ast_node_new(TT_IF);
-    ast_push(if_node, cond);
+    ast_push(if_node, h->cond);
     ast_push(if_node, then_block);
     /* wrap TT_IF in a STMT_t so it reaches lower() via the normal CODE_t → TT_PROGRAM path */
     sc_append_stmt(st, if_node);
+    free(h);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* PST-SC-4b: Emit TT_IF(cond, then_block, else_block) as a single statement.
- * `before_else` is the CODE_t tail snapshot taken at the T_ELSE token. */
-static void sc_finalize_if_else_pst(ScParseState *st, tree_t *cond, STMT_t *before_else)
+ * `h` carries the per-if cond + before_body snapshot (heap-allocated by sc_if_head_new).
+ * `before_else` is the CODE_t tail snapshot taken at the T_ELSE token.
+ *
+ * SL-2 FIX (2026-05-17): previously `sc_finalize_if_else_pst` read `st->if_before_body`
+ * here.  That field is a single slot on the parse state and is overwritten by every
+ * nested `if_head` reduction, so with three or more chained `else if` clauses the
+ * outer finalization read a stale snapshot whose STMT_t had been freed by the inner
+ * `sc_collect_body` call — a heap-use-after-free in `sc_collect_body` line 840.
+ * The per-if snapshot now lives in `IfHead`, so nesting cannot clobber it. */
+static void sc_finalize_if_else_pst(ScParseState *st, struct IfHead *h, STMT_t *before_else)
 {
     tree_t *else_block = sc_collect_body(st, before_else);
-    tree_t *then_block = sc_collect_body(st, st->if_before_body);
+    tree_t *then_block = sc_collect_body(st, h->before_body);
     tree_t *if_node    = ast_node_new(TT_IF);
-    ast_push(if_node, cond);
+    ast_push(if_node, h->cond);
     ast_push(if_node, then_block);
     ast_push(if_node, else_block);
     sc_append_stmt(st, if_node);
+    free(h);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* PST-SC-4c (2026-05-16): pure-syntax while finalizer.

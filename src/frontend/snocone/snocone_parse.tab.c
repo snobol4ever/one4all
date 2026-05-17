@@ -289,9 +289,9 @@ static void     sc_append_stmt        (ScParseState *st, tree_t *top);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static tree_t  *sc_collect_body       (ScParseState *st, STMT_t *snapshot);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void     sc_finalize_if_no_else_pst(ScParseState *st, tree_t *cond);
+static void     sc_finalize_if_no_else_pst(ScParseState *st, struct IfHead *h);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void     sc_finalize_if_else_pst(ScParseState *st, tree_t *cond, STMT_t *before_else);
+static void     sc_finalize_if_else_pst(ScParseState *st, struct IfHead *h, STMT_t *before_else);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_split_subject_pattern(tree_t **subj_io, tree_t **pat_io);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -1663,7 +1663,7 @@ yyreduce:
     {
   case 10: /* matched_stmt: if_head matched_stmt else_keyword matched_stmt  */
 #line 273 "snocone_parse.y"
-                                        { sc_finalize_if_else_pst(st, (yyvsp[-3].expr), (yyvsp[-1].stmt_ptr)); }
+                                        { sc_finalize_if_else_pst(st, (yyvsp[-3].ifhead), (yyvsp[-1].stmt_ptr)); }
 #line 1668 "snocone_parse.tab.c"
     break;
 
@@ -1723,13 +1723,13 @@ yyreduce:
 
   case 21: /* unmatched_stmt: if_head stmt  */
 #line 296 "snocone_parse.y"
-                                        { sc_finalize_if_no_else_pst(st, (yyvsp[-1].expr)); }
+                                        { sc_finalize_if_no_else_pst(st, (yyvsp[-1].ifhead)); }
 #line 1728 "snocone_parse.tab.c"
     break;
 
   case 22: /* unmatched_stmt: if_head matched_stmt else_keyword unmatched_stmt  */
 #line 298 "snocone_parse.y"
-                                        { sc_finalize_if_else_pst(st, (yyvsp[-3].expr), (yyvsp[-1].stmt_ptr)); }
+                                        { sc_finalize_if_else_pst(st, (yyvsp[-3].ifhead), (yyvsp[-1].stmt_ptr)); }
 #line 1734 "snocone_parse.tab.c"
     break;
 
@@ -1747,7 +1747,7 @@ yyreduce:
 
   case 26: /* if_head: T_IF T_LPAREN expr0 T_RPAREN opt_head_sep  */
 #line 306 "snocone_parse.y"
-                                        { st->if_before_body = st->code->tail; (yyval.expr) = (yyvsp[-2].expr); }
+                                        { (yyval.ifhead) = sc_if_head_new(st, (yyvsp[-2].expr)); }
 #line 1752 "snocone_parse.tab.c"
     break;
 
@@ -2884,37 +2884,40 @@ static tree_t *sc_collect_body(ScParseState *st, STMT_t *snapshot)
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* PST-SC-4b: Emit TT_IF(cond, then_block) as a single statement in CODE_t.
- * `cond` is the raw expression from if_head.
- * `before_then` is the CODE_t tail snapshot taken BEFORE the then-body was parsed. */
-static void sc_finalize_if_no_else_pst(ScParseState *st, tree_t *cond)
+ * `h` carries the per-if cond + before_body snapshot (heap-allocated by sc_if_head_new),
+ * so nested ifs each carry their own snapshot — fixes use-after-free that occurred when
+ * a shared ScParseState field was overwritten by an inner if's reduction. */
+static void sc_finalize_if_no_else_pst(ScParseState *st, struct IfHead *h)
 {
-    /* before_then == NULL means nothing was in CODE_t before; then-body is everything */
-    /* We need the snapshot that was taken when if_head fired.  Since if_head now just
-     * returns the cond expr and no longer captures a snapshot, we capture it here using
-     * the current CODE_t tail (the body was already appended by the sub-rules). */
-    /* NOTE: this approach requires that the snapshot be taken BEFORE the body rules run.
-     * We do this by storing it in a local we compute at the call site.
-     * For now, we re-implement by snapshotting at if_head time via sc_if_before_body
-     * stored in ScParseState.  See header changes below. */
-    tree_t *then_block = sc_collect_body(st, st->if_before_body);
+    tree_t *then_block = sc_collect_body(st, h->before_body);
     tree_t *if_node    = ast_node_new(TT_IF);
-    ast_push(if_node, cond);
+    ast_push(if_node, h->cond);
     ast_push(if_node, then_block);
     /* wrap TT_IF in a STMT_t so it reaches lower() via the normal CODE_t → TT_PROGRAM path */
     sc_append_stmt(st, if_node);
+    free(h);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* PST-SC-4b: Emit TT_IF(cond, then_block, else_block) as a single statement.
- * `before_else` is the CODE_t tail snapshot taken at the T_ELSE token. */
-static void sc_finalize_if_else_pst(ScParseState *st, tree_t *cond, STMT_t *before_else)
+ * `h` carries the per-if cond + before_body snapshot (heap-allocated by sc_if_head_new).
+ * `before_else` is the CODE_t tail snapshot taken at the T_ELSE token.
+ *
+ * SL-2 FIX (2026-05-17): previously `sc_finalize_if_else_pst` read `st->if_before_body`
+ * here.  That field is a single slot on the parse state and is overwritten by every
+ * nested `if_head` reduction, so with three or more chained `else if` clauses the
+ * outer finalization read a stale snapshot whose STMT_t had been freed by the inner
+ * `sc_collect_body` call — a heap-use-after-free in `sc_collect_body` line 840.
+ * The per-if snapshot now lives in `IfHead`, so nesting cannot clobber it. */
+static void sc_finalize_if_else_pst(ScParseState *st, struct IfHead *h, STMT_t *before_else)
 {
     tree_t *else_block = sc_collect_body(st, before_else);
-    tree_t *then_block = sc_collect_body(st, st->if_before_body);
+    tree_t *then_block = sc_collect_body(st, h->before_body);
     tree_t *if_node    = ast_node_new(TT_IF);
-    ast_push(if_node, cond);
+    ast_push(if_node, h->cond);
     ast_push(if_node, then_block);
     ast_push(if_node, else_block);
     sc_append_stmt(st, if_node);
+    free(h);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* PST-SC-4c (2026-05-16): pure-syntax while finalizer.

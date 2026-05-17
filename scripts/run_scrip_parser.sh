@@ -18,11 +18,12 @@ if [ ! -d "$SD" ];   then echo "SKIP corpus/SCRIP not found: $SD"; exit 0; fi
 # Shared runtime — beauty.sno INCLUDE order:
 #   global, case, assign, match, counter, stack, tree, ShiftReduce,
 #   TDump, Gen, Qize, semantic, omega, trace
-# NOTE: qize.sc omitted — loading it breaks Append-through-function-parameter
-#   (pre-existing scrip Snocone interpreter bug, tracked in SL-2 notes).
-#   Three Error 5 "Undefined SQize" appear at load time for shift()-based label
-#   patterns; those patterns are non-fatal and the parser runs correctly for
-#   non-label inputs.  Re-add qize.sc here once that bug is fixed.
+# SL-2 (2026-05-17): qize.sc is re-included.  The "Append-through-function-parameter"
+# theory recorded earlier was a misdiagnosis — the actual bug was a use-after-free
+# in snocone_parse.y's sc_finalize_if_else_pst, triggered by any function with
+# three or more chained `else if` clauses (qize.sc's Qize fits that shape).
+# Fixed by giving each `if_head` its own heap-allocated IfHead snapshot instead of
+# sharing a single ScParseState slot that nested ifs clobbered.
 RUNTIME=(
     "$SD/global.sc"
     "$SD/case.sc"
@@ -40,11 +41,11 @@ RUNTIME=(
     "$SD/trace.sc"
 )
 
-# SL-13: lower pipeline (parser_snobol4.sc calls Lower_collect + Lower_run)
-LOWER=(
-    "$SD/lower.sc"
-    "$SD/lower_driver.sc"
-)
+# PST-RB-5e (2026-05-17): lower.sc and lower_driver.sc were deleted from corpus/SCRIP
+# and will be re-translated from lower.c when that file stabilizes.  The PST-era
+# parsers (snobol4, snocone, icon, prolog, raku, rebus) now emit pure AST via TDump
+# and need no SCRIP-side lowering pass.
+LOWER=()
 
 DRIVER="$SD/parser_${LANG}.sc"
 if [ ! -f "$DRIVER" ]; then echo "SKIP no driver: $DRIVER"; exit 0; fi
