@@ -587,6 +587,30 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         nd->n    = 2;
         return nd;
     }
+    case TT_SECTION:
+    case TT_SECTION_PLUS:
+    case TT_SECTION_MINUS: {
+        /* Icon s[i:j] / s[i+:n] / s[i-:n] section. c[0]=base, c[1]=i, c[2]=j-or-n.                     */
+        /* nd->ival encodes kind: 0=RANGE (i:j), 1=PLUS (i+:n), 2=MINUS (i-:n). Executor transforms      */
+        /* PLUS/MINUS to absolute bounds before calling subscript_get2 (which expects RANGE form).       */
+        if (e->n < 3 || !e->c[0] || !e->c[1] || !e->c[2]) return NULL;
+        IR_t *base = lower_icn_expr_node(cfg, e->c[0]);
+        if (!base) return NULL;
+        IR_t *i1   = lower_icn_expr_node(cfg, e->c[1]);
+        if (!i1) return NULL;
+        IR_t *i2   = lower_icn_expr_node(cfg, e->c[2]);
+        if (!i2) return NULL;
+        IR_t *nd = IR_node_alloc(cfg, IR_ICN_SECTION);
+        if (!nd) return NULL;
+        nd->c = calloc(3, sizeof(IR_t *));
+        if (!nd->c) return NULL;
+        nd->c[0] = base;
+        nd->c[1] = i1;
+        nd->c[2] = i2;
+        nd->n    = 3;
+        nd->ival = (e->t == TT_SECTION) ? 0 : (e->t == TT_SECTION_PLUS) ? 1 : 2;
+        return nd;
+    }
     case TT_CASE: {
         /* Icon case E of { K1: V1; ...; default: VD }. c[0]=sel, then key/val pairs, opt default. */
         if (e->n < 1 || !e->c[0]) return NULL;

@@ -823,6 +823,32 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->value = r;
         return nd->γ;
     }
+    case IR_ICN_SECTION: {
+        /* Icon s[i:j] / s[i+:n] / s[i-:n] section. c[0]=base, c[1]=i, c[2]=j. nd->ival encodes kind:    */
+        /* 0=RANGE (i:j), 1=PLUS (i+:n → [i, i+n)), 2=MINUS (i-:n → [i-n, i)). subscript_get2 expects    */
+        /* RANGE bounds; for PLUS/MINUS we transform j to absolute before the call (int-mode only).     */
+        if (nd->n < 3 || !nd->c[0] || !nd->c[1] || !nd->c[2]) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[0]);
+        DESCR_t base = nd->c[0]->value;
+        if (IS_FAIL_fn(base)) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[1]);
+        DESCR_t i1 = nd->c[1]->value;
+        if (IS_FAIL_fn(i1)) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[2]);
+        DESCR_t i2 = nd->c[2]->value;
+        if (IS_FAIL_fn(i2)) { nd->value = FAILDESCR; return nd->ω; }
+        if (nd->ival == 1 && IS_INT_fn(i1) && IS_INT_fn(i2)) {
+            i2 = INTVAL(i1.i + i2.i);
+        } else if (nd->ival == 2 && IS_INT_fn(i1) && IS_INT_fn(i2)) {
+            int64_t lo = i1.i - i2.i;
+            i2 = i1;
+            i1 = INTVAL(lo);
+        }
+        DESCR_t r = subscript_get2(base, i1, i2);
+        if (IS_FAIL_fn(r)) { nd->value = FAILDESCR; return nd->ω; }
+        nd->value = r;
+        return nd->γ;
+    }
     case IR_CASE: {
         /* Icon case E of { K1: V1; K2: V2; ...; default: VD }.                                  */
         /* c[0]=selector; c[1],c[2]=key1,val1; c[3],c[4]=key2,val2; ... last child=default.      */
