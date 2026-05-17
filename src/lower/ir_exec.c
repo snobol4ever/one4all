@@ -50,7 +50,7 @@ static int ir_is_single_shot(IR_t * e) {
     case IR_ICN_ALTERNATE: case IR_ICN_LIMIT: case IR_ICN_BINOP: case IR_ICN_TO_NESTED:
     case IR_ICN_PROC_GEN: case IR_BINOP_GEN: case IR_ALT: case IR_ALTERNATE:
     case IR_SUSPEND: case IR_REPEAT: case IR_TO_BY: case IR_LIMIT: case IR_ICN_SCAN:
-    case IR_ICN_LIST_BANG: case IR_ICN_KEY_GEN: case IR_ICN_FIND_GEN:
+    case IR_ICN_LIST_BANG: case IR_ICN_KEY_GEN: case IR_ICN_FIND_GEN: case IR_ICN_SEQ_GEN:
         return 0;
     case IR_CALL: {
         if (!e->sval) return 1;
@@ -310,7 +310,7 @@ IR_t * IR_exec_node(IR_t * nd) {
             (k) == IR_ICN_TO || (k) == IR_ICN_TO_BY || (k) == IR_ICN_UPTO || \
             (k) == IR_ALT || (k) == IR_ALTERNATE || (k) == IR_BINOP_GEN || \
             (k) == IR_ICN_ITERATE || (k) == IR_ICN_LIMIT || (k) == IR_ICN_PROC_GEN || \
-            (k) == IR_ICN_LIST_BANG || (k) == IR_ICN_KEY_GEN || (k) == IR_ICN_FIND_GEN || (k) == IR_TO_BY)
+            (k) == IR_ICN_LIST_BANG || (k) == IR_ICN_KEY_GEN || (k) == IR_ICN_FIND_GEN || (k) == IR_ICN_SEQ_GEN || (k) == IR_TO_BY)
         int l_gen = IR_IS_GEN_KIND(nd->c[0]->t);
         int r_gen = IR_IS_GEN_KIND(nd->c[1]->t);
         if (nd->state == 0) {
@@ -586,7 +586,7 @@ IR_t * IR_exec_node(IR_t * nd) {
             (k) == IR_ICN_TO || (k) == IR_ICN_TO_BY || (k) == IR_ICN_UPTO || \
             (k) == IR_ALT    || (k) == IR_ALTERNATE  || (k) == IR_BINOP_GEN || \
             (k) == IR_ICN_ITERATE || (k) == IR_ICN_LIMIT || (k) == IR_ICN_PROC_GEN || \
-            (k) == IR_ICN_LIST_BANG || (k) == IR_ICN_KEY_GEN || (k) == IR_ICN_FIND_GEN || (k) == IR_TO_BY  || (k) == IR_ICN_ALTERNATE)
+            (k) == IR_ICN_LIST_BANG || (k) == IR_ICN_KEY_GEN || (k) == IR_ICN_FIND_GEN || (k) == IR_ICN_SEQ_GEN || (k) == IR_TO_BY  || (k) == IR_ICN_ALTERNATE)
         if (nd->n < 1) { nd->value = FAILDESCR; return nd->ω; }
         if (nd->state == 0) {
             for (int i = 0; i < nd->n; i++) {
@@ -1245,6 +1245,40 @@ IR_t * IR_exec_node(IR_t * nd) {
         if (pos1 + st->nlen - 1 >= st->stop) { nd->state = 0; nd->opaque = NULL; nd->value = FAILDESCR; return nd->ω; }
         nd->counter = (int64_t)pos1;  /* next search starts one char past this match's 0-based start */
         nd->value   = INTVAL(pos1);
+        return nd->γ;
+    }
+    case IR_ICN_SEQ_GEN: {
+        /* seq([start [, step]]) — infinite arithmetic progression generator.                     */
+        /* α (state==0): read optional start (c[0], default 1) + step (c[1], default 1), yield   */
+        /*               start; cache step in nd->ival.                                            */
+        /* β (state==1): yield counter + step; advance counter.                                    */
+        /* No upper bound: caller must pair with `\ N` (IR_LIMIT) or break out of every.           */
+        if (nd->state == 0) {
+            int64_t start = 1, step = 1;
+            if (nd->n >= 1 && nd->c[0]) {
+                IR_exec_node(nd->c[0]);
+                DESCR_t sv = nd->c[0]->value;
+                if (IS_FAIL_fn(sv)) { nd->value = FAILDESCR; return nd->ω; }
+                if (IS_INT_fn(sv)) start = sv.i;
+                else if (IS_REAL_fn(sv)) start = (int64_t)sv.r;
+            }
+            if (nd->n >= 2 && nd->c[1]) {
+                IR_exec_node(nd->c[1]);
+                DESCR_t sv = nd->c[1]->value;
+                if (IS_FAIL_fn(sv)) { nd->value = FAILDESCR; return nd->ω; }
+                if (IS_INT_fn(sv)) step = sv.i;
+                else if (IS_REAL_fn(sv)) step = (int64_t)sv.r;
+            }
+            /* Icon seq spec: step must be non-zero (zero would be infinite-no-progress). */
+            if (step == 0) step = 1;
+            nd->ival    = step;
+            nd->counter = start;
+            nd->state   = 1;
+            nd->value   = INTVAL(start);
+            return nd->γ;
+        }
+        nd->counter += nd->ival;
+        nd->value    = INTVAL(nd->counter);
         return nd->γ;
     }
     case IR_CASE: {

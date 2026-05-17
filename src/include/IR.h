@@ -134,6 +134,10 @@ typedef enum {
     IR_ICN_FIND_GEN,    /* Icon find(needle, hay [, start [, stop]]) generator. Yields each match position 1..N.       */
                         /* c[0]=needle, c[1]=hay, optional c[2]=start, c[3]=stop. counter tracks last-yielded position */
                         /* (1-based, 0 means fresh); opaque caches needle/hay strings. α resolves, β advances.         */
+    IR_ICN_SEQ_GEN,     /* Icon seq([start [, step]]) infinite arithmetic-progression generator. Yields start, start+  */
+                        /* step, start+2step, ...  c[0]=optional start (default 1), c[1]=optional step (default 1).    */
+                        /* counter holds last-yielded value (ival used as cached step). α reads args, β advances.      */
+                        /* Always pair with IR_LIMIT / `\N` or `every` with break — otherwise infinite loop.            */
     IR_E_COUNT
 } IR_e;
 typedef struct IR_t IR_t;

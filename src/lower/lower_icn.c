@@ -417,6 +417,26 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
             nd->n = nargs;
             return nd;
         }
+        /* seq([start [, step]]) — infinite arithmetic progression.  Defaults to seq(1, 1) when no */
+        /* args.  Always lowers to IR_ICN_SEQ_GEN — must be paired with a limiting consumer (every  */
+        /* with break, IR_LIMIT via `\ N`).  Without a limit, IR_ICN_SEQ_GEN runs forever.          */
+        if ((nargs == 0 || nargs == 1 || nargs == 2)
+            && strcmp(e->c[0]->v.sval, "seq") == 0) {
+            IR_t **args2 = NULL;
+            if (nargs > 0) {
+                args2 = calloc((size_t)nargs, sizeof(IR_t *));
+                if (!args2) return NULL;
+                for (int j = 0; j < nargs; j++) {
+                    args2[j] = lower_icn_expr_node(cfg, e->c[1+j]);
+                    if (!args2[j]) { free(args2); return NULL; }
+                }
+            }
+            IR_t *nd = IR_node_alloc(cfg, IR_ICN_SEQ_GEN);
+            if (!nd) { free(args2); return NULL; }
+            nd->c = args2;
+            nd->n = nargs;
+            return nd;
+        }
         IR_t **args = NULL;
         if (nargs > 0) {
             args = calloc((size_t)nargs, sizeof(IR_t *));
