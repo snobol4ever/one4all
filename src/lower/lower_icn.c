@@ -310,6 +310,24 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     }
     case TT_ASSIGN: {
         if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
+        /* TT_FIELD lhs: obj.field := rhs  → IR_ICN_FIELD_SET                                      */
+        if (e->c[0]->t == TT_FIELD) {
+            const char *fname = ICN_FIELD_NAME(e->c[0]);
+            if (!fname) return NULL;
+            IR_t *obj = lower_icn_expr_node(cfg, e->c[0]->c[0]);
+            if (!obj) return NULL;
+            IR_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
+            if (!rhs) return NULL;
+            IR_t *nd = IR_node_alloc(cfg, IR_ICN_FIELD_SET);
+            if (!nd) return NULL;
+            nd->sval = fname;
+            nd->c = calloc(2, sizeof(IR_t *));
+            if (!nd->c) return NULL;
+            nd->c[0] = obj;
+            nd->c[1] = rhs;
+            nd->n    = 2;
+            return nd;
+        }
         if (e->c[0]->t != TT_VAR) return NULL;
         if (e->c[0]->v.sval && e->c[0]->v.sval[0] == '&') return NULL;
         IR_t *lhs = lower_icn_expr_node(cfg, e->c[0]);
@@ -900,6 +918,41 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         nd->c[0] = lhs;
         nd->c[1] = rhs;
         nd->n    = 2;
+        return nd;
+    }
+    case TT_FIELD: {
+        /* Icon obj.field read.  c[0]=object expr, c[1]=TT_VAR(fieldname).                        */
+        /* Lower to IR_ICN_FIELD_GET: evaluates c[0] at runtime, calls data_field_ptr(sval, obj). */
+        const char *fname = ICN_FIELD_NAME(e);
+        if (!fname || e->n < 1 || !e->c[0]) return NULL;
+        IR_t *obj = lower_icn_expr_node(cfg, e->c[0]);
+        if (!obj) return NULL;
+        IR_t *nd = IR_node_alloc(cfg, IR_ICN_FIELD_GET);
+        if (!nd) return NULL;
+        nd->sval = fname;
+        nd->c = calloc(1, sizeof(IR_t *));
+        if (!nd->c) return NULL;
+        nd->c[0] = obj;
+        nd->n    = 1;
+        return nd;
+    }
+    case TT_RECORD: {
+        /* Icon `record T(f1,f2,...)` type declaration statement.                                   */
+        /* Build spec string "T(f1,f2,...)" and emit IR_ICN_RECORD_DEF to register the type once.  */
+        if (!e->v.sval) return NULL;
+        char spec[512]; int pos = 0;
+        pos += snprintf(spec+pos, sizeof(spec)-pos, "%s(", e->v.sval);
+        for (int i = 0; i < e->n && pos < (int)sizeof(spec)-2; i++) {
+            if (i > 0) spec[pos++] = ',';
+            const char *fn2 = (e->c[i] && e->c[i]->v.sval) ? e->c[i]->v.sval : "";
+            pos += snprintf(spec+pos, sizeof(spec)-pos, "%s", fn2);
+        }
+        if (pos < (int)sizeof(spec)-1) spec[pos++] = ')';
+        spec[pos] = '\0';
+        IR_t *nd = IR_node_alloc(cfg, IR_ICN_RECORD_DEF);
+        if (!nd) return NULL;
+        nd->sval = GC_strdup(spec);
+        nd->n    = 0;
         return nd;
     }
     case TT_MAKELIST: {

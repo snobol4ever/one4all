@@ -1474,6 +1474,11 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
 #undef _OPCOERCE
 #undef _NUMREL
 #undef _STRREL
+    /* Record constructor fallback: if fn matches a registered ScDatType, construct an instance. */
+    {
+        ScDatType *_rdt = sc_dat_find_type(fn);
+        if (_rdt) { *out = sc_dat_construct(_rdt, args, nargs); return 1; }
+    }
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/

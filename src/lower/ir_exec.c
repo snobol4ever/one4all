@@ -23,6 +23,12 @@ extern int         Σlen;
 #include "coerce.h"
 extern int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR_t *out);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+extern DESCR_t *data_field_ptr(const char *field, DESCR_t obj);
+typedef struct { char name[64]; int nfields; char fields[64][64]; } ScDatType;
+extern ScDatType *sc_dat_register(const char *spec);
+extern ScDatType *sc_dat_find_type(const char *name);
+extern DESCR_t    sc_dat_construct(ScDatType *t, DESCR_t *args, int nargs);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void bb_exec_stmt(void *e);
 #include "bb_box.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -966,6 +972,44 @@ IR_t * IR_exec_node(IR_t * nd) {
             nd->value = (DESCR_t){ .v = DT_S, .slen = 1, .s = ch };
             return nd->γ;
         }
+    }
+    case IR_ICN_RECORD_DEF: {
+        /* Register the record type on first execution (nd->state==0).  sval=spec string.          */
+        /* Idempotent: sc_dat_register is safe to call multiple times (no-ops if already exists). */
+        if (nd->state == 0 && nd->sval) {
+            DEFDAT_fn(nd->sval);
+            sc_dat_register(nd->sval);
+            nd->state = 1;
+        }
+        nd->value = NULVCL;
+        return nd->γ;
+    }
+    case IR_ICN_FIELD_GET: {
+        /* obj.field read.  c[0]=object expr, sval=field name.                                    */
+        if (nd->n < 1 || !nd->c[0] || !nd->sval) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[0]);
+        DESCR_t obj = nd->c[0]->value;
+        if (IS_FAIL_fn(obj)) { nd->value = FAILDESCR; return nd->ω; }
+        DESCR_t *cell = data_field_ptr(nd->sval, obj);
+        if (!cell) { nd->value = FAILDESCR; return nd->ω; }
+        nd->value = *cell;
+        return nd->γ;
+    }
+    case IR_ICN_FIELD_SET: {
+        /* obj.field := rhs.  c[0]=object expr, c[1]=rhs expr, sval=field name.                  */
+        /* Returns the rhs value (Icon assignment expression value semantics).                     */
+        if (nd->n < 2 || !nd->c[0] || !nd->c[1] || !nd->sval) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[1]);
+        DESCR_t rhs = nd->c[1]->value;
+        if (IS_FAIL_fn(rhs)) { nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(nd->c[0]);
+        DESCR_t obj = nd->c[0]->value;
+        if (IS_FAIL_fn(obj)) { nd->value = FAILDESCR; return nd->ω; }
+        DESCR_t *cell = data_field_ptr(nd->sval, obj);
+        if (!cell) { nd->value = FAILDESCR; return nd->ω; }
+        *cell = rhs;
+        nd->value = rhs;
+        return nd->γ;
     }
     case IR_CASE: {
         /* Icon case E of { K1: V1; K2: V2; ...; default: VD }.                                  */

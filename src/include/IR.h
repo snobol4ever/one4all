@@ -112,6 +112,9 @@ typedef enum {
     IR_ICN_IDX,         /* Icon s[i] subscript — c[0]=base, c[1]=index; calls subscript_get(base,idx); FAIL on OOB  */
     IR_ICN_SECTION,     /* Icon s[i:j] / s[i+:n] / s[i-:n] section — c[0]=base,c[1]=i,c[2]=j; ival=section-kind     */
     IR_ICN_LIST_BANG,   /* Icon !L list/table/record generator — c[0]=iterable expr; state=pos; α resets, β advances  */
+    IR_ICN_RECORD_DEF,  /* Icon `record T(f1,f2,...)` — sval=spec string; α runs DEFDAT+sc_dat_register once          */
+    IR_ICN_FIELD_GET,   /* Icon obj.field read  — c[0]=object expr, sval=field name; calls data_field_ptr            */
+    IR_ICN_FIELD_SET,   /* Icon obj.field := rhs — c[0]=object expr, c[1]=rhs expr, sval=field name; data_field_ptr  */
     IR_E_COUNT
 } IR_e;
 typedef struct IR_t IR_t;
