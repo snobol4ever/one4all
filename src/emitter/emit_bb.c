@@ -783,7 +783,13 @@ void emit_bb_charset(bb_box_fn c_fn, const char *c_fn_name, const char *kind_nam
         emit_seq_port_call((uint64_t)(uintptr_t)z, rt_name, rt_fn, 1, s, f);
     }
 }
-#define FLAT_BUF_MAX  (16 * 1024)
+/* PST-RB-5i: raised from 16K to 256K. The 16K cap was sized for SNOBOL4
+   beauty.sno patterns; the SCRIP-hosted parsers (parser_snocone.sc etc.)
+   compose much larger compound patterns — a 931-line grammar lowered to
+   a single `Compiland` pattern overflows 16K immediately. 256K leaves
+   headroom for parser_*.sc patterns and is still small relative to total
+   process memory. */
+#define FLAT_BUF_MAX  (256 * 1024)
 int g_flat_node_id   = 0;
 static int g_flat_slot_count = 0;
 #define FLAT_DATA_BUF_MAX     (32 * 1024)

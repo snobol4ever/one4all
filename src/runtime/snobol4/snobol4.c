@@ -1494,7 +1494,11 @@ static int fn_has_builtin(const char *name);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void _func_init(void);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static DESCR_t _DATA_(DESCR_t *a, int n) {
+DESCR_t sno_DATA_register(DESCR_t *a, int n);   /* exported below as the non-static body */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static DESCR_t _DATA_(DESCR_t *a, int n) { return sno_DATA_register(a, n); }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+DESCR_t sno_DATA_register(DESCR_t *a, int n) {
     if (n < 1) return NULVCL;
     const char *raw_spec = VARVAL_fn(a[0]);
     if (!raw_spec || !*raw_spec) return NULVCL;
@@ -2955,6 +2959,12 @@ DESCR_t APPLY_fn(const char *name, DESCR_t *args, int nargs) {
         DESCR_t r = g_user_call_hook(name, args, nargs);
         if (!IS_FAIL_fn(r)) return r;
     }
+    /* PST-RB-5i diagnostic: name the unresolved symbol when SCRIP_DEBUG_APPLY
+       is set. Without this, "Undefined function or operation" gives no clue
+       which SCRIP helper is missing when running parser_*.sc. Print BEFORE
+       sno_runtime_error because that call longjmps/exits. */
+    if (getenv("SCRIP_DEBUG_APPLY"))
+        fprintf(stderr, "[apply-err5] unresolved '%s' (nargs=%d)\n", name ? name : "(null)", nargs);
     sno_runtime_error(5, NULL);
     return FAILDESCR;
 }

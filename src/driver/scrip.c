@@ -270,7 +270,11 @@ int main(int argc, char **argv)
             else if (lang_rebus)   rebus_compile(src, input_path, &sub_ast);
             else                   snocone_compile(src, input_path, &sub_ast);
             free(src);
-            if (lang_snocone && dump_ir && sub_ast) {
+            if (dump_ir && sub_ast) {
+                /* PST-RB-5i: extend --dump-ast to all non-SNOBOL4 frontends
+                   (was lang_snocone only; rebus/icon/prolog/raku now print
+                   their tree_t and exit, matching the snocone behavior so
+                   parser_*.sc validation has a reference). */
                 ir_dump_program(sub_ast, stdout); return 0;
             }
             MERGE_AST(sub_ast);

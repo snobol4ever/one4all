@@ -108,8 +108,20 @@ DESCR_t _builtin_DATA(DESCR_t *args, int nargs) {
     const char *raw_spec = VARVAL_fn(args[0]);
     if (!raw_spec || !*raw_spec) return FAILDESCR;
     char *spec = GC_strdup(raw_spec);
-    sno_fold_name(spec);
+    /* PST-RB-5i (per RULES "casing belongs at the ingress layer"):
+       do not fold here. The spec arrives already canonicalized from the
+       parser/lex layer; folding at this lookup-side helper would couple
+       policy with mechanism and breaks case-sensitive runs of parser_*.sc. */
     DEFDAT_fn(spec);
     sc_dat_register(spec);
+    /* PST-RB-5i: also register field-accessor functions in the SNOBOL4
+       function table. The legacy split between _builtin_DATA (interp
+       driver, registers in sc_dat_types[]) and _DATA_ (snobol4.c,
+       registers in _func_buckets[]) meant calls like `value(x)` from
+       SCRIP-hosted parsers failed: _builtin_DATA wins the register_fn
+       race in scrip.c so _DATA_'s field-accessor registrations never
+       executed. Chain through here so both tables are populated. */
+    extern DESCR_t sno_DATA_register(DESCR_t *a, int n);
+    sno_DATA_register(args, nargs);
     return NULVCL;
 }
