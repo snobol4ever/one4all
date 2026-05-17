@@ -236,6 +236,54 @@ IR_t * IR_exec_node(IR_t * nd) {
         nd->value = FAILDESCR;
         return nd->ω;
     }
+    case IR_SEQ_EXPR: {
+        /* Value-of-last sequence.  Used for Icon (e1;e2;e3) paren-seq and {} blocks in expression  */
+        /* position. Distinct from IR_SEQ (proc-body fall-off).                                     */
+        /*                                                                                          */
+        /* Generator semantics (Icon spec for (e1;e2;e3) in generator position):                    */
+        /*   α (state==0):  evaluate e1,e2,...,e_{n-1} left-to-right for side effect (any FAIL ⇒    */
+        /*                  whole seq fails); then evaluate e_n yielding the first value.           */
+        /*   β (state==1):  resume e_n only — DO NOT re-fire the leading statements.                */
+        /*                  When e_n exhausts, the whole seq is done; state→0, ω.                   */
+        /*                                                                                          */
+        /* This matches the side-effect-once / pump-last semantics needed by                        */
+        /*   every (x := x+10; "a" | "b" | "c")   ⇒  x increments once; alt pumps three times.      */
+        if (nd->n <= 0) { nd->value = NULVCL; return nd->γ; }
+        IR_t *last_child = nd->c[nd->n - 1];
+        if (nd->state == 0) {
+            /* α: head statements once, then drive the last child fresh. */
+            for (int j = 0; j < nd->n - 1; j++) {
+                if (!nd->c[j]) continue;
+                IR_exec_node(nd->c[j]);
+                if (frame_depth > 0 && FRAME.returning) {
+                    nd->value = nd->c[j]->value;
+                    return nd->ω;
+                }
+                if (IS_FAIL_fn(nd->c[j]->value)) { nd->value = FAILDESCR; return nd->ω; }
+            }
+            if (!last_child) { nd->value = NULVCL; return nd->γ; }
+            last_child->state = 0;
+            IR_exec_node(last_child);
+            if (frame_depth > 0 && FRAME.returning) {
+                nd->value = last_child->value;
+                return nd->ω;
+            }
+            if (IS_FAIL_fn(last_child->value)) { nd->value = FAILDESCR; return nd->ω; }
+            nd->value = last_child->value;
+            nd->state = 1;
+            return nd->γ;
+        }
+        /* β: pump only the tail. */
+        if (!last_child) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+        IR_exec_node(last_child);
+        if (frame_depth > 0 && FRAME.returning) {
+            nd->value = last_child->value;
+            return nd->ω;
+        }
+        if (IS_FAIL_fn(last_child->value)) { nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
+        nd->value = last_child->value;
+        return nd->γ;
+    }
     case IR_BINOP: {
         /* Plain (non-generator) binop.  c[0]=lhs, c[1]=rhs; nd->ival=IcnBinopKind, nd->ival2=is_relop. */
         if (nd->n < 2 || !nd->c[0] || !nd->c[1]) { nd->value = FAILDESCR; return nd->ω; }
@@ -391,7 +439,7 @@ IR_t * IR_exec_node(IR_t * nd) {
             DESCR_t v = nd->c[0]->value;
             if (IS_FAIL_fn(v)) break;
             if (frame_depth > 0 && FRAME.loop_break) break;
-            if (nd->n >= 2 && nd->c[1]) { IR_exec_node(nd->c[1]); }
+            if (nd->n >= 2 && nd->c[1]) { nd->c[1]->state = 0; IR_exec_node(nd->c[1]); }
             if (frame_depth > 0 && (FRAME.loop_break || FRAME.returning)) break;
             if (frame_depth > 0) FRAME.loop_next = 0;
             if (single_shot_call) break;
@@ -415,7 +463,7 @@ IR_t * IR_exec_node(IR_t * nd) {
             DESCR_t cv = nd->c[0]->value;
             if (IS_FAIL_fn(cv)) break;
             if (frame_depth > 0 && FRAME.loop_break) break;
-            if (nd->n >= 2 && nd->c[1]) { IR_exec_node(nd->c[1]); }
+            if (nd->n >= 2 && nd->c[1]) { nd->c[1]->state = 0; IR_exec_node(nd->c[1]); }
             if (frame_depth > 0 && (FRAME.loop_break || FRAME.returning)) break;
             if (frame_depth > 0) FRAME.loop_next = 0;
         }
@@ -436,7 +484,7 @@ IR_t * IR_exec_node(IR_t * nd) {
             DESCR_t cv = nd->c[0]->value;
             if (!IS_FAIL_fn(cv)) break;
             if (frame_depth > 0 && FRAME.loop_break) break;
-            if (nd->n >= 2 && nd->c[1]) { IR_exec_node(nd->c[1]); }
+            if (nd->n >= 2 && nd->c[1]) { nd->c[1]->state = 0; IR_exec_node(nd->c[1]); }
             if (frame_depth > 0 && (FRAME.loop_break || FRAME.returning)) break;
             if (frame_depth > 0) FRAME.loop_next = 0;
         }

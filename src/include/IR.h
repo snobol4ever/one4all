@@ -120,6 +120,10 @@ typedef enum {
     IR_SWAP,            /* Icon x :=: y swap. c[0]=lhs var, c[1]=rhs var. Eval c[1], eval c[0], store rhs-value into  */
                         /* lhs slot, lhs-value into rhs slot. Succeeds with the value that ended up in c[0]'s slot.   */
                         /* Frame-slot path mirrors IR_ASSIGN (scope_get/FRAME.env[slot]); global-NV fallback for both. */
+    IR_SEQ_EXPR,        /* Value-of-last sequence (Icon (e1;e2;e3) paren-seq, {} blocks). Distinct from IR_SEQ which   */
+                        /* models proc-body-falls-off-end (returns FAILDESCR). α: head statements once + drive tail   */
+                        /* fresh; β: resume tail only (NEVER re-fire the head — preserves side-effect-once semantics  */
+                        /* under every/while pumping). state==0 fresh, ==1 active.                                    */
     IR_E_COUNT
 } IR_e;
 typedef struct IR_t IR_t;

@@ -530,8 +530,13 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         return nd;
     }
     case TT_SEQ_EXPR: {
-        /* { stmt1; stmt2; ... } — a compound block, parsed when 2+ statements appear in braces.                                                                                                              */
-        /* Lower each child, wrap in IR_SEQ.  Single-statement blocks are unwrapped by the parser, so n>=2 here.                                                                                              */
+        /* Icon (e1; e2; ... ; en) paren-seq and {s1; s2; ...} brace-blocks in expression position.    */
+        /* Lower to IR_SEQ_EXPR which returns the last child's value (Icon "value-of-last" semantics) */
+        /* rather than IR_SEQ which always fails (proc-body-falls-off-end semantics).  IR_SEQ_EXPR    */
+        /* also provides α/β generator semantics so that, when pumped as a generator, the head        */
+        /* statements fire only once and only the tail is resumed.  Loop drivers (IR_EVERY/IR_WHILE/  */
+        /* IR_UNTIL) reset c[body]->state=0 between iterations so that statement-context bodies       */
+        /* fully re-execute each iteration.                                                           */
         if (e->n < 1) return NULL;
         IR_t **stmts = calloc((size_t)e->n, sizeof(IR_t *));
         if (!stmts) return NULL;
@@ -540,7 +545,7 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
             stmts[j] = lower_icn_expr_node(cfg, e->c[j]);
             if (!stmts[j]) { free(stmts); return NULL; }
         }
-        IR_t *nd = IR_node_alloc(cfg, IR_SEQ);
+        IR_t *nd = IR_node_alloc(cfg, IR_SEQ_EXPR);
         if (!nd) { free(stmts); return NULL; }
         nd->c = stmts;
         nd->n = e->n;

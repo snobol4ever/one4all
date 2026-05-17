@@ -14,7 +14,8 @@ static const char * kind_names[IR_E_COUNT] = {
     "IR_PAT_LEN", "IR_PAT_NOTANY",
     "IR_PAT_POS", "IR_PAT_TAB", "IR_PAT_REM", "IR_PAT_FENCE", "IR_PAT_ABORT", "IR_PAT_CALLOUT",
     "IR_PL_CHOICE", "IR_PL_UNIFY", "IR_PL_CUT", "IR_PL_CALL",
-    [IR_SWAP] = "IR_SWAP"
+    [IR_SWAP] = "IR_SWAP",
+    [IR_SEQ_EXPR] = "IR_SEQ_EXPR"
 };
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 const char * IR_e_name(IR_e k) {
