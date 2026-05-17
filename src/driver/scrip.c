@@ -148,9 +148,32 @@ int main(int argc, char **argv)
     if (!mode_ir_run && !mode_sm_run && !mode_jit_run && !mode_monitor &&
         !mode_jit_emit_x64)
         mode_jit_run = 1;
-    if (!bb_driver && !bb_live) bb_live = 1;
-    (void)bb_driver;
-    if (bb_live) g_bb_mode = BB_MODE_LIVE;
+    /* CLI-3M-3: BB knob is exposed only under --interp (mode_sm_run).
+       --run (mode_jit_run) and --compile (mode_jit_emit_x64) force wired BBs.
+       Rationale: brokered BB execution requires a runtime broker structure
+       that's natural for the interpreter but absent / not supported in the
+       JIT-emit / asm-emit paths. */
+    if (bb_driver && (mode_jit_run || mode_jit_emit_x64)) {
+        fprintf(stderr,
+            "scrip: --bb=brokered is only valid under --interp; "
+            "--run and --compile force --bb=wired\n");
+        return 1;
+    }
+    if (bb_driver && bb_live) {
+        fprintf(stderr,
+            "scrip: --bb=brokered and --bb=wired are mutually exclusive\n");
+        return 1;
+    }
+    /* Default-resolution:
+       Under --interp: default is --bb=brokered (the historic default).
+       Under --run / --compile: forced to --bb=wired (per the guard above).
+       Under --monitor / --ast-run: legacy default-to-wired preserved. */
+    if (!bb_driver && !bb_live) {
+        if (mode_sm_run) bb_driver = 1;
+        else             bb_live   = 1;
+    }
+    if (bb_live)   g_bb_mode = BB_MODE_LIVE;
+    if (bb_driver) g_bb_mode = BB_MODE_BROKERED;
     if (argi >= argc) {
         fprintf(stderr,
             "usage: scrip [mode] [bb] [options] <file> [-- program-args...]\n"
