@@ -12,9 +12,7 @@ typedef struct { CODE_t *prog; tree_t **result; tree_t *ast_prog; } PP;
 static void     sno4_stmt_commit_go(void*,Token,tree_t*,tree_t*,int,tree_t*,tree_t*,tree_t*,tree_t*);
 static Lex     *g_lx;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void     fixup_val(tree_t*);
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int      is_pat(tree_t*);
+
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static tree_t  *parse_expr(Lex*);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -202,15 +200,7 @@ int snobol4_lex(YYSTYPE *yylval_param, void *yyparse_param) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void snobol4_error(void *p,const char *msg){(void)p;sno_error(g_lx?g_lx->lineno:0,"parse error: %s",msg);}
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void fixup_val(tree_t *e){ (void)e; }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int is_pat(tree_t *e){
-    if(!e) return 0;
-    switch(e->t){case TT_ARB:case TT_ARBNO:case TT_CAPT_COND_ASGN:case TT_CAPT_IMMED_ASGN:case TT_CAPT_CURSOR:case TT_DEFER:return 1;default:break;}
-    for(int i=0;i<e->n;i++) if(is_pat(e->c[i])) return 1;
-    return 0;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+
 static void sno4_stmt_commit_go(void *param,Token lbl,tree_t *subj,tree_t *pat,int has_eq,tree_t *repl,tree_t *gu,tree_t *gs,tree_t *gf){
     PP *pp=(PP*)param;
     /* PST-SN4-1a (2026-05-16): EXPORT/IMPORT special-case removed.  The parser
@@ -227,11 +217,12 @@ static void sno4_stmt_commit_go(void *param,Token lbl,tree_t *subj,tree_t *pat,i
     /* PST-SN4-1b (2026-05-16): TT_SCAN-unpacking and TT_SEQ-splitting removed.
      * Parser emits pure syntax tree; lower.c performs the split. */
     s->subject=subj; s->pattern=pat;
-    if(s->subject) fixup_val(s->subject);
-    if(has_eq){s->has_eq=1;s->replacement=repl;if(repl&&!is_pat(repl))fixup_val(repl);}
-    if(gu){ if(gu->t==TT_QLIT) s->goto_u=gu->v.sval; else s->goto_u_expr=gu; }
-    if(gs){ if(gs->t==TT_QLIT) s->goto_s=gs->v.sval; else s->goto_s_expr=gs; }
-    if(gf){ if(gf->t==TT_QLIT) s->goto_f=gf->v.sval; else s->goto_f_expr=gf; }
+    if(has_eq){s->has_eq=1;s->replacement=repl;}
+    /* PST-SN4-W1 (2026-05-18): removed ->t==TT_QLIT inspection.
+     * goto tree_t* nodes stored directly as _expr; make_goto_node handles both. */
+    if(gu) s->goto_u_expr=gu;
+    if(gs) s->goto_s_expr=gs;
+    if(gf) s->goto_f_expr=gf;
     if(!pp->prog->head) pp->prog->head=pp->prog->tail=s; else{pp->prog->tail->next=s;pp->prog->tail=s;}
     if (pp->ast_prog) {
         tree_t *anode = stmt_to_ast(s);
