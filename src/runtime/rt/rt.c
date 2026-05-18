@@ -114,16 +114,8 @@ static const rt_vstack_ops_t g_default_ops = {
     .set_last_ok = _default_set_last_ok,
 };
 static const rt_vstack_ops_t *g_ops = &g_default_ops;
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void rt_set_vstack_backend(const void *ops)
-{
-    g_ops = ops ? (const rt_vstack_ops_t *)ops : &g_default_ops;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-const void *rt_get_default_vstack_backend(void)
-{
-    return &g_default_ops;
-}
+/* DAI-8 cluster 3b: rt_set_vstack_backend + rt_get_default_vstack_backend
+   deleted — non-static, zero callers anywhere. */
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* Public vstack accessors used by mode-4 EVAL fnptr dispatch (EXPVAL_fn slen==2). */
 int rt_vstack_depth(void) { return g_ops->depth(); }
@@ -295,13 +287,7 @@ void rt_pl_b_end_register(const char *name, int arity)
     g_pl_b_max     = 0;
     g_pl_b_entry_i = -1;
 }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void rt_patch_cap_fn(void *cap_ptr, void *child_fn)
-{
-    if (!cap_ptr || !child_fn) return;
-    void **fn_slot = (void **)cap_ptr;
-    *fn_slot = child_fn;
-}
+/* DAI-8 cluster 3b: rt_patch_cap_fn deleted — zero callers. */
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern cap_t *bb_cap_new(bb_box_fn child_fn, void *child_state, const char *varname, DESCR_t *var_ptr, int immediate);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -430,12 +416,7 @@ int64_t rt_pop_int(void)
     }
     return d.i;
 }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void rt_halt(int rc)
-{
-    g_halt_rc  = rc;
-    g_halt_set = 1;
-}
+/* DAI-8 cluster 3b: rt_halt deleted — zero callers (rt_halt_tos remains live). */
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_halt_tos(void)
 {
@@ -466,12 +447,7 @@ void rt_push_str(const char *s, uint32_t slen)
     d.s    = (char *)s;
     vstack_push(d);
 }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void rt_pop_descr(DESCR_t *out)
-{
-    if (!out) { fprintf(stderr, "libscrip_rt: pop_descr: NULL out ptr.\n"); abort(); }
-    *out = vstack_pop();
-}
+/* DAI-8 cluster 3b: rt_pop_descr deleted — zero callers. */
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_arith(int op)
 {
@@ -767,12 +743,7 @@ void rt_coerce_num(void)
     }
     LAST_OK_SET(1);
 }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void rt_push_real(double v)
-{
-    vstack_push(REALVAL(v));
-    LAST_OK_SET(1);
-}
+/* DAI-8 cluster 3b: rt_push_real deleted — zero callers (rt_push_real_bits remains live for emitter). */
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_push_real_bits(uint64_t bits)
 {
@@ -1354,10 +1325,4 @@ static void rt_register_cap(cap_t *c)
     if (g_rt_cap_count < RT_MAX_CAPTURES)
         g_rt_cap_list[g_rt_cap_count++] = c;
 }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void rt_flush_pending_captures(void)
-{
-    for (int i = 0; i < g_rt_cap_count; i++)
-        g_rt_cap_list[i]->has_pending = 0;
-    g_rt_cap_count = 0;
-}
+/* DAI-8 cluster 3b: rt_flush_pending_captures deleted — zero callers. */
