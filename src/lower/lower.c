@@ -1032,9 +1032,18 @@ static void lower_makelist(const tree_t *t)
 static void lower_record(const tree_t *t)
 {
     ICN_BB_EVAL(t);
-    sm_emit_s(g_p, SM_PUSH_LIT_S, t->v.sval ? t->v.sval : "");
-    for (int i = 0; i < t->n; i++) lower_expr(t->c[i]);
-    sm_emit_si(g_p, SM_CALL_FN, "RECORD_MAKE", (int64_t)t->n + 1);
+    /* Convention-2: if v.sval is empty, cname is in c[0]->v.sval (TT_QLIT child).
+     * Children c[1..n-1] are the field/method nodes. */
+    if (!t->v.sval || t->v.sval[0] == '\0') {
+        const char *cname = (t->n >= 1 && t->c[0] && t->c[0]->v.sval) ? t->c[0]->v.sval : "";
+        sm_emit_s(g_p, SM_PUSH_LIT_S, cname);
+        for (int i = 1; i < t->n; i++) lower_expr(t->c[i]);
+        sm_emit_si(g_p, SM_CALL_FN, "RECORD_MAKE", (int64_t)(t->n - 1) + 1);
+    } else {
+        sm_emit_s(g_p, SM_PUSH_LIT_S, t->v.sval);
+        for (int i = 0; i < t->n; i++) lower_expr(t->c[i]);
+        sm_emit_si(g_p, SM_CALL_FN, "RECORD_MAKE", (int64_t)t->n + 1);
+    }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_field(const tree_t *t)
