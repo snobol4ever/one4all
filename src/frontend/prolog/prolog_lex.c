@@ -194,13 +194,6 @@ static Token scan_number(Lexer *lx) {
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int is_atom_start(char c) {
-    return islower((unsigned char)c) || c == '+' || c == '-' || c == '*' ||
-           c == '/' || c == '\\' || c == '^' || c == '<' || c == '>' ||
-           c == '=' || c == '~' || c == '?' || c == '@' || c == '#' ||
-           c == '&';
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static Token scan_word(Lexer *lx) {
     int line = lx->line;
     char *buf = NULL; int len = 0, cap = 0;
@@ -293,52 +286,10 @@ Token lexer_peek(Lexer *lx) {
     return lx->peek;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-Token lexer_expect(Lexer *lx, TkKind kind, const char *context) {
-    Token t = lexer_next(lx);
-    if (t.kind != kind) {
-        fprintf(stderr, "parse error at line %d in %s: expected %s, got '%s'\n",
-                t.line, context, tk_name(kind), t.text ? t.text : "?");
-        Token err; err.kind = TK_ERROR; err.text = strdup("expected");
-        err.ival = 0; err.fval = 0; err.line = t.line;
-        return err;
-    }
-    return t;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void token_free(Token *t) { free(t->text); t->text = NULL; }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void lexer_init(Lexer *lx, const char *src) {
     lx->src      = src ? src : "";
     lx->pos      = 0;
     lx->line     = 1;
     lx->has_peek = 0;
     memset(&lx->peek, 0, sizeof lx->peek);
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-const char *tk_name(TkKind kind) {
-    switch (kind) {
-        case TK_EOF:      return "EOF";
-        case TK_ATOM:     return "atom";
-        case TK_VAR:      return "variable";
-        case TK_ANON:     return "_";
-        case TK_INT:      return "integer";
-        case TK_FLOAT:    return "float";
-        case TK_STRING:   return "string";
-        case TK_LPAREN:   return "(";
-        case TK_RPAREN:   return ")";
-        case TK_LBRACKET: return "[";
-        case TK_RBRACKET: return "]";
-        case TK_PIPE:     return "|";
-        case TK_COMMA:    return ",";
-        case TK_LBRACE:   return "{";
-        case TK_RBRACE:   return "}";
-        case TK_DOT:      return ".";
-        case TK_OP:       return "operator";
-        case TK_NECK:     return ":-";
-        case TK_QUERY:    return "?-";
-        case TK_CUT:      return "!";
-        case TK_SEMI:     return ";";
-        case TK_ERROR:    return "<error>";
-        default:          return "?";
-    }
 }

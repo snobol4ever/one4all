@@ -494,44 +494,6 @@ CODE_t *prolog_lower(PlProgram *pl_prog) {
     return prog;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void ast_dump(tree_t *e, int indent, FILE *out) {
-    if (!e) { fprintf(out, "%*s<null>\n", indent, ""); return; }
-    const char *kname = "?";
-    switch (e->t) {
-        case TT_CHOICE:      kname = "TT_CHOICE";      break;
-        case TT_CLAUSE:      kname = "TT_CLAUSE";      break;
-        case TT_UNIFY:       kname = "TT_UNIFY";       break;
-        case TT_CUT:         kname = "TT_CUT";         break;
-        case TT_TRAIL_MARK:  kname = "TT_TRAIL_MARK";  break;
-        case TT_TRAIL_UNWIND:kname = "TT_TRAIL_UNWIND";break;
-        case TT_FNC:         kname = "TT_FNC";         break;
-        case TT_QLIT:        kname = "TT_QLIT";        break;
-        case TT_ILIT:        kname = "TT_ILIT";        break;
-        case TT_FLIT:        kname = "TT_FLIT";        break;
-        case TT_VAR:         kname = "TT_VAR";        break;
-        case TT_ADD:         kname = "TT_ADD";         break;
-        case TT_SUB:         kname = "TT_SUB";         break;
-        case TT_MUL:         kname = "TT_MUL";         break;
-        case TT_DIV:         kname = "TT_DIV";         break;
-        default: break;
-    }
-    fprintf(out, "%*s%s", indent, "", kname);
-    if (e->v.sval) fprintf(out, "  sval=%s", e->v.sval);
-    if (e->v.ival) fprintf(out, "  ival=%ld", e->v.ival);
-    if (e->t == TT_CLAUSE)
-        fprintf(out, "  n_vars=%ld  n_args=%.0f", e->v.ival, e->v.dval);
-    fprintf(out, "\n");
-    for (int i = 0; i < e->n; i++)
-        ast_dump(e->c[i], indent + 2, out);
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void prolog_lower_pretty(CODE_t *prog, FILE *out) {
-    for (STMT_t *s = prog->head; s; s = s->next) {
-        fprintf(out, "--- stmt (line %d) ---\n", s->lineno);
-        ast_dump(s->subject, 2, out);
-    }
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 tree_t *pl_assert_term(Term *t, int *functor_out, int *arity_out) {
     if (!t) return NULL;
     t = term_deref(t);
