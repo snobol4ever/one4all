@@ -18,8 +18,6 @@ static void write_long(long v) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static long my_strlen(const char *s) { long n=0; while(s[n]) n++; return n; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void icn_write_int(long v) { write_long(v); }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void icn_write_str(const char *s) { if(!s) { write_bytes("\n",1); return; } long l=my_strlen(s); write_bytes(s,l); write_bytes("\n",1); }
 static char icn_str_arena[65536];
 static int  str_arena_pos = 0;
@@ -39,50 +37,6 @@ const char *icn_str_concat(const char *a, const char *b) {
 #define ICN_STACK_MAX 256
 static long icn_stack[ICN_STACK_MAX];
 static int  icn_sp = 0;
-const char *scan_subject = (void*)0;
-long        icn_pos     = 0;
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-long icn_any(const char *cset) {
-    if (!scan_subject) return 0;
-    long len = my_strlen(scan_subject);
-    if (icn_pos >= len) return 0;
-    char c = scan_subject[icn_pos];
-    for (long i = 0; cset[i]; i++) {
-        if (cset[i] == c) {
-            icn_pos++;
-            return icn_pos + 1;
-        }
-    }
-    return 0;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-long icn_many(const char *cset) {
-    if (!scan_subject) return 0;
-    long len = my_strlen(scan_subject);
-    long start = icn_pos;
-    while (icn_pos < len) {
-        char c = scan_subject[icn_pos];
-        int found = 0;
-        for (long i = 0; cset[i]; i++) { if (cset[i] == c) { found = 1; break; } }
-        if (!found) break;
-        icn_pos++;
-    }
-    if (icn_pos == start) return 0;
-    return icn_pos + 1;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-long icn_upto(const char *cset) {
-    if (!scan_subject) return 0;
-    long len = my_strlen(scan_subject);
-    while (icn_pos < len) {
-        char c = scan_subject[icn_pos];
-        for (long i = 0; cset[i]; i++) {
-            if (cset[i] == c) return icn_pos + 1;
-        }
-        icn_pos++;
-    }
-    return 0;
-}
 long icn_retval = 0;
 int  icn_failed = 0;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -93,8 +47,6 @@ int icn_str_eq(const char *a, const char *b) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void icn_push(long v)  { if (icn_sp < ICN_STACK_MAX) icn_stack[icn_sp++] = v; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-long icn_pop(void)     { return icn_sp > 0 ? icn_stack[--icn_sp] : 0; }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 long icn_str_find(const char *s1, const char *s2, long from) {
     if (!s1 || !s2) return 0;
     long l1 = my_strlen(s1), l2 = my_strlen(s2);
@@ -104,42 +56,6 @@ long icn_str_find(const char *s1, const char *s2, long from) {
         if (j == l1) return i + 1;
     }
     return 0;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-long icn_match(const char *s) {
-    if (!s || !scan_subject) return 0;
-    long len = my_strlen(s);
-    long subj_len = my_strlen(scan_subject);
-    if (icn_pos + len > subj_len) return 0;
-    for (long i = 0; i < len; i++)
-        if (scan_subject[icn_pos + i] != s[i]) return 0;
-    icn_pos += len;
-    return icn_pos + 1;
-}
-static char tabmove_buf[4096];
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-const char *icn_tab(long n) {
-    if (!scan_subject) return 0;
-    long subj_len = my_strlen(scan_subject);
-    long new_pos = n - 1;
-    if (new_pos < icn_pos || new_pos > subj_len) return 0;
-    long len = new_pos - icn_pos;
-    if (len >= (long)sizeof(tabmove_buf)) return 0;
-    for (long i = 0; i < len; i++) tabmove_buf[i] = scan_subject[icn_pos + i];
-    tabmove_buf[len] = '\0';
-    icn_pos = new_pos;
-    return tabmove_buf;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-const char *icn_move(long n) {
-    if (!scan_subject) return 0;
-    long subj_len = my_strlen(scan_subject);
-    if (n < 0 || icn_pos + n > subj_len) return 0;
-    if (n >= (long)sizeof(tabmove_buf)) return 0;
-    for (long i = 0; i < n; i++) tabmove_buf[i] = scan_subject[icn_pos + i];
-    tabmove_buf[n] = '\0';
-    icn_pos += n;
-    return tabmove_buf;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int icn_str_cmp(const char *a, const char *b) {
@@ -154,13 +70,6 @@ int icn_str_cmp(const char *a, const char *b) {
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 long icn_strlen(const char *s) { return my_strlen(s); }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-long icn_pow(long base, long exp) {
-    if (exp < 0) return 0;
-    long result = 1;
-    while (exp-- > 0) result *= base;
-    return result;
-}
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 long icn_str_size(const char *s) { return s ? my_strlen(s) : 0; }
 static char subscript_buf[2];
@@ -195,26 +104,6 @@ const char *icn_str_section(const char *s, long i, long j, long kind) {
     out[slen] = '\0';
     str_arena_pos += (int)(slen + 1);
     return out;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-const char *icn_bang_char_at(const char *s, long pos) {
-    if (!s) return (void*)0;
-    long len = my_strlen(s);
-    if (pos < 0 || pos >= len) return (void*)0;
-    subscript_buf[0] = s[pos];
-    subscript_buf[1] = '\0';
-    return subscript_buf;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-long icn_match_pat(const char *pat) {
-    if (!pat || !scan_subject) return -1;
-    long plen = my_strlen(pat);
-    long slen = my_strlen(scan_subject);
-    if (icn_pos + plen > slen) return -1;
-    for (long i = 0; i < plen; i++)
-        if (scan_subject[icn_pos + i] != pat[i]) return -1;
-    icn_pos += plen;
-    return icn_pos;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 const char *icn_cset_complement(const char *cs) {
@@ -261,13 +150,6 @@ const char *icn_cset_diff(const char *a, const char *b) {
     out[n] = '\0';
     str_arena_pos += n + 1;
     return out;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-long icn_random(long n) {
-    static unsigned long seed = 12345;
-    seed = seed * 6364136223846793005UL + 1442695040888963407UL;
-    if (n <= 0) return 0;
-    return (long)((seed >> 33) % (unsigned long)n) + 1;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 const char *icn_cset_inter(const char *a, const char *b) {
