@@ -104,27 +104,6 @@ void exec_stmt_pool_reset(void)
     cache_reset();
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static const char *xkind_name(int k)
-{
-    switch (k) {
-    case  0: return "XCHR";    case  1: return "XSPNC";
-    case  2: return "XBRKC";   case  3: return "XANYC";
-    case  4: return "XNNYC";   case  5: return "XLNTH";
-    case  6: return "XPOSI";   case  7: return "XRPSI";
-    case  8: return "XTB";     case  9: return "XRTB";
-    case 10: return "XFARB";   case 11: return "XARBN";
-    case 12: return "XSTAR";   case 13: return "XFNCE";
-    case 14: return "XFAIL";   case 15: return "XABRT";
-    case 16: return "XSUCF";   case 17: return "XBAL";
-    case 18: return "XEPS";    case 19: return "XCAT";
-    case 20: return "XOR";     case 21: return "XDSAR";
-    case 22: return "XFNME";   case 23: return "XNME";
-    case 24: return "XCALLCAP"; case 25: return "XVAR";
-    case 26: return "XATP";    case 27: return "XBRKX";
-    default: return "XUNKNOWN";
-    }
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void bin_audit_print(void)
 {
     int pat_total = g_bin_hits + g_bin_misses;

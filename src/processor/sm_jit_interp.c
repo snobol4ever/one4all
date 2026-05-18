@@ -1207,25 +1207,6 @@ static void emit_label_blob(size_t trampoline_abs_off)
     seg_u32(SEG_CODE, (uint32_t)rel);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void emit_aligned_call_imm64(void *fn)
-{
-    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x83);
-    seg_byte(SEG_CODE, 0xec); seg_byte(SEG_CODE, 0x08);
-    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xb8);
-    seg_u64(SEG_CODE, (uint64_t)(uintptr_t)fn);
-    seg_byte(SEG_CODE, 0xff); seg_byte(SEG_CODE, 0xd0);
-    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x83);
-    seg_byte(SEG_CODE, 0xc4); seg_byte(SEG_CODE, 0x08);
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void emit_jmp_trampoline(size_t trampoline_abs_off)
-{
-    size_t rel32_end_off = seg_offset(SEG_CODE) + 5;
-    int32_t rel = (int32_t)((int64_t)trampoline_abs_off - (int64_t)rel32_end_off);
-    seg_byte(SEG_CODE, 0xe9);
-    seg_u32(SEG_CODE, (uint32_t)rel);
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int sm_codegen(SM_Program *prog)
 {
     init_handler_table();
@@ -1358,19 +1339,6 @@ int sm_jit_run(SM_Program *prog, SM_State *st)
                   : "r"(st), "r"(st->stack)
                   : "r12", "r13");
     entry();
-    return 0;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_jit_run_plain(SM_Program *prog, SM_State *st)
-{
-    init_handler_table();
-    g_jit_prog   = prog;
-    g_jit_state  = st;
-    g_jit_halted = 0;
-    while (st->pc < prog->count && !g_jit_halted) {
-        st->pc++;
-        g_handlers[prog->instrs[st->pc - 1].op]();
-    }
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
