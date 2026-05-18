@@ -10,9 +10,9 @@ DESCR_t *interp_eval_ref(tree_t *e)
     }
     case TT_IDX: {
         if (e->n < 2) return NULL;
-        DESCR_t base = interp_eval(e->c[0]);
+        DESCR_t base = FAILDESCR;
         if (IS_FAIL_fn(base)) return NULL;
-        DESCR_t idx  = interp_eval(e->c[1]);
+        DESCR_t idx  = FAILDESCR;
         if (IS_FAIL_fn(idx)) return NULL;
         if (IS_ARR(base)) {
             return array_ptr(base.arr, (int)to_int(idx));
@@ -31,7 +31,7 @@ DESCR_t *interp_eval_ref(tree_t *e)
     }
     case TT_FIELD: {
         if (!ICN_FIELD_NAME(e)) return NULL;
-        DESCR_t obj = interp_eval(e->c[0]);
+        DESCR_t obj = FAILDESCR;
         if (IS_FAIL_fn(obj)) return NULL;
         return data_field_ptr(ICN_FIELD_NAME(e), obj);
     }
@@ -43,7 +43,7 @@ DESCR_t *interp_eval_ref(tree_t *e)
         return NULL;
     }
     case TT_INDIRECT: {
-        DESCR_t name_d = interp_eval(e->n >= 1 ? e->c[0] : NULL);
+        DESCR_t name_d = FAILDESCR;
         const char *nm0 = IS_NAMEPTR(name_d)
             ? VARVAL_fn(NAME_DEREF_PTR(name_d))
             : VARVAL_fn(name_d);

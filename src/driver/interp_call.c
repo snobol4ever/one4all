@@ -216,7 +216,7 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                                 subj_name = VARVAL_fn(xv);
                             }
                         } else {
-                            DESCR_t nd = interp_eval(ic);
+                            DESCR_t nd = FAILDESCR;
                             subj_name = VARVAL_fn(nd);
                         }
                         if (subj_name) {
@@ -226,10 +226,10 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                         if (subj_name && s_pattern) {
                             subj_val = NV_GET_fn(subj_name);
                         } else if (!subj_name)
-                            subj_val = interp_eval(s_subject);
+                            subj_val = FAILDESCR;
                     } else if (s_subject->t == TT_FNC && s_has_eq && !s_pattern) {
                     } else {
-                        subj_val = interp_eval(s_subject);
+                        subj_val = FAILDESCR;
                     }
                 }
                 int succeeded = 1;
@@ -240,7 +240,7 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                     } else {
                         DESCR_t repl_val; int has_repl = 0;
                         if (s_has_eq && s_repl) {
-                            repl_val = interp_eval(s_repl);
+                            repl_val = FAILDESCR;
                             has_repl = !IS_FAIL_fn(repl_val);
                         }
                         Σ = subj_name ? subj_name : "";
@@ -249,7 +249,7 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                             pat_d, has_repl ? &repl_val : NULL, has_repl);
                     }
                 } else if (s_has_eq && subj_name) {
-                    DESCR_t repl_val = s_repl ? interp_eval(s_repl) : NULVCL;
+                    DESCR_t repl_val = s_repl ? FAILDESCR : NULVCL;
                     if (strcmp(kw_rtntype, "NRETURN") == 0
                             && s_repl && s_repl->t == TT_FNC && s_repl->v.sval) {
                         DESCR_t raw = NV_GET_fn(s_repl->v.sval);
@@ -265,7 +265,7 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                         } else { set_and_trace(subj_name, repl_val); succeeded = 1; }
                     }
                 } else if (s_has_eq && s_subject && s_subject->t == TT_KEYWORD && s_subject->v.sval) {
-                    DESCR_t repl_val = s_repl ? interp_eval(s_repl) : NULVCL;
+                    DESCR_t repl_val = s_repl ? FAILDESCR : NULVCL;
                     if (IS_FAIL_fn(repl_val)) succeeded = 0;
                     else {
                         if (!ASGNIC_fn(s_subject->v.sval, repl_val))
@@ -274,13 +274,13 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                     }
                 } else if (s_has_eq && s_subject && s_subject->t == TT_IDX &&
                            s_subject->n >= 2) {
-                    DESCR_t base = interp_eval(s_subject->c[0]);
-                    DESCR_t idx  = interp_eval(s_subject->c[1]);
-                    DESCR_t rv   = s_repl ? interp_eval(s_repl) : NULVCL;
+                    DESCR_t base = FAILDESCR;
+                    DESCR_t idx  = FAILDESCR;
+                    DESCR_t rv   = s_repl ? FAILDESCR : NULVCL;
                     if (IS_FAIL_fn(base)||IS_FAIL_fn(idx)||IS_FAIL_fn(rv)) succeeded = 0;
                     else {
                         if (s_subject->n == 3) {
-                            DESCR_t idx2 = interp_eval(s_subject->c[2]);
+                            DESCR_t idx2 = FAILDESCR;
                             subscript_set2(base, idx, idx2, rv);
                         } else { subscript_set(base, idx, rv); }
                         { const char *base_nm = (s_subject->c[0] &&
@@ -291,14 +291,14 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                     }
                 } else if (s_has_eq && s_subject && s_subject->t == TT_FNC &&
                            s_subject->v.sval && s_subject->n >= 1) {
-                    DESCR_t rv = s_repl ? interp_eval(s_repl) : NULVCL;
+                    DESCR_t rv = s_repl ? FAILDESCR : NULVCL;
                     if (!IS_FAIL_fn(rv)) {
                         if (strcmp(s_subject->v.sval, "ITEM") == 0 && s_subject->n >= 2) {
-                            DESCR_t base = interp_eval(s_subject->c[0]);
-                            DESCR_t idx  = interp_eval(s_subject->c[1]);
+                            DESCR_t base = FAILDESCR;
+                            DESCR_t idx  = FAILDESCR;
                             if (!IS_FAIL_fn(base) && !IS_FAIL_fn(idx)) {
                                 if (s_subject->n >= 3) {
-                                    DESCR_t idx2 = interp_eval(s_subject->c[2]);
+                                    DESCR_t idx2 = FAILDESCR;
                                     if (!IS_FAIL_fn(idx2)) subscript_set2(base, idx, idx2, rv);
                                 } else {
                                     subscript_set(base, idx, rv);
@@ -306,7 +306,7 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                                 succeeded = 1;
                             } else succeeded = 0;
                         } else {
-                            DESCR_t obj = interp_eval(s_subject->c[0]);
+                            DESCR_t obj = FAILDESCR;
                             if (!IS_FAIL_fn(obj)) {
                                 FIELD_SET_fn(obj, s_subject->v.sval, rv);
                                 comm_var("<lval>", rv);
@@ -318,16 +318,16 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                            s_subject->v.sval && s_subject->n == 0) {
                     DESCR_t fres = call_user_function(s_subject->v.sval, NULL, 0);
                     if (IS_NAME(fres)) {
-                        DESCR_t rv = s_repl ? interp_eval(s_repl) : NULVCL;
+                        DESCR_t rv = s_repl ? FAILDESCR : NULVCL;
                         if (IS_FAIL_fn(rv)) succeeded = 0;
                         else { succeeded = NAME_SET(fres, rv) ? 1 : 0; }
                     } else succeeded = 0;
                 } else if (s_has_eq && s_subject && s_subject->t == TT_INDIRECT) {
                     tree_t *ichild = s_subject->n > 0 ? s_subject->c[0] : NULL;
-                    DESCR_t repl_val = s_repl ? interp_eval(s_repl) : NULVCL;
+                    DESCR_t repl_val = s_repl ? FAILDESCR : NULVCL;
                     if (IS_FAIL_fn(repl_val)) { succeeded = 0; }
                     else {
-                        DESCR_t ind_val = ichild ? interp_eval(ichild) : NULVCL;
+                        DESCR_t ind_val = ichild ? FAILDESCR : NULVCL;
                         if (IS_NAMEPTR(ind_val)) {
                             *(DESCR_t*)ind_val.ptr = repl_val;
                             { const char *_rn = NV_name_from_ptr((const DESCR_t*)ind_val.ptr);
@@ -367,17 +367,17 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                 if (goto_u && *goto_u)
                     target = goto_u;
                 else if (goto_u_expr) {
-                    DESCR_t cv = interp_eval(goto_u_expr);
+                    DESCR_t cv = FAILDESCR;
                     target = (cv.v == DT_S && cv.s) ? cv.s : NULL;
                 } else if (succeeded && goto_s && *goto_s)
                     target = goto_s;
                 else if (succeeded && goto_s_expr) {
-                    DESCR_t cv = interp_eval(goto_s_expr);
+                    DESCR_t cv = FAILDESCR;
                     target = (cv.v == DT_S && cv.s) ? cv.s : NULL;
                 } else if (!succeeded && goto_f && *goto_f)
                     target = goto_f;
                 else if (!succeeded && goto_f_expr) {
-                    DESCR_t cv = interp_eval(goto_f_expr);
+                    DESCR_t cv = FAILDESCR;
                     target = (cv.v == DT_S && cv.s) ? cv.s : NULL;
                 }
                 if (target) {
