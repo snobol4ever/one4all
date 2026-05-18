@@ -110,7 +110,6 @@ $(SRC)/emitter/emit_jvm.c \
     $(SRC)/driver/interp_label.c \
     $(SRC)/driver/interp_hooks.c \
     $(SRC)/driver/interp_data.c \
-    $(SRC)/driver/interp_eval.c \
     $(SRC)/driver/interp_call.c \
     $(SRC)/driver/interp_ref.c \
     $(SRC)/driver/interp_ast_stubs.c \
@@ -298,7 +297,6 @@ scrip:
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_label.c   -o $(OBJ)/interp_label.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_hooks.c   -o $(OBJ)/interp_hooks.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_data.c    -o $(OBJ)/interp_data.o
-	$(CC) $(CRT)   -c $(SRC)/driver/interp_eval.c    -o $(OBJ)/interp_eval.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_call.c    -o $(OBJ)/interp_call.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_ref.c     -o $(OBJ)/interp_ref.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_ast_stubs.c -o $(OBJ)/interp_ast_stubs.o

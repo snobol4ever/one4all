@@ -236,3 +236,31 @@ DESCR_t _builtin_CODE(DESCR_t *args, int nargs) {
     if (!s || !*s) return FAILDESCR;
     return code(s);
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static const char *PAT_FNC_NAMES[] = {
+    "ANY","NOTANY","SPAN","BREAK","BREAKX","LEN","POS","RPOS","TAB","RTAB",
+    "ARB","ARBNO","REM","FAIL","SUCCEED","FENCE","ABORT","BAL","CALL", NULL
+};
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+int _is_pat_fnc_name(const char *s) {
+    if (!s) return 0;
+    for (int i = 0; PAT_FNC_NAMES[i]; i++)
+        if (strcmp(s, PAT_FNC_NAMES[i]) == 0) return 1;
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+int _expr_is_pat(tree_t *e) {
+    if (!e) return 0;
+    switch (e->t) {
+        case TT_ARB: case TT_ARBNO: case TT_CAPT_COND_ASGN:
+        case TT_CAPT_IMMED_ASGN: case TT_CAPT_CURSOR: case TT_DEFER:
+            return 1;
+        default: break;
+    }
+    if (e->t == TT_FNC && _is_pat_fnc_name(e->v.sval)) return 1;
+    if (e->t == TT_VAR && _is_pat_fnc_name(e->v.sval)) return 1;
+    for (int i = 0; i < e->n; i++)
+        if (_expr_is_pat(e->c[i])) return 1;
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/

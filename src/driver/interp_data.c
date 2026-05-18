@@ -125,3 +125,14 @@ DESCR_t _builtin_DATA(DESCR_t *args, int nargs) {
     sno_DATA_register(args, nargs);
     return NULVCL;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+DESCR_t *data_field_ptr(const char *fname, DESCR_t inst) {
+    if (inst.v < DT_DATA || !inst.u) return NULL;
+    DATBLK_t *blk = inst.u->type;
+    if (!blk) return NULL;
+    for (int i = 0; i < blk->nfields; i++)
+        if (blk->fields[i] && strcmp(blk->fields[i], fname) == 0)
+            return &inst.u->fields[i];
+    return NULL;
+}
+#include "../runtime/interp/icn_runtime.h"
