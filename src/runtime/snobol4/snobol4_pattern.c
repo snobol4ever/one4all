@@ -281,10 +281,6 @@ DESCR_t pat_ref(const char *name) {
     return spat_val(p);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t pat_ref_val(DESCR_t nameVal) {
-    return pat_ref(VARVAL_fn(nameVal));
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t pat_assign_imm(DESCR_t child, DESCR_t var) {
     PATND_t *p = spat_new(XFNME);
     PATND_t *ch = pat_to_patnd(child);
@@ -369,27 +365,6 @@ DESCR_t pat_at_cursor(const char *varname) {
     p->args[0].s    = varname ? GC_strdup(varname) : "";
     p->args[0].slen = varname ? (uint32_t)strlen(varname) : 0;
     return spat_val(p);
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t array_create(DESCR_t spec) {
-    const char *s = VARVAL_fn(spec);
-    int lo = 1, hi = 1;
-    const char *colon = strchr(s, ':');
-    int bare = 0;
-    if (colon) {
-        lo = atoi(s);
-        hi = atoi(colon + 1);
-    } else {
-        hi = atoi(s);
-        bare = 1;
-    }
-    if (hi < lo) hi = lo;
-    ARBLK_t *a = array_new(lo, hi);
-    a->proto_bare = bare;
-    DESCR_t v;
-    v.v = DT_A;
-    v.arr    = a;
-    return v;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t subscript_get(DESCR_t arr, DESCR_t idx) {
@@ -581,165 +556,9 @@ int subscript_set2(DESCR_t arr, DESCR_t i, DESCR_t j, DESCR_t val) {
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t MAKE_TREE_fn(DESCR_t tag, DESCR_t val, DESCR_t n_children, DESCR_t children) {
-    return DATCON_fn("tree", tag, val, n_children, children, (DESCR_t){0});
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t push_val(DESCR_t x) {
-    PUSH_fn(x);
-    return NULVCL;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t pop_val(void) {
-    return POP_fn();
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t top_val(void) {
-    return TOP_fn();
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void register_fn(const char *name, DESCR_t (*fn)(DESCR_t*, int), int min_args, int max_args) {
     (void)min_args; (void)max_args;
     DEFINE_fn(name, fn);
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void define_spec(DESCR_t spec) {
-    DEFINE_fn(VARVAL_fn(spec), NULL);
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t apply_val(DESCR_t fnval, DESCR_t *args, int nargs) {
-    const char *name = VARVAL_fn(fnval);
-    return APPLY_fn(name, args, nargs);
-}
-typedef struct { const char *s; int pos; } SnoEvalCtx;
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void _ev_skip(SnoEvalCtx *e) {
-    while (e->s[e->pos] == ' ' || e->s[e->pos] == '\t') e->pos++;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static char *_ev_ident(SnoEvalCtx *e) {
-    int start = e->pos;
-    while (isalnum((unsigned char)e->s[e->pos]) || e->s[e->pos] == '_') e->pos++;
-    int len = e->pos - start;
-    if (len == 0) return NULL;
-    char *nm = GC_malloc(len + 1);
-    memcpy(nm, e->s + start, len);
-    nm[len] = '\0';
-    return nm;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static char *_ev_strlit(SnoEvalCtx *e) {
-    char delim = e->s[e->pos]; e->pos++;
-    int start = e->pos;
-    while (e->s[e->pos] && e->s[e->pos] != delim) e->pos++;
-    int len = e->pos - start;
-    char *lit = GC_malloc(len + 1);
-    memcpy(lit, e->s + start, len);
-    lit[len] = '\0';
-    if (e->s[e->pos] == delim) e->pos++;
-    return lit;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static DESCR_t _ev_val(SnoEvalCtx *e);
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static DESCR_t _ev_term(SnoEvalCtx *e);
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static DESCR_t _ev_expr(SnoEvalCtx *e);
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int _ev_args(SnoEvalCtx *e, DESCR_t *args, int maxargs) {
-    int na = 0;
-    _ev_skip(e);
-    while (e->s[e->pos] && e->s[e->pos] != ')') {
-        int pos_before = e->pos;
-        if (na > 0) { if (e->s[e->pos] == ',') e->pos++; _ev_skip(e); }
-        if (na < maxargs) args[na++] = _ev_val(e);
-        else _ev_val(e);
-        _ev_skip(e);
-        if (e->pos == pos_before) break;
-    }
-    if (e->s[e->pos] == ')') e->pos++;
-    return na;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static DESCR_t _ev_val(SnoEvalCtx *e) {
-    _ev_skip(e);
-    char c = e->s[e->pos];
-    if (c == '\'' || c == '"') return STRVAL(_ev_strlit(e));
-    if (isalpha((unsigned char)c) || c == '_') {
-        char *nm = _ev_ident(e);
-        _ev_skip(e);
-        if (e->s[e->pos] == '(') {
-            e->pos++;
-            DESCR_t args[8]; int na = _ev_args(e, args, 8);
-            return APPLY_fn(nm, args, na);
-        }
-        return NV_GET_fn(nm);
-    }
-    if (isdigit((unsigned char)c) || c == '-') {
-        char *end;
-        long long iv = strtoll(e->s + e->pos, &end, 10);
-        e->pos = (int)(end - e->s);
-        return INTVAL(iv);
-    }
-    return NULVCL;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static DESCR_t _ev_term(SnoEvalCtx *e) {
-    _ev_skip(e);
-    char c = e->s[e->pos];
-    if (c == '*') {
-        e->pos++;
-        _ev_skip(e);
-        char *nm = _ev_ident(e);
-        if (!nm) return pat_epsilon();
-        _ev_skip(e);
-        if (e->s[e->pos] == '(') {
-            e->pos++;
-            DESCR_t args[8]; int na = _ev_args(e, args, 8);
-            DESCR_t *ac = na ? GC_malloc(na * sizeof(DESCR_t)) : NULL;
-            if (ac) memcpy(ac, args, na * sizeof(DESCR_t));
-            return pat_user_call(nm, ac, na);
-        }
-        return pat_ref(nm);
-    }
-    if (c == '\'' || c == '"') return pat_lit(_ev_strlit(e));
-    if (isalpha((unsigned char)c) || c == '_') {
-        char *nm = _ev_ident(e);
-        _ev_skip(e);
-        if (e->s[e->pos] == '(') {
-            e->pos++;
-            DESCR_t args[8]; int na = _ev_args(e, args, 8);
-            return APPLY_fn(nm, args, na);
-        }
-        return STRVAL(GC_strdup(nm));
-    }
-    return pat_epsilon();
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static DESCR_t _ev_expr(SnoEvalCtx *e) {
-    DESCR_t left = _ev_term(e);
-    if (left.v == DT_S) {
-        DESCR_t v = NV_GET_fn(left.s);
-        if (v.v == DT_P) left = v;
-        else if (v.v == DT_S && v.s && v.s[0]) left = pat_lit(v.s);
-        else left = pat_epsilon();
-    } else if (left.v == DT_SNUL) {
-        left = pat_epsilon();
-    }
-    _ev_skip(e);
-    while (e->s[e->pos] == '.') {
-        e->pos++;
-        _ev_skip(e);
-        DESCR_t right = _ev_term(e);
-        _ev_skip(e);
-        if (right.v == DT_S) {
-            left = pat_assign_cond(left, right);
-        } else {
-            if (right.v == DT_SNUL) right = pat_epsilon();
-            left = pat_cat(left, right);
-        }
-    }
-    return left;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t EVAL_fn(DESCR_t expr) {
@@ -863,13 +682,6 @@ DESCR_t sort_fn(DESCR_t arr) {
     result.v = DT_A;
     result.arr    = a;
     return result;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t pat_call(const char *name, DESCR_t arg) {
-    DESCR_t args[1] = { arg };
-    DESCR_t result = APPLY_fn(name, args, 1);
-    if (IS_FAIL_fn(result)) return pat_fail();
-    return var_as_pattern(result);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t compile_to_expression(const char *src) {
