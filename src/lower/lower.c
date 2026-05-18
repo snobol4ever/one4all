@@ -981,9 +981,11 @@ static void lower_case(const tree_t *t)
         sm_emit(g_p, SM_PUSH_NULL);
         return;
     }
-    int is_raku = (t->n >= 4 && (t->n - 1) % 3 == 0
-                   && t->c[1]
-                   && (t->c[1]->t == TT_ILIT || t->c[1]->t == TT_NUL));
+    /* PRF-8 (2026-05-18): Raku TT_CASE shape is [topic, val0, body0, val1, body1, ...].
+     * Default arm encoded as (TT_NUL, body_def) trailing pair. cmpkind derived from
+     * val->t at lowering time: TT_QLIT -> TT_LEQ (string), else TT_EQ (numeric/value).
+     * Gated on LANG_RAKU; other languages fall through to the generic non-raku branch. */
+    int is_raku = (g_lang == LANG_RAKU && t->n >= 3 && (t->n - 1) % 2 == 0);
     if (!is_raku) {
         int nc = t->n - 1, has_def = nc % 2, npairs = nc / 2;
         lower_expr(t->c[0]);
@@ -1005,21 +1007,24 @@ static void lower_case(const tree_t *t)
         for (int i = 0; i < nend; i++) sm_patch_jump(g_p, end_jumps[i], end);
         return;
     }
-    int ntriples = (t->n - 1) / 3, has_def = 0, def_idx = -1;
-    if (ntriples > 0) {
-        tree_t *last_cmp = t->c[1 + (ntriples-1)*3];
-        if (last_cmp && last_cmp->t == TT_NUL) { has_def = 1; def_idx = ntriples - 1; }
+    int npairs = (t->n - 1) / 2, has_def = 0, def_idx = -1;
+    if (npairs > 0) {
+        tree_t *last_val = t->c[1 + (npairs - 1) * 2];
+        if (last_val && last_val->t == TT_NUL) { has_def = 1; def_idx = npairs - 1; }
     }
     emit_thunk(t->c[0]);
-    for (int i = 0; i < ntriples; i++) {
+    for (int i = 0; i < npairs; i++) {
         if (i == def_idx) continue;
-        int base = 1 + i*3;
-        tree_t *cmp = t->c[base];
-        sm_emit_i(g_p, SM_PUSH_LIT_I, (int64_t)((cmp && cmp->t == TT_ILIT) ? cmp->v.ival : TT_EQ));
-        emit_thunk(t->c[base+1]); emit_thunk(t->c[base+2]);
+        int base = 1 + i * 2;
+        tree_t *val = t->c[base];
+        /* Derive cmpkind from val type: TT_QLIT -> TT_LEQ (string-equal), else TT_EQ. */
+        int64_t cmpkind = (val && val->t == TT_QLIT) ? (int64_t)TT_LEQ : (int64_t)TT_EQ;
+        sm_emit_i(g_p, SM_PUSH_LIT_I, cmpkind);
+        emit_thunk(val);
+        emit_thunk(t->c[base + 1]);
     }
-    if (has_def) { emit_thunk(t->c[1 + def_idx*3 + 2]); }
-    sm_emit_ii(g_p, SM_BB_PUMP_CASE, (int64_t)(ntriples - has_def), (int64_t)has_def);
+    if (has_def) emit_thunk(t->c[1 + def_idx * 2 + 1]);
+    sm_emit_ii(g_p, SM_BB_PUMP_CASE, (int64_t)(npairs - has_def), (int64_t)has_def);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_makelist(const tree_t *t)

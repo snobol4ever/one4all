@@ -335,15 +335,16 @@ for_stmt
     ;
 given_stmt
     : KW_GIVEN expr '{' when_list '}'
-        { /* RK-18d: TT_CASE[ topic, cmpnode0, val0, body0, ... ]
-           * cmp kind stored in TT_ILIT child to avoid corrupting val->v.ival. */
+        { /* PRF-8 (2026-05-18): TT_CASE[ topic, val0, body0, val1, body1, ... ]
+           * cmpkind derived at lowering time from val->t (TT_QLIT -> TT_LEQ, else TT_EQ).
+           * No cmpkind ILIT child. Default arm (none here) would be trailing (TT_NUL, body_def). */
           tree_t *ec=ast_node_new(TT_CASE);
           expr_add_child(ec,$2);
           ExprList *whens=$4;
           for(int i=0;i<whens->count;i++){
               tree_t *pair=whens->items[i];
-              tree_t *cn=pair->c[0], *val=pair->c[1], *body=pair->c[2];
-              expr_add_child(ec,cn); expr_add_child(ec,val); expr_add_child(ec,body);
+              tree_t *val=pair->c[0], *body=pair->c[1];
+              expr_add_child(ec,val); expr_add_child(ec,body);
           }
           exprlist_free(whens);
           $$=ec; }
@@ -354,20 +355,19 @@ given_stmt
           ExprList *whens=$4;
           for(int i=0;i<whens->count;i++){
               tree_t *pair=whens->items[i];
-              tree_t *cn=pair->c[0], *val=pair->c[1], *body=pair->c[2];
-              expr_add_child(ec,cn); expr_add_child(ec,val); expr_add_child(ec,body);
+              tree_t *val=pair->c[0], *body=pair->c[1];
+              expr_add_child(ec,val); expr_add_child(ec,body);
           }
           exprlist_free(whens);
-          expr_add_child(ec,ast_node_new(TT_NUL)); expr_add_child(ec,ast_node_new(TT_NUL)); expr_add_child(ec,$6);
+          expr_add_child(ec,ast_node_new(TT_NUL)); expr_add_child(ec,$6);
           $$=ec; }
     ;
 when_list
     :  { $$=exprlist_new(); }
     | when_list KW_WHEN expr block
-        { tree_e cmpkind=($3->t==TT_QLIT)?TT_LEQ:TT_EQ;
-          tree_t *cn=ast_node_new(TT_ILIT); cn->v.ival=(long long)cmpkind;
+        { /* PRF-8: pair is now [val, body]; cmpkind moved to lower.c (derived from val->t). */
           tree_t *pair=ast_node_new(TT_SEQ_EXPR);
-          expr_add_child(pair,cn); expr_add_child(pair,$3); expr_add_child(pair,$4);
+          expr_add_child(pair,$3); expr_add_child(pair,$4);
           $$=exprlist_append($1,pair); }
     ;
 sub_decl
