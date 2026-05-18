@@ -133,16 +133,16 @@ int icn_string_section_assign(tree_t *lhs, DESCR_t val) {
     int slen = (int)strlen(s);
     int lo = 0, hi = 0;
     if (kind == TT_SECTION) {
-        DESCR_t _i1=(g_lang==LANG_ICN)?bb_eval_value(lhs->c[1]):interp_eval(lhs->c[1]);
-        DESCR_t _i2=(g_lang==LANG_ICN)?bb_eval_value(lhs->c[2]):interp_eval(lhs->c[2]);
+        DESCR_t _i1=interp_eval(lhs->c[1]);
+        DESCR_t _i2=interp_eval(lhs->c[2]);
         int i=(int)to_int(_i1), j=(int)to_int(_i2);
         if (i == 0) i = slen + 1; else if (i < 0) i = slen + 1 + i;
         if (j == 0) j = slen + 1; else if (j < 0) j = slen + 1 + j;
         if (i < 1 || i > slen+1 || j < 1 || j > slen+1) return 0;
         lo = i < j ? i : j; hi = i < j ? j : i;
     } else if (kind == TT_SECTION_PLUS) {
-        DESCR_t _sp1=(g_lang==LANG_ICN)?bb_eval_value(lhs->c[1]):interp_eval(lhs->c[1]);
-        DESCR_t _sp2=(g_lang==LANG_ICN)?bb_eval_value(lhs->c[2]):interp_eval(lhs->c[2]);
+        DESCR_t _sp1=interp_eval(lhs->c[1]);
+        DESCR_t _sp2=interp_eval(lhs->c[2]);
         int i=(int)to_int(_sp1), n=(int)to_int(_sp2);
         if (i == 0) i = slen + 1; else if (i < 0) i = slen + 1 + i;
         if (i < 1 || i > slen+1) return 0;
@@ -150,8 +150,8 @@ int icn_string_section_assign(tree_t *lhs, DESCR_t val) {
         if (i + n > slen + 1) return 0;
         lo = i; hi = i + n;
     } else if (kind == TT_SECTION_MINUS) {
-        DESCR_t _sm1=(g_lang==LANG_ICN)?bb_eval_value(lhs->c[1]):interp_eval(lhs->c[1]);
-        DESCR_t _sm2=(g_lang==LANG_ICN)?bb_eval_value(lhs->c[2]):interp_eval(lhs->c[2]);
+        DESCR_t _sm1=interp_eval(lhs->c[1]);
+        DESCR_t _sm2=interp_eval(lhs->c[2]);
         int i=(int)to_int(_sm1), n=(int)to_int(_sm2);
         if (i == 0) i = slen + 1; else if (i < 0) i = slen + 1 + i;
         if (i < 1 || i > slen+1) return 0;
@@ -159,8 +159,7 @@ int icn_string_section_assign(tree_t *lhs, DESCR_t val) {
         if (i - n < 1) return 0;
         lo = i - n; hi = i;
     } else {
-        extern DESCR_t bb_eval_value(tree_t *e);
-        DESCR_t _idx_d = (g_lang == LANG_ICN) ? bb_eval_value(lhs->c[1]) : interp_eval(lhs->c[1]);
+        DESCR_t _idx_d = interp_eval(lhs->c[1]);
         int i = (int)to_int(_idx_d);
         if (i == 0) return 0;
         if (i < 0) i = slen + 1 + i;

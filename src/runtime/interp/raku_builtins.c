@@ -16,8 +16,8 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
     if (!fn) return 0;
     int nargs = call->n - 1;
             if (!strcmp(fn,"raku_substr") || (!strcmp(fn,"substr") && nargs >= 2)) {
-                DESCR_t sd = bb_eval_value(call->c[1]);
-                DESCR_t id = bb_eval_value(call->c[2]);
+                DESCR_t sd = interp_eval(call->c[1]);
+                DESCR_t id = interp_eval(call->c[2]);
                 const char *s = VARVAL_fn(sd); if (!s) s = "";
                 long slen = (long)strlen(s);
                 long start = IS_INT_fn(id) ? id.i : 0;
@@ -26,7 +26,7 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
                 if (start > slen) start = slen;
                 long len = slen - start;
                 if (nargs >= 3) {
-                    DESCR_t ld = bb_eval_value(call->c[3]);
+                    DESCR_t ld = interp_eval(call->c[3]);
                     len = IS_INT_fn(ld) ? ld.i : len;
                     if (len < 0) len = 0;
                     if (start + len > slen) len = slen - start;
@@ -36,25 +36,25 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
                 { *__rk_out = STRVAL(out); return 1; }
             }
             if (!strcmp(fn,"raku_index") || (!strcmp(fn,"index") && nargs >= 2)) {
-                DESCR_t sd = bb_eval_value(call->c[1]);
-                DESCR_t nd = bb_eval_value(call->c[2]);
+                DESCR_t sd = interp_eval(call->c[1]);
+                DESCR_t nd = interp_eval(call->c[2]);
                 const char *s = VARVAL_fn(sd); if (!s) s = "";
                 const char *needle = VARVAL_fn(nd); if (!needle) needle = "";
                 long from = 0;
-                if (nargs >= 3) { DESCR_t pd = bb_eval_value(call->c[3]); from = IS_INT_fn(pd)?pd.i:0; }
+                if (nargs >= 3) { DESCR_t pd = interp_eval(call->c[3]); from = IS_INT_fn(pd)?pd.i:0; }
                 if (from < 0) from = 0;
                 if (*needle == '\0') { *__rk_out = INTVAL(from); return 1; }
                 const char *found = strstr(s + from, needle);
                 { *__rk_out = found ? INTVAL((long)(found - s)) : INTVAL(-1); return 1; }
             }
             if (!strcmp(fn,"raku_rindex") || (!strcmp(fn,"rindex") && nargs >= 2)) {
-                DESCR_t sd = bb_eval_value(call->c[1]);
-                DESCR_t nd = bb_eval_value(call->c[2]);
+                DESCR_t sd = interp_eval(call->c[1]);
+                DESCR_t nd = interp_eval(call->c[2]);
                 const char *s = VARVAL_fn(sd); if (!s) s = "";
                 const char *needle = VARVAL_fn(nd); if (!needle) needle = "";
                 long slen = (long)strlen(s);
                 long from = slen;
-                if (nargs >= 3) { DESCR_t pd = bb_eval_value(call->c[3]); from = IS_INT_fn(pd)?pd.i:slen; }
+                if (nargs >= 3) { DESCR_t pd = interp_eval(call->c[3]); from = IS_INT_fn(pd)?pd.i:slen; }
                 size_t nlen = strlen(needle);
                 if (nlen == 0) { *__rk_out = INTVAL(from < slen ? from : slen); return 1; }
                 long best = -1;
@@ -64,8 +64,8 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
                 { *__rk_out = INTVAL(best); return 1; }
             }
             if (!strcmp(fn,"raku_match") && nargs == 2) {
-                DESCR_t sd = bb_eval_value(call->c[1]);
-                DESCR_t pd = bb_eval_value(call->c[2]);
+                DESCR_t sd = interp_eval(call->c[1]);
+                DESCR_t pd = interp_eval(call->c[2]);
                 const char *subj = VARVAL_fn(sd); if (!subj) subj = "";
                 if (pd.v == DT_P) {
                     extern int exec_stmt(const char *, DESCR_t *, DESCR_t, DESCR_t *, int);
@@ -81,8 +81,8 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
                 }
             }
             if (!strcmp(fn,"raku_match_global") && nargs == 2) {
-                DESCR_t sd = bb_eval_value(call->c[1]);
-                DESCR_t pd = bb_eval_value(call->c[2]);
+                DESCR_t sd = interp_eval(call->c[1]);
+                DESCR_t pd = interp_eval(call->c[2]);
                 const char *subj = VARVAL_fn(sd); if (!subj) subj = "";
                 const char *pat  = VARVAL_fn(pd); if (!pat)  pat  = "";
                 Raku_nfa *nfa = raku_nfa_build(pat);
@@ -112,8 +112,8 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
                 { *__rk_out = count > 0 ? STRVAL(out) : FAILDESCR; return 1; }
             }
             if (!strcmp(fn,"raku_subst") && nargs == 2) {
-                DESCR_t sd = bb_eval_value(call->c[1]);
-                DESCR_t td = bb_eval_value(call->c[2]);
+                DESCR_t sd = interp_eval(call->c[1]);
+                DESCR_t td = interp_eval(call->c[2]);
                 const char *subj = VARVAL_fn(sd); if (!subj) subj = "";
                 const char *tok  = VARVAL_fn(td); if (!tok)  tok  = "";
                 const char *sep1 = strchr(tok, '\x01');
@@ -147,11 +147,11 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
                 { *__rk_out = did_one ? STRVAL(res) : sd; return 1; }
             }
             if (!strcmp(fn,"open") && (nargs==1||nargs==2)) {
-                DESCR_t pd=bb_eval_value(call->c[1]);
+                DESCR_t pd=interp_eval(call->c[1]);
                 const char *path=VARVAL_fn(pd); if(!path||!*path) { *__rk_out = FAILDESCR; return 1; }
                 const char *mode="r";
                 if(nargs==2){
-                    DESCR_t md=bb_eval_value(call->c[2]);
+                    DESCR_t md=interp_eval(call->c[2]);
                     const char *ms=VARVAL_fn(md); if(!ms) ms="";
                     if(strstr(ms,":w")||strstr(ms,"w")) mode="w";
                     else if(strstr(ms,":a")||strstr(ms,"a")) mode="a";
@@ -163,14 +163,14 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
                 { *__rk_out = INTVAL(idx); return 1; }
             }
             if (!strcmp(fn,"close") && nargs==1) {
-                DESCR_t fd=bb_eval_value(call->c[1]);
+                DESCR_t fd=interp_eval(call->c[1]);
                 int idx=(int)(IS_INT_fn(fd)?fd.i:0);
                 FILE *fp=raku_fh_get(idx);
                 if(fp){fclose(fp);raku_fh_free(idx);}
                 { *__rk_out = INTVAL(0); return 1; }
             }
             if (!strcmp(fn,"slurp") && nargs==1) {
-                DESCR_t ad=bb_eval_value(call->c[1]);
+                DESCR_t ad=interp_eval(call->c[1]);
                 FILE *fp=NULL; int need_close=0;
                 if(IS_INT_fn(ad)) {
                     fp=raku_fh_get((int)ad.i);
@@ -186,7 +186,7 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
                 { *__rk_out = STRVAL(buf); return 1; }
             }
             if (!strcmp(fn,"lines") && nargs==1) {
-                DESCR_t ad=bb_eval_value(call->c[1]);
+                DESCR_t ad=interp_eval(call->c[1]);
                 FILE *fp=NULL; int need_close=0;
                 if(IS_INT_fn(ad)) {
                     fp=raku_fh_get((int)ad.i);
@@ -209,8 +209,8 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
                 { *__rk_out = STRVAL(out); return 1; }
             }
             if ((!strcmp(fn,"raku_print_fh")||!strcmp(fn,"raku_say_fh")) && nargs==2) {
-                DESCR_t fd=bb_eval_value(call->c[1]);
-                DESCR_t vd=bb_eval_value(call->c[2]);
+                DESCR_t fd=interp_eval(call->c[1]);
+                DESCR_t vd=interp_eval(call->c[2]);
                 int idx=(int)(IS_INT_fn(fd)?fd.i:1);
                 FILE *fp=raku_fh_get(idx); if(!fp) fp=stdout;
                 const char *s=VARVAL_fn(vd); if(!s) s="";
@@ -219,8 +219,8 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
                 { *__rk_out = INTVAL(0); return 1; }
             }
             if (!strcmp(fn,"spurt") && nargs==2) {
-                DESCR_t pd=bb_eval_value(call->c[1]);
-                DESCR_t cd=bb_eval_value(call->c[2]);
+                DESCR_t pd=interp_eval(call->c[1]);
+                DESCR_t cd=interp_eval(call->c[2]);
                 const char *path=VARVAL_fn(pd); if(!path||!*path) { *__rk_out = FAILDESCR; return 1; }
                 const char *content=VARVAL_fn(cd); if(!content) content="";
                 FILE *fp=fopen(path,"w"); if(!fp) { *__rk_out = FAILDESCR; return 1; }
@@ -228,7 +228,7 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
                 { *__rk_out = INTVAL(0); return 1; }
             }
             if (!strcmp(fn,"raku_nfa_compile") && nargs == 1) {
-                DESCR_t pd = bb_eval_value(call->c[1]);
+                DESCR_t pd = interp_eval(call->c[1]);
                 const char *pat = VARVAL_fn(pd); if (!pat) pat = "";
                 { Raku_nfa *nfa = raku_nfa_build(pat);
                   if (!nfa) { printf("NFA:%s:ERROR\n", pat); { *__rk_out = INTVAL(0); return 1; } }
@@ -238,7 +238,7 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
                 { *__rk_out = INTVAL(0); return 1; }
             }
             if (!strcmp(fn,"raku_named_capture") && nargs == 1) {
-                DESCR_t nd = bb_eval_value(call->c[1]);
+                DESCR_t nd = interp_eval(call->c[1]);
                 const char *name = VARVAL_fn(nd); if (!name) name = "";
                 if (!g_raku_match.matched) { *__rk_out = STRVAL(GC_strdup("")); return 1; }
                 int g = -1;
@@ -252,7 +252,7 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
                 { *__rk_out = STRVAL(out); return 1; }
             }
             if (!strcmp(fn,"raku_capture") && nargs == 1) {
-                DESCR_t nd = bb_eval_value(call->c[1]);
+                DESCR_t nd = interp_eval(call->c[1]);
                 int n = (int)(IS_INT_fn(nd) ? nd.i : 0);
                 if (!g_raku_match.matched || n < 0 || n >= g_raku_match.ngroups
                     || g_raku_match.group_start[n] < 0) { *__rk_out = STRVAL(GC_strdup("")); return 1; }
@@ -266,21 +266,21 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
                 { *__rk_out = STRVAL(out); return 1; }
             }
             if (!strcmp(fn,"raku_uc") || (!strcmp(fn,"uc") && nargs == 1)) {
-                DESCR_t sd = bb_eval_value(call->c[1]);
+                DESCR_t sd = interp_eval(call->c[1]);
                 const char *s = VARVAL_fn(sd); if (!s) s = "";
                 char *out = GC_strdup(s);
                 for (char *p = out; *p; p++) *p = (char)toupper((unsigned char)*p);
                 { *__rk_out = STRVAL(out); return 1; }
             }
             if (!strcmp(fn,"raku_lc") || (!strcmp(fn,"lc") && nargs == 1)) {
-                DESCR_t sd = bb_eval_value(call->c[1]);
+                DESCR_t sd = interp_eval(call->c[1]);
                 const char *s = VARVAL_fn(sd); if (!s) s = "";
                 char *out = GC_strdup(s);
                 for (char *p = out; *p; p++) *p = (char)tolower((unsigned char)*p);
                 { *__rk_out = STRVAL(out); return 1; }
             }
             if (!strcmp(fn,"raku_trim")) {
-                DESCR_t sd = bb_eval_value(call->c[1]);
+                DESCR_t sd = interp_eval(call->c[1]);
                 const char *s = VARVAL_fn(sd); if (!s) s = "";
                 while (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r') s++;
                 size_t len = strlen(s);
@@ -290,13 +290,13 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
             }
             if (!strcmp(fn,"chars") || !strcmp(fn,"length")) {
                 if (nargs == 1) {
-                    DESCR_t sd = bb_eval_value(call->c[1]);
+                    DESCR_t sd = interp_eval(call->c[1]);
                     const char *s = VARVAL_fn(sd); if (!s) s = "";
                     { *__rk_out = INTVAL((long)strlen(s)); return 1; }
                 }
             }
             if (!strcmp(fn,"raku_die") && nargs >= 1) {
-                DESCR_t md = bb_eval_value(call->c[1]);
+                DESCR_t md = interp_eval(call->c[1]);
                 const char *msg = VARVAL_fn(md); if (!msg) msg = "Died";
                 extern char g_raku_exception[512];
                 snprintf(g_raku_exception, sizeof g_raku_exception, "%s", msg);
@@ -305,7 +305,7 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
             if (!strcmp(fn,"raku_try") && (nargs == 1 || nargs == 2)) {
                 extern char g_raku_exception[512];
                 g_raku_exception[0] = '\0';
-                DESCR_t r = bb_eval_value(call->c[1]);
+                DESCR_t r = interp_eval(call->c[1]);
                 int body_failed = IS_FAIL_fn(r);
                 int real_die    = (g_raku_exception[0] != '\0');
                 if (!body_failed) { g_raku_exception[0]='\0'; { *__rk_out = r; return 1; } }
@@ -324,7 +324,7 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
                     if (_sl2 >= 0 && _sl2 < FRAME.env_n) FRAME.env[_sl2] = exc_d;
                     else NV_SET_fn("$!", exc_d);
                     g_raku_exception[0] = '\0';
-                    { *__rk_out = bb_eval_value(catch_blk); return 1; }
+                    { *__rk_out = interp_eval(catch_blk); return 1; }
                 }
                 g_raku_exception[0] = '\0';
                 { *__rk_out = NULVCL; return 1; }
@@ -332,7 +332,7 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
 #define SOH '\x01'
             if (!strcmp(fn,"raku_map") && nargs == 2) {
                 tree_t *blk = call->c[1];          /* block tree_t* */
-                DESCR_t arrd = bb_eval_value(call->c[2]);
+                DESCR_t arrd = interp_eval(call->c[2]);
                 const char *as = VARVAL_fn(arrd); if (!as) as = "";
                 char *out = GC_strdup("");
                 const char *seg = as;
@@ -359,7 +359,7 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
                       }
                       if (_sl >= 0 && _sl < FRAME.env_n) FRAME.env[_sl] = _ev;
                       else NV_SET_fn("$_", _ev); }
-                    DESCR_t r = bb_eval_value(blk);
+                    DESCR_t r = interp_eval(blk);
                     if (!IS_FAIL_fn(r)) {
                         const char *rv; char rb[64];
                         if (IS_INT_fn(r))       { snprintf(rb,sizeof rb,"%lld",(long long)r.i); rv=rb; }
@@ -378,7 +378,7 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
             }
             if (!strcmp(fn,"raku_grep") && nargs == 2) {
                 tree_t *blk = call->c[1];
-                DESCR_t arrd = bb_eval_value(call->c[2]);
+                DESCR_t arrd = interp_eval(call->c[2]);
                 const char *as = VARVAL_fn(arrd); if (!as) as = "";
                 char *out = GC_strdup("");
                 const char *seg = as;
@@ -405,7 +405,7 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
                       }
                       if (_sl >= 0 && _sl < FRAME.env_n) FRAME.env[_sl] = _ev;
                       else NV_SET_fn("$_", _ev); }
-                    DESCR_t r = bb_eval_value(blk);
+                    DESCR_t r = interp_eval(blk);
                     int truthy = !IS_FAIL_fn(r);
                     if (truthy) {
                         size_t ol = strlen(out), el = strlen(elem);
@@ -420,7 +420,7 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
                 { *__rk_out = STRVAL(out); return 1; }
             }
             if (!strcmp(fn,"raku_sort") && (nargs == 1 || nargs == 2)) {
-                DESCR_t arrd = bb_eval_value(call->c[nargs == 2 ? 2 : 1]);
+                DESCR_t arrd = interp_eval(call->c[nargs == 2 ? 2 : 1]);
                 const char *as = VARVAL_fn(arrd); if (!as || !*as) { *__rk_out = STRVAL(GC_strdup("")); return 1; }
                 tree_t *blk = (nargs == 2) ? call->c[1] : NULL;
                 int cnt = 1; for (const char *p=as;*p;p++) if(*p==SOH) cnt++;
@@ -439,7 +439,7 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
                         while (j>=0) {
                             NV_SET_fn("$a", STRVAL(elems[j]));
                             NV_SET_fn("$b", STRVAL(key));
-                            DESCR_t r = bb_eval_value(blk);
+                            DESCR_t r = interp_eval(blk);
                             long cmp = IS_INT_fn(r) ? r.i : 0;
                             if (cmp <= 0) break;
                             elems[j+1]=elems[j]; j--;
@@ -477,7 +477,7 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
 #undef SOH
             if (!strcmp(fn,"raku_new")) {
                 if (call->n < 2) { *__rk_out = NULVCL; return 1; }
-                DESCR_t cnameD = bb_eval_value(call->c[1]);
+                DESCR_t cnameD = interp_eval(call->c[1]);
                 const char *cname = VARVAL_fn(cnameD);
                 if (!cname || !*cname) { *__rk_out = FAILDESCR; return 1; }
                 ScDatType *t = sc_dat_find_type(cname);
@@ -485,8 +485,8 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
                 DESCR_t fvals[64];
                 for (int i=0;i<t->nfields && i<64;i++) fvals[i]=NULVCL;
                 for (int ci=2; ci+1 < call->n; ci+=2) {
-                    DESCR_t kD = bb_eval_value(call->c[ci]);
-                    DESCR_t vD = bb_eval_value(call->c[ci+1]);
+                    DESCR_t kD = interp_eval(call->c[ci]);
+                    DESCR_t vD = interp_eval(call->c[ci+1]);
                     const char *kname = VARVAL_fn(kD);
                     if (!kname) continue;
                     for (int fi=0;fi<t->nfields;fi++) {
@@ -497,8 +497,8 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
             }
             if (!strcmp(fn,"raku_mcall")) {
                 if (call->n < 3) { *__rk_out = FAILDESCR; return 1; }
-                DESCR_t obj    = bb_eval_value(call->c[1]);
-                DESCR_t mnameD = bb_eval_value(call->c[2]);
+                DESCR_t obj    = interp_eval(call->c[1]);
+                DESCR_t mnameD = interp_eval(call->c[2]);
                 const char *mname = VARVAL_fn(mnameD);
                 if (!mname || !*mname) { *__rk_out = FAILDESCR; return 1; }
                 const char *cname = NULL;
@@ -517,7 +517,7 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
                 int total  = 1 + nextra;
                 DESCR_t *callargs = GC_malloc((size_t)total * sizeof(DESCR_t));
                 callargs[0] = obj;
-                for (int i=0;i<nextra;i++) callargs[i+1] = bb_eval_value(call->c[3+i]);
+                for (int i=0;i<nextra;i++) callargs[i+1] = interp_eval(call->c[3+i]);
                 { *__rk_out = proc_table_call(pi, callargs, total); return 1; }
             }
     return 0;

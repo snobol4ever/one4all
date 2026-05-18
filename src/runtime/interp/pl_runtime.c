@@ -292,6 +292,8 @@ static Term *pl_unified_deep_copy(Term *t);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int          interp_exec_pl_builtin(tree_t *goal, Term **env);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+extern DESCR_t interp_eval(tree_t *e);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 Term *pl_unified_term_from_expr(tree_t *e, Term **env) {
     if (!e) return term_new_atom(prolog_atom_intern("[]"));
     switch (e->t) {
@@ -726,7 +728,7 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     for (int ui = 0; ui < ua; ui++)
                         uenv[ui] = pl_unified_term_from_expr(goal->c[ui], env);
                     Term **sv = g_pl_env; g_pl_env = uenv;
-                    DESCR_t rd = bb_eval_value(uch); g_pl_env = sv;
+                    DESCR_t rd = interp_eval(uch); g_pl_env = sv;
                     if (uenv) free(uenv);
                     return !IS_FAIL_fn(rd);
                 }
@@ -830,7 +832,7 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                         if(ch){ int ca=g->n; Term **cargs=ca?malloc(ca*sizeof(Term*)):NULL;
                                  for(int a=0;a<ca;a++) cargs[a]=pl_unified_term_from_expr(g->c[a],env);
                                  Term **sv=g_pl_env; g_pl_env=cargs;
-                                 DESCR_t rd=bb_eval_value(ch); g_pl_env=sv; if(cargs)free(cargs);
+                                 DESCR_t rd=interp_eval(ch); g_pl_env=sv; if(cargs)free(cargs);
                                  r=!IS_FAIL_fn(rd); }
                         r; }) : interp_exec_pl_builtin(g, env);
                     if(!ok) return 0;
@@ -1877,7 +1879,7 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                             for(int ui=0;ui<ua;ui++)
                                 uenv[ui]=pl_unified_term_from_expr(goal_e->c[ui],env);
                             Term **sv=g_pl_env; g_pl_env=uenv;
-                            DESCR_t rd=bb_eval_value(uch); g_pl_env=sv;
+                            DESCR_t rd=interp_eval(uch); g_pl_env=sv;
                             if(uenv)free(uenv);
                             ok=!IS_FAIL_fn(rd);
                         } else {
