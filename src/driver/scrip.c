@@ -70,18 +70,15 @@ extern int         Δ;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int main(int argc, char **argv)
 {
-    int mode_ir_run        = 0;
-    int mode_sm_run        = 0;
-    int mode_jit_run       = 0;
+    int mode_interp        = 0;
+    int mode_run           = 0;
+    int mode_compile       = 0;
     int mode_monitor       = 0;
-    int opt_jit_emit       = 0;
-    int opt_emit_x64       = 0;
-    int opt_jit_emit_inline = 0;
     int opt_bb_format       = 0;
     int bb_driver          = 0;
     int bb_live            = 0;
-    int dump_ir            = 0;
-    int dump_ir_bison      = 0;
+    int dump_ast           = 0;
+    int dump_ast_bison     = 0;
     int dump_sm            = 0;
     int dump_bb            = 0;
     int dump_sno           = 0;
@@ -89,97 +86,46 @@ int main(int argc, char **argv)
     int opt_bench          = 0;
     const char * target_name = NULL;
     int argi = 1;
-    /* CLI-3M-4: deprecation-warning helper.
-       Each legacy flag warns once per process to stderr.
-       Silenced when:
-         - SCRIP_NO_DEPRECATION env is set (any non-empty, non-"0" value), OR
-         - stderr is not a tty (i.e., redirected — tests capturing 2>&1
-           or 2>file should not see warnings polluting diffs).
-       To force warnings in scripted contexts (CI), set SCRIP_DEPRECATION=1. */
-    enum {
-        DEP_AST_RUN, DEP_IR_RUN, DEP_SM_RUN, DEP_JIT_RUN,
-        DEP_JIT_EMIT, DEP_SM_EMIT, DEP_X64_RAW, DEP_BB_DRIVER, DEP_BB_LIVE,
-        DEP_DUMP_IR, DEP_DUMP_IR_BISON,
-        DEP__COUNT
-    };
-    static char dep_warned[DEP__COUNT];
-    const char *no_dep_env    = getenv("SCRIP_NO_DEPRECATION");
-    const char *force_dep_env = getenv("SCRIP_DEPRECATION");
-    int dep_force  = (force_dep_env && force_dep_env[0] != '\0' && force_dep_env[0] != '0');
-    int dep_off    = (no_dep_env && no_dep_env[0] != '\0' && no_dep_env[0] != '0');
-    int dep_silent = dep_off || (!dep_force && !isatty(fileno(stderr)));
-    #define DEPRECATE(slot, old, neu) do { \
-        if (!dep_silent && !dep_warned[slot]) { \
-            fprintf(stderr, "scrip: warning: " old " is deprecated; use " neu "\n"); \
-            dep_warned[slot] = 1; \
-        } \
-    } while (0)
     while (argi < argc && argv[argi][0] == '-' && argv[argi][1] == '-') {
-        if      (strcmp(argv[argi], "--ast-run")         == 0) { DEPRECATE(DEP_AST_RUN, "--ast-run", "--interp (note: --ast-run will be removed when AST-interp is deleted)"); mode_ir_run = 1; argi++; }
-        else if (strcmp(argv[argi], "--ir-run")          == 0) { DEPRECATE(DEP_IR_RUN, "--ir-run", "--interp (note: --ir-run will be removed when AST-interp is deleted)"); mode_ir_run = 1; argi++; }
-        else if (strcmp(argv[argi], "--sm-run")        == 0) { DEPRECATE(DEP_SM_RUN, "--sm-run", "--interp"); mode_sm_run = 1; argi++; }
-        else if (strcmp(argv[argi], "--interp")        == 0) { mode_sm_run        = 1; argi++; }
-        else if (strcmp(argv[argi], "--jit-run")       == 0) { DEPRECATE(DEP_JIT_RUN, "--jit-run", "--run"); mode_jit_run = 1; argi++; }
-        else if (strcmp(argv[argi], "--run")           == 0) { mode_jit_run       = 1; argi++; }
+        if      (strcmp(argv[argi], "--interp")        == 0) { mode_interp        = 1; argi++; }
+        else if (strcmp(argv[argi], "--run")           == 0) { mode_run           = 1; argi++; }
+        else if (strcmp(argv[argi], "--compile")       == 0) { mode_compile       = 1; if (!target_name) target_name = "x86"; argi++; }
         else if (strcmp(argv[argi], "--monitor")       == 0) { mode_monitor       = 1; argi++; }
-        else if (strcmp(argv[argi], "--jit-emit")      == 0) { DEPRECATE(DEP_JIT_EMIT, "--jit-emit", "--compile (for x64) or --target=jvm/js/wasm"); opt_jit_emit = 1; argi++; }
-        else if (strcmp(argv[argi], "--sm-emit")       == 0) { DEPRECATE(DEP_SM_EMIT, "--sm-emit", "--compile"); opt_jit_emit = 1; argi++; }
-        else if (strcmp(argv[argi], "--compile")       == 0) { opt_jit_emit       = 1; if (!target_name) target_name = "x86"; opt_emit_x64 = 1; argi++; }
-        else if (strcmp(argv[argi], "--x64")           == 0) { /* not deprecated by itself; paired with --compile internally */ opt_emit_x64 = 1; target_name = "x86"; argi++; }
-        else if (strncmp(argv[argi], "--target=", 9)   == 0) { target_name = argv[argi] + 9; opt_jit_emit = 1; argi++; }
-        else if (strcmp(argv[argi], "--jit-emit-inline") == 0) { opt_jit_emit_inline = 1; opt_jit_emit = 1; argi++; }
-        else if (strcmp(argv[argi], "--bb-format")       == 0) { opt_bb_format       = 1; argi++; }
-        else if (strcmp(argv[argi], "--bb-driver")     == 0) { DEPRECATE(DEP_BB_DRIVER, "--bb-driver", "--bb=brokered"); bb_driver = 1; argi++; }
-        else if (strcmp(argv[argi], "--bb-live")       == 0) { DEPRECATE(DEP_BB_LIVE, "--bb-live", "--bb=wired"); bb_live = 1; argi++; }
+        else if (strncmp(argv[argi], "--target=", 9)   == 0) { target_name = argv[argi] + 9; mode_compile = 1; argi++; }
+        else if (strcmp(argv[argi], "--bb-format")     == 0) { opt_bb_format      = 1; argi++; }
         else if (strcmp(argv[argi], "--bb=brokered")   == 0) { bb_driver          = 1; argi++; }
         else if (strcmp(argv[argi], "--bb=wired")      == 0) { bb_live            = 1; argi++; }
-        else if (strcmp(argv[argi], "--dump-ast")        == 0) { dump_ir         = 1; argi++; }
-        else if (strcmp(argv[argi], "--dump-ir")         == 0) { DEPRECATE(DEP_DUMP_IR, "--dump-ir", "--dump-ast"); dump_ir = 1; argi++; }
-        else if (strcmp(argv[argi], "--dump-ast-bison")  == 0) { dump_ir_bison   = 1; argi++; }
-        else if (strcmp(argv[argi], "--dump-ir-bison")   == 0) { DEPRECATE(DEP_DUMP_IR_BISON, "--dump-ir-bison", "--dump-ast-bison"); dump_ir_bison = 1; argi++; }
-        else if (strcmp(argv[argi], "--dump-sm")         == 0) { dump_sm         = 1; argi++; }
-        else if (strcmp(argv[argi], "--dump-bb")         == 0) { dump_bb         = 1; argi++; }
-        else if (strcmp(argv[argi], "--dump-sno")        == 0) { dump_sno        = 1; argi++; }
-        else if (strcmp(argv[argi], "--dump-width")      == 0) {
+        else if (strcmp(argv[argi], "--dump-ast")      == 0) { dump_ast           = 1; argi++; }
+        else if (strcmp(argv[argi], "--dump-ast-bison") == 0) { dump_ast_bison    = 1; argi++; }
+        else if (strcmp(argv[argi], "--dump-sm")       == 0) { dump_sm            = 1; argi++; }
+        else if (strcmp(argv[argi], "--dump-bb")       == 0) { dump_bb            = 1; argi++; }
+        else if (strcmp(argv[argi], "--dump-sno")      == 0) { dump_sno           = 1; argi++; }
+        else if (strcmp(argv[argi], "--dump-width")    == 0) {
             if (argi + 1 < argc) { ir_set_print_width(atoi(argv[++argi])); argi++; }
         }
-        else if (strcmp(argv[argi], "--trace")           == 0) { opt_trace       = 1; argi++; }
-        else if (strcmp(argv[argi], "--bench")           == 0) { opt_bench       = 1; argi++; }
-        else if (strcmp(argv[argi], "--case-sensitive")  == 0) { argi++; }
-        else if (strcmp(argv[argi], "--fold-case")       == 0) {
+        else if (strcmp(argv[argi], "--trace")         == 0) { opt_trace          = 1; argi++; }
+        else if (strcmp(argv[argi], "--bench")         == 0) { opt_bench          = 1; argi++; }
+        else if (strcmp(argv[argi], "--case-sensitive") == 0) { argi++; }
+        else if (strcmp(argv[argi], "--fold-case")     == 0) {
             fprintf(stderr, "scrip: --fold-case is no longer supported; SCRIP is case-sensitive only\n");
             return 1;
         }
         else break;
     }
-    if (!target_name && opt_emit_x64) target_name = "x86";
-    int mode_jit_emit_x64 = (opt_jit_emit && target_name && strcmp(target_name, "x86") == 0);
-    if (opt_jit_emit && !target_name) {
+    int mode_compile_x86 = (mode_compile && target_name && strcmp(target_name, "x86") == 0);
+    if (mode_compile_x86 && (mode_interp || mode_run || mode_monitor)) {
         fprintf(stderr,
-            "scrip: --jit-emit requires a backend selector "
-            "(--x64 or --target=jvm / --target=js / --target=x86)\n");
+            "scrip: --compile (x86) is mutually exclusive with "
+            "--interp / --run / --monitor\n");
         return 1;
     }
-    if (opt_emit_x64 && !opt_jit_emit) {
-        fprintf(stderr, "scrip: --x64 is meaningful only with --jit-emit\n");
-        return 1;
-    }
-    if (mode_jit_emit_x64 &&
-        (mode_ir_run || mode_sm_run || mode_jit_run || mode_monitor)) {
-        fprintf(stderr,
-            "scrip: --jit-emit --x64 is mutually exclusive with "
-            "--ast-run / --sm-run / --jit-run / --monitor\n");
-        return 1;
-    }
-    if (!mode_ir_run && !mode_sm_run && !mode_jit_run && !mode_monitor &&
-        !mode_jit_emit_x64)
-        mode_jit_run = 1;
-    /* CLI-3M-3: BB knob is exposed only under --interp (mode_sm_run).
-       --run (mode_jit_run) and --compile (mode_jit_emit_x64) force wired BBs.
-       Rationale: brokered BB execution requires a runtime broker structure
-       that's natural for the interpreter but absent / not supported in the
-       JIT-emit / asm-emit paths. */
-    if (bb_driver && (mode_jit_run || mode_jit_emit_x64)) {
+    if (!mode_interp && !mode_run && !mode_monitor && !mode_compile)
+        mode_run = 1;
+    /* BB knob is exposed only under --interp.
+       --run and --compile force wired BBs. Rationale: brokered BB execution
+       requires a runtime broker structure that's natural for the interpreter
+       but absent / not supported in the JIT-emit / asm-emit paths. */
+    if (bb_driver && (mode_run || mode_compile)) {
         fprintf(stderr,
             "scrip: --bb=brokered is only valid under --interp; "
             "--run and --compile force --bb=wired\n");
@@ -193,9 +139,9 @@ int main(int argc, char **argv)
     /* Default-resolution:
        Under --interp: default is --bb=brokered (the historic default).
        Under --run / --compile: forced to --bb=wired (per the guard above).
-       Under --monitor / --ast-run: legacy default-to-wired preserved. */
+       Under --monitor: legacy default-to-wired preserved. */
     if (!bb_driver && !bb_live) {
-        if (mode_sm_run) bb_driver = 1;
+        if (mode_interp) bb_driver = 1;
         else             bb_live   = 1;
     }
     if (bb_live)   g_bb_mode = BB_MODE_LIVE;
@@ -208,6 +154,7 @@ int main(int argc, char **argv)
             "  --interp         interpret SM_Program via dispatch loop\n"
             "  --run            SM_Program -> x86 bytes -> mmap slab -> jump in  [DEFAULT]\n"
             "  --compile        emit standalone x86-64 asm to stdout (links libscrip_rt.so)\n"
+            "  --target=ARCH    emit code for the named backend (x86, jvm, js, wasm); implies --compile\n"
             "  --monitor        in-process sync comparator (AST vs SM vs JIT)\n"
             "\n"
             "Byrd Box mode (under --interp; --run and --compile force wired):\n"
@@ -222,16 +169,6 @@ int main(int argc, char **argv)
             "  --trace          MONITOR trace output (diff vs CSNOBOL4)\n"
             "  --bench          print wall-clock time after execution\n"
             "  --dump-ast-bison dump AST via old Bison/Flex parser\n"
-            "\n"
-            "Deprecated aliases (still accepted; will be removed):\n"
-            "  --ast-run, --ir-run    AST-interp mode (slated for deletion)\n"
-            "  --sm-run               alias for --interp\n"
-            "  --jit-run              alias for --run\n"
-            "  --jit-emit --x64       alias for --compile\n"
-            "  --bb-driver            alias for --bb=brokered\n"
-            "  --bb-live              alias for --bb=wired\n"
-            "  --dump-ir              alias for --dump-ast\n"
-            "  --dump-ir-bison        alias for --dump-ast-bison\n"
             "\n"
             "Frontend inferred from file extension:\n"
             "  .sno=SNOBOL4  .icn=Icon  .pl=Prolog  .sc=Snocone  .reb=Rebus\n"
@@ -328,7 +265,7 @@ int main(int argc, char **argv)
             else if (lang_rebus)   rebus_compile(src, input_path, &sub_ast);
             else                   snocone_compile(src, input_path, &sub_ast);
             free(src);
-            if (dump_ir && sub_ast) {
+            if (dump_ast && sub_ast) {
                 /* PST-RB-5i: extend --dump-ast to all non-SNOBOL4 frontends
                    (was lang_snocone only; rebus/icon/prolog/raku now print
                    their tree_t and exit, matching the snocone behavior so
@@ -342,7 +279,7 @@ int main(int argc, char **argv)
              * of the parser_*.sc file.  Actual dump fires after the multi-
              * file loop completes (search for "dump_sno &&" below). */
             MERGE_AST(sub_ast);
-        } else if (dump_ir) {
+        } else if (dump_ast) {
             FILE *f = fopen(input_path, "r");
             if (!f) { fprintf(stderr, "scrip: cannot open '%s'\n", input_path); return 1; }
             if (opt_bench) clock_gettime(CLOCK_MONOTONIC, &_t1);
@@ -363,9 +300,9 @@ int main(int argc, char **argv)
         } else {
             FILE *f = fopen(input_path, "r");
             if (!f) { fprintf(stderr, "scrip: cannot open '%s'\n", input_path); return 1; }
-            tree_t *sub_ast = sno_parse_ast(f, input_path, dump_ir_bison ? &sub : NULL);
+            tree_t *sub_ast = sno_parse_ast(f, input_path, dump_ast_bison ? &sub : NULL);
             fclose(f);
-            if (dump_ir_bison) { ir_dump_program(sub, stdout); return 0; }
+            if (dump_ast_bison) { ir_dump_program(sub, stdout); return 0; }
             MERGE_AST(sub_ast);
         }
         if (!ast_prog) {
@@ -409,7 +346,7 @@ int main(int argc, char **argv)
     }
     g_opt_trace   = opt_trace;
     g_opt_dump_bb = dump_bb;
-    if (dump_sm && !mode_sm_run) {
+    if (dump_sm && !mode_interp) {
         label_table_build(ast_prog);
         prescan_defines(ast_prog);
         SM_Program *sm0 = lower(ast_prog);
@@ -430,8 +367,8 @@ int main(int argc, char **argv)
         tree_to_sno(ast_prog, stdout);
         return 0;
     }
-    if (mode_jit_emit_x64) {
-        g_jit_emit_inline = opt_jit_emit_inline;
+    if (mode_compile_x86) {
+        g_emit_inline = 0;
         g_bb_emit_format  = opt_bb_format;
         SM_Program *sm = sm_preamble(ast_prog);
         if (!sm) return 1;
@@ -443,7 +380,7 @@ int main(int argc, char **argv)
         sm_prog_free(sm);
         return 0;
     }
-    if (opt_jit_emit && target_name && strcmp(target_name, "x86") != 0) {
+    if (mode_compile && target_name && strcmp(target_name, "x86") != 0) {
         if (strcmp(target_name, "js") == 0) {
             if (emit_js_program(ast_prog, stdout) != 0) {
                 fprintf(stderr, "scrip: emit_js_program failed\n");
@@ -482,7 +419,7 @@ int main(int argc, char **argv)
             return 1;
         }
         return 0;
-    } else if (mode_sm_run) {
+    } else if (mode_interp) {
         SM_Program *sm = sm_preamble(ast_prog);
         if (!sm) return 1;
         if (dump_sm) {
@@ -492,7 +429,7 @@ int main(int argc, char **argv)
         }
         sm_run_with_recovery(sm, sm_interp_run);
         sm_prog_free(sm);
-    } else if (mode_jit_run) {
+    } else if (mode_run) {
         SM_Program *sm = sm_preamble(ast_prog);
         if (!sm) return 1;
         if (dump_sm) { sm_prog_print(sm, stdout); sm_prog_free(sm); return 0; }

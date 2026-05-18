@@ -68,7 +68,6 @@ void emit_sm_op_nreturn_s    (void);         void emit_sm_op_nreturn_f   (void);
 void emit_sm_op_unhandled    (int opc);
 /*---- compat macros -------------------------------------------------------*/
 #define sm_codegen_text(prog,out,src)  emit_walk_codegen(prog,out,src)
-#define g_jit_emit_inline              g_emit_inline
 #define flat_is_eligible_node(p)       emit_flat_eligible(p)
 #define patnd_is_fully_invariant(p)    emit_flat_invariant(p)
 #define sm_phase2_to_patnd(pr,s,e,ov)  emit_walk_phase2(pr,s,e,ov)
