@@ -18,12 +18,11 @@
 #   snobol4   PASS  wired-clean    OUTPUT = 'Hello, World!'
 #   snocone   PASS  wired-clean    OUTPUT = 'Hello, World!';
 #   rebus     PASS  wired-clean    output := "Hello, World!"
-#   icon      FAIL  runtime trap  "unhandled SM opcode 61 reached" (= SM_BB_PUMP_PROC)
+#   icon      PASS  wired-clean    write("Hello, World!") (IJ-HELLO-3 2026-05-18)
 #   prolog    FAIL  assemble fail  no .macro PUSH_EXPR in sm_macros.s (directive form)
 #   raku      PASS  wired-clean    OUTPUT = 'Hello, World!' (IJ-HELLO-2b 2026-05-18)
 #
-# IJ-HELLO-2b floor: PASS=4 FAIL=2.  Each subsequent sub-rung (IJ-HELLO-3/4)
-# flips one FAIL row to PASS until IJ-HELLO-5 closes the matrix at 6/0.
+# IJ-HELLO-3 floor: PASS=5 FAIL=1.  IJ-HELLO-4 will flip prolog to close the matrix at 6/0.
 #
 # The script's exit code reports `FAIL=$ACTUAL_FAIL ≠ $EXPECTED_FAIL`, so it
 # fails LOUDLY if the baseline ever drifts (either improvement or regression).
@@ -45,8 +44,8 @@ trap 'rm -rf "$TMP"' EXIT
 [ -f "$RT_SO" ] || { echo "SKIP libscrip_rt.so not built — run: make libscrip_rt"; exit 0; }
 
 EXPECTED_OUTPUT="Hello, World!"
-HW_EXPECTED_PASS=4   # snobol4 snocone rebus raku run hello-world correctly (raku ✅ IJ-HELLO-2b)
-HW_EXPECTED_FAIL=2   # icon prolog currently fail at IJ-HELLO-2b baseline
+HW_EXPECTED_PASS=5   # snobol4 snocone rebus icon raku run hello-world correctly (icon ✅ IJ-HELLO-3)
+HW_EXPECTED_FAIL=1   # prolog currently fails at IJ-HELLO-3 baseline
 ROWS_MATCH=0; ROWS_DRIFT=0
 HW_PASS=0; HW_FAIL=0
 
@@ -177,7 +176,7 @@ echo "=== IJ-HELLO-1 — --compile hello-world × 6 languages × wired-only audi
 check_lang snobol4 "$TMP/hello.sno"  "PASS-wired"
 check_lang snocone "$TMP/hello.sc"   "PASS-wired"
 check_lang rebus   "$TMP/hello.reb"  "PASS-wired"
-check_lang icon    "$TMP/hello.icn"  "FAIL-run"          # SM_BB_PUMP_PROC unhandled at runtime
+check_lang icon    "$TMP/hello.icn"  "PASS-wired"        # IJ-HELLO-3: SM_BB_PUMP_PROC wired to call .L<entry_pc> directly
 check_lang prolog  "$TMP/hello.pl"   "FAIL-link"         # no .macro PUSH_EXPR in sm_macros.s
 check_lang raku    "$TMP/hello.raku" "PASS-wired"        # IJ-HELLO-2b: SUB_TAG_ID match in lower_stmt skips spurious CALL_FN main wrapper
 

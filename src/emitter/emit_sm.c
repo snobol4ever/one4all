@@ -11,6 +11,10 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+/* IJ-HELLO-3: proc_table[].entry_pc resolves "name" -> SM-stream PC for wired SM_BB_PUMP_PROC dispatch.       */
+/* The Icon proc body has already been lowered into the SM stream by lower_proc_skeletons() and the entry_pc   */
+/* set by sm_resolve_proc_entry_pcs(); we just need to emit `call .L<entry_pc>` from this dispatch handler.    */
+#include "../runtime/interp/icn_runtime.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_sm_nullary_rt(const char *macro_name, const char *rt_fn)
 {
@@ -2377,6 +2381,45 @@ static int emit_sm_bb_once_proc_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return emit_sm_lbl_int32(out, sm_template_lookup(SM_BB_ONCE_PROC),
                              lbl, arity, anno);
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* IJ-HELLO-3 (Icon hello-world, mode 4, wired): emit a direct `call .L<entry_pc>` to the Icon procedure's              */
+/* SM-lowered body.  `lower_proc_skeletons()` in src/lower/lower.c has already lowered each Icon proc into the SM       */
+/* stream as `SM_JUMP <skip> ; SM_LABEL "name" ; <body ops> ; SM_RETURN`, and `sm_resolve_proc_entry_pcs()` in           */
+/* src/driver/scrip_sm.c populated `proc_table[i].entry_pc` with the PC of the first body op (just past the SM_LABEL).  */
+/* SM_LABEL's named form (line 2821-2823 here) already marks pc+1 as a target so the `.L<entry_pc>:` label is emitted   */
+/* into the .s output, making it a callable address.  The CALL_EXPRESSION macro in sm_macros.s is `call \tgt` — a       */
+/* plain x86 call, no broker, no rt-helper.  SM_RETURN at body end (= `ret`) returns to us, and the dispatch loop       */
+/* falls through to the immediately-following SM_HALT.  This is the architectural endpoint of IJ-HELLO-3:                */
+/*   • zero runtime helper invocation (no rt_bb_pump_proc, no bb_broker, no _usercall_hook)                              */
+/*   • zero new IR_block_t* walker (existing SM template machinery handles the body)                                     */
+/*   • zero new asm macros (CALL_EXPRESSION already exists for SM_CALL_EXPRESSION)                                       */
+static int emit_sm_bb_pump_proc_dispatch(FILE *out, const SM_Instr *ins, int pc)
+{
+    (void)pc;
+    const char *name = ins->a[0].s ? ins->a[0].s : "";
+    int entry_pc = -1;
+    for (int i = 0; i < proc_count; i++) {
+        if (proc_table[i].name && strcmp(proc_table[i].name, name) == 0) {
+            entry_pc = proc_table[i].entry_pc;
+            break;
+        }
+    }
+    if (entry_pc < 0) {
+        /* Fall through to the unhandled-stub default: an unresolved Icon proc here means the lowerer */
+        /* did not register it, which is a frontend/lowering bug, not an emitter bug.  Emit the      */
+        /* default rt_unhandled_sm so the failure is visible at runtime rather than a silent no-op. */
+        const sm_op_template_t *t = sm_template_lookup(SM_BB_PUMP_PROC);
+        emit_sm_args_t a = { 0 };
+        a.i32_a = SM_BB_PUMP_PROC;
+        return emit_sm_template(out, t, &a);
+    }
+    char anno[96];
+    snprintf(anno, sizeof(anno), "# %s entry=.L%d (IJ-HELLO-3 wired)", name, entry_pc);
+    emit_sm_args_t a = { 0 };
+    a.i32_a = entry_pc;
+    a.anno  = anno;
+    return emit_sm_template(out, sm_template_lookup(SM_CALL_EXPRESSION), &a);
+}
 __attribute__((unused))
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_call_legacy(FILE *out, const SM_Instr *ins, int pc)
@@ -2822,6 +2865,25 @@ static void pattern_windows_collect(const SM_Program *prog)
             if (ins->a[0].s && *ins->a[0].s)
                 pc_used_mark(pc + 1);
             break;
+        case SM_BB_PUMP_PROC: {
+            /* IJ-HELLO-3: mark the resolved entry_pc as a target so its `.L<entry_pc>:` label is emitted   */
+            /* into the .s output.  Without this mark, the SM_LABEL holding the proc's name renders only as */
+            /* the bare `LABEL` macro (no pc prefix) and `call .L<entry_pc>` from the dispatch handler has  */
+            /* no matching target in the same translation unit.  We mark the SM_LABEL's PC itself (which is */
+            /* what proc_table[].entry_pc holds) — the LABEL macro is a noop, so falling through from .L1:  */
+            /* to PC=2's body is correct.                                                                   */
+            const char *name = ins->a[0].s;
+            if (name) {
+                for (int i = 0; i < proc_count; i++) {
+                    if (proc_table[i].name && strcmp(proc_table[i].name, name) == 0) {
+                        if (proc_table[i].entry_pc >= 0)
+                            pc_used_mark(proc_table[i].entry_pc);
+                        break;
+                    }
+                }
+            }
+            break;
+        }
         default:
             break;
         }
@@ -3180,6 +3242,7 @@ int emit_walk_codegen(SM_Program *prog, FILE *out, const char *src_path)
             case SM_DEFINE:       rc = emit_sm_define_dispatch(out, ins, pc);              break;
             case SM_CALL_FN:         rc = emit_sm_call_dispatch(out, ins, pc); break;
             case SM_BB_ONCE_PROC:    rc = emit_sm_bb_once_proc_dispatch(out, ins, pc); break;
+            case SM_BB_PUMP_PROC:    rc = emit_sm_bb_pump_proc_dispatch(out, ins, pc); break;
             case SM_CONCAT:       rc = emit_sm_concat_dispatch(out, pc);      break;
             case SM_PUSH_NULL:    rc = emit_sm_push_null_dispatch(out, pc);   break;
             case SM_PUSH_NULL_NOFLIP: rc = emit_sm_push_null_noflip_dispatch(out, pc); break;
