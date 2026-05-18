@@ -1471,6 +1471,7 @@ static void lower_expr_inner(const tree_t *t)
     case TT_SECTION_MINUS: { ICN_BB_EVAL(t); lower_section_3(t, "ICN_SECTION_MINUS"); return; }
     case TT_BANG_BINARY:                      lower_bang_binary(t);   return;
     case TT_SUSPEND:                          lower_suspend(t);       return;
+    case TT_GATHER: { fprintf(stderr, "FATAL: TT_GATHER reached lower — hoist pass missed a gather node\n"); abort(); return; }
     case TT_TO:                               lower_to(t);            return;
     case TT_TO_BY:                            lower_to_by(t);         return;
     case TT_LIMIT:                            lower_limit(t);         return;

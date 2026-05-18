@@ -204,7 +204,7 @@ program
                 int has_body = 0;
                 for (int i = 0; i < all->count; i++) if (all->items[i]) { has_body=1; break; }
                 if (has_body) {
-                    tree_t *mf = leaf_sval(TT_FNC, "main"); mf->v.ival = 0; mf->_id = SUB_TAG_ID;
+                    tree_t *mf = leaf_sval(TT_FNC, "main"); mf->_id = SUB_TAG_ID;
                     tree_t *mn = ast_node_new(TT_VAR); mn->v.sval = intern("main");
                     expr_add_child(mf, mn);
                     for (int i = 0; i < all->count; i++)
@@ -470,19 +470,10 @@ closure
 expr
     : VAR_SCALAR '=' expr  { $$=expr_binary(TT_ASSIGN,var_node($1),$3); }
     | KW_GATHER block      {
-          static int gather_seq = 0;
-          char gname[32]; snprintf(gname, sizeof gname, "__gather_%d", gather_seq++);
-          tree_t *def = leaf_sval(TT_FNC, gname); def->v.ival = (long long)0; def->_id = SUB_TAG_ID;
-          tree_t *dn  = ast_node_new(TT_VAR); dn->v.sval = intern(gname);
-          expr_add_child(def, dn);
+          tree_t *g = ast_node_new(TT_GATHER);
           tree_t *blk = $2;
-          for (int i = 0; i < blk->n; i++) expr_add_child(def, blk->c[i]);
-          def->_id = 0;
-          add_proc(def);
-          tree_t *call = leaf_sval(TT_FNC, gname);
-          tree_t *cn   = ast_node_new(TT_VAR); cn->v.sval = intern(gname);
-          expr_add_child(call, cn);
-          $$ = call;
+          for (int i = 0; i < blk->n; i++) expr_add_child(g, blk->c[i]);
+          $$ = g;
       }
     | cmp_expr             { $$=$1; }
     ;
@@ -637,10 +628,68 @@ extern void *raku_yy_scan_string(const char *);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void  raku_yy_delete_buffer(void *);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* Gather hoist pass: walk tree recursively, replace TT_GATHER[body...] with TT_FNC call; collect defs. */
+static int   g_gather_seq  = 0;
+static tree_t *g_gather_defs[256];
+static int    g_gather_ndef = 0;
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static void raku_hoist_gather_in_expr(tree_t *e) {
+    if (!e) return;
+    for (int i = 0; i < e->n; i++) raku_hoist_gather_in_expr(e->c[i]);
+    if (e->t != TT_GATHER) return;
+    char gname[32]; snprintf(gname, sizeof gname, "__gather_%d", g_gather_seq++);
+    tree_t *def = ast_node_new(TT_FNC); def->v.sval = intern(gname); def->_id = SUB_TAG_ID;
+    tree_t *dn  = ast_node_new(TT_VAR); dn->v.sval = intern(gname);
+    expr_add_child(def, dn);
+    for (int i = 0; i < e->n; i++) expr_add_child(def, e->c[i]);
+    def->_id = 0;
+    if (g_gather_ndef < 256) g_gather_defs[g_gather_ndef++] = def;
+    e->t      = TT_FNC;
+    e->v.sval = intern(gname);
+    e->n      = 0;
+    e->c      = NULL;
+    e->_nalloc = 0;
+    tree_t *cn = ast_node_new(TT_VAR); cn->v.sval = intern(gname);
+    expr_add_child(e, cn);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static void raku_lower_hoist_gather_pass(tree_t *prog) {
+    if (!prog) return;
+    g_gather_seq  = 0;
+    g_gather_ndef = 0;
+    for (int i = 0; i < prog->n; i++) {
+        tree_t *st = prog->c[i];
+        if (!st || st->t != TT_STMT) continue;
+        for (int j = 0; j < st->n; j++) {
+            tree_t *ch = st->c[j];
+            if (!ch) continue;
+            if (ch->t == TT_ATTR) { for (int k = 0; k < ch->n; k++) raku_hoist_gather_in_expr(ch->c[k]); continue; }
+            raku_hoist_gather_in_expr(ch);
+        }
+    }
+    if (!g_gather_ndef) return;
+    int old_n = prog->n;
+    int new_n = old_n + g_gather_ndef;
+    tree_t **new_c = (tree_t **)calloc((size_t)new_n, sizeof(tree_t *));
+    for (int i = 0; i < g_gather_ndef; i++) {
+        tree_t *st = ast_stmt_new(TT_STMT);
+        expr_add_child(st, ast_attr_int(":lang",  LANG_RAKU));
+        expr_add_child(st, ast_attr_int(":line",  0));
+        expr_add_child(st, ast_attr_int(":stno",  0));
+        expr_add_child(st, ast_attr_expr(":subj", g_gather_defs[i]));
+        new_c[i] = st;
+    }
+    for (int i = 0; i < old_n; i++) new_c[g_gather_ndef + i] = prog->c[i];
+    free(prog->c);
+    prog->c = new_c;
+    prog->n = new_n;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 tree_t *raku_parse_string(const char *src) {
     raku_prog_result = NULL;
     void *buf = raku_yy_scan_string(src);
     raku_yyparse();
     raku_yy_delete_buffer(buf);
+    raku_lower_hoist_gather_pass(raku_prog_result);
     return raku_prog_result;
 }
