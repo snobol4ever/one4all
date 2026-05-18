@@ -3682,31 +3682,14 @@ DESCR_t interp_eval(tree_t *e)
         tree_t *body = (e->n > 1) ? e->c[1] : NULL;
         if ((gen->t == TT_ASSIGN) &&
             gen->n >= 2 && is_suspendable(gen->c[1])) {
-            tree_t *leaf = find_leaf_suspendable(gen->c[1]);
-            if (!leaf) leaf = gen->c[1];
-            bb_node_t rbox = icn_bb_build(leaf);
-            DESCR_t tick = rbox.fn(rbox.ζ, α);
-            while (!IS_FAIL_fn(tick) && !FRAME.returning && !FRAME.loop_break) {
-                interp_eval(gen);
-                if (body) interp_eval(body);
-                if (FRAME.returning || FRAME.loop_break) break;
-                tick = rbox.fn(rbox.ζ, β);
-            }
-            FRAME.loop_break = 0;
-            return NULVCL;
+            NO_AST_WALK_GUARD("icn_bb_build/TT_EVERY-assign-rhs");
+            fprintf(stderr, "[DAI-BOMB] icn_bb_build call site reached in interp_eval/TT_EVERY-assign-rhs. Mode-1 Icon AST walker is amputated; this branch lowered to IR_EVERY at lower time. Use --sm-run/--jit-run/--sm-native.\n");
+            exit(78);
         }
-        tree_t *do_expr = body ? body : gen;
-        bb_node_t box = icn_bb_build(gen);
-        DESCR_t val = box.fn(box.ζ, α);
-        while (!IS_FAIL_fn(val) && !FRAME.returning && !FRAME.loop_break) {
-            frame_push(gen, val.v == DT_I ? val.i : 0, val.v == DT_I ? NULL : val.s);
-            if (do_expr != gen) interp_eval(do_expr);
-            frame_pop();
-            if (FRAME.returning || FRAME.loop_break) break;
-            val = box.fn(box.ζ, β);
-        }
-        FRAME.loop_break = 0;
-        return NULVCL;
+        (void)body;
+        NO_AST_WALK_GUARD("icn_bb_build/TT_EVERY-gen");
+        fprintf(stderr, "[DAI-BOMB] icn_bb_build call site reached in interp_eval/TT_EVERY-gen. Mode-1 Icon AST walker is amputated; this branch lowered to IR_EVERY at lower time. Use --sm-run/--jit-run/--sm-native.\n");
+        exit(78);
     }
     case TT_WHILE: {
         int saved_brk = FRAME.loop_break; FRAME.loop_break = 0;
@@ -3972,13 +3955,9 @@ DESCR_t interp_eval(tree_t *e)
                 #undef AUGOP_CELL
             }
         } else if (rhs && is_suspendable(rhs)) {
-            bb_node_t rbox = icn_bb_build(rhs);
-            DESCR_t tick = rbox.fn(rbox.ζ, α);
-            while (!IS_FAIL_fn(tick) && !FRAME.loop_break && !FRAME.returning) {
-                DESCR_t cur_lv = interp_eval(lhs);
-                AUGOP_APPLY(cur_lv, tick);
-                tick = rbox.fn(rbox.ζ, β);
-            }
+            NO_AST_WALK_GUARD("icn_bb_build/TT_AUGOP-suspend-rhs");
+            fprintf(stderr, "[DAI-BOMB] icn_bb_build call site reached in interp_eval/TT_AUGOP-suspend-rhs. Mode-1 Icon AST walker is amputated; this branch lowered to IR_AUGOP at lower time. Use --sm-run/--jit-run/--sm-native.\n");
+            exit(78);
         } else {
             DESCR_t lv = interp_eval(lhs);
             DESCR_t rv = interp_eval(rhs);
