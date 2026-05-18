@@ -34,13 +34,6 @@ int      frame_depth = 0;
 tree_t  *icn_drive_node = NULL;
 DESCR_t  icn_drive_val;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void frame_push(tree_t *n, long v, const char *sv) {
-    IcnFrame *f = &FRAME;
-    if (f->gen_depth < FRAME_DEPTH_MAX) { f->gen[f->gen_depth].node=n; f->gen[f->gen_depth].cur=v; f->gen[f->gen_depth].sval=sv; f->gen_depth++; }
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void frame_pop(void) { if (FRAME.gen_depth > 0) FRAME.gen_depth--; }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int  icn_frame_lookup(tree_t *n, long *out) {
     IcnFrame *f = &FRAME;
     for (int i=f->gen_depth-1;i>=0;i--) if(f->gen[i].node==n){*out=f->gen[i].cur;return 1;} return 0;
@@ -49,11 +42,6 @@ int  icn_frame_lookup(tree_t *n, long *out) {
 int  icn_frame_lookup_sv(tree_t *n, long *out, const char **sv) {
     IcnFrame *f = &FRAME;
     for (int i=f->gen_depth-1;i>=0;i--) if(f->gen[i].node==n){*out=f->gen[i].cur;*sv=f->gen[i].sval;return 1;} return 0;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int  frame_active(tree_t *n) {
-    IcnFrame *f = &FRAME;
-    for (int i=0;i<f->gen_depth;i++) if(f->gen[i].node==n) return 1; return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int icn_frame_env_active(void) {
@@ -290,13 +278,6 @@ int icn_descr_identical(DESCR_t a, DESCR_t b) {
     return memcmp(&a, &b, sizeof(DESCR_t)) == 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int proc_has_suspend(tree_t *t) {
-    if (!t) return 0;
-    if (t->t == TT_SUSPEND) return 1;
-    for (int i = 0; i < t->n; i++) if (proc_has_suspend(t->c[i])) return 1;
-    return 0;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int is_suspendable(tree_t *e) {
     if (!e) return 0;
     switch (e->t) {
@@ -350,178 +331,12 @@ static DESCR_t icn_bb_oneshot(void *zeta, int entry) {
 }
 typedef struct { IR_block_t *cfg; int first; } icn_dcg_state_t;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void icn_every_body_pre(void) { if (frame_depth > 0) { FRAME.loop_next = 0; } }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int  icn_every_body_broke(void) { if (frame_depth <= 0) return 0; int b = FRAME.loop_break; FRAME.loop_next = 0; FRAME.loop_break = 0; return b; }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t icn_bb_dcg(void *zeta, int entry) {
     icn_dcg_state_t *z = (icn_dcg_state_t *)zeta;
     if (!z || !z->cfg) return FAILDESCR;
     if (entry == α) { z->first = 1; }
     DESCR_t v = z->first ? (z->first=0, IR_exec_once(z->cfg)) : IR_exec_resume(z->cfg);
     return v;
-}
-#define ICN_FNC_GEN_ARGS 8
-typedef struct {
-    bb_node_t   arg_box;
-    tree_t     *call;
-    int         gen_idx;
-    int         nargs;
-    DESCR_t     args[ICN_FNC_GEN_ARGS];
-} icn_fnc_gen_state_t;
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-extern DESCR_t icn_call_builtin(tree_t *call, DESCR_t *args, int nargs);
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static DESCR_t icn_bb_fnc(void *zeta, int entry) {
-    icn_fnc_gen_state_t *z = (icn_fnc_gen_state_t *)zeta;
-    const char *fn = (z->call && z->call->n >= 1 && z->call->c[0]) ? z->call->c[0]->v.sval : NULL;
-    int is_scan_bltn = is_scan_builtin_name(fn);
-    int tick = entry;
-    for (;;) {
-        DESCR_t v = z->arg_box.fn(z->arg_box.ζ, tick);
-        if (IS_FAIL_fn(v)) return FAILDESCR;
-        z->args[z->gen_idx] = v;
-        DESCR_t r = icn_call_builtin(z->call, z->args, z->nargs);
-        if (!IS_FAIL_fn(r)) return r;
-        if (!is_scan_bltn) return FAILDESCR;
-        tick = β;
-    }
-}
-#define ICN_RAKU_ARRAY_MAX 1024
-typedef struct {
-    char       *elems[ICN_RAKU_ARRAY_MAX];
-    int         nelem;
-    int         elem_idx;
-    const char *loopvar;
-} icn_raku_array_state_t;
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static DESCR_t icn_bb_raku_array(void *zeta, int entry) {
-    icn_raku_array_state_t *z = (icn_raku_array_state_t *)zeta;
-    if (entry == α) z->elem_idx = 0;
-    else            z->elem_idx++;
-    if (z->elem_idx >= z->nelem) return FAILDESCR;
-    const char *p = z->elems[z->elem_idx];
-    char *end;
-    long iv = strtol(p, &end, 10);
-    DESCR_t val = (end != p && *end == '\0') ? INTVAL(iv) : STRVAL(p);
-    if (z->loopvar && *z->loopvar) {
-        int slot = scope_get(&FRAME.sc, z->loopvar);
-        if (slot >= 0 && slot < FRAME.env_n)
-            FRAME.env[slot] = val;
-        else
-            NV_SET_fn(z->loopvar, val);
-    }
-    return val;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t icn_bb_to_by_real(void *zeta, int entry) {
-    icn_to_by_real_state_t *z = (icn_to_by_real_state_t *)zeta;
-    if (entry == α) { z->cur = z->lo; }
-    else            { z->cur += z->step; }
-    int exhausted = (z->step >= 0) ? (z->cur > z->hi + 1e-12)
-                                   : (z->cur < z->hi - 1e-12);
-    if (exhausted) return FAILDESCR;
-    return REALVAL(z->cur);
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t icn_bb_find(void *zeta, int entry) {
-    icn_find_state_t *z = (icn_find_state_t *)zeta;
-    if (entry == α) z->next = z->hay;
-    const char *hit = strstr(z->next, z->needle);
-    if (!hit) return FAILDESCR;
-    long pos1 = (long)(hit - z->hay) + 1;
-    z->next = hit + (z->nlen > 0 ? z->nlen : 1);
-    return INTVAL(pos1);
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t icn_bb_bal(void *zeta, int entry) {
-    icn_bal_state_t *z = (icn_bal_state_t *)zeta;
-    if (entry == α) { }
-    int p = z->pos, depth = 0;
-    while (p < z->endp && p < z->slen) {
-        char ch = z->s[p];
-        if (strchr(z->c2, ch)) depth++;
-        else if (strchr(z->c3, ch) && depth > 0) depth--;
-        else if (depth == 0 && strchr(z->c1, ch)) {
-            z->pos = p + 1;
-            return INTVAL((long)(p + 1));
-        }
-        p++;
-    }
-    return FAILDESCR;
-}
-typedef struct { DESCR_t base; bb_node_t idx_gen; } icn_idx_gen_state_t;
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static DESCR_t icn_bb_idx_gen(void *zeta, int entry) {
-    icn_idx_gen_state_t *z = (icn_idx_gen_state_t *)zeta;
-    int e2 = entry;
-    for (;;) {
-        DESCR_t tick = z->idx_gen.fn(z->idx_gen.ζ, e2);
-        if (IS_FAIL_fn(tick)) return FAILDESCR;
-        DESCR_t result = subscript_get(z->base, tick);
-        if (!IS_FAIL_fn(result)) return result;
-        e2 = β;
-    }
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t icn_bb_list_iterate(void *zeta, int entry) {
-    icn_list_iterate_state_t *z = (icn_list_iterate_state_t *)zeta;
-    DESCR_t ea = FIELD_GET_fn(z->list_obj, "frame_elems");
-    int n = (int)FIELD_GET_fn(z->list_obj, "frame_size").i;
-    DESCR_t *elems = (ea.v == DT_DATA) ? (DESCR_t *)ea.ptr : NULL;
-    if (!elems || n <= 0) return FAILDESCR;
-    if (entry == α) z->pos = 0;
-    else            z->pos++;
-    if (z->pos >= n) return FAILDESCR;
-    return elems[z->pos];
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t icn_bb_tbl_iterate(void *zeta, int entry) {
-    icn_tbl_iterate_state_t *z = (icn_tbl_iterate_state_t *)zeta;
-    if (!z->tbl) return FAILDESCR;
-    if (entry == α) { z->bucket = 0; z->entry = z->tbl->buckets[0]; }
-    else if (z->entry) { z->entry = z->entry->next; }
-    while (!z->entry && z->bucket < TABLE_BUCKETS - 1) {
-        z->bucket++;
-        z->entry = z->tbl->buckets[z->bucket];
-    }
-    if (!z->entry) return FAILDESCR;
-    return z->entry->val;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t icn_bb_tbl_key_iterate(void *zeta, int entry) {
-    icn_tbl_key_iterate_state_t *z = (icn_tbl_key_iterate_state_t *)zeta;
-    if (!z->tbl) return FAILDESCR;
-    if (entry == α) { z->bucket = 0; z->entry = z->tbl->buckets[0]; }
-    else if (z->entry) { z->entry = z->entry->next; }
-    while (!z->entry && z->bucket < TABLE_BUCKETS - 1) {
-        z->bucket++;
-        z->entry = z->tbl->buckets[z->bucket];
-    }
-    if (!z->entry) return FAILDESCR;
-    return z->entry->key_descr;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t icn_bb_record_iterate(void *zeta, int entry) {
-    icn_record_iterate_state_t *z = (icn_record_iterate_state_t *)zeta;
-    if (z->inst.v != DT_DATA || !z->inst.u || !z->inst.u->type) return FAILDESCR;
-    int n = z->inst.u->type->nfields;
-    if (n <= 0 || !z->inst.u->fields) return FAILDESCR;
-    if (entry == α) z->pos = 0;
-    else            z->pos++;
-    if (z->pos >= n) return FAILDESCR;
-    return z->inst.u->fields[z->pos];
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static DESCR_t icn_bb_nonnull_filter(void *zeta, int entry) {
-    icn_limit_state_t *z = (icn_limit_state_t *)zeta;
-    int e2 = entry;
-    for (;;) {
-        DESCR_t v = z->gen.fn(z->gen.ζ, e2);
-        if (IS_FAIL_fn(v)) return FAILDESCR;
-        if (v.v == DT_SNUL) { e2 = β; continue; }
-        return v;
-    }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 bb_node_t icn_bb_pump_proc_by_name(const char *name, DESCR_t *args, int nargs) {

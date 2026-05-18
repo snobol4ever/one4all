@@ -30,19 +30,11 @@ typedef struct {
 DESCR_t icn_bb_to_nested(void *zeta, int entry);
 typedef struct { long lo; long hi; long step; long cur; }                             icn_to_by_state_t;
 typedef struct { double lo; double hi; double step; double cur; }                    icn_to_by_real_state_t;
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t icn_bb_to_by_real(void *zeta, int entry);
 typedef struct { const char *str; long len; long pos; char ch[2]; }                  icn_iterate_state_t;
 typedef struct { TBBLK_t *tbl; int bucket; TBPAIR_t *entry; }                        icn_tbl_iterate_state_t;
 typedef struct { TBBLK_t *tbl; int bucket; TBPAIR_t *entry; }                        icn_tbl_key_iterate_state_t;
 typedef struct { DESCR_t list_obj; int pos; }                                         icn_list_iterate_state_t;
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t icn_bb_list_iterate(void *zeta, int entry);
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t icn_bb_tbl_key_iterate(void *zeta, int entry);
 typedef struct { DESCR_t inst; int pos; }                                             icn_record_iterate_state_t;
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t icn_bb_record_iterate(void *zeta, int entry);
 typedef struct { const char *needle; const char *hay; int nlen; const char *next; }  icn_find_state_t;
 typedef struct {
     bb_node_t   subj_gen;
@@ -52,8 +44,6 @@ typedef struct {
     const char *next;
     int         subj_entry;
 } icn_find_gen_subj_t;
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t icn_bb_find_subj(void *zeta, int entry);
 typedef struct {
     bb_node_t   subj_gen;
     const char *cset;
@@ -68,13 +58,7 @@ DESCR_t icn_bb_upto_subj(void *zeta, int entry);
 DESCR_t icn_bb_to_by(void *zeta, int entry);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t icn_bb_iterate(void *zeta, int entry);
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t icn_bb_tbl_iterate(void *zeta, int entry);
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t icn_bb_find(void *zeta, int entry);
 typedef struct { const char *s; const char *c1; const char *c2; const char *c3; int slen; int pos; int endp; } icn_bal_state_t;
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t icn_bb_bal(void *zeta, int entry);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t icn_bb_binop(void *zeta, int entry);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
