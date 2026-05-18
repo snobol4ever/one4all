@@ -1,6 +1,5 @@
 #include "icn_runtime.h"
 #include "icn_value.h"
-#include "icn_stmt.h"
 #include "../ast/ast.h"
 #include "../../frontend/snobol4/scrip_cc.h"
 #include "bb_broker.h"
@@ -22,6 +21,29 @@ extern bb_node_t icn_bb_make_proc_box(tree_t *proc, DESCR_t *args, int nargs);
         abort(); \
     } } while (0)
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* DAI-5b-2: File-local [DAI-BOMB] stubs for bb_eval_value / icn_bb_build / bb_exec_stmt. These three  */
+/* symbols were public global stubs in DAI-2; DAI-5a swept all external callers (replacing them with   */
+/* interp_eval). The internal callers below (icn_lazy_box plus surviving icn_bb_* zeta-fn bodies that  */
+/* DAI-2 preserved as infrastructure) are empirically unreachable across the 265-rung suite + smokes + */
+/* 3 crosschecks (verified DAI-5a trace pass). Static-scope stubs keep them link-resolvable while      */
+/* bombing-loudly if ever reached. The public icn_bb_build / bb_eval_value / bb_exec_stmt symbols are  */
+/* gone (headers scrubbed in this commit). icn_runtime.h / icon_gen.h / icn_value.h no longer declare. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static DESCR_t bb_eval_value(tree_t *e) {
+    fprintf(stderr, "[DAI-BOMB] bb_eval_value (file-local) called from icn_runtime.c. tree tag=%d. The Icon AST walker is amputated; mode-1 Icon routes through interp_eval+ir_exec. Use --sm-run/--jit-run/--sm-native.\n", e ? (int)e->t : -1);
+    exit(78);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static bb_node_t icn_bb_build(tree_t *e) {
+    fprintf(stderr, "[DAI-BOMB] icn_bb_build (file-local) called from icn_runtime.c. tree tag=%d. The Icon AST walker is amputated; mode-1 Icon routes through interp_eval+ir_exec. Use --sm-run/--jit-run/--sm-native.\n", e ? (int)e->t : -1);
+    exit(78);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static void bb_exec_stmt(tree_t *e) {
+    fprintf(stderr, "[DAI-BOMB] bb_exec_stmt (file-local) called from icn_runtime.c. tree tag=%d. The Icon AST walker is amputated; mode-1 Icon routes through interp_eval+ir_exec. Use --sm-run/--jit-run/--sm-native.\n", e ? (int)e->t : -1);
+    exit(78);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t NV_SET_fn(const char *name, DESCR_t val);
 IcnProcEntry proc_table[PROC_TABLE_MAX];
 int          proc_count = 0;
@@ -29,6 +51,7 @@ int          g_lang         = 0;
 tree_t      *g_icn_root     = NULL;
 int g_sm_dispatch_active = 0;
 int g_ast_pump_active = 0;
+unsigned long bb_icn_rnd_seed = 12345UL;
 IcnFrame frame_stack[FRAME_STACK_MAX];
 int      frame_depth = 0;
 tree_t  *icn_drive_node = NULL;
@@ -1228,15 +1251,8 @@ DESCR_t icn_proc_as_value(const char *name) {
     return FAILDESCR;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* DAI (IJ-DEL-ICN-AST, DAI-5b-2): icn_bb_build deleted. The Icon-specific tree_t* AST-walking BB     */
+/* builder is gone. Mode-1 Icon executes via the universal interp_eval walker which routes Icon kinds */
+/* through ir_exec.c (IR_block_t walker); the tree_t* path through the Icon walker was vestigial.     */
+/* icn_bb_dcg, icn_bb_pump_proc_by_name, proc_table machinery above remain (used by modes 2/3/4).     */
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* DAI (IJ-DEL-ICN-AST): icn_bb_build body removed. The Icon-specific tree_t* AST-walking BB         */
-/* builder is amputated. Mode-1 (--ir-run / --ast-run) is no longer a valid Icon execution path.    */
-/* Use --sm-run / --jit-run / --sm-native (modes 2/3/4) for Icon programs.                          */
-/* icn_bb_dcg, icn_bb_pump_proc_by_name, proc_table machinery above remain (used by modes 2/3/4).   */
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-bb_node_t icn_bb_build(tree_t *e) {
-    fprintf(stderr, "[DAI-BOMB] icn_bb_build called (mode-1 Icon AST walker is amputated). "
-                    "tree tag=%d. Use --sm-run/--jit-run/--sm-native instead.\n",
-                    e ? (int)e->t : -1);
-    exit(78);
-}
