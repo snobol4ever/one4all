@@ -2369,7 +2369,9 @@ static int emit_sm_call_dispatch(FILE *out, const SM_Instr *ins, int pc)
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* PJ-9c: emit Mode-4 dispatch for SM_BB_ONCE_PROC (Prolog predicate invocation).                                        */
 /* Mirrors emit_sm_call_dispatch — operands are (name string, arity int), template is SM_TPL_LBL_INT32                  */
-/* in g_sm_templates[] mapped to rt_bb_once_proc (defined in src/runtime/rt/rt.c).                                       */
+/* in g_sm_templates[] mapped to rt_pl_once (defined in src/runtime/rt/rt.c).  IJ-HELLO-4b (2026-05-18) flipped         */
+/* this from rt_bb_once_proc → rt_pl_once to break the brokered-import chain; the bb_broker layer is bypassed in       */
+/* favor of a direct IR_exec_once call on the predicate's IR_block_t.                                                    */
 static int emit_sm_bb_once_proc_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;

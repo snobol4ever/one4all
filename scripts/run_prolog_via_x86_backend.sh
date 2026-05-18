@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # run_prolog_via_x86_backend.sh — compile + link + run a .pl file via scrip --compile --target=x86
 # Usage: bash scripts/run_prolog_via_x86_backend.sh <file.pl>
-# Built for PJ-9d (predicate-registry emit) — feeds rt_register_predicates_pl + rt_bb_once_proc.
+# Built for PJ-9d (predicate-registry emit) — feeds rt_register_predicates_pl + rt_pl_once (post IJ-HELLO-4).
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ONE4ALL="$(cd "$HERE/.." && pwd)"
