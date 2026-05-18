@@ -1304,14 +1304,15 @@ void lower_stmt(const tree_t *s)
             goto emit_gotos;
         }
         else if (subject && subject->t == TT_FNC && subject->v.sval) {
-            /* IJ-HELLO-4a: under --compile (mode 4), SM_PUSH_EXPR is unimplementable without */
-            /* walking the embedded tree_t* at runtime — that's the no-AST-walking violation. */
-            /* Mode 2 (sm_interp) already stubs PL_BUILTIN as [NO-AST]; preserve that fingerprint */
-            /* for all modes by abort-and-explain when an unrecognized PL directive reaches this path. */
-            fprintf(stderr, "FATAL: lower_stmt LANG_PL: unhandled Prolog directive/goal-at-top-level: %s/%d. "
-                            "Only `:- initialization(Goal).` and `:- initialization(Goal, When).` are recognized.\n",
+            /* IJ-HELLO-4a (rev): unrecognized top-level Prolog directive (e.g. `:- assertz(...)`,         */
+            /* `:- retract(...)`, `:- abolish(...)`).  Previously emitted SM_PUSH_EXPR(<tree_t*>) +        */
+            /* SM_CALL_FN "PL_BUILTIN", which mode 2 silently stubbed as [NO-AST] PL_BUILTIN and which     */
+            /* under --compile produced an unassemblable PUSH_EXPR macro call.  Drop the directive — same  */
+            /* effective behavior as the old [NO-AST] stub (silent skip), but doesn't taint the SM stream  */
+            /* with a tree_t* pointer.  Emit a stderr breadcrumb so users see what was skipped.  Real      */
+            /* support for assertz/retract/abolish directives is tracked separately (see PR-* rungs).      */
+            fprintf(stderr, "[NO-AST] PL directive %s/%d not yet lowered — skipped at lower time\n",
                     subject->v.sval, subject->n);
-            abort();
         }
         else {
             fprintf(stderr, "FATAL: lower_stmt LANG_PL unnamed subject kind=%d sval=%s — legacy SM_BB_ONCE deleted (PB-7)\n",
