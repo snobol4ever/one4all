@@ -218,16 +218,12 @@ stmt_list_ne
         }
     | compound_stmt             { $$ = $1; }
     | stmt_list_ne stmt ';'     {
-            tree_t *p = ast_node_new(TT_PROGRAM);
-            expr_add_child(p, $1);
-            if ($2) expr_add_child(p, $2);
-            $$ = p;
+            if ($2) expr_add_child($1, $2);
+            $$ = $1;
         }
     | stmt_list_ne compound_stmt {
-            tree_t *p = ast_node_new(TT_PROGRAM);
-            expr_add_child(p, $1);
-            if ($2) expr_add_child(p, $2);
-            $$ = p;
+            if ($2) for (int i = 0; i < $2->n; i++) expr_add_child($1, $2->c[i]);
+            $$ = $1;
         }
     | stmt_list_ne error ';'    { yyerrok; $$ = $1; }
     ;
