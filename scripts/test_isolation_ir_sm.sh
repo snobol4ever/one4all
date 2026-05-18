@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 # test_isolation_ir_sm.sh — RS-15 grep gate.
 #
-# Verifies that SM-mode runtime files contain no references to the IR-only
-# entry points. Comment-only references are allowed.
-#
-# IR-only symbols: execute_program, interp_eval, interp_eval_pat,
-# interp_eval_ref, call_user_function. label_lookup is allowed since shared
-# files (interp_label.c) define it; SM files just must not call it.
+# NOTE (CLI-3M-9, 2026-05-18): execute_program, interp_eval, interp_eval_pat,
+# interp_eval_ref, call_user_function are ALL DELETED from the codebase.
+# interp_exec.c and interp_eval.c no longer exist.
+# This gate is trivially satisfied — the symbols cannot appear in SM files
+# because they do not exist anywhere. Gate kept for documentation.
 #
 # Returns 0 on PASS (zero leaks), 1 on FAIL.
 
