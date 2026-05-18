@@ -21,29 +21,6 @@ extern bb_node_t icn_bb_make_proc_box(tree_t *proc, DESCR_t *args, int nargs);
         abort(); \
     } } while (0)
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* DAI-5b-2: File-local [DAI-BOMB] stubs for bb_eval_value / icn_bb_build / bb_exec_stmt. These three  */
-/* symbols were public global stubs in DAI-2; DAI-5a swept all external callers (replacing them with   */
-/* interp_eval). The internal callers below (icn_lazy_box plus surviving icn_bb_* zeta-fn bodies that  */
-/* DAI-2 preserved as infrastructure) are empirically unreachable across the 265-rung suite + smokes + */
-/* 3 crosschecks (verified DAI-5a trace pass). Static-scope stubs keep them link-resolvable while      */
-/* bombing-loudly if ever reached. The public icn_bb_build / bb_eval_value / bb_exec_stmt symbols are  */
-/* gone (headers scrubbed in this commit). icn_runtime.h / icon_gen.h / icn_value.h no longer declare. */
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static DESCR_t bb_eval_value(tree_t *e) {
-    fprintf(stderr, "[DAI-BOMB] bb_eval_value (file-local) called from icn_runtime.c. tree tag=%d. The Icon AST walker is amputated; mode-1 Icon routes through interp_eval+ir_exec. Use --sm-run/--jit-run/--sm-native.\n", e ? (int)e->t : -1);
-    exit(78);
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static bb_node_t icn_bb_build(tree_t *e) {
-    fprintf(stderr, "[DAI-BOMB] icn_bb_build (file-local) called from icn_runtime.c. tree tag=%d. The Icon AST walker is amputated; mode-1 Icon routes through interp_eval+ir_exec. Use --sm-run/--jit-run/--sm-native.\n", e ? (int)e->t : -1);
-    exit(78);
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void bb_exec_stmt(tree_t *e) {
-    fprintf(stderr, "[DAI-BOMB] bb_exec_stmt (file-local) called from icn_runtime.c. tree tag=%d. The Icon AST walker is amputated; mode-1 Icon routes through interp_eval+ir_exec. Use --sm-run/--jit-run/--sm-native.\n", e ? (int)e->t : -1);
-    exit(78);
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t NV_SET_fn(const char *name, DESCR_t val);
 IcnProcEntry proc_table[PROC_TABLE_MAX];
 int          proc_count = 0;
@@ -371,14 +348,6 @@ static DESCR_t icn_bb_oneshot(void *zeta, int entry) {
     if (!z->fired && !IS_FAIL_fn(z->val)) { z->fired = 1; return z->val; }
     return FAILDESCR;
 }
-typedef struct { tree_t *expr; } icn_lazy_state_t;
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t icn_lazy_box(void *zeta, int entry) {
-    if (entry != α) return FAILDESCR;
-    icn_lazy_state_t *z = (icn_lazy_state_t *)zeta;
-    DESCR_t v = bb_eval_value(z->expr);
-    return IS_FAIL_fn(v) ? FAILDESCR : v;
-}
 typedef struct { IR_block_t *cfg; int first; } icn_dcg_state_t;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void icn_every_body_pre(void) { if (frame_depth > 0) { FRAME.loop_next = 0; } }
@@ -443,22 +412,6 @@ static DESCR_t icn_bb_raku_array(void *zeta, int entry) {
             NV_SET_fn(z->loopvar, val);
     }
     return val;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-tree_t *find_leaf_suspendable(tree_t *e) {
-    if (!e) return NULL;
-    switch (e->t) {
-        case TT_TO: case TT_TO_BY: case TT_ITERATE: case TT_ALTERNATE:
-        case TT_SUSPEND: case TT_LIMIT: case TT_EVERY: case TT_BANG_BINARY: case TT_SEQ_EXPR:
-            return e;
-        case TT_FNC: return e;
-        default: break;
-    }
-    for (int i = 0; i < e->n; i++) {
-        tree_t *found = find_leaf_suspendable(e->c[i]);
-        if (found) return found;
-    }
-    return NULL;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t icn_bb_to_by_real(void *zeta, int entry) {
