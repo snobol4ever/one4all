@@ -166,8 +166,13 @@ void bb_emit_begin(bb_buf_t buf, int size)
     bb_patch_count = 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+extern int bb_emit_overflow;
 int bb_emit_end(void)
 {
+    if (bb_emit_overflow) {
+        bb_patch_count = 0;  /* patches are invalid due to overflow — discard */
+        return -1;
+    }
     if (bb_patch_count > 0) {
         fprintf(stderr, "bb_emit_end: %d unresolved forward reference(s):\n",
                 bb_patch_count);
@@ -180,6 +185,36 @@ int bb_emit_end(void)
     return bb_emit_pos;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+void bb_emit_patch_rel8(bb_label_t *lbl)
+{
+    if (bb_emit_mode == EMIT_TEXT) {
+        fprintf(stderr,
+                "bb_emit_patch_rel8: TEXT-mode reach (target='%s') — "
+                "use bb_insn_*_rel8 mnemonic helpers\n",
+                lbl->name);
+        abort();
+    }
+    if (bb_label_defined(lbl)) {
+        int disp = lbl->offset - (bb_emit_pos + 1);
+        if (disp < -128 || disp > 127) {
+            fprintf(stderr,
+                    "bb_emit_patch_rel8: rel8 overflow for '%s': disp=%d\n",
+                    lbl->name, disp);
+            abort();
+        }
+        bb_emit_byte((uint8_t)(int8_t)disp);
+        return;
+    }
+    if (bb_patch_count >= BB_PATCH_MAX) {
+        bb_emit_overflow = 1;
+        return;
+    }
+    bb_patch_list[bb_patch_count].site  = bb_emit_pos;
+    bb_patch_list[bb_patch_count].label = lbl;
+    bb_patch_list[bb_patch_count].kind  = PATCH_REL8;
+    bb_patch_count++;
+    bb_emit_byte(0x00);
+}
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void bb_emit_patch_rel32(bb_label_t *lbl)
 {
@@ -196,8 +231,8 @@ void bb_emit_patch_rel32(bb_label_t *lbl)
         return;
     }
     if (bb_patch_count >= BB_PATCH_MAX) {
-        fprintf(stderr, "bb_emit_patch_rel32: patch list full\n");
-        abort();
+        bb_emit_overflow = 1;  /* treat patch overflow same as byte overflow */
+        return;
     }
     bb_patch_list[bb_patch_count].site  = bb_emit_pos;
     bb_patch_list[bb_patch_count].label = lbl;
@@ -206,6 +241,7 @@ void bb_emit_patch_rel32(bb_label_t *lbl)
     bb_emit_u32(0x00000000);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+int bb_emit_overflow = 0;
 void bb_emit_byte(uint8_t b)
 {
     if (bb_emit_mode != EMIT_BINARY_WIRED) {
@@ -216,9 +252,8 @@ void bb_emit_byte(uint8_t b)
         abort();
     }
     if (bb_emit_pos >= bb_emit_size) {
-        fprintf(stderr, "bb_emit_byte: buffer overflow at pos=%d size=%d\n",
-                bb_emit_pos, bb_emit_size);
-        abort();
+        bb_emit_overflow = 1;
+        return;  /* silently drop — caller checks emitter_end() > FLAT_BUF_MAX */
     }
     bb_emit_buf[bb_emit_pos++] = b;
 }
@@ -233,6 +268,7 @@ int  g_emit_pos       = 0;
 void emitter_init_binary(bb_buf_t buf, int size)
 {
     g_is_text = 0; g_emit_text_mode = TEXT_MODE_INVOCATION; g_emit_pos = 0;
+    bb_emit_overflow = 0;
     bb_emit_mode = EMIT_BINARY_WIRED;
     bb_emit_begin(buf, size);
 }
@@ -378,6 +414,7 @@ void bb_label_define(bb_label_t *lbl)
         bb3c_format(f, lbuf, "", "");
         return;
     }
+    if (bb_emit_overflow) return;  /* overflow already occurred — skip patching */
     lbl->offset = bb_emit_pos;
     for (int i = 0; i < bb_patch_count; i++) {
         bb_patch_t *p = &bb_patch_list[i];

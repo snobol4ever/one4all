@@ -1243,6 +1243,8 @@ DESCR_t rt_bb_arbno(void *zeta, int port)
     void *slot0 = *(void **)zeta;
     if (slot0 && ((rt_arbno_t *)slot0)->magic == RT_ARBNO_MAGIC) ζ = (rt_arbno_t *)slot0;
     else ζ = (rt_arbno_t *)zeta;
+    /* Guard: if child fn was never compiled (bb_build returned NULL), treat as epsilon-ARBNO */
+    if (!ζ->fn) return descr_match_span(Σ+Δ, 0);
     DESCR_t ARBNO; DESCR_t br; rt_arbno_frame_t *fr;
     if (port == 0) {
         ζ->depth = 0; fr = &ζ->stack[0];

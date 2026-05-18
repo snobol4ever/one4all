@@ -35,8 +35,7 @@ bb_buf_t bb_alloc(size_t size) {
     pages  = ((size_t)size + (size_t)ps - 1) / (size_t)ps;
     alloc  = pages * (size_t)ps;
     if (start + alloc > pool_limit) {
-        fprintf(stderr, "bb_alloc: pool exhausted (need %zu, have %zu)\n", alloc, (size_t)(pool_limit - start));
-        abort();
+        return NULL;  /* pool exhausted — caller (bb_build_flat/brokered) checks for NULL */
     }
     pool_top = start + alloc;
     return start;

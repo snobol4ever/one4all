@@ -303,13 +303,13 @@ static DESCR_t bb_deferred_var(void *zeta, int entry)
                                 bb_box_fn bfn = bb_build_brokered((PATND_t *)val.p);
                                 if (bfn) {
                                     ζ->child_fn    = bfn;
-                                    ζ->child_state = NULL;
+                                    ζ->child_state = val.p;  /* cache key: pattern ptr */
                                     ζ->child_size  = 0;
                                 } else {
                                     PATND_t *ep = patnd_make_eps();
                                     bb_box_fn efn = bb_build_brokered(ep);
                                     ζ->child_fn    = efn;
-                                    ζ->child_state = NULL;
+                                    ζ->child_state = val.p;  /* cache key even for fallback */
                                     ζ->child_size  = 0;
                                 }
                                 rebuilt = 1;

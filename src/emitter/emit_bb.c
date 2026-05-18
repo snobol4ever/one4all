@@ -1075,7 +1075,8 @@ bb_box_fn bb_build_flat(PATND_t *p) {
     emitter_init_binary(buf, FLAT_BUF_MAX);
     emit_flat_body(p, "pat_flat", 0, 0);
     int nbytes = emitter_end();
-    if (nbytes <= 0 || nbytes > FLAT_BUF_MAX) { bb_free(buf, FLAT_BUF_MAX); return NULL; }
+    extern int bb_emit_overflow;
+    if (bb_emit_overflow || nbytes <= 0 || nbytes > FLAT_BUF_MAX) { bb_free(buf, FLAT_BUF_MAX); return NULL; }
     bb_seal(buf, (size_t)nbytes);
     return (bb_box_fn)buf;
 }
@@ -1091,7 +1092,8 @@ bb_box_fn bb_build_brokered(PATND_t *p) {
     emit_flat_body(p, "pat_brok", 0, 1);
     int nbytes = emitter_end();
     emit_mode_set(EMIT_BINARY_WIRED, NULL);
-    if (nbytes <= 0 || nbytes > FLAT_BUF_MAX) { bb_free(buf, FLAT_BUF_MAX); return NULL; }
+    extern int bb_emit_overflow;
+    if (bb_emit_overflow || nbytes <= 0 || nbytes > FLAT_BUF_MAX) { bb_free(buf, FLAT_BUF_MAX); return NULL; }
     bb_seal(buf, (size_t)nbytes);
     return (bb_box_fn)buf;
 }
