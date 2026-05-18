@@ -10,7 +10,7 @@ run_test() {
     tname="$1"
     src="$TESTS/${tname}.raku"
     exp="$TESTS/${tname}.expected"
-    got=$("$SCRIP" --ir-run "$src" 2>/dev/null) || true
+    got=$("$SCRIP" --interp "$src" 2>/dev/null) || true
     if [ "$got" = "$(cat "$exp")" ]; then
         echo "  PASS $tname"; pass=$((pass+1))
     else

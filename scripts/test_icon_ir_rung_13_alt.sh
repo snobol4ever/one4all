@@ -13,7 +13,7 @@ icon() {
     local label="$1" expected="$2"
     local tmp; tmp=$(mktemp /tmp/icn_XXXXXX.icn)
     cat > "$tmp"
-    local actual; actual=$(timeout 8 "$SCRIP" --ir-run "$tmp" < /dev/null 2>/dev/null) || true
+    local actual; actual=$(timeout 8 "$SCRIP" --interp "$tmp" < /dev/null 2>/dev/null) || true
     rm -f "$tmp"
     if [ "$actual" = "$expected" ]; then
         echo "  PASS $label"; PASS=$((PASS+1))

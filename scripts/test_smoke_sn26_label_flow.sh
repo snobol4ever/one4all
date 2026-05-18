@@ -85,9 +85,9 @@ else
     echo "SKIP sbl missing"
 fi
 
-# scrip --ir-run: matches CSN -> 3 LABELs.
+# scrip --interp: matches CSN -> 3 LABELs.
 if [ -x "$SCRIP" ]; then
-    if run_one "scrip --ir-run"      "timeout 8 env MONITOR_BIN=1 \"$SCRIP\" --ir-run"   3; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); fi
+    if run_one "scrip --interp"      "timeout 8 env MONITOR_BIN=1 \"$SCRIP\" --interp"   3; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); fi
     # scrip --interp: matches SPL on blank-line counting (post -k: 1 blank + 3 stmts + END = 5 LABELs).
     if run_one "scrip --interp"      "timeout 8 env MONITOR_BIN=1 \"$SCRIP\" --interp"   5; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); fi
     # scrip --run: same as sm-run (post -k).

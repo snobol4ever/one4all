@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # test_crosscheck_snocone.sh — 3-mode crosscheck for SNOCONE (GOAL-LANG-SNOCONE)
 #
-# Runs the snocone test corpus through --ir-run, --interp, --run.
+# Runs the snocone test corpus through --interp, --interp, --run.
 # Run on every major push. Mode-consistency check, not regression.
 # If .ref present alongside test file: diffs vs oracle too.
 # Exits 0 only if all three modes agree on every test.
@@ -17,7 +17,7 @@ xcheck() {
     local label="$1" file="$2" ref="${3:-}"
     if [ ! -f "$file" ]; then echo "  SKIP $label (no file)"; SKIP=$((SKIP+1)); return; fi
     local ir sm jit
-    ir=$(timeout  $TIMEOUT "$SCRIP" --ir-run  "$file" </dev/null 2>/dev/null)
+    ir=$(timeout  $TIMEOUT "$SCRIP" --interp  "$file" </dev/null 2>/dev/null)
     sm=$(timeout  $TIMEOUT "$SCRIP" --interp  "$file" </dev/null 2>/dev/null)
     jit=$(timeout $TIMEOUT "$SCRIP" --run "$file" </dev/null 2>/dev/null)
     local ok=1

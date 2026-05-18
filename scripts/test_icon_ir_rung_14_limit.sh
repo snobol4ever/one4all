@@ -13,7 +13,7 @@ if [ ! -d "$CORPUS" ]; then echo "SKIP corpus not found at $CORPUS"; exit 0; fi
 run() {
     local base="$CORPUS/$1"
     local got want
-    got=$(timeout 8 "$SCRIP" --ir-run "${base}.icn" < /dev/null 2>/dev/null) || true
+    got=$(timeout 8 "$SCRIP" --interp "${base}.icn" < /dev/null 2>/dev/null) || true
     want=$(cat "${base}.expected")
     if [ "$got" = "$want" ]; then
         echo "  PASS $1"; PASS=$((PASS+1))

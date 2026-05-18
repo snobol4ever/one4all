@@ -9,7 +9,7 @@ TIMEOUT="${TIMEOUT:-8}"
 GREEN='\033[0;32m'; RED='\033[0;31m'; RESET='\033[0m'
 
 TESTS=(fibonacci palindrome wordcount quicksort pattern_suite)
-MODES=(--ir-run --interp --run)
+MODES=(--interp --interp --run)
 
 PASS=0; FAIL=0
 

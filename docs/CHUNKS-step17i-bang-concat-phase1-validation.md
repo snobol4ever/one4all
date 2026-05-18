@@ -140,7 +140,7 @@ CH-15-SURVEY's deferral of CH-15b.
 | `test_isolation_ir_sm.sh` | PASS | PASS | byte-identical |
 | `test_smoke_unified_broker.sh` | 49/0 | 49/0 | byte-identical |
 | `test_smoke_scrip_all_modes.sh` | 2/0 | 2/0 | byte-identical |
-| `test_icon_ir_all_rungs.sh` | 177/56/30 | 177/56/30 | byte-identical |
+| `test_icon_all_rungs.sh` | 177/56/30 | 177/56/30 | byte-identical |
 | Icon corpus `--interp` | 100/163 | 101/162 | **+1 PASS** (rung15_real_swap_lconcat) |
 | `--interp` rung01–04 | 20/24 | 20/24 | unchanged (the 4 FAILs are pre-existing: rung02_proc_fact, rung02_proc_locals, rung03_suspend_fail, rung03_suspend_return) |
 

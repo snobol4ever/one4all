@@ -175,12 +175,12 @@ if [[ "$want_spl" = "1" ]]; then
     PIDS+=($!)
 fi
 
-# scrip --ir-run by default; --interp / --run via SCRIP_RUN_FLAG override
+# scrip --interp by default; --interp / --run via SCRIP_RUN_FLAG override
 # (SN-32: same harness drives SM/JIT runs without forking the file).
 # Catch-all activated via SCRIP_TRACE/SCRIP_FTRACE only;
 # no source modification, no LOAD-chain.
 if [[ "$want_scr" = "1" ]]; then
-    SCR_RUN_FLAG="${SCRIP_RUN_FLAG:---ir-run}"
+    SCR_RUN_FLAG="${SCRIP_RUN_FLAG:---interp}"
     MONITOR_BIN=1 \
     MONITOR_READY_PIPE="$TMP/scr.ready" \
     MONITOR_GO_PIPE="$TMP/scr.go" \

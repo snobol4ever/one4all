@@ -16,7 +16,7 @@ Ran across:
 - `test_smoke_prolog.sh` (5 tests)
 - `test_smoke_raku.sh` (5 tests)
 - `test_smoke_unified_broker.sh` (49 tests, mixed modes)
-- `test_icon_ir_all_rungs.sh` (263 programs, --ir-run)
+- `test_icon_all_rungs.sh` (263 programs, --ir-run)
 
 Total: 570 raw events, 18 unique (kind, caller, via) tuples.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run_prolog_via_x86_backend.sh — compile + link + run a .pl file via scrip --sm-emit --target=x86
+# run_prolog_via_x86_backend.sh — compile + link + run a .pl file via scrip --compile --target=x86
 # Usage: bash scripts/run_prolog_via_x86_backend.sh <file.pl>
 # Built for PJ-9d (predicate-registry emit) — feeds rt_register_predicates_pl + rt_bb_once_proc.
 set -euo pipefail
@@ -13,7 +13,7 @@ PL="${1:?Usage: run_prolog_via_x86_backend.sh <file.pl>}"
 [ -f "$PL"    ] || { echo "FAIL no such file: $PL"; exit 1; }
 WORK="$(mktemp -d /tmp/pl_x86_XXXXXX)"
 trap 'rm -rf "$WORK"' EXIT
-timeout 8 "$SCRIP" --sm-emit --target=x86 "$PL" > "$WORK/prog.s" 2>"$WORK/scrip.err" < /dev/null || {
+timeout 8 "$SCRIP" --compile --target=x86 "$PL" > "$WORK/prog.s" 2>"$WORK/scrip.err" < /dev/null || {
     echo "FAIL scrip emit failed:"; cat "$WORK/scrip.err"; exit 1
 }
 cp "$ONE4ALL/sm_macros.s" "$WORK/sm_macros.s" 2>/dev/null || true

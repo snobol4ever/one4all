@@ -32,7 +32,7 @@ for prog in "${PROGRAMS[@]}"; do
     fi
     
     echo -n "Emit $base_name ... "
-    if ! timeout 30 "$SCRIP" --sm-emit --target=jvm "$sno_path" > "$j_file" 2>/dev/null; then
+    if ! timeout 30 "$SCRIP" --compile --target=jvm "$sno_path" > "$j_file" 2>/dev/null; then
         echo "FAIL (emit error)"
         rm -f "$j_file"
         continue

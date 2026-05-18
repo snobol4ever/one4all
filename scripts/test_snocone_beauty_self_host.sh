@@ -14,8 +14,8 @@
 # Options:
 #   --input FILE       SNOBOL4 source to beautify
 #                      (default: corpus/programs/snobol4/demo/beauty/beauty.sno)
-#   --mode MODE        scrip mode: --ir-run | --interp | --run
-#                      (default: --ir-run)
+#   --mode MODE        scrip mode: --interp | --interp | --run
+#                      (default: --interp)
 #   --timeout N        seconds for scrip run (default: 30)
 #   --diff             also run SPITBOL oracle and diff (default: off)
 #   --quiet            print only the summary line, suppress diff body
@@ -47,7 +47,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 
 INPUT=""
-MODE="--ir-run"
+MODE="--interp"
 TIMEOUT=30
 DO_DIFF=0
 QUIET=0
@@ -81,7 +81,7 @@ SNO_DIR="$CORPUS/programs/snobol4/demo/beauty"
 [[ -f "$INPUT"   ]] || { echo "FAIL input not found: $INPUT"     >&2; exit 2; }
 
 # --- Lib chain --------------------------------------------------------------
-# Order matches goal-file architecture (Step 1, --ir-run with .sno-equivalent
+# Order matches goal-file architecture (Step 1, --interp with .sno-equivalent
 # .sc files). This is the canonical 16-file ordering established in SB-4b.
 # Last positional arg is beauty.sc itself (the main program).
 LIB_FILES=(

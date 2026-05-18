@@ -4,7 +4,7 @@
 # (fresh scrip + wat2wasm + node host per program) to avoid one bad program taking
 # down the batch.  Compares stdout against the co-located .ref oracle.
 #
-# Pipeline:  .sno  -->  scrip --sm-emit --target=wasm  -->  .wat
+# Pipeline:  .sno  -->  scrip --compile --target=wasm  -->  .wat
 #                 -->  wat2wasm                       -->  .wasm
 #                 -->  node sno_host.mjs              -->  stdout
 #                 -->  diff vs .ref
@@ -48,7 +48,7 @@ TMPD=$(mktemp -d); trap "rm -rf $TMPD" EXIT
 # Skip list — programs that segfault in the scrip frontend (not WASM-specific).
 # scanerr.sno: SIGSEGV in lower.c:304 (emit_pat_capture) on deferred-expr capture
 # *TAB(X) / *ANY(X) / *LEN(X) — var_node->v.sval is 0x1 (uninit) for the unary-*
-# operand.  Crashes on ALL targets and on --interp / --ir-run (frontend bug).
+# operand.  Crashes on ALL targets and on --interp / --interp (frontend bug).
 # To be fixed in a separate upstream session; tracked in PLAN.md.
 SKIP_LIST=" scanerr "
 
@@ -68,7 +68,7 @@ run_one() {
     local wasm="$TMPD/$base.wasm"
     local out="$TMPD/$base.out"
     local inp="$dir/$base.input"
-    if ! timeout "$TIMEOUT" "$SCRIP" --sm-emit --target=wasm "$sno" > "$wat" 2>/dev/null; then
+    if ! timeout "$TIMEOUT" "$SCRIP" --compile --target=wasm "$sno" > "$wat" 2>/dev/null; then
         [[ "$VERBOSE" == "--verbose" ]] && echo "FAIL $base [emit]"
         FAIL=$((FAIL+1)); return 0
     fi

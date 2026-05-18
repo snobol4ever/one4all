@@ -153,7 +153,7 @@ All gates byte-identical to baseline (CH-17g-runtime-bridge-acomp @ `d0d1ddfb`):
 | `test_isolation_ir_sm.sh` | PASS — no IR-only symbol leaks in SM runtime files |
 | `test_smoke_unified_broker.sh` | PASS=49 FAIL=0 |
 | `test_smoke_scrip_all_modes.sh` | PASS=2 FAIL=0 |
-| Icon `--ir-run` corpus (test_icon_ir_all_rungs.sh) | PASS=186 FAIL=47 XFAIL=30 TOTAL=263 |
+| Icon `--ir-run` corpus (test_icon_all_rungs.sh) | PASS=186 FAIL=47 XFAIL=30 TOTAL=263 |
 
 **New gate:** string relop probe under `--interp` produces correct
 output for `==`, `<<`, `>>`.

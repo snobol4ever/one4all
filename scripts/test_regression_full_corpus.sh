@@ -69,7 +69,7 @@ run_sno() {
                 SNO_LIB="$INC" timeout "$TIMEOUT" "$SCRIP" "$sno" 2>/dev/null || true
             fi ;;
         ir-run)
-            SNO_LIB="$INC" timeout "$TIMEOUT" "$SCRIP" --ir-run "$sno" 2>/dev/null || true ;;
+            SNO_LIB="$INC" timeout "$TIMEOUT" "$SCRIP" --interp "$sno" 2>/dev/null || true ;;
         x86)
             local t; t=$(mktemp -d)
             "$SCRIP" --compile "$sno" > "$t/p.s" 2>/dev/null &&
@@ -79,7 +79,7 @@ run_sno() {
             rm -rf "$t" ;;
         jvm)
             local t; t=$(mktemp -d)
-            "$SCRIP" --jit-emit --jvm "$sno" > "$t/p.j" 2>/dev/null
+            "$SCRIP" --compile --jvm "$sno" > "$t/p.j" 2>/dev/null
             if grep -q "^.class" "$t/p.j" 2>/dev/null; then
                 java -jar "$JASMIN" -d "$t" "$t/p.j" 2>/dev/null &&
                 timeout "$TIMEOUT" java -cp "$t" Main 2>/dev/null || true
@@ -87,7 +87,7 @@ run_sno() {
             rm -rf "$t" ;;
         net)
             local t; t=$(mktemp -d)
-            "$SCRIP" --jit-emit --net "$sno" > "$t/p.il" 2>/dev/null &&
+            "$SCRIP" --compile --net "$sno" > "$t/p.il" 2>/dev/null &&
             ilasm "$t/p.il" /output:"$t/p.exe" 2>/dev/null &&
             timeout "$TIMEOUT" mono "$t/p.exe" 2>/dev/null || true
             rm -rf "$t" ;;

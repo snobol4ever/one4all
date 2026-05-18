@@ -9,7 +9,7 @@ echo "=== rung23: bitwise ops / sign / ** / max / min ==="
 for f in "$CORPUS"/*.pl; do
     ref="${f%.pl}.ref"
     [ -f "$ref" ] || continue
-    actual=$(timeout 8 "$SCRIP" --ir-run "$f" 2>/dev/null)
+    actual=$(timeout 8 "$SCRIP" --interp "$f" 2>/dev/null)
     expected=$(cat "$ref")
     if [ "$actual" = "$expected" ]; then
         echo "  PASS $(basename "$f")"; PASS=$((PASS+1))

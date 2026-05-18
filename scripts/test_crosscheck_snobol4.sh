@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # test_crosscheck_snobol4.sh — 3-mode crosscheck for SNOBOL4 (GOAL-LANG-SNOBOL4)
 #
-# Runs the snobol4 test corpus through --ir-run, --interp, --run.
+# Runs the snobol4 test corpus through --interp, --interp, --run.
 # Run on every major push. Mode-consistency check, not regression.
 # If .ref present alongside test file: diffs vs oracle too.
 # Exits 0 only if all three modes agree on every test.
@@ -18,11 +18,11 @@ xcheck() {
     if [ ! -f "$file" ]; then echo "  SKIP $label (no file)"; SKIP=$((SKIP+1)); return; fi
     local ir sm jit
     if [ -n "$sno_lib" ]; then
-        ir=$(SNO_LIB="$sno_lib"  timeout $TIMEOUT "$SCRIP" --ir-run  "$file" </dev/null 2>/dev/null)
+        ir=$(SNO_LIB="$sno_lib"  timeout $TIMEOUT "$SCRIP" --interp  "$file" </dev/null 2>/dev/null)
         sm=$(SNO_LIB="$sno_lib"  timeout $TIMEOUT "$SCRIP" --interp  "$file" </dev/null 2>/dev/null)
         jit=$(SNO_LIB="$sno_lib" timeout $TIMEOUT "$SCRIP" --run "$file" </dev/null 2>/dev/null)
     else
-        ir=$(timeout  $TIMEOUT "$SCRIP" --ir-run  "$file" </dev/null 2>/dev/null)
+        ir=$(timeout  $TIMEOUT "$SCRIP" --interp  "$file" </dev/null 2>/dev/null)
         sm=$(timeout  $TIMEOUT "$SCRIP" --interp  "$file" </dev/null 2>/dev/null)
         jit=$(timeout $TIMEOUT "$SCRIP" --run "$file" </dev/null 2>/dev/null)
     fi

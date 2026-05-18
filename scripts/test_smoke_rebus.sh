@@ -10,7 +10,7 @@ rebus() {
     local label="$1" expected="$2"
     local tmp; tmp=$(mktemp /tmp/reb_XXXXXX.reb)
     cat > "$tmp"
-    local actual; actual=$(timeout 8 "$SCRIP" --ir-run "$tmp" 2>/dev/null)
+    local actual; actual=$(timeout 8 "$SCRIP" --interp "$tmp" 2>/dev/null)
     rm -f "$tmp"
     if [ "$actual" = "$expected" ]; then echo "  PASS $label"; PASS=$((PASS+1))
     else echo "  FAIL $label (got: $(echo "$actual"|head -1))"; FAIL=$((FAIL+1)); fi

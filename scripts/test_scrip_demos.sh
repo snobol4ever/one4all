@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/test_scrip_demos.sh — run all scrip demo/*.md files via --ir-run and compare to .expected
+# scripts/test_scrip_demos.sh — run all scrip demo/*.md files via --interp and compare to .expected
 #
 # Self-contained. Run from anywhere with no env vars.
 # Usage: bash scripts/test_scrip_demos.sh
@@ -32,12 +32,12 @@ check() {
     fi
 }
 
-echo "=== scrip demo suite (--ir-run) ==="
+echo "=== scrip demo suite (--interp) ==="
 echo ""
 
 # demo1 — Hello World (SNO + Icon + Prolog, each prints once → 3 lines)
 # demo2 — Word Count   (SNO + Icon each print 9 → 2 lines)
-# Each demo's .expected reflects what --ir-run produces for the full polyglot .md.
+# Each demo's .expected reflects what --interp produces for the full polyglot .md.
 # If .expected was written for a single-language run it will be updated here as we go.
 
 for demo_dir in "$DEMO_DIR"/demo*/; do
@@ -57,7 +57,7 @@ for demo_dir in "$DEMO_DIR"/demo*/; do
     fi
 
     expected=$(cat "$exp_file")
-    actual=$(timeout "$TIMEOUT" "$SCRIP" --ir-run "$md" < /dev/null 2>/dev/null)
+    actual=$(timeout "$TIMEOUT" "$SCRIP" --interp "$md" < /dev/null 2>/dev/null)
     label="$dname  ($(basename "$md"))"
     check "$label" "$expected" "$actual"
 done

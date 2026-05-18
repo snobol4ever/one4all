@@ -7,7 +7,7 @@ SCRIP="${HERE}/../scrip"
 PASS=0; FAIL=0
 
 run_file() {
-    local label="$1" src="$2" expected="$3" mode="${4:---ir-run}"
+    local label="$1" src="$2" expected="$3" mode="${4:---interp}"
     local tmp; tmp=$(mktemp /tmp/sno_XXXXXX.sno)
     printf '%s\n' "$src" > "$tmp"
     local actual; actual=$(timeout 8 "$SCRIP" $mode "$tmp" 2>/dev/null)

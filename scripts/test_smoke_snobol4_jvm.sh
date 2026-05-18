@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # test_smoke_snobol4_jvm.sh — SJ4-JVM-3 gate: full JVM pipeline on smoke programs
-# scrip --sm-emit --target=jvm → .j file → jasmin.jar → .class → java → verify output
+# scrip --compile --target=jvm → .j file → jasmin.jar → .class → java → verify output
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIP="${SCRIP:-$HERE/../scrip}"
@@ -19,7 +19,7 @@ run_smoke() {
     local oracle_out=$(timeout 8 "$ORACLE" -b "$prog" 2>/dev/null || echo "")
     # Compile to JVM
     local j_file="$tmp/Prog.j"
-    if ! timeout 8 "$SCRIP" --sm-emit --target=jvm "$prog" > "$j_file" 2>/dev/null; then
+    if ! timeout 8 "$SCRIP" --compile --target=jvm "$prog" > "$j_file" 2>/dev/null; then
         echo "FAIL $label (emit)"
         FAIL=$((FAIL+1))
         rm -rf "$tmp"

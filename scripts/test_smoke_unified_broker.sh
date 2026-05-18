@@ -20,7 +20,7 @@ PASS=0; FAIL=0
 _run() {
     local label="$1" file="$2" expected="$3"
     local actual
-    actual=$(timeout "$TIMEOUT" "$SCRIP" --ir-run "$file" < /dev/null 2>/dev/null)
+    actual=$(timeout "$TIMEOUT" "$SCRIP" --interp "$file" < /dev/null 2>/dev/null)
     if [ "$actual" = "$expected" ]; then
         echo "  PASS $label"; PASS=$((PASS+1))
     else
@@ -55,7 +55,7 @@ pl() {
 
 file_test() {
     local label="$1" path="$2" expected="$3" actual
-    actual=$(timeout "$TIMEOUT" "$SCRIP" --ir-run "$path" < /dev/null 2>/dev/null)
+    actual=$(timeout "$TIMEOUT" "$SCRIP" --interp "$path" < /dev/null 2>/dev/null)
     if [ "$actual" = "$expected" ]; then
         echo "  PASS $label"; PASS=$((PASS+1))
     else
@@ -185,7 +185,7 @@ EOF
 RAKU_SCRIP="$ROOT/test/raku_gather.scrip"
 RAKU_REF="$ROOT/test/raku_gather.ref"
 if [ -f "$RAKU_SCRIP" ] && [ -f "$RAKU_REF" ]; then
-    actual=$(timeout "$TIMEOUT" "$SCRIP" --ir-run "$RAKU_SCRIP" < /dev/null 2>/dev/null)
+    actual=$(timeout "$TIMEOUT" "$SCRIP" --interp "$RAKU_SCRIP" < /dev/null 2>/dev/null)
     expected=$(cat "$RAKU_REF")
     if [ "$actual" = "$expected" ]; then
         echo "  PASS raku_gather.scrip (SNO+RAKU polyglot, BB_PUMP via while loop)"
@@ -206,7 +206,7 @@ echo "=== Cross-language polyglot (U-19) ==="
 CROSS="$ROOT/test/cross_lang.scrip"
 REF="$ROOT/test/cross_lang.ref"
 if [ -f "$CROSS" ] && [ -f "$REF" ]; then
-    actual=$(timeout "$TIMEOUT" "$SCRIP" --ir-run "$CROSS" < /dev/null 2>/dev/null)
+    actual=$(timeout "$TIMEOUT" "$SCRIP" --interp "$CROSS" < /dev/null 2>/dev/null)
     expected=$(cat "$REF")
     if [ "$actual" = "$expected" ]; then
         echo "  PASS cross_lang.scrip (SNO+ICN+PL all three bb_broker modes)"
@@ -227,7 +227,7 @@ echo "=== Shared NV store (U-23) ==="
 SHARED="$ROOT/test/test_shared_nv.scrip"
 SREF="$ROOT/test/test_shared_nv.ref"
 if [ -f "$SHARED" ] && [ -f "$SREF" ]; then
-    actual=$(timeout "$TIMEOUT" "$SCRIP" --ir-run "$SHARED" < /dev/null 2>/dev/null)
+    actual=$(timeout "$TIMEOUT" "$SCRIP" --interp "$SHARED" < /dev/null 2>/dev/null)
     expected=$(cat "$SREF")
     if [ "$actual" = "$expected" ]; then
         echo "  PASS test_shared_nv.scrip (SNO+ICN+PL shared NV store)"

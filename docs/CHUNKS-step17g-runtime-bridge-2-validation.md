@@ -147,7 +147,7 @@ No new opcodes, no IR fields, no `sm_lower.c` changes.
 | isolation_ir_sm | PASS — no IR-only symbol leaks in SM runtime files |
 | unified_broker | PASS=49 FAIL=0 |
 | scrip_all_modes | PASS=2 FAIL=0 |
-| Icon corpus `--ir-run` (`test_icon_ir_all_rungs.sh`) | PASS=186 FAIL=47 XFAIL=30 TOTAL=263 |
+| Icon corpus `--ir-run` (`test_icon_all_rungs.sh`) | PASS=186 FAIL=47 XFAIL=30 TOTAL=263 |
 | `./scrip --interp /tmp/probe.icn` (`procedure main() write("hello from icon proc") end`) | byte-identical to `--ir-run` |
 | Multi-call Icon program (`/tmp/probe2.icn`, four calls to write/writes) | byte-identical to `--ir-run` |
 

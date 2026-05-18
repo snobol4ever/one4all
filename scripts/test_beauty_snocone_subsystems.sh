@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run_beauty_sc_subsystem.sh — run Snocone BEAUTY subsystem tests via scrip --ir-run
+# run_beauty_sc_subsystem.sh — run Snocone BEAUTY subsystem tests via scrip --interp
 set -uo pipefail
 SCRIPT_DIR="${CORPUS:-/home/claude/corpus}/programs/snocone/demo/beauty/test"
 SCRIP="${SCRIP:-./scrip}"
@@ -17,7 +17,7 @@ run_subsystem() {
     if [[ ! -f "$driver_sc" ]]; then echo -e "${YELLOW}SKIP${RESET}  $subsys  (no $subsys.sc)"; SKIP=$((SKIP+1)); return; fi
     if [[ ! -f "$driver_ref" ]]; then echo -e "${YELLOW}SKIP${RESET}  $subsys  (no $subsys.ref)"; SKIP=$((SKIP+1)); return; fi
     local err; err=$(mktemp)
-    local got; got=$(timeout "$TIMEOUT" "$SCRIP" --ir-run "$driver_sc" 2>"$err") || true
+    local got; got=$(timeout "$TIMEOUT" "$SCRIP" --interp "$driver_sc" 2>"$err") || true
     local exp; exp=$(cat "$driver_ref")
     if [[ "$got" == "$exp" ]]; then
         echo -e "${GREEN}PASS${RESET}  $subsys"; PASS=$((PASS+1))

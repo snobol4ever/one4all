@@ -33,7 +33,7 @@ trap 'rm -f "$SNO"' EXIT
 
 # ── interpreter modes ─────────────────────────────────────────────────────────
 check "sm-run (default)" "hello" "$(timeout 8 "$SCRIP" "$SNO" < /dev/null 2>/dev/null)"
-check "ir-run"           "hello" "$(timeout 8 "$SCRIP" --ir-run "$SNO" < /dev/null 2>/dev/null)"
+check "ir-run"           "hello" "$(timeout 8 "$SCRIP" --interp "$SNO" < /dev/null 2>/dev/null)"
 
 # ── x86 emit mode ─────────────────────────────────────────────────────────────
 # SM/BB-based x64 emit not yet implemented — new emitter comes box-by-box from SM/BB path.
@@ -42,7 +42,7 @@ echo "SKIP x86 emit (not yet implemented)"
 # ── JVM emit mode ─────────────────────────────────────────────────────────────
 if have java && [ -f "$JASMIN" ]; then
     TMP=$(mktemp -d)
-    timeout 8 "$SCRIP" --jit-emit --jvm "$SNO" > "$TMP/prog.j" < /dev/null 2>/dev/null
+    timeout 8 "$SCRIP" --compile --jvm "$SNO" > "$TMP/prog.j" < /dev/null 2>/dev/null
     if grep -q "^\.class\|^\.source" "$TMP/prog.j" 2>/dev/null; then
         java -jar "$JASMIN" -d "$TMP" "$TMP/prog.j" 2>/dev/null &&
         got=$(java -cp "$TMP" Main 2>/dev/null) || got=""
@@ -58,7 +58,7 @@ fi
 # ── NET emit mode ─────────────────────────────────────────────────────────────
 if have ilasm && have mono; then
     TMP=$(mktemp -d)
-    timeout 8 "$SCRIP" --jit-emit --net "$SNO" > "$TMP/prog.il" < /dev/null 2>/dev/null &&
+    timeout 8 "$SCRIP" --compile --net "$SNO" > "$TMP/prog.il" < /dev/null 2>/dev/null &&
     ilasm "$TMP/prog.il" /output:"$TMP/prog.exe" 2>/dev/null &&
     got=$(mono "$TMP/prog.exe" 2>/dev/null) ||
     got=""

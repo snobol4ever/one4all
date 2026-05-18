@@ -84,7 +84,7 @@ READER_PID=$!
 MONITOR_BIN=1 \
 MONITOR_READY_PIPE="$T/ready" MONITOR_GO_PIPE="$T/go" \
 SCRIP_TRACE=1 SCRIP_FTRACE=1 \
-timeout 10 "$SCRIP" --ir-run "$T/p.sno" </dev/null > "$T/scrip.out" 2> "$T/scrip.err"
+timeout 10 "$SCRIP" --interp "$T/p.sno" </dev/null > "$T/scrip.out" 2> "$T/scrip.err"
 SCRIP_RC=$?
 
 wait $READER_PID 2>/dev/null

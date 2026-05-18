@@ -20,7 +20,7 @@ PASS=0; FAIL=0
 run_one() {
     local name="$1" raku="$2" exp="$3"
     local got want
-    got=$(timeout 8 "$SCRIP" --ir-run "$raku" < /dev/null 2>/dev/null) || true
+    got=$(timeout 8 "$SCRIP" --interp "$raku" < /dev/null 2>/dev/null) || true
     want=$(printf '%s' "$exp")
     if [ "$got" = "$want" ]; then
         echo "  PASS $name"; PASS=$((PASS+1))

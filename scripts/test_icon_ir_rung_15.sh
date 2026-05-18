@@ -9,7 +9,7 @@ pass=0; fail=0
 for icn in "$CORPUS"/rung15_*.icn; do
     name=$(basename "${icn%.icn}")
     exp=$(cat "${icn%.icn}.expected" 2>/dev/null)
-    got=$(timeout 8 "$SCRIP" --ir-run "$icn" < /dev/null 2>/dev/null)
+    got=$(timeout 8 "$SCRIP" --interp "$icn" < /dev/null 2>/dev/null)
     if [ "$got" = "$exp" ]; then echo "  PASS $name"; pass=$((pass+1))
     else echo "  FAIL $name"; echo "    exp: $exp"; echo "    got: $got"; fail=$((fail+1)); fi
 done

@@ -16,7 +16,7 @@ SCRIP="${HERE}/../scrip"
 PASS=0; FAIL=0
 
 run_test() {
-    local label="$1" input="$2" expected="$3" args="${4:---ir-run}"
+    local label="$1" input="$2" expected="$3" args="${4:---interp}"
     local actual
     actual=$(echo "$input" | timeout 8 "$SCRIP" $args /dev/stdin 2>/dev/null)
     if [ "$actual" = "$expected" ]; then
@@ -57,7 +57,7 @@ procedure main()
   write("icon-ok")
 end
 ICON
-actual=$(timeout 8 "$SCRIP" --ir-run "$TMPICN" 2>/dev/null)
+actual=$(timeout 8 "$SCRIP" --interp "$TMPICN" 2>/dev/null)
 if [ "$actual" = "icon-ok" ]; then
     echo "  PASS icn_main_runs"; PASS=$((PASS+1))
 else
@@ -70,7 +70,7 @@ rm -f "$TMPICN"
 if command -v strace >/dev/null 2>&1; then
     TMPSNO=$(mktemp /tmp/fi8_XXXXXX.sno)
     printf "        OUTPUT = 'lazy'\nEND\n" > "$TMPSNO"
-    strace_out=$(strace -e trace=none -e signal=none "$SCRIP" --ir-run "$TMPSNO" 2>&1)
+    strace_out=$(strace -e trace=none -e signal=none "$SCRIP" --interp "$TMPSNO" 2>&1)
     # We can't strace memset directly, so instead: use nm to verify
     # g_fi8_icn_init_count is exported and the code compiles cleanly.
     nm "$SCRIP" 2>/dev/null | grep -q "g_fi8_icn_init_count"

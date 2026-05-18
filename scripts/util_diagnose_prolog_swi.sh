@@ -15,12 +15,12 @@ WRAP=$(mktemp /tmp/pl_wrap_XXXXXX.pl)
 trap 'rm -f "$WRAP"' EXIT
 
 BASE="${1:-}"
-MODE="--ir-run"
+MODE="--interp"
 shift || true
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --mode) MODE="$2"; shift 2 ;;
-        --ir-run|--interp|--run) MODE="$1"; shift ;;
+        --interp|--interp|--run) MODE="$1"; shift ;;
         *) echo "Unknown arg: $1"; exit 1 ;;
     esac
 done

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # test_smoke_snobol4_wasm.sh — SN4-WASM-4 gate: full WASM pipeline on 7 smoke programs
-# scrip --sm-emit --target=wasm → .wat file → wat2wasm → .wasm → node sno_host.mjs → verify output
+# scrip --compile --target=wasm → .wat file → wat2wasm → .wasm → node sno_host.mjs → verify output
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIP="${SCRIP:-$HERE/../scrip}"
@@ -37,7 +37,7 @@ run_smoke() {
     fi
     # Emit WAT
     local wat_file="$tmp/$name.wat"
-    if ! timeout 8 "$SCRIP" --sm-emit --target=wasm "$prog" > "$wat_file" 2>/dev/null; then
+    if ! timeout 8 "$SCRIP" --compile --target=wasm "$prog" > "$wat_file" 2>/dev/null; then
         echo "FAIL $name (emit)"
         FAIL=$((FAIL+1))
         rm -rf "$tmp"

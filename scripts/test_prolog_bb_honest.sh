@@ -4,9 +4,9 @@
 # A PASS here means "honest mode 3": SM dispatch did not fall back to the AST walker.
 # A FAIL/ABORT here means the program still cheats (coro_eval reached from SM dispatch).
 #
-# PB-0 (GOAL-PROLOG-BB-COMPLETE): initial script; baseline N=17 (--ir-run oracle, 2026-05-12).
+# PB-0 (GOAL-PROLOG-BB-COMPLETE): initial script; baseline N=17 (--interp oracle, 2026-05-12).
 # Note: PLAN.md carve estimate of 31 was measured against .expected files (includes programs
-# that --ir-run itself cannot run). This script uses --ir-run as oracle (stricter, correct).
+# that --interp itself cannot run). This script uses --interp as oracle (stricter, correct).
 # Usage: bash scripts/test_prolog_bb_honest.sh [--corpus PATH] [--scrip PATH]
 
 set -u
@@ -23,11 +23,11 @@ for f in "$CORPUS"/rung*.pl; do
     name=$(basename "$f" .pl)
     base="${f%.pl}"
 
-    # Use --ir-run as the oracle for expected output
-    ir_out=$(timeout 8 "$SCRIP" --ir-run "$f" < /dev/null 2>&1)
+    # Use --interp as the oracle for expected output
+    ir_out=$(timeout 8 "$SCRIP" --interp "$f" < /dev/null 2>&1)
     ir_rc=$?
 
-    # Only test programs that pass --ir-run
+    # Only test programs that pass --interp
     [ $ir_rc -ne 0 ] && continue
 
     sm_out=$(timeout 8 bash -c "SCRIP_NO_AST_WALK=1 '$SCRIP' --interp '$f' < /dev/null 2>&1")

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # scripts/test_smoke_snobol4_net.sh — SN4-NET-4 gate: full .NET pipeline on 7 smoke programs
-# scrip --sm-emit --target=net -> .il -> ilasm + SnoRt.il -> .exe -> mono -> verify output
+# scrip --compile --target=net -> .il -> ilasm + SnoRt.il -> .exe -> mono -> verify output
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIP="${SCRIP:-$HERE/../scrip}"
@@ -17,7 +17,7 @@ run_smoke() {
     local oracle_out
     oracle_out=$(timeout 8 "$ORACLE" -b "$prog" < /dev/null 2>/dev/null || true)
     local il_file="$tmp/$name.il"
-    if ! timeout 8 "$SCRIP" --sm-emit --target=net "$prog" < /dev/null > "$il_file" 2>/dev/null; then
+    if ! timeout 8 "$SCRIP" --compile --target=net "$prog" < /dev/null > "$il_file" 2>/dev/null; then
         echo "FAIL $name (emit)"
         FAIL=$((FAIL+1))
         rm -rf "$tmp"

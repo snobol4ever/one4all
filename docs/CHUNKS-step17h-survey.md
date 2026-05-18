@@ -23,7 +23,7 @@ The dispatcher arm at `sm_lower.c:1303` matches nine Icon generator kinds
 | smoke snocone                           | 5      | 0    |
 | smoke rebus                             | 4      | 0    |
 | `test_smoke_unified_broker.sh`          | 49     | 0    |
-| `test_icon_ir_all_rungs.sh` (full corpus) | 263  | 0    |
+| `test_icon_all_rungs.sh` (full corpus) | 263  | 0    |
 | `test_interp_broad_corpus_and_beauty.sh` | full   | 0    |
 | `test_regression_full_corpus.sh`        | full   | 0    |
 | Hand-crafted `every`/`suspend`/section program | 1 | 0    |

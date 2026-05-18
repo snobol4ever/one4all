@@ -44,8 +44,8 @@ run_gate "unified_broker" "bash scripts/test_smoke_unified_broker.sh"
 
 # Optional: full Icon corpus — may be slow.  Drive it manually with the
 # corpus runner if it exists.
-if [ -f "$ROOT/scripts/test_icon_ir_all_rungs.sh" ]; then
-    run_gate "icon_ir_all_rungs" "bash scripts/test_icon_ir_all_rungs.sh"
+if [ -f "$ROOT/scripts/test_icon_all_rungs.sh" ]; then
+    run_gate "icon_ir_all_rungs" "bash scripts/test_icon_all_rungs.sh"
 fi
 
 echo

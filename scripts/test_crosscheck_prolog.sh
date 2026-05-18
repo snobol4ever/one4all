@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # test_crosscheck_prolog.sh — 3-mode crosscheck for PROLOG (GOAL-LANG-PROLOG)
 #
-# Runs the prolog test corpus through --ir-run, --interp, --run.
+# Runs the prolog test corpus through --interp, --interp, --run.
 # Run on every major push. Mode-consistency check, not regression.
 # If .ref present alongside test file: diffs vs oracle too.
 # Exits 0 only if all three modes agree on every test.
@@ -17,7 +17,7 @@ xcheck() {
     local label="$1" file="$2" ref="${3:-}"
     if [ ! -f "$file" ]; then echo "  SKIP $label (no file)"; SKIP=$((SKIP+1)); return; fi
     local ir sm jit
-    ir=$(timeout  $TIMEOUT "$SCRIP" --ir-run  "$file" </dev/null 2>/dev/null)
+    ir=$(timeout  $TIMEOUT "$SCRIP" --interp  "$file" </dev/null 2>/dev/null)
     sm=$(timeout  $TIMEOUT "$SCRIP" --interp  "$file" </dev/null 2>/dev/null)
     jit=$(timeout $TIMEOUT "$SCRIP" --run "$file" </dev/null 2>/dev/null)
     # Primary purpose of this gate: 3-mode dispatch consistency.
@@ -75,8 +75,8 @@ RUNGS=/home/claude/corpus/programs/prolog
 if [ -d "$RUNGS" ]; then
     for f in "$RUNGS"/rung*.pl; do
         [ -f "$f" ] || continue
-        # Skip programs that --ir-run can't complete (timeout, non-zero exit)
-        ir_rc=$(timeout 4 "$SCRIP" --ir-run "$f" </dev/null >/dev/null 2>&1; echo $?)
+        # Skip programs that --interp can't complete (timeout, non-zero exit)
+        ir_rc=$(timeout 4 "$SCRIP" --interp "$f" </dev/null >/dev/null 2>&1; echo $?)
         if [ "$ir_rc" != "0" ]; then SKIP=$((SKIP+1)); continue; fi
         ref="${f%.pl}.ref"
         xcheck "$(basename $f .pl)" "$f" "$ref"

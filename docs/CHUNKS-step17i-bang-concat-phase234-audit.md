@@ -368,7 +368,7 @@ the Phase-1-landed baseline:
 | `test_isolation_ir_sm.sh` | PASS |
 | `test_smoke_unified_broker.sh` | 49/0 |
 | `test_smoke_scrip_all_modes.sh` | 2/0 |
-| `test_icon_ir_all_rungs.sh` | 177/56/30 (TOTAL=263) |
+| `test_icon_all_rungs.sh` | 177/56/30 (TOTAL=263) |
 
 Audit sweep performed at `scrip` HEAD = `a8a064a0`.
 

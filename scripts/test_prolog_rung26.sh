@@ -7,7 +7,7 @@ PASS=0; FAIL=0
 echo "=== rung26: copy_term / atomic_list_concat / string_to_atom ==="
 for f in "$CORPUS"/*.pl; do
     ref="${f%.pl}.ref"; [ -f "$ref" ] || continue
-    actual=$(timeout 8 "$SCRIP" --ir-run "$f" < /dev/null 2>/dev/null)
+    actual=$(timeout 8 "$SCRIP" --interp "$f" < /dev/null 2>/dev/null)
     expected=$(cat "$ref")
     if [ "$actual" = "$expected" ]; then
         echo "  PASS $(basename "$f")"; PASS=$((PASS+1))

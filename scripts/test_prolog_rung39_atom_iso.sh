@@ -8,7 +8,7 @@ echo "=== rung39_atom_iso: ISO §7.8 atom builtins (PR-16 driver) ==="
 for f in "$CORPUS"/*.pl; do
     ref="${f%.pl}.ref"
     [ -f "$ref" ] || continue
-    actual=$(timeout 8 "$SCRIP" --ir-run "$f" < /dev/null 2>/dev/null)
+    actual=$(timeout 8 "$SCRIP" --interp "$f" < /dev/null 2>/dev/null)
     expected=$(cat "$ref")
     if [ "$actual" = "$expected" ]; then
         echo "  PASS $(basename $f)"; PASS=$((PASS+1))

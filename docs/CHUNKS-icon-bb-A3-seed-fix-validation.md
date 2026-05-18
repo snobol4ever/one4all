@@ -50,7 +50,7 @@ bash scripts/test_smoke_raku.sh              # PASS=5 FAIL=0
 bash scripts/test_smoke_rebus.sh             # PASS=4 FAIL=0
 bash scripts/test_smoke_unified_broker.sh    # PASS=49 FAIL=0
 bash scripts/test_isolation_ir_sm.sh         # PASS
-bash scripts/test_icon_ir_all_rungs.sh       # PASS=177 FAIL=56 XFAIL=30
+bash scripts/test_icon_all_rungs.sh       # PASS=177 FAIL=56 XFAIL=30
 bash scripts/test_icon_sm_no_ast_walk.sh     # PASS=117 FAIL=120 ABORT=2
                                              # (pre-rung: PASS=116 FAIL=121 ABORT=2)
 ```

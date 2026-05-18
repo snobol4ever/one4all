@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # test_raku_ir_full_suite.sh — Full Raku rung ladder sweep (RK-27)
 #
-# Runs all RK-1 through RK-26 tests under --ir-run, --interp, and --run.
+# Runs all RK-1 through RK-26 tests under --interp, --interp, and --run.
 # Reports per-rung PASS/FAIL for each mode. Final gate: FAIL=0 in all modes.
 #
 # Gate: PASS=22 FAIL=0 per mode, all three modes.
@@ -47,10 +47,10 @@ run_mode() {
     fi
 }
 
-echo "=== Raku full suite — --ir-run ==="
+echo "=== Raku full suite — --interp ==="
 for raku in "$TESTDIR"/*.raku; do
     [ -f "$raku" ] || continue
-    if run_mode --ir-run "$raku"; then
+    if run_mode --interp "$raku"; then
         IR_PASS=$((IR_PASS+1))
     else
         IR_FAIL=$((IR_FAIL+1))

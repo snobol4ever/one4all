@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# test_prolog_swi_suite.sh — run SWI plunit conformance suite under --ir-run
+# test_prolog_swi_suite.sh — run SWI plunit conformance suite under --interp
 # Iterates corpus/programs/prolog/swi_tests/test_*.pl, loads each with
 # plunit.pl shim + a main wrapper, compares PASS/FAIL per suite against .ref.
 #
@@ -8,7 +8,7 @@
 # Options:
 #   --verbose       show raw scrip output for failing files
 #   --file NAME     run only NAME.pl  (e.g. --file test_bips)
-#   --mode MODE     --ir-run | --interp | --run  (default: --ir-run)
+#   --mode MODE     --interp | --interp | --run  (default: --interp)
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIP="${HERE}/../scrip"
@@ -21,13 +21,13 @@ WRAP=$(mktemp /tmp/pl_wrap_XXXXXX.pl)
 ACTUAL_TMP=$(mktemp /tmp/pl_actual_XXXXXX.txt)
 trap 'rm -f "$WRAP" "$ACTUAL_TMP"' EXIT
 
-VERBOSE=0; ONLY_FILE=""; MODE="--ir-run"
+VERBOSE=0; ONLY_FILE=""; MODE="--interp"
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --verbose)  VERBOSE=1; shift ;;
         --file)     ONLY_FILE="$2"; shift 2 ;;
         --mode)     MODE="$2"; shift 2 ;;
-        --ir-run|--interp|--run) MODE="$1"; shift ;;
+        --interp|--interp|--run) MODE="$1"; shift ;;
         *) echo "Unknown arg: $1"; exit 1 ;;
     esac
 done

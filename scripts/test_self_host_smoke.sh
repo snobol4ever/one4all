@@ -2,7 +2,7 @@
 # test_self_host_smoke.sh — SI-5 cross-check: self-hosted pipeline output must
 # byte-match native scrip output on the same logical program.
 #
-# For each (hosted, native) pair below, run both via `scrip --ir-run` and diff
+# For each (hosted, native) pair below, run both via `scrip --interp` and diff
 # stdout.  The hosted invocation chains tree.sc + lower.sc + lower_driver.sc +
 # sm_interp.sc + the *_interp.sc test driver; the native invocation runs the
 # corresponding *_native.sc source directly.  Both must produce identical bytes.
@@ -27,14 +27,14 @@ for case in smoke_interp sm_interp_test si_06_exp si_07_pat_lit si_08_prim_pats 
     native_sc="$SCRIP_DIR/tests/${case}_native.sc"
     [ -f "$hosted_sc" ] || { echo "SKIP $case — hosted source missing"; continue; }
     [ -f "$native_sc" ] || { echo "SKIP $case — native source missing"; continue; }
-    hosted_out="$(timeout 8 "$SCRIP" --ir-run \
+    hosted_out="$(timeout 8 "$SCRIP" --interp \
         "$SCRIP_DIR/tree.sc" \
         "$SCRIP_DIR/lower.sc" \
         "$SCRIP_DIR/lower_driver.sc" \
         "$SCRIP_DIR/sm_interp.sc" \
         "$hosted_sc" \
         < /dev/null)"
-    native_out="$(timeout 8 "$SCRIP" --ir-run "$native_sc" < /dev/null)"
+    native_out="$(timeout 8 "$SCRIP" --interp "$native_sc" < /dev/null)"
     if [ "$hosted_out" = "$native_out" ] ; then
         echo "PASS $case  (hosted == native, $(echo "$hosted_out" | wc -l) lines)"
         pass=$((pass + 1))

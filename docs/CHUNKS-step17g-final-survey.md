@@ -14,7 +14,7 @@ is the **live, hot, only consumer** of Icon and Raku user-proc dispatch
 in `--ir-run` mode.  It is not dead weight.  Deleting it breaks every
 Icon and Raku program that runs under `--ir-run` — the same corpus that
 the CHUNKS standard gate set uses to validate every rung
-(`test_icon_ir_all_rungs.sh`, baseline 186/47/30).
+(`test_icon_all_rungs.sh`, baseline 186/47/30).
 
 This contradicts the recommendation in `CHUNKS-step17h-survey.md`:
 
@@ -83,7 +83,7 @@ to `polyglot_execute(prog)` (or `execute_program(prog)` for SNO-only).
 of `-1`.  Therefore `proc_table_call`'s `entry_pc >= 0` branch is
 never taken in `--ir-run` mode.
 
-The Icon corpus gate (`test_icon_ir_all_rungs.sh`) runs every
+The Icon corpus gate (`test_icon_all_rungs.sh`) runs every
 program under `--ir-run`.  Its 186 PASS programs all reach the
 legacy `coro_call` body.
 

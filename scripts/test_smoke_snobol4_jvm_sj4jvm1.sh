@@ -11,7 +11,7 @@ check_jasmin() {
     local name="$1" sno="$2"
     local tmp=$(mktemp -d)
     echo "$sno" > "$tmp/t.sno"
-    timeout 8 "$SCRIP" --sm-emit --target=jvm "$tmp/t.sno" > "$tmp/t.j" 2>/dev/null < /dev/null
+    timeout 8 "$SCRIP" --compile --target=jvm "$tmp/t.sno" > "$tmp/t.j" 2>/dev/null < /dev/null
     if timeout 10 java -jar "$JASMIN" "$tmp/t.j" -d "$tmp/" > "$tmp/jasmin.out" 2>&1; then
         echo "PASS $name"
         PASS=$((PASS+1))

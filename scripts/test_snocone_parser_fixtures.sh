@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # test_snocone_parser_fixtures.sh — SI-7 gate
 #
-# Runs `scrip --dump-ir` on every .sc in corpus/programs/snocone/parser-fixtures/
+# Runs `scrip --dump-ast` on every .sc in corpus/programs/snocone/parser-fixtures/
 # and diffs the output against the corresponding .ref oracle.
 #
 # Gate: PASS=67 FAIL=0  (all fixtures, byte-identical AST dump)
@@ -31,7 +31,7 @@ for sc in "$FIXTURES"/*.sc; do
         SKIP=$((SKIP+1))
         continue
     fi
-    actual=$(timeout 8 "$SCRIP" --dump-ir "$sc" 2>/dev/null)
+    actual=$(timeout 8 "$SCRIP" --dump-ast "$sc" 2>/dev/null)
     expected=$(cat "$ref")
     if [ "$actual" = "$expected" ]; then
         echo "  PASS $name"

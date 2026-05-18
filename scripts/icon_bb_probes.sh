@@ -53,7 +53,7 @@ bb_probe_complete() {
 
     # (a) anchor output equality
     local ir_out sm_out
-    ir_out=$(timeout 8 "$SCRIP" --ir-run "${CORPUS}/${anchor}.icn" < /dev/null 2>&1)
+    ir_out=$(timeout 8 "$SCRIP" --interp "${CORPUS}/${anchor}.icn" < /dev/null 2>&1)
     sm_out=$(timeout 8 "$SCRIP" --interp "${CORPUS}/${anchor}.icn" < /dev/null 2>&1)
     if [ "$ir_out" != "$sm_out" ]; then
         echo "$rung FAIL (a): anchor $anchor sm-run differs from ir-run"
@@ -101,7 +101,7 @@ bb_probe_complete() {
         n=$(basename "$f" .icn)
         h_md5=$(timeout 8 bash -c "SCRIP_NO_AST_WALK=1 '$SCRIP' --interp '$f' < /dev/null 2>&1" \
                 | md5sum | cut -d' ' -f1)
-        ir_md5=$(timeout 8 "$SCRIP" --ir-run "$f" < /dev/null 2>&1 | md5sum | cut -d' ' -f1)
+        ir_md5=$(timeout 8 "$SCRIP" --interp "$f" < /dev/null 2>&1 | md5sum | cut -d' ' -f1)
         base_h_md5=$(grep "^$n " baselines/icon-bb/sm-run-honest.md5 2>/dev/null | awk '{print $3}')
         [ "$h_md5" = "$ir_md5" ] && [ "${base_h_md5:-}" != "$ir_md5" ] && \
             flipped=$((flipped + 1))
@@ -120,7 +120,7 @@ bb_probe_complete() {
 bb_probe_detect_anchor() {
     local rung="$1" anchor="$2"
     local ir h_out h_rc
-    ir=$(timeout 8 "$SCRIP" --ir-run "${CORPUS}/${anchor}.icn" < /dev/null 2>&1)
+    ir=$(timeout 8 "$SCRIP" --interp "${CORPUS}/${anchor}.icn" < /dev/null 2>&1)
     h_out=$(timeout 8 bash -c "SCRIP_NO_AST_WALK=1 '$SCRIP' --interp '${CORPUS}/${anchor}.icn' < /dev/null 2>&1")
     h_rc=$?
     if [ $h_rc -eq 134 ] || echo "$h_out" | grep -q "FATAL:" || [ "$ir" != "$h_out" ]; then
@@ -136,7 +136,7 @@ bb_probe_complete_anchor() {
     local rung="$1" anchor="$2"
     local fail=0
     local ir h_out h_rc
-    ir=$(timeout 8 "$SCRIP" --ir-run "${CORPUS}/${anchor}.icn" < /dev/null 2>&1)
+    ir=$(timeout 8 "$SCRIP" --interp "${CORPUS}/${anchor}.icn" < /dev/null 2>&1)
     h_out=$(timeout 8 bash -c "SCRIP_NO_AST_WALK=1 '$SCRIP' --interp '${CORPUS}/${anchor}.icn' < /dev/null 2>&1")
     h_rc=$?
     if [ $h_rc -eq 134 ] || echo "$h_out" | grep -q "FATAL:" || [ "$ir" != "$h_out" ]; then
@@ -157,7 +157,7 @@ bb_probe_scoreboard() {
         n=$(basename "$f" .icn)
         h_md5=$(timeout 8 bash -c "SCRIP_NO_AST_WALK=1 '$SCRIP' --interp '$f' < /dev/null 2>&1" \
                 | md5sum | cut -d' ' -f1)
-        ir_md5=$(timeout 8 "$SCRIP" --ir-run "$f" < /dev/null 2>&1 | md5sum | cut -d' ' -f1)
+        ir_md5=$(timeout 8 "$SCRIP" --interp "$f" < /dev/null 2>&1 | md5sum | cut -d' ' -f1)
         base_h_md5=$(grep "^$n " baselines/icon-bb/sm-run-honest.md5 2>/dev/null | awk '{print $3}')
         if [ "$h_md5" = "$ir_md5" ] && [ "${base_h_md5:-}" != "$ir_md5" ]; then
             flipped=$((flipped + 1))
