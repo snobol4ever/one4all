@@ -55,17 +55,6 @@ static void loop_push(const char *cont, const char *end) {
 static void loop_pop(void) { if (g_loop_sp > 0) g_loop_sp--; }
 static int           g_hoist_entry = -1;
 static int           g_hoist_slot  = -1;
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int lower_is_suspendable_icn(const tree_t *e)
-{
-    if (!e) return 0;
-    if (e->t == TT_SEQ) {
-        for (int i = 0; i < e->n; i++)
-            if (lower_is_suspendable_icn(e->c[i])) return 1;
-        return 0;
-    }
-    return is_suspendable((tree_t *)e);
-}
 extern int g_lang;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_push_expr(const tree_t *t)
@@ -1104,27 +1093,6 @@ static void lower_to_by(const tree_t *t) {
     sm_emit_i(g_p, SM_BB_EVAL, (int64_t)every_table_register((tree_t *)t));
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static const tree_t *find_first_alternate(const tree_t *t)
-{
-    if (!t) return NULL;
-    if (t->t == TT_ALTERNATE) return t;
-    if (t->t == TT_ASSIGN && t->n >= 2)
-        return find_first_alternate(t->c[1]);
-    if (t->t == TT_SEQ) {
-        for (int i = 0; i < t->n; i++) {
-            const tree_t *found = find_first_alternate(t->c[i]);
-            if (found) return found;
-        }
-    }
-    for (int i = 0; i < t->n; i++) {
-        if (t->c[i] && t->c[i]->t == TT_ASSIGN) {
-            const tree_t *found = find_first_alternate(t->c[i]);
-            if (found) return found;
-        }
-    }
-    return NULL;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_limit_every(const tree_t *limit_node, const tree_t *body)
 {
     (void)body;
@@ -1174,11 +1142,6 @@ static void emit_prolog_call(const char *sval)
 {
     const char *sl = strrchr(sval, '/');
     sm_emit_si(g_p, SM_BB_ONCE_PROC, sval, (int64_t)(sl ? atoi(sl + 1) : 0));
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void emit_prolog_call_arity0(const char *sval)
-{
-    sm_emit_si(g_p, SM_BB_ONCE_PROC, sval, 0);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_choice(const tree_t *t)

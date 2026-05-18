@@ -60,12 +60,6 @@ void bb_free(bb_buf_t buf, size_t size) {
     if (mprotect(buf, alloc, PROT_READ | PROT_WRITE) != 0) { perror("bb_free: mprotect RX→RW"); abort(); }
 }
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void bb_pool_destroy(void) {
-    if (!pool_base) return;
-    munmap(pool_base, BB_POOL_SIZE);
-    pool_base = NULL; pool_top = NULL; pool_limit = NULL;
-}
-/*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void bb_pool_reset(void) {
     uint8_t * lo;
     uint8_t * hi;
@@ -79,5 +73,3 @@ void bb_pool_reset(void) {
     }
     pool_top = pool_base;
 }
-/*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-size_t bb_pool_used(void) { return pool_base ? (size_t)(pool_top - pool_base) : 0; }

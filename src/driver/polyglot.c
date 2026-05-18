@@ -145,24 +145,6 @@ void polyglot_init(const tree_t *prog, uint32_t lang_mask)
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int pl_directive_max_var_slot(tree_t *root)
-{
-    if (!root) return -1;
-    int max_slot = -1;
-    enum { CAP = 512 };
-    tree_t *stk[CAP];
-    int top = 0;
-    stk[top++] = root;
-    while (top > 0) {
-        tree_t *e = stk[--top];
-        if (!e) continue;
-        if (e->t == TT_VAR && (int)e->v.ival > max_slot) max_slot = (int)e->v.ival;
-        for (int i = 0; i < e->n && top < CAP; i++)
-            if (e->c[i]) stk[top++] = e->c[i];
-    }
-    return max_slot;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern tree_t *sno_parse_string_ast(const char *src, CODE_t **code_out);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 tree_t *parse_scrip_polyglot(const char *src, const char *filename)

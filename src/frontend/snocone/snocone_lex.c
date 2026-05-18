@@ -54,11 +54,6 @@ int sc_kind_is_value(int kind) {
     if (!sc_value_table_built) sc_value_table_build();
     return (kind >= 0 && kind < 512) ? sc_value_table[kind] : 0;
 }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sc_kind_has_payload(int kind) {
-    if (!sc_value_table_built) sc_value_table_build();
-    return (kind >= 0 && kind < 512) ? sc_payload_table[kind] : 0;
-}
 typedef struct { const char *word; int kind; } KwEntry;
 static const KwEntry KW_TABLE[] = {
     { "if",       T_IF       },
@@ -506,11 +501,4 @@ static void sc_name_table_build(void) {
     sc_name_table[T_STRUCT]        = "T_STRUCT";
     sc_name_table[T_UNKNOWN]          = "T_UNKNOWN";
     sc_name_table_built               = 1;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-const char *sc2_kind_name(int kind) {
-    if (!sc_name_table_built) sc_name_table_build();
-    if (kind < 0 || kind >= 512) return "T_???";
-    const char *s = sc_name_table[kind];
-    return s ? s : "T_???";
 }
