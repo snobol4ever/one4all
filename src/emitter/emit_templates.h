@@ -82,13 +82,7 @@ void emit_bb_xeps (bb_label_t * lbl_succ, bb_label_t * lbl_fail, bb_label_t * lb
 void emit_bb_xfail(bb_label_t * lbl_succ, bb_label_t * lbl_fail, bb_label_t * lbl_β);
 void emit_bb_xfarb(bb_label_t * lbl_succ, bb_label_t * lbl_fail, bb_label_t * lbl_β);
 void emit_bb_xstar(bb_label_t * lbl_succ, bb_label_t * lbl_fail, bb_label_t * lbl_β);
-void emit_bb_xabrt(bb_label_t * lbl_succ, bb_label_t * lbl_fail, bb_label_t * lbl_β);
-void emit_bb_xsucf(bb_label_t * lbl_succ, bb_label_t * lbl_fail, bb_label_t * lbl_β);
-void emit_bb_xbal (bb_label_t * lbl_succ, bb_label_t * lbl_fail, bb_label_t * lbl_β);
 void emit_bb_xfnce(bb_label_t * lbl_succ, bb_label_t * lbl_fail, bb_label_t * lbl_β);
-void emit_bb_xvar (bb_label_t * lbl_succ, bb_label_t * lbl_fail, bb_label_t * lbl_β);
-void emit_bb_xcat (bb_label_t * lbl_succ, bb_label_t * lbl_fail, bb_label_t * lbl_β);
-void emit_bb_xor  (bb_label_t * lbl_succ, bb_label_t * lbl_fail, bb_label_t * lbl_β);
 /*---- BB box templates (charset / int-cursor) -----------------------------*/
 void emit_bb_charset(bb_box_fn c_fn, const char * c_fn_name, const char * kind_name, const char * chars,
                      bb_label_t * lbl_succ, bb_label_t * lbl_fail, bb_label_t * lbl_β);
@@ -113,14 +107,4 @@ void emit_bb_xcallcap(bb_box_fn child_fn, const char * fnc_name,
                       bb_label_t * lbl_succ, bb_label_t * lbl_fail, bb_label_t * lbl_β);
 void emit_bb_xarbn   (bb_box_fn child_fn,
                       bb_label_t * lbl_succ, bb_label_t * lbl_fail, bb_label_t * lbl_β);
-/*---- BB box templates (Icon generators) ----------------------------------*/
-void emit_bb_icon_to     (bb_label_t * lbl_succ, bb_label_t * lbl_fail, bb_label_t * lbl_β);
-void emit_bb_icon_to_by  (bb_label_t * lbl_succ, bb_label_t * lbl_fail, bb_label_t * lbl_β);
-void emit_bb_icon_iterate(bb_label_t * lbl_succ, bb_label_t * lbl_fail, bb_label_t * lbl_β);
-void emit_bb_icon_alt    (bb_label_t * lbl_succ, bb_label_t * lbl_fail, bb_label_t * lbl_β);
-void emit_bb_icon_every  (bb_label_t * lbl_succ, bb_label_t * lbl_fail, bb_label_t * lbl_β);
-void emit_bb_icon_limit  (bb_label_t * lbl_succ, bb_label_t * lbl_fail, bb_label_t * lbl_β);
-void emit_bb_icon_bang   (bb_label_t * lbl_succ, bb_label_t * lbl_fail, bb_label_t * lbl_β);
-void emit_bb_icon_lconcat(bb_label_t * lbl_succ, bb_label_t * lbl_fail, bb_label_t * lbl_β);
-void emit_bb_icon_seq    (bb_label_t * lbl_succ, bb_label_t * lbl_fail, bb_label_t * lbl_β);
 #endif

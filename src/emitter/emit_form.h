@@ -36,16 +36,12 @@ int    emitter_end          (void);
 /*--- inline static insn wrappers (TEXT or binary via emit_form_*) --------*/
 static inline void emit_mov_r10_imm64    (uint64_t v)   { emit_form_reg64_imm64(0x49,0xBA,v,"r10");                           }
 static inline void emit_mov_rax_imm64    (uint64_t v)   { emit_form_reg64_imm64(0x48,0xB8,v,"rax");                           }
-static inline void emit_mov_rsi_imm64    (uint64_t v)   { emit_form_reg64_imm64(0x48,0xBE,v,"rsi");                           }
-static inline void emit_mov_rdx_imm64    (uint64_t v)   { emit_form_reg64_imm64(0x48,0xBA,v,"rdx");                           }
 static inline void emit_mov_rcx_imm64    (uint64_t v)   { emit_form_reg64_imm64(0x48,0xB9,v,"rcx");                           }
 static inline void emit_mov_eax_imm32    (uint32_t v)   { emit_form_reg32_imm32(0xB8,v,"eax");                                }
-static inline void emit_add_eax_imm32    (uint32_t v)   { emit_form_alu_eax_imm32(0x05,v,"add");                              }
 static inline void emit_sub_eax_imm32    (uint32_t v)   { emit_form_alu_eax_imm32(0x2D,v,"sub");                              }
 static inline void emit_cmp_eax_imm32    (uint32_t v)   { emit_form_alu_eax_imm32(0x3D,v,"cmp");                              }
 static inline void emit_cmp_esi_imm8     (uint8_t  v)   { emit_form_alu_esi_imm8(0xFE,v,"cmp");                               }
 static inline void emit_mov_ecx_eax      (void)         { emit_form_reg_reg2(0x89,0xC1,      "mov ecx, eax"                ); }
-static inline void emit_mov_rdi_rax      (void)         { emit_form_reg_reg3(0x48,0x89,0xC7, "mov rdi, rax"                ); }
 static inline void emit_mov_rdx_rax      (void)         { emit_form_reg_reg3(0x48,0x89,0xC2, "mov rdx, rax"                ); }
 static inline void emit_cmp_eax_ecx      (void)         { emit_form_reg_reg2(0x39,0xC8,      "cmp eax, ecx"                ); }
 static inline void emit_xor_edx_edx      (void)         { emit_form_reg_reg2(0x31,0xD2,      "xor edx, edx"                ); }
