@@ -65,7 +65,6 @@ extern int         Ω;
 extern int         Δ;
 #include "../runtime/interp/icn_runtime.h"
 #include "../runtime/interp/pl_runtime.h"
-#include "interp.h"
 #include "driver/polyglot.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int main(int argc, char **argv)
@@ -449,7 +448,10 @@ int main(int argc, char **argv)
         sm_run_with_recovery(sm, sm_interp_run);
         sm_prog_free(sm);
     } else {
-        execute_program(ast_prog);
+        SM_Program *sm = sm_preamble(ast_prog);
+        if (!sm) return 1;
+        sm_run_with_recovery(sm, sm_interp_run);
+        sm_prog_free(sm);
     }
     if (opt_bench) {
         clock_gettime(CLOCK_MONOTONIC, &_t3);

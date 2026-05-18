@@ -108,16 +108,16 @@ $(SRC)/emitter/emit_jvm.c \
     $(SRC)/lower/ir_exec.c \
     $(SRC)/driver/interp_globals.c \
     $(SRC)/driver/interp_label.c \
-    $(SRC)/driver/interp_call.c \
-    $(SRC)/driver/interp_eval.c \
-    $(SRC)/driver/interp_ref.c \
     $(SRC)/driver/interp_hooks.c \
     $(SRC)/driver/interp_data.c \
-    $(SRC)/driver/interp_exec.c \
+    $(SRC)/driver/interp_eval.c \
+    $(SRC)/driver/interp_call.c \
+    $(SRC)/driver/interp_ref.c \
+    $(SRC)/driver/interp_ast_stubs.c \
     $(SRC)/driver/scrip_sm.c \
+    $(SRC)/driver/stmt_ast.c \
     $(SRC)/driver/sync_monitor.c \
     $(SRC)/driver/polyglot.c \
-    $(SRC)/driver/stmt_ast.c \
     $(SRC)/ast/ast_print.c \
     $(SRC)/frontend/snobol4/snobol4.tab.c \
     $(SRC)/frontend/snobol4/snobol4.lex.c \
@@ -234,6 +234,7 @@ scrip:
 	$(CC) $(CRT)   -c $(SRC)/runtime/snobol4/name_t.c                         -o $(OBJ)/name_t.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/snobol4/stmt_exec.c                  -o $(OBJ)/stmt_exec.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/snobol4/eval_code.c                  -o $(OBJ)/eval_code.o
+	$(CC) $(CRT)   -c $(SRC)/runtime/snobol4/eval_pat.c                   -o $(OBJ)/eval_pat.o
 	$(CC) $(CRT)   -c $(SRC)/processor/bb_pool.c                    -o $(OBJ)/bb_pool.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/emit_core.c               -o $(OBJ)/emit_core.o
 	$(CC) $(CRT) -c $(SRC)/processor/bb_boxes.c -o $(OBJ)/bb_boxes.o
@@ -295,17 +296,16 @@ scrip:
 	$(CC) $(CRT)   -c $(SRC)/runtime/rt/rt.c   -o $(OBJ)/rt.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_globals.c -o $(OBJ)/interp_globals.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_label.c   -o $(OBJ)/interp_label.o
-	$(CC) $(CRT)   -c $(SRC)/driver/interp_call.c    -o $(OBJ)/interp_call.o
-	$(CC) $(CRT)   -c $(SRC)/driver/interp_eval.c    -o $(OBJ)/interp_eval.o
-	$(CC) $(CRT)   -c $(SRC)/driver/interp_ref.c     -o $(OBJ)/interp_ref.o
-	$(CC) $(CRT)   -c $(SRC)/runtime/snobol4/eval_pat.c  -o $(OBJ)/eval_pat.o
-	$(CC) $(CRT)   -c $(SRC)/driver/interp_exec.c    -o $(OBJ)/interp_exec.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_hooks.c   -o $(OBJ)/interp_hooks.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_data.c    -o $(OBJ)/interp_data.o
+	$(CC) $(CRT)   -c $(SRC)/driver/interp_eval.c    -o $(OBJ)/interp_eval.o
+	$(CC) $(CRT)   -c $(SRC)/driver/interp_call.c    -o $(OBJ)/interp_call.o
+	$(CC) $(CRT)   -c $(SRC)/driver/interp_ref.c     -o $(OBJ)/interp_ref.o
+	$(CC) $(CRT)   -c $(SRC)/driver/interp_ast_stubs.c -o $(OBJ)/interp_ast_stubs.o
 	$(CC) $(CRT)   -c $(SRC)/driver/scrip_sm.c       -o $(OBJ)/scrip_sm.o
+	$(CC) $(CRT)   -c $(SRC)/driver/stmt_ast.c       -o $(OBJ)/stmt_ast.o
 	$(CC) $(CRT)   -c $(SRC)/driver/sync_monitor.c -o $(OBJ)/sync_monitor.o
 	$(CC) $(CRT)   -c $(SRC)/driver/polyglot.c -o $(OBJ)/polyglot.o
-	$(CC) $(CRT)   -c $(SRC)/driver/stmt_ast.c -o $(OBJ)/stmt_ast.o
 	$(CC) $(CRT)   -c $(SRC)/driver/scrip.c  -o $(OBJ)/scrip_driver.o
 	$(CC) -m64 -no-pie $(OBJ)/*.o $(LIBS) -o scrip
 	@echo "Built: scrip"

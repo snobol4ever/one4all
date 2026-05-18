@@ -1138,7 +1138,8 @@ __attribute__((weak)) const char *sm_opcode_name(sm_opcode_t op)
     (void)op;
     return "?";
 }
-#include "../../driver/interp_private.h"
+int _is_pat_fnc_name(const char *s);
+int _expr_is_pat(tree_t *e);
 __attribute__((weak)) int _is_pat_fnc_name(const char *s)  { (void)s; return 0; }
 __attribute__((weak)) int _expr_is_pat(tree_t *e)          { (void)e; return 0; }
 #include <string.h>
