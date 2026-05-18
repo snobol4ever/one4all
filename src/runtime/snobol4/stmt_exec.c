@@ -59,24 +59,6 @@ static int g_dvar_depth = 0;
 #define DVAR_MAX_DEPTH 4096
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static DESCR_t bb_deferred_var(void *zeta, int entry);
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int patnd_is_invariant(PATND_t *p)
-{
-    if (!p)                                           return 1;
-    switch (p->kind) {
-    case XDSAR:
-    case XVAR:
-    case XATP:
-    case XFNME:
-    case XNME:                                       return 0;
-    case XFARB:                                      return 0;
-    case XSTAR:                                      return 0;
-    default:                                          break;
-    }
-    for (int i = 0; i < p->nchildren; i++)
-        if (p->children[i] && !patnd_is_invariant(p->children[i])) return 0;
-    return 1;
-}
 #define DYNC_CACHE_CAP 512
 typedef struct {
     PATND_t   *key;
@@ -110,17 +92,6 @@ static void cache_insert(PATND_t *key, bb_node_t node)
     slot->template = node;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static bb_node_t cache_get_fresh(cache_slot_t *slot)
-{
-    bb_node_t n = slot->template;
-    if (n.ζ_size && n.ζ) {
-        void *fresh = calloc(1, n.ζ_size);
-        memcpy(fresh, n.ζ, n.ζ_size);
-        n.ζ = fresh;
-    }
-    return n;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void cache_reset(void)
 {
     for (int i = 0; i < DYNC_CACHE_CAP; i++) g_node_cache[i].key = NULL;
@@ -131,12 +102,6 @@ void exec_stmt_pool_reset(void)
 {
     bb_pool_reset();
     cache_reset();
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void cache_stats(int *hits, int *misses)
-{
-    if (hits)   *hits   = g_cache_hits;
-    if (misses) *misses = g_cache_misses;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static const char *xkind_name(int k)
@@ -175,87 +140,6 @@ void bin_audit_print(void)
     if (g_bin_misses > 0)
         fprintf(stderr,
             "BINARY_AUDIT: known fallbacks: XABRT XSUCF XBAL XVAR (not in 50-file corpus)\n");
-}
-typedef struct {
-    const char *name;
-    DESCR_t    *args;
-    int         nargs;
-    int         done;
-    int         consumed;
-} usercall_t;
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static DESCR_t bb_usercall(void *zeta, int entry)
-{
-    usercall_t *ζ = zeta;
-    DESCR_t UC;
-    if (entry == α) goto UC_α;
-                    goto UC_β;
-    UC_α:  ζ->done = 1;
-           if (g_user_call_hook && ζ->name && ζ->name[0]) {
-               DESCR_t *eff_args = ζ->args;
-               DESCR_t  thaw_buf[8];
-               DESCR_t *thawed   = NULL;
-               int      n        = ζ->nargs;
-               int      have_dte = 0;
-               for (int i = 0; i < n; i++) {
-                   if (ζ->args[i].v == DT_E) { have_dte = 1; break; }
-               }
-               if (have_dte && n > 0) {
-                   thawed = (n <= 8) ? thaw_buf
-                                     : (DESCR_t *)GC_MALLOC((size_t)n * sizeof(DESCR_t));
-                   for (int i = 0; i < n; i++) {
-                       thawed[i] = (ζ->args[i].v == DT_E)
-                                   ? EVAL_fn(ζ->args[i])
-                                   : ζ->args[i];
-                   }
-                   eff_args = thawed;
-               }
-               if (getenv("ONE4ALL_USERCALL_TRACE")) {
-                   fprintf(stderr, "BB_USERCALL name=%s nargs=%d\n", ζ->name ? ζ->name : "(null)", n);
-                   for (int i = 0; i < n; i++) {
-                       const char *kind = "?";
-                       switch ((int)ζ->args[i].v) {
-                           case DT_SNUL: kind = "DT_SNUL"; break;
-                           case DT_S:    kind = "DT_S";    break;
-                           case DT_E:    kind = "DT_E";    break;
-                           case DT_I:    kind = "DT_I";    break;
-                           case DT_R:    kind = "DT_R";    break;
-                           case DT_N:    kind = "DT_N";    break;
-                           case DT_P:    kind = "DT_P";    break;
-                           case DT_FAIL: kind = "DT_FAIL"; break;
-                       }
-                       const char *raw_str = (ζ->args[i].v == DT_S && ζ->args[i].s) ? ζ->args[i].s : "";
-                       const char *eff_str = (eff_args[i].v == DT_S && eff_args[i].s) ? eff_args[i].s : "";
-                       fprintf(stderr, "  arg[%d] raw v=%s s=\"%s\" ptr=%p   eff v=%d s=\"%s\"\n",
-                               i, kind, raw_str, ζ->args[i].p, eff_args[i].v, eff_str);
-                   }
-               }
-               DESCR_t r = g_user_call_hook(ζ->name, eff_args, n);
-               extern char kw_rtntype[16];
-               int via_nreturn = (strcmp(kw_rtntype, "NRETURN") == 0);
-               if (IS_FAIL_fn(r))                         goto UC_ω;
-               if (r.v == DT_P && r.p && r.p->kind == XFAIL) goto UC_ω;
-               if (via_nreturn) {
-                   ζ->consumed = 0;
-                   UC = descr_match(Σ + Δ, 0);                  goto UC_γ;
-               }
-               if (r.v == DT_S || r.v == DT_SNUL) {
-                   const char *rs = r.s ? r.s : "";
-                   int         rl = (int)strlen(rs);
-                   if (Δ + rl > Σlen)                              goto UC_ω;
-                   if (rl > 0 && memcmp(Σ + Δ, rs, (size_t)rl) != 0) goto UC_ω;
-                   ζ->consumed = rl;
-                   UC = descr_match(Σ + Δ, rl);
-                   Δ += rl;
-                                                                  goto UC_γ;
-               }
-               ζ->consumed = 0;
-           }
-           UC = descr_match(Σ + Δ, 0);        goto UC_γ;
-    UC_β:  Δ -= ζ->consumed;
-           ζ->consumed = 0;                goto UC_ω;
-    UC_γ:                                  return UC;
-    UC_ω:                                  return FAILDESCR;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static DESCR_t bb_deferred_var(void *zeta, int entry)
@@ -544,136 +428,4 @@ int exec_stmt_blob(const char  *subj_name,
     pat.slen = 0;
     pat.ptr  = (void *)root_fn;
     return exec_stmt(subj_name, subj_var, pat, repl, has_repl);
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int cache_test_run(const char *lit, int n_iters)
-{
-    static PATND_t node;
-    node.kind         = XCHR;
-    node.materialising = 0;
-    node.STRVAL_fn         = lit;
-    node.num          = 0;
-    node.children = NULL; node.nchildren = 0;
-    node.args = NULL;
-    node.nargs = 0;
-    cache_reset();
-    for (int i = 0; i < n_iters; i++) {
-        bb_box_fn bfn = bb_build_brokered(&node);
-        (void)bfn;
-    }
-    int hits = 0, misses = 0;
-    cache_stats(&hits, &misses);
-    return hits;
-}
-#define NV_INIT 16
-typedef struct { char *key; DESCR_t val; } _nv_entry_t;
-static _nv_entry_t *g_nv_table = NULL;
-static int          g_nv_count = 0;
-static int          g_nv_cap   = 0;
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void nv_set_str(const char *name, const char *s)
-{
-    for (int i = 0; i < g_nv_count; i++) {
-        if (strcmp(g_nv_table[i].key, name) == 0) {
-            g_nv_table[i].val.v    = DT_S;
-            g_nv_table[i].val.s    = (char *)s;
-            g_nv_table[i].val.slen = s ? (uint32_t)strlen(s) : 0;
-            return;
-        }
-    }
-    if (!g_nv_table) {
-        g_nv_cap   = NV_INIT;
-        g_nv_table = malloc(g_nv_cap * sizeof(_nv_entry_t));
-    } else if (g_nv_count >= g_nv_cap) {
-        g_nv_cap  *= 2;
-        g_nv_table = realloc(g_nv_table, g_nv_cap * sizeof(_nv_entry_t));
-    }
-    g_nv_table[g_nv_count].key      = strdup(name);
-    g_nv_table[g_nv_count].val.v    = DT_S;
-    g_nv_table[g_nv_count].val.s    = (char *)s;
-    g_nv_table[g_nv_count].val.slen = s ? (uint32_t)strlen(s) : 0;
-    g_nv_count++;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static DESCR_t nv_get(const char *name)
-{
-    for (int i = 0; i < g_nv_count; i++)
-        if (strcmp(g_nv_table[i].key, name) == 0)
-            return g_nv_table[i].val;
-    DESCR_t d; d.v = DT_SNUL; d.slen = 0; d.s = NULL;
-    return d;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int deferred_var_test(void)
-{
-    g_nv_count = 0;
-    nv_set_str("T15_PAT", "Bird");
-    static PATND_t dsar_node;
-    dsar_node.kind  = XDSAR;
-    dsar_node.STRVAL_fn  = "T15_PAT";
-    dsar_node.children = NULL; dsar_node.nchildren = 0;
-    dsar_node.args  = NULL;
-    dsar_node.nargs = 0;
-    cache_reset();
-    bb_box_fn bfn = bb_build_brokered(&dsar_node);
-    bb_node_t dvar;
-    if (bfn) { dvar.fn = bfn; dvar.ζ = NULL; dvar.ζ_size = 0; }
-    else {
-           PATND_t *ep = patnd_make_eps();
-           bb_box_fn efn = bb_build_brokered(ep);
-           dvar.fn = efn; dvar.ζ = NULL; dvar.ζ_size = 0; }
-    int ok = 1;
-    nv_set_str("T15_PAT", "Bird");
-    Σ = "BlueBird"; Ω = (int)strlen(Σ); Δ = 0;
-    DESCR_t r1 = dvar.fn(dvar.ζ, α);
-    ok &= !IS_FAIL_fn(r1) ? 1 : 0;
-    Δ = 0;
-    DESCR_t r2 = dvar.fn(dvar.ζ, α);
-    ok &= !IS_FAIL_fn(r2) ? 1 : 0;
-    printf("  deferred_var: r1=%s r2=%s (both non-empty = re-resolve ran)\n",
-           IS_FAIL_fn(r1)?"empty":"ok", IS_FAIL_fn(r2)?"empty":"ok");
-    return ok;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int anchor_test(void)
-{
-    int ok = 1;
-    kw_anchor = 0;
-    int r_unanchored = exec_stmt_args("XhelloY", "hello", NULL, NULL);
-    ok &= (r_unanchored == 1);
-    printf("  unanchored match at pos 1: %s\n", r_unanchored ? "PASS" : "FAIL");
-    kw_anchor = 1;
-    int r_anchored = exec_stmt_args("XhelloY", "hello", NULL, NULL);
-    ok &= (r_anchored == 0);
-    printf("  anchored match fails (not at pos 0): %s\n", r_anchored == 0 ? "PASS" : "FAIL");
-    kw_anchor = 0;
-    return ok;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int exec_stmt_args(const char *subject, const char *pattern,
-                      const char *repl_str, char **out_subject);
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int exec_stmt_args(const char  *subject,
-                      const char  *pattern,
-                      const char  *repl_str,
-                      char       **out_subject)
-{
-    DESCR_t subj;
-    subj.v    = DT_S;
-    subj.slen = subject ? (uint32_t)strlen(subject) : 0;
-    subj.s    = subject ? (char *)subject : (char *)"";
-    DESCR_t pat;
-    pat.v    = DT_S;
-    pat.slen = pattern ? (uint32_t)strlen(pattern) : 0;
-    pat.s    = pattern ? (char *)pattern : (char *)"";
-    DESCR_t repl_d;
-    repl_d.v    = DT_S;
-    repl_d.slen = repl_str ? (uint32_t)strlen(repl_str) : 0;
-    repl_d.s    = repl_str ? (char *)repl_str : NULL;
-    int has_repl = (repl_str != NULL);
-    int r = exec_stmt(NULL, &subj, pat, has_repl ? &repl_d : NULL, has_repl);
-    if (out_subject && r) {
-        *out_subject = subj.s;
-    }
-                                                              return r;
 }
