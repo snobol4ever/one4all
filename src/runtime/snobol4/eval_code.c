@@ -346,6 +346,22 @@ const char *exec_code(DESCR_t code_block)
         tree_t *subject     = stmt_attr_expr(stmt_attr_find(s, ":subj"));
         tree_t *pattern     = stmt_attr_expr(stmt_attr_find(s, ":pat"));
         tree_t *replacement = stmt_attr_expr(stmt_attr_find(s, ":repl"));
+        /* PST-SN4-1b mirror: split TT_SCAN/TT_SEQ subject into subject+pattern */
+        if (!pattern && subject && subject->t == TT_SCAN && subject->n == 2) {
+            pattern = subject->c[1];
+            subject = subject->c[0];
+        }
+        if (!pattern && subject && subject->t == TT_SEQ && subject->n >= 2) {
+            tree_t *first = subject->c[0];
+            if (first->t == TT_VAR || first->t == TT_KEYWORD || first->t == TT_QLIT || first->t == TT_INDIRECT) {
+                int nc = subject->n - 1;
+                tree_t *rest;
+                if (nc == 1) { rest = subject->c[1]; }
+                else { rest = ast_node_new(TT_SEQ); for (int i = 1; i < subject->n; i++) expr_add_child(rest, subject->c[i]); }
+                pattern = rest;
+                subject = first;
+            }
+        }
         /* PST-SN4-1c: TT_GOTO_S/F/U children */
         const char *goto_u = goto_node_str(stmt_goto_find(s, TT_GOTO_U));
         const char *goto_s = goto_node_str(stmt_goto_find(s, TT_GOTO_S));
