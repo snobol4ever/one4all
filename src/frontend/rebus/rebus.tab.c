@@ -677,7 +677,7 @@ static const yytype_int16 yyrline[] =
 {
        0,   121,   121,   125,   126,   138,   139,   143,   144,   148,
      149,   153,   166,   190,   191,   195,   196,   200,   201,   202,
-     206,   210,   214,   219,   220,   224,   232,   236,   237,   241,
+     206,   210,   214,   219,   220,   226,   232,   236,   237,   241,
      242,   246,   247,   248,   249,   250,   251,   252,   253,   254,
      255,   256,   257,   258,   263,   267,   268,   275,   283,   294,
      298,   302,   310,   322,   336,   347,   358,   368,   379,   393,
@@ -1575,21 +1575,21 @@ yyreduce:
   case 24: /* stmt_list_ne: stmt_list_ne stmt ';'  */
 #line 220 "rebus.y"
                                 {
-            if ((yyvsp[-1].tree)) expr_add_child((yyvsp[-2].tree), (yyvsp[-1].tree));
-            (yyval.tree) = (yyvsp[-2].tree);
+            tree_t *p = ast_node_new(TT_PROGRAM);
+            expr_add_child(p, (yyvsp[-2].tree));
+            if ((yyvsp[-1].tree)) expr_add_child(p, (yyvsp[-1].tree));
+            (yyval.tree) = p;
         }
-#line 1582 "rebus.tab.c"
+#line 1584 "rebus.tab.c"
     break;
 
   case 25: /* stmt_list_ne: stmt_list_ne compound_stmt  */
-#line 224 "rebus.y"
+#line 226 "rebus.y"
                                  {
-            /* merge compound children into existing program node */
-            if ((yyvsp[0].tree)) {
-                for (int i = 0; i < (yyvsp[0].tree)->n; i++)
-                    expr_add_child((yyvsp[-1].tree), (yyvsp[0].tree)->c[i]);
-            }
-            (yyval.tree) = (yyvsp[-1].tree);
+            tree_t *p = ast_node_new(TT_PROGRAM);
+            expr_add_child(p, (yyvsp[-1].tree));
+            if ((yyvsp[0].tree)) expr_add_child(p, (yyvsp[0].tree));
+            (yyval.tree) = p;
         }
 #line 1595 "rebus.tab.c"
     break;
