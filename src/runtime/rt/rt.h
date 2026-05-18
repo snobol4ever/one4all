@@ -175,6 +175,12 @@ void rt_pl_b_entry(int node_idx);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_pl_b_end_register(const char *name, int arity);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* rt_pl_once — IJ-HELLO-4b wired runtime helper for SM_BB_ONCE_PROC.  Looks up the named Prolog */
+/* predicate in g_dcg_table and calls IR_exec_once on its IR_block_t directly — does NOT invoke  */
+/* bb_broker, so the emitted standalone binary's import closure contains neither bb_broker nor   */
+/* rt_bb_once_proc.  See rt.c::rt_pl_once for the full body. */
+void rt_pl_once(const char *name, int arity);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_patch_cap_fn(void *cap_ptr, void *child_fn);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_init_arbno(void **slot_ptr, void *child_fn);

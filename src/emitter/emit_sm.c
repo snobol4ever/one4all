@@ -563,7 +563,7 @@ static const sm_op_template_t g_sm_templates[] = {
     { SM_BB_PUMP         , "BB_PUMP"         , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_BB_PUMP      , 0 },
     { SM_BB_ONCE         , "BB_ONCE"         , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_BB_ONCE      , 0 },
     { SM_BB_EVAL         , "BB_EVAL"         , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_BB_EVAL      , 0 },
-    { SM_BB_ONCE_PROC    , "BB_ONCE_PROC"    , "rt_bb_once_proc"    , SM_TPL_LBL_INT32 , 0               , 0 },
+    { SM_BB_ONCE_PROC    , "BB_ONCE_PROC"    , "rt_pl_once"         , SM_TPL_LBL_INT32 , 0               , 0 },
     { SM_BB_PUMP_PROC    , "BB_PUMP_PROC"    , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_BB_PUMP_PROC , 0 },
     { SM_BB_PUMP_CASE    , "BB_PUMP_CASE"    , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_BB_PUMP_CASE , 0 },
     { SM_BB_PUMP_SM      , "BB_PUMP_SM"      , "rt_unhandled_sm"    , SM_TPL_ARITH , SM_BB_PUMP_SM   , 0 },

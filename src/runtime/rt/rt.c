@@ -903,7 +903,11 @@ void rt_unhandled_sm(int op)
 /* Mirrors `case SM_BB_ONCE_PROC` in src/processor/sm_interp.c:671 (the Mode 2 body).                                    */
 /* Looks up Prolog predicate by name/arity in g_dcg_table, drives via bb_broker(node, BB_ONCE, ...).                     */
 /* On miss: print [NO-AST] fingerprint to match Modes 2/3 (RULES.md stub-fingerprint convention).                        */
+/* DEPRECATED (IJ-HELLO-4b 2026-05-18): retained as a brokered fallback only.  Mode 4 now emits rt_pl_once instead;     */
+/* this symbol survives temporarily to keep any out-of-tree harness scripts (run_prolog_via_x86_backend.sh) building.   */
+/* IJ-HELLO-4c will delete it.                                                                                          */
 #include "../interp/pl_runtime.h"
+#include "../../lower/ir_exec.h"
 void rt_bb_once_proc(const char *name, int arity)
 {
     bb_node_t node = pl_bb_once_proc_by_name(name, arity);
@@ -911,6 +915,30 @@ void rt_bb_once_proc(const char *name, int arity)
         Term **saved_env = g_pl_env;
         pl_bb_env_push(16);
         (void)bb_broker(node, BB_ONCE, NULL, NULL);
+        pl_bb_env_pop(saved_env);
+    } else {
+        fprintf(stderr, "[NO-AST] SM_BB_ONCE_PROC stub: needs fresh SM/BB lowering\n");
+    }
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* rt_pl_once — Mode 4 wired runtime helper for SM_BB_ONCE_PROC (IJ-HELLO-4b 2026-05-18).                                */
+/* Same name+arity lookup as rt_bb_once_proc, but calls IR_exec_once on the predicate's IR_block_t directly instead of   */
+/* routing through bb_broker.  The IR_block_t walker (src/lower/ir_exec.c) is the permitted infrastructure DCG driver — */
+/* it is to Prolog what ir_exec.c's IR walker is to Icon: a four-port-aware tree executor that does NOT walk tree_t*    */
+/* AST nodes.  Eliminating the bb_broker call from this path breaks the brokered-import chain in the emitted binary:   */
+/* `nm hello.bin | grep ' U bb_broker'` returns empty, and `' U rt_bb_once_proc'` returns empty too.  The IR_block_t    */
+/* graph itself is still constructed at startup via rt_register_predicates_pl + rt_pl_b_* builder API — that machinery  */
+/* is unchanged.  Env push/pop semantics mirror rt_bb_once_proc exactly.                                                 */
+void rt_pl_once(const char *name, int arity)
+{
+    const char *q = strrchr(name, '/');
+    int eff_arity = arity;
+    if (q && eff_arity == 0) eff_arity = atoi(q + 1);
+    Pl_PredEntry_BB *bb = pl_dcg_lookup(name, eff_arity);
+    if (bb && bb->ir_body) {
+        Term **saved_env = g_pl_env;
+        pl_bb_env_push(16);
+        (void)IR_exec_once(bb->ir_body);
         pl_bb_env_pop(saved_env);
     } else {
         fprintf(stderr, "[NO-AST] SM_BB_ONCE_PROC stub: needs fresh SM/BB lowering\n");
