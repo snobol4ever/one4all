@@ -1288,9 +1288,14 @@ void lower_stmt(const tree_t *s)
         }
         if (subject && subject->t == TT_FNC && subject->v.sval
                  && strcmp(subject->v.sval, "initialization") == 0
-                 && subject->n == 1 && subject->c[0] && subject->c[0]->v.sval) {
-            /* Emit call to the named entry point.  The arg is an atom (TT_FNC n=0) or a
-             * compound term naming a goal.  We pass "name/arity" so pl_dcg_lookup finds it. */
+                 && (subject->n == 1 || subject->n == 2)
+                 && subject->c[0] && subject->c[0]->v.sval) {
+            /* IJ-HELLO-4a: accept both `:- initialization(Goal).` (n==1) and `:- initialization(Goal, When).` */
+            /* (n==2) forms.  The 2-arg form is standard Prolog ISO where When ∈ {now, after_load, program,   */
+            /* main, restore} — we ignore When (treat as `now`) and dispatch to Goal exactly like the 1-arg   */
+            /* form.  Previously the 2-arg form fell into the else branch which emitted SM_PUSH_EXPR with a   */
+            /* tree_t* AST pointer + SM_CALL_FN "PL_BUILTIN", violating the no-AST-walking rule for modes     */
+            /* 2/3/4 and producing an undefined PUSH_EXPR macro under --compile (assemble failure).           */
             const tree_t *target = subject->c[0];
             int target_arity = target->n;
             char key[256];
@@ -1299,8 +1304,14 @@ void lower_stmt(const tree_t *s)
             goto emit_gotos;
         }
         else if (subject && subject->t == TT_FNC && subject->v.sval) {
-            emit_push_expr(subject);
-            sm_emit_si(g_p, SM_CALL_FN, "PL_BUILTIN", 0);
+            /* IJ-HELLO-4a: under --compile (mode 4), SM_PUSH_EXPR is unimplementable without */
+            /* walking the embedded tree_t* at runtime — that's the no-AST-walking violation. */
+            /* Mode 2 (sm_interp) already stubs PL_BUILTIN as [NO-AST]; preserve that fingerprint */
+            /* for all modes by abort-and-explain when an unrecognized PL directive reaches this path. */
+            fprintf(stderr, "FATAL: lower_stmt LANG_PL: unhandled Prolog directive/goal-at-top-level: %s/%d. "
+                            "Only `:- initialization(Goal).` and `:- initialization(Goal, When).` are recognized.\n",
+                    subject->v.sval, subject->n);
+            abort();
         }
         else {
             fprintf(stderr, "FATAL: lower_stmt LANG_PL unnamed subject kind=%d sval=%s — legacy SM_BB_ONCE deleted (PB-7)\n",
