@@ -94,52 +94,8 @@ static DESCR_t bb_str_concat(tree_t *e)
     buf[al + bl] = '\0';
     return STRVAL(buf);
 }
-/* DESCR_t-input helpers reused by both AST-walking (bb_eval_value) and IR (ir_exec.c). */
-DESCR_t icn_str_concat_d(DESCR_t a, DESCR_t b)
-{
-    if (IS_FAIL_fn(a) || IS_FAIL_fn(b)) return FAILDESCR;
-    DESCR_t as = descr_to_str_icn(a);
-    DESCR_t bs = descr_to_str_icn(b);
-    const char *asp = (as.v == DT_S || as.v == DT_SNUL) ? VARVAL_fn(as) : NULL;
-    const char *bsp = (bs.v == DT_S || bs.v == DT_SNUL) ? VARVAL_fn(bs) : NULL;
-    if (!asp) asp = "";
-    if (!bsp) bsp = "";
-    size_t al = strlen(asp), bl = strlen(bsp);
-    char *buf = GC_malloc(al + bl + 1);
-    memcpy(buf, asp, al);
-    memcpy(buf + al, bsp, bl);
-    buf[al + bl] = '\0';
-    return STRVAL(buf);
-}
-DESCR_t icn_lconcat_d(DESCR_t a, DESCR_t b)
-{
-    if (IS_FAIL_fn(a) || IS_FAIL_fn(b)) return FAILDESCR;
-    if (a.v == DT_DATA && b.v == DT_DATA) {
-        DESCR_t atag = FIELD_GET_fn(a, "icn_type");
-        DESCR_t btag = FIELD_GET_fn(b, "icn_type");
-        if (atag.v == DT_S && atag.s && strcmp(atag.s,"list")==0 &&
-            btag.v == DT_S && btag.s && strcmp(btag.s,"list")==0) {
-            DESCR_t asz_d = FIELD_GET_fn(a, "frame_size");
-            DESCR_t bsz_d = FIELD_GET_fn(b, "frame_size");
-            int an = (int)(IS_INT_fn(asz_d)?asz_d.i:0);
-            int bn = (int)(IS_INT_fn(bsz_d)?bsz_d.i:0);
-            int cn = an + bn;
-            DESCR_t *celems = GC_malloc((cn>0?cn:1)*sizeof(DESCR_t));
-            DESCR_t aptr = FIELD_GET_fn(a, "frame_elems");
-            DESCR_t bptr = FIELD_GET_fn(b, "frame_elems");
-            DESCR_t *ae = (aptr.v == DT_DATA) ? (DESCR_t*)aptr.ptr : NULL;
-            DESCR_t *be = (bptr.v == DT_DATA) ? (DESCR_t*)bptr.ptr : NULL;
-            for (int i=0;i<an;i++) celems[i] = ae ? ae[i] : NULVCL;
-            for (int i=0;i<bn;i++) celems[an+i] = be ? be[i] : NULVCL;
-            DESCR_t eptr; eptr.v=DT_DATA; eptr.slen=0; eptr.ptr=(void*)celems;
-            static int icnlist_lcat_d = 0;
-            if (!icnlist_lcat_d) { DEFDAT_fn("icnlist(frame_elems,frame_size,icn_type)"); icnlist_lcat_d=1; }
-            return DATCON_fn("icnlist", eptr, INTVAL(cn), STRVAL("list"));
-        }
-    }
-    /* Fallback: string concat with coercion (matches TT_LCONCAT spec for non-list operands). */
-    return icn_str_concat_d(a, b);
-}
+/* DESCR_t-input helpers relocated to icn_runtime.c during DAI-5b-1 to enable icn_value.c deletion.
+   icn_str_concat_d, icn_lconcat_d, icn_proc_as_value all live in icn_runtime.c now. */
 typedef enum { BBS_RANGE, BBS_PLUS, BBS_MINUS } bb_section_t;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static DESCR_t bb_section(tree_t *e, bb_section_t kind)
@@ -292,34 +248,9 @@ static void bb_augop_writeback(tree_t *lhs, DESCR_t res)
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t icn_proc_as_value(const char *name)
-{
-    if (!name || name[0] == '&') return FAILDESCR;
-    for (int i = 0; i < proc_count; i++) {
-        if (proc_table[i].name && strcmp(proc_table[i].name, name) == 0) {
-            DESCR_t pv; pv.v = DT_E;
-            pv.slen = (uint32_t)i;
-            pv.i    = proc_table[i].entry_pc;
-            return pv;
-        }
-    }
-    static const char *builtins[] = {
-        "write","writes","read","reads","close","open","remove","flush",
-        "put","get","pull","push","pop","list","image","proc","type","copy",
-        "string","integer","real","numeric","ord","char","reverse","sort","sortf",
-        "find","match","many","any","upto","bal","move","tab","pos",
-        "map","repl","trim","left","right","center","detab","entab",
-        "abs","sqrt","sin","cos","tan","asin","acos","atan","exp","log",
-        "dtor","rtod",
-        "iand","ior","ixor","ishift","icom",
-        "table","key","insert","delete","member","args","level",
-        "collect","stop","exit","runerr","name","variable","seq",
-        NULL
-    };
-    for (int i = 0; builtins[i]; i++)
-        if (strcmp(builtins[i], name) == 0) return STRVAL(name);
-    return FAILDESCR;
-}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* icn_proc_as_value relocated to icn_runtime.c during DAI-5b-1. */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* DAI (IJ-DEL-ICN-AST): bb_eval_value body removed. The Icon-specific tree_t* AST walker is being */
 /* amputated. Mode-1 (--ir-run / --ast-run) is no longer a valid Icon execution path. Use          */
