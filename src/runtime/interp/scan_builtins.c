@@ -197,13 +197,3 @@ int scan_try_call_builtin(tree_t *call, DESCR_t *args, int nargs, DESCR_t *out)
     }
     return 0;
 }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int is_scan_builtin_name(const char *name) {
-    if (!name) return 0;
-    static const char *scan_names[] = {
-        "upto","find","move","tab","pos","rpos","any","many","notany","match","bal", NULL
-    };
-    for (int i = 0; scan_names[i]; i++)
-        if (strcmp(name, scan_names[i]) == 0) return 1;
-    return 0;
-}
