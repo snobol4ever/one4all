@@ -12,6 +12,7 @@ typedef struct ExprList {
 #include "../../ast/ast.h"
 #include "../snobol4/scrip_cc.h"
 #include "raku.tab.h"
+#include "raku_driver.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -122,7 +123,6 @@ static void add_proc(tree_t *e) {
     expr_add_child(st, ast_attr_expr(":subj", e));
     expr_add_child(raku_prog_result, st);
 }
-#define SUB_TAG_ID 1
 #define RAKU_METH_MAX 256
 typedef struct { char key[128]; char procname[128]; } RakuMethEntry;
 static RakuMethEntry raku_meth_table[RAKU_METH_MAX];
@@ -198,14 +198,13 @@ program
                 for (int i = 0; i < all->count; i++) {
                     tree_t *e = all->items[i];
                     if (!e || !(e->t==TT_FNC && e->_id == SUB_TAG_ID)) continue;
-                    e->_id = 0;
                     add_proc(e);
                     all->items[i] = NULL;
                 }
                 int has_body = 0;
                 for (int i = 0; i < all->count; i++) if (all->items[i]) { has_body=1; break; }
                 if (has_body) {
-                    tree_t *mf = leaf_sval(TT_FNC, "main"); mf->v.ival = 0;
+                    tree_t *mf = leaf_sval(TT_FNC, "main"); mf->v.ival = 0; mf->_id = SUB_TAG_ID;
                     tree_t *mn = ast_node_new(TT_VAR); mn->v.sval = intern("main");
                     expr_add_child(mf, mn);
                     for (int i = 0; i < all->count; i++)

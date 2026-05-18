@@ -12,6 +12,7 @@
 #include "../../runtime/interp/icn_runtime.h"
 #include "../../runtime/interp/pl_runtime.h"
 #include "../../frontend/icon/icon_lex.h"
+#include "../../frontend/raku/raku_driver.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1306,6 +1307,17 @@ void lower_stmt(const tree_t *s)
                     subject ? subject->t : -1, (subject && subject->v.sval) ? subject->v.sval : "(null)");
             abort();
         }
+        goto emit_gotos;
+    }
+    /* IJ-HELLO-2b (2026-05-18): Raku `sub <name>(...) { body }` arrives here as TT_STMT{:subj=TT_FNC{ */
+    /* _id=SUB_TAG_ID, v.ival=nparams, c[0]=TT_VAR(name), c[1..nparams]=params, c[nparams+1..]=body}}. */
+    /* The wrapper's v.sval is NULL (union-clobbered by v.ival), so the AST shape is identical to a    */
+    /* regular call-expression TT_FNC; only _id == SUB_TAG_ID distinguishes them. Lower body kids      */
+    /* directly via lower_expr + SM_VOID_POP, skipping the spurious wrapping SM_CALL_FN <name> emit.   */
+    if (lang == LANG_RAKU && subject && subject->t == TT_FNC && subject->_id == SUB_TAG_ID) {
+        int nparams = (int)subject->v.ival;
+        for (int i = nparams + 1; i < subject->n; i++)
+            if (subject->c[i]) { lower_expr(subject->c[i]); sm_emit(g_p, SM_VOID_POP); }
         goto emit_gotos;
     }
     /* PST-SN4-1b (2026-05-16): subject/pattern split moved from sno4_stmt_commit_go.
