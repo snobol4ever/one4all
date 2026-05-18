@@ -1086,6 +1086,32 @@ void rt_call(const char *name, int nargs)
         DESCR_t r = INTVAL(args[0].arr ? (args[0].arr->hi - args[0].arr->lo + 1) : 0);
         vstack_push(r); LAST_OK_SET(1); return;
     }
+    /* IJ-HELLO-2 (Opus 4.7, 2026-05-18): mirror sm_interp.c's SM_CALL_FN
+     * fallback ladder.  Mode 2/3 dispatch unknown SM_CALL_FN names through
+     * icn_try_call_builtin_by_name (Icon-builtin table that handles `write`,
+     * `writes`, `integer`, `image`, list ops, etc.) BEFORE falling to
+     * INVOKE_fn (SNOBOL4 dispatch).  Mode 4 (this function) was skipping
+     * that intermediate step, causing Raku `say(...)` — which lowers to
+     * SM_CALL_FN "write" — to fail with "Error 5 Undefined function"
+     * under --compile while succeeding under --interp / --run.
+     * Returning 0 from icn_try_* means "name not handled" and is side-effect
+     * free, so chaining is safe for non-Icon names.  This fix alone makes
+     * "Hello, World!" reach stdout for Raku --compile; a second bug
+     * (trailing SM_CALL_FN "main" for the proc-def wrapper TT_FNC) still
+     * trips rc=1 with stderr "Error 5" — see IJ-HELLO-2-followup in the
+     * goal file for the lower-side fix that completes the row flip. */
+    if (name) {
+        extern int icn_try_call_builtin_by_name(
+            const char *fn, DESCR_t *args, int nargs, DESCR_t *out);
+        DESCR_t icn_out;
+        if (icn_try_call_builtin_by_name(name, args, nargs, &icn_out)) {
+            if (IS_NAMEPTR(icn_out))      icn_out = NAME_DEREF_PTR(icn_out);
+            else if (IS_NAMEVAL(icn_out)) icn_out = NV_GET_fn(icn_out.s);
+            vstack_push(icn_out);
+            LAST_OK_SET((icn_out.v != DT_FAIL));
+            return;
+        }
+    }
     DESCR_t result = INVOKE_fn(name ? name : "", args, nargs);
     vstack_push(result);
     LAST_OK_SET((result.v != DT_FAIL));
