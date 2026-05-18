@@ -747,7 +747,7 @@ static const yytype_int16 yyrline[] =
      255,   257,   259,   264,   267,   270,   273,   276,   279,   280,
      281,   282,   283,   284,   287,   290,   291,   292,   293,   294,
      297,   299,   301,   305,   309,   311,   315,   319,   323,   325,
-     327,   332,   337,   350,   365,   366,   374,   382,   390,   422,
+     327,   332,   337,   351,   366,   367,   374,   382,   390,   422,
      423,   426,   429,   440,   451,   455,   461,   462,   465,   468,
      471,   472,   487,   490,   491,   492,   493,   494,   495,   496,
      497,   498,   499,   500,   506,   512,   518,   521,   522,   523,
@@ -1942,50 +1942,50 @@ yyreduce:
 
   case 52: /* given_stmt: KW_GIVEN expr '{' when_list '}'  */
 #line 338 "raku.y"
-        { /* RK-18d: TT_CASE[ topic, cmpnode0, val0, body0, ... ]
-           * cmp kind stored in TT_ILIT child to avoid corrupting val->v.ival. */
+        { /* PRF-8 (2026-05-18): TT_CASE[ topic, val0, body0, val1, body1, ... ]
+           * cmpkind derived at lowering time from val->t (TT_QLIT -> TT_LEQ, else TT_EQ).
+           * No cmpkind ILIT child. Default arm (none here) would be trailing (TT_NUL, body_def). */
           tree_t *ec=ast_node_new(TT_CASE);
           expr_add_child(ec,(yyvsp[-3].node));
           ExprList *whens=(yyvsp[-1].list);
           for(int i=0;i<whens->count;i++){
               tree_t *pair=whens->items[i];
-              tree_t *cn=pair->c[0], *val=pair->c[1], *body=pair->c[2];
-              expr_add_child(ec,cn); expr_add_child(ec,val); expr_add_child(ec,body);
+              tree_t *val=pair->c[0], *body=pair->c[1];
+              expr_add_child(ec,val); expr_add_child(ec,body);
           }
           exprlist_free(whens);
           (yyval.node)=ec; }
-#line 1958 "raku.tab.c"
+#line 1959 "raku.tab.c"
     break;
 
   case 53: /* given_stmt: KW_GIVEN expr '{' when_list KW_DEFAULT block '}'  */
-#line 351 "raku.y"
+#line 352 "raku.y"
         {
           tree_t *ec=ast_node_new(TT_CASE);
           expr_add_child(ec,(yyvsp[-5].node));
           ExprList *whens=(yyvsp[-3].list);
           for(int i=0;i<whens->count;i++){
               tree_t *pair=whens->items[i];
-              tree_t *cn=pair->c[0], *val=pair->c[1], *body=pair->c[2];
-              expr_add_child(ec,cn); expr_add_child(ec,val); expr_add_child(ec,body);
+              tree_t *val=pair->c[0], *body=pair->c[1];
+              expr_add_child(ec,val); expr_add_child(ec,body);
           }
           exprlist_free(whens);
-          expr_add_child(ec,ast_node_new(TT_NUL)); expr_add_child(ec,ast_node_new(TT_NUL)); expr_add_child(ec,(yyvsp[-1].node));
+          expr_add_child(ec,ast_node_new(TT_NUL)); expr_add_child(ec,(yyvsp[-1].node));
           (yyval.node)=ec; }
-#line 1975 "raku.tab.c"
+#line 1976 "raku.tab.c"
     break;
 
   case 54: /* when_list: %empty  */
-#line 365 "raku.y"
+#line 366 "raku.y"
        { (yyval.list)=exprlist_new(); }
-#line 1981 "raku.tab.c"
+#line 1982 "raku.tab.c"
     break;
 
   case 55: /* when_list: when_list KW_WHEN expr block  */
-#line 367 "raku.y"
-        { tree_e cmpkind=((yyvsp[-1].node)->t==TT_QLIT)?TT_LEQ:TT_EQ;
-          tree_t *cn=ast_node_new(TT_ILIT); cn->v.ival=(long long)cmpkind;
+#line 368 "raku.y"
+        { /* PRF-8: pair is now [val, body]; cmpkind moved to lower.c (derived from val->t). */
           tree_t *pair=ast_node_new(TT_SEQ_EXPR);
-          expr_add_child(pair,cn); expr_add_child(pair,(yyvsp[-1].node)); expr_add_child(pair,(yyvsp[0].node));
+          expr_add_child(pair,(yyvsp[-1].node)); expr_add_child(pair,(yyvsp[0].node));
           (yyval.list)=exprlist_append((yyvsp[-3].list),pair); }
 #line 1991 "raku.tab.c"
     break;
