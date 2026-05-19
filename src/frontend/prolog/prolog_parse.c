@@ -32,6 +32,10 @@ static Term *scope_get(VarScope *sc, const char *name) {
     sc->count++;
     return v;
 }
+/* PST-PL-6g: IfFrame — the :- if/:- elif/:- else/:- endif directive stack — is a
+ * preprocessor concern, not a control-flow construct.  It conditions which clauses
+ * are admitted to the PlProgram; it has no runtime representation and no tree_t node.
+ * Decision confirmed in PST-PL-6a findings: stays in parser permanently. */
 #define IF_STACK_MAX 32
 typedef struct {
     int active;
