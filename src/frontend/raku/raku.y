@@ -564,8 +564,7 @@ call_expr
           expr_add_child(fe,$1);
           $$=fe; }
     | KW_DIE expr
-        { tree_t *c=make_call("raku_die");
-          expr_add_child(c,$2); $$=c; }
+        { tree_t *d=ast_node_new(TT_DIE); expr_add_child(d,$2); $$=d; }
     | KW_MAP closure expr
         { tree_t *c=make_call("raku_map");
           expr_add_child(c,$2); expr_add_child(c,$3); $$=c; }

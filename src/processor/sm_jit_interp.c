@@ -826,6 +826,13 @@ static void h_call(void)
         STATE->last_ok = 0;
         return;
     }
+    if (name && strcmp(name, "raku_die") == 0 && nargs == 1) {
+        DESCR_t md = POP();
+        extern char g_raku_exception[512];
+        const char *msg = VARVAL_fn(md); if (!msg || !*msg) msg = "Died";
+        snprintf(g_raku_exception, sizeof g_raku_exception, "%s", msg);
+        PUSH(FAILDESCR); STATE->last_ok = 0; return;
+    }
     DESCR_t args[32];
     if (nargs > 32) nargs = 32;
     for (int k = nargs - 1; k >= 0; k--) args[k] = POP();

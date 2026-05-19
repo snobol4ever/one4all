@@ -1269,6 +1269,12 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 st->last_ok = 0;
                 break;
             }
+            if (name && strcmp(name, "raku_die") == 0 && nargs == 1) {
+                extern char g_raku_exception[512];
+                const char *msg = VARVAL_fn(args[0]); if (!msg || !*msg) msg = "Died";
+                snprintf(g_raku_exception, sizeof g_raku_exception, "%s", msg);
+                sm_push(st, FAILDESCR); st->last_ok = 0; break;
+            }
             for (int k = 0; k < nargs; k++) {
                 if (args[k].v == DT_FAIL) {
                     sm_push(st, FAILDESCR);
