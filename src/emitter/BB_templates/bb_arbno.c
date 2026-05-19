@@ -1,11 +1,11 @@
 #include "bb_template_common.h"
 
-void ec_bb_arbno(IR_t * nd, FILE * out) {
+void bb_arbno(IR_t * nd, FILE * out) {
     int nid = ir_node_id(nd); int sid = 0;
     if (IS_TEXT || IS_BIN) { /* x86: via emit_bb_xarbn — not wired here yet (EC-3+). */ return; }
     if (IS_JVM) {
         char tag[32]; snprintf(tag, sizeof tag, "arbno_%d_%d", sid, nid);
-        ec_jvm_class_hdr(out, "arbno");
+        jvm_class_hdr(out, "arbno");
         fprintf(out, ".field private static final MAX_DEPTH I = 64\n");
         fprintf(out, ".field private final body Lbb/bb_box;\n");
         fprintf(out, ".field private final frame_start [I\n.field private final frame_match_st [I\n.field private final frame_match_ln [I\n");
@@ -58,7 +58,7 @@ void ec_bb_arbno(IR_t * nd, FILE * out) {
         return;
     }
     if (IS_NET) {
-        ec_net_class_hdr(out, sid, nid);
+        net_class_hdr(out, sid, nid);
         fprintf(out, "  .field private class [boxes]Snobol4.Runtime.Boxes.IByrdBox _body\n");
         fprintf(out, "  .field private int32[] _matchStart\n  .field private int32[] _matchLen\n");
         fprintf(out, "  .field private int32[] _startStack\n  .field private int32   _depth\n");
@@ -68,17 +68,17 @@ void ec_bb_arbno(IR_t * nd, FILE * out) {
         fprintf(out, "    ldarg.0\n    ldc.i4     64\n    newarr     [mscorlib]System.Int32\n    stfld      int32[] pat_%d_%d::_matchStart\n", sid, nid);
         fprintf(out, "    ldarg.0\n    ldc.i4     64\n    newarr     [mscorlib]System.Int32\n    stfld      int32[] pat_%d_%d::_matchLen\n", sid, nid);
         fprintf(out, "    ldarg.0\n    ldc.i4     64\n    newarr     [mscorlib]System.Int32\n    stfld      int32[] pat_%d_%d::_startStack\n    ret\n  }\n", sid, nid);
-        ec_net_alpha_hdr(out);
+        net_alpha_hdr(out);
         fprintf(out, "    .maxstack 4\n    .locals init (int32 V_startHere, valuetype [boxes]Snobol4.Runtime.Boxes.Spec V_br)\n");
         fprintf(out, "    ldarg.0\n    ldc.i4.0\n    stfld      int32 pat_%d_%d::_depth\n", sid, nid);
-        fprintf(out, "    ldarg.0\n    ldfld      int32[] pat_%d_%d::_matchStart\n    ldc.i4.0\n", sid, nid); ec_net_cursor_load(out); fprintf(out, "    stelem.i4\n");
+        fprintf(out, "    ldarg.0\n    ldfld      int32[] pat_%d_%d::_matchStart\n    ldc.i4.0\n", sid, nid); net_cursor_load(out); fprintf(out, "    stelem.i4\n");
         fprintf(out, "    ldarg.0\n    ldfld      int32[] pat_%d_%d::_matchLen\n    ldc.i4.0\n    ldc.i4.0\n    stelem.i4\n", sid, nid);
-        fprintf(out, "    ldarg.0\n    ldfld      int32[] pat_%d_%d::_startStack\n    ldc.i4.0\n", sid, nid); ec_net_cursor_load(out); fprintf(out, "    stelem.i4\n");
-        fprintf(out, "  ARBNO_%d_%d_LOOP:\n", sid, nid); ec_net_cursor_load(out); fprintf(out, "    stloc.0\n");
+        fprintf(out, "    ldarg.0\n    ldfld      int32[] pat_%d_%d::_startStack\n    ldc.i4.0\n", sid, nid); net_cursor_load(out); fprintf(out, "    stelem.i4\n");
+        fprintf(out, "  ARBNO_%d_%d_LOOP:\n", sid, nid); net_cursor_load(out); fprintf(out, "    stloc.0\n");
         fprintf(out, "    ldarg.0\n    ldfld      class [boxes]Snobol4.Runtime.Boxes.IByrdBox pat_%d_%d::_body\n    ldarg.1\n", sid, nid);
         fprintf(out, "    callvirt   instance valuetype [boxes]Snobol4.Runtime.Boxes.Spec [boxes]Snobol4.Runtime.Boxes.IByrdBox::Alpha(class [boxes]Snobol4.Runtime.Boxes.MatchState)\n");
         fprintf(out, "    stloc.1\n    ldloca.s   V_br\n    call       instance bool [boxes]Snobol4.Runtime.Boxes.Spec::get_IsFail()\n");
-        fprintf(out, "    brtrue     ARBNO_%d_%d_STOP\n", sid, nid); ec_net_cursor_load(out); fprintf(out, "    ldloc.0\n    beq        ARBNO_%d_%d_STOP\n", sid, nid);
+        fprintf(out, "    brtrue     ARBNO_%d_%d_STOP\n", sid, nid); net_cursor_load(out); fprintf(out, "    ldloc.0\n    beq        ARBNO_%d_%d_STOP\n", sid, nid);
         fprintf(out, "    ldarg.0\n    ldfld      int32 pat_%d_%d::_depth\n    ldc.i4     63\n    bge        ARBNO_%d_%d_STOP\n", sid, nid, sid, nid);
         fprintf(out, "    ldarg.0\n    ldarg.0\n    ldfld      int32 pat_%d_%d::_depth\n    ldc.i4.1\n    add\n    stfld      int32 pat_%d_%d::_depth\n", sid, nid, sid, nid);
         fprintf(out, "    ldarg.0\n    ldfld      int32[] pat_%d_%d::_matchStart\n    ldarg.0\n    ldfld      int32 pat_%d_%d::_depth\n", sid, nid, sid, nid);
@@ -88,14 +88,14 @@ void ec_bb_arbno(IR_t * nd, FILE * out) {
         fprintf(out, "    ldarg.0\n    ldfld      int32 pat_%d_%d::_depth\n    ldc.i4.1\n    sub\n    ldelem.i4\n", sid, nid);
         fprintf(out, "    ldloca.s   V_br\n    ldfld      int32 [boxes]Snobol4.Runtime.Boxes.Spec::Length\n    add\n    stelem.i4\n");
         fprintf(out, "    ldarg.0\n    ldfld      int32[] pat_%d_%d::_startStack\n    ldarg.0\n    ldfld      int32 pat_%d_%d::_depth\n", sid, nid, sid, nid);
-        ec_net_cursor_load(out); fprintf(out, "    stelem.i4\n    br         ARBNO_%d_%d_LOOP\n", sid, nid);
+        net_cursor_load(out); fprintf(out, "    stelem.i4\n    br         ARBNO_%d_%d_LOOP\n", sid, nid);
         fprintf(out, "  ARBNO_%d_%d_STOP:\n", sid, nid);
         fprintf(out, "    ldarg.0\n    ldfld      int32[] pat_%d_%d::_matchStart\n", sid, nid);
         fprintf(out, "    ldarg.0\n    ldfld      int32 pat_%d_%d::_depth\n    ldelem.i4\n", sid, nid);
         fprintf(out, "    ldarg.0\n    ldfld      int32[] pat_%d_%d::_matchLen\n", sid, nid);
         fprintf(out, "    ldarg.0\n    ldfld      int32 pat_%d_%d::_depth\n    ldelem.i4\n", sid, nid);
-        ec_net_spec_of(out); fprintf(out, "    ret\n  }\n");
-        ec_net_beta_hdr(out);
+        net_spec_of(out); fprintf(out, "    ret\n  }\n");
+        net_beta_hdr(out);
         fprintf(out, "    .maxstack 3\n    ldarg.0\n    ldfld      int32 pat_%d_%d::_depth\n    ldc.i4.0\n    ble        ARBNO_%d_%d_BFAIL\n", sid, nid, sid, nid);
         fprintf(out, "    ldarg.0\n    ldarg.0\n    ldfld      int32 pat_%d_%d::_depth\n    ldc.i4.1\n    sub\n    stfld      int32 pat_%d_%d::_depth\n", sid, nid, sid, nid);
         fprintf(out, "    ldarg.1\n    ldarg.0\n    ldfld      int32[] pat_%d_%d::_startStack\n", sid, nid);
@@ -105,7 +105,7 @@ void ec_bb_arbno(IR_t * nd, FILE * out) {
         fprintf(out, "    ldarg.0\n    ldfld      int32 pat_%d_%d::_depth\n    ldelem.i4\n", sid, nid);
         fprintf(out, "    ldarg.0\n    ldfld      int32[] pat_%d_%d::_matchLen\n", sid, nid);
         fprintf(out, "    ldarg.0\n    ldfld      int32 pat_%d_%d::_depth\n    ldelem.i4\n", sid, nid);
-        ec_net_spec_of(out); fprintf(out, "    ret\n  ARBNO_%d_%d_BFAIL:\n", sid, nid); ec_net_fail_ret(out); fprintf(out, "  }\n}\n");
+        net_spec_of(out); fprintf(out, "    ret\n  ARBNO_%d_%d_BFAIL:\n", sid, nid); net_fail_ret(out); fprintf(out, "  }\n}\n");
         fprintf(out, "    newobj     instance void pat_%d_%d::.ctor(class [boxes]Snobol4.Runtime.Boxes.IByrdBox)\n", sid, nid);
     }
 }

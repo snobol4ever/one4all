@@ -1,11 +1,11 @@
 #include "bb_template_common.h"
 
-void ec_bb_lit(IR_t * nd, FILE * out) {
+void bb_lit(IR_t * nd, FILE * out) {
     int nid = ir_node_id(nd); int sid = 0;
     if (IS_TEXT || IS_BIN) { /* x86: via emit_flat_node/emit_bb_xchr — not wired here yet (EC-3+). */ return; }
     if (IS_JVM) {
         char tag[32]; snprintf(tag, sizeof tag, "lit_%d_%d", sid, nid);
-        ec_jvm_class_hdr(out, "lit");
+        jvm_class_hdr(out, "lit");
         fprintf(out, ".field private final lit Ljava/lang/String;\n");
         fprintf(out, ".field private final len I\n");
         fprintf(out, ".method public <init>(Lbb/bb_box$MatchState;Ljava/lang/String;)V\n");
@@ -41,7 +41,7 @@ void ec_bb_lit(IR_t * nd, FILE * out) {
     }
     if (IS_JS) {
         fprintf(out, "function make_pat_%d_%d(ms) { const lit = ", nd->ival, nid);
-        ec_js_escape(out, nd->sval);
+        js_escape(out, nd->sval);
         fprintf(out, "; const len = lit.length; let self = { succ: null, fail: null,\n");
         fprintf(out, "alpha() { if (ms.delta + len > ms.omega || ms.sigma.slice(ms.delta, ms.delta + len) !== lit) { self.fail.alpha(); return; } ms.delta += len; self.succ.alpha(); },\n");
         fprintf(out, "beta() { ms.delta -= len; self.fail.alpha(); }\n");
@@ -50,7 +50,7 @@ void ec_bb_lit(IR_t * nd, FILE * out) {
     }
     if (IS_NET) {
         const char * lit = nd->sval ? nd->sval : "";
-        ec_net_class_hdr(out, sid, nid);
+        net_class_hdr(out, sid, nid);
         fprintf(out, "  .field private string _lit\n  .field private int32  _len\n");
         fprintf(out, "  .method public specialname rtspecialname instance void .ctor(string lit) cil managed\n  {\n");
         fprintf(out, "    .maxstack 3\n    ldarg.0\n    call       instance void [mscorlib]System.Object::.ctor()\n");
@@ -61,38 +61,38 @@ void ec_bb_lit(IR_t * nd, FILE * out) {
         fprintf(out, "    ldfld      string pat_%d_%d::_lit\n", sid, nid);
         fprintf(out, "    callvirt   instance int32 [mscorlib]System.String::get_Length()\n");
         fprintf(out, "    stfld      int32 pat_%d_%d::_len\n    ret\n  }\n", sid, nid);
-        ec_net_alpha_hdr(out);
+        net_alpha_hdr(out);
         fprintf(out, "    .maxstack 4\n    .locals init (valuetype [boxes]Snobol4.Runtime.Boxes.Spec V_r)\n");
-        ec_net_cursor_load(out);
+        net_cursor_load(out);
         fprintf(out, "    ldfld      int32 pat_%d_%d::_len\n    add\n", sid, nid);
-        fprintf(out, "    ldarg.1\n"); ec_net_ms_length(out);
+        fprintf(out, "    ldarg.1\n"); net_ms_length(out);
         fprintf(out, "    bgt        LIT_%d_%d_A_FAIL\n", sid, nid);
         fprintf(out, "    ldarg.1\n");
-        ec_net_cursor_load(out);
+        net_cursor_load(out);
         fprintf(out, "    ldfld      string pat_%d_%d::_lit\n", sid, nid);
         fprintf(out, "    callvirt   instance bool [boxes]Snobol4.Runtime.Boxes.MatchState::MatchesAt(int32, string)\n");
         fprintf(out, "    brfalse    LIT_%d_%d_A_FAIL\n", sid, nid);
-        ec_net_cursor_load(out);
+        net_cursor_load(out);
         fprintf(out, "    ldfld      int32 pat_%d_%d::_len\n", sid, nid);
-        ec_net_spec_of(out);
+        net_spec_of(out);
         fprintf(out, "    stloc.0\n");
         fprintf(out, "    ldarg.1\n    ldarg.1\n");
-        ec_net_cursor_load(out);
+        net_cursor_load(out);
         fprintf(out, "    ldfld      int32 pat_%d_%d::_len\n    add\n", sid, nid);
         fprintf(out, "    stfld      int32 [boxes]Snobol4.Runtime.Boxes.MatchState::Cursor\n");
         fprintf(out, "    ldloc.0\n    ret\n");
         fprintf(out, "  LIT_%d_%d_A_FAIL:\n", sid, nid);
-        ec_net_fail_ret(out);
+        net_fail_ret(out);
         fprintf(out, "  }\n");
-        ec_net_beta_hdr(out);
+        net_beta_hdr(out);
         fprintf(out, "    .maxstack 3\n");
         fprintf(out, "    ldarg.1\n    ldarg.1\n");
-        ec_net_cursor_load(out);
+        net_cursor_load(out);
         fprintf(out, "    ldfld      int32 pat_%d_%d::_len\n    sub\n", sid, nid);
         fprintf(out, "    stfld      int32 [boxes]Snobol4.Runtime.Boxes.MatchState::Cursor\n");
-        ec_net_fail_ret(out);
+        net_fail_ret(out);
         fprintf(out, "  }\n}\n");
-        ec_net_escape_ldstr(out, lit);
+        net_escape_ldstr(out, lit);
         fprintf(out, "    newobj     instance void pat_%d_%d::.ctor(string)\n", sid, nid);
     }
 }

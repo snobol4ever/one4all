@@ -1,11 +1,11 @@
 #include "bb_template_common.h"
 
-void ec_bb_cat(IR_t * nd, FILE * out) {
+void bb_cat(IR_t * nd, FILE * out) {
     int nid = ir_node_id(nd); int sid = 0;
     if (IS_TEXT || IS_BIN) { /* x86: via emit_flat_xcat — not wired here yet (EC-3+). */ return; }
     if (IS_JVM) {
         char tag[32]; snprintf(tag, sizeof tag, "seq_%d_%d", sid, nid);
-        ec_jvm_class_hdr(out, "seq");
+        jvm_class_hdr(out, "seq");
         fprintf(out, ".field private final left Lbb/bb_box;\n.field private final right Lbb/bb_box;\n");
         fprintf(out, ".field private matched_start I\n.field private matched_len I\n");
         fprintf(out, ".method public <init>(Lbb/bb_box$MatchState;Lbb/bb_box;Lbb/bb_box;)V\n    .limit stack 3\n    .limit locals 4\n");
@@ -45,7 +45,7 @@ void ec_bb_cat(IR_t * nd, FILE * out) {
         return;
     }
     if (IS_NET) {
-        ec_net_class_hdr(out, sid, nid);
+        net_class_hdr(out, sid, nid);
         fprintf(out, "  .field private class [boxes]Snobol4.Runtime.Boxes.IByrdBox _left\n");
         fprintf(out, "  .field private class [boxes]Snobol4.Runtime.Boxes.IByrdBox _right\n");
         fprintf(out, "  .field private int32 _mStart\n  .field private int32 _mLen\n");
@@ -53,9 +53,9 @@ void ec_bb_cat(IR_t * nd, FILE * out) {
         fprintf(out, "    .maxstack 2\n    ldarg.0\n    call       instance void [mscorlib]System.Object::.ctor()\n");
         fprintf(out, "    ldarg.0\n    ldarg.1\n    stfld      class [boxes]Snobol4.Runtime.Boxes.IByrdBox pat_%d_%d::_left\n", sid, nid);
         fprintf(out, "    ldarg.0\n    ldarg.2\n    stfld      class [boxes]Snobol4.Runtime.Boxes.IByrdBox pat_%d_%d::_right\n    ret\n  }\n", sid, nid);
-        ec_net_alpha_hdr(out);
+        net_alpha_hdr(out);
         fprintf(out, "    .maxstack 3\n    .locals init (valuetype [boxes]Snobol4.Runtime.Boxes.Spec V_lr, valuetype [boxes]Snobol4.Runtime.Boxes.Spec V_rr)\n");
-        fprintf(out, "    ldarg.0\n"); ec_net_cursor_load(out); fprintf(out, "    stfld      int32 pat_%d_%d::_mStart\n", sid, nid);
+        fprintf(out, "    ldarg.0\n"); net_cursor_load(out); fprintf(out, "    stfld      int32 pat_%d_%d::_mStart\n", sid, nid);
         fprintf(out, "    ldarg.0\n    ldfld      class [boxes]Snobol4.Runtime.Boxes.IByrdBox pat_%d_%d::_left\n    ldarg.1\n", sid, nid);
         fprintf(out, "    callvirt   instance valuetype [boxes]Snobol4.Runtime.Boxes.Spec [boxes]Snobol4.Runtime.Boxes.IByrdBox::Alpha(class [boxes]Snobol4.Runtime.Boxes.MatchState)\n");
         fprintf(out, "    stloc.0\n    ldloca.s   V_lr\n    call       instance bool [boxes]Snobol4.Runtime.Boxes.Spec::get_IsFail()\n");
@@ -68,8 +68,8 @@ void ec_bb_cat(IR_t * nd, FILE * out) {
         fprintf(out, "    ldarg.0\n    ldfld      int32 pat_%d_%d::_mStart\n", sid, nid);
         fprintf(out, "    ldarg.0\n    ldfld      int32 pat_%d_%d::_mLen\n", sid, nid);
         fprintf(out, "    ldloca.s   V_rr\n    ldfld      int32 [boxes]Snobol4.Runtime.Boxes.Spec::Length\n    add\n");
-        ec_net_spec_of(out); fprintf(out, "    ret\n  CAT_%d_%d_FAIL:\n", sid, nid); ec_net_fail_ret(out); fprintf(out, "  }\n");
-        ec_net_beta_hdr(out);
+        net_spec_of(out); fprintf(out, "    ret\n  CAT_%d_%d_FAIL:\n", sid, nid); net_fail_ret(out); fprintf(out, "  }\n");
+        net_beta_hdr(out);
         fprintf(out, "    .maxstack 2\n    .locals init (valuetype [boxes]Snobol4.Runtime.Boxes.Spec V_rr)\n");
         fprintf(out, "    ldarg.0\n    ldfld      class [boxes]Snobol4.Runtime.Boxes.IByrdBox pat_%d_%d::_right\n    ldarg.1\n", sid, nid);
         fprintf(out, "    callvirt   instance valuetype [boxes]Snobol4.Runtime.Boxes.Spec [boxes]Snobol4.Runtime.Boxes.IByrdBox::Beta(class [boxes]Snobol4.Runtime.Boxes.MatchState)\n");
@@ -81,7 +81,7 @@ void ec_bb_cat(IR_t * nd, FILE * out) {
         fprintf(out, "    ldarg.0\n    ldfld      int32 pat_%d_%d::_mStart\n", sid, nid);
         fprintf(out, "    ldarg.0\n    ldfld      int32 pat_%d_%d::_mLen\n", sid, nid);
         fprintf(out, "    ldloca.s   V_rr\n    ldfld      int32 [boxes]Snobol4.Runtime.Boxes.Spec::Length\n    add\n");
-        ec_net_spec_of(out); fprintf(out, "    ret\n  }\n}\n");
+        net_spec_of(out); fprintf(out, "    ret\n  }\n}\n");
         fprintf(out, "    newobj     instance void pat_%d_%d::.ctor(class [boxes]Snobol4.Runtime.Boxes.IByrdBox, class [boxes]Snobol4.Runtime.Boxes.IByrdBox)\n", sid, nid);
     }
 }

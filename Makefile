@@ -76,22 +76,22 @@ RT_PIC_SRCS := \
     $(SRC)/runtime/snobol4/eval_pat.c \
     $(SRC)/processor/bb_pool.c \
     $(SRC)/emitter/emit_core.c \
-    $(SRC)/emitter/BB_templates/ec_bb_lit.c \
-    $(SRC)/emitter/BB_templates/ec_bb_any.c \
-    $(SRC)/emitter/BB_templates/ec_bb_notany.c \
-    $(SRC)/emitter/BB_templates/ec_bb_span.c \
-    $(SRC)/emitter/BB_templates/ec_bb_break.c \
-    $(SRC)/emitter/BB_templates/ec_bb_arb.c \
-    $(SRC)/emitter/BB_templates/ec_bb_arbno.c \
-    $(SRC)/emitter/BB_templates/ec_bb_cat.c \
-    $(SRC)/emitter/BB_templates/ec_bb_alt.c \
-    $(SRC)/emitter/BB_templates/ec_bb_len.c \
-    $(SRC)/emitter/BB_templates/ec_bb_pos.c \
-    $(SRC)/emitter/BB_templates/ec_bb_tab.c \
-    $(SRC)/emitter/BB_templates/ec_bb_rem.c \
-    $(SRC)/emitter/BB_templates/ec_bb_fence.c \
-    $(SRC)/emitter/BB_templates/ec_bb_abort.c \
-    $(SRC)/emitter/BB_templates/ec_bb_capture.c \
+    $(SRC)/emitter/BB_templates/bb_lit.c \
+    $(SRC)/emitter/BB_templates/bb_any.c \
+    $(SRC)/emitter/BB_templates/bb_notany.c \
+    $(SRC)/emitter/BB_templates/bb_span.c \
+    $(SRC)/emitter/BB_templates/bb_break.c \
+    $(SRC)/emitter/BB_templates/bb_arb.c \
+    $(SRC)/emitter/BB_templates/bb_arbno.c \
+    $(SRC)/emitter/BB_templates/bb_cat.c \
+    $(SRC)/emitter/BB_templates/bb_alt.c \
+    $(SRC)/emitter/BB_templates/bb_len.c \
+    $(SRC)/emitter/BB_templates/bb_pos.c \
+    $(SRC)/emitter/BB_templates/bb_tab.c \
+    $(SRC)/emitter/BB_templates/bb_rem.c \
+    $(SRC)/emitter/BB_templates/bb_fence.c \
+    $(SRC)/emitter/BB_templates/bb_abort.c \
+    $(SRC)/emitter/BB_templates/bb_capture.c \
     $(SRC)/emitter/emit_bb.c \
     $(SRC)/emitter/emit_sm.c \
     $(SRC)/emitter/emit_ir.c \
@@ -252,22 +252,22 @@ scrip:
 	$(CC) $(CRT)   -c $(SRC)/runtime/snobol4/eval_pat.c                   -o $(OBJ)/eval_pat.o
 	$(CC) $(CRT)   -c $(SRC)/processor/bb_pool.c                    -o $(OBJ)/bb_pool.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/emit_core.c               -o $(OBJ)/emit_core.o
-	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/ec_bb_lit.c      -o $(OBJ)/ec_bb_lit.o
-	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/ec_bb_any.c      -o $(OBJ)/ec_bb_any.o
-	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/ec_bb_notany.c   -o $(OBJ)/ec_bb_notany.o
-	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/ec_bb_span.c     -o $(OBJ)/ec_bb_span.o
-	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/ec_bb_break.c    -o $(OBJ)/ec_bb_break.o
-	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/ec_bb_arb.c      -o $(OBJ)/ec_bb_arb.o
-	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/ec_bb_arbno.c    -o $(OBJ)/ec_bb_arbno.o
-	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/ec_bb_cat.c      -o $(OBJ)/ec_bb_cat.o
-	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/ec_bb_alt.c      -o $(OBJ)/ec_bb_alt.o
-	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/ec_bb_len.c      -o $(OBJ)/ec_bb_len.o
-	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/ec_bb_pos.c      -o $(OBJ)/ec_bb_pos.o
-	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/ec_bb_tab.c      -o $(OBJ)/ec_bb_tab.o
-	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/ec_bb_rem.c      -o $(OBJ)/ec_bb_rem.o
-	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/ec_bb_fence.c    -o $(OBJ)/ec_bb_fence.o
-	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/ec_bb_abort.c    -o $(OBJ)/ec_bb_abort.o
-	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/ec_bb_capture.c  -o $(OBJ)/ec_bb_capture.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_lit.c      -o $(OBJ)/bb_lit.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_any.c      -o $(OBJ)/bb_any.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_notany.c   -o $(OBJ)/bb_notany.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_span.c     -o $(OBJ)/bb_span.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_break.c    -o $(OBJ)/bb_break.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_arb.c      -o $(OBJ)/bb_arb.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_arbno.c    -o $(OBJ)/bb_arbno.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_cat.c      -o $(OBJ)/bb_cat.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_alt.c      -o $(OBJ)/bb_alt.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_len.c      -o $(OBJ)/bb_len.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_pos.c      -o $(OBJ)/bb_pos.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_tab.c      -o $(OBJ)/bb_tab.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_rem.c      -o $(OBJ)/bb_rem.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_fence.c    -o $(OBJ)/bb_fence.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_abort.c    -o $(OBJ)/bb_abort.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_capture.c  -o $(OBJ)/bb_capture.o
 	$(CC) $(CRT) -c $(SRC)/processor/bb_boxes.c -o $(OBJ)/bb_boxes.o
 	$(CC) $(CRT) -c $(SRC)/processor/bb_broker.c -o $(OBJ)/bb_broker.o
 	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -DIR_DEFINE_NAMES \

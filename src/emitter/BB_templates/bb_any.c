@@ -1,11 +1,11 @@
 #include "bb_template_common.h"
 
-void ec_bb_any(IR_t * nd, FILE * out) {
+void bb_any(IR_t * nd, FILE * out) {
     int nid = ir_node_id(nd); int sid = 0;
     if (IS_TEXT || IS_BIN) { /* x86: via emit_bb_charset/bb_any — not wired here yet (EC-3+). */ return; }
     if (IS_JVM) {
         char tag[32]; snprintf(tag, sizeof tag, "any_%d_%d", sid, nid);
-        ec_jvm_class_hdr(out, "any"); fprintf(out, ".field private final chars Ljava/lang/String;\n"); ec_jvm_init_ms_str(out, "any", "chars");
+        jvm_class_hdr(out, "any"); fprintf(out, ".field private final chars Ljava/lang/String;\n"); jvm_init_ms_str(out, "any", "chars");
         fprintf(out, ".method public \316\261()Lbb/bb_box$Spec;\n    .limit stack 5\n    .limit locals 2\n");
         fprintf(out, "    aload_0\n    getfield bb/bb_any/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/delta I\n");
         fprintf(out, "    aload_0\n    getfield bb/bb_any/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/omega I\n    if_icmpge %s_omega\n", tag);
@@ -23,20 +23,20 @@ void ec_bb_any(IR_t * nd, FILE * out) {
         return;
     }
     if (IS_JS) {
-        fprintf(out, "function make_pat_%d_%d(ms) { const chars = ", nd->ival, nid); ec_js_escape(out, nd->sval);
+        fprintf(out, "function make_pat_%d_%d(ms) { const chars = ", nd->ival, nid); js_escape(out, nd->sval);
         fprintf(out, "; let self = { succ: null, fail: null,\nalpha() { if (ms.delta >= ms.omega || chars.indexOf(ms.sigma[ms.delta]) < 0) { self.fail.alpha(); return; } const r = ms.sigma.slice(ms.delta, ms.delta + 1); ms.delta++; self.succ.alpha(); return r; },\nbeta() { ms.delta--; self.fail.alpha(); }\n}; return self; }\n");
         return;
     }
     if (IS_NET) {
         const char * chars = nd->sval ? nd->sval : "";
-        ec_net_charset_class(out, sid, nid, "ANY"); ec_net_alpha_hdr(out);
-        fprintf(out, "    .maxstack 3\n    .locals init (valuetype [boxes]Snobol4.Runtime.Boxes.Spec V_r)\n    ldarg.1\n"); ec_net_cursor_load(out);
+        net_charset_class(out, sid, nid, "ANY"); net_alpha_hdr(out);
+        fprintf(out, "    .maxstack 3\n    .locals init (valuetype [boxes]Snobol4.Runtime.Boxes.Spec V_r)\n    ldarg.1\n"); net_cursor_load(out);
         fprintf(out, "    ldfld      string pat_%d_%d::_chars\n    callvirt   instance bool [boxes]Snobol4.Runtime.Boxes.MatchState::CharInSet(int32, string)\n    brfalse    ANY_%d_%d_A_FAIL\n", sid, nid, sid, nid);
-        ec_net_cursor_load(out); fprintf(out, "    ldc.i4.1\n"); ec_net_spec_of(out); fprintf(out, "    stloc.0\n    ldarg.1\n    ldarg.1\n"); ec_net_cursor_load(out);
+        net_cursor_load(out); fprintf(out, "    ldc.i4.1\n"); net_spec_of(out); fprintf(out, "    stloc.0\n    ldarg.1\n    ldarg.1\n"); net_cursor_load(out);
         fprintf(out, "    ldc.i4.1\n    add\n    stfld      int32 [boxes]Snobol4.Runtime.Boxes.MatchState::Cursor\n    ldloc.0\n    ret\n  ANY_%d_%d_A_FAIL:\n", sid, nid);
-        ec_net_fail_ret(out); fprintf(out, "  }\n"); ec_net_beta_hdr(out);
-        fprintf(out, "    .maxstack 3\n    ldarg.1\n    ldarg.1\n"); ec_net_cursor_load(out);
-        fprintf(out, "    ldc.i4.1\n    sub\n    stfld      int32 [boxes]Snobol4.Runtime.Boxes.MatchState::Cursor\n"); ec_net_fail_ret(out); fprintf(out, "  }\n}\n");
-        ec_net_escape_ldstr(out, chars); fprintf(out, "    newobj     instance void pat_%d_%d::.ctor(string)\n", sid, nid);
+        net_fail_ret(out); fprintf(out, "  }\n"); net_beta_hdr(out);
+        fprintf(out, "    .maxstack 3\n    ldarg.1\n    ldarg.1\n"); net_cursor_load(out);
+        fprintf(out, "    ldc.i4.1\n    sub\n    stfld      int32 [boxes]Snobol4.Runtime.Boxes.MatchState::Cursor\n"); net_fail_ret(out); fprintf(out, "  }\n}\n");
+        net_escape_ldstr(out, chars); fprintf(out, "    newobj     instance void pat_%d_%d::.ctor(string)\n", sid, nid);
     }
 }
