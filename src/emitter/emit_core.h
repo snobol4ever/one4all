@@ -159,4 +159,7 @@ void bb_insn_mov_ecx_eax      (void);              void bb_insn_cmp_eax_ecx     
 void bb_insn_mov_rax_mem_rcx  (void);              void bb_insn_movsxd_rcx_r10mem(void);
 void bb_insn_lea_rax_rax_rcx  (void);              void bb_insn_mov_rdi_rax      (void);
 void bb_insn_add_eax_imm32    (uint32_t v);        void bb_insn_cmp_eax_mem_rcx  (void);
+/*--- EC unified BB node emitter (EC-2+) ------------------------------------*/
+struct IR_t;
+int emit_bb_node(struct IR_t * nd, FILE * out);
 #endif

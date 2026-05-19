@@ -1204,6 +1204,180 @@ void emit_sub_delta_imm(int v)
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* EC-2 helpers — shared across JVM/JS/.NET arms; removed from silos in EC-5. */
+#include "IR.h"
+#include "emit_ir.h"
+static void ec_js_escape(FILE * out, const char * s) {
+    fprintf(out, "\"");
+    for (; s && *s; s++) {
+        unsigned char c = (unsigned char)*s;
+        if      (c == '"')  fprintf(out, "\\\"");
+        else if (c == '\\') fprintf(out, "\\\\");
+        else if (c == '\n') fprintf(out, "\\n");
+        else if (c == '\r') fprintf(out, "\\r");
+        else if (c == '\t') fprintf(out, "\\t");
+        else if (c < 0x20 || c > 0x7e) fprintf(out, "\\x%02x", c);
+        else fprintf(out, "%c", c);
+    }
+    fprintf(out, "\"");
+}
+static void ec_jvm_class_hdr(FILE * out, const char * name) {
+    fprintf(out, ".class public bb/bb_%s\n", name);
+    fprintf(out, ".super bb/bb_box\n");
+    fprintf(out, ".inner class public static final spec inner bb/bb_box$Spec outer bb/bb_box\n");
+    fprintf(out, ".inner class public static final matchstate inner bb/bb_box$MatchState outer bb/bb_box\n");
+}
+static void ec_net_escape_ldstr(FILE * out, const char * s) {
+    fprintf(out, "    ldstr      \"");
+    if (!s) { fprintf(out, "\"\n"); return; }
+    for (const unsigned char * p = (const unsigned char *)s; *p; p++) {
+        if (*p == '"')       fprintf(out, "\\\"");
+        else if (*p == '\\') fprintf(out, "\\\\");
+        else if (*p < 0x20 || *p == 0x7f) fprintf(out, "\\u%04X", (unsigned)*p);
+        else fputc(*p, out);
+    }
+    fprintf(out, "\"\n");
+}
+static void ec_net_class_hdr(FILE * out, int sid, int nid) {
+    fprintf(out, ".class nested public auto ansi beforefieldinit pat_%d_%d\n", sid, nid);
+    fprintf(out, "       extends [mscorlib]System.Object\n");
+    fprintf(out, "       implements [boxes]Snobol4.Runtime.Boxes.IByrdBox\n{\n");
+}
+static void ec_net_alpha_hdr(FILE * out) {
+    fprintf(out, "  .method public virtual instance valuetype [boxes]Snobol4.Runtime.Boxes.Spec\n");
+    fprintf(out, "          Alpha(class [boxes]Snobol4.Runtime.Boxes.MatchState ms) cil managed\n  {\n");
+}
+static void ec_net_beta_hdr(FILE * out) {
+    fprintf(out, "  .method public virtual instance valuetype [boxes]Snobol4.Runtime.Boxes.Spec\n");
+    fprintf(out, "          Beta(class [boxes]Snobol4.Runtime.Boxes.MatchState ms) cil managed\n  {\n");
+}
+static void ec_net_fail_ret(FILE * out) {
+    fprintf(out, "    ldsfld     valuetype [boxes]Snobol4.Runtime.Boxes.Spec [boxes]Snobol4.Runtime.Boxes.Spec::Fail\n");
+    fprintf(out, "    ret\n");
+}
+static void ec_net_cursor_load(FILE * out) {
+    fprintf(out, "    ldarg.1\n");
+    fprintf(out, "    ldfld      int32 [boxes]Snobol4.Runtime.Boxes.MatchState::Cursor\n");
+}
+static void ec_net_ms_length(FILE * out) {
+    fprintf(out, "    callvirt   instance int32 [boxes]Snobol4.Runtime.Boxes.MatchState::get_Length()\n");
+}
+static void ec_net_spec_of(FILE * out) {
+    fprintf(out, "    call       valuetype [boxes]Snobol4.Runtime.Boxes.Spec [boxes]Snobol4.Runtime.Boxes.Spec::Of(int32, int32)\n");
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* EC-2: IR_PAT_LIT — unified template function (JVM / JS / .NET arms; x86 arms in emit_bb.c). */
+static void ec_bb_lit_jvm(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd); int sid = 0;
+    char tag[32]; snprintf(tag, sizeof tag, "lit_%d_%d", sid, nid);
+    ec_jvm_class_hdr(out, "lit");
+    fprintf(out, ".field private final lit Ljava/lang/String;\n");
+    fprintf(out, ".field private final len I\n");
+    fprintf(out, ".method public <init>(Lbb/bb_box$MatchState;Ljava/lang/String;)V\n");
+    fprintf(out, "    .limit stack 3\n    .limit locals 3\n");
+    fprintf(out, "    aload_0\n    aload_1\n    invokespecial bb/bb_box/<init>(Lbb/bb_box$MatchState;)V\n");
+    fprintf(out, "    aload_0\n    aload_2\n    putfield bb/bb_lit/lit Ljava/lang/String;\n");
+    fprintf(out, "    aload_0\n    aload_2\n    invokevirtual java/lang/String/length()I\n    putfield bb/bb_lit/len I\n");
+    fprintf(out, "    return\n.end method\n");
+    fprintf(out, ".method public \316\261()Lbb/bb_box$Spec;\n");
+    fprintf(out, "    .limit stack 6\n    .limit locals 2\n");
+    fprintf(out, "    aload_0\n    getfield bb/bb_lit/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/delta I\n");
+    fprintf(out, "    aload_0\n    getfield bb/bb_lit/len I\n    iadd\n");
+    fprintf(out, "    aload_0\n    getfield bb/bb_lit/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/omega I\n");
+    fprintf(out, "    if_icmpgt %s_omega\n", tag);
+    fprintf(out, "    aload_0\n    getfield bb/bb_lit/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/sigma Ljava/lang/String;\n");
+    fprintf(out, "    aload_0\n    getfield bb/bb_lit/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/delta I\n");
+    fprintf(out, "    aload_0\n    getfield bb/bb_lit/lit Ljava/lang/String;\n    iconst_0\n");
+    fprintf(out, "    aload_0\n    getfield bb/bb_lit/len I\n");
+    fprintf(out, "    invokevirtual java/lang/String/regionMatches(ILjava/lang/String;II)Z\n");
+    fprintf(out, "    ifeq %s_omega\n", tag);
+    fprintf(out, "    aload_0\n    getfield bb/bb_lit/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/delta I\n    istore_1\n");
+    fprintf(out, "    aload_0\n    getfield bb/bb_lit/ms Lbb/bb_box$MatchState;\n    dup\n    getfield bb/bb_box$MatchState/delta I\n");
+    fprintf(out, "    aload_0\n    getfield bb/bb_lit/len I\n    iadd\n    putfield bb/bb_box$MatchState/delta I\n");
+    fprintf(out, "    new bb/bb_box$Spec\n    dup\n    iload_1\n    aload_0\n    getfield bb/bb_lit/len I\n");
+    fprintf(out, "    invokespecial bb/bb_box$Spec/<init>(II)V\n    areturn\n");
+    fprintf(out, "%s_omega:\n    aconst_null\n    areturn\n.end method\n", tag);
+    fprintf(out, ".method public \316\262()Lbb/bb_box$Spec;\n");
+    fprintf(out, "    .limit stack 4\n    .limit locals 1\n");
+    fprintf(out, "    aload_0\n    getfield bb/bb_lit/ms Lbb/bb_box$MatchState;\n    dup\n    getfield bb/bb_box$MatchState/delta I\n");
+    fprintf(out, "    aload_0\n    getfield bb/bb_lit/len I\n    isub\n    putfield bb/bb_box$MatchState/delta I\n");
+    fprintf(out, "    aconst_null\n    areturn\n.end method\n");
+}
+static void ec_bb_lit_js(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd);
+    fprintf(out, "function make_pat_%d_%d(ms) { const lit = ", nd->ival, nid);
+    ec_js_escape(out, nd->sval);
+    fprintf(out, "; const len = lit.length; let self = { succ: null, fail: null,\n");
+    fprintf(out, "alpha() { if (ms.delta + len > ms.omega || ms.sigma.slice(ms.delta, ms.delta + len) !== lit) { self.fail.alpha(); return; } ms.delta += len; self.succ.alpha(); },\n");
+    fprintf(out, "beta() { ms.delta -= len; self.fail.alpha(); }\n");
+    fprintf(out, "}; return self; }\n");
+}
+static void ec_bb_lit_net(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd); int sid = 0;
+    const char * lit = nd->sval ? nd->sval : "";
+    ec_net_class_hdr(out, sid, nid);
+    fprintf(out, "  .field private string _lit\n  .field private int32  _len\n");
+    fprintf(out, "  .method public specialname rtspecialname instance void .ctor(string lit) cil managed\n  {\n");
+    fprintf(out, "    .maxstack 3\n    ldarg.0\n    call       instance void [mscorlib]System.Object::.ctor()\n");
+    fprintf(out, "    ldarg.0\n    ldarg.1\n    dup\n    brtrue     LIT_%d_%d_NN\n    pop\n    ldstr      \"\"\n", sid, nid);
+    fprintf(out, "  LIT_%d_%d_NN:\n", sid, nid);
+    fprintf(out, "    stfld      string pat_%d_%d::_lit\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldarg.0\n");
+    fprintf(out, "    ldfld      string pat_%d_%d::_lit\n", sid, nid);
+    fprintf(out, "    callvirt   instance int32 [mscorlib]System.String::get_Length()\n");
+    fprintf(out, "    stfld      int32 pat_%d_%d::_len\n    ret\n  }\n", sid, nid);
+    ec_net_alpha_hdr(out);
+    fprintf(out, "    .maxstack 4\n    .locals init (valuetype [boxes]Snobol4.Runtime.Boxes.Spec V_r)\n");
+    ec_net_cursor_load(out);
+    fprintf(out, "    ldfld      int32 pat_%d_%d::_len\n    add\n", sid, nid);
+    fprintf(out, "    ldarg.1\n"); ec_net_ms_length(out);
+    fprintf(out, "    bgt        LIT_%d_%d_A_FAIL\n", sid, nid);
+    fprintf(out, "    ldarg.1\n");
+    ec_net_cursor_load(out);
+    fprintf(out, "    ldfld      string pat_%d_%d::_lit\n", sid, nid);
+    fprintf(out, "    callvirt   instance bool [boxes]Snobol4.Runtime.Boxes.MatchState::MatchesAt(int32, string)\n");
+    fprintf(out, "    brfalse    LIT_%d_%d_A_FAIL\n", sid, nid);
+    ec_net_cursor_load(out);
+    fprintf(out, "    ldfld      int32 pat_%d_%d::_len\n", sid, nid);
+    ec_net_spec_of(out);
+    fprintf(out, "    stloc.0\n");
+    fprintf(out, "    ldarg.1\n    ldarg.1\n");
+    ec_net_cursor_load(out);
+    fprintf(out, "    ldfld      int32 pat_%d_%d::_len\n    add\n", sid, nid);
+    fprintf(out, "    stfld      int32 [boxes]Snobol4.Runtime.Boxes.MatchState::Cursor\n");
+    fprintf(out, "    ldloc.0\n    ret\n");
+    fprintf(out, "  LIT_%d_%d_A_FAIL:\n", sid, nid);
+    ec_net_fail_ret(out);
+    fprintf(out, "  }\n");
+    ec_net_beta_hdr(out);
+    fprintf(out, "    .maxstack 3\n");
+    fprintf(out, "    ldarg.1\n    ldarg.1\n");
+    ec_net_cursor_load(out);
+    fprintf(out, "    ldfld      int32 pat_%d_%d::_len\n    sub\n", sid, nid);
+    fprintf(out, "    stfld      int32 [boxes]Snobol4.Runtime.Boxes.MatchState::Cursor\n");
+    ec_net_fail_ret(out);
+    fprintf(out, "  }\n}\n");
+    ec_net_escape_ldstr(out, lit);
+    fprintf(out, "    newobj     instance void pat_%d_%d::.ctor(string)\n", sid, nid);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* emit_bb_node — unified BB node emitter. Dispatches JVM/JS/NET arms; x86 arms remain in emit_bb.c.
+   EC-2: IR_PAT_LIT implemented. All other kinds fall through to [unimplemented] stub. */
+int emit_bb_node(IR_t * nd, FILE * out) {
+    if (!nd) return 1;
+    switch (nd->t) {
+    case IR_PAT_LIT:
+        if (IS_JVM) { ec_bb_lit_jvm(nd, out); return 0; }
+        if (IS_JS)  { ec_bb_lit_js(nd, out);  return 0; }
+        if (IS_NET) { ec_bb_lit_net(nd, out); return 0; }
+        return 1;
+    default:
+        if (IS_JVM || IS_JS || IS_NET)
+            fprintf(out, "; [emit_bb_node: kind=%d not yet migrated to unified template]\n", (int)nd->t);
+        return 1;
+    }
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
