@@ -449,22 +449,22 @@ cmp_expr
     | add_expr OP_SEQ add_expr  { $$=expr_binary(TT_LEQ,$1,$3); }
     | add_expr OP_SNE add_expr  { $$=expr_binary(TT_LNE,$1,$3); }
     | add_expr OP_SMATCH LIT_REGEX
-        {
-          tree_t *c = make_call("raku_match");
-          expr_add_child(c, $1);
-          expr_add_child(c, leaf_sval(TT_QLIT, $3));
+        { tree_t *c = ast_node_new(TT_SMATCH);
+          ast_push(c, $1);
+          ast_push(c, leaf_sval(TT_QLIT, $3));
+          ast_push(c, leaf_sval(TT_QLIT, "match"));
           $$ = c; }
     | add_expr OP_SMATCH LIT_MATCH_GLOBAL
-        {
-          tree_t *c = make_call("raku_match_global");
-          expr_add_child(c, $1);
-          expr_add_child(c, leaf_sval(TT_QLIT, $3));
+        { tree_t *c = ast_node_new(TT_SMATCH);
+          ast_push(c, $1);
+          ast_push(c, leaf_sval(TT_QLIT, $3));
+          ast_push(c, leaf_sval(TT_QLIT, "match_global"));
           $$ = c; }
     | add_expr OP_SMATCH LIT_SUBST
-        {
-          tree_t *c = make_call("raku_subst");
-          expr_add_child(c, $1);
-          expr_add_child(c, leaf_sval(TT_QLIT, $3));
+        { tree_t *c = ast_node_new(TT_SMATCH);
+          ast_push(c, $1);
+          ast_push(c, leaf_sval(TT_QLIT, $3));
+          ast_push(c, leaf_sval(TT_QLIT, "subst"));
           $$ = c; }
     | range_expr               { $$=$1; }
     ;

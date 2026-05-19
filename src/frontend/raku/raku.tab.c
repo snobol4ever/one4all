@@ -2179,30 +2179,30 @@ yyreduce:
 
   case 83: /* cmp_expr: add_expr OP_SMATCH LIT_REGEX  */
 #line 452 "raku.y"
-        {
-          tree_t *c = make_call("raku_match");
-          expr_add_child(c, (yyvsp[-2].node));
-          expr_add_child(c, leaf_sval(TT_QLIT, (yyvsp[0].sval)));
+        { tree_t *c = ast_node_new(TT_SMATCH);
+          ast_push(c, (yyvsp[-2].node));
+          ast_push(c, leaf_sval(TT_QLIT, (yyvsp[0].sval)));
+          ast_push(c, leaf_sval(TT_QLIT, "match"));
           (yyval.node) = c; }
 #line 2188 "raku.tab.c"
     break;
 
   case 84: /* cmp_expr: add_expr OP_SMATCH LIT_MATCH_GLOBAL  */
 #line 458 "raku.y"
-        {
-          tree_t *c = make_call("raku_match_global");
-          expr_add_child(c, (yyvsp[-2].node));
-          expr_add_child(c, leaf_sval(TT_QLIT, (yyvsp[0].sval)));
+        { tree_t *c = ast_node_new(TT_SMATCH);
+          ast_push(c, (yyvsp[-2].node));
+          ast_push(c, leaf_sval(TT_QLIT, (yyvsp[0].sval)));
+          ast_push(c, leaf_sval(TT_QLIT, "match_global"));
           (yyval.node) = c; }
 #line 2198 "raku.tab.c"
     break;
 
   case 85: /* cmp_expr: add_expr OP_SMATCH LIT_SUBST  */
 #line 464 "raku.y"
-        {
-          tree_t *c = make_call("raku_subst");
-          expr_add_child(c, (yyvsp[-2].node));
-          expr_add_child(c, leaf_sval(TT_QLIT, (yyvsp[0].sval)));
+        { tree_t *c = ast_node_new(TT_SMATCH);
+          ast_push(c, (yyvsp[-2].node));
+          ast_push(c, leaf_sval(TT_QLIT, (yyvsp[0].sval)));
+          ast_push(c, leaf_sval(TT_QLIT, "subst"));
           (yyval.node) = c; }
 #line 2208 "raku.tab.c"
     break;

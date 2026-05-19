@@ -1716,6 +1716,16 @@ static void lower_expr_inner(const tree_t *t)
     case TT_SAY_FH:  if (t->n >= 2) { lower_expr(t->c[0]); lower_expr(t->c[1]); } sm_emit_si(g_p, SM_CALL_FN, "raku_say_fh",   2); return;
     case TT_PRINT_FH:if (t->n >= 2) { lower_expr(t->c[0]); lower_expr(t->c[1]); } sm_emit_si(g_p, SM_CALL_FN, "raku_print_fh", 2); return;
     case TT_DIE:     if (t->n >= 1) lower_expr(t->c[0]); sm_emit_si(g_p, SM_CALL_FN, "raku_die",       1); return;
+    case TT_SMATCH: {
+        const char *flavor = (t->n >= 3 && t->c[2] && t->c[2]->v.sval) ? t->c[2]->v.sval : "match";
+        const char *fn = strcmp(flavor, "match_global") == 0 ? "raku_match_global"
+                       : strcmp(flavor, "subst")        == 0 ? "raku_subst"
+                       :                                        "raku_match";
+        if (t->n >= 1) lower_expr(t->c[0]);
+        if (t->n >= 2) lower_expr(t->c[1]);
+        sm_emit_si(g_p, SM_CALL_FN, fn, 2);
+        return;
+    }
     case TT_ARR_GET:    if (t->n >= 2) { lower_expr(t->c[0]); lower_expr(t->c[1]); } sm_emit_si(g_p, SM_CALL_FN, "arr_get",      2); return;
     case TT_ARR_SET:    if (t->n >= 3) { lower_expr(t->c[0]); lower_expr(t->c[1]); lower_expr(t->c[2]); } sm_emit_si(g_p, SM_CALL_FN, "arr_set",   3); return;
     case TT_HASH_GET:   if (t->n >= 2) { lower_expr(t->c[0]); lower_expr(t->c[1]); } sm_emit_si(g_p, SM_CALL_FN, "hash_get",     2); return;
