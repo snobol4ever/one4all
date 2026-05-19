@@ -147,17 +147,7 @@ static void     sc_finalize_do_while_pst(ScParseState *st, struct DoHead *h, tre
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static struct ForHead   *sc_for_head_new_pst(ScParseState *st, tree_t *cond, tree_t *step, STMT_t *before_body);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static STMT_t  *sc_make_label_stmt    (ScParseState *st, char *label);
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static STMT_t  *sc_make_goto_uncond_stmt(ScParseState *st, char *target);
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void     sc_splice_after       (ScParseState *st, STMT_t *anchor, STMT_t *chain_head, STMT_t *chain_tail);
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_append_chain       (ScParseState *st, STMT_t *chain_head, STMT_t *chain_tail);
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void     sc_finalize_if_no_else(ScParseState *st, struct IfHead *h);
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void     sc_finalize_if_else   (ScParseState *st, struct IfHead *h, STMT_t *before_else);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_finalize_for_pst   (ScParseState *st, struct ForHead *h);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -601,56 +591,14 @@ void sc_error(ScParseState *st, const char *msg) {
     st->nerrors++;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void sc_split_subject_pattern(tree_t **subj_io, tree_t **pat_io) {
-    tree_t *subj = *subj_io;
-    if (*pat_io || !subj) return;
-    if (subj->kind == TT_SCAN && subj->nchildren == 2) {
-        tree_t *new_subj = subj->children[0];
-        tree_t *new_pat  = subj->children[1];
-        free(subj->children);
-        free(subj);
-        *subj_io = new_subj;
-        *pat_io  = new_pat;
-        return;
-    }
-    if (subj->kind == TT_SEQ && subj->nchildren >= 2) {
-        tree_t *first = subj->children[0];
-        if (first->kind == TT_VAR || first->kind == TT_KEYWORD ||
-            first->kind == TT_QLIT || first->kind == TT_INDIRECT) {
-            int nc = subj->nchildren - 1;
-            tree_t *rest;
-            if (nc == 1) {
-                rest = subj->children[1];
-            } else {
-                rest = expr_new(TT_SEQ);
-                for (int i = 1; i < subj->nchildren; i++)
-                    expr_add_child(rest, subj->children[i]);
-            }
-            free(subj->children);
-            free(subj);
-            *subj_io = first;
-            *pat_io  = rest;
-            return;
-        }
-    }
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PST-SC-4m: thin accumulator — no TT_ASSIGN unpack, no splice logic. */
 static void sc_append_stmt(ScParseState *st, tree_t *top) {
     if (!top) return;
     STMT_t *s = stmt_new();
-    s->lineno = st->ctx ? st->ctx->line : 0;
-    s->stno   = ++st->code->nstmts;
-    if (top->kind == TT_ASSIGN && top->nchildren == 2) {
-        s->subject     = top->children[0];
-        s->replacement = top->children[1];
-        s->has_eq      = 1;
-        free(top->children);
-        free(top);
-    } else {
-        s->subject = top;
-    }
-    if (!st->code->head) st->code->head = st->code->tail = s;
-    else { st->code->tail->next = s; st->code->tail = s; }
+    s->lineno  = st->ctx ? st->ctx->line : 0;
+    s->stno    = ++st->code->nstmts;
+    s->subject = top;
+    sc_append_chain(st, s, s);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static tree_t *sc_int_literal(const char *txt) {
@@ -730,40 +678,6 @@ static void sc_finalize_function_pst(ScParseState *st, struct FuncHead *h)
     sc_append_stmt(st, def);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static STMT_t *sc_make_label_stmt(ScParseState *st, char *label) {
-    STMT_t *s = stmt_new();
-    s->lineno = st->ctx ? st->ctx->line : 0;
-    s->stno   = ++st->code->nstmts;
-    s->label  = label;
-    return s;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static STMT_t *sc_make_cond_fail_stmt(ScParseState *st, tree_t *cond, char *fail_target, int lineno) {
-    STMT_t *s = stmt_new();
-    s->lineno = lineno;
-    s->stno   = ++st->code->nstmts;
-    if (cond && cond->kind == TT_ASSIGN && cond->nchildren == 2) {
-        s->subject     = cond->children[0];
-        s->replacement = cond->children[1];
-        s->has_eq      = 1;
-        free(cond->children);
-        free(cond);
-    } else {
-        s->subject = cond;
-    }
-    sc_split_subject_pattern(&s->subject, &s->pattern);
-    s->goto_f = fail_target;
-    return s;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static STMT_t *sc_make_goto_uncond_stmt(ScParseState *st, char *target) {
-    STMT_t *s = stmt_new();
-    s->lineno = st->ctx ? st->ctx->line : 0;
-    s->stno   = ++st->code->nstmts;
-    s->goto_u = target;
-    return s;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* PST-SC-4i (2026-05-16): label: → STMT_t with label field only; stmt_to_ast produces TT_STMT(:lbl).
  * No sc_pending_label_clear; no subject/pattern split. Direct append to CODE chain. */
 static void sc_append_label_node(ScParseState *st, const char *name) {
@@ -774,20 +688,6 @@ static void sc_append_label_node(ScParseState *st, const char *name) {
     sc_append_chain(st, s, s);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void sc_splice_after(ScParseState *st, STMT_t *anchor,
-                            STMT_t *chain_head, STMT_t *chain_tail) {
-    if (!chain_head) return;
-    if (!chain_tail) chain_tail = chain_head;
-    if (anchor) {
-        chain_tail->next = anchor->next;
-        anchor->next     = chain_head;
-        if (st->code->tail == anchor) st->code->tail = chain_tail;
-    } else {
-        chain_tail->next = st->code->head;
-        st->code->head   = chain_head;
-        if (!st->code->tail) st->code->tail = chain_tail;
-    }
-}
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void sc_append_chain(ScParseState *st, STMT_t *chain_head, STMT_t *chain_tail) {
     if (!chain_head) return;
@@ -797,29 +697,6 @@ static void sc_append_chain(ScParseState *st, STMT_t *chain_head, STMT_t *chain_
     st->code->tail = chain_tail;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void sc_finalize_if_no_else(ScParseState *st, struct IfHead *h) {
-    char   *Lend       = sc_label_new(st, "_Lend");
-    STMT_t *cond_stmt  = sc_make_cond_fail_stmt(st, h->cond, strdup(Lend), h->lineno);
-    STMT_t *end_label  = sc_make_label_stmt(st, Lend);
-    sc_splice_after(st, h->before_body, cond_stmt, cond_stmt);
-    sc_append_chain(st, end_label, end_label);
-    free(h);
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void sc_finalize_if_else(ScParseState *st, struct IfHead *h, STMT_t *before_else) {
-    char   *Lelse     = sc_label_new(st, "_Lelse");
-    char   *Lend      = sc_label_new(st, "_Lend");
-    STMT_t *cond_stmt = sc_make_cond_fail_stmt(st, h->cond, strdup(Lelse), h->lineno);
-    STMT_t *goto_end  = sc_make_goto_uncond_stmt(st, strdup(Lend));
-    STMT_t *else_pad  = sc_make_label_stmt(st, Lelse);
-    STMT_t *end_pad   = sc_make_label_stmt(st, Lend);
-    sc_splice_after(st, h->before_body, cond_stmt, cond_stmt);
-    STMT_t *anchor = (before_else == h->before_body) ? cond_stmt : before_else;
-    goto_end->next = else_pad;
-    sc_splice_after(st, anchor, goto_end, else_pad);
-    sc_append_chain(st, end_pad, end_pad);
-    free(h);
-}
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* PST-SC-4b (2026-05-16): collect stmts appended to CODE_t after `snapshot` into a TT_PROGRAM
  * tree node, removing them from CODE_t.  Returns a TT_PROGRAM whose children are
@@ -905,15 +782,6 @@ static void sc_finalize_while_pst(ScParseState *st, struct WhileHead *h, tree_t 
     sc_append_stmt(st, w);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static STMT_t *sc_make_cond_succ_stmt(ScParseState *st, tree_t *cond, char *succ_target, int lineno) {
-    STMT_t *s = stmt_new();
-    s->lineno  = lineno;
-    s->stno    = ++st->code->nstmts;
-    s->subject = cond;
-    sc_split_subject_pattern(&s->subject, &s->pattern);
-    s->goto_s = succ_target;
-    return s;
-}
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* PST-SC-4d (2026-05-16): pure-syntax do-while finalizer.
  * Builds TT_DO_WHILE(TT_PROGRAM(body), cond, TT_QLIT(cont_lbl), TT_QLIT(end_lbl)).
