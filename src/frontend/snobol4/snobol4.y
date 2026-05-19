@@ -11,6 +11,13 @@ typedef struct { CODE_t *prog; tree_t **result; tree_t *ast_prog; } PP;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sno4_stmt_commit_go(void*,Token,tree_t*,tree_t*,int,tree_t*,tree_t*,tree_t*,tree_t*);
 static Lex     *g_lx;
+/* PST-SN4-W3: stack for nested IDX/FNC/VLIST target nodes built left-to-right */
+#define G_CUR_MAX 64
+static tree_t  *g_cur_stack[G_CUR_MAX];
+static int      g_cur_top = 0;
+static inline void   g_cur_push(tree_t *n) { g_cur_stack[g_cur_top++] = n; }
+static inline tree_t*g_cur_top_(void)      { return g_cur_stack[g_cur_top-1]; }
+static inline tree_t*g_cur_pop(void)       { return g_cur_stack[--g_cur_top]; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -45,7 +52,7 @@ static tree_e pat_prim_kind(const char *s) {
 %token T_CONCAT T_COMMA T_LPAREN T_RPAREN T_LBRACK T_RBRACK T_LANGLE T_RANGLE
 %type <expr> expr0 expr2 expr3 expr4 expr5 expr6 expr7 expr8
 %type <expr> expr9 expr10 expr11 expr12 expr13 expr14 expr15 expr17
-%type <expr> exprlist exprlist_ne opt_subject opt_pattern opt_repl
+%type <expr> opt_subject opt_pattern opt_repl
 %type <expr> goto_label_expr
 %type <expr> goto_expr goto_atom
 %%
@@ -91,14 +98,6 @@ opt_pattern: expr3                                                              
 opt_repl   : T_2EQUAL expr0                                                                   { $$=$2; }
            | T_2EQUAL                                                                          { tree_t*e=ast_node_new(TT_QLIT);e->v.sval=strdup("");$$=e; }
            |                                                                           { $$=NULL; }
-           ;
-goto_atom  : T_STR   { tree_t*e=ast_node_new(TT_QLIT);  e->v.sval=(char*)$1.sval; $$=e; }
-           | T_IDENT  { tree_t*e=ast_node_new(TT_VAR);   e->v.sval=(char*)$1.sval; $$=e; }
-           | T_FUNCTION { tree_t*e=ast_node_new(TT_VAR); e->v.sval=(char*)$1.sval; $$=e; }
-           | T_END    { tree_t*e=ast_node_new(TT_VAR);   e->v.sval=(char*)$1.sval; $$=e; }
-           ;
-goto_expr  : goto_atom                          { $$=$1; }
-           | goto_expr T_CONCAT goto_atom       { tree_t*s=ast_node_new(TT_SEQ);expr_add_child(s,$1);expr_add_child(s,$3);$$=s; }
            ;
 goto_label_expr
            : T_GOTO_LPAREN T_IDENT T_GOTO_RPAREN                                             { tree_t*e=ast_node_new(TT_QLIT);e->v.sval=strdup($2.sval);$$=e; }
@@ -167,27 +166,49 @@ expr14     : T_1AT      expr14                                                  
            | T_1PIPE expr14                                                             { tree_t*_e=expr_unary(TT_OPSYN,$2); _e->v.sval=strdup("|"); $$=_e; }
            | expr15                                                                                { $$=$1; }
            ;
-expr15     : expr15 T_LBRACK exprlist T_RBRACK                                                  { tree_t*i=ast_node_new(TT_IDX);expr_add_child(i,$1);for(int j=0;j<$3->n;j++)expr_add_child(i,$3->c[j]);free($3->c);free($3);$$=i; }
-           | expr15 T_LANGLE exprlist T_RANGLE                                                  { tree_t*i=ast_node_new(TT_IDX);expr_add_child(i,$1);for(int j=0;j<$3->n;j++)expr_add_child(i,$3->c[j]);free($3->c);free($3);$$=i; }
+/* PST-SN4-W3 (2026-05-18): Eliminate TT_NUL accumulator pattern.
+ * Previously exprlist_ne built a throwaway TT_NUL node then expr15/expr17
+ * tore it apart post-hoc via ->n/->c inspection. Now mid-rule actions
+ * create the real target node (TT_IDX/TT_FNC/TT_VLIST) before its children
+ * are parsed and store it in g_cur; idx_args/fnc_args/vlist_args add
+ * children directly left-to-right. No ->n/->c field reads in any action. */
+expr15     : expr15 T_LBRACK { tree_t*i=ast_node_new(TT_IDX);expr_add_child(i,$1);g_cur_push(i); } idx_args T_RBRACK  { $$=g_cur_pop(); }
+           | expr15 T_LANGLE { tree_t*i=ast_node_new(TT_IDX);expr_add_child(i,$1);g_cur_push(i); } idx_args T_RANGLE  { $$=g_cur_pop(); }
            | expr17                                                                                { $$=$1; }
            ;
-exprlist   : exprlist_ne                                                                           { $$=$1; }
-           |                                                                           { $$=ast_node_new(TT_NUL); }
-           ;
-exprlist_ne: exprlist_ne T_COMMA expr0                                                            { expr_add_child($1,$3);$$=$1; }
-           | exprlist_ne T_COMMA                                                                  { expr_add_child($1,ast_node_new(TT_NUL));$$=$1; }
-           | expr0                                                                                 { tree_t*l=ast_node_new(TT_NUL);expr_add_child(l,$1);$$=l; }
+idx_args   : idx_args T_COMMA expr0                                                               { expr_add_child(g_cur_top_(),$3); }
+           | idx_args T_COMMA                                                                     { expr_add_child(g_cur_top_(),ast_node_new(TT_NUL)); }
+           | expr0                                                                                 { expr_add_child(g_cur_top_(),$1); }
+           |
            ;
 expr17     : T_LPAREN expr0 T_RPAREN                                                            { $$=$2; }
-           | T_LPAREN expr0 T_COMMA exprlist_ne T_RPAREN                                       { tree_t*a=ast_node_new(TT_VLIST);expr_add_child(a,$2);for(int i=0;i<$4->n;i++)expr_add_child(a,$4->c[i]);free($4->c);free($4);$$=a; }
+           | T_LPAREN expr0 T_COMMA { tree_t*a=ast_node_new(TT_VLIST);expr_add_child(a,$2);g_cur_push(a); } vlist_args T_RPAREN { $$=g_cur_pop(); }
            | T_LPAREN T_RPAREN                                                                  { $$=ast_node_new(TT_NUL); }
-           | T_FUNCTION T_LPAREN exprlist T_RPAREN                                             { tree_e _k=pat_prim_kind($1.sval);tree_t*e=ast_node_new(_k==TT_VAR?TT_FNC:_k);if(_k==TT_VAR)e->v.sval=(char*)$1.sval;for(int i=0;i<$3->n;i++)expr_add_child(e,$3->c[i]);free($3->c);free($3);$$=e; }
+           | T_FUNCTION T_LPAREN { tree_e _k=pat_prim_kind($1.sval);tree_t*e=ast_node_new(_k==TT_VAR?TT_FNC:_k);if(_k==TT_VAR)e->v.sval=(char*)$1.sval;g_cur_push(e); } fnc_args T_RPAREN { $$=g_cur_pop(); }
            | T_IDENT                                                                              { tree_t*e=ast_node_new(TT_VAR);e->v.sval=(char*)$1.sval;$$=e; }
            | T_END                                                                                { tree_t*e=ast_node_new(TT_VAR);    e->v.sval=(char*)$1.sval;$$=e; }
            | T_KEYWORD                                                                            { tree_t*e=ast_node_new(TT_KEYWORD);e->v.sval=(char*)$1.sval;$$=e; }
            | T_STR                                                                                { tree_t*e=ast_node_new(TT_QLIT);   e->v.sval=(char*)$1.sval;$$=e; }
            | T_INT                                                                                { tree_t*e=ast_node_new(TT_ILIT);   e->v.ival=$1.ival;$$=e; }
            | T_REAL                                                                               { tree_t*e=ast_node_new(TT_FLIT);   e->v.dval=$1.dval;$$=e; }
+           ;
+vlist_args : vlist_args T_COMMA expr0                                                            { expr_add_child(g_cur_top_(),$3); }
+           | expr0                                                                                 { expr_add_child(g_cur_top_(),$1); }
+           ;
+fnc_args   : fnc_args T_COMMA expr0                                                              { expr_add_child(g_cur_top_(),$3); }
+           | fnc_args T_COMMA                                                                     { expr_add_child(g_cur_top_(),ast_node_new(TT_NUL)); }
+           | expr0                                                                                 { expr_add_child(g_cur_top_(),$1); }
+           |
+           ;
+/* PST-SN4-W3: goto_expr uses expr_add_child into existing TT_SEQ to stay flat,
+ * same left-to-right discipline as expr3/expr4. First atom starts the node. */
+goto_atom  : T_STR    { tree_t*e=ast_node_new(TT_QLIT); e->v.sval=(char*)$1.sval; $$=e; }
+           | T_IDENT   { tree_t*e=ast_node_new(TT_VAR);  e->v.sval=(char*)$1.sval; $$=e; }
+           | T_FUNCTION{ tree_t*e=ast_node_new(TT_VAR);  e->v.sval=(char*)$1.sval; $$=e; }
+           | T_END     { tree_t*e=ast_node_new(TT_VAR);  e->v.sval=(char*)$1.sval; $$=e; }
+           ;
+goto_expr  : goto_atom                                                                            { $$=$1; }
+           | goto_expr T_CONCAT goto_atom                                                         { expr_add_child($1,$3); $$=$1; }
            ;
 %%
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
