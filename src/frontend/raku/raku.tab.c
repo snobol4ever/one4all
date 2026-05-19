@@ -1755,36 +1755,36 @@ yyreduce:
 
   case 23: /* stmt: VAR_ARRAY '[' expr ']' '=' expr ';'  */
 #line 263 "raku.y"
-        { tree_t *c=make_call("arr_set");
-          expr_add_child(c,var_node((yyvsp[-6].sval))); expr_add_child(c,(yyvsp[-4].node)); expr_add_child(c,(yyvsp[-1].node)); (yyval.node)=c; }
+        { tree_t *c=ast_node_new(TT_ARR_SET);
+          ast_push(c,var_node((yyvsp[-6].sval))); ast_push(c,(yyvsp[-4].node)); ast_push(c,(yyvsp[-1].node)); (yyval.node)=c; }
 #line 1761 "raku.tab.c"
     break;
 
   case 24: /* stmt: VAR_HASH '<' IDENT '>' '=' expr ';'  */
 #line 266 "raku.y"
-        { tree_t *c=make_call("hash_set");
-          expr_add_child(c,var_node((yyvsp[-6].sval))); expr_add_child(c,leaf_sval(TT_QLIT,(yyvsp[-4].sval))); expr_add_child(c,(yyvsp[-1].node)); (yyval.node)=c; }
+        { tree_t *c=ast_node_new(TT_HASH_SET);
+          ast_push(c,var_node((yyvsp[-6].sval))); ast_push(c,leaf_sval(TT_QLIT,(yyvsp[-4].sval))); ast_push(c,(yyvsp[-1].node)); (yyval.node)=c; }
 #line 1768 "raku.tab.c"
     break;
 
   case 25: /* stmt: VAR_HASH '{' expr '}' '=' expr ';'  */
 #line 269 "raku.y"
-        { tree_t *c=make_call("hash_set");
-          expr_add_child(c,var_node((yyvsp[-6].sval))); expr_add_child(c,(yyvsp[-4].node)); expr_add_child(c,(yyvsp[-1].node)); (yyval.node)=c; }
+        { tree_t *c=ast_node_new(TT_HASH_SET);
+          ast_push(c,var_node((yyvsp[-6].sval))); ast_push(c,(yyvsp[-4].node)); ast_push(c,(yyvsp[-1].node)); (yyval.node)=c; }
 #line 1775 "raku.tab.c"
     break;
 
   case 26: /* stmt: KW_DELETE VAR_HASH '<' IDENT '>' ';'  */
 #line 272 "raku.y"
-        { tree_t *c=make_call("hash_delete");
-          expr_add_child(c,var_node((yyvsp[-4].sval))); expr_add_child(c,leaf_sval(TT_QLIT,(yyvsp[-2].sval))); (yyval.node)=c; }
+        { tree_t *c=ast_node_new(TT_HASH_DELETE);
+          ast_push(c,var_node((yyvsp[-4].sval))); ast_push(c,leaf_sval(TT_QLIT,(yyvsp[-2].sval))); (yyval.node)=c; }
 #line 1782 "raku.tab.c"
     break;
 
   case 27: /* stmt: KW_DELETE VAR_HASH '{' expr '}' ';'  */
 #line 275 "raku.y"
-        { tree_t *c=make_call("hash_delete");
-          expr_add_child(c,var_node((yyvsp[-4].sval))); expr_add_child(c,(yyvsp[-2].node)); (yyval.node)=c; }
+        { tree_t *c=ast_node_new(TT_HASH_DELETE);
+          ast_push(c,var_node((yyvsp[-4].sval))); ast_push(c,(yyvsp[-2].node)); (yyval.node)=c; }
 #line 1789 "raku.tab.c"
     break;
 
@@ -2521,31 +2521,31 @@ yyreduce:
 
   case 127: /* atom: VAR_ARRAY '[' expr ']'  */
 #line 604 "raku.y"
-        { tree_t *c=make_call("arr_get"); expr_add_child(c,var_node((yyvsp[-3].sval))); expr_add_child(c,(yyvsp[-1].node)); (yyval.node)=c; }
+        { tree_t *c=ast_node_new(TT_ARR_GET); ast_push(c,var_node((yyvsp[-3].sval))); ast_push(c,(yyvsp[-1].node)); (yyval.node)=c; }
 #line 2526 "raku.tab.c"
     break;
 
   case 128: /* atom: VAR_HASH '<' IDENT '>'  */
 #line 606 "raku.y"
-        { tree_t *c=make_call("hash_get"); expr_add_child(c,var_node((yyvsp[-3].sval))); expr_add_child(c,leaf_sval(TT_QLIT,(yyvsp[-1].sval))); (yyval.node)=c; }
+        { tree_t *c=ast_node_new(TT_HASH_GET); ast_push(c,var_node((yyvsp[-3].sval))); ast_push(c,leaf_sval(TT_QLIT,(yyvsp[-1].sval))); (yyval.node)=c; }
 #line 2532 "raku.tab.c"
     break;
 
   case 129: /* atom: VAR_HASH '{' expr '}'  */
 #line 608 "raku.y"
-        { tree_t *c=make_call("hash_get"); expr_add_child(c,var_node((yyvsp[-3].sval))); expr_add_child(c,(yyvsp[-1].node)); (yyval.node)=c; }
+        { tree_t *c=ast_node_new(TT_HASH_GET); ast_push(c,var_node((yyvsp[-3].sval))); ast_push(c,(yyvsp[-1].node)); (yyval.node)=c; }
 #line 2538 "raku.tab.c"
     break;
 
   case 130: /* atom: KW_EXISTS VAR_HASH '<' IDENT '>'  */
 #line 610 "raku.y"
-        { tree_t *c=make_call("hash_exists"); expr_add_child(c,var_node((yyvsp[-3].sval))); expr_add_child(c,leaf_sval(TT_QLIT,(yyvsp[-1].sval))); (yyval.node)=c; }
+        { tree_t *c=ast_node_new(TT_HASH_EXISTS); ast_push(c,var_node((yyvsp[-3].sval))); ast_push(c,leaf_sval(TT_QLIT,(yyvsp[-1].sval))); (yyval.node)=c; }
 #line 2544 "raku.tab.c"
     break;
 
   case 131: /* atom: KW_EXISTS VAR_HASH '{' expr '}'  */
 #line 612 "raku.y"
-        { tree_t *c=make_call("hash_exists"); expr_add_child(c,var_node((yyvsp[-3].sval))); expr_add_child(c,(yyvsp[-1].node)); (yyval.node)=c; }
+        { tree_t *c=ast_node_new(TT_HASH_EXISTS); ast_push(c,var_node((yyvsp[-3].sval))); ast_push(c,(yyvsp[-1].node)); (yyval.node)=c; }
 #line 2550 "raku.tab.c"
     break;
 

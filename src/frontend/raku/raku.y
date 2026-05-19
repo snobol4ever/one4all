@@ -260,20 +260,20 @@ stmt
           expr_add_child(fe,var_node($1));
           $$=expr_binary(TT_ASSIGN,fe,$5); }
     | VAR_ARRAY '[' expr ']' '=' expr ';'
-        { tree_t *c=make_call("arr_set");
-          expr_add_child(c,var_node($1)); expr_add_child(c,$3); expr_add_child(c,$6); $$=c; }
+        { tree_t *c=ast_node_new(TT_ARR_SET);
+          ast_push(c,var_node($1)); ast_push(c,$3); ast_push(c,$6); $$=c; }
     | VAR_HASH '<' IDENT '>' '=' expr ';'
-        { tree_t *c=make_call("hash_set");
-          expr_add_child(c,var_node($1)); expr_add_child(c,leaf_sval(TT_QLIT,$3)); expr_add_child(c,$6); $$=c; }
+        { tree_t *c=ast_node_new(TT_HASH_SET);
+          ast_push(c,var_node($1)); ast_push(c,leaf_sval(TT_QLIT,$3)); ast_push(c,$6); $$=c; }
     | VAR_HASH '{' expr '}' '=' expr ';'
-        { tree_t *c=make_call("hash_set");
-          expr_add_child(c,var_node($1)); expr_add_child(c,$3); expr_add_child(c,$6); $$=c; }
+        { tree_t *c=ast_node_new(TT_HASH_SET);
+          ast_push(c,var_node($1)); ast_push(c,$3); ast_push(c,$6); $$=c; }
     | KW_DELETE VAR_HASH '<' IDENT '>' ';'
-        { tree_t *c=make_call("hash_delete");
-          expr_add_child(c,var_node($2)); expr_add_child(c,leaf_sval(TT_QLIT,$4)); $$=c; }
+        { tree_t *c=ast_node_new(TT_HASH_DELETE);
+          ast_push(c,var_node($2)); ast_push(c,leaf_sval(TT_QLIT,$4)); $$=c; }
     | KW_DELETE VAR_HASH '{' expr '}' ';'
-        { tree_t *c=make_call("hash_delete");
-          expr_add_child(c,var_node($2)); expr_add_child(c,$4); $$=c; }
+        { tree_t *c=ast_node_new(TT_HASH_DELETE);
+          ast_push(c,var_node($2)); ast_push(c,$4); $$=c; }
     | expr ';' { $$=$1; }
     | if_stmt           { $$=$1; }
     | while_stmt        { $$=$1; }
@@ -601,15 +601,15 @@ atom
           tree_t *c=make_call("raku_named_capture");
           expr_add_child(c,leaf_sval(TT_QLIT,$1)); $$=c; }
     | VAR_ARRAY '[' expr ']'
-        { tree_t *c=make_call("arr_get"); expr_add_child(c,var_node($1)); expr_add_child(c,$3); $$=c; }
+        { tree_t *c=ast_node_new(TT_ARR_GET); ast_push(c,var_node($1)); ast_push(c,$3); $$=c; }
     | VAR_HASH '<' IDENT '>'
-        { tree_t *c=make_call("hash_get"); expr_add_child(c,var_node($1)); expr_add_child(c,leaf_sval(TT_QLIT,$3)); $$=c; }
+        { tree_t *c=ast_node_new(TT_HASH_GET); ast_push(c,var_node($1)); ast_push(c,leaf_sval(TT_QLIT,$3)); $$=c; }
     | VAR_HASH '{' expr '}'
-        { tree_t *c=make_call("hash_get"); expr_add_child(c,var_node($1)); expr_add_child(c,$3); $$=c; }
+        { tree_t *c=ast_node_new(TT_HASH_GET); ast_push(c,var_node($1)); ast_push(c,$3); $$=c; }
     | KW_EXISTS VAR_HASH '<' IDENT '>'
-        { tree_t *c=make_call("hash_exists"); expr_add_child(c,var_node($2)); expr_add_child(c,leaf_sval(TT_QLIT,$4)); $$=c; }
+        { tree_t *c=ast_node_new(TT_HASH_EXISTS); ast_push(c,var_node($2)); ast_push(c,leaf_sval(TT_QLIT,$4)); $$=c; }
     | KW_EXISTS VAR_HASH '{' expr '}'
-        { tree_t *c=make_call("hash_exists"); expr_add_child(c,var_node($2)); expr_add_child(c,$4); $$=c; }
+        { tree_t *c=ast_node_new(TT_HASH_EXISTS); ast_push(c,var_node($2)); ast_push(c,$4); $$=c; }
     | IDENT           { $$=var_node($1); }
     | VAR_TWIGIL
         { tree_t *fe=ast_node_new(TT_FIELD);
