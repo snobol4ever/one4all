@@ -806,8 +806,86 @@ static void lower_unless(const tree_t *t)
     sm_emit(g_p, SM_PUSH_NULL);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* PST-SC-LABELS: lower_while_until reads no QLIT label children — generates labels internally.
- * TT_WHILE shape: c[0]=cond, c[1]=body (TT_PROGRAM or expr). No label children. */
+/* PRF-12-try (2026-05-19): lower_try handles TT_TRY(try_body, ?catch_body).
+ * Inline SM control flow. raku_die() inside the try body sets g_raku_exception but lower_stmt
+ * swallows the FAILDESCR via SM_VOID_POP — execution continues past die. We detect the exception
+ * post-body via raku_exc_check (SM_CALL_FN 0-arg helper):
+ *
+ *   raku_exc_clear   -- clear g_raku_exception
+ *   VOID_POP
+ *   [try body stmts via lower_stmt — each fail is consumed by lower_stmt's VOID_POP]
+ *   raku_exc_check   -- push 1/last_ok=1 if exception set; FAILDESCR/last_ok=0 if clean
+ *   JUMP_F no_catch  -- jump past catch if NO exception (last_ok=0)
+ *   VOID_POP         -- consume the "1" marker
+ *   raku_exc_get     -- push exception string
+ *   STORE_VAR "$!"   -- bind to $!
+ *   [catch body stmts]
+ *   JUMP end
+ * no_catch:
+ *   VOID_POP         -- consume FAILDESCR from raku_exc_check
+ * end:
+ *   PUSH_NULL        -- statement result */
+static void lower_try(const tree_t *t)
+{
+    if (t->n < 1) { sm_emit(g_p, SM_PUSH_NULL); return; }
+
+    /* Step 1: clear exception state */
+    sm_emit_si(g_p, SM_CALL_FN, "raku_exc_clear", 0);
+    sm_emit(g_p, SM_VOID_POP);
+
+    /* Step 2: lower try body — lower_stmt handles each stmt's VOID_POP internally */
+    const tree_t *try_b = t->c[0];
+    if (try_b && try_b->t == TT_PROGRAM) {
+        for (int i = 0; i < try_b->n; i++) if (try_b->c[i]) lower_stmt(try_b->c[i]);
+    } else if (try_b) {
+        lower_expr(try_b); sm_emit(g_p, SM_VOID_POP);
+    }
+
+    /* Step 3: check if die() fired during try body */
+    sm_emit_si(g_p, SM_CALL_FN, "raku_exc_check", 0);
+    int jno_catch = sm_emit_i(g_p, SM_JUMP_F, 0);  /* jump if NO exception */
+    sm_emit(g_p, SM_VOID_POP);                       /* consume "1" marker */
+
+    const tree_t *catch_b = (t->n > 1) ? t->c[1] : NULL;
+    if (catch_b) {
+        /* Step 4: bind $! and run catch body */
+        sm_emit_si(g_p, SM_CALL_FN, "raku_exc_get", 0);
+        sm_emit_s(g_p, SM_STORE_VAR, "$!");
+        if (catch_b->t == TT_PROGRAM) {
+            for (int i = 0; i < catch_b->n; i++) if (catch_b->c[i]) lower_stmt(catch_b->c[i]);
+        } else {
+            lower_expr(catch_b); sm_emit(g_p, SM_VOID_POP);
+        }
+    }
+
+    int jend = sm_emit_i(g_p, SM_JUMP, 0);
+
+    sm_patch_jump(g_p, jno_catch, sm_label(g_p));
+    sm_emit(g_p, SM_VOID_POP);  /* consume FAILDESCR from raku_exc_check */
+
+    sm_patch_jump(g_p, jend, sm_label(g_p));
+    sm_emit(g_p, SM_PUSH_NULL);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PRF-12-my-type (2026-05-19): lower_decl handles TT_DECL(TT_VAR(type), TT_VAR(name), ?expr).
+ * Type annotation is preserved in tree (c[0]) but runtime-ignored in current SCRIP.
+ * Semantics: assign c[2] (or empty string if no initializer) to c[1]. */
+static void lower_decl(const tree_t *t)
+{
+    if (t->n < 2) { sm_emit(g_p, SM_PUSH_NULL); return; }
+    const tree_t *var  = t->c[1];   /* TT_VAR(name) */
+    const tree_t *init = (t->n > 2) ? t->c[2] : NULL;
+    if (init) {
+        lower_expr(init);
+    } else {
+        sm_emit_s(g_p, SM_PUSH_LIT_S, "");  /* default: empty string */
+    }
+    if (var && var->v.sval)
+        sm_emit_s(g_p, SM_STORE_VAR, var->v.sval);
+    else
+        sm_emit(g_p, SM_VOID_POP);
+    sm_emit(g_p, SM_PUSH_NULL);
+}
 static void lower_while_until(const tree_t *t, int exit_on_success)
 {
     LabelTable *tbl   = &g_labtab;
@@ -1598,6 +1676,8 @@ static void lower_expr_inner(const tree_t *t)
             lower_if(t);
         return;
     case TT_UNLESS:                           lower_unless(t);        return;
+    case TT_DECL:                             lower_decl(t);          return;
+    case TT_TRY:                              lower_try(t);           return;
     case TT_WHILE:                            lower_while(t);         return;
     case TT_DO_WHILE:                         lower_do_while(t);      return;
     case TT_FOR:                              lower_for(t);           return;

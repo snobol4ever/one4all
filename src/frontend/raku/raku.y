@@ -213,17 +213,17 @@ stmt
     | KW_MY VAR_HASH '=' expr ';'
         { $$ = expr_binary(TT_ASSIGN, var_node($2), $4); }
     | KW_MY IDENT VAR_SCALAR '=' expr ';'
-        { free($2); $$ = expr_binary(TT_ASSIGN, var_node($3), $5); }
+        { tree_t *e=ast_node_new(TT_DECL); ast_push(e,leaf_sval(TT_VAR,$2)); free($2); ast_push(e,var_node($3)); ast_push(e,$5); $$=e; }
     | KW_MY IDENT VAR_ARRAY '=' expr ';'
-        { free($2); $$ = expr_binary(TT_ASSIGN, var_node($3), $5); }
+        { tree_t *e=ast_node_new(TT_DECL); ast_push(e,leaf_sval(TT_VAR,$2)); free($2); ast_push(e,var_node($3)); ast_push(e,$5); $$=e; }
     | KW_MY IDENT VAR_HASH '=' expr ';'
-        { free($2); $$ = expr_binary(TT_ASSIGN, var_node($3), $5); }
+        { tree_t *e=ast_node_new(TT_DECL); ast_push(e,leaf_sval(TT_VAR,$2)); free($2); ast_push(e,var_node($3)); ast_push(e,$5); $$=e; }
     | KW_MY IDENT VAR_SCALAR ';'
-        { free($2); $$ = expr_binary(TT_ASSIGN, var_node($3), leaf_sval(TT_QLIT, "")); }
+        { tree_t *e=ast_node_new(TT_DECL); ast_push(e,leaf_sval(TT_VAR,$2)); free($2); ast_push(e,var_node($3)); $$=e; }
     | KW_MY IDENT VAR_ARRAY ';'
-        { free($2); $$ = expr_binary(TT_ASSIGN, var_node($3), leaf_sval(TT_QLIT, "")); }
+        { tree_t *e=ast_node_new(TT_DECL); ast_push(e,leaf_sval(TT_VAR,$2)); free($2); ast_push(e,var_node($3)); $$=e; }
     | KW_MY IDENT VAR_HASH ';'
-        { free($2); $$ = expr_binary(TT_ASSIGN, var_node($3), leaf_sval(TT_QLIT, "")); }
+        { tree_t *e=ast_node_new(TT_DECL); ast_push(e,leaf_sval(TT_VAR,$2)); free($2); ast_push(e,var_node($3)); $$=e; }
     | KW_SAY expr ';'
         { tree_t *c=ast_node_new(TT_SAY); expr_add_child(c,$2); $$=c; }
     | KW_SAY '(' expr ',' expr ')' ';'
@@ -266,11 +266,9 @@ stmt
     | for_stmt          { $$=$1; }
     | given_stmt        { $$=$1; }
     | KW_TRY block
-        { tree_t *c=make_call("raku_try");
-          expr_add_child(c,$2); $$=c; }
+        { tree_t *e=ast_node_new(TT_TRY); ast_push(e,$2); $$=e; }
     | KW_TRY block KW_CATCH block
-        { tree_t *c=make_call("raku_try");
-          expr_add_child(c,$2); expr_add_child(c,$4); $$=c; }
+        { tree_t *e=ast_node_new(TT_TRY); ast_push(e,$2); ast_push(e,$4); $$=e; }
     | unless_stmt       { $$=$1; }
     | until_stmt        { $$=$1; }
     | repeat_stmt       { $$=$1; }

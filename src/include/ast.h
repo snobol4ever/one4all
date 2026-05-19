@@ -36,10 +36,12 @@ typedef enum tree_e {
     TT_PROC_DECL,
     TT_SUB_DECL,
     TT_DIE,
+    TT_TRY,
     TT_ARR_GET,           TT_ARR_SET,
     TT_HASH_GET,          TT_HASH_SET,          TT_HASH_DELETE,       TT_HASH_EXISTS,
     TT_CLASS_DECL,
     TT_FOR_RANGE,
+    TT_DECL,
     TT_KIND_COUNT
 } tree_e;
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -167,11 +169,13 @@ static const char * const tt_e_name[TT_KIND_COUNT] = {
     [TT_PROC_DECL]        = "TT_PROC_DECL",
     [TT_SUB_DECL]         = "TT_SUB_DECL",
     [TT_DIE]              = "TT_DIE",
+    [TT_TRY]              = "TT_TRY",
     [TT_ARR_GET]          = "TT_ARR_GET",         [TT_ARR_SET]          = "TT_ARR_SET",
     [TT_HASH_GET]         = "TT_HASH_GET",         [TT_HASH_SET]         = "TT_HASH_SET",
     [TT_HASH_DELETE]      = "TT_HASH_DELETE",      [TT_HASH_EXISTS]      = "TT_HASH_EXISTS",
     [TT_CLASS_DECL]       = "TT_CLASS_DECL",
     [TT_FOR_RANGE]        = "TT_FOR_RANGE",
+    [TT_DECL]             = "TT_DECL",
 };
 #endif
 /*================================================================================================================================================================================*/
