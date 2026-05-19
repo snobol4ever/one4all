@@ -317,12 +317,8 @@ if_stmt
 unless_stmt
     : T_UNLESS stmt T_THEN opt_semi stmt_body
         {
-            /* unless cond then body == if ~cond then body
-               Represent as TT_IF with TT_NOT-wrapped condition (pure syntax) */
-            tree_t *not_cond = ast_node_new(TT_NOT);
-            expr_add_child(not_cond, $2);
-            tree_t *n = ast_node_new(TT_IF);
-            expr_add_child(n, not_cond);
+            tree_t *n = ast_node_new(TT_UNLESS);
+            expr_add_child(n, $2);
             expr_add_child(n, $5);
             $$ = n;
         }

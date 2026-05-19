@@ -154,6 +154,21 @@ static void lower_tree_stmt(RebLow *L, tree_t *s) {
         free(l_then); free(l_else); free(l_end);
         break;
     }
+    case TT_UNLESS: {
+        /* c[0]=cond c[1]=body — body runs when cond FAILS */
+        char *l_body = newlab(L);
+        char *l_end  = newlab(L);
+        STMT_t *cst  = blank_stmt();
+        cst->subject = lower_tree_expr(L, s->c[0]);
+        cst->goto_s = strdup(l_end);
+        cst->goto_f = strdup(l_body);
+        emit(L, cst);
+        emit_label(L, l_body);
+        lower_tree_stmt(L, s->c[1]);
+        emit_label(L, l_end);
+        free(l_body); free(l_end);
+        break;
+    }
     case TT_WHILE: {
         char *l_top  = newlab(L);
         char *l_body = newlab(L);
