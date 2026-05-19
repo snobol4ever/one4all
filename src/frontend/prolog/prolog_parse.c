@@ -45,7 +45,6 @@ typedef struct {
     const char *filename;
     int         nerrors;
     int         in_args;
-    int         tree_mismatches;   /* PST-PL-6c */
     IfFrame     ifst[IF_STACK_MAX];
     int         ifst_top;
 } Parser;
@@ -366,28 +365,28 @@ static Term *parse_term(Parser *p, int max_prec) {
     return lhs;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int count_conj(Term *t) {
+static int dcg_var_counter = 0;
+/* DCG-only helpers: count_conj / flatten_conj for Term* DCG expansion. */
+static int dcg_count_conj(Term *t) {
     t = term_deref(t);
     if (!t) return 0;
     int comma_id = prolog_atom_intern(",");
     if (t->tag == TERM_COMPOUND && t->compound.functor == comma_id && t->compound.arity == 2)
-        return count_conj(t->compound.args[0]) + count_conj(t->compound.args[1]);
+        return dcg_count_conj(t->compound.args[0]) + dcg_count_conj(t->compound.args[1]);
     return 1;
 }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int flatten_conj(Term *t, Term **buf, int idx) {
+static int dcg_flatten_conj(Term *t, Term **buf, int idx) {
     t = term_deref(t);
     if (!t) return idx;
     int comma_id = prolog_atom_intern(",");
     if (t->tag == TERM_COMPOUND && t->compound.functor == comma_id && t->compound.arity == 2) {
-        idx = flatten_conj(t->compound.args[0], buf, idx);
-        idx = flatten_conj(t->compound.args[1], buf, idx);
+        idx = dcg_flatten_conj(t->compound.args[0], buf, idx);
+        idx = dcg_flatten_conj(t->compound.args[1], buf, idx);
         return idx;
     }
     buf[idx++] = t;
     return idx;
 }
-static int dcg_var_counter = 0;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* PST-PL-6b — Parallel tree_t-building path.
  * Runs alongside the Term* path. Both active simultaneously.
@@ -725,15 +724,7 @@ static tree_t *pt_primary(Parser *p, TreeScope *ts) {
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static tree_t *pt_term(Parser *p, TreeScope *ts, int max_prec) {
-    /* Save and restore lexer position: pt_primary consumes tokens from p->lx
-     * but the Term* path already consumed them. We CANNOT double-consume.
-     * Strategy: pt_term is called on a SECOND parse pass of a saved token
-     * stream, OR we drive pt_term from the same single pass as the Term* path
-     * by running each sub-parse in lockstep.
-     *
-     * For PST-PL-6b the approach is: run the parallel path on a CLONED
-     * lexer snapshot taken before the Term* parse. See pt_parse_clause().
-     */
+    /* PST-PL-6f: pt_term is now the sole parse path for non-DCG clauses. */
     tree_t *lhs = pt_primary(p, ts);
     if (!lhs) return NULL;
     for (;;) {
@@ -822,10 +813,10 @@ static int dcg_expand_body(Term *body, Term *s_in, Term *s_out,
     int curl_id  = prolog_atom_intern("{}");
     if (body->tag == TERM_COMPOUND && body->compound.functor == curl_id
             && body->compound.arity == 1) {
-        int n = count_conj(body->compound.args[0]);
+        int n = dcg_count_conj(body->compound.args[0]);
         int old = idx;
         Term **tmp = malloc((n+1) * sizeof(Term *));
-        int nn = flatten_conj(body->compound.args[0], tmp, 0);
+        int nn = dcg_flatten_conj(body->compound.args[0], tmp, 0);
         for (int i = 0; i < nn; i++) buf[idx++] = tmp[i];
         free(tmp);
         (void)old;
@@ -917,30 +908,29 @@ static void dcg_expand_clause(PlClause *cl, Term *dcg_body, Term *pushback, VarS
     for (int i = 0; i < n; i++) cl->body[i] = buf[i];
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int eval_if_condition(Term *cond) {
-    cond = term_deref(cond);
+static int eval_if_condition_tree(tree_t *cond) {
     if (!cond) return -1;
-    if (cond->tag == TERM_ATOM) {
-        const char *a = prolog_atom_name(cond->atom_id);
-        if (strcmp(a, "true") == 0) return 1;
-        if (strcmp(a, "fail") == 0 || strcmp(a, "false") == 0) return 0;
+    if (cond->t == TT_QLIT) {
+        const char *a = cond->v.sval ? cond->v.sval : "";
+        if (strcmp(a, "true")  == 0) return 1;
+        if (strcmp(a, "fail")  == 0 || strcmp(a, "false") == 0) return 0;
         return -1;
     }
-    if (cond->tag != TERM_COMPOUND) return -1;
-    const char *fn = prolog_atom_name(cond->compound.functor);
-    int arity = cond->compound.arity;
+    if (cond->t != TT_FNC) return -1;
+    const char *fn = cond->v.sval ? cond->v.sval : "";
+    int arity = cond->n;
     if ((strcmp(fn, "\\+") == 0 || strcmp(fn, "not") == 0) && arity == 1) {
-        int v = eval_if_condition(cond->compound.args[0]);
+        int v = eval_if_condition_tree(cond->c[0]);
         if (v < 0) return -1;
         return v ? 0 : 1;
     }
     if (strcmp(fn, "current_prolog_flag") == 0 && arity == 2) {
-        Term *flag_t = term_deref(cond->compound.args[0]);
-        Term *val_t  = term_deref(cond->compound.args[1]);
-        if (!flag_t || !val_t || flag_t->tag != TERM_ATOM || val_t->tag != TERM_ATOM)
-            return -1;
-        const char *flag = prolog_atom_name(flag_t->atom_id);
-        const char *val  = prolog_atom_name(val_t->atom_id);
+        tree_t *flag_t = cond->c[0];
+        tree_t *val_t  = cond->c[1];
+        if (!flag_t || !val_t) return -1;
+        const char *flag = (flag_t->t == TT_QLIT) ? flag_t->v.sval : NULL;
+        const char *val  = (val_t->t  == TT_QLIT) ? val_t->v.sval  : NULL;
+        if (!flag || !val) return -1;
         if (strcmp(flag, "bounded") == 0) {
             if (strcmp(val, "true")  == 0) return 1;
             if (strcmp(val, "false") == 0) return 0;
@@ -956,19 +946,18 @@ static int eval_if_condition(Term *cond) {
     return -1;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int try_handle_if_directive(Parser *p, Term *goal, int lineno) {
-    goal = term_deref(goal);
+static int try_handle_if_directive_tree(Parser *p, tree_t *goal, int lineno) {
     if (!goal) return 0;
     const char *fn = NULL;
     int arity = 0;
-    Term *arg0 = NULL;
-    if (goal->tag == TERM_ATOM) {
-        fn = prolog_atom_name(goal->atom_id);
+    tree_t *arg0 = NULL;
+    if (goal->t == TT_QLIT) {
+        fn = goal->v.sval;
         arity = 0;
-    } else if (goal->tag == TERM_COMPOUND) {
-        fn = prolog_atom_name(goal->compound.functor);
-        arity = goal->compound.arity;
-        if (arity > 0) arg0 = goal->compound.args[0];
+    } else if (goal->t == TT_FNC) {
+        fn = goal->v.sval;
+        arity = goal->n;
+        if (arity > 0) arg0 = goal->c[0];
     } else {
         return 0;
     }
@@ -979,7 +968,7 @@ static int try_handle_if_directive(Parser *p, Term *goal, int lineno) {
             return 1;
         }
         int parent_active = if_currently_active(p);
-        int verdict = parent_active ? eval_if_condition(arg0) : 0;
+        int verdict = parent_active ? eval_if_condition_tree(arg0) : 0;
         int active = parent_active && (verdict != 0);
         IfFrame *f = &p->ifst[p->ifst_top++];
         f->active = active;
@@ -997,7 +986,7 @@ static int try_handle_if_directive(Parser *p, Term *goal, int lineno) {
         if (!f->parent_active || f->taken) {
             f->active = 0;
         } else {
-            int verdict = eval_if_condition(arg0);
+            int verdict = eval_if_condition_tree(arg0);
             int active  = (verdict != 0);
             f->active = active;
             if (active) f->taken = 1;
@@ -1028,416 +1017,90 @@ static int try_handle_if_directive(Parser *p, Term *goal, int lineno) {
     }
     return 0;
 }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* PST-PL-6c — Structural equivalence verifier: Term* ↔ tree_t
- * Both trees are serialized to a canonical S-expression string and compared.
- * Called from parse_clause for every non-directive clause.
- *
- * Normalization rules (same for both sides):
- *   atom          → (atom "name")
- *   integer       → (int N)
- *   float         → (flt F)
- *   variable      → (var "name")  — name comes from VarScope for Term*
- *   cut           → (cut)
- *   list [H|T]    → (list H ... T?)  — flattened, tail only if non-nil
- *   compound f/n  → (fnc "f" c1 c2 ... cn)
- *   if-then-else  → (if C T E)       — from both ';'/'->' and TT_IF
- *   conjunction   → (seq g1 g2 ... gn)  — flattened from ',' chains / TT_PROGRAM
- */
 
-#define PL_SER_MAX (1<<17)   /* 128 KB should be more than enough per clause */
-
-typedef struct { char *buf; int len; int cap; int err; } PLS;
-
-static void pls_init(PLS *s) {
-    s->cap = 256; s->buf = malloc(s->cap); s->len = 0; s->err = 0; s->buf[0] = 0;
-}
-static void pls_free(PLS *s) { free(s->buf); }
-static void pls_char(PLS *s, char c) {
-    if (s->err) return;
-    if (s->len + 2 >= PL_SER_MAX) { s->err = 1; return; }
-    if (s->len + 2 > s->cap) {
-        s->cap *= 2; s->buf = realloc(s->buf, s->cap);
-    }
-    s->buf[s->len++] = c; s->buf[s->len] = 0;
-}
-static void pls_str(PLS *s, const char *t) { for (; t && *t; t++) pls_char(s, *t); }
-static void pls_int(PLS *s, long v) { char tmp[32]; snprintf(tmp,32,"%ld",v); pls_str(s,tmp); }
-static void pls_flt(PLS *s, double v) { char tmp[32]; snprintf(tmp,32,"%.17g",v); pls_str(s,tmp); }
-
-/* Forward declarations */
-static void ser_term(PLS *s, Term *t, VarScope *sc);
-static void ser_tree(PLS *s, tree_t *t);
-
-/* Serialize Term* conjunction as flat (seq g1 g2 ...) */
-static void ser_term_conj_flat(PLS *s, Term *t, VarScope *sc) {
-    t = term_deref(t);
-    if (!t) return;
-    int comma_id = prolog_atom_intern(",");
-    if (t->tag == TERM_COMPOUND && t->compound.functor == comma_id && t->compound.arity == 2) {
-        ser_term_conj_flat(s, t->compound.args[0], sc);
-        pls_char(s, ' ');
-        ser_term_conj_flat(s, t->compound.args[1], sc);
-    } else {
-        ser_term(s, t, sc);
-    }
-}
-
-/* Serialize Term* list as flat (list e1 e2 ... [tail]) */
-static void ser_term_list(PLS *s, Term *t, VarScope *sc) {
-    /* t is the cons chain after '[' — i.e. '.'(H,T) or nil */
-    pls_str(s, "(list");
-    for (;;) {
-        t = term_deref(t);
-        if (!t) break;
-        if (t->tag == TERM_ATOM && t->atom_id == ATOM_NIL) break;
-        if (t->tag == TERM_COMPOUND && t->compound.functor == ATOM_DOT && t->compound.arity == 2) {
-            pls_char(s, ' ');
-            ser_term(s, t->compound.args[0], sc);
-            t = t->compound.args[1];
-        } else {
-            /* tail variable or non-nil atom */
-            pls_str(s, " |");
-            ser_term(s, t, sc);
-            break;
-        }
-    }
-    pls_char(s, ')');
-}
-
-/* Reverse-lookup variable name from VarScope by Term* pointer */
-static const char *sc_name_for(VarScope *sc, Term *t) {
-    t = term_deref(t);
-    for (int i = 0; i < sc->count; i++)
-        if (sc->entries[i].term == t) return sc->entries[i].name;
-    return "_";
-}
-
-static void ser_term(PLS *s, Term *t, VarScope *sc) {
-    t = term_deref(t);
-    if (!t) { pls_str(s, "(null)"); return; }
-    switch (t->tag) {
-        case TERM_VAR: {
-            const char *nm = sc_name_for(sc, t);
-            pls_str(s, "(var \""); pls_str(s, nm); pls_str(s, "\")");
-            return;
-        }
-        case TERM_INT:
-            pls_str(s, "(int "); pls_int(s, t->ival); pls_char(s, ')');
-            return;
-        case TERM_FLOAT:
-            pls_str(s, "(flt "); pls_flt(s, t->fval); pls_char(s, ')');
-            return;
-        case TERM_ATOM: {
-            const char *n = prolog_atom_name(t->atom_id);
-            if (!n) n = "?";
-            if (t->atom_id == ATOM_NIL)  { pls_str(s, "(list)"); return; }
-            if (t->atom_id == ATOM_CUT)  { pls_str(s, "(cut)");  return; }
-            pls_str(s, "(atom \""); pls_str(s, n); pls_str(s, "\")");
-            return;
-        }
-        case TERM_COMPOUND: {
-            const char *fn = prolog_atom_name(t->compound.functor);
-            if (!fn) fn = "?";
-            int arity = t->compound.arity;
-            /* list */
-            if (t->compound.functor == ATOM_DOT && arity == 2) {
-                ser_term_list(s, t, sc);
-                return;
-            }
-            /* cut atom (shouldn't reach here as compound, but guard) */
-            if (t->compound.functor == ATOM_CUT && arity == 0) {
-                pls_str(s, "(cut)"); return;
-            }
-            int comma_id  = prolog_atom_intern(",");
-            int semi_id   = prolog_atom_intern(";");
-            int arrow_id  = prolog_atom_intern("->");
-            /* if-then-else: ;(->(C,T),E) */
-            if (t->compound.functor == semi_id && arity == 2) {
-                Term *left = term_deref(t->compound.args[0]);
-                if (left && left->tag == TERM_COMPOUND &&
-                    left->compound.functor == arrow_id && left->compound.arity == 2) {
-                    pls_str(s, "(if ");
-                    ser_term(s, left->compound.args[0], sc);
-                    pls_char(s, ' ');
-                    ser_term(s, left->compound.args[1], sc);
-                    pls_char(s, ' ');
-                    ser_term(s, t->compound.args[1], sc);
-                    pls_char(s, ')');
-                    return;
-                }
-            }
-            /* conjunction as (seq ...) */
-            if (t->compound.functor == comma_id && arity == 2) {
-                pls_str(s, "(seq ");
-                ser_term_conj_flat(s, t, sc);
-                pls_char(s, ')');
-                return;
-            }
-            /* general compound */
-            pls_str(s, "(fnc \""); pls_str(s, fn); pls_str(s, "\"");
-            for (int i = 0; i < arity; i++) {
-                pls_char(s, ' ');
-                ser_term(s, t->compound.args[i], sc);
-            }
-            pls_char(s, ')');
-            return;
-        }
-        case TERM_REF:
-            ser_term(s, t->ref, sc);
-            return;
-    }
-}
-
-/* Serialize tree_t */
-static void ser_tree_list(PLS *s, tree_t *t);
-
-/* Flatten TT_FNC(",") chains into individual items for (seq ...) emission. */
-static void ser_tree_conj_flat(PLS *s, tree_t *t) {
-    if (!t) return;
-    if (t->t == TT_FNC && t->v.sval && strcmp(t->v.sval, ",") == 0) {
-        for (int i = 0; i < t->n; i++) ser_tree_conj_flat(s, t->c[i]);
-        return;
-    }
-    pls_char(s, ' '); ser_tree(s, t);
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void ser_tree(PLS *s, tree_t *t) {
-    if (!t) { pls_str(s, "(null)"); return; }
-    switch (t->t) {
-        case TT_VAR:
-            pls_str(s, "(var \"");
-            pls_str(s, t->v.sval ? t->v.sval : "_");
-            pls_str(s, "\")");
-            return;
-        case TT_ILIT:
-            pls_str(s, "(int "); pls_int(s, t->v.ival); pls_char(s, ')');
-            return;
-        case TT_FLIT:
-            pls_str(s, "(flt "); pls_flt(s, t->v.dval); pls_char(s, ')');
-            return;
-        case TT_QLIT:
-            pls_str(s, "(atom \"");
-            pls_str(s, t->v.sval ? t->v.sval : "");
-            pls_str(s, "\")");
-            return;
-        case TT_CUT:
-            pls_str(s, "(cut)");
-            return;
-        case TT_NUL:
-            pls_str(s, "(nul)");
-            return;
-        case TT_MAKELIST:
-            ser_tree_list(s, t);
-            return;
-        case TT_IF:
-            pls_str(s, "(if ");
-            for (int i = 0; i < t->n; i++) {
-                if (i) pls_char(s, ' ');
-                ser_tree(s, t->c[i]);
-            }
-            pls_char(s, ')');
-            return;
-        case TT_PROGRAM:
-            /* body conjunction — emit as (seq ...) */
-            pls_str(s, "(seq");
-            for (int i = 0; i < t->n; i++) {
-                pls_char(s, ' ');
-                ser_tree(s, t->c[i]);
-            }
-            pls_char(s, ')');
-            return;
-        case TT_FNC: {
-            const char *fn = t->v.sval ? t->v.sval : "?";
-            /* {} with no children is the empty-brace atom — match Term* (atom "{}") */
-            if (strcmp(fn, "{}") == 0 && t->n == 0) {
-                pls_str(s, "(atom \"{}\")");
-                return;
-            }
-            /* TT_FNC(",") is binary conjunction in body — serialize as (seq ...).
-             * But ','(X) used as a unary functor (e.g. call(','(A),B)) stays as (fnc ",").
-             * Only flatten when it has exactly 2 children (the standard binary form). */
-            if (strcmp(fn, ",") == 0 && t->n == 2) {
-                pls_str(s, "(seq");
-                ser_tree_conj_flat(s, t);
-                pls_char(s, ')');
-                return;
-            }
-            pls_str(s, "(fnc \""); pls_str(s, fn); pls_str(s, "\"");
-            for (int i = 0; i < t->n; i++) {
-                pls_char(s, ' ');
-                ser_tree(s, t->c[i]);
-            }
-            pls_char(s, ')');
-            return;
-        }
-        default:
-            pls_str(s, "(unk)");
-            return;
-    }
-}
-
-static void ser_tree_list(PLS *s, tree_t *t) {
-    /* TT_MAKELIST: v.ival=1 means last child is explicit tail (| Tail).
-     * v.ival=0 means proper list — all children are elements. */
-    int has_tail = (int)t->v.ival;
-    int nelems = has_tail ? t->n - 1 : t->n;
-    pls_str(s, "(list");
-    for (int i = 0; i < nelems; i++) {
-        pls_char(s, ' ');
-        ser_tree(s, t->c[i]);
-    }
-    if (has_tail && t->n > 0) {
-        pls_str(s, " |");
-        ser_tree(s, t->c[t->n - 1]);
-    }
-    pls_char(s, ')');
-}
-
-/* Serialize full clause: Term* side */
-static void ser_clause_term(PLS *s, PlClause *cl, VarScope *sc) {
-    pls_str(s, "(clause ");
-    if (cl->head) ser_term(s, cl->head, sc);
-    else          pls_str(s, "(nul)");
-    /* Use conj-flat for each body goal: directives store body[0] as a raw
-     * conjunction term (not pre-flattened), so flatten here to match tree_t. */
-    pls_str(s, " (seq");
-    for (int i = 0; i < cl->nbody; i++) {
-        pls_char(s, ' ');
-        ser_term_conj_flat(s, cl->body[i], sc);
-    }
-    pls_str(s, "))");
-}
-
-/* Serialize full clause: tree_t side (TT_CLAUSE node) */
-static void ser_clause_tree(PLS *s, tree_t *tr) {
-    if (!tr || tr->t != TT_CLAUSE) { pls_str(s, "(bad-clause)"); return; }
-    pls_str(s, "(clause ");
-    ser_tree(s, tr->n > 0 ? tr->c[0] : NULL);
-    pls_char(s, ' ');
-    ser_tree(s, tr->n > 1 ? tr->c[1] : NULL);
-    pls_char(s, ')');
-}
-
-/* The public verifier: compare Term* clause against its tree_t.
- * Returns 1 if equivalent, 0 if mismatch (prints diff to stderr). */
-static int pl_verify_clause_tree(PlClause *cl, VarScope *sc, const char *filename) {
-    if (!cl->tr) return 1;   /* directives skipped */
-    PLS sa, sb;
-    pls_init(&sa); pls_init(&sb);
-    ser_clause_term(&sa, cl, sc);
-    ser_clause_tree(&sb, cl->tr);
-    int ok = (sa.err == 0 && sb.err == 0 && strcmp(sa.buf, sb.buf) == 0);
-    if (!ok) {
-        fprintf(stderr, "PST-PL-6c MISMATCH in %s line %d:\n  TERM: %s\n  TREE: %s\n",
-                filename ? filename : "?", cl->lineno, sa.buf, sb.buf);
-    }
-    pls_free(&sa); pls_free(&sb);
-    return ok;
-}
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static PlClause *parse_clause(Parser *p) {
     scope_reset(&p->sc);
     Token pk = lexer_peek(&p->lx);
     if (pk.kind == TK_EOF) return NULL;
-    /* PST-PL-6b: save lexer + ifst_top before Term* parse so we can replay. */
-    Lexer saved_lx  = p->lx;
-    int   saved_ifst_top = p->ifst_top;
-    int   is_dcg = 0;   /* PST-PL-6c: DCG clauses skip verification */
+    /* PST-PL-6f: pt_term is now the primary parse path for non-DCG clauses.
+     * DCG still uses Term* via dcg_expand_clause; we snapshot the lexer only
+     * for DCG so we can re-parse head/body as Term*. */
+    Lexer saved_lx     = p->lx;
+    int   saved_ifst   = p->ifst_top;
+    TreeScope ts; ts_reset(&ts);
     PlClause *cl = calloc(1, sizeof(PlClause));
     cl->lineno = pk.line;
+
     if (pk.kind == TK_NECK) {
+        /* Directive: parse directly via pt_term. */
         lexer_next(&p->lx);
-        Term *goal = parse_term(p, 1200);
+        tree_t *body_tr = pt_term(p, &ts, 1200);
         Token dot = lexer_next(&p->lx);
         if (dot.kind != TK_DOT)
             perror_at(p, dot.line, "expected . after directive");
-        if (try_handle_if_directive(p, goal, cl->lineno)) {
-            cl->head  = NULL;
-            cl->body  = NULL;
-            cl->nbody = 0;
-            cl->tr    = NULL;   /* directives: no tree */
+        if (try_handle_if_directive_tree(p, body_tr, cl->lineno)) {
+            cl->head = NULL; cl->body = NULL; cl->nbody = 0; cl->tr = NULL;
             return cl;
         }
         cl->head  = NULL;
-        cl->body  = malloc(sizeof(Term *));
-        cl->body[0] = goal;
-        cl->nbody = 1;
-        /* PST-PL-6b: replay directive through parallel path */
-        {
-            Parser p2 = *p;
-            p2.lx = saved_lx;
-            p2.ifst_top = saved_ifst_top;
-            p2.in_args  = 0;
-            TreeScope ts2; ts_reset(&ts2);
-            lexer_next(&p2.lx);  /* consume TK_NECK */
-            tree_t *body_tr = pt_term(&p2, &ts2, 1200);
-            cl->tr = pt_make_clause(NULL, body_tr);
-        }
-        /* PST-PL-6c: verify */
-        if (!pl_verify_clause_tree(cl, &p->sc, p->filename))
-            p->tree_mismatches++;
+        cl->body  = NULL;
+        cl->nbody = 0;
+        cl->tr = pt_make_clause(NULL, body_tr);
         return cl;
     }
-    Term *head = parse_term(p, 1199);
-    cl->head = head;
+
+    /* Non-directive: parse head as tree_t. */
+    tree_t *head_tr = pt_term(p, &ts, 1199);
     pk = lexer_peek(&p->lx);
+
     if (pk.kind == TK_NECK) {
+        /* Rule: head :- body */
         lexer_next(&p->lx);
-        Term *body_term = parse_term(p, 1200);
-        int n = count_conj(body_term);
-        cl->body  = malloc((n ? n : 1) * sizeof(Term *));
-        cl->nbody = flatten_conj(body_term, cl->body, 0);
+        tree_t *body_tr = pt_term(p, &ts, 1200);
+        cl->tr = pt_make_clause(head_tr, body_tr);
+        Token dot = lexer_next(&p->lx);
+        if (dot.kind != TK_DOT)
+            perror_at(p, dot.line, "expected . at end of clause");
     } else if (pk.kind == TK_OP && strcmp(pk.text, "-->") == 0) {
-        lexer_next(&p->lx);
+        /* DCG rule: re-parse head and body as Term* using saved lexer. */
+        p->lx       = saved_lx;
+        p->ifst_top = saved_ifst;
+        scope_reset(&p->sc);
+        Term *head = parse_term(p, 1199);
+        cl->head = head;
+        pk = lexer_peek(&p->lx);
+        lexer_next(&p->lx);   /* consume --> */
         Term *dcg_body = parse_term(p, 1200);
         Term *pushback = NULL;
         Term *hd = term_deref(cl->head);
         int comma_id = prolog_atom_intern(",");
-        if (hd->tag == TERM_COMPOUND && hd->compound.functor == comma_id && hd->compound.arity == 2) {
+        if (hd && hd->tag == TERM_COMPOUND &&
+            hd->compound.functor == comma_id && hd->compound.arity == 2) {
             cl->head = hd->compound.args[0];
             pushback = hd->compound.args[1];
         }
         dcg_expand_clause(cl, dcg_body, pushback, &p->sc);
-        /* DCG: Term* has been expanded; tree_t carries raw pre-expansion form.
-         * Shapes legitimately differ — skip 6c verification for DCG clauses. */
-        cl->tr = NULL;  /* NULL tr → verifier skips it */
-        is_dcg = 1;
+        cl->tr = NULL;   /* DCG: tree_t not built; lower_clause (Term*) handles it */
+        Token dot = lexer_next(&p->lx);
+        if (dot.kind != TK_DOT)
+            perror_at(p, dot.line, "expected . at end of DCG clause");
+        /* Snapshot var names/terms for lower_clause slot assignment */
+        if (p->sc.count > 0) {
+            cl->nvar      = p->sc.count;
+            cl->var_names = malloc((size_t)p->sc.count * sizeof(char *));
+            cl->var_terms = malloc((size_t)p->sc.count * sizeof(Term *));
+            for (int _vi = 0; _vi < p->sc.count; _vi++) {
+                cl->var_names[_vi] = p->sc.entries[_vi].name;
+                cl->var_terms[_vi] = p->sc.entries[_vi].term;
+            }
+        }
     } else {
-        cl->body  = NULL;
-        cl->nbody = 0;
-    }
-    Token dot = lexer_next(&p->lx);
-    if (dot.kind != TK_DOT)
-        perror_at(p, dot.line, "expected . at end of clause");
-    /* PST-PL-6b: replay clause through parallel path (skip DCG) */
-    if (!is_dcg) {
-        Parser p2 = *p;
-        p2.lx = saved_lx;
-        p2.ifst_top = saved_ifst_top;
-        p2.in_args  = 0;
-        TreeScope ts2; ts_reset(&ts2);
-        tree_t *head_tr = pt_term(&p2, &ts2, 1199);
-        Token pk2 = lexer_peek(&p2.lx);
-        tree_t *body_tr = NULL;
-        if (pk2.kind == TK_NECK) {
-            lexer_next(&p2.lx);
-            body_tr = pt_term(&p2, &ts2, 1200);
-        }
-        cl->tr = pt_make_clause(head_tr, body_tr);
-    }
-    /* PST-PL-6c: verify (skipped when is_dcg, since cl->tr == NULL) */
-    if (!pl_verify_clause_tree(cl, &p->sc, p->filename))
-        p->tree_mismatches++;
-    /* PST-PL-6e: snapshot named-var name→Term* mapping for pre-lower slot pass in lower_clause */
-    if (p->sc.count > 0) {
-        cl->nvar      = p->sc.count;
-        cl->var_names = malloc((size_t)p->sc.count * sizeof(char *));
-        cl->var_terms = malloc((size_t)p->sc.count * sizeof(Term *));
-        for (int _vi = 0; _vi < p->sc.count; _vi++) {
-            cl->var_names[_vi] = p->sc.entries[_vi].name;
-            cl->var_terms[_vi] = p->sc.entries[_vi].term;
-        }
+        /* Fact: no body */
+        cl->tr = pt_make_clause(head_tr, NULL);
+        Token dot = lexer_next(&p->lx);
+        if (dot.kind != TK_DOT)
+            perror_at(p, dot.line, "expected . at end of fact");
     }
     return cl;
 }
@@ -1450,7 +1113,6 @@ PlProgram *prolog_parse(const char *src, const char *filename) {
     p.nerrors  = 0;
     p.ifst_top = 0;
     p.in_args  = 0;
-    p.tree_mismatches = 0;
     scope_reset(&p.sc);
     PlProgram *prog = calloc(1, sizeof(PlProgram));
     for (;;) {
@@ -1465,7 +1127,7 @@ PlProgram *prolog_parse(const char *src, const char *filename) {
         }
         PlClause *cl = parse_clause(&p);
         if (!cl) break;
-        if (cl->head == NULL && cl->body == NULL && cl->nbody == 0) {
+        if (cl->head == NULL && cl->body == NULL && cl->nbody == 0 && cl->tr == NULL) {
             free(cl);
             continue;
         }
@@ -1485,97 +1147,7 @@ PlProgram *prolog_parse(const char *src, const char *filename) {
         p.nerrors++;
     }
     prog->nerrors = p.nerrors;
-    prog->tree_mismatches = p.tree_mismatches;
     return prog;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void term_pretty(Term *t, FILE *out) {
-    t = term_deref(t);
-    if (!t) { fprintf(out, "<null>"); return; }
-    switch (t->tag) {
-        case TERM_ATOM: {
-            const char *n = prolog_atom_name(t->atom_id);
-            if (!n) n = "?";
-            int needs_quote = !islower((unsigned char)n[0]) && n[0] != '[';
-            for (const char *c = n; *c && !needs_quote; c++)
-                if (!isalnum((unsigned char)*c) && *c != '_') needs_quote = 1;
-            if (needs_quote && strcmp(n,"[]") != 0 && strcmp(n,"!")!=0 &&
-                strcmp(n,",")!=0 && strcmp(n,".")!=0)
-                fprintf(out, "'%s'", n);
-            else
-                fprintf(out, "%s", n);
-            break;
-        }
-        case TERM_VAR:
-            fprintf(out, "_V%d", t->var_slot < 0 ? 0 : t->var_slot);
-            break;
-        case TERM_INT:
-            fprintf(out, "%ld", t->ival);
-            break;
-        case TERM_FLOAT:
-            fprintf(out, "%g", t->fval);
-            break;
-        case TERM_COMPOUND: {
-            const char *fn = prolog_atom_name(t->compound.functor);
-            if (!fn) fn = "?";
-            if (t->compound.functor == ATOM_DOT && t->compound.arity == 2) {
-                fprintf(out, "[");
-                term_pretty(t->compound.args[0], out);
-                Term *tail = term_deref(t->compound.args[1]);
-                while (tail && tail->tag == TERM_COMPOUND &&
-                       tail->compound.functor == ATOM_DOT && tail->compound.arity == 2) {
-                    fprintf(out, ",");
-                    term_pretty(tail->compound.args[0], out);
-                    tail = term_deref(tail->compound.args[1]);
-                }
-                if (tail && !(tail->tag == TERM_ATOM && tail->atom_id == ATOM_NIL)) {
-                    fprintf(out, "|");
-                    term_pretty(tail, out);
-                }
-                fprintf(out, "]");
-                break;
-            }
-            if (t->compound.arity == 2 && find_binop(fn)) {
-                fprintf(out, "(");
-                term_pretty(t->compound.args[0], out);
-                fprintf(out, " %s ", fn);
-                term_pretty(t->compound.args[1], out);
-                fprintf(out, ")");
-                break;
-            }
-            fprintf(out, "%s(", fn);
-            for (int i = 0; i < t->compound.arity; i++) {
-                if (i) fprintf(out, ",");
-                term_pretty(t->compound.args[i], out);
-            }
-            fprintf(out, ")");
-            break;
-        }
-        case TERM_REF:
-            term_pretty(t->ref, out);
-            break;
-    }
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void prolog_program_pretty(PlProgram *prog, FILE *out) {
-    for (PlClause *cl = prog->head; cl; cl = cl->next) {
-        if (!cl->head) {
-            fprintf(out, ":- ");
-            if (cl->nbody > 0) term_pretty(cl->body[0], out);
-            fprintf(out, ".\n");
-            continue;
-        }
-        term_pretty(cl->head, out);
-        if (cl->nbody > 0) {
-            fprintf(out, " :-\n");
-            for (int i = 0; i < cl->nbody; i++) {
-                fprintf(out, "    ");
-                term_pretty(cl->body[i], out);
-                if (i + 1 < cl->nbody) fprintf(out, ",\n");
-            }
-        }
-        fprintf(out, ".\n");
-    }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void prolog_program_free(PlProgram *prog) {

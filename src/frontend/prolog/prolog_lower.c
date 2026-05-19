@@ -342,18 +342,21 @@ CODE_t *prolog_lower(PlProgram *pl_prog) {
         int ci = 0;
         for (PlClause *cl = pl_prog->head; cl && ci < PL_MAX_CLAUSES; cl = cl->next, ci++) {
             plunit_suite[ci][0] = '\0';
-            if (!cl->head && cl->nbody > 0) {
-                Term *d = term_deref(cl->body[0]);
-                if (d && d->tag == TERM_COMPOUND && d->compound.arity >= 1) {
-                    const char *fn = prolog_atom_name(d->compound.functor);
-                    if (fn && strcmp(fn, "begin_tests") == 0) {
-                        Term *a = term_deref(d->compound.args[0]);
-                        const char *sn = NULL;
-                        if (a && a->tag == TERM_ATOM)     sn = prolog_atom_name(a->atom_id);
-                        if (a && a->tag == TERM_COMPOUND) sn = prolog_atom_name(a->compound.functor);
-                        if (sn) strncpy(cur_suite, sn, 63);
-                    } else if (fn && strcmp(fn, "end_tests") == 0) {
-                        cur_suite[0] = '\0';
+            if (!cl->head && cl->tr && cl->tr->n > 0 && cl->tr->c[0] && cl->tr->c[0]->t == TT_NUL) {
+                /* Directive: read begin_tests/end_tests from tree_t */
+                tree_t *bp = cl->tr->c[1];
+                if (bp && bp->t == TT_PROGRAM && bp->n > 0) {
+                    tree_t *d = bp->c[0];
+                    if (d && d->t == TT_FNC && d->v.sval && d->n >= 1) {
+                        if (strcmp(d->v.sval, "begin_tests") == 0) {
+                            tree_t *a = d->c[0];
+                            const char *sn = NULL;
+                            if (a && a->t == TT_QLIT) sn = a->v.sval;
+                            if (a && a->t == TT_FNC)  sn = a->v.sval;
+                            if (sn) strncpy(cur_suite, sn, 63);
+                        } else if (strcmp(d->v.sval, "end_tests") == 0) {
+                            cur_suite[0] = '\0';
+                        }
                     }
                 }
             } else if (cl->head && cur_suite[0]) {
@@ -367,12 +370,17 @@ CODE_t *prolog_lower(PlProgram *pl_prog) {
     int      nkeys = 0;
     int      clause_idx = 0;
     for (PlClause *cl = pl_prog->head; cl; cl = cl->next, clause_idx++) {
-        if (!cl->head) continue;
-        /* PST-PL-6d: use tree_t path when cl->tr is available (non-DCG clauses).
-         * DCG clauses have cl->tr == NULL — fall back to Term* path. */
+        /* PST-PL-6f: non-DCG rules have cl->head==NULL; use tree to detect directives.
+         * A clause is a directive if: cl->head==NULL and (cl->tr==NULL or tr->c[0]->t==TT_NUL).
+         * A clause is a rule/fact if: cl->tr != NULL and tr->c[0]->t != TT_NUL. */
+        int is_dcg  = (cl->head != NULL && cl->tr == NULL);  /* DCG: Term* head, no tree */
+        int is_rule = (cl->tr != NULL && cl->tr->n > 0 &&
+                       cl->tr->c[0] && cl->tr->c[0]->t != TT_NUL);
+        if (!is_rule && !is_dcg) continue;   /* directive or empty */
+        /* PST-PL-6f: use tree_t path for non-DCG; Term* for DCG (cl->tr==NULL). */
         PredKey k;
         if (cl->tr) {
-            tree_t *tr_head = (cl->tr->n > 0) ? cl->tr->c[0] : NULL;
+            tree_t *tr_head = cl->tr->c[0];
             k = key_of_head_tree(tr_head);
         } else {
             k = key_of_head(cl->head);
@@ -434,51 +442,46 @@ CODE_t *prolog_lower(PlProgram *pl_prog) {
         expr_add_child(choices[found], ec);
     }
     for (PlClause *cl = pl_prog->head; cl; cl = cl->next) {
-        if (!cl->head && cl->nbody > 0) {
-            /* PST-PL-6d: use tree_t body goal when available */
-            tree_t *goal_tr = NULL;
-            if (cl->tr && cl->tr->n > 1 && cl->tr->c[1]->t == TT_PROGRAM
-                    && cl->tr->c[1]->n > 0) {
-                goal_tr = cl->tr->c[1]->c[0];   /* first body goal from tree */
+        if (cl->head) continue;   /* skip DCG rules (have Term* head) */
+        /* PST-PL-6f: non-DCG rules have cl->head==NULL but cl->tr->c[0]->t != TT_NUL.
+         * Only process as directive when head is TT_NUL. */
+        if (cl->tr && cl->tr->n > 0 && cl->tr->c[0] && cl->tr->c[0]->t != TT_NUL) continue;
+        /* Directive: cl->tr is always set post-6f (non-DCG).
+         * Extract first body goal from the tree. */
+        if (!cl->tr || cl->tr->n < 2) continue;
+        tree_t *body_prog = cl->tr->c[1];
+        if (!body_prog || body_prog->t != TT_PROGRAM || body_prog->n == 0) continue;
+        tree_t *goal_tr = body_prog->c[0];
+        /* Detect :- export(...) directives from tree_t */
+        int is_export = 0;
+        if (goal_tr && goal_tr->t == TT_FNC && goal_tr->v.sval &&
+            strcmp(goal_tr->v.sval, "export") == 0 && goal_tr->n == 1) {
+            is_export = 1;
+            tree_t *arg = goal_tr->c[0];
+            const char *ename = NULL;
+            if (arg && arg->t == TT_FNC && arg->v.sval &&
+                strcmp(arg->v.sval, "/") == 0 && arg->n >= 1 &&
+                arg->c[0] && arg->c[0]->t == TT_QLIT) {
+                ename = arg->c[0]->v.sval;
+            } else if (arg && arg->t == TT_QLIT) {
+                ename = arg->v.sval;
             }
-            Term *goal = cl->body[0];
-            Term *dg   = term_deref(goal);
-            int is_export = 0;
-            if (dg && dg->tag == TERM_COMPOUND
-                && dg->compound.arity == 1) {
-                int fn = dg->compound.functor;
-                const char *fname = prolog_atom_name(fn);
-                if (fname && strcmp(fname, "export") == 0) {
-                    is_export = 1;
-                    Term *arg = term_deref(dg->compound.args[0]);
-                    const char *ename = NULL;
-                    if (arg && arg->tag == TERM_COMPOUND
-                        && arg->compound.arity == 2) {
-                        Term *n = term_deref(arg->compound.args[0]);
-                        if (n && n->tag == TERM_ATOM)
-                            ename = prolog_atom_name(n->atom_id);
-                    } else if (arg && arg->tag == TERM_ATOM) {
-                        ename = prolog_atom_name(arg->atom_id);
-                    }
-                    if (ename) {
-                        ExportEntry *e = calloc(1, sizeof *e);
-                        e->name = strdup(ename);
-                        e->next = prog->exports;
-                        prog->exports = e;
-                    }
-                }
+            if (ename) {
+                ExportEntry *e = calloc(1, sizeof *e);
+                e->name = strdup(ename);
+                e->next = prog->exports;
+                prog->exports = e;
             }
-            if (!is_export) {
-                STMT_t *s = stmt_new();
-                /* PST-PL-6d: use tree_t goal when available */
-                s->subject = goal_tr ? goal_tr : lower_term(goal);
-                s->lineno  = cl->lineno;
-                s->lang    = LANG_PL;
-                if (!prog->head) prog->head = s;
-                else             prog->tail->next = s;
-                prog->tail = s;
-                prog->nstmts++;
-            }
+        }
+        if (!is_export) {
+            STMT_t *s = stmt_new();
+            s->subject = goal_tr;
+            s->lineno  = cl->lineno;
+            s->lang    = LANG_PL;
+            if (!prog->head) prog->head = s;
+            else             prog->tail->next = s;
+            prog->tail = s;
+            prog->nstmts++;
         }
     }
     for (int i = 0; i < nkeys; i++) {
