@@ -162,4 +162,26 @@ void bb_insn_add_eax_imm32    (uint32_t v);        void bb_insn_cmp_eax_mem_rcx 
 /*--- EC unified BB node emitter (EC-2+) ------------------------------------*/
 struct IR_t;
 int emit_bb_node(struct IR_t * nd, FILE * out);
+/*--- EC-3 JVM scalar helpers (promoted from static in emit_jvm.c) ----------*/
+void jvm_push_int2(FILE * out, long v);
+void jvm_emit_ldc_string(FILE * out, const char * s);
+/*--- EC-3 SM push/pop literal templates (SM_templates/sm_push_pop_lits.c) --*/
+#include "sm_prog.h"
+void sm_push_lit_i(const SM_Instr * instr, FILE * out);
+void sm_push_lit_s(const SM_Instr * instr, FILE * out);
+void sm_push_lit_f(const SM_Instr * instr, FILE * out);
+void sm_push_null (const SM_Instr * instr, FILE * out);
+void sm_void_pop  (const SM_Instr * instr, FILE * out);
+void sm_push_var  (const SM_Instr * instr, FILE * out);
+void sm_store_var (const SM_Instr * instr, FILE * out);
+/*--- EC-3 SM arithmetic templates (SM_templates/sm_arith.c) ----------------*/
+void sm_concat    (const SM_Instr * instr, FILE * out);
+void sm_neg       (const SM_Instr * instr, FILE * out);
+void sm_coerce_num(const SM_Instr * instr, FILE * out);
+void sm_exp       (const SM_Instr * instr, FILE * out);
+void sm_add       (const SM_Instr * instr, FILE * out);
+void sm_sub       (const SM_Instr * instr, FILE * out);
+void sm_mul       (const SM_Instr * instr, FILE * out);
+void sm_div       (const SM_Instr * instr, FILE * out);
+void sm_mod       (const SM_Instr * instr, FILE * out);
 #endif

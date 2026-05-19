@@ -1205,6 +1205,28 @@ void emit_sub_delta_imm(int v)
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* EC-3 JVM scalar helpers — promoted from static in emit_jvm.c; used by SM_templates. */
+void jvm_push_int2(FILE * out, long v) {
+    if (v == -1) { fprintf(out, "    iconst_m1\n"); return; }
+    if (v >= 0 && v <= 5) { fprintf(out, "    iconst_%ld\n", v); return; }
+    if (v >= -128 && v <= 127) { fprintf(out, "    bipush %ld\n", v); return; }
+    if (v >= -32768 && v <= 32767) { fprintf(out, "    sipush %ld\n", v); return; }
+    fprintf(out, "    ldc %ld\n", v);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+void jvm_emit_ldc_string(FILE * out, const char * s) {
+    fprintf(out, "    ldc \"");
+    for (const char * p = s; *p; p++) {
+        if      (*p == '"')  fprintf(out, "\\\"");
+        else if (*p == '\\') fprintf(out, "\\\\");
+        else if (*p == '\n') fprintf(out, "\\n");
+        else if (*p == '\r') fprintf(out, "\\r");
+        else if (*p == '\t') fprintf(out, "\\t");
+        else                 fputc(*p, out);
+    }
+    fprintf(out, "\"\n");
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* EC-2 helpers — shared across JVM/JS/.NET arms; removed from silos in EC-5. */
 #include "IR.h"
 #include "emit_ir.h"

@@ -70,35 +70,12 @@ static void jvm_val_helper(FILE * out, const char * name) {
     fprintf(out, "    ireturn\n.end method\n");
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* Escape a SNOBOL4 string literal for use as a Jasmin ldc string operand.
-   Jasmin ldc strings use Java string literal syntax inside double-quotes. */
-static void jvm_emit_ldc_string(FILE * out, const char * s) {
-    fprintf(out, "    ldc \"");
-    for (const char * p = s; * p; p++) {
-        if (* p == '"')  { fprintf(out, "\\\""); }
-        else if (* p == '\\') { fprintf(out, "\\\\"); }
-        else if (* p == '\n') { fprintf(out, "\\n"); }
-        else if (* p == '\r') { fprintf(out, "\\r"); }
-        else if (* p == '\t') { fprintf(out, "\\t"); }
-        else                  { fputc(* p, out); }
-    }
-    fprintf(out, "\"\n");
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* Emit an integer push instruction choosing the most compact opcode. */
 static void jvm_push_int(FILE * out, long v) {
     if (v >= -1 && v <= 5)        { fprintf(out, "    iconst_%ld\n", v == -1 ? (long)'m' : v); if (v == -1) fprintf(out, "    iconst_m1\n"); }
     else if (v >= -128 && v <= 127) { fprintf(out, "    bipush %ld\n", v); }
     else if (v >= -32768 && v <= 32767) { fprintf(out, "    sipush %ld\n", v); }
     else                            { fprintf(out, "    ldc %ld\n", v); }
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void jvm_push_int2(FILE * out, long v) {
-    if (v == -1) { fprintf(out, "    iconst_m1\n"); return; }
-    if (v >= 0 && v <= 5) { fprintf(out, "    iconst_%ld\n", v); return; }
-    if (v >= -128 && v <= 127) { fprintf(out, "    bipush %ld\n", v); return; }
-    if (v >= -32768 && v <= 32767) { fprintf(out, "    sipush %ld\n", v); return; }
-    fprintf(out, "    ldc %ld\n", v);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* ── IR_PAT_LIT ── */
@@ -644,33 +621,22 @@ static void emit_jvm_one_instr(SM_Program * sm, int i, int n,
     case SM_STNO:
         jvm_push_int(out, instr->a[0].i); fprintf(out, "    i2l\n");
         fprintf(out, "    invokestatic rt/SnoRt/set_stno(J)V\n"); break;
-    case SM_PUSH_LIT_I:
-        jvm_push_int(out, instr->a[0].i); fprintf(out, "    i2l\n");
-        fprintf(out, "    invokestatic rt/SnoRt/push_int(J)V\n"); break;
-    case SM_PUSH_LIT_S:
-        jvm_emit_ldc_string(out, instr->a[0].s ? instr->a[0].s : "");
-        fprintf(out, "    invokestatic rt/SnoRt/push_str(Ljava/lang/String;)V\n"); break;
-    case SM_PUSH_LIT_F:
-        fprintf(out, "    ldc2_w %.17g\n", instr->a[0].f);
-        fprintf(out, "    invokestatic rt/SnoRt/push_real(D)V\n"); break;
-    case SM_PUSH_NULL: case SM_PUSH_NULL_NOFLIP:
-        fprintf(out, "    invokestatic rt/SnoRt/push_null()V\n"); break;
-    case SM_PUSH_VAR:
-        jvm_emit_ldc_string(out, instr->a[0].s ? instr->a[0].s : "");
-        fprintf(out, "    invokestatic rt/SnoRt/push_var(Ljava/lang/String;)V\n"); break;
-    case SM_STORE_VAR:
-        jvm_emit_ldc_string(out, instr->a[0].s ? instr->a[0].s : "");
-        fprintf(out, "    invokestatic rt/SnoRt/store_var(Ljava/lang/String;)V\n"); break;
-    case SM_VOID_POP: fprintf(out, "    invokestatic rt/SnoRt/pop_void()V\n"); break;
-    case SM_CONCAT:   fprintf(out, "    invokestatic rt/SnoRt/concat()V\n"); break;
-    case SM_NEG:      fprintf(out, "    invokestatic rt/SnoRt/neg()V\n"); break;
-    case SM_COERCE_NUM: fprintf(out, "    invokestatic rt/SnoRt/coerce_num()V\n"); break;
-    case SM_EXP:      fprintf(out, "    invokestatic rt/SnoRt/exp_op()V\n"); break;
-    case SM_ADD:      fprintf(out, "    bipush 0\n    invokestatic rt/SnoRt/arith(I)V\n"); break;
-    case SM_SUB:      fprintf(out, "    bipush 1\n    invokestatic rt/SnoRt/arith(I)V\n"); break;
-    case SM_MUL:      fprintf(out, "    bipush 2\n    invokestatic rt/SnoRt/arith(I)V\n"); break;
-    case SM_DIV:      fprintf(out, "    bipush 3\n    invokestatic rt/SnoRt/arith(I)V\n"); break;
-    case SM_MOD:      fprintf(out, "    invokestatic rt/SnoRt/mod()V\n"); break;
+    case SM_PUSH_LIT_I: sm_push_lit_i(instr, out); break;
+    case SM_PUSH_LIT_S: sm_push_lit_s(instr, out); break;
+    case SM_PUSH_LIT_F: sm_push_lit_f(instr, out); break;
+    case SM_PUSH_NULL: case SM_PUSH_NULL_NOFLIP: sm_push_null(instr, out); break;
+    case SM_PUSH_VAR:  sm_push_var(instr, out); break;
+    case SM_STORE_VAR: sm_store_var(instr, out); break;
+    case SM_VOID_POP: sm_void_pop(instr, out); break;
+    case SM_CONCAT:   sm_concat(instr, out); break;
+    case SM_NEG:      sm_neg(instr, out); break;
+    case SM_COERCE_NUM: sm_coerce_num(instr, out); break;
+    case SM_EXP:      sm_exp(instr, out); break;
+    case SM_ADD:      sm_add(instr, out); break;
+    case SM_SUB:      sm_sub(instr, out); break;
+    case SM_MUL:      sm_mul(instr, out); break;
+    case SM_DIV:      sm_div(instr, out); break;
+    case SM_MOD:      sm_mod(instr, out); break;
     case SM_ACOMP:
         jvm_push_int(out, instr->a[0].i);
         fprintf(out, "    invokestatic rt/SnoRt/acomp(I)V\n"); break;

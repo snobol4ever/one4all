@@ -802,63 +802,24 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
             net_push_i4(out, (int)instr->a[0].i);
             fprintf(out, "    call       void SnoRt::set_stno(int32)\n");
             break;
-        case SM_PUSH_LIT_I:
-            net_push_i4(out, (int)instr->a[0].i);
-            fprintf(out, "    call       void SnoRt::push_int(int32)\n");
-            break;
+        case SM_PUSH_LIT_I: sm_push_lit_i(instr, out); break;
         case SM_PUSH_LIT_S:
-        case SM_PUSH_LIT_CS:
-            net_escape_ldstr(out, instr->a[0].s ? instr->a[0].s : "");
-            net_push_i4(out, instr->a[0].s ? (int)strlen(instr->a[0].s) : 0);
-            fprintf(out, "    call       void SnoRt::push_str(string, int32)\n");
-            break;
-        case SM_PUSH_LIT_F:
-            fprintf(out, "    ldc.r8     %.17g\n", instr->a[0].f);
-            fprintf(out, "    call       void SnoRt::push_real(float64)\n");
-            break;
+        case SM_PUSH_LIT_CS: sm_push_lit_s(instr, out); break;
+        case SM_PUSH_LIT_F: sm_push_lit_f(instr, out); break;
         case SM_PUSH_NULL:
-        case SM_PUSH_NULL_NOFLIP:
-            fprintf(out, "    call       void SnoRt::push_null()\n");
-            break;
-        case SM_PUSH_VAR:
-            net_escape_ldstr(out, instr->a[0].s ? instr->a[0].s : "");
-            fprintf(out, "    call       void SnoRt::push_var(string)\n");
-            break;
-        case SM_STORE_VAR:
-            net_escape_ldstr(out, instr->a[0].s ? instr->a[0].s : "");
-            fprintf(out, "    call       void SnoRt::store_var(string)\n");
-            break;
-        case SM_VOID_POP:
-            fprintf(out, "    call       void SnoRt::pop_void()\n");
-            break;
-        case SM_CONCAT:
-            fprintf(out, "    call       void SnoRt::concat()\n");
-            break;
-        case SM_NEG:
-            fprintf(out, "    call       void SnoRt::negate()\n");
-            break;
-        case SM_COERCE_NUM:
-            fprintf(out, "    call       void SnoRt::coerce_num()\n");
-            break;
-        case SM_EXP:
-            fprintf(out, "    call       void SnoRt::exp_op()\n");
-            break;
-        case SM_ADD:
-            fprintf(out, "    ldc.i4.1\n    call       void SnoRt::arith(int32)\n");
-            break;
-        case SM_SUB:
-            fprintf(out, "    ldc.i4.2\n    call       void SnoRt::arith(int32)\n");
-            break;
-        case SM_MUL:
-            fprintf(out, "    ldc.i4.3\n    call       void SnoRt::arith(int32)\n");
-            break;
-        case SM_DIV:
-            fprintf(out, "    ldc.i4.4\n    call       void SnoRt::arith(int32)\n");
-            break;
-        case SM_MOD:
-            net_push_i4(out, 6);
-            fprintf(out, "    call       void SnoRt::arith(int32)\n");
-            break;
+        case SM_PUSH_NULL_NOFLIP: sm_push_null(instr, out); break;
+        case SM_PUSH_VAR:  sm_push_var(instr, out); break;
+        case SM_STORE_VAR: sm_store_var(instr, out); break;
+        case SM_VOID_POP: sm_void_pop(instr, out); break;
+        case SM_CONCAT:     sm_concat(instr, out); break;
+        case SM_NEG:        sm_neg(instr, out); break;
+        case SM_COERCE_NUM: sm_coerce_num(instr, out); break;
+        case SM_EXP:        sm_exp(instr, out); break;
+        case SM_ADD:        sm_add(instr, out); break;
+        case SM_SUB:        sm_sub(instr, out); break;
+        case SM_MUL:        sm_mul(instr, out); break;
+        case SM_DIV:        sm_div(instr, out); break;
+        case SM_MOD:        sm_mod(instr, out); break;
         case SM_ACOMP:
             net_push_i4(out, (int)instr->a[0].i);
             fprintf(out, "    call       void SnoRt::acomp(int32)\n");

@@ -321,61 +321,23 @@ int emit_js_from_sm(SM_Program * sm, FILE * out) {
             break;
         case SM_LABEL:
             break;
-        case SM_PUSH_LIT_I:
-            fprintf(out, "rt.push_int(%lld); ", instr->a[0].i);
-            break;
-        case SM_PUSH_LIT_S:
-            fprintf(out, "rt.push_str(");
-            js_escape_string(out, instr->a[0].s);
-            fprintf(out, ", %d); ", (int)(instr->a[0].s ? strlen(instr->a[0].s) : 0));
-            break;
-        case SM_PUSH_LIT_F:
-            fprintf(out, "rt.push_real_bits(%.17g); ", instr->a[0].f);
-            break;
+        case SM_PUSH_LIT_I: sm_push_lit_i(instr, out); break;
+        case SM_PUSH_LIT_S: sm_push_lit_s(instr, out); break;
+        case SM_PUSH_LIT_F: sm_push_lit_f(instr, out); break;
         case SM_PUSH_NULL:
-        case SM_PUSH_NULL_NOFLIP:
-            fprintf(out, "rt.push_null(); ");
-            break;
-        case SM_PUSH_VAR:
-            fprintf(out, "rt.push_var(");
-            js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
-            fprintf(out, "); ");
-            break;
-        case SM_STORE_VAR:
-            fprintf(out, "rt.store_var(");
-            js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
-            fprintf(out, "); ");
-            break;
-        case SM_VOID_POP:
-            fprintf(out, "rt.pop_void(); ");
-            break;
-        case SM_ADD:
-            fprintf(out, "rt.arith('add'); ");
-            break;
-        case SM_SUB:
-            fprintf(out, "rt.arith('sub'); ");
-            break;
-        case SM_MUL:
-            fprintf(out, "rt.arith('mul'); ");
-            break;
-        case SM_DIV:
-            fprintf(out, "rt.arith('div'); ");
-            break;
-        case SM_MOD:
-            fprintf(out, "rt.arith('mod'); ");
-            break;
-        case SM_CONCAT:
-            fprintf(out, "rt.concat(); ");
-            break;
-        case SM_NEG:
-            fprintf(out, "rt.neg(); ");
-            break;
-        case SM_COERCE_NUM:
-            fprintf(out, "rt.coerce_num(); ");
-            break;
-        case SM_EXP:
-            fprintf(out, "rt.exp_op(); ");
-            break;
+        case SM_PUSH_NULL_NOFLIP: sm_push_null(instr, out); break;
+        case SM_PUSH_VAR:  sm_push_var(instr, out); break;
+        case SM_STORE_VAR: sm_store_var(instr, out); break;
+        case SM_VOID_POP: sm_void_pop(instr, out); break;
+        case SM_ADD:        sm_add(instr, out); break;
+        case SM_SUB:        sm_sub(instr, out); break;
+        case SM_MUL:        sm_mul(instr, out); break;
+        case SM_DIV:        sm_div(instr, out); break;
+        case SM_MOD:        sm_mod(instr, out); break;
+        case SM_CONCAT:     sm_concat(instr, out); break;
+        case SM_NEG:        sm_neg(instr, out); break;
+        case SM_COERCE_NUM: sm_coerce_num(instr, out); break;
+        case SM_EXP:        sm_exp(instr, out); break;
         case SM_HALT:
             fprintf(out, "break loop; ");
             has_continue = 1;
