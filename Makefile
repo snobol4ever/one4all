@@ -192,45 +192,11 @@ out/sm_codegen_x64_emit_test: $(SRC)/emitter/sm_codegen_x64_emit_test.c \
 	@echo "Built: out/sm_codegen_x64_emit_test"
 
 
-# ── EM-7a Phase-2 simulator unit test ────────────────────────────────────────
-# Links against libscrip_rt.so for pat_* constructors + GC.
-out/sm_phase2_sim_test: $(SRC)/emitter/sm_phase2_sim_test.c \
-                         \
-                        $(SRC)/lower/sm_prog.c \
-                        $(SRC)/lower/sm_prog.h \
-                        out/libscrip_rt.so
-	@mkdir -p out
-	$(CC) -O0 -g $(WARN) \
-	    -I$(SRC) -I$(SRC)/lower -I$(SRC)/processor -I$(SRC)/emitter -I$(SRC)/runtime/snobol4 -I$(RT) -I$(RT)/rt \
-	    -DDYN_ENGINE_LINKED \
-	    $(SRC)/emitter/sm_phase2_sim_test.c \
-	    $(SRC)/lower/sm_prog.c \
-	    -Lout -lscrip_rt -lgc -lm \
-	    -Wl,-rpath,$(shell pwd)/out \
-	    -o out/sm_phase2_sim_test
-
-# ── EM-7b bb_build_flat_text unit test ───────────────────────────────────────
-# Verifies dual-mode bb_flat.c: TEXT-mode emission produces a .s with
-# the four externally-visible α/β/γ/ω labels and assembles cleanly.
-# Links against libscrip_rt.so (which already includes bb_flat.c +
-# bb_emit.c + pat_* constructors).
-out/bb_flat_text_test: $(SRC)/emitter/bb_flat_text_test.c \
-                        \
-                       $(SRC)/lower/sm_prog.c \
-                       $(SRC)/lower/sm_prog.h \
-                       out/libscrip_rt.so \
-                       $(SRC)/processor/bb_pool.h
-	@mkdir -p out
-	$(CC) -O0 -g $(WARN) \
-	    -I$(SRC) -I$(SRC)/lower -I$(SRC)/processor -I$(SRC)/emitter -I$(SRC)/runtime/snobol4 -I$(RT) -I$(RT)/rt \
-	    -DDYN_ENGINE_LINKED \
-	    $(SRC)/emitter/bb_flat_text_test.c \
-	    $(SRC)/lower/sm_prog.c \
-	    -Lout -lscrip_rt -lgc -lm \
-	    -Wl,-rpath,$(shell pwd)/out \
-	    -o out/bb_flat_text_test
-	@echo "Built: out/bb_flat_text_test"
-	@echo "Built: out/sm_phase2_sim_test"
+# ── EM-7a/EM-7b unit tests retired 2026-05-19 (EC-BB-UNIFY-2): the underlying
+# compile-time PATND_t API converted to IR_t*. The tests asserted XKIND_t
+# fields (kind/nchildren/children) and the patnd_is_fully_invariant(PATND_t*)
+# signature, both of which no longer exist for the compile-time walker.
+# Coverage subsumed by GATE-2 (broker) and the mode-4 compile gate.
 
 # ── scrip — unified driver (all modes, all frontends) ────────────────────────
 # WASM removed from scrip build (2026-04-08): --jit-emit --wasm / emit_wasm.c

@@ -2,6 +2,7 @@
 #include "emit_templates.h"
 #include "emit_form.h"
 #include "../rt/rt.h"
+#include "IR.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -2184,254 +2185,319 @@ static int  emit_sm_pat_cat_dispatch    (FILE *out, int pc)  { (void)pc; edp4_la
 static int  emit_sm_pat_alt_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_alt);      return 0; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int  emit_sm_pat_deref_dispatch  (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_deref);    return 0; }
+/*------------------------------------------------------------------------------------------------------------------------------------*/
+/* Phase-2 simulator (EC-BB-UNIFY-2): builds IR_t* pattern trees from an SM_Instr window.                                              */
+/*                                                                                                                                     */
+/* The simulator walks the SM stream and mimics what the runtime stack would do — but instead of calling pat_* PATND_t constructors    */
+/* at compile time, it allocates IR_t nodes from an IR_block_t cfg. Each SimVal carries either a constant operand (string/int) or a    */
+/* pattern IR_t* — the same descriptor-tag distinction the runtime makes, just in compile-time IR_t space.                             */
+/*                                                                                                                                     */
+/* The PATND_t world remains alive at runtime (pat_* in rt.c and snobol4_pattern.c are still @PLT-live from emitted asm); this conver- */
+/* sion removes the compile-time-only PATND_t path that fed emit_flat_build / emit_flat_eligible / emit_flat_invariant.                */
+/*------------------------------------------------------------------------------------------------------------------------------------*/
 #define PHASE2_SIM_DEPTH  128
 typedef struct {
-    DESCR_t val;
-    int     is_pat;
-    int     is_variant;
+    /* exactly one of these is set, governed by tag */
+    IR_t       * pat;       /* tag==SIMV_PAT: built IR pattern node                          */
+    const char * sval;      /* tag==SIMV_CS:  constant string operand                        */
+    int64_t      ival;      /* tag==SIMV_CI:  constant int operand                           */
+    enum { SIMV_PAT, SIMV_CS, SIMV_CI, SIMV_VARIANT } tag;
+    int          is_variant;
 } SimVal;
 typedef struct {
     SimVal slots[PHASE2_SIM_DEPTH];
     int    top;
 } SimStack;
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------------------------------------------------------------------*/
 static void simstack_init(SimStack *ss) { ss->top = 0; }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------------------------------------------------------------------*/
 static void simstack_push(SimStack *ss, SimVal v)
 {
     if (ss->top < PHASE2_SIM_DEPTH) ss->slots[ss->top++] = v;
 }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------------------------------------------------------------------*/
 static SimVal simstack_pop(SimStack *ss)
 {
     if (ss->top > 0) return ss->slots[--ss->top];
-    SimVal v; v.val = pat_epsilon(); v.is_pat = 1; v.is_variant = 1;
+    SimVal v; v.tag = SIMV_VARIANT; v.pat = NULL; v.sval = NULL; v.ival = 0; v.is_variant = 1;
     return v;
 }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void simstack_push_const_s(SimStack *ss, const char *s)
-{
-    SimVal v;
-    v.val.v  = DT_S;
-    v.val.s  = s;
-    v.is_pat = 0;
-    v.is_variant = 0;
-    simstack_push(ss, v);
+/*------------------------------------------------------------------------------------------------------------------------------------*/
+static SimVal simv_pat(IR_t *nd, int is_variant) {
+    SimVal v; v.tag = SIMV_PAT; v.pat = nd; v.sval = NULL; v.ival = 0; v.is_variant = is_variant; return v;
 }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void simstack_push_const_i(SimStack *ss, int64_t n)
-{
-    SimVal v;
-    v.val.v  = DT_I;
-    v.val.i  = n;
-    v.is_pat = 0;
-    v.is_variant = 0;
-    simstack_push(ss, v);
+/*------------------------------------------------------------------------------------------------------------------------------------*/
+static SimVal simv_cs(const char *s) {
+    SimVal v; v.tag = SIMV_CS; v.pat = NULL; v.sval = s ? s : ""; v.ival = 0; v.is_variant = 0; return v;
 }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void simstack_push_variant_val(SimStack *ss)
-{
-    SimVal v;
-    v.val = pat_epsilon();
-    v.is_pat = 0;
-    v.is_variant = 1;
-    simstack_push(ss, v);
+/*------------------------------------------------------------------------------------------------------------------------------------*/
+static SimVal simv_ci(int64_t n) {
+    SimVal v; v.tag = SIMV_CI; v.pat = NULL; v.sval = NULL; v.ival = n; v.is_variant = 0; return v;
 }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static SimVal make_pat_val(DESCR_t d, int is_variant)
-{
-    SimVal v;
-    v.val = d;
-    v.is_pat = 1;
-    v.is_variant = is_variant;
-    return v;
+/*------------------------------------------------------------------------------------------------------------------------------------*/
+static SimVal simv_variant(void) {
+    SimVal v; v.tag = SIMV_VARIANT; v.pat = NULL; v.sval = NULL; v.ival = 0; v.is_variant = 1; return v;
 }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int emit_flat_eligible(const PATND_t *p)
-{
-    if (!p) return 1;
-    return p->kind != XVAR;
+/*------------------------------------------------------------------------------------------------------------------------------------*/
+/* Build a nullary IR pat node (LIT/ARB/REM/SPAN/.../FENCE/ABORT). */
+static IR_t * pat_node_alloc(IR_block_t *cfg, IR_e t) {
+    return IR_node_alloc(cfg, t);
 }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int emit_flat_invariant(const PATND_t *p)
+/*------------------------------------------------------------------------------------------------------------------------------------*/
+/* Attach n children to an IR_t* node, allocating the c[] array. */
+static void pat_set_children(IR_t *nd, IR_t **ch, int n) {
+    if (!nd || n <= 0) return;
+    nd->c = (IR_t **)calloc((size_t)n, sizeof(IR_t *));
+    if (!nd->c) return;
+    for (int i = 0; i < n; i++) nd->c[i] = ch[i];
+    nd->n = n;
+}
+/*------------------------------------------------------------------------------------------------------------------------------------*/
+/* Build a charset IR pat node: SPAN/BREAK/ANY/NOTANY take an sval (cset). If the popped arg isn't a constant string, the node still   */
+/* materialises with an empty sval — the variant-ness flag carries through so it's marked ineligible downstream.                       */
+static IR_t * pat_node_charset(IR_block_t *cfg, IR_e t, const SimVal *arg) {
+    IR_t *nd = IR_node_alloc(cfg, t);
+    if (!nd) return NULL;
+    nd->sval = (arg && arg->tag == SIMV_CS && arg->sval) ? arg->sval : "";
+    return nd;
+}
+/*------------------------------------------------------------------------------------------------------------------------------------*/
+/* Build an int-arg IR pat node: LEN/POS/RPOS/TAB/RTAB carry the int in ival. RPOS/RTAB use nd->n!=0 as the "reverse" flag (emit_bb.c  */
+/* line 901-904: `if (nd->n) emit_bb_xrpsi(...) else emit_bb_xposi(...)`). We set n=1 for RPOS/RTAB, n=0 for POS/TAB.                  */
+static IR_t * pat_node_intarg(IR_block_t *cfg, IR_e t, int reverse, const SimVal *arg) {
+    IR_t *nd = IR_node_alloc(cfg, t);
+    if (!nd) return NULL;
+    nd->ival = (arg && arg->tag == SIMV_CI) ? arg->ival : 0;
+    nd->n    = reverse ? 1 : 0;  /* encodes RPOS/RTAB vs POS/TAB for emit_flat_ir */
+    return nd;
+}
+/*------------------------------------------------------------------------------------------------------------------------------------*/
+/* Map XKIND-style kinds we never produce here (XNME/XFNME/XCALLCAP/XVAR) onto IR_e equivalents for the eligibility check:             */
+/*   XVAR     → has no IR_e analogue (walker never builds runtime-var-as-pattern); not produced.                                       */
+/*   XNME     → IR_PAT_ASSIGN_COND                                                                                                     */
+/*   XFNME    → IR_PAT_ASSIGN_IMM                                                                                                      */
+/*   XCALLCAP → IR_PAT_CALLOUT                                                                                                         */
+/* So the invariant rule "XNME/XFNME/XCALLCAP ⇒ ineligible" becomes "IR_PAT_ASSIGN_IMM/ASSIGN_COND/CALLOUT ⇒ ineligible".               */
+int emit_flat_eligible(const IR_t *nd)
 {
-    if (!p) return 1;
-    if (!flat_is_eligible_node(p)) return 0;
-    if (p->kind == XCAT && p->nchildren > 2) return 0;
-    if (p->kind == XNME || p->kind == XFNME || p->kind == XCALLCAP) return 0;
-    for (int i = 0; i < p->nchildren; i++)
-        if (!patnd_is_fully_invariant(p->children[i])) return 0;
+    if (!nd) return 1;
+    /* Old check was "kind != XVAR". The walker no longer constructs anything like XVAR (var_as_pattern is a runtime-only path), so    */
+    /* the IR_t version always returns 1. Kept as a hook for symmetry with the legacy API.                                             */
     return 1;
 }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t emit_walk_phase2(const SM_Program *prog,
-                            int phase2_start, int phase2_end,
-                            int *out_variant)
+/*------------------------------------------------------------------------------------------------------------------------------------*/
+int emit_flat_invariant(const IR_t *nd)
+{
+    if (!nd) return 1;
+    if (!emit_flat_eligible(nd)) return 0;
+    if (nd->t == IR_PAT_CAT && nd->n > 2) return 0;
+    if (nd->t == IR_PAT_ASSIGN_IMM || nd->t == IR_PAT_ASSIGN_COND || nd->t == IR_PAT_CALLOUT) return 0;
+    for (int i = 0; i < nd->n; i++)
+        if (!emit_flat_invariant(nd->c[i])) return 0;
+    return 1;
+}
+/*------------------------------------------------------------------------------------------------------------------------------------*/
+/* Build IR_t* pattern tree from an SM stream window. Returns the root IR node (NULL on empty window). cfg owns the lifetime of all    */
+/* allocated nodes. Caller is responsible for IR_free(cfg) when the window is no longer needed.                                        */
+IR_t * emit_walk_phase2(const SM_Program *prog,
+                         int phase2_start, int phase2_end,
+                         IR_block_t *cfg, int *out_variant)
 {
     SimStack ss;
     simstack_init(&ss);
     int has_variant = 0;
+    if (!cfg) { *out_variant = 1; return NULL; }
     for (int pc = phase2_start; pc < phase2_end; pc++) {
         const SM_Instr *ins = &prog->instrs[pc];
         switch (ins->op) {
         case SM_PUSH_LIT_S:
         case SM_PUSH_LIT_CS:
-            simstack_push_const_s(&ss, ins->a[0].s ? ins->a[0].s : "");
+            simstack_push(&ss, simv_cs(ins->a[0].s ? ins->a[0].s : ""));
             break;
         case SM_PUSH_LIT_I:
-            simstack_push_const_i(&ss, ins->a[0].i);
+            simstack_push(&ss, simv_ci(ins->a[0].i));
             break;
         case SM_PUSH_VAR:
-            simstack_push_variant_val(&ss);
+            simstack_push(&ss, simv_variant());
             has_variant = 1;
             break;
-        case SM_PAT_EPS:
-            simstack_push(&ss, make_pat_val(pat_epsilon(), 0));
+        case SM_PAT_EPS: {
+            /* IR has no IR_PAT_EPS; use NULL (emit_flat_ir treats NULL as xeps). */
+            simstack_push(&ss, simv_pat(NULL, 0));
             break;
-        case SM_PAT_ARB:
-            simstack_push(&ss, make_pat_val(pat_arb(), 0));
+        }
+        case SM_PAT_ARB: {
+            IR_t *nd = pat_node_alloc(cfg, IR_PAT_ARB);
+            simstack_push(&ss, simv_pat(nd, 0));
             break;
-        case SM_PAT_REM:
-            simstack_push(&ss, make_pat_val(pat_rem(), 0));
+        }
+        case SM_PAT_REM: {
+            IR_t *nd = pat_node_alloc(cfg, IR_PAT_REM);
+            simstack_push(&ss, simv_pat(nd, 0));
             break;
+        }
         case SM_PAT_FAIL:
-            simstack_push(&ss, make_pat_val(pat_fail(), 0));
-            break;
         case SM_PAT_SUCCEED:
-            simstack_push(&ss, make_pat_val(pat_succeed(), 0));
+        case SM_PAT_BAL: {
+            /* No IR_PAT_FAIL/SUCCEED/BAL today; emit_flat_ir falls through default to jmp lbl_fail. Mark variant so the window is     */
+            /* not selected as invariant — runtime path handles these correctly.                                                       */
+            simstack_push(&ss, simv_variant());
+            has_variant = 1;
             break;
-        case SM_PAT_ABORT:
-            simstack_push(&ss, make_pat_val(pat_abort(), 0));
+        }
+        case SM_PAT_ABORT: {
+            IR_t *nd = pat_node_alloc(cfg, IR_PAT_ABORT);
+            simstack_push(&ss, simv_pat(nd, 0));
             break;
-        case SM_PAT_BAL:
-            simstack_push(&ss, make_pat_val(pat_bal(), 0));
+        }
+        case SM_PAT_FENCE0: {
+            IR_t *nd = pat_node_alloc(cfg, IR_PAT_FENCE);
+            simstack_push(&ss, simv_pat(nd, 0));
             break;
-        case SM_PAT_FENCE0:
-            simstack_push(&ss, make_pat_val(pat_fence(), 0));
-            break;
+        }
         case SM_PAT_LIT: {
-            const char *s = ins->a[0].s ? ins->a[0].s : "";
-            simstack_push(&ss, make_pat_val(pat_lit(s), 0));
+            IR_t *nd = pat_node_alloc(cfg, IR_PAT_LIT);
+            nd->sval = ins->a[0].s ? ins->a[0].s : "";
+            simstack_push(&ss, simv_pat(nd, 0));
             break;
         }
         case SM_PAT_SPAN: {
             SimVal arg = simstack_pop(&ss);
-            const char *cs = (arg.val.v == DT_S && arg.val.s) ? arg.val.s : "";
-            simstack_push(&ss, make_pat_val(pat_span(cs), arg.is_variant));
+            IR_t *nd = pat_node_charset(cfg, IR_PAT_SPAN, &arg);
+            simstack_push(&ss, simv_pat(nd, arg.is_variant));
             if (arg.is_variant) has_variant = 1;
             break;
         }
         case SM_PAT_BREAK: {
             SimVal arg = simstack_pop(&ss);
-            const char *cs = (arg.val.v == DT_S && arg.val.s) ? arg.val.s : "";
-            simstack_push(&ss, make_pat_val(pat_break_(cs), arg.is_variant));
+            IR_t *nd = pat_node_charset(cfg, IR_PAT_BREAK, &arg);
+            simstack_push(&ss, simv_pat(nd, arg.is_variant));
             if (arg.is_variant) has_variant = 1;
             break;
         }
         case SM_PAT_ANY: {
             SimVal arg = simstack_pop(&ss);
-            const char *cs = (arg.val.v == DT_S && arg.val.s) ? arg.val.s : "";
-            simstack_push(&ss, make_pat_val(pat_any_cs(cs), arg.is_variant));
+            IR_t *nd = pat_node_charset(cfg, IR_PAT_ANY, &arg);
+            simstack_push(&ss, simv_pat(nd, arg.is_variant));
             if (arg.is_variant) has_variant = 1;
             break;
         }
         case SM_PAT_NOTANY: {
             SimVal arg = simstack_pop(&ss);
-            const char *cs = (arg.val.v == DT_S && arg.val.s) ? arg.val.s : "";
-            simstack_push(&ss, make_pat_val(pat_notany(cs), arg.is_variant));
+            IR_t *nd = pat_node_charset(cfg, IR_PAT_NOTANY, &arg);
+            simstack_push(&ss, simv_pat(nd, arg.is_variant));
             if (arg.is_variant) has_variant = 1;
             break;
         }
         case SM_PAT_LEN: {
             SimVal arg = simstack_pop(&ss);
-            int64_t n = (arg.val.v == DT_I) ? arg.val.i : 0;
-            simstack_push(&ss, make_pat_val(pat_len(n), arg.is_variant));
+            IR_t *nd = pat_node_intarg(cfg, IR_PAT_LEN, 0, &arg);
+            simstack_push(&ss, simv_pat(nd, arg.is_variant));
             if (arg.is_variant) has_variant = 1;
             break;
         }
         case SM_PAT_POS: {
             SimVal arg = simstack_pop(&ss);
-            int64_t n = (arg.val.v == DT_I) ? arg.val.i : 0;
-            int v = arg.is_variant;
-            simstack_push(&ss, make_pat_val(pat_pos(n), v));
-            if (v) has_variant = 1;
+            IR_t *nd = pat_node_intarg(cfg, IR_PAT_POS, 0, &arg);
+            simstack_push(&ss, simv_pat(nd, arg.is_variant));
+            if (arg.is_variant) has_variant = 1;
             break;
         }
         case SM_PAT_RPOS: {
             SimVal arg = simstack_pop(&ss);
-            int64_t n = (arg.val.v == DT_I) ? arg.val.i : 0;
-            int v = arg.is_variant;
-            simstack_push(&ss, make_pat_val(pat_rpos(n), v));
-            if (v) has_variant = 1;
+            IR_t *nd = pat_node_intarg(cfg, IR_PAT_POS, 1, &arg);  /* n=1 ⇒ rpos */
+            simstack_push(&ss, simv_pat(nd, arg.is_variant));
+            if (arg.is_variant) has_variant = 1;
             break;
         }
         case SM_PAT_TAB: {
             SimVal arg = simstack_pop(&ss);
-            int64_t n = (arg.val.v == DT_I) ? arg.val.i : 0;
-            simstack_push(&ss, make_pat_val(pat_tab(n), arg.is_variant));
+            IR_t *nd = pat_node_intarg(cfg, IR_PAT_TAB, 0, &arg);
+            simstack_push(&ss, simv_pat(nd, arg.is_variant));
             if (arg.is_variant) has_variant = 1;
             break;
         }
         case SM_PAT_RTAB: {
             SimVal arg = simstack_pop(&ss);
-            int64_t n = (arg.val.v == DT_I) ? arg.val.i : 0;
-            simstack_push(&ss, make_pat_val(pat_rtab(n), arg.is_variant));
+            IR_t *nd = pat_node_intarg(cfg, IR_PAT_TAB, 1, &arg);  /* n=1 ⇒ rtab */
+            simstack_push(&ss, simv_pat(nd, arg.is_variant));
             if (arg.is_variant) has_variant = 1;
             break;
         }
         case SM_PAT_ARBNO: {
             SimVal inner = simstack_pop(&ss);
-            int v = inner.is_variant;
-            simstack_push(&ss, make_pat_val(pat_arbno(inner.val), v));
-            if (v) has_variant = 1;
+            IR_t *nd = pat_node_alloc(cfg, IR_PAT_ARBNO);
+            if (inner.tag == SIMV_PAT && inner.pat) {
+                IR_t *ch[1] = { inner.pat };
+                pat_set_children(nd, ch, 1);
+            }
+            simstack_push(&ss, simv_pat(nd, inner.is_variant));
+            if (inner.is_variant) has_variant = 1;
             break;
         }
         case SM_PAT_FENCE1: {
             SimVal inner = simstack_pop(&ss);
-            simstack_push(&ss, make_pat_val(pat_fence_p(inner.val), inner.is_variant));
+            IR_t *nd = pat_node_alloc(cfg, IR_PAT_FENCE);
+            if (inner.tag == SIMV_PAT && inner.pat) {
+                IR_t *ch[1] = { inner.pat };
+                pat_set_children(nd, ch, 1);
+            }
+            simstack_push(&ss, simv_pat(nd, inner.is_variant));
             if (inner.is_variant) has_variant = 1;
             break;
         }
         case SM_PAT_CAT: {
             SimVal right = simstack_pop(&ss);
             SimVal left  = simstack_pop(&ss);
+            IR_t *nd = pat_node_alloc(cfg, IR_PAT_CAT);
+            IR_t *ch[2] = {
+                (left.tag  == SIMV_PAT) ? left.pat  : NULL,
+                (right.tag == SIMV_PAT) ? right.pat : NULL
+            };
+            pat_set_children(nd, ch, 2);
             int v = left.is_variant | right.is_variant;
-            simstack_push(&ss, make_pat_val(pat_cat(left.val, right.val), v));
+            simstack_push(&ss, simv_pat(nd, v));
             if (v) has_variant = 1;
             break;
         }
         case SM_PAT_ALT: {
             SimVal right = simstack_pop(&ss);
             SimVal left  = simstack_pop(&ss);
+            IR_t *nd = pat_node_alloc(cfg, IR_PAT_ALT);
+            IR_t *ch[2] = {
+                (left.tag  == SIMV_PAT) ? left.pat  : NULL,
+                (right.tag == SIMV_PAT) ? right.pat : NULL
+            };
+            pat_set_children(nd, ch, 2);
             int v = left.is_variant | right.is_variant;
-            simstack_push(&ss, make_pat_val(pat_alt(left.val, right.val), v));
+            simstack_push(&ss, simv_pat(nd, v));
             if (v) has_variant = 1;
             break;
         }
         case SM_PAT_DEREF: {
-            SimVal arg = simstack_pop(&ss);
-            DESCR_t d;
-            if (arg.val.v == DT_S && arg.val.s)
-                d = pat_ref(arg.val.s);
-            else
-                d = pat_epsilon();
-            simstack_push(&ss, make_pat_val(d, 0));
+            /* Indirect var-ref: no compile-time-eligible IR_e analogue. Mark variant. */
+            (void)simstack_pop(&ss);
+            simstack_push(&ss, simv_variant());
+            has_variant = 1;
             break;
         }
         case SM_PAT_REFNAME: {
-            const char *name = ins->a[0].s ? ins->a[0].s : "";
-            simstack_push(&ss, make_pat_val(pat_ref(name), 0));
+            /* Named pattern variable reference: variant. */
+            simstack_push(&ss, simv_variant());
+            has_variant = 1;
             break;
         }
         case SM_PAT_CAPTURE: {
             SimVal child = simstack_pop(&ss);
             const char *vname = ins->a[0].s ? ins->a[0].s : "";
             int kind = (int)ins->a[1].i;
-            DESCR_t var = NAME_fn(vname);
-            DESCR_t d;
-            if (kind == 1) d = pat_assign_imm(child.val, var);
-            else           d = pat_assign_cond(child.val, var);
-            simstack_push(&ss, make_pat_val(d, child.is_variant));
+            IR_t *nd = pat_node_alloc(cfg, (kind == 1) ? IR_PAT_ASSIGN_IMM : IR_PAT_ASSIGN_COND);
+            nd->sval = vname;
+            if (child.tag == SIMV_PAT && child.pat) {
+                IR_t *ch[1] = { child.pat };
+                pat_set_children(nd, ch, 1);
+            }
+            simstack_push(&ss, simv_pat(nd, child.is_variant));
             if (child.is_variant) has_variant = 1;
             break;
         }
@@ -2441,29 +2507,38 @@ DESCR_t emit_walk_phase2(const SM_Program *prog,
         case SM_PAT_USERCALL_ARGS: {
             SimVal child = simstack_pop(&ss);
             const char *fname = ins->a[0].s ? ins->a[0].s : "";
-            DESCR_t d = pat_assign_callcap(child.val, fname, NULL, 0);
-            simstack_push(&ss, make_pat_val(d, 1));
+            IR_t *nd = pat_node_alloc(cfg, IR_PAT_CALLOUT);
+            nd->sval = fname;
+            if (child.tag == SIMV_PAT && child.pat) {
+                IR_t *ch[1] = { child.pat };
+                pat_set_children(nd, ch, 1);
+            }
+            simstack_push(&ss, simv_pat(nd, 1));
             has_variant = 1;
             break;
         }
         default:
-            simstack_push_variant_val(&ss);
+            simstack_push(&ss, simv_variant());
             has_variant = 1;
             break;
         }
     }
     *out_variant = has_variant;
-    if (ss.top == 0) return pat_epsilon();
-    return ss.slots[ss.top - 1].val;
+    if (ss.top == 0) return NULL;  /* empty window — emit_flat_ir treats NULL as xeps */
+    {
+        SimVal top = ss.slots[ss.top - 1];
+        return (top.tag == SIMV_PAT) ? top.pat : NULL;
+    }
 }
 #define MAX_PATTERN_WINDOWS 4096
 typedef struct {
-    int  phase2_start;
-    int  phase2_end;
-    int  exec_stmt_pc;
-    int  pat_id;
-    int  is_invariant;
-    DESCR_t root;
+    int           phase2_start;
+    int           phase2_end;
+    int           exec_stmt_pc;
+    int           pat_id;
+    int           is_invariant;
+    IR_t        * root;     /* compile-time pattern IR built by emit_walk_phase2 (NULL for empty windows) */
+    IR_block_t  * cfg;      /* arena owning root and any descendants                                       */
 } pattern_window_t;
 static pattern_window_t g_pat_windows[MAX_PATTERN_WINDOWS];
 static int              g_pat_windows_n   = 0;
@@ -2471,6 +2546,14 @@ static int              g_pat_windows_id  = 0;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void pattern_windows_reset(void)
 {
+    /* Release any cfgs from a prior codegen pass before zeroing the array. */
+    for (int i = 0; i < g_pat_windows_n; i++) {
+        if (g_pat_windows[i].cfg) {
+            IR_free(g_pat_windows[i].cfg);
+            g_pat_windows[i].cfg = NULL;
+        }
+        g_pat_windows[i].root = NULL;
+    }
     g_pat_windows_n  = 0;
     g_pat_windows_id = 0;
     cap_fixups_reset();
@@ -2543,18 +2626,22 @@ static void pattern_windows_collect(const SM_Program *prog)
         if (ins->op != SM_EXEC_STMT) continue;
         int phase2_end = pc - 2;
         if (phase2_end < stmt_start) phase2_end = stmt_start;
-        int has_variant = 0;
-        DESCR_t root = sm_phase2_to_patnd(prog, stmt_start, phase2_end, &has_variant);
         if (g_pat_windows_n >= MAX_PATTERN_WINDOWS)
             continue;
+        /* Allocate a cfg sized for the worst-case node count of this window (each SM_PAT instruction emits at most one IR node). */
+        int win_len = phase2_end - stmt_start;
+        if (win_len < 1) win_len = 1;
+        IR_block_t *cfg = IR_alloc(win_len + 8, IR_LANG_SNO);
+        int has_variant = 0;
+        IR_t *root = emit_walk_phase2(prog, stmt_start, phase2_end, cfg, &has_variant);
         pattern_window_t *w = &g_pat_windows[g_pat_windows_n++];
         w->phase2_start = stmt_start;
         w->phase2_end   = phase2_end;
         w->exec_stmt_pc = pc;
         w->pat_id       = g_pat_windows_id++;
         w->root         = root;
-        PATND_t *p = (PATND_t *)root.p;
-        w->is_invariant = (!has_variant && p && patnd_is_fully_invariant(p)) ? 1 : 0;
+        w->cfg          = cfg;
+        w->is_invariant = (!has_variant && root && emit_flat_invariant(root)) ? 1 : 0;
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -2575,7 +2662,8 @@ static int emit_pattern_blobs(FILE *out)
         if (!w->is_invariant) continue;
         char prefix[64];
         snprintf(prefix, sizeof(prefix), "pat_%d", w->pat_id);
-        PATND_t *p = (PATND_t *)w->root.p;
+        IR_t *p = w->root;
+        if (!p) { w->is_invariant = 0; continue; }
         if (emit_flat_build(p, out, prefix) != 0) {
             w->is_invariant = 0;
         } else {

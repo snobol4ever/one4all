@@ -3,14 +3,16 @@
 #include "emit_core.h"
 #include "sm_prog.h"
 #include "emit_bb.h"
+#include "IR.h"
 #include <stdio.h>
 /*---- SM opcode walker (mode-4 text codegen) ------------------------------*/
 void emit_sm_selftest(void);
 int  emit_walk_codegen(SM_Program * prog, FILE * out, const char * src_path);
-DESCR_t emit_walk_phase2(const SM_Program * prog, int phase2_start, int phase2_end, int * out_variant);
+/* EC-BB-UNIFY-2: phase-2 simulator returns an IR_t* pattern root built into the caller-supplied cfg arena (NULL on empty window). */
+IR_t * emit_walk_phase2(const SM_Program * prog, int phase2_start, int phase2_end, IR_block_t * cfg, int * out_variant);
 /*---- flat-glob eligibility -----------------------------------------------*/
-int  emit_flat_eligible (const PATND_t * p);
-int  emit_flat_invariant(const PATND_t * p);
+int  emit_flat_eligible (const IR_t * nd);
+int  emit_flat_invariant(const IR_t * nd);
 extern int g_emit_inline;
 /*---- SM opcode template dispatch (called by walker) ----------------------*/
 void emit_sm_op_label        (int pc);
@@ -68,7 +70,6 @@ void emit_sm_op_nreturn_s    (void);         void emit_sm_op_nreturn_f   (void);
 void emit_sm_op_unhandled    (int opc);
 /*---- compat macros -------------------------------------------------------*/
 #define sm_codegen_text(prog,out,src)  emit_walk_codegen(prog,out,src)
-#define flat_is_eligible_node(p)       emit_flat_eligible(p)
-#define patnd_is_fully_invariant(p)    emit_flat_invariant(p)
-#define sm_phase2_to_patnd(pr,s,e,ov)  emit_walk_phase2(pr,s,e,ov)
+#define flat_is_eligible_node(nd)      emit_flat_eligible(nd)
+#define patnd_is_fully_invariant(nd)   emit_flat_invariant(nd)
 #endif
