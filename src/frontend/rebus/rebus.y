@@ -536,17 +536,10 @@ postfix_expr
     | postfix_expr '(' arglist ')'
         {
             TAL *al = $3;
-            tree_t *f;
-            /* if callee is a plain TT_VAR, promote to TT_FNC with name */
-            if ($1->t == TT_VAR) {
-                f = ast_node_new(TT_FNC);
-                f->v.sval = $1->v.sval;  /* steal sval */
-                $1->v.sval = NULL;
-            } else {
-                /* indirect call: TT_FNC with no name, first child = callee */
-                f = ast_node_new(TT_FNC);
-                expr_add_child(f, $1);
-            }
+            /* PST-RB-C-5: always TT_FNC[callee, arg0, arg1, ...] with $1 as c[0].
+               No kind inspection of $1, no sval stealing. Lower handles named vs indirect. */
+            tree_t *f = ast_node_new(TT_FNC);
+            expr_add_child(f, $1);
             for (int i = 0; i < al->n; i++)
                 expr_add_child(f, al->a[i] ? al->a[i] : ast_node_new(TT_NUL));
             free(al->a); free(al);

@@ -686,8 +686,8 @@ static const yytype_int16 yyrline[] =
      482,   483,   484,   485,   486,   487,   488,   489,   490,   491,
      495,   496,   497,   501,   502,   503,   504,   508,   509,   510,
      514,   515,   516,   517,   518,   519,   520,   521,   525,   526,
-     535,   536,   555,   565,   574,   579,   587,   588,   589,   590,
-     591,   592,   596,   600,   601,   605,   606,   610,   611,   612
+     535,   536,   548,   558,   567,   572,   580,   581,   582,   583,
+     584,   585,   589,   593,   594,   598,   599,   603,   604,   605
 };
 #endif
 
@@ -2241,27 +2241,20 @@ yyreduce:
 #line 537 "rebus.y"
         {
             TAL *al = (yyvsp[-1].tal);
-            tree_t *f;
-            /* if callee is a plain TT_VAR, promote to TT_FNC with name */
-            if ((yyvsp[-3].tree)->t == TT_VAR) {
-                f = ast_node_new(TT_FNC);
-                f->v.sval = (yyvsp[-3].tree)->v.sval;  /* steal sval */
-                (yyvsp[-3].tree)->v.sval = NULL;
-            } else {
-                /* indirect call: TT_FNC with no name, first child = callee */
-                f = ast_node_new(TT_FNC);
-                expr_add_child(f, (yyvsp[-3].tree));
-            }
+            /* PST-RB-C-5: always TT_FNC[callee, arg0, arg1, ...] with $1 as c[0].
+               No kind inspection of $1, no sval stealing. Lower handles named vs indirect. */
+            tree_t *f = ast_node_new(TT_FNC);
+            expr_add_child(f, (yyvsp[-3].tree));
             for (int i = 0; i < al->n; i++)
                 expr_add_child(f, al->a[i] ? al->a[i] : ast_node_new(TT_NUL));
             free(al->a); free(al);
             (yyval.tree) = f;
         }
-#line 2261 "rebus.tab.c"
+#line 2254 "rebus.tab.c"
     break;
 
   case 112: /* postfix_expr: postfix_expr '[' arglist ']'  */
-#line 556 "rebus.y"
+#line 549 "rebus.y"
         {
             TAL *al = (yyvsp[-1].tal);
             tree_t *idx = ast_node_new(TT_IDX);
@@ -2271,11 +2264,11 @@ yyreduce:
             free(al->a); free(al);
             (yyval.tree) = idx;
         }
-#line 2275 "rebus.tab.c"
+#line 2268 "rebus.tab.c"
     break;
 
   case 113: /* postfix_expr: postfix_expr '[' expr T_PLUSCOLON expr ']'  */
-#line 566 "rebus.y"
+#line 559 "rebus.y"
         {
             /* section: TT_IDX c[0]=base c[1]=start c[2]=len */
             tree_t *idx = ast_node_new(TT_IDX);
@@ -2284,113 +2277,113 @@ yyreduce:
             expr_add_child(idx, (yyvsp[-1].tree));
             (yyval.tree) = idx;
         }
-#line 2288 "rebus.tab.c"
+#line 2281 "rebus.tab.c"
     break;
 
   case 114: /* postfix_expr: postfix_expr '.' primary  */
-#line 575 "rebus.y"
+#line 568 "rebus.y"
         {
             tree_t *n = ast_node_new(TT_CAPT_COND_ASGN);
             expr_add_child(n, (yyvsp[-2].tree)); expr_add_child(n, (yyvsp[0].tree)); (yyval.tree) = n;
         }
-#line 2297 "rebus.tab.c"
+#line 2290 "rebus.tab.c"
     break;
 
   case 115: /* postfix_expr: postfix_expr '$' primary  */
-#line 580 "rebus.y"
+#line 573 "rebus.y"
         {
             tree_t *n = ast_node_new(TT_CAPT_IMMED_ASGN);
             expr_add_child(n, (yyvsp[-2].tree)); expr_add_child(n, (yyvsp[0].tree)); (yyval.tree) = n;
         }
-#line 2306 "rebus.tab.c"
+#line 2299 "rebus.tab.c"
     break;
 
   case 116: /* primary: T_STR  */
-#line 587 "rebus.y"
+#line 580 "rebus.y"
                     { tree_t *n = ast_node_new(TT_QLIT); n->v.sval = (yyvsp[0].sval); (yyval.tree) = n; }
-#line 2312 "rebus.tab.c"
+#line 2305 "rebus.tab.c"
     break;
 
   case 117: /* primary: T_INT  */
-#line 588 "rebus.y"
+#line 581 "rebus.y"
                     { tree_t *n = ast_node_new(TT_ILIT); n->v.ival = (yyvsp[0].ival); (yyval.tree) = n; }
-#line 2318 "rebus.tab.c"
+#line 2311 "rebus.tab.c"
     break;
 
   case 118: /* primary: T_REAL  */
-#line 589 "rebus.y"
+#line 582 "rebus.y"
                     { tree_t *n = ast_node_new(TT_FLIT); n->v.dval = (yyvsp[0].dval); (yyval.tree) = n; }
-#line 2324 "rebus.tab.c"
+#line 2317 "rebus.tab.c"
     break;
 
   case 119: /* primary: T_KEYWORD  */
-#line 590 "rebus.y"
+#line 583 "rebus.y"
                     { tree_t *n = ast_node_new(TT_KEYWORD); n->v.sval = (yyvsp[0].sval); (yyval.tree) = n; }
-#line 2330 "rebus.tab.c"
+#line 2323 "rebus.tab.c"
     break;
 
   case 120: /* primary: T_IDENT  */
-#line 591 "rebus.y"
+#line 584 "rebus.y"
                     { tree_t *n = ast_node_new(TT_VAR); n->v.sval = (yyvsp[0].sval); (yyval.tree) = n; }
-#line 2336 "rebus.tab.c"
+#line 2329 "rebus.tab.c"
     break;
 
   case 121: /* primary: '(' expr ')'  */
-#line 592 "rebus.y"
+#line 585 "rebus.y"
                     { (yyval.tree) = (yyvsp[-1].tree); }
-#line 2342 "rebus.tab.c"
+#line 2335 "rebus.tab.c"
     break;
 
   case 122: /* pat_expr: expr  */
-#line 596 "rebus.y"
+#line 589 "rebus.y"
                 { (yyval.tree) = (yyvsp[0].tree); }
-#line 2348 "rebus.tab.c"
+#line 2341 "rebus.tab.c"
     break;
 
   case 123: /* opt_expr: %empty  */
-#line 600 "rebus.y"
+#line 593 "rebus.y"
         { (yyval.tree) = NULL; }
-#line 2354 "rebus.tab.c"
+#line 2347 "rebus.tab.c"
     break;
 
   case 124: /* opt_expr: expr  */
-#line 601 "rebus.y"
+#line 594 "rebus.y"
                     { (yyval.tree) = (yyvsp[0].tree); }
-#line 2360 "rebus.tab.c"
+#line 2353 "rebus.tab.c"
     break;
 
   case 125: /* arglist: %empty  */
-#line 605 "rebus.y"
+#line 598 "rebus.y"
         { (yyval.tal) = tal_new(); }
-#line 2366 "rebus.tab.c"
+#line 2359 "rebus.tab.c"
     break;
 
   case 126: /* arglist: arglist_ne  */
-#line 606 "rebus.y"
+#line 599 "rebus.y"
                     { (yyval.tal) = (yyvsp[0].tal); }
-#line 2372 "rebus.tab.c"
+#line 2365 "rebus.tab.c"
     break;
 
   case 127: /* arglist_ne: expr  */
-#line 610 "rebus.y"
+#line 603 "rebus.y"
                                 { TAL *al = tal_new(); tal_push(al, (yyvsp[0].tree)); (yyval.tal) = al; }
-#line 2378 "rebus.tab.c"
+#line 2371 "rebus.tab.c"
     break;
 
   case 128: /* arglist_ne: arglist_ne ',' expr  */
-#line 611 "rebus.y"
+#line 604 "rebus.y"
                                 { tal_push((yyvsp[-2].tal), (yyvsp[0].tree)); (yyval.tal) = (yyvsp[-2].tal); }
-#line 2384 "rebus.tab.c"
+#line 2377 "rebus.tab.c"
     break;
 
   case 129: /* arglist_ne: arglist_ne ','  */
-#line 612 "rebus.y"
+#line 605 "rebus.y"
                                 { tal_push((yyvsp[-1].tal), NULL); (yyval.tal) = (yyvsp[-1].tal); }
-#line 2390 "rebus.tab.c"
+#line 2383 "rebus.tab.c"
     break;
 
 
-#line 2394 "rebus.tab.c"
+#line 2387 "rebus.tab.c"
 
       default: break;
     }
@@ -2583,7 +2576,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 615 "rebus.y"
+#line 608 "rebus.y"
 
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rebus_parse_init(void) {

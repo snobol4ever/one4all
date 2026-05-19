@@ -122,8 +122,15 @@ static tree_t *lower_tree_expr(RebLow *L, tree_t *e) {
     /* Call / index */
     case TT_FNC: {
         tree_t *f = ast_node_new(TT_FNC);
-        f->v.sval = e->v.sval ? strdup(e->v.sval) : NULL;
-        for (int i = 0; i < e->n; i++)
+        int start = 0;
+        if (e->v.sval) {
+            f->v.sval = strdup(e->v.sval);
+        } else if (e->n > 0 && e->c[0] && e->c[0]->t == TT_VAR && e->c[0]->v.sval) {
+            /* PST-RB-C-5 canonical shape: c[0] is callee VAR — extract name, skip c[0] in children */
+            f->v.sval = strdup(e->c[0]->v.sval);
+            start = 1;
+        }
+        for (int i = start; i < e->n; i++)
             expr_add_child(f, lower_tree_expr(L, e->c[i]));
         return f;
     }
