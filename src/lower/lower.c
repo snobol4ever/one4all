@@ -1715,7 +1715,7 @@ static void lower_expr_inner(const tree_t *t)
     case TT_SECTION_MINUS: { ICN_BB_EVAL(t); lower_section_3(t, "ICN_SECTION_MINUS"); return; }
     case TT_BANG_BINARY:                      lower_bang_binary(t);   return;
     case TT_SUSPEND:                          lower_suspend(t);       return;
-    case TT_GATHER: { fprintf(stderr, "FATAL: TT_GATHER reached lower — hoist pass missed a gather node\n"); abort(); return; }
+    case TT_GATHER: { fprintf(stderr, "FATAL: TT_GATHER reached lower_expr — lower_gather_hoist_pass missed a gather node\n"); abort(); return; }
     case TT_SAY:     if (t->n >= 1) lower_expr(t->c[0]); sm_emit_si(g_p, SM_CALL_FN, "write",          1); return;
     case TT_PRINT:   if (t->n >= 1) lower_expr(t->c[0]); sm_emit_si(g_p, SM_CALL_FN, "writes",         1); return;
     case TT_SAY_FH:  if (t->n >= 2) { lower_expr(t->c[0]); lower_expr(t->c[1]); } sm_emit_si(g_p, SM_CALL_FN, "raku_say_fh",   2); return;
@@ -1905,6 +1905,63 @@ static void lower_proc_skeletons(void)
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PRF-12-gather-hoist: walk prog for TT_GATHER nodes, fountain __gather_N sub-decls, prepend as stmts. */
+/* TT_GATHER now has exactly one child: the TT_SEQ_EXPR block from the parser. */
+static int     g_ghoist_seq  = 0;
+static tree_t *g_ghoist_defs[256];
+static int     g_ghoist_ndef = 0;
+static void lower_hoist_gather_in_expr(tree_t * e) {
+    if (!e) return;
+    for (int i = 0; i < e->n; i++) lower_hoist_gather_in_expr(e->c[i]);
+    if (e->t != TT_GATHER) return;
+    char gname[32]; snprintf(gname, sizeof gname, "__gather_%d", g_ghoist_seq++);
+    tree_t * def = ast_node_new(TT_SUB_DECL); def->v.sval = intern(gname);
+    tree_t * dn  = ast_node_new(TT_VAR); dn->v.sval = intern(gname);
+    expr_add_child(def, dn);
+    tree_t * body = (e->n >= 1) ? e->c[0] : NULL;
+    if (body) for (int i = 0; i < body->n; i++) expr_add_child(def, body->c[i]);
+    if (g_ghoist_ndef < 256) g_ghoist_defs[g_ghoist_ndef++] = def;
+    e->t      = TT_FNC;
+    e->v.sval = intern(gname);
+    e->n      = 0;
+    e->c      = NULL;
+    tree_t * cn = ast_node_new(TT_VAR); cn->v.sval = intern(gname);
+    expr_add_child(e, cn);
+}
+static void lower_gather_hoist_pass(const tree_t * prog) {
+    if (!prog) return;
+    g_ghoist_seq  = 0;
+    g_ghoist_ndef = 0;
+    for (int i = 0; i < prog->n; i++) {
+        tree_t * st = prog->c[i];
+        if (!st || st->t != TT_STMT) continue;
+        for (int j = 0; j < st->n; j++) {
+            tree_t * ch = st->c[j];
+            if (!ch) continue;
+            if (ch->t == TT_ATTR) { for (int k = 0; k < ch->n; k++) lower_hoist_gather_in_expr(ch->c[k]); continue; }
+            lower_hoist_gather_in_expr(ch);
+        }
+    }
+    if (!g_ghoist_ndef) return;
+    int old_n = prog->n;
+    int new_n = old_n + g_ghoist_ndef;
+    char * block = (char *)malloc(sizeof(size_t) + (size_t)new_n * sizeof(tree_t *));
+    tree_t ** new_c = (tree_t **)(block + sizeof(size_t));
+    *(size_t *)block = (size_t)new_n;
+    for (int i = 0; i < g_ghoist_ndef; i++) {
+        tree_t * st = ast_stmt_new(TT_STMT);
+        expr_add_child(st, ast_attr_int(":lang",  LANG_RAKU));
+        expr_add_child(st, ast_attr_int(":line",  0));
+        expr_add_child(st, ast_attr_int(":stno",  0));
+        expr_add_child(st, ast_attr_expr(":subj", g_ghoist_defs[i]));
+        new_c[i] = st;
+    }
+    for (int i = 0; i < old_n; i++) new_c[g_ghoist_ndef + i] = prog->c[i];
+    if (prog->c) free((char *)prog->c - sizeof(size_t));
+    ((tree_t *)prog)->c = new_c;
+    ((tree_t *)prog)->n = new_n;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 SM_Program *lower(const tree_t *prog)
 {
     if (!prog || prog->t != TT_PROGRAM) return NULL;
@@ -1915,6 +1972,9 @@ SM_Program *lower(const tree_t *prog)
     g_sc_func_name = NULL;
     labtab_init(&g_labtab);
     for (int i = 0; i < LOWER_UNHANDLED_WORDS; i++) g_unhandled_kinds[i] = 0;
+    int has_raku = 0;
+    for (int i = 0; i < prog->n && !has_raku; i++) { const tree_t * s = prog->c[i]; if (s && s->t == TT_STMT && attr_int_of(s, ":lang") == LANG_RAKU) has_raku = 1; }
+    if (has_raku) lower_gather_hoist_pass(prog);
     lower_proc_skeletons();
     int stno = 0, has_icn = 0;
     for (int ci = 0; ci < prog->n; ci++) {
