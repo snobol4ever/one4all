@@ -1991,7 +1991,7 @@ yyreduce:
   case 56: /* sub_decl: KW_SUB IDENT '(' param_list ')' block  */
 #line 373 "raku.y"
         { ExprList *params=(yyvsp[-2].list); int np=params?params->count:0;
-          tree_t *e=leaf_sval(TT_FNC,(yyvsp[-4].sval)); e->v.ival=(long long)np; e->_id=SUB_TAG_ID;
+          tree_t *e=leaf_sval(TT_SUB_DECL,(yyvsp[-4].sval)); e->v.ival=(long long)np;
           tree_t *nn=ast_node_new(TT_VAR); nn->v.sval=intern((yyvsp[-4].sval)); expr_add_child(e,nn);
           if(params){ for(int i=0;i<np;i++) expr_add_child(e,params->items[i]); exprlist_free(params); }
           tree_t *body=(yyvsp[0].node);
@@ -2002,7 +2002,7 @@ yyreduce:
 
   case 57: /* sub_decl: KW_SUB IDENT '(' ')' block  */
 #line 381 "raku.y"
-        { tree_t *e=leaf_sval(TT_FNC,(yyvsp[-3].sval)); e->v.ival=(long long)0; e->_id=SUB_TAG_ID;
+        { tree_t *e=leaf_sval(TT_SUB_DECL,(yyvsp[-3].sval)); e->v.ival=(long long)0;
           tree_t *nn=ast_node_new(TT_VAR); nn->v.sval=intern((yyvsp[-3].sval)); expr_add_child(e,nn);
           tree_t *body=(yyvsp[0].node);
           for(int i=0;i<body->n;i++) expr_add_child(e,body->c[i]);

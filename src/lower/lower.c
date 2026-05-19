@@ -1317,12 +1317,9 @@ void lower_stmt(const tree_t *s)
         }
         goto emit_gotos;
     }
-    /* IJ-HELLO-2b (2026-05-18): Raku `sub <name>(...) { body }` arrives here as TT_STMT{:subj=TT_FNC{ */
-    /* _id=SUB_TAG_ID, v.ival=nparams, c[0]=TT_VAR(name), c[1..nparams]=params, c[nparams+1..]=body}}. */
-    /* The wrapper's v.sval is NULL (union-clobbered by v.ival), so the AST shape is identical to a    */
-    /* regular call-expression TT_FNC; only _id == SUB_TAG_ID distinguishes them. Lower body kids      */
-    /* directly via lower_expr + SM_VOID_POP, skipping the spurious wrapping SM_CALL_FN <name> emit.   */
-    if (lang == LANG_RAKU && subject && subject->t == TT_FNC && subject->_id == SUB_TAG_ID) {
+    /* PRF-12-sub: Raku sub declarations now use TT_SUB_DECL (no _id side-channel).                    */
+    /* c[0]=TT_VAR(name), c[1..nparams]=params, c[nparams+1..]=body. Lower body stmts for effect.     */
+    if (lang == LANG_RAKU && subject && subject->t == TT_SUB_DECL) {
         int nparams = (int)subject->v.ival;
         for (int i = nparams + 1; i < subject->n; i++)
             if (subject->c[i]) { lower_expr(subject->c[i]); sm_emit(g_p, SM_VOID_POP); }
@@ -1478,6 +1475,7 @@ static void lower_expr_inner(const tree_t *t)
     case TT_LOOP_NEXT:                        lower_loop_next(t);     return;
     /* PST-SC-4k (2026-05-19): TT_GOTO_U emitted by snocone_parse.y T_GOTO production; label in v.sval */
     case TT_GOTO_U: { const char *lbl = t->v.sval; if (lbl && lbl[0]) emit_goto(SM_JUMP, lbl); return; }
+    case TT_SUB_DECL: { int np=(int)t->v.ival; for(int i=np+1;i<t->n;i++) if(t->c[i]){lower_expr(t->c[i]);sm_emit(g_p,SM_VOID_POP);} sm_emit(g_p,SM_PUSH_NULL); return; }
     case TT_RETURN:                           lower_return(t);        return;
     case TT_PROC_FAIL:                        lower_proc_fail(t);     return;
     case TT_NRETURN:                          lower_nreturn(t);       return;

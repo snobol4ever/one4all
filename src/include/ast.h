@@ -27,12 +27,14 @@ typedef enum tree_e {
     TT_IF,                TT_UNLESS,            TT_CASE,              TT_RETURN,            TT_PROC_FAIL,         TT_NRETURN,           TT_LOOP_BREAK,        TT_LOOP_NEXT,         TT_BANG_BINARY,       TT_DEFINE,
     TT_SECTION,           TT_SECTION_PLUS,      TT_SECTION_MINUS,
     TT_RECORD,            TT_FIELD,             TT_GLOBAL,            TT_LOCAL,             TT_STATIC_DECL,       TT_INITIAL,           TT_REVASSIGN,         TT_REVSWAP,
-    TT_FUNCTION,          TT_RECORD_DECL,
     TT_PROGRAM,           TT_STMT,              TT_END,               TT_ATTR,
     TT_GOTO_S,            TT_GOTO_F,            TT_GOTO_U,
     TT_GATHER,
+    TT_FUNCTION,          TT_RECORD_DECL,
+    TT_SAY,               TT_SAY_FH,
+    TT_PRINT,             TT_PRINT_FH,
     TT_PROC_DECL,
-    TT_SAY,          TT_PRINT,        TT_SAY_FH,       TT_PRINT_FH,
+    TT_SUB_DECL,
     TT_KIND_COUNT
 } tree_e;
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -150,14 +152,16 @@ static const char * const tt_e_name[TT_KIND_COUNT] = {
     [TT_LOOP_BREAK]       = "TT_LOOP_BREAK",     [TT_LOOP_NEXT]        = "TT_LOOP_NEXT",       [TT_BANG_BINARY]      = "TT_BANG_BINARY",     [TT_DEFINE]           = "TT_DEFINE",
     [TT_SECTION]          = "TT_SECTION",        [TT_SECTION_PLUS]     = "TT_SECTION_PLUS",    [TT_SECTION_MINUS]    = "TT_SECTION_MINUS",
     [TT_RECORD]           = "TT_RECORD",         [TT_FIELD]            = "TT_FIELD",           [TT_GLOBAL]           = "TT_GLOBAL",
-    [TT_FUNCTION]         = "TT_FUNCTION",       [TT_RECORD_DECL]      = "TT_RECORD_DECL",
     [TT_LOCAL]            = "TT_LOCAL",          [TT_STATIC_DECL]      = "TT_STATIC_DECL",
     [TT_INITIAL]          = "TT_INITIAL",        [TT_REVASSIGN]        = "TT_REVASSIGN",       [TT_REVSWAP]          = "TT_REVSWAP",
     [TT_PROGRAM]          = "TT_PROGRAM",        [TT_STMT]             = "TT_STMT",            [TT_END]              = "TT_END",
     [TT_ATTR]             = "TT_ATTR",           [TT_GOTO_S]           = "TT_GOTO_S",          [TT_GOTO_F]           = "TT_GOTO_F",
     [TT_GOTO_U]           = "TT_GOTO_U",         [TT_GATHER]           = "TT_GATHER",
+    [TT_FUNCTION]         = "TT_FUNCTION",       [TT_RECORD_DECL]      = "TT_RECORD_DECL",
+    [TT_SAY]              = "TT_SAY",             [TT_SAY_FH]           = "TT_SAY_FH",
+    [TT_PRINT]            = "TT_PRINT",           [TT_PRINT_FH]         = "TT_PRINT_FH",
     [TT_PROC_DECL]        = "TT_PROC_DECL",
-    [TT_SAY]              = "TT_SAY",            [TT_PRINT]            = "TT_PRINT",           [TT_SAY_FH]           = "TT_SAY_FH",          [TT_PRINT_FH]         = "TT_PRINT_FH",
+    [TT_SUB_DECL]         = "TT_SUB_DECL",
 };
 #endif
 /*================================================================================================================================================================================*/

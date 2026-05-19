@@ -111,7 +111,7 @@ void polyglot_init(const tree_t *prog, uint32_t lang_mask)
                 spec[pos] = '\0';
                 icn_record_register(spec);
             }
-            if ((proc->t == TT_FNC || proc->t == TT_PROC_DECL) && proc->v.sval && *proc->v.sval) {
+            if ((proc->t == TT_FNC || proc->t == TT_PROC_DECL || proc->t == TT_SUB_DECL) && proc->v.sval && *proc->v.sval) {
                 const char *name = proc->v.sval;
                 if (proc_count < PROC_TABLE_MAX) {
                     proc_table[proc_count].name     = name;

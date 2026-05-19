@@ -371,14 +371,14 @@ when_list
 sub_decl
     : KW_SUB IDENT '(' param_list ')' block
         { ExprList *params=$4; int np=params?params->count:0;
-          tree_t *e=leaf_sval(TT_FNC,$2); e->v.ival=(long long)np; e->_id=SUB_TAG_ID;
+          tree_t *e=leaf_sval(TT_SUB_DECL,$2); e->v.ival=(long long)np;
           tree_t *nn=ast_node_new(TT_VAR); nn->v.sval=intern($2); expr_add_child(e,nn);
           if(params){ for(int i=0;i<np;i++) expr_add_child(e,params->items[i]); exprlist_free(params); }
           tree_t *body=$6;
           for(int i=0;i<body->n;i++) expr_add_child(e,body->c[i]);
           $$=e; }
     | KW_SUB IDENT '(' ')' block
-        { tree_t *e=leaf_sval(TT_FNC,$2); e->v.ival=(long long)0; e->_id=SUB_TAG_ID;
+        { tree_t *e=leaf_sval(TT_SUB_DECL,$2); e->v.ival=(long long)0;
           tree_t *nn=ast_node_new(TT_VAR); nn->v.sval=intern($2); expr_add_child(e,nn);
           tree_t *body=$5;
           for(int i=0;i<body->n;i++) expr_add_child(e,body->c[i]);
