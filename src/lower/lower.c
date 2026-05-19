@@ -1158,6 +1158,49 @@ static void lower_suspend(const tree_t *t)
     sm_patch_jump(g_p, jdone, sm_label(g_p));
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PRF-12-class: lower-side Raku method dispatch table (migrated from parser). */
+#define LOWER_RAKU_METH_MAX 256
+typedef struct { char key[128]; char procname[128]; } LowerRakuMethEntry;
+static LowerRakuMethEntry g_raku_meth_table[LOWER_RAKU_METH_MAX];
+static int                g_raku_meth_count = 0;
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static void lower_raku_meth_register(const char *cname, const char *mname, const char *procname) {
+    if (g_raku_meth_count >= LOWER_RAKU_METH_MAX) return;
+    LowerRakuMethEntry *e = &g_raku_meth_table[g_raku_meth_count++];
+    snprintf(e->key,      sizeof e->key,      "%s::%s", cname, mname);
+    snprintf(e->procname, sizeof e->procname,  "%s",     procname);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static void lower_class_decl(const tree_t *t)
+{
+    if (!t || t->n < 1 || !t->c[0]) return;
+    const char *cname = t->c[0]->v.sval ? t->c[0]->v.sval : "";
+    tree_t *rec = ast_node_new(TT_RECORD);
+    rec->v.sval = (char *)intern(cname);
+    for (int i = 1; i < t->n; i++) {
+        tree_t *item = t->c[i];
+        if (!item) continue;
+        if (item->t == TT_VAR) {
+            ast_push(rec, item);
+        } else if (item->t == TT_SUB_DECL) {
+            char fullname[256];
+            int nparams = (int)item->v.ival;
+            const char *shortname = (item->n > 0 && item->c[0] && item->c[0]->v.sval) ? item->c[0]->v.sval : "";
+            snprintf(fullname, sizeof fullname, "%s__%s", cname, shortname);
+            const char *fname = intern(fullname);
+            lower_raku_meth_register(cname, shortname, fname);
+            if (item->n > 0 && item->c[0] && item->c[0]->t == TT_VAR)
+                item->c[0]->v.sval = (char *)fname;
+            for (int j = nparams + 1; j < item->n; j++)
+                if (item->c[j]) { lower_expr(item->c[j]); sm_emit(g_p, SM_VOID_POP); }
+        }
+    }
+    sm_emit_s(g_p, SM_PUSH_LIT_S, cname);
+    for (int i = 0; i < rec->n; i++) lower_expr(rec->c[i]);
+    sm_emit_si(g_p, SM_CALL_FN, "RECORD_MAKE", (int64_t)rec->n + 1);
+    sm_emit(g_p, SM_VOID_POP);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_limit(const tree_t *t) { emit_push_expr(t); sm_emit(g_p, SM_BB_PUMP); }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_iterate(const tree_t *t)
@@ -1340,6 +1383,10 @@ void lower_stmt(const tree_t *s)
             if (subject->c[i]) { lower_expr(subject->c[i]); sm_emit(g_p, SM_VOID_POP); }
         goto emit_gotos;
     }
+    if (lang == LANG_RAKU && subject && subject->t == TT_CLASS_DECL) {
+        lower_class_decl(subject);
+        goto emit_gotos;
+    }
     /* PST-SN4-1b (2026-05-16): subject/pattern split moved from sno4_stmt_commit_go.
      * Parser now emits TT_SCAN(subj,pat) and TT_SEQ(subj,pat,...) as pure syntax;
      * lower is responsible for splitting them into separate subject/pattern slots. */
@@ -1517,6 +1564,7 @@ static void lower_expr_inner(const tree_t *t)
     case TT_HASH_SET:   if (t->n >= 3) { lower_expr(t->c[0]); lower_expr(t->c[1]); lower_expr(t->c[2]); } sm_emit_si(g_p, SM_CALL_FN, "hash_set",  3); return;
     case TT_HASH_DELETE:if (t->n >= 2) { lower_expr(t->c[0]); lower_expr(t->c[1]); } sm_emit_si(g_p, SM_CALL_FN, "hash_delete",  2); return;
     case TT_HASH_EXISTS:if (t->n >= 2) { lower_expr(t->c[0]); lower_expr(t->c[1]); } sm_emit_si(g_p, SM_CALL_FN, "hash_exists",  2); return;
+    case TT_CLASS_DECL: lower_class_decl(t); sm_emit(g_p, SM_PUSH_NULL); return;
     case TT_TO:                               lower_to(t);            return;
     case TT_TO_BY:                            lower_to_by(t);         return;
     case TT_LIMIT:                            lower_limit(t);         return;

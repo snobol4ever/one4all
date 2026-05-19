@@ -389,30 +389,14 @@ class_decl
         {
             const char *cname = intern($2); free($2);
             ExprList *body = $4;
-            tree_t *rec = ast_node_new(TT_RECORD);
-            rec->v.sval = (char *)cname;
+            tree_t *cd = ast_node_new(TT_CLASS_DECL);
+            ast_push(cd, leaf_sval(TT_VAR, cname));
             if (body) {
-                for (int i = 0; i < body->count; i++) {
-                    tree_t *item = body->items[i];
-                    if (!item) continue;
-                    if (item->t == TT_VAR) {
-                        expr_add_child(rec, item);
-                    } else if (item->t == TT_SUB_DECL) {
-                        char fullname[256];
-                        snprintf(fullname, sizeof fullname, "%s__%s", cname, item->v.sval);
-                        const char *fname = intern(fullname);
-                        raku_meth_register(cname, item->v.sval, fname);
-                        item->v.sval = (char *)fname;
-                        if (item->n > 0 && item->c[0]->t == TT_VAR)
-                            item->c[0]->v.sval = (char *)fname;
-                        add_proc(item);
-                        body->items[i] = NULL;
-                    }
-                }
+                for (int i = 0; i < body->count; i++)
+                    if (body->items[i]) ast_push(cd, body->items[i]);
                 exprlist_free(body);
             }
-            add_proc(rec);
-            $$ = ast_node_new(TT_NUL);
+            $$ = cd;
         }
     ;
 class_body_list
@@ -425,7 +409,7 @@ class_body_list
           $$ = exprlist_append($1, fv); }
     | class_body_list KW_METHOD IDENT '(' param_list ')' block
         { ExprList *params = $5; int np = params ? params->count : 0;
-          tree_t *e = leaf_sval(TT_SUB_DECL, $3);
+          tree_t *e = ast_node_new(TT_SUB_DECL);
           e->v.ival = (long long)(np + 1);
           tree_t *nn = ast_node_new(TT_VAR); nn->v.sval = intern($3); expr_add_child(e, nn);
           expr_add_child(e, leaf_sval(TT_VAR, "self"));
@@ -435,7 +419,7 @@ class_body_list
           free($3);
           $$ = exprlist_append($1, e); }
     | class_body_list KW_METHOD IDENT '(' ')' block
-        { tree_t *e = leaf_sval(TT_SUB_DECL, $3);
+        { tree_t *e = ast_node_new(TT_SUB_DECL);
           e->v.ival = (long long)(1);
           tree_t *nn = ast_node_new(TT_VAR); nn->v.sval = intern($3); expr_add_child(e, nn);
           expr_add_child(e, leaf_sval(TT_VAR, "self"));
