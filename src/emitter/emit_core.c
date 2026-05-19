@@ -1391,7 +1391,7 @@ static int g_wasm_str_next = WASM_STR_DATA_BASE;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void wasm_strtab_reset(void) { g_wasm_strtab_n = 0; g_wasm_str_next = WASM_STR_DATA_BASE; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int wasm_intern_str(const char * s) {
+int wasm_intern_str(const char * s) {
     int len = s ? (int)strlen(s) : 0;
     for (int i = 0; i < g_wasm_strtab_n; i++)
         if (g_wasm_strtab[i].len == len && (len == 0 || memcmp(g_wasm_strtab[i].s, s, len) == 0)) return g_wasm_strtab[i].addr;
@@ -1405,7 +1405,7 @@ static int wasm_intern_str(const char * s) {
     return addr;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int wasm_intern_name(const char * s) {
+int wasm_intern_name(const char * s) {
     if (!s) return wasm_intern_str(s);
     int len = (int)strlen(s);
     static char buf[256];

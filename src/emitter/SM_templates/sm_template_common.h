@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-/* Mode test macros (defined in emit_core.h): IS_JVM, IS_JS, IS_NET */
+/* Mode test macros (defined in emit_core.h): IS_JVM, IS_JS, IS_NET, IS_WASM */
 /* EC-3 JVM helpers declared in emit_core.h: jvm_push_int2, jvm_emit_ldc_string */
 /* EC-3 JS helper: js_escape (declared in bb_template_common.h, defined in emit_core.c) */
 void js_escape(FILE * out, const char * s);
@@ -16,3 +16,6 @@ void js_escape(FILE * out, const char * s);
 void net_escape_ldstr(FILE * out, const char * s);
 /* EC-3 NET helper: net_push_i4 (defined in emit_core.c) */
 void net_push_i4(FILE * out, int v);
+/* EC-WASM helpers: intern string/name into the WASM linear-memory string table (emit_core.c) */
+int wasm_intern_str(const char * s);
+int wasm_intern_name(const char * s);
