@@ -618,9 +618,7 @@ static void emit_jvm_one_instr(SM_Program * sm, int i, int n,
     SM_Instr * instr = &sm->instrs[i];
     switch (instr->op) {
     case SM_LABEL: break;
-    case SM_STNO:
-        jvm_push_int(out, instr->a[0].i); fprintf(out, "    i2l\n");
-        fprintf(out, "    invokestatic rt/SnoRt/set_stno(J)V\n"); break;
+    case SM_STNO:  sm_stno(instr, out); break;
     case SM_PUSH_LIT_I: sm_push_lit_i(instr, out); break;
     case SM_PUSH_LIT_S: sm_push_lit_s(instr, out); break;
     case SM_PUSH_LIT_F: sm_push_lit_f(instr, out); break;
@@ -637,12 +635,8 @@ static void emit_jvm_one_instr(SM_Program * sm, int i, int n,
     case SM_MUL:      sm_mul(instr, out); break;
     case SM_DIV:      sm_div(instr, out); break;
     case SM_MOD:      sm_mod(instr, out); break;
-    case SM_ACOMP:
-        jvm_push_int(out, instr->a[0].i);
-        fprintf(out, "    invokestatic rt/SnoRt/acomp(I)V\n"); break;
-    case SM_LCOMP:
-        jvm_push_int(out, instr->a[0].i);
-        fprintf(out, "    invokestatic rt/SnoRt/lcomp(I)V\n"); break;
+    case SM_ACOMP: sm_acomp(instr, out); break;
+    case SM_LCOMP: sm_lcomp(instr, out); break;
     case SM_JUMP: {
         int target = (int)instr->a[0].i;
         const char * end_lbl = in_body ? "sm_pc_body_end" : "sm_pc_fn_end";

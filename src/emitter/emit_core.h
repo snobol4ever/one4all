@@ -184,4 +184,8 @@ void sm_sub       (const SM_Instr * instr, FILE * out);
 void sm_mul       (const SM_Instr * instr, FILE * out);
 void sm_div       (const SM_Instr * instr, FILE * out);
 void sm_mod       (const SM_Instr * instr, FILE * out);
+/*--- EC-3c SM compare/stno templates (SM_templates/sm_compare.c) -----------*/
+void sm_stno      (const SM_Instr * instr, FILE * out);
+void sm_acomp     (const SM_Instr * instr, FILE * out);
+void sm_lcomp     (const SM_Instr * instr, FILE * out);
 #endif

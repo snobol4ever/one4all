@@ -798,10 +798,7 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
         fprintf(out, "  NET_L%d:\n", i);
         int has_continue = 0;
         switch (instr->op) {
-        case SM_STNO:
-            net_push_i4(out, (int)instr->a[0].i);
-            fprintf(out, "    call       void SnoRt::set_stno(int32)\n");
-            break;
+        case SM_STNO:  sm_stno(instr, out); break;
         case SM_PUSH_LIT_I: sm_push_lit_i(instr, out); break;
         case SM_PUSH_LIT_S:
         case SM_PUSH_LIT_CS: sm_push_lit_s(instr, out); break;
@@ -820,14 +817,8 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
         case SM_MUL:        sm_mul(instr, out); break;
         case SM_DIV:        sm_div(instr, out); break;
         case SM_MOD:        sm_mod(instr, out); break;
-        case SM_ACOMP:
-            net_push_i4(out, (int)instr->a[0].i);
-            fprintf(out, "    call       void SnoRt::acomp(int32)\n");
-            break;
-        case SM_LCOMP:
-            net_push_i4(out, (int)instr->a[0].i);
-            fprintf(out, "    call       void SnoRt::lcomp(int32)\n");
-            break;
+        case SM_ACOMP: sm_acomp(instr, out); break;
+        case SM_LCOMP: sm_lcomp(instr, out); break;
         case SM_HALT:
             fprintf(out, "    call       void SnoRt::halt_tos()\n");
             fprintf(out, "    br         NET_DONE\n");

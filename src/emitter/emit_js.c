@@ -316,9 +316,7 @@ int emit_js_from_sm(SM_Program * sm, FILE * out) {
         fprintf(out, "case %d: ", i);
         int has_continue = 0;
         switch (instr->op) {
-        case SM_STNO:
-            fprintf(out, "rt.set_stno(%lld); ", instr->a[0].i);
-            break;
+        case SM_STNO: sm_stno(instr, out); break;
         case SM_LABEL:
             break;
         case SM_PUSH_LIT_I: sm_push_lit_i(instr, out); break;

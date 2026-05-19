@@ -13,3 +13,5 @@
 void js_escape(FILE * out, const char * s);
 /* EC-3 NET helper: net_escape_ldstr (defined in emit_core.c) */
 void net_escape_ldstr(FILE * out, const char * s);
+/* EC-3 NET helper: net_push_i4 (defined in emit_core.c) */
+void net_push_i4(FILE * out, int v);
