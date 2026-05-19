@@ -498,59 +498,6 @@ static tree_t *pt_binop(const char *op, tree_t *lhs, tree_t *rhs) {
     return n;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* Pure reduce action: wrap head and body into TT_CLAUSE(head, body).
- * Children in source order. NO conjunction flattening, NO if-then-else
- * detection — those are lower's job. The tree is a geometric record of
- * the token stream; lower interprets it. */
-/* Flatten a tree_t conjunction (TT_FNC(",")) into flat TT_PROGRAM children.
- * This is n-ary flattening — a reduce action on left-recursive grammar.
- * Mirrors flatten_conj() for the Term* path. Stays in parser per design. */
-static void pt_flatten_conj(tree_t *t, tree_t *prog) {
-    if (!t) return;
-    if (t->t == TT_FNC && t->v.sval && strcmp(t->v.sval, ",") == 0) {
-        for (int i = 0; i < t->n; i++)
-            pt_flatten_conj(t->c[i], prog);
-        return;
-    }
-    ast_push(prog, t);
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* Detect ;(->(Cond,Then),Else) and collapse to TT_IF(cond,then,else).
- * This is a grammar-level reduce: the ';'/'->' combination is a
- * syntactic idiom that maps to a dedicated node kind. */
-static tree_t *pt_maybe_ifthenelse(tree_t *semi_node) {
-    if (semi_node->n != 2) return semi_node;
-    tree_t *left  = semi_node->c[0];
-    tree_t *right = semi_node->c[1];
-    if (!left || left->t != TT_FNC || !left->v.sval) return semi_node;
-    if (strcmp(left->v.sval, "->") != 0 || left->n < 2) return semi_node;
-    /* Wrap then/else in TT_PROGRAM if they're conjunctions, mirroring
-     * flatten_conj on the Term* side. Cond is always a single goal. */
-    tree_t *then_prog = ast_node_new(TT_PROGRAM);
-    pt_flatten_conj(left->c[1], then_prog);
-    tree_t *else_prog = ast_node_new(TT_PROGRAM);
-    pt_flatten_conj(right, else_prog);
-    tree_t *iff = ast_node_new(TT_IF);
-    ast_push(iff, left->c[0]);   /* cond — single goal */
-    ast_push(iff, then_prog->n == 1 ? then_prog->c[0] : then_prog);  /* then */
-    ast_push(iff, else_prog->n == 1 ? else_prog->c[0] : else_prog);  /* else */
-    return iff;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static tree_t *pt_make_clause(tree_t *head_tr, tree_t *body_tr) {
-    tree_t *cl = ast_node_new(TT_CLAUSE);
-    if (head_tr) {
-        ast_push(cl, head_tr);
-    } else {
-        ast_push(cl, ast_node_new(TT_NUL));   /* directive: head is TT_NUL */
-    }
-    /* body: flatten conjunction into TT_PROGRAM (n-ary reduce) */
-    tree_t *prog = ast_node_new(TT_PROGRAM);
-    if (body_tr) pt_flatten_conj(body_tr, prog);
-    ast_push(cl, prog);
-    return cl;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static tree_t *pt_primary(Parser *p, TreeScope *ts) {
     Token tk = lexer_next(&p->lx);
     switch (tk.kind) {
@@ -748,9 +695,7 @@ static tree_t *pt_term(Parser *p, TreeScope *ts, int max_prec) {
         tree_t *rhs = pt_term(p, ts, rprec);
         if (!rhs) break;
         tree_t *node = pt_binop(op->name, lhs, rhs);
-        /* Collapse ;(->(C,T),E) → TT_IF(c,t,e) at parse time (n-ary reduce). */
-        if (strcmp(op->name, ";") == 0)
-            node = pt_maybe_ifthenelse(node);
+        /* PST-PL-6h: raw TT_FNC(";") emitted; pl_maybe_ifthenelse runs in lower. */
         lhs = node;
     }
     return lhs;
@@ -1050,7 +995,11 @@ static PlClause *parse_clause(Parser *p) {
         cl->head  = NULL;
         cl->body  = NULL;
         cl->nbody = 0;
-        cl->tr = pt_make_clause(NULL, body_tr);
+        /* PST-PL-6h: raw TT_CLAUSE[TT_NUL, raw_body]; lower wraps+flattens body */
+        { tree_t *_cl = ast_node_new(TT_CLAUSE);
+          ast_push(_cl, ast_node_new(TT_NUL));
+          if (body_tr) ast_push(_cl, body_tr);
+          cl->tr = _cl; }
         return cl;
     }
 
@@ -1062,7 +1011,11 @@ static PlClause *parse_clause(Parser *p) {
         /* Rule: head :- body */
         lexer_next(&p->lx);
         tree_t *body_tr = pt_term(p, &ts, 1200);
-        cl->tr = pt_make_clause(head_tr, body_tr);
+        /* PST-PL-6h: raw TT_CLAUSE[head, raw_body]; lower wraps+flattens */
+        { tree_t *_cl = ast_node_new(TT_CLAUSE);
+          ast_push(_cl, head_tr);
+          if (body_tr) ast_push(_cl, body_tr);
+          cl->tr = _cl; }
         Token dot = lexer_next(&p->lx);
         if (dot.kind != TK_DOT)
             perror_at(p, dot.line, "expected . at end of clause");
@@ -1101,7 +1054,10 @@ static PlClause *parse_clause(Parser *p) {
         }
     } else {
         /* Fact: no body */
-        cl->tr = pt_make_clause(head_tr, NULL);
+        /* PST-PL-6h: fact — TT_CLAUSE[head] with no body child */
+        { tree_t *_cl = ast_node_new(TT_CLAUSE);
+          ast_push(_cl, head_tr);
+          cl->tr = _cl; }
         Token dot = lexer_next(&p->lx);
         if (dot.kind != TK_DOT)
             perror_at(p, dot.line, "expected . at end of fact");

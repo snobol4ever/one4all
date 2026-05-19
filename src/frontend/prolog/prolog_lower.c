@@ -242,6 +242,54 @@ static tree_t *lower_clause(PlClause *cl, PredKey key) {
  * walk all TT_VAR nodes, assign sequential v.ival by name.
  * Anonymous vars ("_") each get a unique slot.
  */
+/* PST-PL-6h — pre-lower helpers moved from prolog_parse.c.
+ * Parser now emits raw TT_FNC(",", ...) and TT_FNC(";", ...) nodes.
+ * Lower interprets structure; parser just reflects token order. */
+
+/* Flatten TT_FNC(",") chain into flat TT_PROGRAM children (n-ary). */
+static void pl_flatten_conj(tree_t *t, tree_t *prog) {
+    if (!t) return;
+    if (t->t == TT_FNC && t->v.sval && strcmp(t->v.sval, ",") == 0) {
+        for (int i = 0; i < t->n; i++)
+            pl_flatten_conj(t->c[i], prog);
+        return;
+    }
+    ast_push(prog, t);
+}
+
+/* Detect ;(->(Cond,Then),Else) and collapse to TT_IF(cond,then,else). */
+static tree_t *pl_maybe_ifthenelse(tree_t *semi_node) {
+    if (semi_node->n != 2) return semi_node;
+    tree_t *left  = semi_node->c[0];
+    tree_t *right = semi_node->c[1];
+    if (!left || left->t != TT_FNC || !left->v.sval) return semi_node;
+    if (strcmp(left->v.sval, "->") != 0 || left->n < 2) return semi_node;
+    tree_t *then_prog = ast_node_new(TT_PROGRAM);
+    pl_flatten_conj(left->c[1], then_prog);
+    tree_t *else_prog = ast_node_new(TT_PROGRAM);
+    pl_flatten_conj(right, else_prog);
+    tree_t *iff = ast_node_new(TT_IF);
+    ast_push(iff, left->c[0]);
+    ast_push(iff, then_prog->n == 1 ? then_prog->c[0] : then_prog);
+    ast_push(iff, else_prog->n == 1 ? else_prog->c[0] : else_prog);
+    return iff;
+}
+
+/* Build TT_CLAUSE[head_or_NUL, TT_PROGRAM(body)] from raw parser tree.
+ * Parser emits raw body (TT_FNC(",") chain or single goal); lower wraps here. */
+static tree_t *pl_make_clause(tree_t *head_tr, tree_t *body_tr) {
+    tree_t *cl = ast_node_new(TT_CLAUSE);
+    if (head_tr) {
+        ast_push(cl, head_tr);
+    } else {
+        ast_push(cl, ast_node_new(TT_NUL));
+    }
+    tree_t *prog = ast_node_new(TT_PROGRAM);
+    if (body_tr) pl_flatten_conj(body_tr, prog);
+    ast_push(cl, prog);
+    return cl;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 #define TR_SLOT_MAX 256
 typedef struct { const char *name; int slot; } TRSlot;
 typedef struct { TRSlot e[TR_SLOT_MAX]; int n; int next; } TRSlotMap;
@@ -300,9 +348,10 @@ static tree_t *lower_clause_from_tree(tree_t *tr, PredKey key) {
     ec->v.dval = (double)key.arity;
     ec->v.ival = n_vars;
 
-    /* c[0] of tr = head; c[1] = TT_PROGRAM body */
+    /* c[0] of tr = head; c[1] = raw body (TT_FNC(",") chain or single goal)
+     * PST-PL-6h: parser no longer pre-wraps body in TT_PROGRAM; lower does it. */
     tree_t *head = (tr->n > 0) ? tr->c[0] : NULL;
-    tree_t *body = (tr->n > 1) ? tr->c[1] : NULL;
+    tree_t *raw_body = (tr->n > 1) ? tr->c[1] : NULL;
 
     /* Add head arguments as direct children of ec (not the head node itself) */
     if (head && head->t == TT_FNC) {
@@ -311,11 +360,28 @@ static tree_t *lower_clause_from_tree(tree_t *tr, PredKey key) {
     }
     /* else: 0-arity head (TT_QLIT) — no args to add */
 
-    /* Add body goals */
-    if (body && body->t == TT_PROGRAM) {
-        for (int i = 0; i < body->n; i++)
-            expr_add_child(ec, body->c[i]);
+    /* PST-PL-6h: build body TT_PROGRAM in lower, not in parser.
+     * If the parser already wrapped in TT_PROGRAM (pre-6h clauses in-flight),
+     * fall back gracefully. */
+    tree_t *body_prog;
+    if (raw_body && raw_body->t == TT_PROGRAM) {
+        /* Compat path: parser pre-built TT_PROGRAM (should not occur post-6h) */
+        body_prog = raw_body;
+    } else {
+        body_prog = ast_node_new(TT_PROGRAM);
+        if (raw_body) pl_flatten_conj(raw_body, body_prog);
     }
+
+    /* Walk flattened goals: apply pl_maybe_ifthenelse to any TT_FNC(";") */
+    for (int i = 0; i < body_prog->n; i++) {
+        tree_t *g = body_prog->c[i];
+        if (g && g->t == TT_FNC && g->v.sval && strcmp(g->v.sval, ";") == 0)
+            body_prog->c[i] = pl_maybe_ifthenelse(g);
+    }
+
+    /* Add body goals to emitted clause */
+    for (int i = 0; i < body_prog->n; i++)
+        expr_add_child(ec, body_prog->c[i]);
 
     return ec;
 }
@@ -345,9 +411,16 @@ CODE_t *prolog_lower(PlProgram *pl_prog) {
             if (!cl->head && cl->tr && cl->tr->n > 0 && cl->tr->c[0] && cl->tr->c[0]->t == TT_NUL) {
                 /* Directive: read begin_tests/end_tests from tree_t */
                 tree_t *bp = cl->tr->c[1];
+                /* PST-PL-6h compat: body may be raw (TT_FNC etc.) or pre-wrapped TT_PROGRAM */
+                tree_t *d = NULL;
                 if (bp && bp->t == TT_PROGRAM && bp->n > 0) {
-                    tree_t *d = bp->c[0];
-                    if (d && d->t == TT_FNC && d->v.sval && d->n >= 1) {
+                    d = bp->c[0];
+                } else if (bp) {
+                    /* raw single goal or TT_FNC(",") chain — first goal is the directive */
+                    d = (bp->t == TT_FNC && bp->v.sval && strcmp(bp->v.sval, ",") == 0 && bp->n > 0)
+                        ? bp->c[0] : bp;
+                }
+                if (d && d->t == TT_FNC && d->v.sval && d->n >= 1) {
                         if (strcmp(d->v.sval, "begin_tests") == 0) {
                             tree_t *a = d->c[0];
                             const char *sn = NULL;
@@ -357,7 +430,6 @@ CODE_t *prolog_lower(PlProgram *pl_prog) {
                         } else if (strcmp(d->v.sval, "end_tests") == 0) {
                             cur_suite[0] = '\0';
                         }
-                    }
                 }
             } else if (cl->head && cur_suite[0]) {
                 strncpy(plunit_suite[ci], cur_suite, 63);
@@ -449,9 +521,20 @@ CODE_t *prolog_lower(PlProgram *pl_prog) {
         /* Directive: cl->tr is always set post-6f (non-DCG).
          * Extract first body goal from the tree. */
         if (!cl->tr || cl->tr->n < 2) continue;
-        tree_t *body_prog = cl->tr->c[1];
-        if (!body_prog || body_prog->t != TT_PROGRAM || body_prog->n == 0) continue;
-        tree_t *goal_tr = body_prog->c[0];
+        tree_t *raw_body = cl->tr->c[1];
+        /* PST-PL-6h: body may be raw (TT_FNC chain) or pre-built TT_PROGRAM */
+        tree_t *goal_tr = NULL;
+        if (raw_body && raw_body->t == TT_PROGRAM && raw_body->n > 0) {
+            goal_tr = raw_body->c[0];
+        } else if (raw_body) {
+            /* Raw: single goal or TT_FNC(",") — first goal is what we want */
+            if (raw_body->t == TT_FNC && raw_body->v.sval &&
+                strcmp(raw_body->v.sval, ",") == 0 && raw_body->n > 0)
+                goal_tr = raw_body->c[0];
+            else
+                goal_tr = raw_body;
+        }
+        if (!goal_tr) continue;
         /* Detect :- export(...) directives from tree_t */
         int is_export = 0;
         if (goal_tr && goal_tr->t == TT_FNC && goal_tr->v.sval &&
