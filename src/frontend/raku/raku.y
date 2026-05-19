@@ -325,17 +325,11 @@ for_stmt
     ;
 given_stmt
     : KW_GIVEN expr '{' when_list '}'
-        { /* PRF-8 (2026-05-18): TT_CASE[ topic, val0, body0, val1, body1, ... ]
-           * cmpkind derived at lowering time from val->t (TT_QLIT -> TT_LEQ, else TT_EQ).
-           * No cmpkind ILIT child. Default arm (none here) would be trailing (TT_NUL, body_def). */
+        { /* PRF-12-given: when_list is now flat [val0, body0, val1, body1, ...] — no pair nodes. */
           tree_t *ec=ast_node_new(TT_CASE);
           expr_add_child(ec,$2);
           ExprList *whens=$4;
-          for(int i=0;i<whens->count;i++){
-              tree_t *pair=whens->items[i];
-              tree_t *val=pair->c[0], *body=pair->c[1];
-              expr_add_child(ec,val); expr_add_child(ec,body);
-          }
+          for(int i=0;i<whens->count;i++) expr_add_child(ec,whens->items[i]);
           exprlist_free(whens);
           $$=ec; }
     | KW_GIVEN expr '{' when_list KW_DEFAULT block '}'
@@ -343,11 +337,7 @@ given_stmt
           tree_t *ec=ast_node_new(TT_CASE);
           expr_add_child(ec,$2);
           ExprList *whens=$4;
-          for(int i=0;i<whens->count;i++){
-              tree_t *pair=whens->items[i];
-              tree_t *val=pair->c[0], *body=pair->c[1];
-              expr_add_child(ec,val); expr_add_child(ec,body);
-          }
+          for(int i=0;i<whens->count;i++) expr_add_child(ec,whens->items[i]);
           exprlist_free(whens);
           expr_add_child(ec,ast_node_new(TT_NUL)); expr_add_child(ec,$6);
           $$=ec; }
@@ -355,10 +345,9 @@ given_stmt
 when_list
     :  { $$=exprlist_new(); }
     | when_list KW_WHEN expr block
-        { /* PRF-8: pair is now [val, body]; cmpkind moved to lower.c (derived from val->t). */
-          tree_t *pair=ast_node_new(TT_SEQ_EXPR);
-          expr_add_child(pair,$3); expr_add_child(pair,$4);
-          $$=exprlist_append($1,pair); }
+        { /* PRF-12-given: push val and body directly — no intermediate TT_SEQ_EXPR pair. */
+          exprlist_append($1,$3); exprlist_append($1,$4);
+          $$=$1; }
     ;
 sub_decl
     : KW_SUB IDENT '(' param_list ')' block
