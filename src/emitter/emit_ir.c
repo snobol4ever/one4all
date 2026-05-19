@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "emit_ir.h"
+#include "emit_core.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int ir_node_id(IR_t * nd) { return (int)((uintptr_t)nd % 100000u); }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -59,11 +60,11 @@ int emit_ir_block(IR_block_t * cfg, FILE * out, const char * target) {
     else if (strcmp(target, "net")  == 0) vt = &g_emit_vtable_net;
     else if (strcmp(target, "c")    == 0) vt = &g_emit_vtable_c;
     if (!vt) { fprintf(out, "; emit_ir_block: unknown target '%s'\n", target); return 1; }
-    if (vt->emit_prologue && vt->emit_prologue(cfg, out) != 0) return 1;
+    if (emit_prologue(cfg, out) != 0) return 1;
     if (cfg && cfg->entry) {
         emit_walk_ctx_t ctx = { vt, out };
         ir_walk(cfg, emit_visit_node, &ctx);
     }
-    if (vt->emit_epilogue && vt->emit_epilogue(cfg, out) != 0) return 1;
+    if (emit_epilogue(cfg, out) != 0) return 1;
     return 0;
 }

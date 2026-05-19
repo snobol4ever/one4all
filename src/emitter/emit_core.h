@@ -5,6 +5,7 @@
 #define TEXT_MODE_DEFINITION  1
 #include "bb_pool.h"
 #include "x86_opcodes.h"
+#include "IR.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -228,4 +229,7 @@ void sm_pat_capture_fn_args(const SM_Instr * instr, FILE * out);
 void sm_pat_usercall     (const SM_Instr * instr, FILE * out);
 void sm_pat_usercall_args(const SM_Instr * instr, FILE * out);
 void sm_exec_stmt        (const SM_Instr * instr, FILE * out);
+/*--- EC-4: unified prologue/epilogue (emit_core.c) — replaces per-silo statics ----------*/
+int  emit_prologue(IR_block_t * cfg, FILE * out);
+int  emit_epilogue(IR_block_t * cfg, FILE * out);
 #endif

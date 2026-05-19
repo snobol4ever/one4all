@@ -837,9 +837,9 @@ int emit_jvm_program(const tree_t * ast_prog, FILE * out) {
     bb_emit_mode_t saved_mode = bb_emit_mode;
     FILE *         saved_out  = bb_emit_out;
     emit_mode_set(EMIT_JVM, out);
-    emit_jvm_prologue(NULL, out);
+    emit_prologue(NULL, out);
     emit_jvm_from_sm(sm, out);
-    emit_jvm_epilogue(NULL, out);
+    emit_epilogue(NULL, out);
     emit_mode_set(saved_mode, saved_out);
     sm_prog_free(sm);
     return 0;

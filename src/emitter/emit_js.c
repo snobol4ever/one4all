@@ -280,10 +280,8 @@ int emit_js_program(const tree_t * ast_prog, FILE * out) {
     bb_emit_mode_t saved_mode = bb_emit_mode;
     FILE *         saved_out  = bb_emit_out;
     emit_mode_set(EMIT_JS, out);
-    /* Prologue: header + runtime require + _init. */
-    fprintf(out, "'use strict';\n");
-    fprintf(out, "const rt = require('/home/claude/one4all/src/runtime/js/sno_runtime.js');\n");
-    fprintf(out, "rt._init();\n");
+    /* Prologue: header + runtime require + _init + loop open (unified). */
+    emit_prologue(NULL, out);
     /* Pre-scan: emit user-fn entry-PC registration for all SM_LABEL with a name.
      * This includes both define_entry labels and plain labels (for alt-entry
      * forms like DEFINE("FOO(X)", "ALT") where ALT is a plain SM_LABEL). */
@@ -299,10 +297,8 @@ int emit_js_program(const tree_t * ast_prog, FILE * out) {
         }
     }
     fprintf(out, "});\n");
-    fprintf(out, "let _pc = 0;\n");
-    fprintf(out, "loop: while (true) { switch (_pc) {\n");
     emit_js_from_sm(sm, out);
-    emit_js_epilogue(NULL, out);
+    emit_epilogue(NULL, out);
     emit_mode_set(saved_mode, saved_out);
     sm_prog_free(sm);
     return 0;

@@ -1030,9 +1030,9 @@ int emit_net_program(const tree_t * ast_prog, FILE * out) {
     bb_emit_mode_t saved_mode = bb_emit_mode;
     FILE *         saved_out  = bb_emit_out;
     emit_mode_set(EMIT_NET, out);
-    emit_net_prologue(NULL, out);
+    emit_prologue(NULL, out);
     emit_net_from_sm(sm, out);
-    emit_net_epilogue(NULL, out);
+    emit_epilogue(NULL, out);
     emit_mode_set(saved_mode, saved_out);
     sm_prog_free(sm);
     return 0;
