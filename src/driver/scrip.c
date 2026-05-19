@@ -199,7 +199,7 @@ int main(int argc, char **argv)
                 for (int _i = 0; _i < (sub_ast)->n; _i++) { \
                     ast_push(ast_prog, (sub_ast)->c[_i]); \
                 } \
-                free((sub_ast)->c); free(sub_ast); \
+                if ((sub_ast)->c) free((char *)(sub_ast)->c - sizeof(size_t)); free(sub_ast); \
             } \
         } \
     } while(0)

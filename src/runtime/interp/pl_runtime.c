@@ -609,7 +609,7 @@ static void pl_synth_add_child(tree_t *e, tree_t *child) {
 static void pl_synth_free(tree_t *e) {
     if (!e) return;
     for (int i = 0; i < e->n; i++) pl_synth_free(e->c[i]);
-    free(e->c);
+    if (e->c) free((char *)e->c - sizeof(size_t));
     if (e->v.sval) free(e->v.sval);
     free(e);
 }

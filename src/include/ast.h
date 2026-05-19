@@ -93,17 +93,6 @@ static inline tree_t * ast_pop(tree_t * p) {
     tree_t * child;
     if (p->n == 0) return NULL;
     child = p->c[--p->n];
-    if (p->n == 0) {
-        free((char *)p->c - sizeof(size_t)); p->c = NULL;
-    } else {
-        size_t cap = AST_CAP(p);
-        if ((size_t)p->n < cap / 4 && cap > 4) {
-            size_t new_cap = cap / 2;
-            char * block = (char *)realloc((char *)p->c - sizeof(size_t), sizeof(size_t) + new_cap * sizeof(tree_t *));
-            p->c = (tree_t **)(block + sizeof(size_t));
-            AST_SET_CAP(p, new_cap);
-        }
-    }
     return child;
 }
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/

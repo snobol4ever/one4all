@@ -203,7 +203,7 @@ tree_t *parse_scrip_polyglot(const char *src, const char *filename)
             if (!ch) continue;
             ast_push(result, ch);
         }
-        free(sub_ast->c); free(sub_ast);
+        if (sub_ast->c) free((char *)sub_ast->c - sizeof(size_t)); free(sub_ast);
     }
     return result;
 }
