@@ -10,7 +10,6 @@ tree_t *ast_gc_clone(const tree_t *e)
     c->t      = e->t;
     c->v.ival      = e->v.ival;
     c->v.dval      = e->v.dval;
-    c->_id        = e->_id;
     c->n = e->n;
     switch (e->t) {
         case TT_QLIT: case TT_VAR: case TT_KEYWORD: case TT_FNC:

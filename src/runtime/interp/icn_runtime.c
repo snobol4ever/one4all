@@ -163,12 +163,12 @@ void icn_scope_patch(IcnScope *sc, tree_t *e) {
     }
     if (e->t == TT_VAR && e->v.sval) {
         if (e->v.sval[0] == '&') {
-            e->_id = -1;
+            e->v.ival = -1;
         } else if (is_global(e->v.sval)) {
-            e->_id = -1;
+            e->v.ival = -1;
         } else {
             int s = scope_add(sc, e->v.sval);
-            e->_id = (s >= 0) ? s : -1;
+            e->v.ival = (s >= 0) ? s : -1;
         }
     }
     int child_start = (e->t == TT_FNC) ? 1 : 0;
@@ -488,7 +488,7 @@ int icn_string_section_assign(tree_t *lhs, DESCR_t val) {
         }
     }
     if (!cell && bch && bch->t == TT_VAR && frame_depth > 0) {
-        int sl = bch->_id;
+        int sl = (int)bch->v.ival;
         if (sl >= 0 && sl < FRAME.env_n) cell = &FRAME.env[sl];
     }
     if (!cell) cell = interp_eval_ref(bch);
@@ -550,7 +550,7 @@ int icn_string_section_assign(tree_t *lhs, DESCR_t val) {
         icn_frame_env_store(_icn_bb_var_slot, STRVAL(buf));
     } else if (base_expr && base_expr->t == TT_VAR && base_expr->v.sval &&
                base_expr->v.sval[0] != '&' &&
-               !(frame_depth > 0 && base_expr->_id >= 0 && base_expr->_id < FRAME.env_n)) {
+               !(frame_depth > 0 && base_expr->v.ival >= 0 && base_expr->v.ival < FRAME.env_n)) {
         set_and_trace(base_expr->v.sval, STRVAL(buf));
     } else {
         *cell = STRVAL(buf);
@@ -1928,7 +1928,6 @@ DESCR_t icn_call_builtin(tree_t *call, DESCR_t *args, int nargs) {
             clone.v.sval      = call->v.sval;
             clone.v.ival      = call->v.ival;
             clone.v.dval      = call->v.dval;
-            clone._id        = call->_id;
             clone.c  = kids;
             clone.n = nargs + 1;
             return FAILDESCR;
