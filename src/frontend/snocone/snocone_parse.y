@@ -167,7 +167,7 @@ static void     sc_finalize_function_pst(ScParseState *st, struct FuncHead *h);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_append_label_node  (ScParseState *st, const char *name);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void     sc_append_goto_label  (ScParseState *st, char *target);
+
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_loop_push           (ScParseState *st, char *cont_label, char *end_label, int is_loop);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -395,7 +395,7 @@ simple_stmt : expr0 T_SEMICOLON                { sc_append_stmt(st, $1); }
             | T_RETURN T_SEMICOLON          { sc_append_stmt(st, ast_node_new(TT_RETURN)); }
             | T_FRETURN T_SEMICOLON         { sc_append_stmt(st, ast_node_new(TT_PROC_FAIL)); }
             | T_NRETURN T_SEMICOLON         { sc_append_stmt(st, ast_node_new(TT_NRETURN)); }
-            | T_GOTO T_IDENT T_SEMICOLON    { sc_append_goto_label(st, $2); free($2); }
+            | T_GOTO T_IDENT T_SEMICOLON    { tree_t *g = ast_node_new(TT_GOTO_U); g->sval = strdup($2); free($2); sc_append_stmt(st, g); }
             | T_BREAK T_SEMICOLON           { sc_append_break(st, NULL); }
             | T_BREAK T_IDENT T_SEMICOLON   { sc_append_break(st, $2); free($2); }
             | T_CONTINUE T_SEMICOLON        { sc_append_continue(st, NULL); }
@@ -773,11 +773,6 @@ static void sc_append_label_node(ScParseState *st, const char *name) {
     s->stno   = ++st->code->nstmts;
     s->label  = strdup(name);
     sc_append_chain(st, s, s);
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void sc_append_goto_label(ScParseState *st, char *target) {
-    STMT_t *g = sc_make_goto_uncond_stmt(st, strdup(target));
-    sc_append_chain(st, g, g);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void sc_splice_after(ScParseState *st, STMT_t *anchor,

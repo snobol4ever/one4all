@@ -374,7 +374,7 @@ static void     sc_finalize_function_pst(ScParseState *st, struct FuncHead *h);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_append_label_node  (ScParseState *st, const char *name);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void     sc_append_goto_label  (ScParseState *st, char *target);
+
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_loop_push           (ScParseState *st, char *cont_label, char *end_label, int is_loop);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -1919,7 +1919,7 @@ yyreduce:
 
   case 58: /* simple_stmt: T_GOTO T_IDENT T_SEMICOLON  */
 #line 398 "snocone_parse.y"
-                                            { sc_append_goto_label(st, (yyvsp[-1].str)); free((yyvsp[-1].str)); }
+                                            { tree_t *g = ast_node_new(TT_GOTO_U); g->sval = strdup((yyvsp[-1].str)); free((yyvsp[-1].str)); sc_append_stmt(st, g); }
 #line 1924 "snocone_parse.tab.c"
     break;
 
@@ -2803,11 +2803,6 @@ static void sc_append_label_node(ScParseState *st, const char *name) {
     s->stno   = ++st->code->nstmts;
     s->label  = strdup(name);
     sc_append_chain(st, s, s);
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void sc_append_goto_label(ScParseState *st, char *target) {
-    STMT_t *g = sc_make_goto_uncond_stmt(st, strdup(target));
-    sc_append_chain(st, g, g);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void sc_splice_after(ScParseState *st, STMT_t *anchor,

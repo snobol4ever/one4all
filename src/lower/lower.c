@@ -1457,6 +1457,8 @@ static void lower_expr_inner(const tree_t *t)
     case TT_REPEAT:                           lower_repeat(t);        return;
     case TT_LOOP_BREAK:                       lower_loop_break(t);    return;
     case TT_LOOP_NEXT:                        lower_loop_next(t);     return;
+    /* PST-SC-4k (2026-05-19): TT_GOTO_U emitted by snocone_parse.y T_GOTO production; label in v.sval */
+    case TT_GOTO_U: { const char *lbl = t->v.sval; if (lbl && lbl[0]) emit_goto(SM_JUMP, lbl); return; }
     case TT_RETURN:                           lower_return(t);        return;
     case TT_PROC_FAIL:                        lower_proc_fail(t);     return;
     case TT_NRETURN:                          lower_nreturn(t);       return;
