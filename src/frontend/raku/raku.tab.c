@@ -2814,7 +2814,10 @@ static void raku_lower_hoist_gather_pass(tree_t *prog) {
     if (!g_gather_ndef) return;
     int old_n = prog->n;
     int new_n = old_n + g_gather_ndef;
-    tree_t **new_c = (tree_t **)calloc((size_t)new_n, sizeof(tree_t *));
+    size_t new_cap = (size_t)new_n;
+    char *block = (char *)malloc(sizeof(size_t) + new_cap * sizeof(tree_t *));
+    tree_t **new_c = (tree_t **)(block + sizeof(size_t));
+    *(size_t *)block = new_cap;
     for (int i = 0; i < g_gather_ndef; i++) {
         tree_t *st = ast_stmt_new(TT_STMT);
         expr_add_child(st, ast_attr_int(":lang",  LANG_RAKU));
@@ -2824,7 +2827,7 @@ static void raku_lower_hoist_gather_pass(tree_t *prog) {
         new_c[i] = st;
     }
     for (int i = 0; i < old_n; i++) new_c[g_gather_ndef + i] = prog->c[i];
-    free(prog->c);
+    if (prog->c) free((char *)prog->c - sizeof(size_t));
     prog->c = new_c;
     prog->n = new_n;
 }
