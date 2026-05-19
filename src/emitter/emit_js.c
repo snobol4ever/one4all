@@ -351,42 +351,9 @@ int emit_js_from_sm(SM_Program * sm, FILE * out) {
             js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
             fprintf(out, ", %lld, %d); if (_r >= 0) { _pc = _r; continue; } } ", instr->a[1].i, i + 1);
             break;
-        case SM_RETURN:
-            fprintf(out, "{ let _r = rt.fn_return(0, 0); if (_r === -2) { break loop; } _pc = _r; continue; } ");
-            has_continue = 1;
-            break;
-        case SM_FRETURN:
-            fprintf(out, "{ let _r = rt.fn_return(1, 0); if (_r === -2) { break loop; } _pc = _r; continue; } ");
-            has_continue = 1;
-            break;
-        case SM_NRETURN:
-            fprintf(out, "{ let _r = rt.fn_return(2, 0); if (_r === -2) { break loop; } _pc = _r; continue; } ");
-            has_continue = 1;
-            break;
-        case SM_RETURN_S:
-            fprintf(out, "{ let _r = rt.fn_return(0, 1); if (_r === -1) { _pc = %d; continue; } if (_r === -2) { break loop; } _pc = _r; continue; } ", i + 1);
-            has_continue = 1;
-            break;
-        case SM_RETURN_F:
-            fprintf(out, "{ let _r = rt.fn_return(0, 2); if (_r === -1) { _pc = %d; continue; } if (_r === -2) { break loop; } _pc = _r; continue; } ", i + 1);
-            has_continue = 1;
-            break;
-        case SM_FRETURN_S:
-            fprintf(out, "{ let _r = rt.fn_return(1, 1); if (_r === -1) { _pc = %d; continue; } if (_r === -2) { break loop; } _pc = _r; continue; } ", i + 1);
-            has_continue = 1;
-            break;
-        case SM_FRETURN_F:
-            fprintf(out, "{ let _r = rt.fn_return(1, 2); if (_r === -1) { _pc = %d; continue; } if (_r === -2) { break loop; } _pc = _r; continue; } ", i + 1);
-            has_continue = 1;
-            break;
-        case SM_NRETURN_S:
-            fprintf(out, "{ let _r = rt.fn_return(2, 1); if (_r === -1) { _pc = %d; continue; } if (_r === -2) { break loop; } _pc = _r; continue; } ", i + 1);
-            has_continue = 1;
-            break;
-        case SM_NRETURN_F:
-            fprintf(out, "{ let _r = rt.fn_return(2, 2); if (_r === -1) { _pc = %d; continue; } if (_r === -2) { break loop; } _pc = _r; continue; } ", i + 1);
-            has_continue = 1;
-            break;
+        case SM_RETURN:   case SM_RETURN_S:  case SM_RETURN_F:  { sm_ctx_t ctx = {i}; has_continue |= sm_return(instr, &ctx, out); break; }
+        case SM_FRETURN:  case SM_FRETURN_S: case SM_FRETURN_F: { sm_ctx_t ctx = {i}; has_continue |= sm_freturn(instr, &ctx, out); break; }
+        case SM_NRETURN:  case SM_NRETURN_S: case SM_NRETURN_F: { sm_ctx_t ctx = {i}; has_continue |= sm_nreturn(instr, &ctx, out); break; }
         case SM_DEFINE_ENTRY:
             /* Marker after a define_entry label; no runtime action (registration done by DEFINE builtin). */
             break;

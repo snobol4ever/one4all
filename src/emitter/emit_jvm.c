@@ -665,57 +665,9 @@ static void emit_jvm_one_instr(SM_Program * sm, int i, int n,
         }
         break;
     }
-    case SM_RETURN:
-        jvm_push_int2(out, 0); jvm_push_int2(out, 1);
-        fprintf(out, "    invokestatic rt/SnoRt/do_return(II)I\n    pop\n");
-        fprintf(out, "    invokestatic rt/SnoRt/fn_return_push()V\n");
-        fprintf(out, "    return\n"); break;
-    case SM_RETURN_S:
-        fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n    ifeq sm_pc_%d_rs_skip\n", i);
-        jvm_push_int2(out, 0); jvm_push_int2(out, 1);
-        fprintf(out, "    invokestatic rt/SnoRt/do_return(II)I\n    pop\n");
-        fprintf(out, "    invokestatic rt/SnoRt/fn_return_push()V\n");
-        fprintf(out, "    return\nsm_pc_%d_rs_skip:\n", i); break;
-    case SM_RETURN_F:
-        fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n    ifne sm_pc_%d_rf_skip\n", i);
-        jvm_push_int2(out, 0); jvm_push_int2(out, 1);
-        fprintf(out, "    invokestatic rt/SnoRt/do_return(II)I\n    pop\n");
-        fprintf(out, "    invokestatic rt/SnoRt/fn_return_push()V\n");
-        fprintf(out, "    return\nsm_pc_%d_rf_skip:\n", i); break;
-    case SM_FRETURN:
-        jvm_push_int2(out, 1); jvm_push_int2(out, 0);
-        fprintf(out, "    invokestatic rt/SnoRt/do_return(II)I\n    pop\n");
-        fprintf(out, "    invokestatic rt/SnoRt/fn_return_push()V\n");
-        fprintf(out, "    return\n"); break;
-    case SM_FRETURN_S:
-        fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n    ifeq sm_pc_%d_fs_skip\n", i);
-        jvm_push_int2(out, 1); jvm_push_int2(out, 0);
-        fprintf(out, "    invokestatic rt/SnoRt/do_return(II)I\n    pop\n");
-        fprintf(out, "    invokestatic rt/SnoRt/fn_return_push()V\n");
-        fprintf(out, "    return\nsm_pc_%d_fs_skip:\n", i); break;
-    case SM_FRETURN_F:
-        fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n    ifne sm_pc_%d_ff_skip\n", i);
-        jvm_push_int2(out, 1); jvm_push_int2(out, 0);
-        fprintf(out, "    invokestatic rt/SnoRt/do_return(II)I\n    pop\n");
-        fprintf(out, "    invokestatic rt/SnoRt/fn_return_push()V\n");
-        fprintf(out, "    return\nsm_pc_%d_ff_skip:\n", i); break;
-    case SM_NRETURN:
-        jvm_push_int2(out, 2); jvm_push_int2(out, 0);
-        fprintf(out, "    invokestatic rt/SnoRt/do_return(II)I\n    pop\n");
-        fprintf(out, "    invokestatic rt/SnoRt/fn_return_push()V\n");
-        fprintf(out, "    return\n"); break;
-    case SM_NRETURN_S:
-        fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n    ifeq sm_pc_%d_ns_skip\n", i);
-        jvm_push_int2(out, 2); jvm_push_int2(out, 0);
-        fprintf(out, "    invokestatic rt/SnoRt/do_return(II)I\n    pop\n");
-        fprintf(out, "    invokestatic rt/SnoRt/fn_return_push()V\n");
-        fprintf(out, "    return\nsm_pc_%d_ns_skip:\n", i); break;
-    case SM_NRETURN_F:
-        fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n    ifne sm_pc_%d_nf_skip\n", i);
-        jvm_push_int2(out, 2); jvm_push_int2(out, 0);
-        fprintf(out, "    invokestatic rt/SnoRt/do_return(II)I\n    pop\n");
-        fprintf(out, "    invokestatic rt/SnoRt/fn_return_push()V\n");
-        fprintf(out, "    return\nsm_pc_%d_nf_skip:\n", i); break;
+    case SM_RETURN:   case SM_RETURN_S:  case SM_RETURN_F:  { sm_ctx_t ctx = {i}; sm_return(instr, &ctx, out); break; }
+    case SM_FRETURN:  case SM_FRETURN_S: case SM_FRETURN_F: { sm_ctx_t ctx = {i}; sm_freturn(instr, &ctx, out); break; }
+    case SM_NRETURN:  case SM_NRETURN_S: case SM_NRETURN_F: { sm_ctx_t ctx = {i}; sm_nreturn(instr, &ctx, out); break; }
     case SM_DEFINE_ENTRY: case SM_DEFINE: break;
     case SM_HALT: { sm_ctx_t ctx = {i, n, in_body, in_my_method}; sm_halt(instr, &ctx, out); break; }
     case SM_PAT_LIT:

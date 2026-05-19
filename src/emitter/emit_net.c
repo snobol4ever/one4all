@@ -893,80 +893,9 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
             }
             break;
         }
-        case SM_RETURN:
-        case SM_RETURN_S:
-        case SM_RETURN_F: {
-            int fk = (i >= 0 && i < n && pc_to_fn) ? pc_to_fn[i] : -1;
-            const char * fname = (fk >= 0) ? fn_names[fk] : NULL;
-            /* _S: skip if !last_ok; _F: skip if last_ok */
-            if (instr->op == SM_RETURN_S) {
-                fprintf(out, "    call       bool SnoRt::last_ok()\n");
-                fprintf(out, "    brfalse    NET_L%d\n", i + 1);
-            } else if (instr->op == SM_RETURN_F) {
-                fprintf(out, "    call       bool SnoRt::last_ok()\n");
-                fprintf(out, "    brtrue     NET_L%d\n", i + 1);
-            }
-            if (fname) {
-                net_escape_ldstr(out, fname);
-                fprintf(out, "    call       void SnoRt::push_var(string)\n");
-            } else {
-                fprintf(out, "    call       void SnoRt::push_null()\n");
-            }
-            fprintf(out, "    call       void SnoRt::frame_exit()\n");
-            net_push_i4(out, 0);
-            net_push_i4(out, 1);
-            fprintf(out, "    call       void SnoRt::do_return(int32, bool)\n");
-            fprintf(out, "    call       int32 SnoRt::pop_ret_pc()\n");
-            fprintf(out, "    stloc      _pc\n    br         NET_DISPATCH\n");
-            has_continue = 1;
-            break;
-        }
-        case SM_FRETURN:
-        case SM_FRETURN_S:
-        case SM_FRETURN_F:
-            if (instr->op == SM_FRETURN_S) {
-                fprintf(out, "    call       bool SnoRt::last_ok()\n");
-                fprintf(out, "    brfalse    NET_L%d\n", i + 1);
-            } else if (instr->op == SM_FRETURN_F) {
-                fprintf(out, "    call       bool SnoRt::last_ok()\n");
-                fprintf(out, "    brtrue     NET_L%d\n", i + 1);
-            }
-            fprintf(out, "    call       void SnoRt::push_null()\n");
-            fprintf(out, "    call       void SnoRt::frame_exit()\n");
-            net_push_i4(out, 1);
-            net_push_i4(out, 0);
-            fprintf(out, "    call       void SnoRt::do_return(int32, bool)\n");
-            fprintf(out, "    call       int32 SnoRt::pop_ret_pc()\n");
-            fprintf(out, "    stloc      _pc\n    br         NET_DISPATCH\n");
-            has_continue = 1;
-            break;
-        case SM_NRETURN:
-        case SM_NRETURN_S:
-        case SM_NRETURN_F: {
-            int fk = (i >= 0 && i < n && pc_to_fn) ? pc_to_fn[i] : -1;
-            const char * fname = (fk >= 0) ? fn_names[fk] : NULL;
-            if (instr->op == SM_NRETURN_S) {
-                fprintf(out, "    call       bool SnoRt::last_ok()\n");
-                fprintf(out, "    brfalse    NET_L%d\n", i + 1);
-            } else if (instr->op == SM_NRETURN_F) {
-                fprintf(out, "    call       bool SnoRt::last_ok()\n");
-                fprintf(out, "    brtrue     NET_L%d\n", i + 1);
-            }
-            if (fname) {
-                net_escape_ldstr(out, fname);
-                fprintf(out, "    call       void SnoRt::push_var(string)\n");
-            } else {
-                fprintf(out, "    call       void SnoRt::push_null()\n");
-            }
-            fprintf(out, "    call       void SnoRt::frame_exit()\n");
-            net_push_i4(out, 2);
-            net_push_i4(out, 0);
-            fprintf(out, "    call       void SnoRt::do_return(int32, bool)\n");
-            fprintf(out, "    call       int32 SnoRt::pop_ret_pc()\n");
-            fprintf(out, "    stloc      _pc\n    br         NET_DISPATCH\n");
-            has_continue = 1;
-            break;
-        }
+        case SM_RETURN:  case SM_RETURN_S:  case SM_RETURN_F:  { sm_ctx_t ctx = {i, n, 0, NULL, pc_to_fn, fn_names, fn_count}; has_continue |= sm_return(instr, &ctx, out); break; }
+        case SM_FRETURN: case SM_FRETURN_S: case SM_FRETURN_F: { sm_ctx_t ctx = {i, n, 0, NULL, pc_to_fn, fn_names, fn_count}; has_continue |= sm_freturn(instr, &ctx, out); break; }
+        case SM_NRETURN: case SM_NRETURN_S: case SM_NRETURN_F: { sm_ctx_t ctx = {i, n, 0, NULL, pc_to_fn, fn_names, fn_count}; has_continue |= sm_nreturn(instr, &ctx, out); break; }
         case SM_DEFINE_ENTRY:
         case SM_DEFINE:
         case SM_EXEC_STMT:

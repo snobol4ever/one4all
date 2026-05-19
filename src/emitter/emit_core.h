@@ -194,4 +194,7 @@ int  sm_jump      (const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out);
 int  sm_jump_s    (const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out);
 int  sm_jump_f    (const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out);
 int  sm_halt      (const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out);
+int  sm_return    (const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out);
+int  sm_freturn   (const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out);
+int  sm_nreturn   (const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out);
 #endif
