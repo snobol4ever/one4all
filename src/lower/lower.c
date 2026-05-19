@@ -881,6 +881,55 @@ static void lower_for(const tree_t *t)
     free(lbl_cont); free(lbl_end);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PRF-12-for: lower TT_FOR_RANGE[TT_VAR(v), lo, hi, body, opt:TT_ILIT(exclusive)].
+ * Desugars to: v=lo; while(v<=hi){body; v=v+1}  (exclusive: v<hi). */
+static void lower_for_range(const tree_t *t)
+{
+    if (!t || t->n < 4) { sm_emit(g_p, SM_PUSH_NULL); return; }
+    const tree_t *vnode = t->c[0];
+    const tree_t *lo    = t->c[1];
+    const tree_t *hi    = t->c[2];
+    const tree_t *body  = t->c[3];
+    int exclusive = (t->n > 4 && t->c[4] && t->c[4]->t == TT_ILIT) ? (int)t->c[4]->v.ival : 0;
+    const char *vname = (vnode && vnode->v.sval) ? vnode->v.sval : "__for_v";
+    lower_expr(lo);
+    emit_var_store(vname);
+    sm_emit(g_p, SM_VOID_POP);
+    char *lbl_cont = lower_fresh_label("_Lcont");
+    char *lbl_end  = lower_fresh_label("_Lend");
+    int top = g_p->count;
+    sm_emit_s(g_p, SM_PUSH_VAR, vname);
+    sm_emit(g_p, SM_COERCE_NUM);
+    lower_expr(hi);
+    sm_emit(g_p, SM_COERCE_NUM);
+    sm_emit_i(g_p, SM_ACOMP, exclusive ? (int64_t)TT_LT : (int64_t)TT_LE);
+    int jf = sm_emit_i(g_p, SM_JUMP_F, 0);
+    sm_emit(g_p, SM_VOID_POP);
+    loop_push(lbl_cont, lbl_end);
+    if (body && body->t == TT_SEQ_EXPR) {
+        for (int i = 0; i < body->n; i++) if (body->c[i]) { lower_expr(body->c[i]); sm_emit(g_p, SM_VOID_POP); }
+    } else if (body) {
+        lower_expr(body); sm_emit(g_p, SM_VOID_POP);
+    }
+    loop_pop();
+    labtab_define(&g_labtab, lbl_cont, g_p->count);
+    sm_emit_s(g_p, SM_PUSH_VAR, vname);
+    sm_emit(g_p, SM_COERCE_NUM);
+    tree_t *one = ast_node_new(TT_ILIT); one->v.ival = 1;
+    lower_expr(one);
+    sm_emit(g_p, SM_COERCE_NUM);
+    sm_emit(g_p, SM_ADD);
+    emit_var_store(vname);
+    sm_emit(g_p, SM_VOID_POP);
+    sm_emit_i(g_p, SM_JUMP, top);
+    int exit_pos = g_p->count;
+    sm_patch_jump(g_p, jf, exit_pos);
+    sm_emit(g_p, SM_VOID_POP);
+    labtab_define(&g_labtab, lbl_end, exit_pos);
+    sm_emit(g_p, SM_PUSH_NULL);
+    free(lbl_cont); free(lbl_end);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_repeat(const tree_t *t)
 {
     int top = sm_label(g_p);
@@ -1565,6 +1614,7 @@ static void lower_expr_inner(const tree_t *t)
     case TT_HASH_DELETE:if (t->n >= 2) { lower_expr(t->c[0]); lower_expr(t->c[1]); } sm_emit_si(g_p, SM_CALL_FN, "hash_delete",  2); return;
     case TT_HASH_EXISTS:if (t->n >= 2) { lower_expr(t->c[0]); lower_expr(t->c[1]); } sm_emit_si(g_p, SM_CALL_FN, "hash_exists",  2); return;
     case TT_CLASS_DECL: lower_class_decl(t); sm_emit(g_p, SM_PUSH_NULL); return;
+    case TT_FOR_RANGE:  lower_for_range(t);  return;
     case TT_TO:                               lower_to(t);            return;
     case TT_TO_BY:                            lower_to_by(t);         return;
     case TT_LIMIT:                            lower_limit(t);         return;

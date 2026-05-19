@@ -305,17 +305,25 @@ repeat_stmt
     ;
 for_stmt
     : KW_FOR add_expr OP_RANGE add_expr OP_ARROW VAR_SCALAR block
-        { $$ = make_for_range($2, $4, strip_sigil($6), $7); }
+        { const char *vn = intern(strip_sigil($6)); free($6);
+          tree_t *r = ast_node_new(TT_FOR_RANGE);
+          ast_push(r, leaf_sval(TT_VAR, vn)); ast_push(r, $2); ast_push(r, $4); ast_push(r, $7);
+          tree_t *ex = ast_node_new(TT_ILIT); ex->v.ival = 0; ast_push(r, ex);
+          $$ = r; }
     | KW_FOR add_expr OP_RANGE_EX add_expr OP_ARROW VAR_SCALAR block
-        { $$ = make_for_range($2, $4, strip_sigil($6), $7); }
+        { const char *vn = intern(strip_sigil($6)); free($6);
+          tree_t *r = ast_node_new(TT_FOR_RANGE);
+          ast_push(r, leaf_sval(TT_VAR, vn)); ast_push(r, $2); ast_push(r, $4); ast_push(r, $7);
+          tree_t *ex = ast_node_new(TT_ILIT); ex->v.ival = 1; ast_push(r, ex);
+          $$ = r; }
     | KW_FOR expr OP_ARROW VAR_SCALAR block
-        { const char *vn = intern(strip_sigil($4));
+        { const char *vn = intern(strip_sigil($4)); free($4);
           tree_t *gen = expr_unary(TT_ITERATE, $2);
           gen->v.sval = (char *)vn;
-          $$=expr_binary(TT_EVERY,gen,$5); }
+          $$ = expr_binary(TT_EVERY, gen, $5); }
     | KW_FOR expr block
-        { tree_t *gen=($2->t==TT_VAR)?expr_unary(TT_ITERATE,$2):$2;
-          $$=expr_binary(TT_EVERY,gen,$3); }
+        { tree_t *gen = expr_unary(TT_ITERATE, $2);
+          $$ = expr_binary(TT_EVERY, gen, $3); }
     ;
 given_stmt
     : KW_GIVEN expr '{' when_list '}'

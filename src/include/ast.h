@@ -39,6 +39,7 @@ typedef enum tree_e {
     TT_ARR_GET,           TT_ARR_SET,
     TT_HASH_GET,          TT_HASH_SET,          TT_HASH_DELETE,       TT_HASH_EXISTS,
     TT_CLASS_DECL,
+    TT_FOR_RANGE,
     TT_KIND_COUNT
 } tree_e;
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -170,6 +171,7 @@ static const char * const tt_e_name[TT_KIND_COUNT] = {
     [TT_HASH_GET]         = "TT_HASH_GET",         [TT_HASH_SET]         = "TT_HASH_SET",
     [TT_HASH_DELETE]      = "TT_HASH_DELETE",      [TT_HASH_EXISTS]      = "TT_HASH_EXISTS",
     [TT_CLASS_DECL]       = "TT_CLASS_DECL",
+    [TT_FOR_RANGE]        = "TT_FOR_RANGE",
 };
 #endif
 /*================================================================================================================================================================================*/
