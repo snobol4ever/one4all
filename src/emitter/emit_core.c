@@ -1,5 +1,6 @@
 #include "emit_core.h"
 #include "BB_templates/bb_templates.h"
+#include "SM_templates/sm_templates.h"
 #include "sm_jit_interp.h"
 #include "emit_form.h"
 #include <string.h>
@@ -1485,7 +1486,7 @@ static void wasm_pre_scan_userfns(SM_Program * sm) {
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* EC-6: emit_wasm_from_sm — moved from emit_wasm.c. */
+/* EC-WASM-SM: emit_wasm_from_sm — now delegates to SM_template functions (one per opcode). */
 static int emit_wasm_from_sm(SM_Program * sm, FILE * out) {
     if (!sm || !out || sm->count == 0) return 0;
     int n = sm->count;
@@ -1494,35 +1495,70 @@ static int emit_wasm_from_sm(SM_Program * sm, FILE * out) {
     for (int i = 0; i < n; i++) {
         SM_Instr * ins = &sm->instrs[i];
         int has_jump = 0;
+        sm_ctx_t ctx = {i, n, 0, NULL, NULL, NULL, 0};
         fprintf(out, "        (if (i32.eq (local.get $pc) (i32.const %d)) (then\n", i);
         switch (ins->op) {
-        case SM_STNO:          fprintf(out, "          (call $sno_set_stno (i32.const %lld))\n", ins->a[0].i); break;
-        case SM_LABEL:         break;
-        case SM_PUSH_LIT_I:   fprintf(out, "          (call $sno_push_int (i32.const %lld))\n", ins->a[0].i); break;
-        case SM_PUSH_LIT_S:   { int addr = wasm_intern_str(ins->a[0].s); int len = ins->a[0].s ? (int)strlen(ins->a[0].s) : 0; fprintf(out, "          (call $sno_push_str (i32.const 0x%x) (i32.const %d))\n", addr, len); break; }
-        case SM_PUSH_LIT_CS:  { int addr = wasm_intern_str(ins->a[0].s); int len = ins->a[0].s ? (int)strlen(ins->a[0].s) : 0; fprintf(out, "          (call $sno_push_str (i32.const 0x%x) (i32.const %d))\n", addr, len); break; }
-        case SM_PUSH_LIT_F:   fprintf(out, "          (call $sno_push_real (f64.const %.17g))\n", ins->a[0].f); break;
-        case SM_PUSH_NULL:
-        case SM_PUSH_NULL_NOFLIP: fprintf(out, "          (call $sno_push_null)\n"); break;
-        case SM_PUSH_VAR:     { int addr = wasm_intern_name(ins->a[0].s); int len = ins->a[0].s ? (int)strlen(ins->a[0].s) : 0; fprintf(out, "          (call $sno_push_var (i32.const 0x%x) (i32.const %d))\n", addr, len); break; }
-        case SM_STORE_VAR:    { int addr = wasm_intern_name(ins->a[0].s); int len = ins->a[0].s ? (int)strlen(ins->a[0].s) : 0; fprintf(out, "          (call $sno_store_var (i32.const 0x%x) (i32.const %d))\n", addr, len); break; }
-        case SM_VOID_POP:     fprintf(out, "          (call $sno_pop_void)\n"); break;
-        case SM_CONCAT:       fprintf(out, "          (call $sno_concat)\n"); break;
-        case SM_NEG:          fprintf(out, "          (call $sno_neg)\n"); break;
-        case SM_COERCE_NUM:   fprintf(out, "          (call $sno_coerce_num)\n"); break;
-        case SM_EXP:          fprintf(out, "          (call $sno_exp_op)\n"); break;
-        case SM_ADD:          fprintf(out, "          (call $sno_arith (i32.const 0))\n"); break;
-        case SM_SUB:          fprintf(out, "          (call $sno_arith (i32.const 1))\n"); break;
-        case SM_MUL:          fprintf(out, "          (call $sno_arith (i32.const 2))\n"); break;
-        case SM_DIV:          fprintf(out, "          (call $sno_arith (i32.const 3))\n"); break;
-        case SM_MOD:          fprintf(out, "          (call $sno_arith (i32.const 4))\n"); break;
-        case SM_LCOMP:        fprintf(out, "          (call $sno_lcomp (i32.const %lld))\n", ins->a[0].i); break;
-        case SM_ACOMP:        fprintf(out, "          (call $sno_acomp (i32.const %lld))\n", ins->a[0].i); break;
-        case SM_HALT:         fprintf(out, "          (call $sno_halt_tos)\n          (br $done)\n"); has_jump = 1; break;
-        case SM_JUMP:         fprintf(out, "          (i32.const %lld) (local.set $pc) (br $lp)\n", ins->a[0].i); has_jump = 1; break;
-        case SM_JUMP_S:       fprintf(out, "          (if (call $sno_last_ok)\n            (then (i32.const %lld) (local.set $pc))\n            (else (i32.const %d)   (local.set $pc)))\n          (br $lp)\n", ins->a[0].i, i + 1); has_jump = 1; break;
-        case SM_JUMP_F:       fprintf(out, "          (if (i32.eqz (call $sno_last_ok))\n            (then (i32.const %lld) (local.set $pc))\n            (else (i32.const %d)   (local.set $pc)))\n          (br $lp)\n", ins->a[0].i, i + 1); has_jump = 1; break;
-        case SM_CALL_FN: {
+        case SM_STNO:                                    sm_stno(ins, out);                       break;
+        case SM_LABEL:                                                                            break;
+        case SM_PUSH_LIT_I:                              sm_push_lit_i(ins, out);                 break;
+        case SM_PUSH_LIT_S:   case SM_PUSH_LIT_CS:      sm_push_lit_s(ins, out);                 break;
+        case SM_PUSH_LIT_F:                              sm_push_lit_f(ins, out);                 break;
+        case SM_PUSH_NULL:    case SM_PUSH_NULL_NOFLIP: sm_push_null(ins, out);                  break;
+        case SM_PUSH_VAR:                                sm_push_var(ins, out);                   break;
+        case SM_STORE_VAR:                               sm_store_var(ins, out);                  break;
+        case SM_VOID_POP:                                sm_void_pop(ins, out);                   break;
+        case SM_CONCAT:                                  sm_concat(ins, out);                     break;
+        case SM_NEG:                                     sm_neg(ins, out);                        break;
+        case SM_COERCE_NUM:                              sm_coerce_num(ins, out);                 break;
+        case SM_EXP:                                     sm_exp(ins, out);                        break;
+        case SM_ADD:                                     sm_add(ins, out);                        break;
+        case SM_SUB:                                     sm_sub(ins, out);                        break;
+        case SM_MUL:                                     sm_mul(ins, out);                        break;
+        case SM_DIV:                                     sm_div(ins, out);                        break;
+        case SM_MOD:                                     sm_mod(ins, out);                        break;
+        case SM_LCOMP:                                   sm_lcomp(ins, out);                      break;
+        case SM_ACOMP:                                   sm_acomp(ins, out);                      break;
+        case SM_INCR:                                    sm_add(ins, out);                        break;
+        case SM_DECR:                                    sm_sub(ins, out);                        break;
+        case SM_HALT:         has_jump = sm_halt(ins, &ctx, out);                                 break;
+        case SM_JUMP:         has_jump = sm_jump(ins, &ctx, out);                                 break;
+        case SM_JUMP_S:       has_jump = sm_jump_s(ins, &ctx, out);                              break;
+        case SM_JUMP_F:       has_jump = sm_jump_f(ins, &ctx, out);                              break;
+        case SM_RETURN:   case SM_RETURN_S:   case SM_RETURN_F:   has_jump = sm_return(ins, &ctx, out);  break;
+        case SM_FRETURN:  case SM_FRETURN_S:  case SM_FRETURN_F:  has_jump = sm_freturn(ins, &ctx, out); break;
+        case SM_NRETURN:  case SM_NRETURN_S:  case SM_NRETURN_F:  has_jump = sm_nreturn(ins, &ctx, out); break;
+        case SM_PAT_LIT:                                 sm_pat_lit(ins, out);                    break;
+        case SM_PAT_ANY:                                 sm_pat_any_i(ins, i, out);               break;
+        case SM_PAT_NOTANY:                              sm_pat_notany(ins, i, out);               break;
+        case SM_PAT_SPAN:                                sm_pat_span(ins, i, out);                break;
+        case SM_PAT_BREAK:                               sm_pat_break(ins, i, out);               break;
+        case SM_PAT_LEN:                                 sm_pat_len(ins, out);                    break;
+        case SM_PAT_POS:                                 sm_pat_pos(ins, out);                    break;
+        case SM_PAT_RPOS:                                sm_pat_rpos(ins, out);                   break;
+        case SM_PAT_TAB:                                 sm_pat_tab(ins, out);                    break;
+        case SM_PAT_RTAB:                                sm_pat_rtab(ins, out);                   break;
+        case SM_PAT_REM:                                 sm_pat_rem(ins, out);                    break;
+        case SM_PAT_ARB:                                 sm_pat_arb(ins, out);                    break;
+        case SM_PAT_ARBNO:                               sm_pat_arbno(ins, out);                  break;
+        case SM_PAT_BAL:                                 sm_pat_bal(ins, out);                    break;
+        case SM_PAT_FAIL:                                sm_pat_fail(ins, out);                   break;
+        case SM_PAT_SUCCEED:                             sm_pat_succeed(ins, out);                break;
+        case SM_PAT_ABORT:                               sm_pat_abort(ins, out);                  break;
+        case SM_PAT_FENCE0:                              sm_pat_fence0(ins, out);                 break;
+        case SM_PAT_FENCE1:                              sm_pat_fence1(ins, out);                 break;
+        case SM_PAT_EPS:                                 sm_pat_eps(ins, out);                    break;
+        case SM_PAT_CAT:                                 sm_pat_cat(ins, out);                    break;
+        case SM_PAT_ALT:                                 sm_pat_alt(ins, out);                    break;
+        case SM_PAT_DEREF:                               sm_pat_deref(ins, out);                  break;
+        case SM_PAT_REFNAME:                             sm_pat_refname(ins, out);                break;
+        case SM_PAT_CAPTURE:                             sm_pat_capture(ins, out);                break;
+        case SM_PAT_CAPTURE_FN:                          sm_pat_capture_fn(ins, out);             break;
+        case SM_PAT_CAPTURE_FN_ARGS:                     sm_pat_capture_fn_args(ins, out);        break;
+        case SM_PAT_USERCALL:                            sm_pat_usercall(ins, out);               break;
+        case SM_PAT_USERCALL_ARGS:                       sm_pat_usercall_args(ins, out);          break;
+        case SM_EXEC_STMT:    case SM_DEFINE_ENTRY: case SM_DEFINE: sm_exec_stmt(ins, out);      break;
+        case SM_CALL_FN:      case SM_SUSPEND_VALUE: {
+            /* Call dispatch — inline WASM frame logic (user-fn table lookup). */
             const char * cname = ins->a[0].s; int nargs = (int)ins->a[1].i;
             if (cname && cname[0]) {
                 WasmUserFn * fn = wasm_userfn_find(cname);
@@ -1542,67 +1578,11 @@ static int emit_wasm_from_sm(SM_Program * sm, FILE * out) {
                 fprintf(out, "          (call $sno_call (i32.const 0x%x) (i32.const %d) (i32.const %d))\n", addr, len, nargs);
             } else {
                 fprintf(out, "          (local.set $tmp (call $sno_fn_return (i32.const 0) (i32.const 0)))\n");
-                fprintf(out, "          (if (i32.eq (local.get $tmp) (i32.const -2))\n            (then (br $done))\n            (else (local.set $pc (local.get $tmp)) (br $lp)))\n"); has_jump = 1;
+                fprintf(out, "          (if (i32.eq (local.get $tmp) (i32.const -2)) (then (br $done)) (else (local.set $pc (local.get $tmp)) (br $lp)))\n"); has_jump = 1;
             }
             break;
         }
-        case SM_SUSPEND_VALUE: {
-            const char * cname = ins->a[0].s; int nargs = (int)ins->a[1].i;
-            if (cname && cname[0]) {
-                WasmUserFn * fn = wasm_userfn_find(cname);
-                if (fn) {
-                    int na = wasm_intern_name(fn->name); int nl = (int)strlen(fn->name);
-                    fprintf(out, "          (local.set $fr (call $sno_call_frame_push (i32.const %d) (i32.const 0x%x) (i32.const %d)))\n", i + 1, na, nl);
-                    fprintf(out, "          (call $sno_save_var (local.get $fr) (i32.const 0x%x) (i32.const %d))\n", na, nl);
-                    for (int k = 0; k < fn->nparams; k++) { int pa = wasm_intern_name(fn->params[k]); int pl = (int)strlen(fn->params[k]); fprintf(out, "          (call $sno_save_var (local.get $fr) (i32.const 0x%x) (i32.const %d))\n", pa, pl); }
-                    fprintf(out, "          (call $sno_clear_var (i32.const 0x%x) (i32.const %d))\n", na, nl);
-                    int nbind = (nargs < fn->nparams) ? nargs : fn->nparams;
-                    for (int k = nbind - 1; k >= 0; k--) { int pa = wasm_intern_name(fn->params[k]); int pl = (int)strlen(fn->params[k]); fprintf(out, "          (call $sno_set_var_from_tos (i32.const 0x%x) (i32.const %d))\n", pa, pl); }
-                    for (int k = fn->nparams; k < nargs; k++) fprintf(out, "          (call $sno_pop_to_null)\n");
-                    fprintf(out, "          (call $sno_call_frame_close)\n");
-                    fprintf(out, "          (i32.const %d) (local.set $pc) (br $lp)\n", fn->entry_pc); has_jump = 1; break;
-                }
-                int addr = wasm_intern_name(cname); int len = (int)strlen(cname);
-                fprintf(out, "          (call $sno_call (i32.const 0x%x) (i32.const %d) (i32.const %d))\n", addr, len, nargs);
-            } else fprintf(out, "          ;; SM_SUSPEND_VALUE with NULL name (no-op)\n");
-            break;
-        }
-        case SM_RETURN:   case SM_FRETURN:   case SM_NRETURN:   { int k = (ins->op == SM_FRETURN) ? 1 : ((ins->op == SM_NRETURN) ? 2 : 0); fprintf(out, "          (local.set $tmp (call $sno_fn_return (i32.const %d) (i32.const 0)))\n          (if (i32.eq (local.get $tmp) (i32.const -2))\n            (then (br $done))\n            (else (local.set $pc (local.get $tmp)) (br $lp)))\n", k); has_jump = 1; break; }
-        case SM_RETURN_S: case SM_FRETURN_S: case SM_NRETURN_S: { int k = (ins->op == SM_FRETURN_S) ? 1 : ((ins->op == SM_NRETURN_S) ? 2 : 0); fprintf(out, "          (local.set $tmp (call $sno_fn_return (i32.const %d) (i32.const 1)))\n          (if (i32.eq (local.get $tmp) (i32.const -1))\n            (then (i32.const %d) (local.set $pc) (br $lp))\n            (else (if (i32.eq (local.get $tmp) (i32.const -2))\n              (then (br $done))\n              (else (local.set $pc (local.get $tmp)) (br $lp)))))\n", k, i + 1); has_jump = 1; break; }
-        case SM_RETURN_F: case SM_FRETURN_F: case SM_NRETURN_F: { int k = (ins->op == SM_FRETURN_F) ? 1 : ((ins->op == SM_NRETURN_F) ? 2 : 0); fprintf(out, "          (local.set $tmp (call $sno_fn_return (i32.const %d) (i32.const 2)))\n          (if (i32.eq (local.get $tmp) (i32.const -1))\n            (then (i32.const %d) (local.set $pc) (br $lp))\n            (else (if (i32.eq (local.get $tmp) (i32.const -2))\n              (then (br $done))\n              (else (local.set $pc (local.get $tmp)) (br $lp)))))\n", k, i + 1); has_jump = 1; break; }
-        case SM_INCR: fprintf(out, "          (call $sno_arith (i32.const 0))\n"); break;
-        case SM_DECR: fprintf(out, "          (call $sno_arith (i32.const 1))\n"); break;
-        case SM_PAT_LIT:      { const char * s = ins->a[0].s ? ins->a[0].s : ""; int addr = wasm_intern_str(s); int len = (int)strlen(s); fprintf(out, "          (call $sno_pat_lit (i32.const 0x%x) (i32.const %d))\n", addr, len); break; }
-        case SM_PAT_ANY:      fprintf(out, "          (call $sno_pat_any)\n"); break;
-        case SM_PAT_NOTANY:   fprintf(out, "          (call $sno_pat_notany)\n"); break;
-        case SM_PAT_SPAN:     fprintf(out, "          (call $sno_pat_span)\n"); break;
-        case SM_PAT_BREAK:    fprintf(out, "          (call $sno_pat_break)\n"); break;
-        case SM_PAT_LEN:      fprintf(out, "          (call $sno_pat_len)\n"); break;
-        case SM_PAT_POS:      fprintf(out, "          (call $sno_pat_pos)\n"); break;
-        case SM_PAT_RPOS:     fprintf(out, "          (call $sno_pat_rpos)\n"); break;
-        case SM_PAT_TAB:      fprintf(out, "          (call $sno_pat_tab)\n"); break;
-        case SM_PAT_RTAB:     fprintf(out, "          (call $sno_pat_rtab)\n"); break;
-        case SM_PAT_REM:      fprintf(out, "          (call $sno_pat_rem)\n"); break;
-        case SM_PAT_ARB:      fprintf(out, "          (call $sno_pat_arb)\n"); break;
-        case SM_PAT_ARBNO:    fprintf(out, "          (call $sno_pat_arbno)\n"); break;
-        case SM_PAT_BAL:      fprintf(out, "          (call $sno_pat_bal)\n"); break;
-        case SM_PAT_FAIL:     fprintf(out, "          (call $sno_pat_fail)\n"); break;
-        case SM_PAT_SUCCEED:  fprintf(out, "          (call $sno_pat_succeed)\n"); break;
-        case SM_PAT_ABORT:    fprintf(out, "          (call $sno_pat_abort)\n"); break;
-        case SM_PAT_FENCE0:
-        case SM_PAT_FENCE1:   fprintf(out, "          (call $sno_pat_fence)\n"); break;
-        case SM_PAT_EPS:      fprintf(out, "          (call $sno_pat_eps)\n"); break;
-        case SM_PAT_CAT:      fprintf(out, "          (call $sno_pat_cat)\n"); break;
-        case SM_PAT_ALT:      fprintf(out, "          (call $sno_pat_alt)\n"); break;
-        case SM_PAT_DEREF:    fprintf(out, "          (call $sno_pat_deref)\n"); break;
-        case SM_PAT_REFNAME:  { int addr = wasm_intern_name(ins->a[0].s ? ins->a[0].s : ""); fprintf(out, "          (call $sno_pat_refname (i32.const 0x%x) (i32.const %lld))\n", addr, (long long)ins->a[1].i); break; }
-        case SM_PAT_CAPTURE:  { int addr = wasm_intern_name(ins->a[0].s ? ins->a[0].s : ""); fprintf(out, "          (call $sno_pat_capture (i32.const 0x%x) (i32.const %lld) (i32.const %lld))\n", addr, (long long)ins->a[1].i, (long long)ins->a[2].i); break; }
-        case SM_PAT_CAPTURE_FN:      fprintf(out, "          ;; SM_PAT_CAPTURE_FN not yet implemented\n"); break;
-        case SM_PAT_CAPTURE_FN_ARGS: fprintf(out, "          ;; SM_PAT_CAPTURE_FN_ARGS not yet implemented\n"); break;
-        case SM_PAT_USERCALL:        fprintf(out, "          ;; SM_PAT_USERCALL not yet implemented\n"); break;
-        case SM_PAT_USERCALL_ARGS:   fprintf(out, "          ;; SM_PAT_USERCALL_ARGS not yet implemented\n"); break;
-        case SM_EXEC_STMT:    fprintf(out, "          (call $sno_exec_stmt (i32.const 0) (i32.const 0) (i32.const 0))\n"); break;
-        default:              fprintf(out, "          ;; unhandled SM opcode %d\n", ins->op); break;
+        default: fprintf(out, "          ;; unhandled SM opcode %d\n", ins->op); break;
         }
         if (!has_jump) fprintf(out, "          (i32.const %d) (local.set $pc) (br $lp)\n", i + 1);
         fprintf(out, "        ))\n");
