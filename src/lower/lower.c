@@ -53,6 +53,13 @@ static void loop_push(const char *cont, const char *end) {
     if (g_loop_sp < LOWER_LOOP_STACK_MAX) { g_loop_stack[g_loop_sp].cont = cont; g_loop_stack[g_loop_sp].end = end; g_loop_sp++; }
 }
 static void loop_pop(void) { if (g_loop_sp > 0) g_loop_sp--; }
+/* PST-SC-LABELS: generate fresh internal loop labels in lower (not parser) */
+static int g_loop_label_seq = 0;
+static char *lower_fresh_label(const char *prefix) {
+    char buf[64];
+    snprintf(buf, sizeof buf, "%s_%d", prefix, g_loop_label_seq++);
+    return strdup(buf);
+}
 static int           g_hoist_entry = -1;
 static int           g_hoist_slot  = -1;
 extern int g_lang;
@@ -769,57 +776,50 @@ static void lower_if_stmt(const tree_t *t)
     sm_emit(g_p, SM_PUSH_NULL);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* PST-SC-4c (2026-05-16): lower_while_until handles TT_WHILE(cond, TT_PROGRAM(body), QLIT(cont), QLIT(end)).
- * When the body is TT_PROGRAM, iterate via lower_stmt (no stack value) so break jumping out
- * mid-body doesn't leave the SM_VOID_POP at the exit position with nothing on the stack. */
+/* PST-SC-LABELS: lower_while_until reads no QLIT label children — generates labels internally.
+ * TT_WHILE shape: c[0]=cond, c[1]=body (TT_PROGRAM or expr). No label children. */
 static void lower_while_until(const tree_t *t, int exit_on_success)
 {
     LabelTable *tbl   = &g_labtab;
-    const char *lbl_cont = (t->n > 2 && t->c[2]) ? t->c[2]->v.sval : NULL;
-    const char *lbl_end  = (t->n > 3 && t->c[3]) ? t->c[3]->v.sval : NULL;
+    char *lbl_cont = lower_fresh_label("_Ltop");
+    char *lbl_end  = lower_fresh_label("_Lend");
     int top = g_p->count;
-    if (lbl_cont && lbl_cont[0]) labtab_define(tbl, lbl_cont, top);
-    if (t->n < 1) { sm_emit(g_p, SM_PUSH_NULL); return; }
+    labtab_define(tbl, lbl_cont, top);
+    if (t->n < 1) { free(lbl_cont); free(lbl_end); sm_emit(g_p, SM_PUSH_NULL); return; }
     lower_expr(t->c[0]);
     int jx = exit_on_success ? sm_emit_i(g_p, SM_JUMP_S, 0) : sm_emit_i(g_p, SM_JUMP_F, 0);
     sm_emit(g_p, SM_VOID_POP);
     loop_push(lbl_cont, lbl_end);
     const tree_t *body = (t->n > 1) ? t->c[1] : NULL;
     if (body && body->t == TT_PROGRAM) {
-        /* Snocone stmt block — iterate for effect; break can jump out before block ends */
         for (int i = 0; i < body->n; i++)
             if (body->c[i]) lower_stmt(body->c[i]);
     } else if (body) {
-        /* Icon/expression body — evaluates to a value */
         lower_expr(body); sm_emit(g_p, SM_VOID_POP);
     }
     loop_pop();
     sm_emit_i(g_p, SM_JUMP, top);
     int exit_pos = g_p->count;
     sm_patch_jump(g_p, jx, exit_pos);
-    if (lbl_end && lbl_end[0]) labtab_define(tbl, lbl_end, exit_pos);
-    /* TT_PROGRAM path: break jumps here with nothing on stack — no VOID_POP */
-    if (!body || body->t != TT_PROGRAM) {
-        sm_emit(g_p, SM_VOID_POP);
-    }
+    labtab_define(tbl, lbl_end, exit_pos);
+    if (!body || body->t != TT_PROGRAM) sm_emit(g_p, SM_VOID_POP);
     sm_emit(g_p, SM_PUSH_NULL);
+    free(lbl_cont); free(lbl_end);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_while(const tree_t *t) { lower_while_until(t, 0); }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_until(const tree_t *t) { lower_while_until(t, 1); }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* PST-SC-4d (2026-05-16): lower TT_DO_WHILE(TT_PROGRAM(body), cond, QLIT(cont), QLIT(end)).
- * Executes body first (stmt iteration), then tests cond — jumps back to top if true.
- * cont label defined before cond test; end label defined at exit. */
+/* PST-SC-LABELS: lower TT_DO_WHILE(TT_PROGRAM(body), cond). No QLIT label children.
+ * Labels generated internally. Body first; cond tested at bottom; cont before cond. */
 static void lower_do_while(const tree_t *t)
 {
     LabelTable *tbl   = &g_labtab;
-    const char *lbl_cont = (t->n > 2 && t->c[2]) ? t->c[2]->v.sval : NULL;
-    const char *lbl_end  = (t->n > 3 && t->c[3]) ? t->c[3]->v.sval : NULL;
+    char *lbl_cont = lower_fresh_label("_Lcont");
+    char *lbl_end  = lower_fresh_label("_Lend");
     int top = g_p->count;
     loop_push(lbl_cont, lbl_end);
-    /* body */
     const tree_t *body = (t->n > 0) ? t->c[0] : NULL;
     if (body && body->t == TT_PROGRAM) {
         for (int i = 0; i < body->n; i++)
@@ -828,35 +828,32 @@ static void lower_do_while(const tree_t *t)
         lower_expr(body); sm_emit(g_p, SM_VOID_POP);
     }
     loop_pop();
-    /* cont label goes here — before the cond test (continue target) */
-    if (lbl_cont && lbl_cont[0]) labtab_define(tbl, lbl_cont, g_p->count);
-    /* cond */
+    labtab_define(tbl, lbl_cont, g_p->count);
     if (t->n > 1 && t->c[1]) {
         lower_expr(t->c[1]);
         int jback = sm_emit_i(g_p, SM_JUMP_S, 0);
-        sm_emit(g_p, SM_VOID_POP);    /* cond false path: fall through to exit */
+        sm_emit(g_p, SM_VOID_POP);
         sm_patch_jump(g_p, jback, top);
     }
     int exit_pos = g_p->count;
-    if (lbl_end && lbl_end[0]) labtab_define(tbl, lbl_end, exit_pos);
+    labtab_define(tbl, lbl_end, exit_pos);
     sm_emit(g_p, SM_PUSH_NULL);
+    free(lbl_cont); free(lbl_end);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* PST-SC-4e (2026-05-16): lower TT_FOR(cond, step, TT_PROGRAM(body), QLIT(cont), QLIT(end)).
- * Init was already lowered as a preceding statement. Structure:
- *   top: test cond → exit on fail; body (stmt iter); cont: step; jump back to top; end. */
+/* PST-SC-LABELS: lower TT_FOR(cond, step, TT_PROGRAM(body)). No QLIT label children.
+ * Init lowered as preceding statement (PST-SC-FOR-INIT will fix that). Labels generated here. */
 static void lower_for(const tree_t *t)
 {
     LabelTable *tbl      = &g_labtab;
-    const char *lbl_cont = (t->n > 3 && t->c[3]) ? t->c[3]->v.sval : NULL;
-    const char *lbl_end  = (t->n > 4 && t->c[4]) ? t->c[4]->v.sval : NULL;
+    char *lbl_cont = lower_fresh_label("_Lcont");
+    char *lbl_end  = lower_fresh_label("_Lend");
     int top = g_p->count;
-    if (t->n < 1 || !t->c[0]) { sm_emit(g_p, SM_PUSH_NULL); return; }
+    if (t->n < 1 || !t->c[0]) { free(lbl_cont); free(lbl_end); sm_emit(g_p, SM_PUSH_NULL); return; }
     lower_expr(t->c[0]);
     int jf = sm_emit_i(g_p, SM_JUMP_F, 0);
     sm_emit(g_p, SM_VOID_POP);
     loop_push(lbl_cont, lbl_end);
-    /* body */
     const tree_t *body = (t->n > 2) ? t->c[2] : NULL;
     if (body && body->t == TT_PROGRAM) {
         for (int i = 0; i < body->n; i++)
@@ -865,15 +862,15 @@ static void lower_for(const tree_t *t)
         lower_expr(body); sm_emit(g_p, SM_VOID_POP);
     }
     loop_pop();
-    /* cont: step expression */
-    if (lbl_cont && lbl_cont[0]) labtab_define(tbl, lbl_cont, g_p->count);
+    labtab_define(tbl, lbl_cont, g_p->count);
     if (t->n > 1 && t->c[1]) { lower_expr(t->c[1]); sm_emit(g_p, SM_VOID_POP); }
     sm_emit_i(g_p, SM_JUMP, top);
     int exit_pos = g_p->count;
     sm_patch_jump(g_p, jf, exit_pos);
-    sm_emit(g_p, SM_VOID_POP);   /* pop cond value on fail path */
-    if (lbl_end && lbl_end[0]) labtab_define(tbl, lbl_end, exit_pos);
+    sm_emit(g_p, SM_VOID_POP);
+    labtab_define(tbl, lbl_end, exit_pos);
     sm_emit(g_p, SM_PUSH_NULL);
+    free(lbl_cont); free(lbl_end);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_repeat(const tree_t *t)
@@ -1635,6 +1632,7 @@ SM_Program *lower(const tree_t *prog)
     g_p            = sm_prog_new();
     g_in_proc_body = 0;
     g_proc_scope   = NULL;
+    g_loop_label_seq = 0;
     labtab_init(&g_labtab);
     for (int i = 0; i < LOWER_UNHANDLED_WORDS; i++) g_unhandled_kinds[i] = 0;
     lower_proc_skeletons();

@@ -294,17 +294,13 @@ if_head     : T_IF T_LPAREN expr0 T_RPAREN opt_head_sep
                                         { $$ = sc_if_head_new(st, $3); }
             ;
 while_head  : T_WHILE T_LPAREN expr0 T_RPAREN opt_head_sep
-                                        { char *lc = sc_label_new(st, "_Ltop");
-                                          char *le = sc_label_new(st, "_Lend");
-                                          sc_loop_push(st, lc, le, 1);
+                                        { sc_loop_push(st, NULL, NULL, 1);
                                           struct WhileHead *wh = calloc(1, sizeof *wh);
                                           wh->cond        = $3;
                                           wh->before_body = st->code->tail;
                                           $$ = wh; }
             ;
-do_head     : T_DO                  { char *lc = sc_label_new(st, "_Lcont");
-                                      char *le = sc_label_new(st, "_Lend");
-                                      sc_loop_push(st, lc, le, 1);
+do_head     : T_DO                  { sc_loop_push(st, NULL, NULL, 1);
                                       struct DoHead *dh = calloc(1, sizeof *dh);
                                       dh->before_body = st->code->tail;
                                       $$ = dh; }
@@ -316,9 +312,7 @@ for_lead    : T_FOR                  { }
             ;
 for_head    : for_lead T_LPAREN expr0 T_SEMICOLON expr0 T_SEMICOLON expr0 T_RPAREN opt_head_sep
                                         { sc_append_stmt(st, $3);
-                                          char *lc = sc_label_new(st, "_Lcont");
-                                          char *le = sc_label_new(st, "_Lend");
-                                          sc_loop_push(st, lc, le, 1);
+                                          sc_loop_push(st, NULL, NULL, 1);
                                           $$ = sc_for_head_new_pst(st, $5, $7, st->code->tail); }
             ;
 switch_head : T_SWITCH T_LPAREN expr0 T_RPAREN
@@ -765,17 +759,10 @@ static void sc_finalize_if_else_pst(ScParseState *st, struct IfHead *h, STMT_t *
  * sc_loop_push was called in while_head; sc_loop_pop resolves break/continue here. */
 static void sc_finalize_while_pst(ScParseState *st, struct WhileHead *h, tree_t *cond)
 {
-    LoopFrame *lf     = st->loop_top;
-    char      *Ltop   = lf ? strdup(lf->cont_label) : sc_label_new(st, "_Ltop");
-    char      *Lend   = lf ? strdup(lf->end_label)  : sc_label_new(st, "_Lend");
     tree_t    *body   = sc_collect_body(st, h->before_body);
-    tree_t    *qlit_c = ast_node_new(TT_QLIT); qlit_c->sval = Ltop;
-    tree_t    *qlit_e = ast_node_new(TT_QLIT); qlit_e->sval = Lend;
     tree_t    *w      = ast_node_new(TT_WHILE);
     ast_push(w, cond);
     ast_push(w, body);
-    ast_push(w, qlit_c);
-    ast_push(w, qlit_e);
     sc_loop_pop(st);
     free(h);
     sc_append_stmt(st, w);
@@ -789,17 +776,10 @@ static void sc_finalize_while_pst(ScParseState *st, struct WhileHead *h, tree_t 
  * sc_loop_push was called in do_head; sc_loop_pop resolves break/continue here. */
 static void sc_finalize_do_while_pst(ScParseState *st, struct DoHead *h, tree_t *cond)
 {
-    LoopFrame *lf     = st->loop_top;
-    char      *Lcont  = lf ? strdup(lf->cont_label) : sc_label_new(st, "_Lcont");
-    char      *Lend   = lf ? strdup(lf->end_label)  : sc_label_new(st, "_Lend");
     tree_t    *body   = sc_collect_body(st, h->before_body);
-    tree_t    *qlit_c = ast_node_new(TT_QLIT); qlit_c->sval = Lcont;
-    tree_t    *qlit_e = ast_node_new(TT_QLIT); qlit_e->sval = Lend;
     tree_t    *dw     = ast_node_new(TT_DO_WHILE);
     ast_push(dw, body);
     ast_push(dw, cond);
-    ast_push(dw, qlit_c);
-    ast_push(dw, qlit_e);
     sc_loop_pop(st);
     free(h);
     sc_append_stmt(st, dw);
@@ -811,18 +791,11 @@ static void sc_finalize_do_while_pst(ScParseState *st, struct DoHead *h, tree_t 
  * Body collected from for_before_body snapshot. Labels from sc_loop_push in grammar action. */
 static void sc_finalize_for_pst(ScParseState *st, struct ForHead *h)
 {
-    LoopFrame *lf     = st->loop_top;
-    char      *Lcont  = lf ? strdup(lf->cont_label) : sc_label_new(st, "_Lcont");
-    char      *Lend   = lf ? strdup(lf->end_label)  : sc_label_new(st, "_Lend");
     tree_t    *body   = sc_collect_body(st, h->before_body);
-    tree_t    *qlit_c = ast_node_new(TT_QLIT); qlit_c->sval = Lcont;
-    tree_t    *qlit_e = ast_node_new(TT_QLIT); qlit_e->sval = Lend;
     tree_t    *f      = ast_node_new(TT_FOR);
     ast_push(f, h->cond);
     ast_push(f, h->step);
     ast_push(f, body);
-    ast_push(f, qlit_c);
-    ast_push(f, qlit_e);
     sc_loop_pop(st);
     sc_append_stmt(st, f);
     free(h);

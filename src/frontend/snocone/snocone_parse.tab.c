@@ -778,18 +778,18 @@ static const yytype_int16 yyrline[] =
 {
        0,   248,   248,   249,   251,   252,   254,   255,   258,   259,
      260,   262,   264,   266,   268,   270,   272,   274,   276,   278,
-     280,   283,   285,   287,   289,   291,   293,   296,   305,   312,
-     313,   315,   317,   324,   327,   328,   330,   331,   334,   335,
-     338,   339,   341,   345,   346,   347,   350,   354,   360,   362,
-     368,   371,   373,   374,   375,   381,   382,   383,   384,   385,
-     386,   387,   388,   390,   391,   393,   395,   399,   402,   405,
-     408,   411,   414,   417,   419,   422,   424,   427,   429,   432,
-     435,   438,   441,   444,   447,   450,   453,   456,   459,   462,
-     465,   468,   471,   474,   477,   479,   481,   484,   486,   488,
-     491,   493,   496,   498,   500,   503,   510,   513,   516,   518,
-     523,   526,   533,   537,   541,   543,   545,   547,   549,   556,
-     558,   560,   562,   563,   564,   565,   566,   567,   568,   570,
-     572,   574,   576,   578,   580
+     280,   283,   285,   287,   289,   291,   293,   296,   303,   308,
+     309,   311,   313,   318,   321,   322,   324,   325,   328,   329,
+     332,   333,   335,   339,   340,   341,   344,   348,   354,   356,
+     362,   365,   367,   368,   369,   375,   376,   377,   378,   379,
+     380,   381,   382,   384,   385,   387,   389,   393,   396,   399,
+     402,   405,   408,   411,   413,   416,   418,   421,   423,   426,
+     429,   432,   435,   438,   441,   444,   447,   450,   453,   456,
+     459,   462,   465,   468,   471,   473,   475,   478,   480,   482,
+     485,   487,   490,   492,   494,   497,   504,   507,   510,   512,
+     517,   520,   527,   531,   535,   537,   539,   541,   543,   550,
+     552,   554,   556,   557,   558,   559,   560,   561,   562,   564,
+     566,   568,   570,   572,   574
 };
 #endif
 
@@ -1744,682 +1744,676 @@ yyreduce:
 
   case 27: /* while_head: T_WHILE T_LPAREN expr0 T_RPAREN opt_head_sep  */
 #line 297 "snocone_parse.y"
-                                        { char *lc = sc_label_new(st, "_Ltop");
-                                          char *le = sc_label_new(st, "_Lend");
-                                          sc_loop_push(st, lc, le, 1);
+                                        { sc_loop_push(st, NULL, NULL, 1);
                                           struct WhileHead *wh = calloc(1, sizeof *wh);
                                           wh->cond        = (yyvsp[-2].expr);
                                           wh->before_body = st->code->tail;
                                           (yyval.whilehead) = wh; }
-#line 1755 "snocone_parse.tab.c"
+#line 1753 "snocone_parse.tab.c"
     break;
 
   case 28: /* do_head: T_DO  */
-#line 305 "snocone_parse.y"
-                                    { char *lc = sc_label_new(st, "_Lcont");
-                                      char *le = sc_label_new(st, "_Lend");
-                                      sc_loop_push(st, lc, le, 1);
+#line 303 "snocone_parse.y"
+                                    { sc_loop_push(st, NULL, NULL, 1);
                                       struct DoHead *dh = calloc(1, sizeof *dh);
                                       dh->before_body = st->code->tail;
                                       (yyval.dohead) = dh; }
-#line 1766 "snocone_parse.tab.c"
+#line 1762 "snocone_parse.tab.c"
     break;
 
   case 31: /* for_lead: T_FOR  */
-#line 315 "snocone_parse.y"
+#line 311 "snocone_parse.y"
                                      { }
-#line 1772 "snocone_parse.tab.c"
+#line 1768 "snocone_parse.tab.c"
     break;
 
   case 32: /* for_head: for_lead T_LPAREN expr0 T_SEMICOLON expr0 T_SEMICOLON expr0 T_RPAREN opt_head_sep  */
-#line 318 "snocone_parse.y"
+#line 314 "snocone_parse.y"
                                         { sc_append_stmt(st, (yyvsp[-6].expr));
-                                          char *lc = sc_label_new(st, "_Lcont");
-                                          char *le = sc_label_new(st, "_Lend");
-                                          sc_loop_push(st, lc, le, 1);
+                                          sc_loop_push(st, NULL, NULL, 1);
                                           (yyval.forhead) = sc_for_head_new_pst(st, (yyvsp[-4].expr), (yyvsp[-2].expr), st->code->tail); }
-#line 1782 "snocone_parse.tab.c"
+#line 1776 "snocone_parse.tab.c"
     break;
 
   case 33: /* switch_head: T_SWITCH T_LPAREN expr0 T_RPAREN  */
-#line 325 "snocone_parse.y"
+#line 319 "snocone_parse.y"
                                         { (yyval.switchhead) = sc_switch_head_new(st, (yyvsp[-1].expr)); }
-#line 1788 "snocone_parse.tab.c"
+#line 1782 "snocone_parse.tab.c"
     break;
 
   case 38: /* case_or_default_label: T_CASE expr0 T_COLON  */
-#line 334 "snocone_parse.y"
+#line 328 "snocone_parse.y"
                                         { sc_switch_case_label(st, (yyvsp[-1].expr)); }
-#line 1794 "snocone_parse.tab.c"
+#line 1788 "snocone_parse.tab.c"
     break;
 
   case 39: /* case_or_default_label: T_DEFAULT T_COLON  */
-#line 335 "snocone_parse.y"
+#line 329 "snocone_parse.y"
                                         { sc_switch_default_label(st); }
-#line 1800 "snocone_parse.tab.c"
+#line 1794 "snocone_parse.tab.c"
     break;
 
   case 42: /* func_head: T_DEFINE T_IDENT T_LPAREN func_arglist opt_head_sep  */
-#line 342 "snocone_parse.y"
+#line 336 "snocone_parse.y"
                                         { (yyval.funchead) = sc_func_head_new_pst(st, (yyvsp[-3].str), (yyvsp[-1].str)); free((yyvsp[-3].str)); free((yyvsp[-1].str)); }
-#line 1806 "snocone_parse.tab.c"
+#line 1800 "snocone_parse.tab.c"
     break;
 
   case 43: /* func_arglist: T_RPAREN  */
-#line 345 "snocone_parse.y"
+#line 339 "snocone_parse.y"
                                        { (yyval.str) = strdup(""); }
-#line 1812 "snocone_parse.tab.c"
+#line 1806 "snocone_parse.tab.c"
     break;
 
   case 44: /* func_arglist: T_IDENT T_RPAREN  */
-#line 346 "snocone_parse.y"
+#line 340 "snocone_parse.y"
                                        { (yyval.str) = strdup((yyvsp[-1].str)); free((yyvsp[-1].str)); }
-#line 1818 "snocone_parse.tab.c"
+#line 1812 "snocone_parse.tab.c"
     break;
 
   case 45: /* func_arglist: func_arglist_ne T_RPAREN  */
-#line 347 "snocone_parse.y"
+#line 341 "snocone_parse.y"
                                        { (yyval.str) = (yyvsp[-1].str); }
-#line 1824 "snocone_parse.tab.c"
+#line 1818 "snocone_parse.tab.c"
     break;
 
   case 46: /* func_arglist_ne: T_IDENT T_COMMA T_IDENT  */
-#line 351 "snocone_parse.y"
+#line 345 "snocone_parse.y"
                 { int len = strlen((yyvsp[-2].str)) + 1 + strlen((yyvsp[0].str)) + 1;
                   char *s = malloc(len); snprintf(s, len, "%s,%s", (yyvsp[-2].str), (yyvsp[0].str));
                   free((yyvsp[-2].str)); free((yyvsp[0].str)); (yyval.str) = s; }
-#line 1832 "snocone_parse.tab.c"
+#line 1826 "snocone_parse.tab.c"
     break;
 
   case 47: /* func_arglist_ne: func_arglist_ne T_COMMA T_IDENT  */
-#line 355 "snocone_parse.y"
+#line 349 "snocone_parse.y"
                 { int len = strlen((yyvsp[-2].str)) + 1 + strlen((yyvsp[0].str)) + 1;
                   char *s = malloc(len); snprintf(s, len, "%s,%s", (yyvsp[-2].str), (yyvsp[0].str));
                   free((yyvsp[-2].str)); free((yyvsp[0].str)); (yyval.str) = s; }
-#line 1840 "snocone_parse.tab.c"
+#line 1834 "snocone_parse.tab.c"
     break;
 
   case 48: /* struct_field_list: T_IDENT  */
-#line 361 "snocone_parse.y"
+#line 355 "snocone_parse.y"
                 { (yyval.str) = strdup((yyvsp[0].str)); free((yyvsp[0].str)); }
-#line 1846 "snocone_parse.tab.c"
+#line 1840 "snocone_parse.tab.c"
     break;
 
   case 49: /* struct_field_list: struct_field_list T_COMMA T_IDENT  */
-#line 363 "snocone_parse.y"
+#line 357 "snocone_parse.y"
                 { int len = strlen((yyvsp[-2].str)) + 1 + strlen((yyvsp[0].str)) + 1;
                   char *s = malloc(len); snprintf(s, len, "%s,%s", (yyvsp[-2].str), (yyvsp[0].str));
                   free((yyvsp[-2].str)); free((yyvsp[0].str)); (yyval.str) = s; }
-#line 1854 "snocone_parse.tab.c"
+#line 1848 "snocone_parse.tab.c"
     break;
 
   case 50: /* else_keyword: T_ELSE  */
-#line 368 "snocone_parse.y"
+#line 362 "snocone_parse.y"
                                      { (yyval.stmt_ptr) = st->code->tail; }
-#line 1860 "snocone_parse.tab.c"
+#line 1854 "snocone_parse.tab.c"
     break;
 
   case 51: /* label_decl: T_IDENT T_COLON  */
-#line 371 "snocone_parse.y"
+#line 365 "snocone_parse.y"
                                      { sc_append_label_node(st, (yyvsp[-1].str)); free((yyvsp[-1].str)); }
-#line 1866 "snocone_parse.tab.c"
+#line 1860 "snocone_parse.tab.c"
     break;
 
   case 52: /* simple_stmt: expr0 T_SEMICOLON  */
-#line 373 "snocone_parse.y"
+#line 367 "snocone_parse.y"
                                                { sc_append_stmt(st, (yyvsp[-1].expr)); }
-#line 1872 "snocone_parse.tab.c"
+#line 1866 "snocone_parse.tab.c"
     break;
 
   case 53: /* simple_stmt: T_SEMICOLON  */
-#line 374 "snocone_parse.y"
+#line 368 "snocone_parse.y"
                                                {         }
-#line 1878 "snocone_parse.tab.c"
+#line 1872 "snocone_parse.tab.c"
     break;
 
   case 54: /* simple_stmt: T_RETURN expr0 T_SEMICOLON  */
-#line 375 "snocone_parse.y"
+#line 369 "snocone_parse.y"
                                             { if (st->cur_func_name) {
                                                tree_t *lhs = ast_node_new(TT_VAR); lhs->sval = strdup(st->cur_func_name);
                                                tree_t *asgn = ast_node_new(TT_ASSIGN); ast_push(asgn, lhs); ast_push(asgn, (yyvsp[-1].expr));
                                                sc_append_stmt(st, asgn);
                                              } else { sc_append_stmt(st, (yyvsp[-1].expr)); }
                                              sc_append_stmt(st, ast_node_new(TT_RETURN)); }
-#line 1889 "snocone_parse.tab.c"
+#line 1883 "snocone_parse.tab.c"
     break;
 
   case 55: /* simple_stmt: T_RETURN T_SEMICOLON  */
-#line 381 "snocone_parse.y"
+#line 375 "snocone_parse.y"
                                             { sc_append_stmt(st, ast_node_new(TT_RETURN)); }
-#line 1895 "snocone_parse.tab.c"
+#line 1889 "snocone_parse.tab.c"
     break;
 
   case 56: /* simple_stmt: T_FRETURN T_SEMICOLON  */
-#line 382 "snocone_parse.y"
+#line 376 "snocone_parse.y"
                                             { sc_append_stmt(st, ast_node_new(TT_PROC_FAIL)); }
-#line 1901 "snocone_parse.tab.c"
+#line 1895 "snocone_parse.tab.c"
     break;
 
   case 57: /* simple_stmt: T_NRETURN T_SEMICOLON  */
-#line 383 "snocone_parse.y"
+#line 377 "snocone_parse.y"
                                             { sc_append_stmt(st, ast_node_new(TT_NRETURN)); }
-#line 1907 "snocone_parse.tab.c"
+#line 1901 "snocone_parse.tab.c"
     break;
 
   case 58: /* simple_stmt: T_GOTO T_IDENT T_SEMICOLON  */
-#line 384 "snocone_parse.y"
+#line 378 "snocone_parse.y"
                                             { tree_t *g = ast_node_new(TT_GOTO_U); g->sval = strdup((yyvsp[-1].str)); free((yyvsp[-1].str)); sc_append_stmt(st, g); }
-#line 1913 "snocone_parse.tab.c"
+#line 1907 "snocone_parse.tab.c"
     break;
 
   case 59: /* simple_stmt: T_BREAK T_SEMICOLON  */
-#line 385 "snocone_parse.y"
+#line 379 "snocone_parse.y"
                                             { sc_append_break(st, NULL); }
-#line 1919 "snocone_parse.tab.c"
+#line 1913 "snocone_parse.tab.c"
     break;
 
   case 60: /* simple_stmt: T_BREAK T_IDENT T_SEMICOLON  */
-#line 386 "snocone_parse.y"
+#line 380 "snocone_parse.y"
                                             { sc_append_break(st, (yyvsp[-1].str)); free((yyvsp[-1].str)); }
-#line 1925 "snocone_parse.tab.c"
+#line 1919 "snocone_parse.tab.c"
     break;
 
   case 61: /* simple_stmt: T_CONTINUE T_SEMICOLON  */
-#line 387 "snocone_parse.y"
+#line 381 "snocone_parse.y"
                                             { sc_append_continue(st, NULL); }
-#line 1931 "snocone_parse.tab.c"
+#line 1925 "snocone_parse.tab.c"
     break;
 
   case 62: /* simple_stmt: T_CONTINUE T_IDENT T_SEMICOLON  */
-#line 388 "snocone_parse.y"
+#line 382 "snocone_parse.y"
                                              { sc_append_continue(st, (yyvsp[-1].str)); free((yyvsp[-1].str)); }
-#line 1937 "snocone_parse.tab.c"
+#line 1931 "snocone_parse.tab.c"
     break;
 
   case 63: /* block_stmt: T_LBRACE stmt_list T_RBRACE  */
-#line 390 "snocone_parse.y"
+#line 384 "snocone_parse.y"
                                                { }
-#line 1943 "snocone_parse.tab.c"
+#line 1937 "snocone_parse.tab.c"
     break;
 
   case 64: /* block_stmt: T_LBRACE T_RBRACE  */
-#line 391 "snocone_parse.y"
+#line 385 "snocone_parse.y"
                                                {                  }
-#line 1949 "snocone_parse.tab.c"
+#line 1943 "snocone_parse.tab.c"
     break;
 
   case 65: /* expr0: expr1 T_2EQUAL expr0  */
-#line 394 "snocone_parse.y"
+#line 388 "snocone_parse.y"
                                 { (yyval.expr) = expr_binary(TT_ASSIGN, (yyvsp[-2].expr), (yyvsp[0].expr)); }
-#line 1955 "snocone_parse.tab.c"
+#line 1949 "snocone_parse.tab.c"
     break;
 
   case 66: /* expr0: expr1 T_2EQUAL  */
-#line 396 "snocone_parse.y"
+#line 390 "snocone_parse.y"
                                 { tree_t *empty = expr_new(TT_QLIT);
                                   empty->sval = strdup("");
                                   (yyval.expr) = expr_binary(TT_ASSIGN, (yyvsp[-1].expr), empty); }
-#line 1963 "snocone_parse.tab.c"
+#line 1957 "snocone_parse.tab.c"
     break;
 
   case 67: /* expr0: expr1 T_PLUS_ASSIGN expr0  */
-#line 400 "snocone_parse.y"
+#line 394 "snocone_parse.y"
                                 { tree_t *a = ast_node_new(TT_AUGOP); a->ival = TK_AUGPLUS;
                                   ast_push(a, (yyvsp[-2].expr)); ast_push(a, (yyvsp[0].expr)); (yyval.expr) = a; }
-#line 1970 "snocone_parse.tab.c"
+#line 1964 "snocone_parse.tab.c"
     break;
 
   case 68: /* expr0: expr1 T_MINUS_ASSIGN expr0  */
-#line 403 "snocone_parse.y"
+#line 397 "snocone_parse.y"
                                 { tree_t *a = ast_node_new(TT_AUGOP); a->ival = TK_AUGMINUS;
                                   ast_push(a, (yyvsp[-2].expr)); ast_push(a, (yyvsp[0].expr)); (yyval.expr) = a; }
-#line 1977 "snocone_parse.tab.c"
+#line 1971 "snocone_parse.tab.c"
     break;
 
   case 69: /* expr0: expr1 T_STAR_ASSIGN expr0  */
-#line 406 "snocone_parse.y"
+#line 400 "snocone_parse.y"
                                 { tree_t *a = ast_node_new(TT_AUGOP); a->ival = TK_AUGSTAR;
                                   ast_push(a, (yyvsp[-2].expr)); ast_push(a, (yyvsp[0].expr)); (yyval.expr) = a; }
-#line 1984 "snocone_parse.tab.c"
+#line 1978 "snocone_parse.tab.c"
     break;
 
   case 70: /* expr0: expr1 T_SLASH_ASSIGN expr0  */
-#line 409 "snocone_parse.y"
+#line 403 "snocone_parse.y"
                                 { tree_t *a = ast_node_new(TT_AUGOP); a->ival = TK_AUGSLASH;
                                   ast_push(a, (yyvsp[-2].expr)); ast_push(a, (yyvsp[0].expr)); (yyval.expr) = a; }
-#line 1991 "snocone_parse.tab.c"
+#line 1985 "snocone_parse.tab.c"
     break;
 
   case 71: /* expr0: expr1 T_CARET_ASSIGN expr0  */
-#line 412 "snocone_parse.y"
+#line 406 "snocone_parse.y"
                                 { tree_t *a = ast_node_new(TT_AUGOP); a->ival = TK_AUGPOW;
                                   ast_push(a, (yyvsp[-2].expr)); ast_push(a, (yyvsp[0].expr)); (yyval.expr) = a; }
-#line 1998 "snocone_parse.tab.c"
+#line 1992 "snocone_parse.tab.c"
     break;
 
   case 72: /* expr0: expr1  */
-#line 415 "snocone_parse.y"
+#line 409 "snocone_parse.y"
                                 { (yyval.expr) = (yyvsp[0].expr); }
-#line 2004 "snocone_parse.tab.c"
+#line 1998 "snocone_parse.tab.c"
     break;
 
   case 73: /* expr1: expr3 T_2QUEST expr1  */
-#line 418 "snocone_parse.y"
+#line 412 "snocone_parse.y"
                                 { (yyval.expr) = expr_binary(TT_SCAN, (yyvsp[-2].expr), (yyvsp[0].expr)); }
-#line 2010 "snocone_parse.tab.c"
+#line 2004 "snocone_parse.tab.c"
     break;
 
   case 74: /* expr1: expr3  */
-#line 420 "snocone_parse.y"
+#line 414 "snocone_parse.y"
                                 { (yyval.expr) = (yyvsp[0].expr); }
-#line 2016 "snocone_parse.tab.c"
+#line 2010 "snocone_parse.tab.c"
     break;
 
   case 75: /* expr3: expr3 T_2PIPE expr4  */
-#line 423 "snocone_parse.y"
+#line 417 "snocone_parse.y"
                                 { (yyval.expr) = expr_binary(TT_ALT, (yyvsp[-2].expr), (yyvsp[0].expr)); }
-#line 2022 "snocone_parse.tab.c"
+#line 2016 "snocone_parse.tab.c"
     break;
 
   case 76: /* expr3: expr4  */
-#line 425 "snocone_parse.y"
+#line 419 "snocone_parse.y"
                                 { (yyval.expr) = (yyvsp[0].expr); }
-#line 2028 "snocone_parse.tab.c"
+#line 2022 "snocone_parse.tab.c"
     break;
 
   case 77: /* expr4: expr4 T_CONCAT expr5  */
-#line 428 "snocone_parse.y"
+#line 422 "snocone_parse.y"
                                 { (yyval.expr) = expr_binary(TT_SEQ, (yyvsp[-2].expr), (yyvsp[0].expr)); }
-#line 2034 "snocone_parse.tab.c"
+#line 2028 "snocone_parse.tab.c"
     break;
 
   case 78: /* expr4: expr5  */
-#line 430 "snocone_parse.y"
+#line 424 "snocone_parse.y"
                                 { (yyval.expr) = (yyvsp[0].expr); }
-#line 2040 "snocone_parse.tab.c"
+#line 2034 "snocone_parse.tab.c"
     break;
 
   case 79: /* expr5: expr5 T_EQ expr6  */
-#line 433 "snocone_parse.y"
+#line 427 "snocone_parse.y"
                                 { tree_t *e = expr_new(TT_FNC); e->sval = strdup("EQ");
                                   expr_add_child(e, (yyvsp[-2].expr)); expr_add_child(e, (yyvsp[0].expr)); (yyval.expr) = e; }
-#line 2047 "snocone_parse.tab.c"
+#line 2041 "snocone_parse.tab.c"
     break;
 
   case 80: /* expr5: expr5 T_NE expr6  */
-#line 436 "snocone_parse.y"
+#line 430 "snocone_parse.y"
                                 { tree_t *e = expr_new(TT_FNC); e->sval = strdup("NE");
                                   expr_add_child(e, (yyvsp[-2].expr)); expr_add_child(e, (yyvsp[0].expr)); (yyval.expr) = e; }
-#line 2054 "snocone_parse.tab.c"
+#line 2048 "snocone_parse.tab.c"
     break;
 
   case 81: /* expr5: expr5 T_LT expr6  */
-#line 439 "snocone_parse.y"
+#line 433 "snocone_parse.y"
                                 { tree_t *e = expr_new(TT_FNC); e->sval = strdup("LT");
                                   expr_add_child(e, (yyvsp[-2].expr)); expr_add_child(e, (yyvsp[0].expr)); (yyval.expr) = e; }
-#line 2061 "snocone_parse.tab.c"
+#line 2055 "snocone_parse.tab.c"
     break;
 
   case 82: /* expr5: expr5 T_GT expr6  */
-#line 442 "snocone_parse.y"
+#line 436 "snocone_parse.y"
                                 { tree_t *e = expr_new(TT_FNC); e->sval = strdup("GT");
                                   expr_add_child(e, (yyvsp[-2].expr)); expr_add_child(e, (yyvsp[0].expr)); (yyval.expr) = e; }
-#line 2068 "snocone_parse.tab.c"
+#line 2062 "snocone_parse.tab.c"
     break;
 
   case 83: /* expr5: expr5 T_LE expr6  */
-#line 445 "snocone_parse.y"
+#line 439 "snocone_parse.y"
                                 { tree_t *e = expr_new(TT_FNC); e->sval = strdup("LE");
                                   expr_add_child(e, (yyvsp[-2].expr)); expr_add_child(e, (yyvsp[0].expr)); (yyval.expr) = e; }
-#line 2075 "snocone_parse.tab.c"
+#line 2069 "snocone_parse.tab.c"
     break;
 
   case 84: /* expr5: expr5 T_GE expr6  */
-#line 448 "snocone_parse.y"
+#line 442 "snocone_parse.y"
                                 { tree_t *e = expr_new(TT_FNC); e->sval = strdup("GE");
                                   expr_add_child(e, (yyvsp[-2].expr)); expr_add_child(e, (yyvsp[0].expr)); (yyval.expr) = e; }
-#line 2082 "snocone_parse.tab.c"
+#line 2076 "snocone_parse.tab.c"
     break;
 
   case 85: /* expr5: expr5 T_LEQ expr6  */
-#line 451 "snocone_parse.y"
+#line 445 "snocone_parse.y"
                                 { tree_t *e = expr_new(TT_FNC); e->sval = strdup("LEQ");
                                   expr_add_child(e, (yyvsp[-2].expr)); expr_add_child(e, (yyvsp[0].expr)); (yyval.expr) = e; }
-#line 2089 "snocone_parse.tab.c"
+#line 2083 "snocone_parse.tab.c"
     break;
 
   case 86: /* expr5: expr5 T_LNE expr6  */
-#line 454 "snocone_parse.y"
+#line 448 "snocone_parse.y"
                                 { tree_t *e = expr_new(TT_FNC); e->sval = strdup("LNE");
                                   expr_add_child(e, (yyvsp[-2].expr)); expr_add_child(e, (yyvsp[0].expr)); (yyval.expr) = e; }
-#line 2096 "snocone_parse.tab.c"
+#line 2090 "snocone_parse.tab.c"
     break;
 
   case 87: /* expr5: expr5 T_LLT expr6  */
-#line 457 "snocone_parse.y"
+#line 451 "snocone_parse.y"
                                 { tree_t *e = expr_new(TT_FNC); e->sval = strdup("LLT");
                                   expr_add_child(e, (yyvsp[-2].expr)); expr_add_child(e, (yyvsp[0].expr)); (yyval.expr) = e; }
-#line 2103 "snocone_parse.tab.c"
+#line 2097 "snocone_parse.tab.c"
     break;
 
   case 88: /* expr5: expr5 T_LGT expr6  */
-#line 460 "snocone_parse.y"
+#line 454 "snocone_parse.y"
                                 { tree_t *e = expr_new(TT_FNC); e->sval = strdup("LGT");
                                   expr_add_child(e, (yyvsp[-2].expr)); expr_add_child(e, (yyvsp[0].expr)); (yyval.expr) = e; }
-#line 2110 "snocone_parse.tab.c"
+#line 2104 "snocone_parse.tab.c"
     break;
 
   case 89: /* expr5: expr5 T_LLE expr6  */
-#line 463 "snocone_parse.y"
+#line 457 "snocone_parse.y"
                                 { tree_t *e = expr_new(TT_FNC); e->sval = strdup("LLE");
                                   expr_add_child(e, (yyvsp[-2].expr)); expr_add_child(e, (yyvsp[0].expr)); (yyval.expr) = e; }
-#line 2117 "snocone_parse.tab.c"
+#line 2111 "snocone_parse.tab.c"
     break;
 
   case 90: /* expr5: expr5 T_LGE expr6  */
-#line 466 "snocone_parse.y"
+#line 460 "snocone_parse.y"
                                 { tree_t *e = expr_new(TT_FNC); e->sval = strdup("LGE");
                                   expr_add_child(e, (yyvsp[-2].expr)); expr_add_child(e, (yyvsp[0].expr)); (yyval.expr) = e; }
-#line 2124 "snocone_parse.tab.c"
+#line 2118 "snocone_parse.tab.c"
     break;
 
   case 91: /* expr5: expr5 T_IDENT_OP expr6  */
-#line 469 "snocone_parse.y"
+#line 463 "snocone_parse.y"
                                 { tree_t *e = expr_new(TT_FNC); e->sval = strdup("IDENT");
                                   expr_add_child(e, (yyvsp[-2].expr)); expr_add_child(e, (yyvsp[0].expr)); (yyval.expr) = e; }
-#line 2131 "snocone_parse.tab.c"
+#line 2125 "snocone_parse.tab.c"
     break;
 
   case 92: /* expr5: expr5 T_DIFFER expr6  */
-#line 472 "snocone_parse.y"
+#line 466 "snocone_parse.y"
                                 { tree_t *e = expr_new(TT_FNC); e->sval = strdup("DIFFER");
                                   expr_add_child(e, (yyvsp[-2].expr)); expr_add_child(e, (yyvsp[0].expr)); (yyval.expr) = e; }
-#line 2138 "snocone_parse.tab.c"
+#line 2132 "snocone_parse.tab.c"
     break;
 
   case 93: /* expr5: expr6  */
-#line 475 "snocone_parse.y"
+#line 469 "snocone_parse.y"
                                 { (yyval.expr) = (yyvsp[0].expr); }
-#line 2144 "snocone_parse.tab.c"
+#line 2138 "snocone_parse.tab.c"
     break;
 
   case 94: /* expr6: expr6 T_2PLUS expr9  */
-#line 478 "snocone_parse.y"
+#line 472 "snocone_parse.y"
                                 { (yyval.expr) = expr_binary(TT_ADD, (yyvsp[-2].expr), (yyvsp[0].expr)); }
-#line 2150 "snocone_parse.tab.c"
+#line 2144 "snocone_parse.tab.c"
     break;
 
   case 95: /* expr6: expr6 T_2MINUS expr9  */
-#line 480 "snocone_parse.y"
+#line 474 "snocone_parse.y"
                                 { (yyval.expr) = expr_binary(TT_SUB, (yyvsp[-2].expr), (yyvsp[0].expr)); }
-#line 2156 "snocone_parse.tab.c"
+#line 2150 "snocone_parse.tab.c"
     break;
 
   case 96: /* expr6: expr9  */
-#line 482 "snocone_parse.y"
+#line 476 "snocone_parse.y"
                                 { (yyval.expr) = (yyvsp[0].expr); }
-#line 2162 "snocone_parse.tab.c"
+#line 2156 "snocone_parse.tab.c"
     break;
 
   case 97: /* expr9: expr9 T_2STAR expr11  */
-#line 485 "snocone_parse.y"
+#line 479 "snocone_parse.y"
                                 { (yyval.expr) = expr_binary(TT_MUL, (yyvsp[-2].expr), (yyvsp[0].expr)); }
-#line 2168 "snocone_parse.tab.c"
+#line 2162 "snocone_parse.tab.c"
     break;
 
   case 98: /* expr9: expr9 T_2SLASH expr11  */
-#line 487 "snocone_parse.y"
+#line 481 "snocone_parse.y"
                                 { (yyval.expr) = expr_binary(TT_DIV, (yyvsp[-2].expr), (yyvsp[0].expr)); }
-#line 2174 "snocone_parse.tab.c"
+#line 2168 "snocone_parse.tab.c"
     break;
 
   case 99: /* expr9: expr11  */
-#line 489 "snocone_parse.y"
+#line 483 "snocone_parse.y"
                                 { (yyval.expr) = (yyvsp[0].expr); }
-#line 2180 "snocone_parse.tab.c"
+#line 2174 "snocone_parse.tab.c"
     break;
 
   case 100: /* expr11: expr12 T_2CARET expr11  */
-#line 492 "snocone_parse.y"
+#line 486 "snocone_parse.y"
                                 { (yyval.expr) = expr_binary(TT_POW, (yyvsp[-2].expr), (yyvsp[0].expr)); }
-#line 2186 "snocone_parse.tab.c"
+#line 2180 "snocone_parse.tab.c"
     break;
 
   case 101: /* expr11: expr12  */
-#line 494 "snocone_parse.y"
+#line 488 "snocone_parse.y"
                                 { (yyval.expr) = (yyvsp[0].expr); }
-#line 2192 "snocone_parse.tab.c"
+#line 2186 "snocone_parse.tab.c"
     break;
 
   case 102: /* expr12: expr12 T_2DOLLAR expr15  */
-#line 497 "snocone_parse.y"
+#line 491 "snocone_parse.y"
                                 { (yyval.expr) = expr_binary(TT_CAPT_IMMED_ASGN, (yyvsp[-2].expr), (yyvsp[0].expr)); }
-#line 2198 "snocone_parse.tab.c"
+#line 2192 "snocone_parse.tab.c"
     break;
 
   case 103: /* expr12: expr12 T_2DOT expr15  */
-#line 499 "snocone_parse.y"
+#line 493 "snocone_parse.y"
                                 { (yyval.expr) = expr_binary(TT_CAPT_COND_ASGN,  (yyvsp[-2].expr), (yyvsp[0].expr)); }
-#line 2204 "snocone_parse.tab.c"
+#line 2198 "snocone_parse.tab.c"
     break;
 
   case 104: /* expr12: expr15  */
-#line 501 "snocone_parse.y"
+#line 495 "snocone_parse.y"
                                 { (yyval.expr) = (yyvsp[0].expr); }
-#line 2210 "snocone_parse.tab.c"
+#line 2204 "snocone_parse.tab.c"
     break;
 
   case 105: /* expr15: expr15 T_LBRACK exprlist T_RBRACK  */
-#line 504 "snocone_parse.y"
+#line 498 "snocone_parse.y"
                                 { tree_t *idx = expr_new(TT_IDX);
                                   expr_add_child(idx, (yyvsp[-3].expr));
                                   for (int i = 0; i < (yyvsp[-1].expr)->nchildren; i++)
                                       expr_add_child(idx, (yyvsp[-1].expr)->children[i]);
                                   free((yyvsp[-1].expr)->children); free((yyvsp[-1].expr));
                                   (yyval.expr) = idx; }
-#line 2221 "snocone_parse.tab.c"
+#line 2215 "snocone_parse.tab.c"
     break;
 
   case 106: /* expr15: expr17  */
-#line 511 "snocone_parse.y"
+#line 505 "snocone_parse.y"
+                                { (yyval.expr) = (yyvsp[0].expr); }
+#line 2221 "snocone_parse.tab.c"
+    break;
+
+  case 107: /* exprlist: exprlist_ne  */
+#line 508 "snocone_parse.y"
                                 { (yyval.expr) = (yyvsp[0].expr); }
 #line 2227 "snocone_parse.tab.c"
     break;
 
-  case 107: /* exprlist: exprlist_ne  */
-#line 514 "snocone_parse.y"
-                                { (yyval.expr) = (yyvsp[0].expr); }
+  case 108: /* exprlist: %empty  */
+#line 510 "snocone_parse.y"
+                                { (yyval.expr) = expr_new(TT_NUL); }
 #line 2233 "snocone_parse.tab.c"
     break;
 
-  case 108: /* exprlist: %empty  */
-#line 516 "snocone_parse.y"
-                                { (yyval.expr) = expr_new(TT_NUL); }
-#line 2239 "snocone_parse.tab.c"
-    break;
-
   case 109: /* exprlist_ne: exprlist_ne T_COMMA expr0  */
-#line 519 "snocone_parse.y"
+#line 513 "snocone_parse.y"
                                 { tree_t *l = expr_new(TT_NUL);
                                   for (int i = 0; i < (yyvsp[-2].expr)->nchildren; i++) expr_add_child(l, (yyvsp[-2].expr)->children[i]);
                                   free((yyvsp[-2].expr)->children); free((yyvsp[-2].expr));
                                   expr_add_child(l, (yyvsp[0].expr)); (yyval.expr) = l; }
-#line 2248 "snocone_parse.tab.c"
+#line 2242 "snocone_parse.tab.c"
     break;
 
   case 110: /* exprlist_ne: expr0  */
-#line 524 "snocone_parse.y"
+#line 518 "snocone_parse.y"
                                 { tree_t *l = expr_new(TT_NUL); expr_add_child(l, (yyvsp[0].expr)); (yyval.expr) = l; }
-#line 2254 "snocone_parse.tab.c"
+#line 2248 "snocone_parse.tab.c"
     break;
 
   case 111: /* expr17: T_CALL exprlist T_RPAREN  */
-#line 527 "snocone_parse.y"
+#line 521 "snocone_parse.y"
                                 { tree_t *e = expr_new(TT_FNC);
                                   e->sval = (yyvsp[-2].str);
                                   for (int i = 0; i < (yyvsp[-1].expr)->nchildren; i++)
                                       expr_add_child(e, (yyvsp[-1].expr)->children[i]);
                                   free((yyvsp[-1].expr)->children); free((yyvsp[-1].expr));
                                   (yyval.expr) = e; }
-#line 2265 "snocone_parse.tab.c"
+#line 2259 "snocone_parse.tab.c"
     break;
 
   case 112: /* expr17: T_IDENT  */
-#line 534 "snocone_parse.y"
+#line 528 "snocone_parse.y"
                                 { tree_t *e = expr_new(TT_VAR);
                                   e->sval = (yyvsp[0].str);
                                   (yyval.expr) = e; }
-#line 2273 "snocone_parse.tab.c"
+#line 2267 "snocone_parse.tab.c"
     break;
 
   case 113: /* expr17: T_KEYWORD  */
-#line 538 "snocone_parse.y"
+#line 532 "snocone_parse.y"
                                 { tree_t *e = expr_new(TT_KEYWORD);
                                   e->sval = (yyvsp[0].str);
                                   (yyval.expr) = e; }
-#line 2281 "snocone_parse.tab.c"
+#line 2275 "snocone_parse.tab.c"
     break;
 
   case 114: /* expr17: T_INT  */
-#line 542 "snocone_parse.y"
+#line 536 "snocone_parse.y"
                                 { (yyval.expr) = sc_int_literal((yyvsp[0].str)); free((yyvsp[0].str)); }
-#line 2287 "snocone_parse.tab.c"
+#line 2281 "snocone_parse.tab.c"
     break;
 
   case 115: /* expr17: T_REAL  */
-#line 544 "snocone_parse.y"
+#line 538 "snocone_parse.y"
                                 { (yyval.expr) = sc_real_literal((yyvsp[0].str)); free((yyvsp[0].str)); }
-#line 2293 "snocone_parse.tab.c"
+#line 2287 "snocone_parse.tab.c"
     break;
 
   case 116: /* expr17: T_STR  */
-#line 546 "snocone_parse.y"
+#line 540 "snocone_parse.y"
                                 { (yyval.expr) = sc_str_literal((yyvsp[0].str)); free((yyvsp[0].str)); }
-#line 2299 "snocone_parse.tab.c"
+#line 2293 "snocone_parse.tab.c"
     break;
 
   case 117: /* expr17: T_LPAREN expr0 T_RPAREN  */
-#line 548 "snocone_parse.y"
+#line 542 "snocone_parse.y"
                                 { (yyval.expr) = (yyvsp[-1].expr); }
-#line 2305 "snocone_parse.tab.c"
+#line 2299 "snocone_parse.tab.c"
     break;
 
   case 118: /* expr17: T_LPAREN expr0 T_COMMA exprlist_ne T_RPAREN  */
-#line 550 "snocone_parse.y"
+#line 544 "snocone_parse.y"
                                 { tree_t *a = expr_new(TT_VLIST);
                                   expr_add_child(a, (yyvsp[-3].expr));
                                   for (int i = 0; i < (yyvsp[-1].expr)->nchildren; i++)
                                       expr_add_child(a, (yyvsp[-1].expr)->children[i]);
                                   free((yyvsp[-1].expr)->children); free((yyvsp[-1].expr));
                                   (yyval.expr) = a; }
-#line 2316 "snocone_parse.tab.c"
+#line 2310 "snocone_parse.tab.c"
     break;
 
   case 119: /* expr17: T_LPAREN T_RPAREN  */
-#line 557 "snocone_parse.y"
+#line 551 "snocone_parse.y"
                                 { (yyval.expr) = expr_new(TT_NUL); }
-#line 2322 "snocone_parse.tab.c"
+#line 2316 "snocone_parse.tab.c"
     break;
 
   case 120: /* expr17: T_1PLUS expr17  */
-#line 559 "snocone_parse.y"
+#line 553 "snocone_parse.y"
                                 { (yyval.expr) = expr_unary(TT_PLS, (yyvsp[0].expr)); }
-#line 2328 "snocone_parse.tab.c"
+#line 2322 "snocone_parse.tab.c"
     break;
 
   case 121: /* expr17: T_1MINUS expr17  */
-#line 561 "snocone_parse.y"
+#line 555 "snocone_parse.y"
                                 { (yyval.expr) = expr_unary(TT_MNS, (yyvsp[0].expr)); }
-#line 2334 "snocone_parse.tab.c"
+#line 2328 "snocone_parse.tab.c"
     break;
 
   case 122: /* expr17: T_1STAR expr17  */
-#line 562 "snocone_parse.y"
+#line 556 "snocone_parse.y"
                                 { (yyval.expr) = expr_unary(TT_DEFER,       (yyvsp[0].expr)); }
-#line 2340 "snocone_parse.tab.c"
+#line 2334 "snocone_parse.tab.c"
     break;
 
   case 123: /* expr17: T_1DOT expr17  */
-#line 563 "snocone_parse.y"
+#line 557 "snocone_parse.y"
                                 { (yyval.expr) = expr_unary(TT_NAME,        (yyvsp[0].expr)); }
-#line 2346 "snocone_parse.tab.c"
+#line 2340 "snocone_parse.tab.c"
     break;
 
   case 124: /* expr17: T_1DOLLAR expr17  */
-#line 564 "snocone_parse.y"
+#line 558 "snocone_parse.y"
                                 { (yyval.expr) = expr_unary(TT_INDIRECT,    (yyvsp[0].expr)); }
-#line 2352 "snocone_parse.tab.c"
+#line 2346 "snocone_parse.tab.c"
     break;
 
   case 125: /* expr17: T_1AT expr17  */
-#line 565 "snocone_parse.y"
+#line 559 "snocone_parse.y"
                                 { (yyval.expr) = expr_unary(TT_CAPT_CURSOR, (yyvsp[0].expr)); }
-#line 2358 "snocone_parse.tab.c"
+#line 2352 "snocone_parse.tab.c"
     break;
 
   case 126: /* expr17: T_1TILDE expr17  */
-#line 566 "snocone_parse.y"
+#line 560 "snocone_parse.y"
                                 { (yyval.expr) = expr_unary(TT_NOT,         (yyvsp[0].expr)); }
-#line 2364 "snocone_parse.tab.c"
+#line 2358 "snocone_parse.tab.c"
     break;
 
   case 127: /* expr17: T_1QUEST expr17  */
-#line 567 "snocone_parse.y"
+#line 561 "snocone_parse.y"
                                 { (yyval.expr) = expr_unary(TT_INTERROGATE, (yyvsp[0].expr)); }
-#line 2370 "snocone_parse.tab.c"
+#line 2364 "snocone_parse.tab.c"
     break;
 
   case 128: /* expr17: T_1AMP expr17  */
-#line 568 "snocone_parse.y"
+#line 562 "snocone_parse.y"
                                 { tree_t *_e = expr_unary(TT_OPSYN, (yyvsp[0].expr));
                                   _e->sval = strdup("&"); (yyval.expr) = _e; }
-#line 2377 "snocone_parse.tab.c"
+#line 2371 "snocone_parse.tab.c"
     break;
 
   case 129: /* expr17: T_1PERCENT expr17  */
-#line 570 "snocone_parse.y"
+#line 564 "snocone_parse.y"
                                 { tree_t *_e = expr_unary(TT_OPSYN, (yyvsp[0].expr));
                                   _e->sval = strdup("%"); (yyval.expr) = _e; }
-#line 2384 "snocone_parse.tab.c"
+#line 2378 "snocone_parse.tab.c"
     break;
 
   case 130: /* expr17: T_1SLASH expr17  */
-#line 572 "snocone_parse.y"
+#line 566 "snocone_parse.y"
                                 { tree_t *_e = expr_unary(TT_OPSYN, (yyvsp[0].expr));
                                   _e->sval = strdup("/"); (yyval.expr) = _e; }
-#line 2391 "snocone_parse.tab.c"
+#line 2385 "snocone_parse.tab.c"
     break;
 
   case 131: /* expr17: T_1POUND expr17  */
-#line 574 "snocone_parse.y"
+#line 568 "snocone_parse.y"
                                 { tree_t *_e = expr_unary(TT_OPSYN, (yyvsp[0].expr));
                                   _e->sval = strdup("#"); (yyval.expr) = _e; }
-#line 2398 "snocone_parse.tab.c"
+#line 2392 "snocone_parse.tab.c"
     break;
 
   case 132: /* expr17: T_1PIPE expr17  */
-#line 576 "snocone_parse.y"
+#line 570 "snocone_parse.y"
                                 { tree_t *_e = expr_unary(TT_OPSYN, (yyvsp[0].expr));
                                   _e->sval = strdup("|"); (yyval.expr) = _e; }
-#line 2405 "snocone_parse.tab.c"
+#line 2399 "snocone_parse.tab.c"
     break;
 
   case 133: /* expr17: T_1EQUAL expr17  */
-#line 578 "snocone_parse.y"
+#line 572 "snocone_parse.y"
                                 { tree_t *_e = expr_unary(TT_OPSYN, (yyvsp[0].expr));
                                   _e->sval = strdup("="); (yyval.expr) = _e; }
-#line 2412 "snocone_parse.tab.c"
+#line 2406 "snocone_parse.tab.c"
     break;
 
   case 134: /* expr17: T_1BANG expr17  */
-#line 580 "snocone_parse.y"
+#line 574 "snocone_parse.y"
                                 { tree_t *_e = expr_unary(TT_OPSYN, (yyvsp[0].expr));
                                   _e->sval = strdup("!"); (yyval.expr) = _e; }
-#line 2419 "snocone_parse.tab.c"
+#line 2413 "snocone_parse.tab.c"
     break;
 
 
-#line 2423 "snocone_parse.tab.c"
+#line 2417 "snocone_parse.tab.c"
 
       default: break;
     }
@@ -2612,7 +2606,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 583 "snocone_parse.y"
+#line 577 "snocone_parse.y"
 
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void sc_error(ScParseState *st, const char *msg) {
@@ -2798,17 +2792,10 @@ static void sc_finalize_if_else_pst(ScParseState *st, struct IfHead *h, STMT_t *
  * sc_loop_push was called in while_head; sc_loop_pop resolves break/continue here. */
 static void sc_finalize_while_pst(ScParseState *st, struct WhileHead *h, tree_t *cond)
 {
-    LoopFrame *lf     = st->loop_top;
-    char      *Ltop   = lf ? strdup(lf->cont_label) : sc_label_new(st, "_Ltop");
-    char      *Lend   = lf ? strdup(lf->end_label)  : sc_label_new(st, "_Lend");
     tree_t    *body   = sc_collect_body(st, h->before_body);
-    tree_t    *qlit_c = ast_node_new(TT_QLIT); qlit_c->sval = Ltop;
-    tree_t    *qlit_e = ast_node_new(TT_QLIT); qlit_e->sval = Lend;
     tree_t    *w      = ast_node_new(TT_WHILE);
     ast_push(w, cond);
     ast_push(w, body);
-    ast_push(w, qlit_c);
-    ast_push(w, qlit_e);
     sc_loop_pop(st);
     free(h);
     sc_append_stmt(st, w);
@@ -2822,17 +2809,10 @@ static void sc_finalize_while_pst(ScParseState *st, struct WhileHead *h, tree_t 
  * sc_loop_push was called in do_head; sc_loop_pop resolves break/continue here. */
 static void sc_finalize_do_while_pst(ScParseState *st, struct DoHead *h, tree_t *cond)
 {
-    LoopFrame *lf     = st->loop_top;
-    char      *Lcont  = lf ? strdup(lf->cont_label) : sc_label_new(st, "_Lcont");
-    char      *Lend   = lf ? strdup(lf->end_label)  : sc_label_new(st, "_Lend");
     tree_t    *body   = sc_collect_body(st, h->before_body);
-    tree_t    *qlit_c = ast_node_new(TT_QLIT); qlit_c->sval = Lcont;
-    tree_t    *qlit_e = ast_node_new(TT_QLIT); qlit_e->sval = Lend;
     tree_t    *dw     = ast_node_new(TT_DO_WHILE);
     ast_push(dw, body);
     ast_push(dw, cond);
-    ast_push(dw, qlit_c);
-    ast_push(dw, qlit_e);
     sc_loop_pop(st);
     free(h);
     sc_append_stmt(st, dw);
@@ -2844,18 +2824,11 @@ static void sc_finalize_do_while_pst(ScParseState *st, struct DoHead *h, tree_t 
  * Body collected from for_before_body snapshot. Labels from sc_loop_push in grammar action. */
 static void sc_finalize_for_pst(ScParseState *st, struct ForHead *h)
 {
-    LoopFrame *lf     = st->loop_top;
-    char      *Lcont  = lf ? strdup(lf->cont_label) : sc_label_new(st, "_Lcont");
-    char      *Lend   = lf ? strdup(lf->end_label)  : sc_label_new(st, "_Lend");
     tree_t    *body   = sc_collect_body(st, h->before_body);
-    tree_t    *qlit_c = ast_node_new(TT_QLIT); qlit_c->sval = Lcont;
-    tree_t    *qlit_e = ast_node_new(TT_QLIT); qlit_e->sval = Lend;
     tree_t    *f      = ast_node_new(TT_FOR);
     ast_push(f, h->cond);
     ast_push(f, h->step);
     ast_push(f, body);
-    ast_push(f, qlit_c);
-    ast_push(f, qlit_e);
     sc_loop_pop(st);
     sc_append_stmt(st, f);
     free(h);
