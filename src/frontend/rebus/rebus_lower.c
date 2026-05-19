@@ -360,15 +360,16 @@ static void lower_tree_stmt(RebLow *L, tree_t *s) {
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void lower_decl(RebLow *L, RDecl *d) {
+static void lower_decl(RebLow *L, tree_t *d) {
     if (!d) return;
-    switch (d->kind) {
-    case RD_RECORD: {
+    switch (d->t) {
+    case TT_RECORD_DECL: {
+        /* c[0]=TT_VAR(name), c[1..]=TT_VAR(field) */
         char buf[1024]; int pos = 0;
-        pos += snprintf(buf + pos, sizeof buf - pos, "%s(", d->name);
-        for (int i = 0; i < d->nfields; i++) {
-            if (i) pos += snprintf(buf + pos, sizeof buf - pos, ",");
-            pos += snprintf(buf + pos, sizeof buf - pos, "%s", d->fields[i]);
+        pos += snprintf(buf + pos, sizeof buf - pos, "%s(", d->c[0]->v.sval);
+        for (int i = 1; i < d->n; i++) {
+            if (i > 1) pos += snprintf(buf + pos, sizeof buf - pos, ",");
+            pos += snprintf(buf + pos, sizeof buf - pos, "%s", d->c[i]->v.sval);
         }
         snprintf(buf + pos, sizeof buf - pos, ")");
         STMT_t *st = blank_stmt();
@@ -377,19 +378,27 @@ static void lower_decl(RebLow *L, RDecl *d) {
         emit(L, st);
         break;
     }
-    case RD_FUNCTION: {
+    case TT_FUNCTION: {
+        /* c[0]=TT_VAR(name), c[1]=TT_VLIST(params), c[2]=TT_VLIST(locals),
+           c[3]=TT_PROGRAM(initial)|TT_NUL, c[4]=TT_PROGRAM(body). v.ival=lineno. */
+        tree_t *name_node   = d->c[0];
+        tree_t *params_node = d->c[1];
+        tree_t *locals_node = d->c[2];
+        tree_t *init_node   = d->c[3];
+        tree_t *body_node   = d->c[4];
+        const char *fname   = name_node->v.sval;
         char buf[2048]; int pos = 0;
-        pos += snprintf(buf + pos, sizeof buf - pos, "%s(", d->name);
-        for (int i = 0; i < d->nparams; i++) {
+        pos += snprintf(buf + pos, sizeof buf - pos, "%s(", fname);
+        for (int i = 0; i < params_node->n; i++) {
             if (i) pos += snprintf(buf + pos, sizeof buf - pos, ",");
-            pos += snprintf(buf + pos, sizeof buf - pos, "%s", d->params[i]);
+            pos += snprintf(buf + pos, sizeof buf - pos, "%s", params_node->c[i]->v.sval);
         }
         pos += snprintf(buf + pos, sizeof buf - pos, ")");
-        if (d->nlocals > 0) {
+        if (locals_node->n > 0) {
             pos += snprintf(buf + pos, sizeof buf - pos, "/");
-            for (int i = 0; i < d->nlocals; i++) {
+            for (int i = 0; i < locals_node->n; i++) {
                 if (i) pos += snprintf(buf + pos, sizeof buf - pos, ",");
-                pos += snprintf(buf + pos, sizeof buf - pos, "%s", d->locals[i]);
+                pos += snprintf(buf + pos, sizeof buf - pos, "%s", locals_node->c[i]->v.sval);
             }
         }
         STMT_t *def_st = blank_stmt();
@@ -398,18 +407,17 @@ static void lower_decl(RebLow *L, RDecl *d) {
         emit(L, def_st);
         char *l_end = newlab(L);
         emit_goto(L, l_end);
-        emit_label(L, d->name);
-        /* PST-RB-5b: use body_tree and initial_tree (tree_t) */
-        if (d->initial_tree) {
+        emit_label(L, fname);
+        if (init_node && init_node->t != TT_NUL) {
             char flagbuf[64];
-            snprintf(flagbuf, sizeof flagbuf, "rb_init_%s", d->name);
+            snprintf(flagbuf, sizeof flagbuf, "rb_init_%s", fname);
             tree_t *flag = ast_node_new(TT_VAR); flag->v.sval = strdup(flagbuf);
             char *l_done = newlab(L);
             STMT_t *chk = blank_stmt();
             chk->subject = flag;
             chk->goto_s = strdup(l_done);
             emit(L, chk);
-            lower_tree_stmt(L, d->initial_tree);
+            lower_tree_stmt(L, init_node);
             tree_t *fv = ast_node_new(TT_VAR); fv->v.sval = strdup(flagbuf);
             tree_t *one = ast_node_new(TT_ILIT); one->v.ival = 1;
             STMT_t *fst = blank_stmt();
@@ -418,24 +426,28 @@ static void lower_decl(RebLow *L, RDecl *d) {
             emit_label(L, l_done); free(l_done);
         }
         char *saved_fname = L->fname;
-        L->fname = strdup(d->name);
-        if (d->body_tree) lower_tree_stmt(L, d->body_tree);
+        L->fname = strdup(fname);
+        if (body_node) lower_tree_stmt(L, body_node);
         free(L->fname);
         L->fname = saved_fname;
         emit_goto(L, "RETURN");
         emit_label(L, l_end); free(l_end);
         break;
     }
+    default:
+        fprintf(stderr, "rebus_lower: unexpected decl kind TT_%d\n", d->t);
+        L->nerrors++;
+        break;
     }
-    if (d->next) lower_decl(L, d->next);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-CODE_t *rebus_lower(RProgram *rp) {
-    if (!rp) return NULL;
+CODE_t *rebus_lower(tree_t *prog) {
+    if (!prog) return NULL;
     RebLow L = {0};
     L.prog     = calloc(1, sizeof(CODE_t));
     L.filename = "<rebus>";
-    lower_decl(&L, rp->decls);
+    for (int i = 0; i < prog->n; i++)
+        lower_decl(&L, prog->c[i]);
     if (L.nerrors > 0) {
         fprintf(stderr, "rebus_lower: %d error(s)\n", L.nerrors);
         return NULL;
@@ -451,7 +463,7 @@ void rebus_compile(const char *src, const char *filename, tree_t **out_ast) {
         fprintf(stderr, "rebus_compile: fmemopen failed\n");
         return;
     }
-    RProgram *rp = rebus_parse(f, filename);
+    tree_t *rp = rebus_parse(f, filename);
     fclose(f);
     if (!rp) {
         fprintf(stderr, "rebus_compile: parse error in %s\n", filename);

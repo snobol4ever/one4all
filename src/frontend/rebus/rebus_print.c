@@ -158,32 +158,37 @@ static void print_tree(tree_t *t, FILE *out, int depth) {
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void print_decl(RDecl *d, FILE *out) {
+static void print_decl(tree_t *d, FILE *out) {
     if (!d) return;
-    switch (d->kind) {
-    case RD_RECORD:
-        fprintf(out, "record %s(", d->name ? d->name : "?");
-        for (int i = 0; i < d->nfields; i++) { if (i) fprintf(out, ", "); fprintf(out, "%s", d->fields[i] ? d->fields[i] : "?"); }
+    switch (d->t) {
+    case TT_RECORD_DECL:
+        fprintf(out, "record %s(", d->c[0]->v.sval ? d->c[0]->v.sval : "?");
+        for (int i = 1; i < d->n; i++) { if (i > 1) fprintf(out, ", "); fprintf(out, "%s", d->c[i]->v.sval ? d->c[i]->v.sval : "?"); }
         fprintf(out, ")\n\n");
         break;
-    case RD_FUNCTION:
-        fprintf(out, "function %s(", d->name ? d->name : "?");
-        for (int i = 0; i < d->nparams; i++) { if (i) fprintf(out, ", "); fprintf(out, "%s", d->params[i] ? d->params[i] : "?"); }
+    case TT_FUNCTION: {
+        tree_t *nm = d->c[0], *ps = d->c[1], *ls = d->c[2], *ini = d->c[3], *body = d->c[4];
+        fprintf(out, "function %s(", nm->v.sval ? nm->v.sval : "?");
+        for (int i = 0; i < ps->n; i++) { if (i) fprintf(out, ", "); fprintf(out, "%s", ps->c[i]->v.sval ? ps->c[i]->v.sval : "?"); }
         fprintf(out, ")");
-        if (d->nlocals > 0) {
+        if (ls->n > 0) {
             fprintf(out, "\n  local ");
-            for (int i = 0; i < d->nlocals; i++) { if (i) fprintf(out, ", "); fprintf(out, "%s", d->locals[i] ? d->locals[i] : "?"); }
+            for (int i = 0; i < ls->n; i++) { if (i) fprintf(out, ", "); fprintf(out, "%s", ls->c[i]->v.sval ? ls->c[i]->v.sval : "?"); }
         }
-        if (d->initial_tree) { fprintf(out, "\n  initial "); print_tree(d->initial_tree, out, 0); }
+        if (ini && ini->t != TT_NUL) { fprintf(out, "\n  initial "); print_tree(ini, out, 0); }
         fprintf(out, "\n");
-        if (d->body_tree) print_tree(d->body_tree, out, 1);
+        if (body) print_tree(body, out, 1);
         fprintf(out, "end\n\n");
+        break;
+    }
+    default:
+        fprintf(out, "<unknown decl kind %d>\n", d->t);
         break;
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void rebus_print(RProgram *prog, FILE *out) {
+void rebus_print(tree_t *prog, FILE *out) {
     if (!prog) { fprintf(out, "<null program>\n"); return; }
-    for (RDecl *d = prog->decls; d; d = d->next)
-        print_decl(d, out);
+    for (int i = 0; i < prog->n; i++)
+        print_decl(prog->c[i], out);
 }

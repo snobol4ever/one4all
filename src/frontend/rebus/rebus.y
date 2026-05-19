@@ -6,12 +6,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-static RProgram *prog;
-extern RProgram *rebus_parsed_program;
+static tree_t *prog;
+extern tree_t *rebus_parsed_program;
 extern int       rebus_nerrors;
 
-/* PST-RB-5b: parser now builds tree_t directly for all exprs and stmts.
-   RDecl still used for declaration structure (body/params now tree_t). */
+/* PST-RB-DECL-2: parser builds tree_t for all productions including decls.
+   RDecl/RDKind/RProgram eliminated. prog is now tree_t* (TT_PROGRAM). */
 
 typedef struct { char **a; int n, cap; } SAL;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -53,9 +53,8 @@ extern int  rebus_yylineno;
     char       *sval;
     long        ival;
     double      dval;
-    tree_t     *tree;   /* PST: exprs and stmts are tree_t* */
-    RDecl      *decl;
-    RCase      *rcase;  /* kept temporarily for case clause list */
+    tree_t     *tree;   /* PST: all productions now tree_t* */
+    RCase      *rcase;  /* parser-local scratch for caselist only */
     void       *sal;    /* SAL* — for string id lists (params/locals/fields) */
     void       *tal;    /* TAL* — for tree_t child lists (args, stmt lists) */
 }
@@ -87,7 +86,7 @@ extern int  rebus_yylineno;
 %token T_SLE
 %token T_PLUSCOLON
 
-%type <decl>   decl function_decl record_decl
+%type <tree>   decl function_decl record_decl
 %type <tree>   stmt stmt_body compound_stmt expr_as_stmt
 %type <tree>   if_stmt unless_stmt while_stmt until_stmt
 %type <tree>   repeat_stmt for_stmt case_stmt
@@ -124,16 +123,7 @@ program
 decl_list
     :
     | decl_list decl        {
-            if ($2) {
-                $2->next = NULL;
-                if (!prog->decls) prog->decls = $2;
-                else {
-                    RDecl *d = prog->decls;
-                    while (d->next) d = d->next;
-                    d->next = $2;
-                }
-                prog->ndecls++;
-            }
+            if ($2) expr_add_child(prog, $2);
         }
     | decl_list ';'         { }
     | decl_list error ';'   { yyerrok; }
@@ -152,13 +142,16 @@ opt_semi
 record_decl
     : T_RECORD T_IDENT '(' opt_idlist ')' opt_semi
         {
-            RDecl *d   = rdecl_new(RD_RECORD, yylineno);
-            d->name    = $2;
-            SAL *sl    = $4;
-            d->fields  = sl->a;
-            d->nfields = sl->n;
-            free(sl);
-            $$ = d;
+            tree_t *rec = ast_node_new(TT_RECORD_DECL);
+            tree_t *nm  = ast_node_new(TT_VAR); nm->v.sval = $2;
+            expr_add_child(rec, nm);
+            SAL *sl = $4;
+            for (int i = 0; i < sl->n; i++) {
+                tree_t *fld = ast_node_new(TT_VAR); fld->v.sval = sl->a[i];
+                expr_add_child(rec, fld);
+            }
+            free(sl->a); free(sl);
+            $$ = rec;
         }
     ;
 
@@ -169,20 +162,33 @@ function_decl
         stmt_list
       T_END
         {
-            RDecl *d    = rdecl_new(RD_FUNCTION, yylineno);
-            d->name     = $2;
-            SAL *ps     = (SAL*)$4;
-            d->params   = ps->a;
-            d->nparams  = ps->n;
-            free(ps);
-            SAL *ls     = (SAL*)$7;
-            d->locals   = ls->a;
-            d->nlocals  = ls->n;
-            free(ls);
-            /* PST: initial and body are now tree_t* stored in decl_tree fields */
-            d->initial_tree = $8;   /* tree_t* or NULL */
-            d->body_tree    = $9;   /* tree_t* (TT_PROGRAM) */
-            $$ = d;
+            tree_t *fn = ast_node_new(TT_FUNCTION);
+            fn->v.ival = yylineno;
+            tree_t *nm = ast_node_new(TT_VAR); nm->v.sval = $2;
+            expr_add_child(fn, nm);
+            /* params: TT_VLIST of TT_VAR */
+            tree_t *params_node = ast_node_new(TT_VLIST);
+            SAL *ps = (SAL*)$4;
+            for (int i = 0; i < ps->n; i++) {
+                tree_t *p = ast_node_new(TT_VAR); p->v.sval = ps->a[i];
+                expr_add_child(params_node, p);
+            }
+            free(ps->a); free(ps);
+            expr_add_child(fn, params_node);
+            /* locals: TT_VLIST of TT_VAR */
+            tree_t *locals_node = ast_node_new(TT_VLIST);
+            SAL *ls = (SAL*)$7;
+            for (int i = 0; i < ls->n; i++) {
+                tree_t *l = ast_node_new(TT_VAR); l->v.sval = ls->a[i];
+                expr_add_child(locals_node, l);
+            }
+            free(ls->a); free(ls);
+            expr_add_child(fn, locals_node);
+            /* initial: TT_PROGRAM or TT_NUL */
+            expr_add_child(fn, $8 ? $8 : ast_node_new(TT_NUL));
+            /* body: TT_PROGRAM */
+            expr_add_child(fn, $9);
+            $$ = fn;
         }
     ;
 
@@ -608,6 +614,6 @@ arglist_ne
 %%
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rebus_parse_init(void) {
-    prog = calloc(1, sizeof *prog);
+    prog = ast_node_new(TT_PROGRAM);
     rebus_parsed_program = prog;
 }

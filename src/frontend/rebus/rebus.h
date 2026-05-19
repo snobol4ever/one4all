@@ -5,6 +5,8 @@
 #include <string.h>
 #include <stdarg.h>
 #include "../../ast/ast.h"
+/* RCase — parser-local scratch accumulator for caselist reductions only.
+   No RCase* pointer may survive in any tree_t output. (PST-RB-DECL-3 Option A) */
 typedef struct RCase RCase;
 struct RCase {
     int       is_default;
@@ -12,36 +14,6 @@ struct RCase {
     tree_t   *body_tree;
     RCase    *next;
 };
-typedef enum {
-    RD_FUNCTION,
-    RD_RECORD,
-} RDKind;
-typedef struct RDecl RDecl;
-struct RDecl {
-    RDKind    kind;
-    int       lineno;
-    char     *name;
-    char    **params;
-    int       nparams;
-    char    **locals;
-    int       nlocals;
-    tree_t   *initial_tree;
-    tree_t   *body_tree;
-    char    **fields;
-    int       nfields;
-    RDecl    *next;
-};
-typedef struct {
-    RDecl  *decls;
-    int     ndecls;
-} RProgram;
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static inline RDecl *rdecl_new(RDKind k, int lineno) {
-    RDecl *d = calloc(1, sizeof *d);
-    d->kind   = k;
-    d->lineno = lineno;
-    return d;
-}
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static inline RCase *rcase_new(int lineno) {
     RCase *c = calloc(1, sizeof *c);
@@ -60,9 +32,10 @@ static inline char *rebus_intern_n(const char *s, int n) {
     return p;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-RProgram *rebus_parse(FILE *f, const char *filename);
+/* PST-RB-DECL-2: parser output is now tree_t* (TT_PROGRAM of TT_FUNCTION/TT_RECORD_DECL nodes). */
+tree_t *rebus_parse(FILE *f, const char *filename);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void rebus_print(RProgram *prog, FILE *out);
+void rebus_print(tree_t *prog, FILE *out);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rebus_error(int lineno, const char *fmt, ...);
 extern int   rebus_nerrors;

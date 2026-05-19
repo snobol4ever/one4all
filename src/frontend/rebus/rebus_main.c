@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void rebus_emit(RProgram *prog, FILE *out);
+void rebus_emit(tree_t *prog, FILE *out);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int main(int argc, char *argv[]) {
     const char *outfile = NULL;
@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
         out = fopen(outfile, "w");
         if (!out) { perror(outfile); return 1; }
     }
-    RProgram *prog = rebus_parse(in, infile ? infile : "<stdin>");
+    tree_t *prog = rebus_parse(in, infile ? infile : "<stdin>");
     if (rebus_nerrors) {
         fprintf(stderr, "rebus: %d parse error(s)\n", rebus_nerrors);
         return 1;

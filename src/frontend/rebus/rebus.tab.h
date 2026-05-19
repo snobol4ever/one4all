@@ -134,13 +134,12 @@ union REBUS_YYSTYPE
     char       *sval;
     long        ival;
     double      dval;
-    tree_t     *tree;   /* PST: exprs and stmts are tree_t* */
-    RDecl      *decl;
-    RCase      *rcase;  /* kept temporarily for case clause list */
+    tree_t     *tree;   /* PST: all productions now tree_t* */
+    RCase      *rcase;  /* parser-local scratch for caselist only */
     void       *sal;    /* SAL* — for string id lists (params/locals/fields) */
     void       *tal;    /* TAL* — for tree_t child lists (args, stmt lists) */
 
-#line 144 "rebus.tab.h"
+#line 143 "rebus.tab.h"
 
 };
 typedef union REBUS_YYSTYPE REBUS_YYSTYPE;

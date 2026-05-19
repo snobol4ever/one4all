@@ -2410,9 +2410,9 @@ void rebus_yyerror(const char *msg) { rebus_error(yylineno,"%s",msg); }
 extern int   rebus_yyparse(void);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void  rebus_parse_init(void);
-RProgram    *rebus_parsed_program = NULL;
+tree_t      *rebus_parsed_program = NULL;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-RProgram *rebus_parse(FILE *f, const char *filename) {
+tree_t *rebus_parse(FILE *f, const char *filename) {
     rebus_filename=(char *)filename;
     last_tok=0;
     rbuf=malloc(RBUF_MAX);

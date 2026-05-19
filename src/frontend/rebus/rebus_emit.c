@@ -229,52 +229,57 @@ static void emit_tree_stmt(tree_t *s, FILE *out, int depth) {
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void emit_decl(RDecl *d, FILE *out) {
+static void emit_decl(tree_t *d, FILE *out) {
     if (!d) return;
-    switch (d->kind) {
-    case RD_RECORD: {
-        fprintf(out, "        DATA('%s(", d->name ? d->name : "?");
-        for (int i = 0; i < d->nfields; i++) { if (i) fprintf(out, ","); fprintf(out, "%s", d->fields[i]); }
-        fprintf(out, ")')\n");
+    switch (d->t) {
+    case TT_RECORD_DECL: {
+        fprintf(out, "        DATA('%s(", d->c[0]->v.sval ? d->c[0]->v.sval : "?");
+        for (int i = 1; i < d->n; i++) { if (i > 1) fprintf(out, ","); fprintf(out, "%s", d->c[i]->v.sval); }
+        fprintf(out, "')\n");
         break;
     }
-    case RD_FUNCTION: {
-        fprintf(out, "        DEFINE('%s(", d->name ? d->name : "?");
-        for (int i = 0; i < d->nparams; i++) { if (i) fprintf(out, ","); fprintf(out, "%s", d->params[i]); }
+    case TT_FUNCTION: {
+        tree_t *nm = d->c[0], *ps = d->c[1], *ls = d->c[2], *ini = d->c[3], *body = d->c[4];
+        const char *fname = nm->v.sval ? nm->v.sval : "?";
+        fprintf(out, "        DEFINE('%s(", fname);
+        for (int i = 0; i < ps->n; i++) { if (i) fprintf(out, ","); fprintf(out, "%s", ps->c[i]->v.sval); }
         fprintf(out, ")");
-        if (d->nlocals > 0) {
+        if (ls->n > 0) {
             fprintf(out, "/");
-            for (int i = 0; i < d->nlocals; i++) { if (i) fprintf(out, ","); fprintf(out, "%s", d->locals[i]); }
+            for (int i = 0; i < ls->n; i++) { if (i) fprintf(out, ","); fprintf(out, "%s", ls->c[i]->v.sval); }
         }
         fprintf(out, "')\n");
         int skip = next_label();
         fprintf(out, "     :(%d)\n", skip);
-        fprintf(out, "%s\n", d->name ? d->name : "?");
+        fprintf(out, "%s\n", fname);
         const char *saved = rb_current_func;
-        rb_current_func = d->name ? d->name : "";
-        if (d->initial_tree) {
+        rb_current_func = fname;
+        if (ini && ini->t != TT_NUL) {
             int flag_lab = next_label();
             int done_lab = next_label();
-            fprintf(out, "        _INIT_%s_%d  :S(%d)\n", d->name ? d->name : "f", flag_lab, done_lab);
-            emit_tree_stmt(d->initial_tree, out, 2);
-            fprintf(out, "        _INIT_%s_%d = 1\n", d->name ? d->name : "f", flag_lab);
+            fprintf(out, "        _INIT_%s_%d  :S(%d)\n", fname, flag_lab, done_lab);
+            emit_tree_stmt(ini, out, 2);
+            fprintf(out, "        _INIT_%s_%d = 1\n", fname, flag_lab);
             fprintf(out, ":(%d)\n", done_lab);
         }
-        if (d->body_tree) emit_tree_stmt(d->body_tree, out, 2);
+        if (body) emit_tree_stmt(body, out, 2);
         fprintf(out, "     :(RETURN)\n");
         fprintf(out, ":(%d)\n", skip);
         rb_current_func = saved;
         break;
     }
+    default:
+        fprintf(out, "* <unknown decl kind %d>\n", d->t);
+        break;
     }
-    if (d->next) emit_decl(d->next, out);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void rebus_emit(RProgram *prog, FILE *out) {
+void rebus_emit(tree_t *prog, FILE *out) {
     if (!prog) return;
     rb_label = 0;
     rb_loop_depth = 0;
     rb_current_func = "";
-    emit_decl(prog->decls, out);
+    for (int i = 0; i < prog->n; i++)
+        emit_decl(prog->c[i], out);
     fprintf(out, "END\n");
 }
