@@ -76,7 +76,7 @@ void emit_sm_pat_capture_fn_args(const char * fname_lbl, uint64_t fname_ptr, int
 /*---- BB box templates (stateless) ----------------------------------------*/
 #include "emit_bb.h"
 /* XCHR — literal-string-match box. */
-void emit_bb_xchr (PATND_t * p, const char * lit_label,
+void emit_bb_xchr (const char * lit, const char * lit_label,
                    bb_label_t * lbl_succ, bb_label_t * lbl_fail, bb_label_t * lbl_β);
 void emit_bb_xeps (bb_label_t * lbl_succ, bb_label_t * lbl_fail, bb_label_t * lbl_β);
 void emit_bb_xfail(bb_label_t * lbl_succ, bb_label_t * lbl_fail, bb_label_t * lbl_β);

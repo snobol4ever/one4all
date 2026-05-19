@@ -21,5 +21,4 @@ void bb_fence(IR_t * nd, FILE * out) {
         fprintf(out, "    newobj     instance void pat_%d_%d::.ctor()\n", sid, nid);
         return;
     }
-    /* IS_TEXT / IS_BIN: x86 path via emit_flat_node → emit_bb_xfnce — not wired here yet (EC-3+). */
 }

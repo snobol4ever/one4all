@@ -22,5 +22,4 @@ void bb_abort(IR_t * nd, FILE * out) {
         fprintf(out, "    newobj     instance void pat_%d_%d::.ctor()\n", sid, nid);
         return;
     }
-    /* IS_TEXT / IS_BIN: x86 path — not wired here yet (EC-3+). */
 }

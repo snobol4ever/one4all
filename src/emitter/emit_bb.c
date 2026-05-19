@@ -2,7 +2,7 @@
 #include "emit_form.h"
 #include "emit_templates.h"
 #include "../frontend/icon/icon_gen.h"
-#include "snobol4_patnd.h"
+#include "IR.h"
 #include "../rt/rt.h"
 #include <string.h>
 #include <stdio.h>
@@ -472,8 +472,8 @@ void emit_bb_xrpsi(int n, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
     emit_label_define(b); emit_jmp(f, JMP_JMP);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void emit_bb_xchr(PATND_t *p, const char *lit_label, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
-    const char *lit = (p && p->STRVAL_fn) ? p->STRVAL_fn : "";
+void emit_bb_xchr(const char *lit, const char *lit_label, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
+    if (!lit) lit = "";
     int len = (int)strlen(lit);
     char preview[40];
     if (len > 24) snprintf(preview, sizeof(preview), "'%.24s...'", lit);
@@ -601,10 +601,10 @@ static char   g_flat_data_buf[FLAT_DATA_BUF_MAX];
 static size_t g_flat_data_len    = 0;
 static int    g_flat_data_active = 0;
 #define CHILD_CACHE_MAX 64
-static struct { PATND_t *key; bb_box_fn fn; char text_lbl[80]; } g_child_cache[CHILD_CACHE_MAX];
+static struct { IR_t *key; bb_box_fn fn; char text_lbl[80]; } g_child_cache[CHILD_CACHE_MAX];
 static int g_child_cache_n = 0;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static bb_box_fn child_cache_get(PATND_t *p) {
+static bb_box_fn child_cache_get(IR_t *p) {
     for (int i = 0; i < g_child_cache_n; i++) if (g_child_cache[i].key == p) return g_child_cache[i].fn;
     return NULL;
 }
@@ -614,7 +614,7 @@ static const char *child_cache_get_lbl(bb_box_fn fn) {
     return NULL;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void child_cache_put(PATND_t *p, bb_box_fn fn) {
+static void child_cache_put(IR_t *p, bb_box_fn fn) {
     if (g_child_cache_n < CHILD_CACHE_MAX) { g_child_cache[g_child_cache_n].key = p; g_child_cache[g_child_cache_n].fn = fn; g_child_cache[g_child_cache_n].text_lbl[0] = '\0'; g_child_cache_n++; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -795,16 +795,16 @@ void emit_flat_banner_rule(char ch) {
     emit_text_rawf("%s\n", buf);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void emit_flat_pat_banner(const char *prefix, PATND_t *p) { if (!g_is_text) return; (void)prefix; (void)p; emit_flat_banner_rule('='); }
-static void emit_flat_node(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
+static void emit_flat_ir_banner(void) { if (!g_is_text) return; emit_flat_banner_rule('='); }
+static void emit_flat_ir(IR_t *nd, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void emit_flat_xfnce(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β) {
-    if (p->nchildren == 0) { emit_bb_xfnce(lbl_succ, lbl_fail, lbl_β); return; }
+static void emit_flat_ir_fence(IR_t *nd, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β) {
+    if (!nd || nd->n == 0) { emit_bb_xfnce(lbl_succ, lbl_fail, lbl_β); return; }
     int id = g_flat_node_id++;
     bb_label_t child_γ, child_ω;
     emit_label_initf(&child_γ, "xfnce%d_γ", id);
     emit_label_initf(&child_ω, "xfnce%d_ω", id);
-    emit_flat_node(p->children[0], &child_γ, &child_ω, lbl_β);
+    emit_flat_ir(nd->c[0], &child_γ, &child_ω, lbl_β);
     emit_label_define_bb(&child_γ);
     emit_jmp_label(lbl_succ, JMP_JMP);
     emit_label_define_bb(&child_ω);
@@ -813,7 +813,7 @@ static void emit_flat_xfnce(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fa
     emit_jmp_label(lbl_fail, JMP_JMP);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void emit_flat_xcat(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β) {
+static void emit_flat_ir_cat(IR_t *nd, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β) {
     int id = g_flat_node_id++;
     bb_label_t mid_γ, right_ω, left_β, right_β, xcat_ω;
     emit_label_initf(&mid_γ,   "xcat%d_γ",         id);
@@ -821,7 +821,7 @@ static void emit_flat_xcat(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fai
     emit_label_initf(&left_β,  "xcat%d_left_β",    id);
     emit_label_initf(&right_β, "xcat%d_right_β",   id);
     emit_label_initf(&xcat_ω,  "xcat%d_ω",         id);
-    if (p->nchildren == 0) {
+    if (!nd || nd->n == 0) {
         emit_jmp_label(lbl_succ, JMP_JMP);
         emit_label_define_bb(lbl_β); emit_jmp_label(lbl_fail, JMP_JMP);
         emit_label_define_bb(&xcat_ω); emit_jmp_label(lbl_fail, JMP_JMP);
@@ -829,20 +829,20 @@ static void emit_flat_xcat(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fai
         emit_label_define_bb(&right_β); emit_label_define_bb(&left_β);
         return;
     }
-    if (p->nchildren == 1) {
-        emit_flat_node(p->children[0], lbl_succ, lbl_fail, &left_β);
+    if (nd->n == 1) {
+        emit_flat_ir(nd->c[0], lbl_succ, lbl_fail, &left_β);
         emit_label_define_bb(lbl_β); emit_jmp_label(&left_β, JMP_JMP);
         emit_label_define_bb(&xcat_ω); emit_jmp_label(lbl_fail, JMP_JMP);
         emit_label_define_bb(&mid_γ); emit_label_define_bb(&right_ω); emit_label_define_bb(&right_β);
         return;
     }
-    emit_flat_node(p->children[0], &mid_γ, &xcat_ω, &left_β);
+    emit_flat_ir(nd->c[0], &mid_γ, &xcat_ω, &left_β);
     emit_label_define_bb(&mid_γ);
     bb_label_t *last_β = &right_β;
-    if (p->nchildren == 2) {
-        emit_flat_node(p->children[1], lbl_succ, &right_ω, &right_β);
+    if (nd->n == 2) {
+        emit_flat_ir(nd->c[1], lbl_succ, &right_ω, &right_β);
     } else {
-        int nc = p->nchildren;
+        int nc = nd->n;
         bb_label_t *mids  = alloca(sizeof(bb_label_t) * (nc - 1));
         bb_label_t *betas = alloca(sizeof(bb_label_t) * (nc - 1));
         for (int i = 0; i < nc - 1; i++) {
@@ -851,7 +851,7 @@ static void emit_flat_xcat(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fai
         }
         for (int i = 1; i < nc; i++) {
             bb_label_t *s = (i < nc-1) ? &mids[i-1] : lbl_succ;
-            emit_flat_node(p->children[i], s, &right_ω, &betas[i-1]);
+            emit_flat_ir(nd->c[i], s, &right_ω, &betas[i-1]);
             if (i < nc-1) emit_label_define_bb(&mids[i-1]);
         }
         last_β = &betas[nc-2];
@@ -861,11 +861,11 @@ static void emit_flat_xcat(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fai
     emit_label_define_bb(&xcat_ω);  emit_jmp_label(lbl_fail, JMP_JMP);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void emit_flat_alt(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β) {
+static void emit_flat_ir_alt(IR_t *nd, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β) {
     int id = g_flat_node_id++;
-    int nc = p->nchildren;
+    int nc = nd ? nd->n : 0;
     if (nc == 0) { emit_label_define_bb(lbl_β); emit_jmp_label(lbl_fail, JMP_JMP); return; }
-    if (nc == 1) { emit_flat_node(p->children[0], lbl_succ, lbl_fail, lbl_β); return; }
+    if (nc == 1) { emit_flat_ir(nd->c[0], lbl_succ, lbl_fail, lbl_β); return; }
     bb_label_t *ci_βs = alloca((size_t)nc * sizeof(bb_label_t));
     bb_label_t *ci_ωs = alloca((size_t)nc * sizeof(bb_label_t));
     for (int i = 0; i < nc; i++) {
@@ -874,7 +874,7 @@ static void emit_flat_alt(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fail
     }
     for (int i = 0; i < nc; i++) {
         bb_label_t *f = (i < nc-1) ? &ci_ωs[i] : &ci_ωs[nc-1];
-        emit_flat_node(p->children[i], lbl_succ, f, &ci_βs[i]);
+        emit_flat_ir(nd->c[i], lbl_succ, f, &ci_βs[i]);
         if (i < nc-1) emit_label_define_bb(&ci_ωs[i]);
         else          emit_label_define_bb(&ci_ωs[nc-1]);
     }
@@ -882,45 +882,42 @@ static void emit_flat_alt(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fail
     emit_label_define_bb(lbl_β); emit_jmp_label(&ci_βs[0], JMP_JMP);
 }
 extern int memcmp(const void *, const void *, size_t);
-static void emit_flat_node(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β) {
-    if (!p) { emit_bb_xeps(lbl_succ, lbl_fail, lbl_β); return; }
-    switch (p->kind) {
-    case XCHR: {
-        const char *lit = p->STRVAL_fn ? p->STRVAL_fn : "";
+static void emit_flat_ir(IR_t *nd, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β) {
+    if (!nd) { emit_bb_xeps(lbl_succ, lbl_fail, lbl_β); return; }
+    switch (nd->t) {
+    case IR_PAT_LIT: {
+        const char *lit = nd->sval ? nd->sval : "";
         const char *lit_label = (g_flat_intern_str && g_is_text) ? g_flat_intern_str(lit) : NULL;
-        emit_bb_xchr(p, lit_label, lbl_succ, lbl_fail, lbl_β);
+        emit_bb_xchr(lit, lit_label, lbl_succ, lbl_fail, lbl_β);
         break;
     }
-    case XEPS:  emit_bb_xeps        (lbl_succ, lbl_fail, lbl_β); break;
-    case XFAIL: emit_bb_xfail       (lbl_succ, lbl_fail, lbl_β); break;
-    case XPOSI: emit_bb_xposi       ((int)p->num, lbl_succ, lbl_fail, lbl_β); break;
-    case XRPSI: emit_bb_xrpsi       ((int)p->num, lbl_succ, lbl_fail, lbl_β); break;
-    case XCAT:  emit_flat_xcat      (p, lbl_succ, lbl_fail, lbl_β); break;
-    case XOR:   emit_flat_alt       (p, lbl_succ, lbl_fail, lbl_β); break;
-    case XSPNC: emit_bb_charset(NULL, "bb_span",   "SPAN",   p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
-    case XANYC: emit_bb_charset(NULL, "bb_any",    "ANY",    p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
-    case XBRKC: emit_bb_charset(NULL, "bb_brk",    "BREAK",  p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
-    case XNNYC: emit_bb_charset(NULL, "bb_notany", "NOTANY", p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
-    case XLNTH: emit_bb_xlnth       ((long long)p->num, lbl_succ, lbl_fail, lbl_β); break;
-    case XTB:   emit_bb_xtb         ((long long)p->num, lbl_succ, lbl_fail, lbl_β); break;
-    case XRTB:  emit_bb_xrtb        ((long long)p->num, lbl_succ, lbl_fail, lbl_β); break;
-    case XFNCE: emit_flat_xfnce     (p, lbl_succ, lbl_fail, lbl_β); break;
-    case XFARB: emit_bb_xfarb       (lbl_succ, lbl_fail, lbl_β); break;
-    case XSTAR: emit_bb_xstar       (lbl_succ, lbl_fail, lbl_β); break;
-    case XBRKX: emit_bb_xbrkx       (p->STRVAL_fn ? p->STRVAL_fn : "", lbl_succ, lbl_fail, lbl_β); break;
-    case XATP:  emit_bb_xatp        (p->STRVAL_fn, lbl_succ, lbl_fail, lbl_β); break;
-    case XDSAR: emit_bb_xdsar       (p->STRVAL_fn, lbl_succ, lbl_fail, lbl_β); break;
-    case XARBN: {
-        PATND_t *ch = (p->nchildren > 0) ? p->children[0] : NULL;
+    case IR_PAT_ARB:    emit_bb_xfarb(lbl_succ, lbl_fail, lbl_β); break;
+    case IR_PAT_REM:    emit_bb_xstar(lbl_succ, lbl_fail, lbl_β); break;
+    case IR_PAT_SPAN:   emit_bb_charset(NULL, "bb_span",   "SPAN",   nd->sval?nd->sval:"", lbl_succ, lbl_fail, lbl_β); break;
+    case IR_PAT_ANY:    emit_bb_charset(NULL, "bb_any",    "ANY",    nd->sval?nd->sval:"", lbl_succ, lbl_fail, lbl_β); break;
+    case IR_PAT_BREAK:  emit_bb_charset(NULL, "bb_brk",    "BREAK",  nd->sval?nd->sval:"", lbl_succ, lbl_fail, lbl_β); break;
+    case IR_PAT_NOTANY: emit_bb_charset(NULL, "bb_notany", "NOTANY", nd->sval?nd->sval:"", lbl_succ, lbl_fail, lbl_β); break;
+    case IR_PAT_LEN:    emit_bb_xlnth((long long)nd->ival, lbl_succ, lbl_fail, lbl_β); break;
+    case IR_PAT_POS:    if (nd->n) emit_bb_xrpsi((int)nd->ival, lbl_succ, lbl_fail, lbl_β);
+                        else       emit_bb_xposi ((int)nd->ival, lbl_succ, lbl_fail, lbl_β); break;
+    case IR_PAT_TAB:    if (nd->n) emit_bb_xrtb ((long long)nd->ival, lbl_succ, lbl_fail, lbl_β);
+                        else       emit_bb_xtb   ((long long)nd->ival, lbl_succ, lbl_fail, lbl_β); break;
+    case IR_PAT_FENCE:  emit_flat_ir_fence(nd, lbl_succ, lbl_fail, lbl_β); break;
+    case IR_PAT_ABORT:  emit_bb_xfail(lbl_succ, lbl_fail, lbl_β); break;
+    case IR_PAT_CAT:    emit_flat_ir_cat(nd, lbl_succ, lbl_fail, lbl_β); break;
+    case IR_PAT_ALT:    emit_flat_ir_alt(nd, lbl_succ, lbl_fail, lbl_β); break;
+    case IR_PAT_ARBNO: {
+        IR_t *ch = (nd->n > 0) ? nd->c[0] : NULL;
         bb_box_fn cfn = ch ? child_cache_get(ch) : NULL;
         emit_bb_xarbn(cfn, lbl_succ, lbl_fail, lbl_β);
         break;
     }
-    case XFNME: {
-        PATND_t *ch = (p->nchildren > 0) ? p->children[0] : NULL;
+    case IR_PAT_ASSIGN_IMM: {
+        IR_t *ch = (nd->n > 0) ? nd->c[0] : NULL;
         bb_box_fn cfn = ch ? child_cache_get(ch) : NULL;
-        if (p->var.v == DT_N && p->var.slen == 1 && p->var.ptr) {
-            void *z = bb_cap_new(cfn, NULL, NULL, (DESCR_t *)p->var.ptr, 1);
+        const char *vn = nd->sval ? nd->sval : "";
+        if (nd->value.v == DT_N && nd->value.slen == 1 && nd->value.ptr) {
+            void *z = bb_cap_new(cfn, NULL, NULL, (DESCR_t *)nd->value.ptr, 1);
             emit_bb_box_banner("CAP_IMM", "");
             if (IS_TEXT) {
                 char zlbl[80]; emit_bb_ptr_slot(zlbl);
@@ -935,16 +932,16 @@ static void emit_flat_node(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fai
                 emit_seq_port_call((uint64_t)(uintptr_t)z, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 1, lbl_succ, lbl_fail);
             }
         } else {
-            const char *vn = (p->var.v == DT_S || p->var.v == DT_SNUL || p->var.v == DT_N) ? p->var.s : VARVAL_fn(p->var);
             emit_bb_xfnme(cfn, vn, lbl_succ, lbl_fail, lbl_β);
         }
         break;
     }
-    case XNME: {
-        PATND_t *ch = (p->nchildren > 0) ? p->children[0] : NULL;
+    case IR_PAT_ASSIGN_COND: {
+        IR_t *ch = (nd->n > 0) ? nd->c[0] : NULL;
         bb_box_fn cfn = ch ? child_cache_get(ch) : NULL;
-        if (p->var.v == DT_N && p->var.slen == 1 && p->var.ptr) {
-            void *z = bb_cap_new(cfn, NULL, NULL, (DESCR_t *)p->var.ptr, 0);
+        const char *vn = nd->sval ? nd->sval : "";
+        if (nd->value.v == DT_N && nd->value.slen == 1 && nd->value.ptr) {
+            void *z = bb_cap_new(cfn, NULL, NULL, (DESCR_t *)nd->value.ptr, 0);
             emit_bb_box_banner("CAP_COND", "");
             if (IS_TEXT) {
                 char zlbl[80]; emit_bb_ptr_slot(zlbl);
@@ -959,15 +956,8 @@ static void emit_flat_node(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fai
                 emit_seq_port_call((uint64_t)(uintptr_t)z, "rt_bb_cap", (uint64_t)(uintptr_t)rt_bb_cap, 1, lbl_succ, lbl_fail);
             }
         } else {
-            const char *vn = (p->var.v == DT_S || p->var.v == DT_SNUL || p->var.v == DT_N) ? p->var.s : VARVAL_fn(p->var);
             emit_bb_xnme(cfn, vn, lbl_succ, lbl_fail, lbl_β);
         }
-        break;
-    }
-    case XCALLCAP: {
-        PATND_t *ch = (p->nchildren > 0) ? p->children[0] : NULL;
-        bb_box_fn cfn = ch ? child_cache_get(ch) : NULL;
-        emit_bb_xcallcap(cfn, p->STRVAL_fn, lbl_succ, lbl_fail, lbl_β);
         break;
     }
     default:
@@ -978,7 +968,7 @@ static void emit_flat_node(PATND_t *p, bb_label_t *lbl_succ, bb_label_t *lbl_fai
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_flat_body(PATND_t *p, const char *prefix, int text_externalise, int brokered) {
+static int emit_flat_body(IR_t *nd, const char *prefix, int text_externalise, int brokered) {
     bb_label_t lbl_α, lbl_α_body, lbl_succ, lbl_fail, lbl_β;
     emit_label_initf(&lbl_α,      "%s_α",      prefix);
     emit_label_initf(&lbl_α_body, "%s_α_body", prefix);
@@ -987,7 +977,7 @@ static int emit_flat_body(PATND_t *p, const char *prefix, int text_externalise, 
     emit_label_initf(&lbl_β,       "%s_β",       prefix);
     if (text_externalise) data_buf_reset();
     if (text_externalise) {
-        emit_flat_pat_banner(prefix, p);
+        emit_flat_ir_banner();
         emit_text_global(lbl_α.name);
         emit_text_global(lbl_β.name);
         emit_text_global(lbl_succ.name);
@@ -998,7 +988,7 @@ static int emit_flat_body(PATND_t *p, const char *prefix, int text_externalise, 
     flat_box_entry_dispatch(&lbl_α_body, &lbl_β);
     emit_label_define_bb(&lbl_α_body);
     if (!text_externalise) emit_label_define_bb(&lbl_α);
-    emit_flat_node(p, &lbl_succ, &lbl_fail, &lbl_β);
+    emit_flat_ir(nd, &lbl_succ, &lbl_fail, &lbl_β);
     emit_label_define_bb(&lbl_succ);
     emit_sigma_plus_delta(ADDR_SIGMA);
     emit_mov_rdx_rax();
@@ -1023,10 +1013,10 @@ static int emit_flat_body(PATND_t *p, const char *prefix, int text_externalise, 
 static int g_in_prebuild = 0;
 static int g_text_child_counter = 0;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void pre_build_children_text(PATND_t *p, FILE *out, const char *base_prefix) {
-    if (!p) return;
-    if (p->kind == XARBN || p->kind == XNME || p->kind == XFNME || p->kind == XCALLCAP) {
-        PATND_t *ch = (p->nchildren > 0) ? p->children[0] : NULL;
+static void pre_build_children_text(IR_t *nd, FILE *out, const char *base_prefix) {
+    if (!nd) return;
+    if (nd->t == IR_PAT_ARBNO || nd->t == IR_PAT_ASSIGN_COND || nd->t == IR_PAT_ASSIGN_IMM || nd->t == IR_PAT_CALLOUT) {
+        IR_t *ch = (nd->n > 0) ? nd->c[0] : NULL;
         if (ch && !child_cache_get(ch)) {
             pre_build_children_text(ch, out, base_prefix);
             char child_prefix[120];
@@ -1043,31 +1033,31 @@ static void pre_build_children_text(PATND_t *p, FILE *out, const char *base_pref
         }
         return;
     }
-    for (int i = 0; i < p->nchildren; i++) pre_build_children_text(p->children[i], out, base_prefix);
+    for (int i = 0; i < nd->n; i++) pre_build_children_text(nd->c[i], out, base_prefix);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void pre_build_children(PATND_t *p) {
-    if (!p) return;
-    if (p->kind == XARBN || p->kind == XNME || p->kind == XFNME || p->kind == XCALLCAP) {
-        PATND_t *ch = (p->nchildren > 0) ? p->children[0] : NULL;
+static void pre_build_children(IR_t *nd) {
+    if (!nd) return;
+    if (nd->t == IR_PAT_ARBNO || nd->t == IR_PAT_ASSIGN_COND || nd->t == IR_PAT_ASSIGN_IMM || nd->t == IR_PAT_CALLOUT) {
+        IR_t *ch = (nd->n > 0) ? nd->c[0] : NULL;
         if (ch && !child_cache_get(ch)) {
             pre_build_children(ch);
-            bb_box_fn fn = (p->kind == XARBN || p->kind == XNME || p->kind == XFNME) ? bb_build_brokered(ch) : bb_build_flat(ch);
+            bb_box_fn fn = (nd->t == IR_PAT_ARBNO || nd->t == IR_PAT_ASSIGN_COND || nd->t == IR_PAT_ASSIGN_IMM) ? bb_build_brokered(ch) : bb_build_flat(ch);
             if (!fn) fn = bb_build_brokered(ch);
             child_cache_put(ch, fn);
         }
         return;
     }
-    for (int i = 0; i < p->nchildren; i++) pre_build_children(p->children[i]);
+    for (int i = 0; i < nd->n; i++) pre_build_children(nd->c[i]);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-bb_box_fn bb_build_flat(PATND_t *p) {
+bb_box_fn bb_build_flat(IR_t *nd) {
     bb_buf_t buf = bb_alloc(FLAT_BUF_MAX);
     if (!buf) return NULL;
-    if (!g_in_prebuild) { g_child_cache_n = 0; g_in_prebuild = 1; pre_build_children(p); g_in_prebuild = 0; }
+    if (!g_in_prebuild) { g_child_cache_n = 0; g_in_prebuild = 1; pre_build_children(nd); g_in_prebuild = 0; }
     g_flat_slot_count = 0; g_flat_node_id = 0;
     emitter_init_binary(buf, FLAT_BUF_MAX);
-    emit_flat_body(p, "pat_flat", 0, 0);
+    emit_flat_body(nd, "pat_flat", 0, 0);
     int nbytes = emitter_end();
     extern int bb_emit_overflow;
     if (bb_emit_overflow || nbytes <= 0 || nbytes > FLAT_BUF_MAX) { bb_free(buf, FLAT_BUF_MAX); return NULL; }
@@ -1075,15 +1065,15 @@ bb_box_fn bb_build_flat(PATND_t *p) {
     return (bb_box_fn)buf;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-bb_box_fn bb_build_brokered(PATND_t *p) {
+bb_box_fn bb_build_brokered(IR_t *nd) {
     bb_buf_t buf = bb_alloc(FLAT_BUF_MAX);
     if (!buf) return NULL;
-    if (!g_in_prebuild) { g_child_cache_n = 0; g_in_prebuild = 1; pre_build_children(p); g_in_prebuild = 0; }
+    if (!g_in_prebuild) { g_child_cache_n = 0; g_in_prebuild = 1; pre_build_children(nd); g_in_prebuild = 0; }
     g_flat_slot_count = 0; g_flat_node_id = 0;
     emit_mode_set(EMIT_BINARY_BROKERED, NULL);
     emitter_init_binary(buf, FLAT_BUF_MAX);
     emit_seq_brokered_enter();
-    emit_flat_body(p, "pat_brok", 0, 1);
+    emit_flat_body(nd, "pat_brok", 0, 1);
     int nbytes = emitter_end();
     emit_mode_set(EMIT_BINARY_WIRED, NULL);
     extern int bb_emit_overflow;
@@ -1092,19 +1082,19 @@ bb_box_fn bb_build_brokered(PATND_t *p) {
     return (bb_box_fn)buf;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int emit_flat_build(PATND_t *p, FILE *out, const char *prefix) {
+int emit_flat_build(IR_t *nd, FILE *out, const char *prefix) {
     g_child_cache_n = 0;
     g_text_child_counter = 0;
-    pre_build_children_text(p, out, prefix);
+    pre_build_children_text(nd, out, prefix);
     emitter_init_text(out, TEXT_MODE_INVOCATION);
-    int rc = emit_flat_body(p, prefix, 1, 0);
+    int rc = emit_flat_body(nd, prefix, 1, 0);
     emitter_end();
     bb3c_flush_pending();
     return rc;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void emit_bb_register_child_label(PATND_t *p, const char *α_label) {
-    bb_box_fn fn = child_cache_get(p);
+void emit_bb_register_child_label(IR_t *nd, const char *α_label) {
+    bb_box_fn fn = child_cache_get(nd);
     if (fn) child_cache_set_lbl(fn, α_label);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/

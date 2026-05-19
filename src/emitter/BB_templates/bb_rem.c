@@ -2,7 +2,7 @@
 
 void bb_rem(IR_t * nd, FILE * out) {
     int nid = ir_node_id(nd); int sid = 0; (void)sid;
-    if (IS_TEXT || IS_BIN) { /* x86: via emit_bb_xstar — not wired here yet (EC-3+). */ return; }
+    if (IS_BIN) return; /* x86 binary: emit_flat_body path, not emit_bb_node */
     if (IS_JVM) {
         jvm_class_hdr(out, "rem"); jvm_init_ms_only(out, "rem");
         fprintf(out, ".method public \316\261()Lbb/bb_box$Spec;\n    .limit stack 6\n    .limit locals 2\n");

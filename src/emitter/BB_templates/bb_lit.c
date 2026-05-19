@@ -2,7 +2,7 @@
 
 void bb_lit(IR_t * nd, FILE * out) {
     int nid = ir_node_id(nd); int sid = 0;
-    if (IS_TEXT || IS_BIN) { /* x86: via emit_flat_node/emit_bb_xchr — not wired here yet (EC-3+). */ return; }
+    if (IS_BIN) return; /* x86 binary: emit_flat_body path, not emit_bb_node */
     if (IS_JVM) {
         char tag[32]; snprintf(tag, sizeof tag, "lit_%d_%d", sid, nid);
         jvm_class_hdr(out, "lit");
