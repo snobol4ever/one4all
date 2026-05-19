@@ -529,17 +529,13 @@ call_expr
     | KW_DIE expr
         { tree_t *d=ast_node_new(TT_DIE); expr_add_child(d,$2); $$=d; }
     | KW_MAP closure expr
-        { tree_t *c=make_call("raku_map");
-          expr_add_child(c,$2); expr_add_child(c,$3); $$=c; }
+        { tree_t *c = ast_node_new(TT_MAP);  ast_push(c, $2); ast_push(c, $3); $$ = c; }
     | KW_GREP closure expr
-        { tree_t *c=make_call("raku_grep");
-          expr_add_child(c,$2); expr_add_child(c,$3); $$=c; }
+        { tree_t *c = ast_node_new(TT_GREP); ast_push(c, $2); ast_push(c, $3); $$ = c; }
     | KW_SORT expr
-        { tree_t *c=make_call("raku_sort");
-          expr_add_child(c,$2); $$=c; }
+        { tree_t *c = ast_node_new(TT_SORT); ast_push(c, $2); $$ = c; }
     | KW_SORT closure expr
-        { tree_t *c=make_call("raku_sort");
-          expr_add_child(c,$2); expr_add_child(c,$3); $$=c; }
+        { tree_t *c = ast_node_new(TT_SORT); ast_push(c, $2); ast_push(c, $3); $$ = c; }
     | atom           { $$=$1; }
     ;
 arg_list
