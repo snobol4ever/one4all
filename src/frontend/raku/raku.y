@@ -291,9 +291,9 @@ while_stmt
     ;
 unless_stmt
     : KW_UNLESS '(' expr ')' block
-        { tree_t *e=ast_node_new(TT_IF); expr_add_child(e,expr_unary(TT_NOT,$3)); expr_add_child(e,$5); $$=e; }
+        { tree_t *e=ast_node_new(TT_UNLESS); ast_push(e,$3); ast_push(e,$5); $$=e; }
     | KW_UNLESS '(' expr ')' block KW_ELSE block
-        { tree_t *e=ast_node_new(TT_IF); expr_add_child(e,expr_unary(TT_NOT,$3)); expr_add_child(e,$5); expr_add_child(e,$7); $$=e; }
+        { tree_t *e=ast_node_new(TT_UNLESS); ast_push(e,$3); ast_push(e,$5); ast_push(e,$7); $$=e; }
     ;
 until_stmt
     : KW_UNTIL '(' expr ')' block

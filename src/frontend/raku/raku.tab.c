@@ -1874,13 +1874,13 @@ yyreduce:
 
   case 44: /* unless_stmt: KW_UNLESS '(' expr ')' block  */
 #line 294 "raku.y"
-        { tree_t *e=ast_node_new(TT_IF); expr_add_child(e,expr_unary(TT_NOT,(yyvsp[-2].node))); expr_add_child(e,(yyvsp[0].node)); (yyval.node)=e; }
+        { tree_t *e=ast_node_new(TT_UNLESS); ast_push(e,(yyvsp[-2].node)); ast_push(e,(yyvsp[0].node)); (yyval.node)=e; }
 #line 1879 "raku.tab.c"
     break;
 
   case 45: /* unless_stmt: KW_UNLESS '(' expr ')' block KW_ELSE block  */
 #line 296 "raku.y"
-        { tree_t *e=ast_node_new(TT_IF); expr_add_child(e,expr_unary(TT_NOT,(yyvsp[-4].node))); expr_add_child(e,(yyvsp[-2].node)); expr_add_child(e,(yyvsp[0].node)); (yyval.node)=e; }
+        { tree_t *e=ast_node_new(TT_UNLESS); ast_push(e,(yyvsp[-4].node)); ast_push(e,(yyvsp[-2].node)); ast_push(e,(yyvsp[0].node)); (yyval.node)=e; }
 #line 1885 "raku.tab.c"
     break;
 
