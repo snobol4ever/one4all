@@ -520,6 +520,11 @@ static void emit_lhs_store(const tree_t *lhs)
         sm_emit_s(g_p, SM_PUSH_LIT_S, ICN_FIELD_NAME(lhs) ? ICN_FIELD_NAME(lhs) : "");
         sm_emit_si(g_p, SM_CALL_FN, "FIELD_SET", 3); return;
     }
+    if (lhs->t == TT_TWIGIL_FIELD) {
+        sm_emit_s(g_p, SM_PUSH_VAR, "self");
+        sm_emit_s(g_p, SM_PUSH_LIT_S, lhs->v.sval ? lhs->v.sval : "");
+        sm_emit_si(g_p, SM_CALL_FN, "FIELD_SET", 3); return;
+    }
     if (lhs->t == TT_RANDOM && lhs->n >= 1) {
         lower_expr(T0(lhs));
         sm_emit_si(g_p, SM_CALL_FN, "ICN_RANDOM_SET", 2); return;
@@ -1758,6 +1763,11 @@ static void lower_expr_inner(const tree_t *t)
     }
     case TT_CAPTURE:       if (t->n >= 1) lower_expr(t->c[0]); sm_emit_si(g_p, SM_CALL_FN, "raku_capture",       1); return;
     case TT_NAMED_CAPTURE: if (t->n >= 1) lower_expr(t->c[0]); sm_emit_si(g_p, SM_CALL_FN, "raku_named_capture", 1); return;
+    case TT_TWIGIL_FIELD:
+        sm_emit_s(g_p, SM_PUSH_VAR, "self");
+        sm_emit_s(g_p, SM_PUSH_LIT_S, t->v.sval ? t->v.sval : "");
+        sm_emit_si(g_p, SM_CALL_FN, "FIELD_GET", 2);
+        return;
     case TT_ARR_GET:    if (t->n >= 2) { lower_expr(t->c[0]); lower_expr(t->c[1]); } sm_emit_si(g_p, SM_CALL_FN, "arr_get",      2); return;
     case TT_ARR_SET:    if (t->n >= 3) { lower_expr(t->c[0]); lower_expr(t->c[1]); lower_expr(t->c[2]); } sm_emit_si(g_p, SM_CALL_FN, "arr_set",   3); return;
     case TT_HASH_GET:   if (t->n >= 2) { lower_expr(t->c[0]); lower_expr(t->c[1]); } sm_emit_si(g_p, SM_CALL_FN, "hash_get",     2); return;

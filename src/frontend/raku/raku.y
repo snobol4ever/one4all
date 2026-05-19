@@ -569,10 +569,9 @@ atom
         { tree_t *c=ast_node_new(TT_HASH_EXISTS); ast_push(c,var_node($2)); ast_push(c,$4); $$=c; }
     | IDENT           { $$=var_node($1); }
     | VAR_TWIGIL
-        { tree_t *fe=ast_node_new(TT_FIELD);
-          fe->v.sval=(char*)intern($1); free($1);
-          expr_add_child(fe, leaf_sval(TT_VAR, "self"));
-          $$=fe; }
+        { tree_t *fe = ast_node_new(TT_TWIGIL_FIELD);
+          fe->v.sval = (char *)intern($1); free($1);
+          $$ = fe; }
     | '(' expr ')'    { $$=$2; }
     ;
 %%

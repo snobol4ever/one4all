@@ -47,6 +47,7 @@ typedef enum tree_e {
     TT_METHCALL,
     TT_MAP,               TT_GREP,              TT_SORT,
     TT_CAPTURE,           TT_NAMED_CAPTURE,
+    TT_TWIGIL_FIELD,
     TT_KIND_COUNT
 } tree_e;
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -186,6 +187,7 @@ static const char * const tt_e_name[TT_KIND_COUNT] = {
     [TT_METHCALL]         = "TT_METHCALL",
     [TT_MAP]              = "TT_MAP",             [TT_GREP]             = "TT_GREP",             [TT_SORT]             = "TT_SORT",
     [TT_CAPTURE]          = "TT_CAPTURE",         [TT_NAMED_CAPTURE]    = "TT_NAMED_CAPTURE",
+    [TT_TWIGIL_FIELD]     = "TT_TWIGIL_FIELD",
 };
 #endif
 /*================================================================================================================================================================================*/

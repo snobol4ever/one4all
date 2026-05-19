@@ -755,7 +755,7 @@ static const yytype_int16 yyrline[] =
      491,   492,   494,   496,   501,   502,   508,   512,   519,   524,
      529,   531,   533,   535,   537,   539,   542,   543,   546,   547,
      548,   549,   550,   551,   552,   553,   557,   560,   562,   564,
-     566,   568,   570,   571,   576
+     566,   568,   570,   571,   575
 };
 #endif
 
@@ -2514,21 +2514,20 @@ yyreduce:
 
   case 133: /* atom: VAR_TWIGIL  */
 #line 572 "raku.y"
-        { tree_t *fe=ast_node_new(TT_FIELD);
-          fe->v.sval=(char*)intern((yyvsp[0].sval)); free((yyvsp[0].sval));
-          expr_add_child(fe, leaf_sval(TT_VAR, "self"));
-          (yyval.node)=fe; }
-#line 2522 "raku.tab.c"
+        { tree_t *fe = ast_node_new(TT_TWIGIL_FIELD);
+          fe->v.sval = (char *)intern((yyvsp[0].sval)); free((yyvsp[0].sval));
+          (yyval.node) = fe; }
+#line 2521 "raku.tab.c"
     break;
 
   case 134: /* atom: '(' expr ')'  */
-#line 576 "raku.y"
+#line 575 "raku.y"
                       { (yyval.node)=(yyvsp[-1].node); }
-#line 2528 "raku.tab.c"
+#line 2527 "raku.tab.c"
     break;
 
 
-#line 2532 "raku.tab.c"
+#line 2531 "raku.tab.c"
 
       default: break;
     }
@@ -2721,7 +2720,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 578 "raku.y"
+#line 577 "raku.y"
 
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void *raku_yy_scan_string(const char *);
