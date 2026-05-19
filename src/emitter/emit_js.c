@@ -360,69 +360,35 @@ int emit_js_from_sm(SM_Program * sm, FILE * out) {
         case SM_PUSH_EXPRESSION:
             fprintf(out, "rt.push_null(); ");  /* expression-thunk stub */
             break;
-        case SM_PAT_LIT:
-            fprintf(out, "rt.pat_lit(");
-            js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
-            fprintf(out, "); ");
-            break;
-        case SM_PAT_SPAN:    fprintf(out, "rt.pat_span(); ");    break;
-        case SM_PAT_BREAK:   fprintf(out, "rt.pat_break(); ");   break;
-        case SM_PAT_ANY:     fprintf(out, "rt.pat_any(); ");     break;
-        case SM_PAT_NOTANY:  fprintf(out, "rt.pat_notany(); ");  break;
-        case SM_PAT_LEN:     fprintf(out, "rt.pat_len(); ");     break;
-        case SM_PAT_POS:     fprintf(out, "rt.pat_pos(); ");     break;
-        case SM_PAT_RPOS:    fprintf(out, "rt.pat_rpos(); ");    break;
-        case SM_PAT_TAB:     fprintf(out, "rt.pat_tab(); ");     break;
-        case SM_PAT_RTAB:    fprintf(out, "rt.pat_rtab(); ");    break;
-        case SM_PAT_REM:     fprintf(out, "rt.pat_rem(); ");     break;
-        case SM_PAT_ARB:     fprintf(out, "rt.pat_arb(); ");     break;
-        case SM_PAT_ARBNO:   fprintf(out, "rt.pat_arbno(); ");   break;
-        case SM_PAT_BAL:     fprintf(out, "rt.pat_bal(); ");     break;
-        case SM_PAT_FAIL:    fprintf(out, "rt.pat_fail(); ");    break;
-        case SM_PAT_SUCCEED: fprintf(out, "rt.pat_succeed(); "); break;
-        case SM_PAT_ABORT:   fprintf(out, "rt.pat_abort(); ");   break;
-        case SM_PAT_FENCE0:  fprintf(out, "rt.pat_fence(); ");   break;
-        case SM_PAT_EPS:     fprintf(out, "rt.pat_eps(); ");     break;
-        case SM_PAT_CAT:     fprintf(out, "rt.pat_cat(); ");     break;
-        case SM_PAT_ALT:     fprintf(out, "rt.pat_alt(); ");     break;
-        case SM_PAT_DEREF:   fprintf(out, "rt.pat_deref(); ");   break;
-        case SM_PAT_REFNAME:
-            fprintf(out, "rt.pat_refname(");
-            js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
-            fprintf(out, "); ");
-            break;
-        case SM_PAT_CAPTURE:
-            fprintf(out, "rt.pat_capture(");
-            js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
-            fprintf(out, ", %lld); ", instr->a[1].i);
-            break;
-        case SM_PAT_CAPTURE_FN:
-            fprintf(out, "rt.pat_capture_fn(");
-            js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
-            fprintf(out, ", %lld, ", instr->a[1].i);
-            js_escape_string(out, instr->a[2].s ? instr->a[2].s : "");
-            fprintf(out, "); ");
-            break;
-        case SM_PAT_CAPTURE_FN_ARGS:
-            fprintf(out, "rt.pat_capture_fn_args(");
-            js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
-            fprintf(out, ", %lld, %lld); ", instr->a[1].i, instr->a[2].i);
-            break;
-        case SM_PAT_USERCALL:
-            fprintf(out, "rt.pat_usercall(");
-            js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
-            fprintf(out, "); ");
-            break;
-        case SM_PAT_USERCALL_ARGS:
-            fprintf(out, "rt.pat_usercall_args(");
-            js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
-            fprintf(out, ", %lld); ", instr->a[1].i);
-            break;
-        case SM_EXEC_STMT:
-            fprintf(out, "rt.exec_stmt(");
-            js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
-            fprintf(out, ", %lld); ", instr->a[1].i);
-            break;
+        case SM_PAT_LIT:              sm_pat_lit(instr, out); break;
+        case SM_PAT_SPAN:             sm_pat_span(instr, i, out); break;
+        case SM_PAT_BREAK:            sm_pat_break(instr, i, out); break;
+        case SM_PAT_ANY:              sm_pat_any_i(instr, i, out); break;
+        case SM_PAT_NOTANY:           sm_pat_notany(instr, i, out); break;
+        case SM_PAT_LEN:              sm_pat_len(instr, out); break;
+        case SM_PAT_POS:              sm_pat_pos(instr, out); break;
+        case SM_PAT_RPOS:             sm_pat_rpos(instr, out); break;
+        case SM_PAT_TAB:              sm_pat_tab(instr, out); break;
+        case SM_PAT_RTAB:             sm_pat_rtab(instr, out); break;
+        case SM_PAT_REM:              sm_pat_rem(instr, out); break;
+        case SM_PAT_ARB:              sm_pat_arb(instr, out); break;
+        case SM_PAT_ARBNO:            sm_pat_arbno(instr, out); break;
+        case SM_PAT_BAL:              sm_pat_bal(instr, out); break;
+        case SM_PAT_FAIL:             sm_pat_fail(instr, out); break;
+        case SM_PAT_SUCCEED:          sm_pat_succeed(instr, out); break;
+        case SM_PAT_ABORT:            sm_pat_abort(instr, out); break;
+        case SM_PAT_FENCE0:           sm_pat_fence0(instr, out); break;
+        case SM_PAT_EPS:              sm_pat_eps(instr, out); break;
+        case SM_PAT_CAT:              sm_pat_cat(instr, out); break;
+        case SM_PAT_ALT:              sm_pat_alt(instr, out); break;
+        case SM_PAT_DEREF:            sm_pat_deref(instr, out); break;
+        case SM_PAT_REFNAME:          sm_pat_refname(instr, out); break;
+        case SM_PAT_CAPTURE:          sm_pat_capture(instr, out); break;
+        case SM_PAT_CAPTURE_FN:       sm_pat_capture_fn(instr, out); break;
+        case SM_PAT_CAPTURE_FN_ARGS:  sm_pat_capture_fn_args(instr, out); break;
+        case SM_PAT_USERCALL:         sm_pat_usercall(instr, out); break;
+        case SM_PAT_USERCALL_ARGS:    sm_pat_usercall_args(instr, out); break;
+        case SM_EXEC_STMT:            sm_exec_stmt(instr, out); break;
         default:
             break;
         }

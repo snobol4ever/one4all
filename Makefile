@@ -96,6 +96,7 @@ RT_PIC_SRCS := \
     $(SRC)/emitter/SM_templates/sm_arith.c \
     $(SRC)/emitter/SM_templates/sm_compare.c \
     $(SRC)/emitter/SM_templates/sm_control.c \
+    $(SRC)/emitter/SM_templates/sm_pat.c \
     $(SRC)/emitter/emit_bb.c \
     $(SRC)/emitter/emit_sm.c \
     $(SRC)/emitter/emit_ir.c \
@@ -242,6 +243,7 @@ scrip:
 	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_arith.c          -o $(OBJ)/sm_arith.o
 	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_compare.c        -o $(OBJ)/sm_compare.o
 	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_control.c        -o $(OBJ)/sm_control.o
+	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat.c             -o $(OBJ)/sm_pat.o
 	$(CC) $(CRT) -c $(SRC)/processor/bb_boxes.c -o $(OBJ)/bb_boxes.o
 	$(CC) $(CRT) -c $(SRC)/processor/bb_broker.c -o $(OBJ)/bb_broker.o
 	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -DIR_DEFINE_NAMES \
