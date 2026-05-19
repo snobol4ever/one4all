@@ -624,8 +624,8 @@ static const yytype_uint8 yyrline[] =
      159,   160,   161,   162,   163,   164,   165,   166,   167,   175,
      175,   176,   176,   177,   179,   180,   181,   182,   184,   185,
      185,   186,   187,   187,   188,   189,   190,   191,   192,   193,
-     195,   196,   198,   199,   200,   201,   205,   206,   207,   208,
-     210,   211
+     195,   196,   198,   199,   200,   201,   203,   204,   205,   206,
+     208,   209
 };
 #endif
 
@@ -2004,38 +2004,38 @@ yyreduce:
     break;
 
   case 116: /* goto_atom: T_STR  */
-#line 205 "snobol4.y"
+#line 203 "snobol4.y"
                       { tree_t*e=ast_node_new(TT_QLIT); e->v.sval=(char*)(yyvsp[0].tok).sval; (yyval.expr)=e; }
 #line 2010 "snobol4.tab.c"
     break;
 
   case 117: /* goto_atom: T_IDENT  */
-#line 206 "snobol4.y"
+#line 204 "snobol4.y"
                        { tree_t*e=ast_node_new(TT_VAR);  e->v.sval=(char*)(yyvsp[0].tok).sval; (yyval.expr)=e; }
 #line 2016 "snobol4.tab.c"
     break;
 
   case 118: /* goto_atom: T_FUNCTION  */
-#line 207 "snobol4.y"
+#line 205 "snobol4.y"
                        { tree_t*e=ast_node_new(TT_VAR);  e->v.sval=(char*)(yyvsp[0].tok).sval; (yyval.expr)=e; }
 #line 2022 "snobol4.tab.c"
     break;
 
   case 119: /* goto_atom: T_END  */
-#line 208 "snobol4.y"
+#line 206 "snobol4.y"
                        { tree_t*e=ast_node_new(TT_VAR);  e->v.sval=(char*)(yyvsp[0].tok).sval; (yyval.expr)=e; }
 #line 2028 "snobol4.tab.c"
     break;
 
   case 120: /* goto_expr: goto_atom  */
-#line 210 "snobol4.y"
+#line 208 "snobol4.y"
                                                                                                   { (yyval.expr)=(yyvsp[0].expr); }
 #line 2034 "snobol4.tab.c"
     break;
 
   case 121: /* goto_expr: goto_expr T_CONCAT goto_atom  */
-#line 211 "snobol4.y"
-                                                                                                  { expr_add_child((yyvsp[-2].expr),(yyvsp[0].expr)); (yyval.expr)=(yyvsp[-2].expr); }
+#line 209 "snobol4.y"
+                                                                                                  { tree_t*s=ast_node_new(TT_SEQ);expr_add_child(s,(yyvsp[-2].expr));expr_add_child(s,(yyvsp[0].expr));(yyval.expr)=s; }
 #line 2040 "snobol4.tab.c"
     break;
 
@@ -2233,7 +2233,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 213 "snobol4.y"
+#line 211 "snobol4.y"
 
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int snobol4_lex(YYSTYPE *yylval_param, void *yyparse_param) {

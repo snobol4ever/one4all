@@ -200,15 +200,13 @@ fnc_args   : fnc_args T_COMMA expr0                                             
            | expr0                                                                                 { expr_add_child(g_cur_top_(),$1); }
            |
            ;
-/* PST-SN4-W3: goto_expr uses expr_add_child into existing TT_SEQ to stay flat,
- * same left-to-right discipline as expr3/expr4. First atom starts the node. */
 goto_atom  : T_STR    { tree_t*e=ast_node_new(TT_QLIT); e->v.sval=(char*)$1.sval; $$=e; }
            | T_IDENT   { tree_t*e=ast_node_new(TT_VAR);  e->v.sval=(char*)$1.sval; $$=e; }
            | T_FUNCTION{ tree_t*e=ast_node_new(TT_VAR);  e->v.sval=(char*)$1.sval; $$=e; }
            | T_END     { tree_t*e=ast_node_new(TT_VAR);  e->v.sval=(char*)$1.sval; $$=e; }
            ;
 goto_expr  : goto_atom                                                                            { $$=$1; }
-           | goto_expr T_CONCAT goto_atom                                                         { expr_add_child($1,$3); $$=$1; }
+           | goto_expr T_CONCAT goto_atom                                                         { tree_t*s=ast_node_new(TT_SEQ);expr_add_child(s,$1);expr_add_child(s,$3);$$=s; }
            ;
 %%
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
