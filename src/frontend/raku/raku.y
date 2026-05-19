@@ -195,22 +195,8 @@ program
         {
             ExprList *all = $1;
             if (all) {
-                for (int i = 0; i < all->count; i++) {
-                    tree_t *e = all->items[i];
-                    if (!e || e->t != TT_SUB_DECL) continue;
-                    add_proc(e);
-                    all->items[i] = NULL;
-                }
-                int has_body = 0;
-                for (int i = 0; i < all->count; i++) if (all->items[i]) { has_body=1; break; }
-                if (has_body) {
-                    tree_t *mf = leaf_sval(TT_SUB_DECL, "main");
-                    tree_t *mn = ast_node_new(TT_VAR); mn->v.sval = intern("main");
-                    expr_add_child(mf, mn);
-                    for (int i = 0; i < all->count; i++)
-                        if (all->items[i]) expr_add_child(mf, all->items[i]);
-                    add_proc(mf);
-                }
+                for (int i = 0; i < all->count; i++)
+                    if (all->items[i]) add_proc(all->items[i]);
                 exprlist_free(all);
             }
         }
