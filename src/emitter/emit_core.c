@@ -1437,3 +1437,486 @@ int emit_epilogue(IR_block_t * cfg, FILE * out) {
     }
     return 0;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* EC-5: jvm_sanitize_name — moved from emit_jvm.c. */
+static void jvm_sanitize_name(char * dst, size_t dsz, const char * src) {
+    size_t j = 0;
+    for (size_t i = 0; src[i] && j + 1 < dsz; i++) {
+        char c = src[i];
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') dst[j++] = c;
+        else dst[j++] = '_';
+    }
+    if (j == 0 && j + 4 < dsz) { dst[j++] = 's'; dst[j++] = 'n'; dst[j++] = 'o'; }
+    dst[j] = '\0';
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* EC-5: net_parse_define_proto — moved from emit_net.c. */
+static char ** net_parse_define_proto(const char * proto, char ** out_fname, int * out_n) {
+    *out_fname = NULL; *out_n = 0;
+    if (!proto) return NULL;
+    const char * lp = strchr(proto, '(');
+    const char * rp = lp ? strchr(lp, ')') : NULL;
+    if (!lp) {
+        size_t flen = strlen(proto); char * fn = (char *)malloc(flen + 1);
+        memcpy(fn, proto, flen); fn[flen] = '\0'; *out_fname = fn; return NULL;
+    }
+    size_t flen = (size_t)(lp - proto); char * fn = (char *)malloc(flen + 1);
+    memcpy(fn, proto, flen); fn[flen] = '\0'; *out_fname = fn;
+    if (!rp || rp <= lp + 1) return NULL;
+    int cap = 4, count = 0;
+    char ** params = (char **)malloc((size_t)(cap + 1) * sizeof(char *));
+    const char * s = lp + 1;
+    while (s < rp) {
+        while (s < rp && (*s == ' ' || *s == '\t')) s++;
+        const char * pstart = s;
+        while (s < rp && *s != ',' && *s != ' ' && *s != '\t') s++;
+        size_t plen = (size_t)(s - pstart);
+        if (plen > 0) {
+            if (count >= cap) { cap *= 2; params = (char **)realloc(params, (size_t)(cap + 1) * sizeof(char *)); }
+            char * p = (char *)malloc(plen + 1); memcpy(p, pstart, plen); p[plen] = '\0'; params[count++] = p;
+        }
+        while (s < rp && (*s == ' ' || *s == '\t')) s++;
+        if (s < rp && *s == ',') s++;
+    }
+    params[count] = NULL; *out_n = count; return params;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* EC-5: ir_node_id / ir_is_generator / ir_walk — moved from emit_ir.c. */
+int ir_node_id(IR_t * nd) { return (int)((uintptr_t)nd % 100000u); }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+int ir_is_generator(IR_e k) {
+    if (k >= IR_PAT_LIT   && k <= IR_PAT_CALLOUT)  return 1;
+    if (k >= IR_PL_CHOICE && k <= IR_PL_CALL)      return 1;
+    if (k >= IR_ICN_TO    && k <= IR_ICN_PROC_GEN) return 1;
+    if (k == IR_SCAN || k == IR_ALTERNATE || k == IR_TO_BY ||
+        k == IR_EVERY || k == IR_WHILE    || k == IR_LIMIT || k == IR_SUSPEND) return 1;
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+#define IR_WALK_MAX 4096
+static int g_visited[IR_WALK_MAX];
+static int g_vcount = 0;
+static void ir_walk_rec(IR_t * nd, void (*visit)(IR_t *, void *), void * ctx) {
+    if (!nd) return;
+    int id = ir_node_id(nd);
+    for (int i = 0; i < g_vcount; i++) if (g_visited[i] == id) return;
+    if (g_vcount < IR_WALK_MAX) g_visited[g_vcount++] = id;
+    visit(nd, ctx);
+    ir_walk_rec(nd->α, visit, ctx); ir_walk_rec(nd->β, visit, ctx);
+    ir_walk_rec(nd->γ, visit, ctx); ir_walk_rec(nd->ω, visit, ctx);
+    if (nd->c) for (int i = 0; i < nd->n; i++) ir_walk_rec(nd->c[i], visit, ctx);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+void ir_walk(IR_block_t * cfg, void (*visit)(IR_t *, void *), void * ctx) {
+    if (!cfg || !cfg->entry) return;
+    g_vcount = 0;
+    ir_walk_rec(cfg->entry, visit, ctx);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* EC-5: emit_jvm_from_sm — moved from emit_jvm.c (method-split SM walk). */
+static void emit_jvm_one_instr(SM_Program * sm, int i, int n, const char ** fn_names, const int * fn_pcs, int fn_count, int in_body, const char * in_my_method, FILE * out) {
+    SM_Instr * instr = &sm->instrs[i];
+    switch (instr->op) {
+    case SM_LABEL: break;
+    case SM_STNO:  sm_stno(instr, out); break;
+    case SM_PUSH_LIT_I: sm_push_lit_i(instr, out); break;
+    case SM_PUSH_LIT_S: sm_push_lit_s(instr, out); break;
+    case SM_PUSH_LIT_F: sm_push_lit_f(instr, out); break;
+    case SM_PUSH_NULL: case SM_PUSH_NULL_NOFLIP: sm_push_null(instr, out); break;
+    case SM_PUSH_VAR:  sm_push_var(instr, out); break;
+    case SM_STORE_VAR: sm_store_var(instr, out); break;
+    case SM_VOID_POP:  sm_void_pop(instr, out); break;
+    case SM_CONCAT:    sm_concat(instr, out); break;
+    case SM_NEG:       sm_neg(instr, out); break;
+    case SM_COERCE_NUM: sm_coerce_num(instr, out); break;
+    case SM_EXP:       sm_exp(instr, out); break;
+    case SM_ADD:       sm_add(instr, out); break;
+    case SM_SUB:       sm_sub(instr, out); break;
+    case SM_MUL:       sm_mul(instr, out); break;
+    case SM_DIV:       sm_div(instr, out); break;
+    case SM_MOD:       sm_mod(instr, out); break;
+    case SM_ACOMP:     sm_acomp(instr, out); break;
+    case SM_LCOMP:     sm_lcomp(instr, out); break;
+    case SM_JUMP:   { sm_ctx_t ctx = {i, n, in_body, in_my_method}; sm_jump(instr, &ctx, out); break; }
+    case SM_JUMP_S: { sm_ctx_t ctx = {i, n, in_body, in_my_method}; sm_jump_s(instr, &ctx, out); break; }
+    case SM_JUMP_F: { sm_ctx_t ctx = {i, n, in_body, in_my_method}; sm_jump_f(instr, &ctx, out); break; }
+    case SM_CALL_FN: case SM_SUSPEND_VALUE: {
+        const char * cname = instr->a[0].s ? instr->a[0].s : "";
+        if (!cname[0]) {
+            jvm_push_int2(out, 0); jvm_push_int2(out, 1);
+            fprintf(out, "    invokestatic rt/SnoRt/do_return(II)I\n    pop\n");
+            fprintf(out, "    invokestatic rt/SnoRt/fn_return_push()V\n    return\n"); break;
+        }
+        int entry_pc = -1;
+        for (int k = 0; k < fn_count; k++) if (fn_names[k] && strcmp(fn_names[k], cname) == 0) { entry_pc = fn_pcs[k]; break; }
+        if (entry_pc >= 0) {
+            char mname[256]; jvm_sanitize_name(mname, sizeof mname, cname);
+            jvm_emit_ldc_string(out, cname); jvm_push_int2(out, (long)instr->a[1].i);
+            fprintf(out, "    invokestatic rt/SnoRt/bind_params(Ljava/lang/String;I)V\n");
+            fprintf(out, "    invokestatic Prog/sno_fn_%s()V\n", mname);
+        } else {
+            jvm_emit_ldc_string(out, cname); jvm_push_int2(out, (long)instr->a[1].i);
+            fprintf(out, "    invokestatic rt/SnoRt/call(Ljava/lang/String;I)V\n");
+        }
+        break;
+    }
+    case SM_RETURN:   case SM_RETURN_S:  case SM_RETURN_F:  { sm_ctx_t ctx = {i}; sm_return(instr, &ctx, out); break; }
+    case SM_FRETURN:  case SM_FRETURN_S: case SM_FRETURN_F: { sm_ctx_t ctx = {i}; sm_freturn(instr, &ctx, out); break; }
+    case SM_NRETURN:  case SM_NRETURN_S: case SM_NRETURN_F: { sm_ctx_t ctx = {i}; sm_nreturn(instr, &ctx, out); break; }
+    case SM_DEFINE_ENTRY: case SM_DEFINE: break;
+    case SM_HALT: { sm_ctx_t ctx = {i, n, in_body, in_my_method}; sm_halt(instr, &ctx, out); break; }
+    case SM_PAT_LIT:             sm_pat_lit(instr, out); break;
+    case SM_PAT_ANY:             sm_pat_any_i(instr, i, out); break;
+    case SM_PAT_NOTANY:          sm_pat_notany(instr, i, out); break;
+    case SM_PAT_SPAN:            sm_pat_span(instr, i, out); break;
+    case SM_PAT_BREAK:           sm_pat_break(instr, i, out); break;
+    case SM_PAT_LEN:             sm_pat_len(instr, out); break;
+    case SM_PAT_POS:             sm_pat_pos(instr, out); break;
+    case SM_PAT_RPOS:            sm_pat_rpos(instr, out); break;
+    case SM_PAT_TAB:             sm_pat_tab(instr, out); break;
+    case SM_PAT_RTAB:            sm_pat_rtab(instr, out); break;
+    case SM_PAT_ARB:             sm_pat_arb(instr, out); break;
+    case SM_PAT_ARBNO:           sm_pat_arbno(instr, out); break;
+    case SM_PAT_REM:             sm_pat_rem(instr, out); break;
+    case SM_PAT_BAL:             sm_pat_bal(instr, out); break;
+    case SM_PAT_FENCE0:          sm_pat_fence0(instr, out); break;
+    case SM_PAT_FENCE1:          sm_pat_fence1(instr, out); break;
+    case SM_PAT_ABORT:           sm_pat_abort(instr, out); break;
+    case SM_PAT_FAIL:            sm_pat_fail(instr, out); break;
+    case SM_PAT_SUCCEED:         sm_pat_succeed(instr, out); break;
+    case SM_PAT_EPS:             sm_pat_eps(instr, out); break;
+    case SM_PAT_CAT:             sm_pat_cat(instr, out); break;
+    case SM_PAT_ALT:             sm_pat_alt(instr, out); break;
+    case SM_PAT_DEREF:           sm_pat_deref(instr, out); break;
+    case SM_PAT_REFNAME:         sm_pat_refname(instr, out); break;
+    case SM_PAT_CAPTURE:         sm_pat_capture(instr, out); break;
+    case SM_PAT_CAPTURE_FN:      sm_pat_capture_fn(instr, out); break;
+    case SM_PAT_CAPTURE_FN_ARGS: sm_pat_capture_fn_args(instr, out); break;
+    case SM_PAT_USERCALL:        sm_pat_usercall(instr, out); break;
+    case SM_PAT_USERCALL_ARGS:   sm_pat_usercall_args(instr, out); break;
+    case SM_EXEC_STMT: {
+        const char * sname = instr->a[0].s ? instr->a[0].s : "";
+        int has_repl = (int)instr->a[1].i;
+        jvm_emit_ldc_string(out, sname); jvm_push_int2(out, has_repl);
+        fprintf(out, "    invokestatic rt/SnoRt/sno_exec_stmt(Ljava/lang/String;I)V\n"); break;
+    }
+    default: break;
+    }
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static void emit_jvm_sm_range(SM_Program * sm, int lo, int hi, int n, const char ** fn_names, const int * fn_pcs, int fn_count, FILE * out) {
+    char * in_my = (char *)calloc((size_t)n, 1);
+    for (int i = lo; i < hi; i++) in_my[i] = 1;
+    fprintf(out, "    ; \xe2\x94\x80\xe2\x94\x80 SM instructions %d..%d \xe2\x94\x80\xe2\x94\x80\n", lo, hi - 1);
+    for (int i = lo; i < hi; i++) { fprintf(out, "sm_pc_%d:\n", i); emit_jvm_one_instr(sm, i, n, fn_names, fn_pcs, fn_count, 0, in_my, out); }
+    fprintf(out, "sm_pc_fn_end:\n");
+    free(in_my);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static int emit_jvm_from_sm(SM_Program * sm, FILE * out) {
+    if (!sm || !out) return 0;
+    int n = sm->count; if (n == 0) return 0;
+    int * fn_pcs = (int *)calloc((size_t)n, sizeof(int));
+    int * fn_ends = (int *)calloc((size_t)n, sizeof(int));
+    const char ** fn_names = (const char **)calloc((size_t)n, sizeof(const char *));
+    int fn_count = 0;
+    for (int i = 0; i < n; i++) {
+        SM_Instr * ins = &sm->instrs[i];
+        if (ins->op == SM_LABEL && ins->a[2].i && ins->a[0].s) { fn_pcs[fn_count] = i; fn_names[fn_count] = ins->a[0].s; fn_count++; }
+    }
+    int * group_ends = (int *)calloc((size_t)fn_count, sizeof(int));
+    for (int k = 0; k < fn_count; k++) group_ends[k] = -1;
+    for (int k = 0; k < fn_count; k++) {
+        int p = fn_pcs[k];
+        for (int j = p - 1; j >= 0; j--) {
+            SM_Instr * pi = &sm->instrs[j];
+            if (pi->op == SM_LABEL && pi->a[2].i) break;
+            if (pi->op == SM_LABEL) break;
+            if (pi->op == SM_HALT) break;
+            if (pi->op == SM_JUMP) { int t = (int)pi->a[0].i; if (t > p && t <= n) group_ends[k] = t; break; }
+        }
+    }
+    for (int k = 0; k < fn_count; k++) { if (group_ends[k] < 0) { if (k > 0) group_ends[k] = group_ends[k - 1]; else group_ends[k] = n; } }
+    for (int k = 0; k < fn_count; k++) {
+        int my_end = group_ends[k];
+        if (k + 1 < fn_count && fn_pcs[k + 1] < my_end) my_end = fn_pcs[k + 1];
+        if (my_end > n) my_end = n;
+        fn_ends[k] = my_end;
+    }
+    free(group_ends);
+    char * is_fn_body = (char *)calloc((size_t)n, 1);
+    for (int k = 0; k < fn_count; k++) for (int j = fn_pcs[k]; j < fn_ends[k]; j++) is_fn_body[j] = 1;
+    char * body_in_my = (char *)calloc((size_t)n, 1);
+    for (int i = 0; i < n; i++) body_in_my[i] = is_fn_body[i] ? 0 : 1;
+    fprintf(out, ".method public static sno_body()V\n    .limit stack 16\n    .limit locals 4\n");
+    fprintf(out, "    ; \xe2\x94\x80\xe2\x94\x80 SM body (non-function PCs) \xe2\x94\x80\xe2\x94\x80\n");
+    for (int i = 0; i < n; i++) { if (is_fn_body[i]) continue; fprintf(out, "sm_pc_%d:\n", i); emit_jvm_one_instr(sm, i, n, fn_names, fn_pcs, fn_count, 1, body_in_my, out); }
+    fprintf(out, "sm_pc_body_end:\n    return\n.end method\n");
+    free(body_in_my);
+    for (int k = 0; k < fn_count; k++) {
+        char mname[256]; jvm_sanitize_name(mname, sizeof mname, fn_names[k]);
+        fprintf(out, ".method public static sno_fn_%s()V\n    .limit stack 16\n    .limit locals 4\n", mname);
+        emit_jvm_sm_range(sm, fn_pcs[k], fn_ends[k], n, fn_names, fn_pcs, fn_count, out);
+        fprintf(out, "    return\n.end method\n");
+    }
+    free(fn_pcs); free(fn_names); free(fn_ends); free(is_fn_body);
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* EC-5: emit_js_from_sm — moved from emit_js.c. */
+static void js_escape_string(FILE * out, const char * s) {
+    fprintf(out, "\"");
+    for (; s && *s; s++) {
+        unsigned char c = (unsigned char)*s;
+        if      (c == '"')  fprintf(out, "\\\"");
+        else if (c == '\\') fprintf(out, "\\\\");
+        else if (c == '\n') fprintf(out, "\\n");
+        else if (c == '\r') fprintf(out, "\\r");
+        else if (c == '\t') fprintf(out, "\\t");
+        else if (c < 0x20 || c > 0x7e) fprintf(out, "\\x%02x", c);
+        else fprintf(out, "%c", c);
+    }
+    fprintf(out, "\"");
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static int emit_js_from_sm(SM_Program * sm, FILE * out) {
+    if (!sm || !out || sm->count == 0) return 0;
+    for (int i = 0; i < sm->count; i++) {
+        SM_Instr * instr = &sm->instrs[i];
+        fprintf(out, "case %d: ", i);
+        int has_continue = 0;
+        switch (instr->op) {
+        case SM_STNO:              sm_stno(instr, out); break;
+        case SM_LABEL:             break;
+        case SM_PUSH_LIT_I:        sm_push_lit_i(instr, out); break;
+        case SM_PUSH_LIT_S:        sm_push_lit_s(instr, out); break;
+        case SM_PUSH_LIT_F:        sm_push_lit_f(instr, out); break;
+        case SM_PUSH_NULL: case SM_PUSH_NULL_NOFLIP: sm_push_null(instr, out); break;
+        case SM_PUSH_VAR:          sm_push_var(instr, out); break;
+        case SM_STORE_VAR:         sm_store_var(instr, out); break;
+        case SM_VOID_POP:          sm_void_pop(instr, out); break;
+        case SM_ADD:               sm_add(instr, out); break;
+        case SM_SUB:               sm_sub(instr, out); break;
+        case SM_MUL:               sm_mul(instr, out); break;
+        case SM_DIV:               sm_div(instr, out); break;
+        case SM_MOD:               sm_mod(instr, out); break;
+        case SM_CONCAT:            sm_concat(instr, out); break;
+        case SM_NEG:               sm_neg(instr, out); break;
+        case SM_COERCE_NUM:        sm_coerce_num(instr, out); break;
+        case SM_EXP:               sm_exp(instr, out); break;
+        case SM_HALT:   { sm_ctx_t ctx = {i, sm->count, 0, NULL}; has_continue |= sm_halt(instr, &ctx, out); break; }
+        case SM_JUMP:   { sm_ctx_t ctx = {i, sm->count, 0, NULL}; has_continue |= sm_jump(instr, &ctx, out); break; }
+        case SM_JUMP_S: { sm_ctx_t ctx = {i, sm->count, 0, NULL}; has_continue |= sm_jump_s(instr, &ctx, out); break; }
+        case SM_JUMP_F: { sm_ctx_t ctx = {i, sm->count, 0, NULL}; has_continue |= sm_jump_f(instr, &ctx, out); break; }
+        case SM_SUSPEND_VALUE:
+            fprintf(out, "{ let _r = rt.call_or_jump("); js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
+            fprintf(out, ", %lld, %d); if (_r >= 0) { _pc = _r; continue; } } ", instr->a[1].i, i + 1);
+            fprintf(out, "rt.set_last_ok(!rt._is_fail(rt._peek())); "); break;
+        case SM_CALL_FN:
+            fprintf(out, "{ let _r = rt.call_or_jump("); js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
+            fprintf(out, ", %lld, %d); if (_r >= 0) { _pc = _r; continue; } } ", instr->a[1].i, i + 1); break;
+        case SM_RETURN:   case SM_RETURN_S:  case SM_RETURN_F:  { sm_ctx_t ctx = {i}; has_continue |= sm_return(instr, &ctx, out); break; }
+        case SM_FRETURN:  case SM_FRETURN_S: case SM_FRETURN_F: { sm_ctx_t ctx = {i}; has_continue |= sm_freturn(instr, &ctx, out); break; }
+        case SM_NRETURN:  case SM_NRETURN_S: case SM_NRETURN_F: { sm_ctx_t ctx = {i}; has_continue |= sm_nreturn(instr, &ctx, out); break; }
+        case SM_DEFINE_ENTRY: break;
+        case SM_PUSH_EXPRESSION: fprintf(out, "rt.push_null(); "); break;
+        case SM_PAT_LIT:             sm_pat_lit(instr, out); break;
+        case SM_PAT_SPAN:            sm_pat_span(instr, i, out); break;
+        case SM_PAT_BREAK:           sm_pat_break(instr, i, out); break;
+        case SM_PAT_ANY:             sm_pat_any_i(instr, i, out); break;
+        case SM_PAT_NOTANY:          sm_pat_notany(instr, i, out); break;
+        case SM_PAT_LEN:             sm_pat_len(instr, out); break;
+        case SM_PAT_POS:             sm_pat_pos(instr, out); break;
+        case SM_PAT_RPOS:            sm_pat_rpos(instr, out); break;
+        case SM_PAT_TAB:             sm_pat_tab(instr, out); break;
+        case SM_PAT_RTAB:            sm_pat_rtab(instr, out); break;
+        case SM_PAT_REM:             sm_pat_rem(instr, out); break;
+        case SM_PAT_ARB:             sm_pat_arb(instr, out); break;
+        case SM_PAT_ARBNO:           sm_pat_arbno(instr, out); break;
+        case SM_PAT_BAL:             sm_pat_bal(instr, out); break;
+        case SM_PAT_FAIL:            sm_pat_fail(instr, out); break;
+        case SM_PAT_SUCCEED:         sm_pat_succeed(instr, out); break;
+        case SM_PAT_ABORT:           sm_pat_abort(instr, out); break;
+        case SM_PAT_FENCE0:          sm_pat_fence0(instr, out); break;
+        case SM_PAT_EPS:             sm_pat_eps(instr, out); break;
+        case SM_PAT_CAT:             sm_pat_cat(instr, out); break;
+        case SM_PAT_ALT:             sm_pat_alt(instr, out); break;
+        case SM_PAT_DEREF:           sm_pat_deref(instr, out); break;
+        case SM_PAT_REFNAME:         sm_pat_refname(instr, out); break;
+        case SM_PAT_CAPTURE:         sm_pat_capture(instr, out); break;
+        case SM_PAT_CAPTURE_FN:      sm_pat_capture_fn(instr, out); break;
+        case SM_PAT_CAPTURE_FN_ARGS: sm_pat_capture_fn_args(instr, out); break;
+        case SM_PAT_USERCALL:        sm_pat_usercall(instr, out); break;
+        case SM_PAT_USERCALL_ARGS:   sm_pat_usercall_args(instr, out); break;
+        case SM_EXEC_STMT:           sm_exec_stmt(instr, out); break;
+        default: break;
+        }
+        if (!has_continue) fprintf(out, "_pc = %d; continue; ", i + 1);
+    }
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* EC-5: emit_net_from_sm — moved from emit_net.c. */
+static int emit_net_from_sm(SM_Program * sm, FILE * out) {
+    if (!sm || !out) return 0;
+    int n = sm->count;
+    int * fn_pcs = NULL; const char ** fn_names = NULL; char *** fn_params = NULL;
+    int * fn_nparams = NULL; int fn_count = 0; int * pc_to_fn = NULL;
+    if (n > 0) {
+        fn_pcs = (int *)calloc((size_t)n, sizeof(int));
+        fn_names = (const char **)calloc((size_t)n, sizeof(const char *));
+        fn_params = (char ***)calloc((size_t)n, sizeof(char **));
+        fn_nparams = (int *)calloc((size_t)n, sizeof(int));
+        pc_to_fn = (int *)malloc((size_t)n * sizeof(int));
+        for (int p = 0; p < n; p++) pc_to_fn[p] = -1;
+        for (int i = 0; i < n; i++) {
+            SM_Instr * ins = &sm->instrs[i];
+            if (ins->op == SM_LABEL && ins->a[2].i && ins->a[0].s) { fn_pcs[fn_count] = i; fn_names[fn_count] = ins->a[0].s; fn_count++; }
+        }
+        for (int i = 1; i < n; i++) {
+            SM_Instr * ins = &sm->instrs[i];
+            if (ins->op != SM_CALL_FN && ins->op != SM_SUSPEND_VALUE) continue;
+            if (!ins->a[0].s || strcmp(ins->a[0].s, "DEFINE") != 0) continue;
+            SM_Instr * prev = &sm->instrs[i - 1];
+            if (prev->op != SM_PUSH_LIT_S && prev->op != SM_PUSH_LIT_CS) continue;
+            if (!prev->a[0].s) continue;
+            char * fname = NULL; int npar = 0;
+            char ** pars = net_parse_define_proto(prev->a[0].s, &fname, &npar);
+            if (fname) {
+                for (int k = 0; k < fn_count; k++) {
+                    if (fn_names[k] && strcmp(fn_names[k], fname) == 0) { fn_params[k] = pars; fn_nparams[k] = npar; pars = NULL; break; }
+                }
+                free(fname);
+                if (pars) { for (int q = 0; q < npar; q++) free(pars[q]); free(pars); }
+            }
+        }
+        for (int k = 0; k < fn_count; k++) {
+            int entry = fn_pcs[k], around_target = -1;
+            for (int p = entry - 1; p >= 0; p--) {
+                SM_Instr * pi = &sm->instrs[p];
+                if (pi->op == SM_JUMP && (int)pi->a[0].i > entry) { around_target = (int)pi->a[0].i; break; }
+            }
+            int body_end = (around_target > 0) ? around_target - 1 : entry;
+            for (int p = entry; p <= body_end && p < n; p++) if (pc_to_fn[p] < 0) pc_to_fn[p] = k;
+        }
+    }
+    fprintf(out, "    .locals init (int32 _pc)\n    ldc.i4.0\n    stloc      _pc\n");
+    fprintf(out, "  NET_DISPATCH:\n    ldloc      _pc\n    switch (");
+    for (int i = 0; i < n; i++) { fprintf(out, "NET_L%d", i); if (i < n - 1) fprintf(out, ", "); }
+    fprintf(out, ")\n    br         NET_DONE\n");
+    for (int i = 0; i < n; i++) {
+        SM_Instr * instr = &sm->instrs[i];
+        fprintf(out, "  NET_L%d:\n", i);
+        int has_continue = 0;
+        switch (instr->op) {
+        case SM_STNO:  sm_stno(instr, out); break;
+        case SM_PUSH_LIT_I: sm_push_lit_i(instr, out); break;
+        case SM_PUSH_LIT_S: case SM_PUSH_LIT_CS: sm_push_lit_s(instr, out); break;
+        case SM_PUSH_LIT_F: sm_push_lit_f(instr, out); break;
+        case SM_PUSH_NULL: case SM_PUSH_NULL_NOFLIP: sm_push_null(instr, out); break;
+        case SM_PUSH_VAR:   sm_push_var(instr, out); break;
+        case SM_STORE_VAR:  sm_store_var(instr, out); break;
+        case SM_VOID_POP:   sm_void_pop(instr, out); break;
+        case SM_CONCAT:     sm_concat(instr, out); break;
+        case SM_NEG:        sm_neg(instr, out); break;
+        case SM_COERCE_NUM: sm_coerce_num(instr, out); break;
+        case SM_EXP:        sm_exp(instr, out); break;
+        case SM_ADD:        sm_add(instr, out); break;
+        case SM_SUB:        sm_sub(instr, out); break;
+        case SM_MUL:        sm_mul(instr, out); break;
+        case SM_DIV:        sm_div(instr, out); break;
+        case SM_MOD:        sm_mod(instr, out); break;
+        case SM_ACOMP:      sm_acomp(instr, out); break;
+        case SM_LCOMP:      sm_lcomp(instr, out); break;
+        case SM_HALT:   { sm_ctx_t ctx = {i, n, 0, NULL}; has_continue |= sm_halt(instr, &ctx, out); break; }
+        case SM_LABEL:
+            if (instr->a[2].i && instr->a[0].s) {
+                int k = -1;
+                for (int q = 0; q < fn_count; q++) if (fn_pcs[q] == i) { k = q; break; }
+                fprintf(out, "    ldc.i4.1\n    call       void SnoRt::set_last_ok(bool)\n");
+                fprintf(out, "    call       void SnoRt::frame_push()\n");
+                if (k >= 0 && fn_names[k]) { net_escape_ldstr(out, fn_names[k]); fprintf(out, "    call       void SnoRt::frame_save(string)\n"); }
+                if (k >= 0 && fn_params[k] && fn_nparams[k] > 0) {
+                    for (int p = 0; p < fn_nparams[k]; p++) { net_escape_ldstr(out, fn_params[k][p]); fprintf(out, "    call       void SnoRt::frame_save(string)\n"); }
+                    for (int p = fn_nparams[k] - 1; p >= 0; p--) { net_escape_ldstr(out, fn_params[k][p]); fprintf(out, "    call       void SnoRt::store_var(string)\n"); }
+                }
+            }
+            break;
+        case SM_JUMP:   { sm_ctx_t ctx = {i, n, 0, NULL}; has_continue |= sm_jump(instr, &ctx, out); break; }
+        case SM_JUMP_S: { sm_ctx_t ctx = {i, n, 0, NULL}; has_continue |= sm_jump_s(instr, &ctx, out); break; }
+        case SM_JUMP_F: { sm_ctx_t ctx = {i, n, 0, NULL}; has_continue |= sm_jump_f(instr, &ctx, out); break; }
+        case SM_SUSPEND_VALUE: case SM_CALL_FN: {
+            const char * cname = instr->a[0].s ? instr->a[0].s : "";
+            int entry_pc = -1;
+            for (int k = 0; k < fn_count; k++) if (fn_names[k] && strcmp(fn_names[k], cname) == 0) { entry_pc = fn_pcs[k]; break; }
+            if (entry_pc >= 0) {
+                net_push_i4(out, i + 1); fprintf(out, "    call       void SnoRt::push_ret_pc(int32)\n");
+                net_push_i4(out, entry_pc); fprintf(out, "    stloc      _pc\n    br         NET_DISPATCH\n"); has_continue = 1;
+            } else if (cname[0] == '\0' && pc_to_fn && i >= 0 && i < n && pc_to_fn[i] >= 0) {
+                int fk = pc_to_fn[i]; const char * fname = (fk >= 0 && fk < fn_count) ? fn_names[fk] : NULL;
+                if (fname) { net_escape_ldstr(out, fname); fprintf(out, "    call       void SnoRt::push_var(string)\n"); }
+                else fprintf(out, "    call       void SnoRt::push_null()\n");
+                fprintf(out, "    call       void SnoRt::frame_exit()\n");
+                net_push_i4(out, 0); net_push_i4(out, 1);
+                fprintf(out, "    call       void SnoRt::do_return(int32, bool)\n");
+                fprintf(out, "    call       int32 SnoRt::pop_ret_pc()\n    stloc      _pc\n    br         NET_DISPATCH\n"); has_continue = 1;
+            } else {
+                net_escape_ldstr(out, cname); net_push_i4(out, (int)instr->a[1].i);
+                fprintf(out, "    call       void SnoRt::sno_call(string, int32)\n");
+            }
+            break;
+        }
+        case SM_RETURN:  case SM_RETURN_S:  case SM_RETURN_F:  { sm_ctx_t ctx = {i, n, 0, NULL, pc_to_fn, fn_names, fn_count}; has_continue |= sm_return(instr, &ctx, out); break; }
+        case SM_FRETURN: case SM_FRETURN_S: case SM_FRETURN_F: { sm_ctx_t ctx = {i, n, 0, NULL, pc_to_fn, fn_names, fn_count}; has_continue |= sm_freturn(instr, &ctx, out); break; }
+        case SM_NRETURN: case SM_NRETURN_S: case SM_NRETURN_F: { sm_ctx_t ctx = {i, n, 0, NULL, pc_to_fn, fn_names, fn_count}; has_continue |= sm_nreturn(instr, &ctx, out); break; }
+        case SM_DEFINE_ENTRY: case SM_DEFINE: case SM_EXEC_STMT: {
+            int has_repl = (int)instr->a[1].i; const char * subj_name = instr->a[0].s ? instr->a[0].s : "";
+            if (has_repl) fprintf(out, "    pop\n");
+            fprintf(out, "    pop\n    pop\n");
+            net_escape_ldstr(out, subj_name);
+            fprintf(out, "    call       void SnoRt::push_var(string)\n    dup\n");
+            fprintf(out, "    call       int32 [mscorlib]System.String::get_Length()\n");
+            fprintf(out, "    call       void SnoRt::set_omega(int32)\n    call       void SnoRt::set_sigma(string)\n");
+            fprintf(out, "    ldc.i4.0\n    call       void SnoRt::set_delta(int32)\n");
+            fprintf(out, "    ldc.i4.0\n    call       void SnoRt::set_last_ok(bool)\n"); break;
+        }
+        default: break;
+        }
+        if (!has_continue && i + 1 < n) { net_push_i4(out, i + 1); fprintf(out, "    stloc      _pc\n    br         NET_DISPATCH\n"); }
+    }
+    fprintf(out, "  NET_DONE:\n");
+    if (fn_params) { for (int k = 0; k < fn_count; k++) { if (fn_params[k]) { for (int q = 0; q < fn_nparams[k]; q++) free(fn_params[k][q]); free(fn_params[k]); } } free(fn_params); }
+    free(fn_nparams); free(pc_to_fn); free(fn_pcs); free(fn_names);
+    return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* EC-5: emit_program — unified entry point replacing emit_jvm_program/emit_js_program/emit_net_program. */
+int emit_program(const tree_t * ast_prog, FILE * out, bb_emit_mode_t mode) {
+    if (!ast_prog || !out) return 1;
+    SM_Program * sm = sm_preamble(ast_prog);
+    if (!sm) return 1;
+    bb_emit_mode_t saved_mode = bb_emit_mode;
+    FILE *         saved_out  = bb_emit_out;
+    emit_mode_set(mode, out);
+    emit_prologue(NULL, out);
+    if (IS_JVM) emit_jvm_from_sm(sm, out);
+    else if (IS_JS) {
+        fprintf(out, "rt._register_label_pcs({");
+        int first = 1;
+        for (int i = 0; i < sm->count; i++) {
+            SM_Instr * in = &sm->instrs[i];
+            if (in->op == SM_LABEL && in->a[0].s && in->a[0].s[0]) {
+                if (!first) fprintf(out, ",");
+                js_escape_string(out, in->a[0].s);
+                fprintf(out, ":%d", i);
+                first = 0;
+            }
+        }
+        fprintf(out, "});\n");
+        emit_js_from_sm(sm, out);
+    } else if (IS_NET) emit_net_from_sm(sm, out);
+    emit_epilogue(NULL, out);
+    emit_mode_set(saved_mode, saved_out);
+    sm_prog_free(sm);
+    return 0;
+}

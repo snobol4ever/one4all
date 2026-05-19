@@ -232,4 +232,6 @@ void sm_exec_stmt        (const SM_Instr * instr, FILE * out);
 /*--- EC-4: unified prologue/epilogue (emit_core.c) — replaces per-silo statics ----------*/
 int  emit_prologue(IR_block_t * cfg, FILE * out);
 int  emit_epilogue(IR_block_t * cfg, FILE * out);
+struct tree_t;
+int  emit_program(const struct tree_t * ast_prog, FILE * out, bb_emit_mode_t mode);
 #endif

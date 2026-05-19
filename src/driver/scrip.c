@@ -27,9 +27,6 @@ extern void ir_set_print_width(int w);   /* --dump-width N: inline/multiline thr
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void ir_print_node_nl(const tree_t *e, FILE *f);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-extern int emit_jvm_program(const tree_t * ast_prog, FILE * out);
-extern int emit_js_program(const tree_t * ast_prog, FILE * out);
-extern int emit_net_program(const tree_t * ast_prog, FILE * out);
 extern int emit_wasm_program(const tree_t * ast_prog, FILE * out);
 #include "snobol4.h"
 #include "sil_macros.h"
@@ -45,7 +42,6 @@ extern int emit_wasm_program(const tree_t * ast_prog, FILE * out);
 #include "scrip_sm.h"
 #include "sync_monitor.h"
 #include "sm_image.h"
-#include "emit_ir.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t pat_at_cursor(const char *varname);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -381,28 +377,23 @@ int main(int argc, char **argv)
     }
     if (mode_compile && target_name && strcmp(target_name, "x86") != 0) {
         if (strcmp(target_name, "js") == 0) {
-            if (emit_js_program(ast_prog, stdout) != 0) {
-                fprintf(stderr, "scrip: emit_js_program failed\n");
+            if (emit_program(ast_prog, stdout, EMIT_JS) != 0) {
+                fprintf(stderr, "scrip: emit_program(js) failed\n");
                 return 1;
             }
         } else if (strcmp(target_name, "jvm") == 0) {
-            if (emit_jvm_program(ast_prog, stdout) != 0) {
-                fprintf(stderr, "scrip: emit_jvm_program failed\n");
+            if (emit_program(ast_prog, stdout, EMIT_JVM) != 0) {
+                fprintf(stderr, "scrip: emit_program(jvm) failed\n");
                 return 1;
             }
         } else if (strcmp(target_name, "net") == 0) {
-            if (emit_net_program(ast_prog, stdout) != 0) {
-                fprintf(stderr, "scrip: emit_net_program failed\n");
+            if (emit_program(ast_prog, stdout, EMIT_NET) != 0) {
+                fprintf(stderr, "scrip: emit_program(net) failed\n");
                 return 1;
             }
         } else if (strcmp(target_name, "wasm") == 0) {
             if (emit_wasm_program(ast_prog, stdout) != 0) {
                 fprintf(stderr, "scrip: emit_wasm_program failed\n");
-                return 1;
-            }
-        } else {
-            if (emit_ir_block(NULL, stdout, target_name) != 0) {
-                fprintf(stderr, "scrip: emit_ir_block failed for target '%s'\n", target_name);
                 return 1;
             }
         }
