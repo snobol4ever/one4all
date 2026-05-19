@@ -254,7 +254,8 @@ static void lower_tree_stmt(RebLow *L, tree_t *s) {
         break;
     }
     case TT_CASE: {
-        /* c[0]=expr c[1..]=TT_IF clauses (guard=c[0], body=c[1]) */
+        /* c[0]=expr; then alternating pairs c[1]=guard0, c[2]=body0, c[3]=guard1, c[4]=body1 ...
+           default clause: guard is TT_NUL. No TT_IF wrapper nodes. */
         char *l_end = newlab(L);
         char tmpbuf[32];
         snprintf(tmpbuf, sizeof tmpbuf, "rb_case_%d", L->label_ctr);
@@ -263,13 +264,11 @@ static void lower_tree_stmt(RebLow *L, tree_t *s) {
         assign->subject = expr_binary(TT_ASSIGN, tmpvar, lower_tree_expr(L, s->c[0]));
         emit(L, assign);
         char *l_next = NULL;
-        for (int i = 1; i < s->n; i++) {
-            tree_t *clause = s->c[i]; /* TT_IF node */
+        for (int i = 1; i + 1 < s->n; i += 2) {
+            tree_t *guard = s->c[i];
+            tree_t *body  = s->c[i + 1];
             if (l_next) { emit_label(L, l_next); free(l_next); l_next = NULL; }
-            tree_t *guard = clause->c[0];
-            tree_t *body  = clause->c[1];
             if (guard->t == TT_NUL) {
-                /* default clause */
                 lower_tree_stmt(L, body);
                 emit_goto(L, l_end);
             } else {

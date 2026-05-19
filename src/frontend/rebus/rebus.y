@@ -384,19 +384,18 @@ for_stmt
 case_stmt
     : T_CASE expr T_OF '{' caselist '}'
         {
-            /* TT_CASE c[0]=expr c[1..]=clauses (each TT_IF for guard:body or TT_NUL:body for default) */
+            /* TT_CASE c[0]=expr, then alternating guard/body pairs:
+               c[1]=guard0 c[2]=body0 c[3]=guard1 c[4]=body1 ...
+               default clause: guard is TT_NUL. No synthesized TT_IF wrappers. */
             tree_t *cs = ast_node_new(TT_CASE);
             expr_add_child(cs, $2);
-            /* walk RCase list, convert to tree children */
             for (RCase *c = $5; c; c = c->next) {
-                tree_t *clause = ast_node_new(TT_IF);
                 if (c->is_default) {
-                    expr_add_child(clause, ast_node_new(TT_NUL));
+                    expr_add_child(cs, ast_node_new(TT_NUL));
                 } else {
-                    expr_add_child(clause, c->guard_tree);
+                    expr_add_child(cs, c->guard_tree);
                 }
-                expr_add_child(clause, c->body_tree);
-                expr_add_child(cs, clause);
+                expr_add_child(cs, c->body_tree);
             }
             $$ = cs;
         }
