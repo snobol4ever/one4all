@@ -99,7 +99,8 @@ extern int  rebus_yylineno;
 %type <sal>    opt_locals opt_params
 %type <tal>    arglist arglist_ne
 %type <tree>   opt_initial
-/* case clause list reuses RCase for now — 5c will remove it */
+/* RCase is parser-local scratch for caselist reductions (Option A, PST-RB-DECL-3).
+   No RCase* survives in any tree_t output — freed at end of case_stmt action. */
 %type <rcase>  caselist caseclause
 
 %expect 1
@@ -392,7 +393,8 @@ case_stmt
         {
             /* TT_CASE c[0]=expr, then alternating guard/body pairs:
                c[1]=guard0 c[2]=body0 c[3]=guard1 c[4]=body1 ...
-               default clause: guard is TT_NUL. No synthesized TT_IF wrappers. */
+               default clause: guard is TT_NUL. No synthesized TT_IF wrappers.
+               RCase is parser-local scratch only — freed here, never escapes. */
             tree_t *cs = ast_node_new(TT_CASE);
             expr_add_child(cs, $2);
             for (RCase *c = $5; c; c = c->next) {
@@ -403,6 +405,7 @@ case_stmt
                 }
                 expr_add_child(cs, c->body_tree);
             }
+            { RCase *c = $5; while (c) { RCase *nx = c->next; free(c); c = nx; } }
             $$ = cs;
         }
     ;
