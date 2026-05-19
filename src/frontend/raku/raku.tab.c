@@ -2344,21 +2344,21 @@ yyreduce:
 
   case 107: /* call_expr: atom '.' IDENT '(' arg_list ')'  */
 #line 513 "raku.y"
-        { tree_t *c=make_call("raku_mcall");
-          expr_add_child(c,(yyvsp[-5].node));
-          expr_add_child(c,leaf_sval(TT_QLIT,(yyvsp[-3].sval))); free((yyvsp[-3].sval));
-          ExprList *args=(yyvsp[-1].list);
-          if(args){ for(int i=0;i<args->count;i++) expr_add_child(c,args->items[i]); exprlist_free(args); }
-          (yyval.node)=c; }
+        { tree_t *c = ast_node_new(TT_METHCALL);
+          ast_push(c, (yyvsp[-5].node));
+          ast_push(c, leaf_sval(TT_QLIT, (yyvsp[-3].sval))); free((yyvsp[-3].sval));
+          ExprList *args = (yyvsp[-1].list);
+          if (args) { for (int i = 0; i < args->count; i++) ast_push(c, args->items[i]); exprlist_free(args); }
+          (yyval.node) = c; }
 #line 2354 "raku.tab.c"
     break;
 
   case 108: /* call_expr: atom '.' IDENT '(' ')'  */
 #line 520 "raku.y"
-        { tree_t *c=make_call("raku_mcall");
-          expr_add_child(c,(yyvsp[-4].node));
-          expr_add_child(c,leaf_sval(TT_QLIT,(yyvsp[-2].sval))); free((yyvsp[-2].sval));
-          (yyval.node)=c; }
+        { tree_t *c = ast_node_new(TT_METHCALL);
+          ast_push(c, (yyvsp[-4].node));
+          ast_push(c, leaf_sval(TT_QLIT, (yyvsp[-2].sval))); free((yyvsp[-2].sval));
+          (yyval.node) = c; }
 #line 2363 "raku.tab.c"
     break;
 

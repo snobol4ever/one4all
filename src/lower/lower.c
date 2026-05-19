@@ -1732,6 +1732,12 @@ static void lower_expr_inner(const tree_t *t)
         sm_emit_si(g_p, SM_CALL_FN, "raku_new", (int64_t)nchildren);
         return;
     }
+    case TT_METHCALL: {
+        int nchildren = t->n;
+        for (int i = 0; i < nchildren; i++) if (t->c[i]) lower_expr(t->c[i]);
+        sm_emit_si(g_p, SM_CALL_FN, "raku_mcall", (int64_t)nchildren);
+        return;
+    }
     case TT_ARR_GET:    if (t->n >= 2) { lower_expr(t->c[0]); lower_expr(t->c[1]); } sm_emit_si(g_p, SM_CALL_FN, "arr_get",      2); return;
     case TT_ARR_SET:    if (t->n >= 3) { lower_expr(t->c[0]); lower_expr(t->c[1]); lower_expr(t->c[2]); } sm_emit_si(g_p, SM_CALL_FN, "arr_set",   3); return;
     case TT_HASH_GET:   if (t->n >= 2) { lower_expr(t->c[0]); lower_expr(t->c[1]); } sm_emit_si(g_p, SM_CALL_FN, "hash_get",     2); return;

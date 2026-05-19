@@ -510,17 +510,17 @@ call_expr
           ast_push(c, leaf_sval(TT_QLIT, $1)); free($1);
           $$ = c; }
     | atom '.' IDENT '(' arg_list ')'
-        { tree_t *c=make_call("raku_mcall");
-          expr_add_child(c,$1);
-          expr_add_child(c,leaf_sval(TT_QLIT,$3)); free($3);
-          ExprList *args=$5;
-          if(args){ for(int i=0;i<args->count;i++) expr_add_child(c,args->items[i]); exprlist_free(args); }
-          $$=c; }
+        { tree_t *c = ast_node_new(TT_METHCALL);
+          ast_push(c, $1);
+          ast_push(c, leaf_sval(TT_QLIT, $3)); free($3);
+          ExprList *args = $5;
+          if (args) { for (int i = 0; i < args->count; i++) ast_push(c, args->items[i]); exprlist_free(args); }
+          $$ = c; }
     | atom '.' IDENT '(' ')'
-        { tree_t *c=make_call("raku_mcall");
-          expr_add_child(c,$1);
-          expr_add_child(c,leaf_sval(TT_QLIT,$3)); free($3);
-          $$=c; }
+        { tree_t *c = ast_node_new(TT_METHCALL);
+          ast_push(c, $1);
+          ast_push(c, leaf_sval(TT_QLIT, $3)); free($3);
+          $$ = c; }
     | atom '.' IDENT
         { tree_t *fe=ast_node_new(TT_FIELD);
           fe->v.sval=(char*)intern($3); free($3);
