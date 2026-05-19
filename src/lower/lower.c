@@ -778,6 +778,34 @@ static void lower_if_stmt(const tree_t *t)
     sm_emit(g_p, SM_PUSH_NULL);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PRF-12-unless (2026-05-19): lower_unless handles TT_UNLESS(cond, then_body, ?else_body).
+ * Semantics: execute then_body when cond FAILS (falsy); execute else_body when cond SUCCEEDS.
+ * This is the mirror of lower_if_stmt with SM_JUMP_S (skip then when cond succeeds). */
+static void lower_unless(const tree_t *t)
+{
+    if (t->n < 1) return;
+    lower_expr(t->c[0]);
+    /* Jump past the then-body when condition succeeds (unless = "if not") */
+    int js = sm_emit_i(g_p, SM_JUMP_S, 0);
+    sm_emit(g_p, SM_VOID_POP);
+    /* then body (runs when cond fails = falsy) */
+    const tree_t *then_b = (t->n > 1) ? t->c[1] : NULL;
+    if (then_b && then_b->t == TT_PROGRAM) {
+        for (int i = 0; i < then_b->n; i++) if (then_b->c[i]) lower_stmt(then_b->c[i]);
+    } else if (then_b) { lower_expr(then_b); sm_emit(g_p, SM_VOID_POP); }
+    int jend = sm_emit_i(g_p, SM_JUMP, 0);
+    sm_patch_jump(g_p, js, sm_label(g_p));
+    sm_emit(g_p, SM_VOID_POP);
+    /* else body (runs when cond succeeds = truthy) */
+    const tree_t *else_b = (t->n > 2) ? t->c[2] : NULL;
+    if (else_b && else_b->t == TT_PROGRAM) {
+        for (int i = 0; i < else_b->n; i++) if (else_b->c[i]) lower_stmt(else_b->c[i]);
+    } else if (else_b) { lower_expr(else_b); sm_emit(g_p, SM_VOID_POP); }
+    sm_patch_jump(g_p, jend, sm_label(g_p));
+    /* push null so lower_stmt's surrounding SM_VOID_POP has something to consume */
+    sm_emit(g_p, SM_PUSH_NULL);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* PST-SC-LABELS: lower_while_until reads no QLIT label children — generates labels internally.
  * TT_WHILE shape: c[0]=cond, c[1]=body (TT_PROGRAM or expr). No label children. */
 static void lower_while_until(const tree_t *t, int exit_on_success)
@@ -1569,6 +1597,7 @@ static void lower_expr_inner(const tree_t *t)
         else
             lower_if(t);
         return;
+    case TT_UNLESS:                           lower_unless(t);        return;
     case TT_WHILE:                            lower_while(t);         return;
     case TT_DO_WHILE:                         lower_do_while(t);      return;
     case TT_FOR:                              lower_for(t);           return;
