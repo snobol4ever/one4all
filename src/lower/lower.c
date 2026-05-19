@@ -1346,7 +1346,7 @@ static void lower_class_decl(const tree_t *t)
             lower_raku_meth_register(cname, shortname, fname);
             if (item->n > 0 && item->c[0] && item->c[0]->t == TT_VAR)
                 item->c[0]->v.sval = (char *)fname;
-            for (int j = nparams + 1; j < item->n; j++)
+            for (int j = nparams; j < item->n; j++)
                 if (item->c[j]) { lower_expr(item->c[j]); sm_emit(g_p, SM_VOID_POP); }
         }
     }

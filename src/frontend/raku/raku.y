@@ -393,7 +393,6 @@ class_body_list
           tree_t *e = ast_node_new(TT_SUB_DECL);
           e->v.ival = (long long)(np + 1);
           tree_t *nn = ast_node_new(TT_VAR); nn->v.sval = intern($3); expr_add_child(e, nn);
-          expr_add_child(e, leaf_sval(TT_VAR, "self"));
           if (params) { for (int i = 0; i < np; i++) expr_add_child(e, params->items[i]); exprlist_free(params); }
           tree_t *body = $7;
           for (int i = 0; i < body->n; i++) expr_add_child(e, body->c[i]);
@@ -403,7 +402,6 @@ class_body_list
         { tree_t *e = ast_node_new(TT_SUB_DECL);
           e->v.ival = (long long)(1);
           tree_t *nn = ast_node_new(TT_VAR); nn->v.sval = intern($3); expr_add_child(e, nn);
-          expr_add_child(e, leaf_sval(TT_VAR, "self"));
           tree_t *body = $6;
           for (int i = 0; i < body->n; i++) expr_add_child(e, body->c[i]);
           free($3);
