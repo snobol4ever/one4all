@@ -72,6 +72,26 @@ static void lower_unhandled(const tree_t *t)
     sm_emit(g_p, SM_PUSH_NULL);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* PST-SC-4l (2026-05-19): split TT_SCAN(subj,pat) or TT_SEQ(var/kw/qlit/indirect, rest...) subject
+ * into separate subj+pat locals. Replaces sc_split_subject_pattern in snocone_parse.y sc_append_stmt.
+ * Tree is read-only here; no free(). Pointers are reassigned to children of the wrapper node. */
+static void lower_subj_pat_split(const tree_t **subj_io, const tree_t **pat_io)
+{
+    const tree_t *subj = *subj_io;
+    if (*pat_io || !subj) return;
+    if (subj->t == TT_SCAN && subj->n == 2) { *subj_io = subj->c[0]; *pat_io = subj->c[1]; return; }
+    if (subj->t == TT_SEQ && subj->n >= 2) {
+        const tree_t *first = subj->c[0];
+        if (first->t == TT_VAR || first->t == TT_KEYWORD || first->t == TT_QLIT || first->t == TT_INDIRECT) {
+            *subj_io = first;
+            if (subj->n == 2) { *pat_io = subj->c[1]; return; }
+            tree_t *rest = ast_node_new(TT_SEQ);
+            for (int i = 1; i < subj->n; i++) ast_push(rest, subj->c[i]);
+            *pat_io = rest;
+        }
+    }
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_goto(sm_opcode_t op, const char *target)
 {
     if (!target) return -1;
@@ -1225,6 +1245,8 @@ void lower_stmt(const tree_t *s)
     tree_t      *subject = attr_expr_of(s, ":subj");
     tree_t      *pattern = attr_expr_of(s, ":pat");
     int         has_eq  = (stmt_attr_find(s, ":eq") != NULL);
+    /* PST-SC-4l (2026-05-19): split TT_SCAN/TT_SEQ subject into subj+pat in lower, not parser */
+    lower_subj_pat_split((const tree_t **)&subject, (const tree_t **)&pattern);
     tree_t      *replacement = attr_expr_of(s, ":repl");
     /* PST-SN4-1c: gotos are now TT_GOTO_S/F/U children, not TT_ATTR(":goS"...) */
     tree_t      *go_s_attr   = stmt_goto_find(s, TT_GOTO_S);
