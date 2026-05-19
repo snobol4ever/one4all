@@ -431,8 +431,7 @@ expr
     : VAR_SCALAR '=' expr  { $$=expr_binary(TT_ASSIGN,var_node($1),$3); }
     | KW_GATHER block      {
           tree_t *g = ast_node_new(TT_GATHER);
-          tree_t *blk = $2;
-          for (int i = 0; i < blk->n; i++) expr_add_child(g, blk->c[i]);
+          expr_add_child(g, $2);
           $$ = g;
       }
     | cmp_expr             { $$=$1; }
@@ -643,6 +642,5 @@ tree_t *raku_parse_string(const char *src) {
     void *buf = raku_yy_scan_string(src);
     raku_yyparse();
     raku_yy_delete_buffer(buf);
-    raku_lower_hoist_gather_pass(raku_prog_result);
     return raku_prog_result;
 }
