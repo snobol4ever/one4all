@@ -30,6 +30,7 @@ typedef enum tree_e {
     TT_PROGRAM,           TT_STMT,              TT_END,               TT_ATTR,
     TT_GOTO_S,            TT_GOTO_F,            TT_GOTO_U,
     TT_GATHER,
+    TT_PROC_DECL,
     TT_KIND_COUNT
 } tree_e;
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -152,6 +153,7 @@ static const char * const tt_e_name[TT_KIND_COUNT] = {
     [TT_PROGRAM]          = "TT_PROGRAM",        [TT_STMT]             = "TT_STMT",            [TT_END]              = "TT_END",
     [TT_ATTR]             = "TT_ATTR",           [TT_GOTO_S]           = "TT_GOTO_S",          [TT_GOTO_F]           = "TT_GOTO_F",
     [TT_GOTO_U]           = "TT_GOTO_U",         [TT_GATHER]           = "TT_GATHER",
+    [TT_PROC_DECL]        = "TT_PROC_DECL",
 };
 #endif
 /*================================================================================================================================================================================*/

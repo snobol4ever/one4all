@@ -994,14 +994,13 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     }
 }
 /* lower_icn_proc_body — build IR_block_t* for an Icon procedure body.                                                                                                                                     */
-/* Input: the TT_PROC AST node. Children [0]=name-or-formals, [1..nparams]=params, [body_start..] = body statements.                                                                                       */
+/* Input: the TT_PROC_DECL AST node. c[0]=TT_VAR(name), c[1]=TT_VLIST(params), c[2]=TT_PROGRAM(body).                                                                                                       */
 /* Returns NULL if any statement cannot be lowered yet — caller falls back to legacy SM path.                                                                                                              */
 /* The resulting block: IR_SEQ over the body statements; body fails (FAILDESCR) so bb_broker exits after one tick.                                                                                         */
 IR_block_t *lower_icn_proc_body(tree_t *proc) {
-    if (!proc || proc->t != TT_FNC) return NULL;
-    int nparams    = proc->_id;
-    int body_start = 1 + nparams;
-    int n_stmts    = proc->n - body_start;
+    if (!proc || proc->t != TT_PROC_DECL) return NULL;
+    tree_t *body_node = (proc->n >= 3) ? proc->c[2] : NULL;
+    int n_stmts = body_node ? body_node->n : 0;
     if (n_stmts <= 0) return NULL;
     IR_block_t *cfg = IR_alloc(4096, IR_LANG_ICN);
     if (!cfg) return NULL;
@@ -1009,7 +1008,7 @@ IR_block_t *lower_icn_proc_body(tree_t *proc) {
     if (!stmt_nodes) { IR_free(cfg); return NULL; }
     int built = 0;
     for (int i = 0; i < n_stmts; i++) {
-        tree_t *st = proc->c[body_start + i];
+        tree_t *st = body_node->c[i];
         if (!st) continue;
         IR_t *nd = lower_icn_expr_node(cfg, st);
         if (!nd) { free(stmt_nodes); IR_free(cfg); return NULL; }

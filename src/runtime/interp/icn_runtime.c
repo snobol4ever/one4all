@@ -195,17 +195,16 @@ DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs)
         }
         if (found_pi >= 0 && proc_table[found_pi].proc) {
             found_proc = proc_table[found_pi].proc;
-            int nparams_p = found_proc->_id;
-            int body_start = 1 + nparams_p;
-            for (int bi = body_start; bi < found_proc->n; bi++)
-                icn_scope_patch(&proc_table[found_pi].lower_sc, found_proc->c[bi]);
+            tree_t *body_nd = (found_proc->t == TT_PROC_DECL && found_proc->n >= 3) ? found_proc->c[2] : NULL;
+            if (body_nd) for (int bi = 0; bi < body_nd->n; bi++)
+                icn_scope_patch(&proc_table[found_pi].lower_sc, body_nd->c[bi]);
             int total_slots = proc_table[found_pi].lower_sc.n;
             if (total_slots > f->env_n) f->env_n = total_slots;
             f->sc = proc_table[found_pi].lower_sc;
             IcnScope *sc = &proc_table[found_pi].lower_sc;
             IcnFrame *parent_f = (frame_depth >= 2) ? &frame_stack[frame_depth - 2] : NULL;
-            for (int bi = body_start; bi < found_proc->n; bi++) {
-                tree_t *st = found_proc->c[bi];
+            for (int bi = 0; body_nd && bi < body_nd->n; bi++) {
+                tree_t *st = body_nd->c[bi];
                 if (!st || st->t != TT_STATIC_DECL) continue;
                 for (int j = 0; j < st->n; j++) {
                     tree_t *vn = st->c[j];
@@ -226,10 +225,9 @@ DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs)
     DESCR_t result = sm_call_expression(entry_pc);
     if (found_pi >= 0 && found_proc) {
         IcnScope *sc = &proc_table[found_pi].lower_sc;
-        int nparams_p = found_proc->_id;
-        int body_start = 1 + nparams_p;
-        for (int bi = body_start; bi < found_proc->n; bi++) {
-            tree_t *st = found_proc->c[bi];
+        tree_t *body_nd2 = (found_proc->t == TT_PROC_DECL && found_proc->n >= 3) ? found_proc->c[2] : NULL;
+        for (int bi = 0; body_nd2 && bi < body_nd2->n; bi++) {
+            tree_t *st = body_nd2->c[bi];
             if (!st || st->t != TT_STATIC_DECL) continue;
             for (int j = 0; j < st->n; j++) {
                 tree_t *vn = st->c[j];

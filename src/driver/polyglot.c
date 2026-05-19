@@ -111,14 +111,14 @@ void polyglot_init(const tree_t *prog, uint32_t lang_mask)
                 spec[pos] = '\0';
                 icn_record_register(spec);
             }
-            if (proc->t == TT_FNC && proc->v.sval && *proc->v.sval) {
+            if ((proc->t == TT_FNC || proc->t == TT_PROC_DECL) && proc->v.sval && *proc->v.sval) {
                 const char *name = proc->v.sval;
                 if (proc_count < PROC_TABLE_MAX) {
                     proc_table[proc_count].name     = name;
                     proc_table[proc_count].proc     = proc;
                     proc_table[proc_count].entry_pc = -1;
                     proc_table[proc_count].nparams  = (s_lang == LANG_ICN)
-                        ? proc->_id
+                        ? (proc->t == TT_PROC_DECL && proc->n >= 2 ? proc->c[1]->n : 0)
                         : (int)proc->v.ival;
                     proc_count++;
                     if (mod_idx >= 0) g_registry.mods[mod_idx].proc_count++;

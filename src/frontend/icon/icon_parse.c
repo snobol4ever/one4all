@@ -750,12 +750,16 @@ static tree_t *parse_proc(IcnParser *p) {
         }
     }
     expect(p, TK_END, "end of procedure");
-    tree_t *proc = ast_node_new(TT_FNC);
-    proc->v.sval = intern_n(name_tok.val.sval.data, (int)name_tok.val.sval.len);
-    proc->_id    = nparams;
-    push_child(proc, e_leaf_sval(TT_VAR, proc->v.sval, -1));
-    for (int i = 0; i < nparams; i++) push_child(proc, params[i]);
-    for (int i = 0; i < nstmts; i++) push_child(proc, stmts[i]);
+    const char *procname = intern_n(name_tok.val.sval.data, (int)name_tok.val.sval.len);
+    tree_t *vlist = ast_node_new(TT_VLIST);
+    for (int i = 0; i < nparams; i++) ast_push(vlist, params[i]);
+    tree_t *body = ast_node_new(TT_PROGRAM);
+    for (int i = 0; i < nstmts; i++) ast_push(body, stmts[i]);
+    tree_t *proc = ast_node_new(TT_PROC_DECL);
+    proc->v.sval = procname;
+    ast_push(proc, e_leaf_sval(TT_VAR, procname, -1));
+    ast_push(proc, vlist);
+    ast_push(proc, body);
     free(params); free(stmts);
     return proc;
 }

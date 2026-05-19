@@ -1494,16 +1494,19 @@ static void lower_expr_inner(const tree_t *t)
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void build_proc_scope(IcnScope *sc, const tree_t *proc, int body_start)
 {
-    int nparams = proc->_id;
     sc->n = 0;
+    tree_t *plist = (proc->t == TT_PROC_DECL && proc->n >= 2) ? proc->c[1] : NULL;
+    tree_t *bnode = (proc->t == TT_PROC_DECL && proc->n >= 3) ? proc->c[2] : NULL;
+    int nparams = plist ? plist->n : 0;
     for (int i = 0; i < nparams && i < FRAME_SLOT_MAX; i++) {
-        tree_t *pn = proc->c[1+i];
+        tree_t *pn = plist->c[i];
         if (pn && pn->v.sval) scope_add(sc, pn->v.sval);
     }
-    for (int i = body_start; i < proc->n; i++)
-        expression_scope_walk(sc, proc->c[i]);
-    for (int i = body_start; i < proc->n; i++) {
-        tree_t *ch = proc->c[i];
+    int bn = bnode ? bnode->n : 0;
+    for (int i = 0; i < bn; i++)
+        expression_scope_walk(sc, bnode->c[i]);
+    for (int i = 0; i < bn; i++) {
+        tree_t *ch = bnode->c[i];
         if (!ch || ch->t != TT_INITIAL) continue;
         for (int ai = 0; ai < ch->n; ai++) {
             tree_t *as = ch->c[ai];
@@ -1538,7 +1541,7 @@ static void lower_proc_skeletons(void)
         int skip = sm_emit_i(g_p, SM_JUMP, 0);
         sm_label_named(g_p, nm);
         if (proc) {
-            int body_start = 1 + proc->_id;
+            int body_start = 0;
             IcnScope sc; build_proc_scope(&sc, proc, body_start);
             proc_table[pi].lower_sc = sc;
             /* Attempt to lower body to an IR_block_t DCG.  When successful, runtime icn_bb_pump_proc_by_name */
@@ -1570,9 +1573,12 @@ static void lower_proc_skeletons(void)
             g_proc_scope = &sc; g_in_proc_body = 1;
             g_in_gen_proc_body = proc_table[pi].is_generator;  /* IJ-SUSPEND: emit real SM for gen procs */
             g_lang = LANG_ICN;
-            for (int i = body_start; i < proc->n; i++) {
-                if (!proc->c[i]) continue;
-                lower_expr( proc->c[i]); sm_emit(g_p, SM_VOID_POP);
+            {
+                tree_t *bnd = (proc->t == TT_PROC_DECL && proc->n >= 3) ? proc->c[2] : NULL;
+                for (int i = 0; bnd && i < bnd->n; i++) {
+                    if (!bnd->c[i]) continue;
+                    lower_expr(bnd->c[i]); sm_emit(g_p, SM_VOID_POP);
+                }
             }
             g_lang = 0;
             g_in_proc_body = 0; g_proc_scope = NULL;
