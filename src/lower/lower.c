@@ -1105,19 +1105,69 @@ static void lower_nreturn(const tree_t *t)
 static void lower_case(const tree_t *t)
 {
     if (t->n < 1) { sm_emit(g_p, SM_PUSH_NULL); return; }
-    /* PST-SC-4f: Snocone TT_CASE has QLIT end-label as last child and TT_PROGRAM arm bodies.
-     * Detect by checking if last child is TT_QLIT. */
+    /* PST-SC-SWITCH-LABELS (2026-05-19): Snocone TT_CASE shape is now [disc, val0, body0, val1, body1, ...]
+     * with NO trailing QLIT end-label child. Detect by: last child is NOT TT_QLIT.
+     * (Raku TT_CASE has [topic, val0, body0, ...] with odd n-1 count; distinguishable by g_lang.)
+     * lower mints the break label and registers it in labtab so TT_LOOP_BREAK resolves correctly. */
     int last = t->n - 1;
-    int is_snocone = (last >= 1 && t->c[last] && t->c[last]->t == TT_QLIT);
-    if (is_snocone) {
-        /* Shape: disc, (val, TT_PROGRAM(body))*, QLIT(end_lbl)
-         * val == TT_NUL means default arm. */
+    int is_snocone = (g_lang != LANG_RAKU) && !(last >= 1 && t->c[last] && t->c[last]->t == TT_QLIT);
+    /* Legacy Snocone path (old tree with trailing QLIT): keep working for any residual trees */
+    int has_qlit_end = (last >= 1 && t->c[last] && t->c[last]->t == TT_QLIT);
+    if (has_qlit_end && g_lang != LANG_RAKU) {
+        /* Old shape: disc, (val, body)*, QLIT(end_lbl) — backward compat only */
         LabelTable *tbl = &g_labtab;
         const char *lbl_end = t->c[last]->v.sval;
-        int narms = (last - 1) / 2;   /* pairs: (val,body) each 2 children, disc=c[0], qlit=c[last] */
+        int narms = (last - 1) / 2;
         lower_expr(t->c[0]);
         sm_emit_s(g_p, SM_STORE_VAR, "__case_topic__"); sm_emit(g_p, SM_VOID_POP);
-        /* emit compare-and-branch chain; default arm (TT_NUL value) falls to the end */
+        int *arm_entry = (int *)GC_MALLOC((size_t)(narms > 0 ? narms : 1) * sizeof(int));
+        int *end_jumps = (int *)GC_MALLOC((size_t)(narms > 0 ? narms : 1) * sizeof(int));
+        int nend = 0, def_arm = -1;
+        for (int i = 0; i < narms; i++) {
+            tree_t *val  = t->c[1 + i*2];
+            if (!val || val->t == TT_NUL) { def_arm = i; continue; }
+            sm_emit_s(g_p, SM_PUSH_VAR, "__case_topic__");
+            lower_expr(val);
+            sm_emit_si(g_p, SM_CALL_FN, "ICN_CASE_EQ", 2);
+            arm_entry[i] = sm_emit_i(g_p, SM_JUMP_S, 0);
+            sm_emit(g_p, SM_VOID_POP);
+        }
+        int jdefault = sm_emit_i(g_p, SM_JUMP, 0);
+        for (int i = 0; i < narms; i++) {
+            tree_t *val  = t->c[1 + i*2];
+            tree_t *body = t->c[2 + i*2];
+            if (!val || val->t == TT_NUL) {
+                sm_patch_jump(g_p, jdefault, g_p->count);
+                jdefault = -1;
+            } else {
+                sm_patch_jump(g_p, arm_entry[i], g_p->count);
+                sm_emit(g_p, SM_VOID_POP);
+            }
+            if (body && body->t == TT_PROGRAM) {
+                for (int j = 0; j < body->n; j++)
+                    if (body->c[j]) lower_stmt(body->c[j]);
+            } else if (body) {
+                lower_expr(body); sm_emit(g_p, SM_VOID_POP);
+            }
+            if (nend < 256) end_jumps[nend++] = sm_emit_i(g_p, SM_JUMP, 0);
+        }
+        int exit_pos = g_p->count;
+        if (jdefault >= 0) sm_patch_jump(g_p, jdefault, exit_pos);
+        for (int i = 0; i < nend; i++) sm_patch_jump(g_p, end_jumps[i], exit_pos);
+        if (lbl_end && lbl_end[0]) labtab_define(tbl, lbl_end, exit_pos);
+        sm_emit(g_p, SM_PUSH_NULL);
+        (void)def_arm;
+        return;
+    }
+    if (is_snocone) {
+        /* PST-SC-SWITCH-LABELS shape: disc, (val, body)* — no trailing QLIT.
+         * Mint the break/end label here; push it on g_loop_stack so TT_LOOP_BREAK resolves. */
+        LabelTable *tbl = &g_labtab;
+        char *lbl_end  = lower_fresh_label("_Lend");
+        int narms = (t->n - 1) / 2;   /* disc=c[0], then pairs */
+        loop_push(lbl_end, lbl_end);   /* break inside switch jumps to end */
+        lower_expr(t->c[0]);
+        sm_emit_s(g_p, SM_STORE_VAR, "__case_topic__"); sm_emit(g_p, SM_VOID_POP);
         int *arm_entry = (int *)GC_MALLOC((size_t)(narms > 0 ? narms : 1) * sizeof(int));
         int *end_jumps = (int *)GC_MALLOC((size_t)(narms > 0 ? narms : 1) * sizeof(int));
         int nend = 0, def_arm = -1;
@@ -1155,8 +1205,11 @@ static void lower_case(const tree_t *t)
         int exit_pos = g_p->count;
         if (jdefault >= 0) sm_patch_jump(g_p, jdefault, exit_pos);
         for (int i = 0; i < nend; i++) sm_patch_jump(g_p, end_jumps[i], exit_pos);
-        if (lbl_end && lbl_end[0]) labtab_define(tbl, lbl_end, exit_pos);
+        labtab_define(tbl, lbl_end, exit_pos);
+        loop_pop();
+        free(lbl_end);
         sm_emit(g_p, SM_PUSH_NULL);
+        (void)def_arm;
         return;
     }
     /* PRF-8 (2026-05-18): Raku TT_CASE shape is [topic, val0, body0, val1, body1, ...].

@@ -749,11 +749,9 @@ static void sc_finalize_if_else_pst(ScParseState *st, struct IfHead *h, STMT_t *
     free(h);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* PST-SC-4c (2026-05-16): pure-syntax while finalizer.
- * Builds TT_WHILE(cond, TT_PROGRAM(body), TT_QLIT(cont_lbl), TT_QLIT(end_lbl)).
- * Label strings are stored as QLIT children so lower.c can call labtab_define
- * at the right instruction positions without emitting SM_LABEL instructions.
- * sc_loop_push was called in while_head; sc_loop_pop resolves break/continue here. */
+/* PST-SC-4c/PST-SC-LABELS (2026-05-16/19): pure-syntax while finalizer.
+ * Builds TT_WHILE(cond, body). Labels minted in lower.c via lower_fresh_label.
+ * sc_loop_push was called in while_head with NULL,NULL; sc_loop_pop resolves break/continue here. */
 static void sc_finalize_while_pst(ScParseState *st, struct WhileHead *h, tree_t *cond)
 {
     tree_t    *body   = sc_collect_body(st, h->before_body);
@@ -766,11 +764,9 @@ static void sc_finalize_while_pst(ScParseState *st, struct WhileHead *h, tree_t 
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* PST-SC-4d (2026-05-16): pure-syntax do-while finalizer.
- * Builds TT_DO_WHILE(TT_PROGRAM(body), cond, TT_QLIT(cont_lbl), TT_QLIT(end_lbl)).
- * Body is child 0 (executed first); cond is child 1 (tested at loop bottom).
- * Label QLITs in c[2]/c[3] let lower.c call labtab_define without emitting SM_LABEL.
- * sc_loop_push was called in do_head; sc_loop_pop resolves break/continue here. */
+/* PST-SC-4d/PST-SC-LABELS (2026-05-16/19): pure-syntax do-while finalizer.
+ * Builds TT_DO_WHILE(body, cond). Labels minted in lower.c via lower_fresh_label.
+ * sc_loop_push was called in do_head with NULL,NULL; sc_loop_pop resolves break/continue here. */
 static void sc_finalize_do_while_pst(ScParseState *st, struct DoHead *h, tree_t *cond)
 {
     tree_t    *body   = sc_collect_body(st, h->before_body);
@@ -782,10 +778,9 @@ static void sc_finalize_do_while_pst(ScParseState *st, struct DoHead *h, tree_t 
     sc_append_stmt(st, dw);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* PST-SC-4e (2026-05-16): pure-syntax for-loop finalizer.
- * Builds TT_FOR(cond, step, TT_PROGRAM(body), TT_QLIT(cont_lbl), TT_QLIT(end_lbl)).
- * Init was already appended as a preceding statement (via sc_append_stmt in for_head action).
- * Body collected from for_before_body snapshot. Labels from sc_loop_push in grammar action. */
+/* PST-SC-4e/PST-SC-FOR-INIT/PST-SC-LABELS (2026-05-16/19): pure-syntax for-loop finalizer.
+ * Builds TT_FOR(init, cond, step, body). Labels minted in lower.c via lower_fresh_label.
+ * Body collected from for_before_body snapshot. sc_loop_push in grammar action uses NULL,NULL. */
 static void sc_finalize_for_pst(ScParseState *st, struct ForHead *h)
 {
     tree_t    *body   = sc_collect_body(st, h->before_body);
@@ -864,19 +859,20 @@ static void sc_switch_cases_grow(struct SwitchHead *h) {
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* PST-SC-4f (2026-05-16): switch head records disc and labels; no tmp-assign emitted.
- * lower.c will handle the IDENT comparisons directly from TT_CASE children. */
+ * PST-SC-SWITCH-LABELS (2026-05-19): no sc_label_new calls here; lower.c mints labels via
+ * lower_fresh_label(). sc_loop_push gets NULL,NULL so the break-target is resolved in lower. */
 static struct SwitchHead *sc_switch_head_new(ScParseState *st, tree_t *disc) {
     struct SwitchHead *h = calloc(1, sizeof *h);
     h->disc          = disc;
     h->lineno        = st->ctx ? st->ctx->line : 0;
     h->prev_switch   = st->cur_switch;
-    h->end_label     = sc_label_new(st, "_Lend");
-    h->default_label = sc_label_new(st, "_Ldefault");
+    h->end_label     = NULL;
+    h->default_label = NULL;
     h->has_default   = 0;
     h->tmp_name      = NULL;
     h->after_tmp_assign     = NULL;
     h->last_case_label_tail = NULL;
-    sc_loop_push(st, strdup(h->end_label), strdup(h->end_label), 0);
+    sc_loop_push(st, NULL, NULL, 0);
     st->cur_switch = h;
     return h;
 }
@@ -911,10 +907,10 @@ static void sc_switch_default_label(ScParseState *st) {
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* PST-SC-4f (2026-05-16): pure-syntax switch finalizer.
- * Builds TT_CASE(disc, val1, TT_PROGRAM(body1), val2, TT_PROGRAM(body2), ..., [TT_PROGRAM(default)]).
- * Bodies collected in reverse order (last arm first) so sc_collect_body's forward-scan works.
- * NULL value child marks the default arm. QLIT(end_lbl) is last child for lower.c.
- * lower_case already handles TT_CASE n-ary flat structure; Snocone bodies are TT_PROGRAM. */
+ * PST-SC-SWITCH-LABELS (2026-05-19): TT_CASE shape is now [disc, val0, body0, val1, body1, ...].
+ * No QLIT end-label child — lower.c mints the break label via lower_fresh_label() and registers
+ * it in the labtab for TT_LOOP_BREAK resolution, mirroring what PST-SC-LABELS did for while/do/for.
+ * NULL value child (TT_NUL) marks the default arm. Bodies are TT_PROGRAM nodes. */
 static void sc_finalize_switch_pst(ScParseState *st, struct SwitchHead *h)
 {
     int nc = h->cases_count;
@@ -922,9 +918,8 @@ static void sc_finalize_switch_pst(ScParseState *st, struct SwitchHead *h)
     tree_t **bodies = calloc((size_t)(nc > 0 ? nc : 1), sizeof *bodies);
     for (int i = nc - 1; i >= 0; i--)
         bodies[i] = sc_collect_body(st, h->cases[i].before_body);
-    /* Build TT_CASE node */
-    tree_t *node   = ast_node_new(TT_CASE);
-    tree_t *qlit_e = ast_node_new(TT_QLIT); qlit_e->sval = strdup(h->end_label);
+    /* Build TT_CASE node: [disc, val0, body0, val1, body1, ...] — no trailing QLIT */
+    tree_t *node = ast_node_new(TT_CASE);
     ast_push(node, h->disc);
     for (int i = 0; i < nc; i++) {
         /* value: NULL for default → push TT_NUL placeholder */
@@ -935,7 +930,6 @@ static void sc_finalize_switch_pst(ScParseState *st, struct SwitchHead *h)
         }
         ast_push(node, bodies[i]);
     }
-    ast_push(node, qlit_e);
     free(bodies);
     sc_loop_pop(st);
     st->cur_switch = h->prev_switch;
