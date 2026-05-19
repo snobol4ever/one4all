@@ -239,15 +239,13 @@ stmt
     | KW_MY IDENT VAR_HASH ';'
         { free($2); $$ = expr_binary(TT_ASSIGN, var_node($3), leaf_sval(TT_QLIT, "")); }
     | KW_SAY expr ';'
-        { tree_t *c=make_call("write"); expr_add_child(c,$2); $$=c; }
+        { tree_t *c=ast_node_new(TT_SAY); expr_add_child(c,$2); $$=c; }
     | KW_SAY '(' expr ',' expr ')' ';'
-        {
-          tree_t *c=make_call("raku_say_fh"); expr_add_child(c,$3); expr_add_child(c,$5); $$=c; }
+        { tree_t *c=ast_node_new(TT_SAY_FH); expr_add_child(c,$3); expr_add_child(c,$5); $$=c; }
     | KW_PRINT expr ';'
-        { tree_t *c=make_call("writes"); expr_add_child(c,$2); $$=c; }
+        { tree_t *c=ast_node_new(TT_PRINT); expr_add_child(c,$2); $$=c; }
     | KW_PRINT '(' expr ',' expr ')' ';'
-        {
-          tree_t *c=make_call("raku_print_fh"); expr_add_child(c,$3); expr_add_child(c,$5); $$=c; }
+        { tree_t *c=ast_node_new(TT_PRINT_FH); expr_add_child(c,$3); expr_add_child(c,$5); $$=c; }
     | KW_TAKE expr ';'
         { $$=expr_unary(TT_SUSPEND,$2); }
     | KW_RETURN expr ';'

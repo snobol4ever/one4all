@@ -1496,6 +1496,10 @@ static void lower_expr_inner(const tree_t *t)
     case TT_BANG_BINARY:                      lower_bang_binary(t);   return;
     case TT_SUSPEND:                          lower_suspend(t);       return;
     case TT_GATHER: { fprintf(stderr, "FATAL: TT_GATHER reached lower — hoist pass missed a gather node\n"); abort(); return; }
+    case TT_SAY:     if (t->n >= 1) lower_expr(t->c[0]); sm_emit_si(g_p, SM_CALL_FN, "write",          1); return;
+    case TT_PRINT:   if (t->n >= 1) lower_expr(t->c[0]); sm_emit_si(g_p, SM_CALL_FN, "writes",         1); return;
+    case TT_SAY_FH:  if (t->n >= 2) { lower_expr(t->c[0]); lower_expr(t->c[1]); } sm_emit_si(g_p, SM_CALL_FN, "raku_say_fh",   2); return;
+    case TT_PRINT_FH:if (t->n >= 2) { lower_expr(t->c[0]); lower_expr(t->c[1]); } sm_emit_si(g_p, SM_CALL_FN, "raku_print_fh", 2); return;
     case TT_TO:                               lower_to(t);            return;
     case TT_TO_BY:                            lower_to_by(t);         return;
     case TT_LIMIT:                            lower_limit(t);         return;
