@@ -442,26 +442,16 @@ assign_expr
             expr_add_child(n, $1); expr_add_child(n, $3); $$ = n;
         }
     | alt_expr T_ADDASSIGN assign_expr      {
-            /* lhs +:= rhs => TT_ASSIGN(lhs, TT_ADD(lhs, rhs)) */
-            tree_t *lhs2 = ast_node_new(TT_VAR); lhs2->v.sval = strdup($1->v.sval ? $1->v.sval : "");
-            tree_t *add  = ast_node_new(TT_ADD);
-            expr_add_child(add, $1); expr_add_child(add, $3);
-            tree_t *n = ast_node_new(TT_ASSIGN);
-            expr_add_child(n, lhs2); expr_add_child(n, add); $$ = n;
+            tree_t *n = ast_node_new(TT_AUGOP); n->v.ival = AUGOP_ADD;
+            expr_add_child(n, $1); expr_add_child(n, $3); $$ = n;
         }
     | alt_expr T_SUBASSIGN assign_expr      {
-            tree_t *lhs2 = ast_node_new(TT_VAR); lhs2->v.sval = strdup($1->v.sval ? $1->v.sval : "");
-            tree_t *sub  = ast_node_new(TT_SUB);
-            expr_add_child(sub, $1); expr_add_child(sub, $3);
-            tree_t *n = ast_node_new(TT_ASSIGN);
-            expr_add_child(n, lhs2); expr_add_child(n, sub); $$ = n;
+            tree_t *n = ast_node_new(TT_AUGOP); n->v.ival = AUGOP_SUB;
+            expr_add_child(n, $1); expr_add_child(n, $3); $$ = n;
         }
     | alt_expr T_CATASSIGN assign_expr      {
-            tree_t *lhs2 = ast_node_new(TT_VAR); lhs2->v.sval = strdup($1->v.sval ? $1->v.sval : "");
-            tree_t *cat  = ast_node_new(TT_CAT);
-            expr_add_child(cat, $1); expr_add_child(cat, $3);
-            tree_t *n = ast_node_new(TT_ASSIGN);
-            expr_add_child(n, lhs2); expr_add_child(n, cat); $$ = n;
+            tree_t *n = ast_node_new(TT_AUGOP); n->v.ival = AUGOP_CONCAT;
+            expr_add_child(n, $1); expr_add_child(n, $3); $$ = n;
         }
     ;
 

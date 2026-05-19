@@ -94,6 +94,28 @@ static tree_t *lower_tree_expr(RebLow *L, tree_t *e) {
     /* Assignment */
     case TT_ASSIGN: return expr_binary(TT_ASSIGN, lower_tree_expr(L,e->c[0]), lower_tree_expr(L,e->c[1]));
     case TT_SWAP:   return make_fnc("EXCHG", 2, lower_tree_expr(L,e->c[0]), lower_tree_expr(L,e->c[1]));
+    case TT_AUGOP: {
+        /* TT_AUGOP c[0]=lhs c[1]=rhs v.ival=AUGOP_*
+           Desugar to TT_ASSIGN(lhs_clone, TT_op(lhs_clone2, rhs)).
+           Two clones needed: one for the ASSIGN target, one for the op LHS. */
+        tree_t *lhs  = lower_tree_expr(L, e->c[0]);
+        tree_t *rhs  = lower_tree_expr(L, e->c[1]);
+        tree_t *lhs2 = ast_node_new(lhs->t);
+        if (lhs->v.sval) lhs2->v.sval = strdup(lhs->v.sval);
+        lhs2->v.ival = lhs->v.ival;
+        tree_t *op_node;
+        switch ((int)e->v.ival) {
+        case AUGOP_ADD:    op_node = expr_binary(TT_ADD, lhs2, rhs); break;
+        case AUGOP_SUB:    op_node = expr_binary(TT_SUB, lhs2, rhs); break;
+        case AUGOP_CONCAT: op_node = expr_binary(TT_CAT, lhs2, rhs); break;
+        default:
+            fprintf(stderr, "rebus_lower: unhandled AUGOP %d\n", (int)e->v.ival);
+            L->nerrors++;
+            op_node = rhs;
+            break;
+        }
+        return expr_binary(TT_ASSIGN, lhs, op_node);
+    }
     /* Captures */
     case TT_CAPT_COND_ASGN:  return expr_binary(TT_CAPT_COND_ASGN,  lower_tree_expr(L,e->c[0]), lower_tree_expr(L,e->c[1]));
     case TT_CAPT_IMMED_ASGN: return expr_binary(TT_CAPT_IMMED_ASGN, lower_tree_expr(L,e->c[0]), lower_tree_expr(L,e->c[1]));
