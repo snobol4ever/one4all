@@ -96,21 +96,6 @@ static tree_t *lower_interp_str(const char *s) {
         result=result?expr_binary(TT_CAT,result,lit):lit; }
     return result ? result : leaf_sval(TT_QLIT,"");
 }
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static tree_t *make_for_range(tree_t *lo, tree_t *hi, const char *vname, tree_t *body) {
-    tree_t *init = expr_binary(TT_ASSIGN, leaf_sval(TT_VAR,vname), lo);
-    tree_t *cond = expr_binary(TT_LE, leaf_sval(TT_VAR,vname), hi);
-    tree_t *one  = ast_node_new(TT_ILIT); one->v.ival = 1;
-    tree_t *incr_rhs = expr_binary(TT_ADD, leaf_sval(TT_VAR,vname), one);
-    tree_t *incr = expr_binary(TT_ASSIGN, leaf_sval(TT_VAR,vname), incr_rhs);
-    tree_t *body2 = ast_node_new(TT_SEQ_EXPR);
-    for (int i = 0; i < body->n; i++) expr_add_child(body2, body->c[i]);
-    expr_add_child(body2, incr);
-    tree_t *wloop = expr_binary(TT_WHILE, cond, body2);
-    tree_t *seq   = ast_node_new(TT_SEQ_EXPR);
-    expr_add_child(seq, init); expr_add_child(seq, wloop);
-    return seq;
-}
 tree_t *raku_prog_result = NULL;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void add_proc(tree_t *e) {
@@ -578,64 +563,6 @@ atom
 extern void *raku_yy_scan_string(const char *);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void  raku_yy_delete_buffer(void *);
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* Gather hoist pass: walk tree recursively, replace TT_GATHER[body...] with TT_FNC call; collect defs. */
-static int   g_gather_seq  = 0;
-static tree_t *g_gather_defs[256];
-static int    g_gather_ndef = 0;
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void raku_hoist_gather_in_expr(tree_t *e) {
-    if (!e) return;
-    for (int i = 0; i < e->n; i++) raku_hoist_gather_in_expr(e->c[i]);
-    if (e->t != TT_GATHER) return;
-    char gname[32]; snprintf(gname, sizeof gname, "__gather_%d", g_gather_seq++);
-    tree_t *def = ast_node_new(TT_SUB_DECL); def->v.sval = intern(gname);
-    tree_t *dn  = ast_node_new(TT_VAR); dn->v.sval = intern(gname);
-    expr_add_child(def, dn);
-    for (int i = 0; i < e->n; i++) expr_add_child(def, e->c[i]);
-    if (g_gather_ndef < 256) g_gather_defs[g_gather_ndef++] = def;
-    e->t      = TT_FNC;
-    e->v.sval = intern(gname);
-    e->n      = 0;
-    e->c      = NULL;
-    tree_t *cn = ast_node_new(TT_VAR); cn->v.sval = intern(gname);
-    expr_add_child(e, cn);
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void raku_lower_hoist_gather_pass(tree_t *prog) {
-    if (!prog) return;
-    g_gather_seq  = 0;
-    g_gather_ndef = 0;
-    for (int i = 0; i < prog->n; i++) {
-        tree_t *st = prog->c[i];
-        if (!st || st->t != TT_STMT) continue;
-        for (int j = 0; j < st->n; j++) {
-            tree_t *ch = st->c[j];
-            if (!ch) continue;
-            if (ch->t == TT_ATTR) { for (int k = 0; k < ch->n; k++) raku_hoist_gather_in_expr(ch->c[k]); continue; }
-            raku_hoist_gather_in_expr(ch);
-        }
-    }
-    if (!g_gather_ndef) return;
-    int old_n = prog->n;
-    int new_n = old_n + g_gather_ndef;
-    size_t new_cap = (size_t)new_n;
-    char *block = (char *)malloc(sizeof(size_t) + new_cap * sizeof(tree_t *));
-    tree_t **new_c = (tree_t **)(block + sizeof(size_t));
-    *(size_t *)block = new_cap;
-    for (int i = 0; i < g_gather_ndef; i++) {
-        tree_t *st = ast_stmt_new(TT_STMT);
-        expr_add_child(st, ast_attr_int(":lang",  LANG_RAKU));
-        expr_add_child(st, ast_attr_int(":line",  0));
-        expr_add_child(st, ast_attr_int(":stno",  0));
-        expr_add_child(st, ast_attr_expr(":subj", g_gather_defs[i]));
-        new_c[i] = st;
-    }
-    for (int i = 0; i < old_n; i++) new_c[g_gather_ndef + i] = prog->c[i];
-    if (prog->c) free((char *)prog->c - sizeof(size_t));
-    prog->c = new_c;
-    prog->n = new_n;
-}
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 tree_t *raku_parse_string(const char *src) {
     raku_prog_result = NULL;
