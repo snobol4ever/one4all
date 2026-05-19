@@ -60,6 +60,8 @@ static char *lower_fresh_label(const char *prefix) {
     snprintf(buf, sizeof buf, "%s_%d", prefix, g_loop_label_seq++);
     return strdup(buf);
 }
+/* PST-SC-RET-IN-FN: current Snocone function name for return-value assignment in lower */
+static const char *g_sc_func_name = NULL;
 static int           g_hoist_entry = -1;
 static int           g_hoist_slot  = -1;
 extern int g_lang;
@@ -907,15 +909,19 @@ static void lower_loop_next(const tree_t *t)
     (void)t; sm_emit(g_p, SM_PUSH_NULL);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* PST-SC-4j (fixed): TT_RETURN — emits SM_RETURN directly.
- * The return-value assignment (funcname = expr) is a separate TT_ASSIGN stmt
- * that the parser emits immediately before TT_RETURN; by the time we arrive
- * here the function's retval variable is already set.  SM_RETURN reads it
- * via fr->retval_name in the interpreter, so no stack manipulation needed here.
- * TT_RETURN has no children (confirmed by snocone_parse.y). */
+/* PST-SC-RET-IN-FN: TT_RETURN may carry c[0]=return-value expr.
+ * If c[0] present and g_sc_func_name set: SM_STORE_VAR(funcname) then SM_RETURN.
+ * Bare TT_RETURN (no child): just SM_RETURN. */
 static void lower_return(const tree_t *t)
 {
-    (void)t; sm_emit(g_p, SM_RETURN);
+    if (t->n > 0 && t->c[0] && g_sc_func_name) {
+        lower_expr(t->c[0]);
+        sm_emit_s(g_p, SM_STORE_VAR, g_sc_func_name);
+        sm_emit(g_p, SM_VOID_POP);
+    } else if (t->n > 0 && t->c[0]) {
+        lower_expr(t->c[0]); sm_emit(g_p, SM_VOID_POP);
+    }
+    sm_emit(g_p, SM_RETURN);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* PST-SC-4j (fixed): TT_PROC_FAIL — freturn; in Snocone — emit SM_FRETURN directly. */
@@ -1212,12 +1218,15 @@ void lower_stmt(const tree_t *s)
         labtab_define(tbl, name, entry_pos);
         /* body */
         const tree_t *body = (s->n > 2) ? s->c[2] : NULL;
+        const char *saved_sc_func = g_sc_func_name;
+        g_sc_func_name = name;
         if (body && body->t == TT_PROGRAM) {
             for (int i = 0; i < body->n; i++)
                 if (body->c[i]) lower_stmt(body->c[i]);
         } else if (body) {
             lower_expr(body); sm_emit(g_p, SM_VOID_POP);
         }
+        g_sc_func_name = saved_sc_func;
         /* patch skip */
         sm_patch_jump(g_p, skip, g_p->count);
         return;
@@ -1631,6 +1640,7 @@ SM_Program *lower(const tree_t *prog)
     g_in_proc_body = 0;
     g_proc_scope   = NULL;
     g_loop_label_seq = 0;
+    g_sc_func_name = NULL;
     labtab_init(&g_labtab);
     for (int i = 0; i < LOWER_UNHANDLED_WORDS; i++) g_unhandled_kinds[i] = 0;
     lower_proc_skeletons();

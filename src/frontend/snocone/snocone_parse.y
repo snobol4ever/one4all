@@ -366,12 +366,8 @@ label_decl
             ;
 simple_stmt : expr0 T_SEMICOLON                { sc_append_stmt(st, $1); }
             | T_SEMICOLON                      {         }
-            | T_RETURN expr0 T_SEMICOLON    { if (st->cur_func_name) {
-                                               tree_t *lhs = ast_node_new(TT_VAR); lhs->sval = strdup(st->cur_func_name);
-                                               tree_t *asgn = ast_node_new(TT_ASSIGN); ast_push(asgn, lhs); ast_push(asgn, $2);
-                                               sc_append_stmt(st, asgn);
-                                             } else { sc_append_stmt(st, $2); }
-                                             sc_append_stmt(st, ast_node_new(TT_RETURN)); }
+            | T_RETURN expr0 T_SEMICOLON    { tree_t *r = ast_node_new(TT_RETURN); ast_push(r, $2);
+                                             sc_append_stmt(st, r); }
             | T_RETURN T_SEMICOLON          { sc_append_stmt(st, ast_node_new(TT_RETURN)); }
             | T_FRETURN T_SEMICOLON         { sc_append_stmt(st, ast_node_new(TT_PROC_FAIL)); }
             | T_NRETURN T_SEMICOLON         { sc_append_stmt(st, ast_node_new(TT_NRETURN)); }
