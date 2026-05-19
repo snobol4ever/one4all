@@ -2289,12 +2289,7 @@ static void sno4_stmt_commit_go(void *param,Token lbl,tree_t *subj,tree_t *pat,i
     if(!pp->prog->head) pp->prog->head=pp->prog->tail=s; else{pp->prog->tail->next=s;pp->prog->tail=s;}
     if (pp->ast_prog) {
         tree_t *anode = stmt_to_ast(s);
-        if (pp->ast_prog->n >= pp->ast_prog->_nalloc) {
-            pp->ast_prog->_nalloc = pp->ast_prog->_nalloc ? pp->ast_prog->_nalloc * 2 : 64;
-            pp->ast_prog->c = realloc(pp->ast_prog->c,
-                (size_t)pp->ast_prog->_nalloc * sizeof(tree_t*));
-        }
-        pp->ast_prog->c[pp->ast_prog->n++] = anode;
+        ast_push(pp->ast_prog, anode);
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/

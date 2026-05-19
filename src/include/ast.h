@@ -70,15 +70,21 @@ struct tree_t {
     } v;
     int         n;
     tree_t   ** c;
-    int         _nalloc;
     int         _id;
 };
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 #include <stdlib.h>
+#include <string.h>
+/* capacity stored as size_t prefix word immediately before p->c[0] */
+#define AST_CAP(p)         (*(size_t *)((char *)(p)->c - sizeof(size_t)))
+#define AST_SET_CAP(p, v)  (*(size_t *)((char *)(p)->c - sizeof(size_t)) = (size_t)(v))
 static inline void ast_push(tree_t * p, tree_t * child) {
-    if (p->n >= p->_nalloc) {
-        p->_nalloc = p->_nalloc ? p->_nalloc * 2 : 4;
-        p->c = (tree_t **)realloc(p->c, (size_t)p->_nalloc * sizeof(tree_t *));
+    size_t cap = p->c ? AST_CAP(p) : 0;
+    if ((size_t)p->n >= cap) {
+        size_t new_cap = cap ? cap * 2 : 4;
+        char * block = (char *)realloc(p->c ? (char *)p->c - sizeof(size_t) : NULL, sizeof(size_t) + new_cap * sizeof(tree_t *));
+        p->c = (tree_t **)(block + sizeof(size_t));
+        AST_SET_CAP(p, new_cap);
     }
     p->c[p->n++] = child;
 }
@@ -88,10 +94,15 @@ static inline tree_t * ast_pop(tree_t * p) {
     if (p->n == 0) return NULL;
     child = p->c[--p->n];
     if (p->n == 0) {
-        free(p->c); p->c = NULL; p->_nalloc = 0;
-    } else if (p->n < p->_nalloc / 4) {
-        p->_nalloc /= 2;
-        p->c = (tree_t **)realloc(p->c, (size_t)p->_nalloc * sizeof(tree_t *));
+        free((char *)p->c - sizeof(size_t)); p->c = NULL;
+    } else {
+        size_t cap = AST_CAP(p);
+        if ((size_t)p->n < cap / 4 && cap > 4) {
+            size_t new_cap = cap / 2;
+            char * block = (char *)realloc((char *)p->c - sizeof(size_t), sizeof(size_t) + new_cap * sizeof(tree_t *));
+            p->c = (tree_t **)(block + sizeof(size_t));
+            AST_SET_CAP(p, new_cap);
+        }
     }
     return child;
 }

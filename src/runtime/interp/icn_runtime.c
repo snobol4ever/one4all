@@ -1931,7 +1931,6 @@ DESCR_t icn_call_builtin(tree_t *call, DESCR_t *args, int nargs) {
             clone._id        = call->_id;
             clone.c  = kids;
             clone.n = nargs + 1;
-            clone._nalloc    = nargs + 1;
             return FAILDESCR;
         }
     }

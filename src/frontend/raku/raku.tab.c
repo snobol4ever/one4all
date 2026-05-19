@@ -2795,7 +2795,6 @@ static void raku_hoist_gather_in_expr(tree_t *e) {
     e->v.sval = intern(gname);
     e->n      = 0;
     e->c      = NULL;
-    e->_nalloc = 0;
     tree_t *cn = ast_node_new(TT_VAR); cn->v.sval = intern(gname);
     expr_add_child(e, cn);
 }
