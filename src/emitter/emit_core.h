@@ -10,12 +10,15 @@
 #include <stdio.h>
 #include <stdarg.h>
 /*--- emit mode -----------------------------------------------------------*/
-typedef enum { EMIT_TEXT = 0, EMIT_BINARY_WIRED = 1, EMIT_BINARY_BROKERED = 2, EMIT_MACRO_DEF = 3, EMIT_TEXT_INLINE = 4 } bb_emit_mode_t;
+typedef enum { EMIT_TEXT = 0, EMIT_BINARY_WIRED = 1, EMIT_BINARY_BROKERED = 2, EMIT_MACRO_DEF = 3, EMIT_TEXT_INLINE = 4, EMIT_JVM = 5, EMIT_JS = 6, EMIT_NET = 7 } bb_emit_mode_t;
 #define EMIT_BINARY     EMIT_BINARY_WIRED
 #define IS_TEXT     (bb_emit_mode != EMIT_BINARY_WIRED && bb_emit_mode != EMIT_BINARY_BROKERED)
 #define IS_BIN      (bb_emit_mode == EMIT_BINARY_WIRED || bb_emit_mode == EMIT_BINARY_BROKERED)
 #define IS_WIRED    (bb_emit_mode == EMIT_BINARY_WIRED)
 #define IS_BROKERED (bb_emit_mode == EMIT_BINARY_BROKERED)
+#define IS_JVM      (bb_emit_mode == EMIT_JVM)
+#define IS_JS       (bb_emit_mode == EMIT_JS)
+#define IS_NET      (bb_emit_mode == EMIT_NET)
 /*--- label ---------------------------------------------------------------*/
 #define BB_LABEL_NAME_MAX   80
 #define BB_LABEL_UNRESOLVED (-1)
