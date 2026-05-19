@@ -105,6 +105,7 @@ struct DoHead {
     STMT_t *before_body;   /* snapshot taken after loop push, before body stmts */
 };
 struct ForHead {
+    tree_t *init;
     tree_t *cond;
     tree_t *step;
     STMT_t *before_body;
@@ -143,7 +144,7 @@ static void     sc_finalize_while_pst  (ScParseState *st, struct WhileHead *h, t
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_finalize_do_while_pst(ScParseState *st, struct DoHead *h, tree_t *cond);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static struct ForHead   *sc_for_head_new_pst(ScParseState *st, tree_t *cond, tree_t *step, STMT_t *before_body);
+static struct ForHead   *sc_for_head_new_pst(ScParseState *st, tree_t *init, tree_t *cond, tree_t *step, STMT_t *before_body);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_append_chain       (ScParseState *st, STMT_t *chain_head, STMT_t *chain_tail);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -311,9 +312,8 @@ do_body     : T_LBRACE stmt_list T_RBRACE
 for_lead    : T_FOR                  { }
             ;
 for_head    : for_lead T_LPAREN expr0 T_SEMICOLON expr0 T_SEMICOLON expr0 T_RPAREN opt_head_sep
-                                        { sc_append_stmt(st, $3);
-                                          sc_loop_push(st, NULL, NULL, 1);
-                                          $$ = sc_for_head_new_pst(st, $5, $7, st->code->tail); }
+                                        { sc_loop_push(st, NULL, NULL, 1);
+                                          $$ = sc_for_head_new_pst(st, $3, $5, $7, st->code->tail); }
             ;
 switch_head : T_SWITCH T_LPAREN expr0 T_RPAREN
                                         { $$ = sc_switch_head_new(st, $3); }
@@ -627,9 +627,10 @@ static struct IfHead *sc_if_head_new(ScParseState *st, tree_t *cond) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* PST-SC-4e: slimmed ForHead carries only cond+step; snapshot/labels handled in grammar action */
-static struct ForHead *sc_for_head_new_pst(ScParseState *st, tree_t *cond, tree_t *step, STMT_t *before_body) {
+static struct ForHead *sc_for_head_new_pst(ScParseState *st, tree_t *init, tree_t *cond, tree_t *step, STMT_t *before_body) {
     (void)st;
     struct ForHead *h = calloc(1, sizeof *h);
+    h->init        = init;
     h->cond        = cond;
     h->step        = step;
     h->before_body = before_body;
@@ -789,6 +790,8 @@ static void sc_finalize_for_pst(ScParseState *st, struct ForHead *h)
 {
     tree_t    *body   = sc_collect_body(st, h->before_body);
     tree_t    *f      = ast_node_new(TT_FOR);
+    /* PST-SC-FOR-INIT: c[0]=init, c[1]=cond, c[2]=step, c[3]=body */
+    ast_push(f, h->init ? h->init : ast_node_new(TT_NUL));
     ast_push(f, h->cond);
     ast_push(f, h->step);
     ast_push(f, body);

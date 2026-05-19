@@ -315,6 +315,7 @@ struct DoHead {
     STMT_t *before_body;   /* snapshot taken after loop push, before body stmts */
 };
 struct ForHead {
+    tree_t *init;
     tree_t *cond;
     tree_t *step;
     STMT_t *before_body;
@@ -353,7 +354,7 @@ static void     sc_finalize_while_pst  (ScParseState *st, struct WhileHead *h, t
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_finalize_do_while_pst(ScParseState *st, struct DoHead *h, tree_t *cond);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static struct ForHead   *sc_for_head_new_pst(ScParseState *st, tree_t *cond, tree_t *step, STMT_t *before_body);
+static struct ForHead   *sc_for_head_new_pst(ScParseState *st, tree_t *init, tree_t *cond, tree_t *step, STMT_t *before_body);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_append_chain       (ScParseState *st, STMT_t *chain_head, STMT_t *chain_tail);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -387,7 +388,7 @@ static void     sc_finalize_switch_pst (ScParseState *st, struct SwitchHead *h);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void     sc_emit_struct         (ScParseState *st, char *name, char *fields);
 
-#line 391 "snocone_parse.tab.c"
+#line 392 "snocone_parse.tab.c"
 
 #ifdef short
 # undef short
@@ -776,10 +777,10 @@ static const yytype_int8 yytranslate[] =
 /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
 static const yytype_int16 yyrline[] =
 {
-       0,   248,   248,   249,   251,   252,   254,   255,   258,   259,
-     260,   262,   264,   266,   268,   270,   272,   274,   276,   278,
-     280,   283,   285,   287,   289,   291,   293,   296,   303,   308,
-     309,   311,   313,   318,   321,   322,   324,   325,   328,   329,
+       0,   249,   249,   250,   252,   253,   255,   256,   259,   260,
+     261,   263,   265,   267,   269,   271,   273,   275,   277,   279,
+     281,   284,   286,   288,   290,   292,   294,   297,   304,   309,
+     310,   312,   314,   318,   321,   322,   324,   325,   328,   329,
      332,   333,   335,   339,   340,   341,   344,   348,   354,   356,
      362,   365,   367,   368,   369,   371,   372,   373,   374,   375,
      376,   377,   378,   380,   381,   383,   385,   389,   392,   395,
@@ -1653,125 +1654,124 @@ yyreduce:
   switch (yyn)
     {
   case 10: /* matched_stmt: if_head matched_stmt else_keyword matched_stmt  */
-#line 261 "snocone_parse.y"
+#line 262 "snocone_parse.y"
                                         { sc_finalize_if_else_pst(st, (yyvsp[-3].ifhead), (yyvsp[-1].stmt_ptr)); }
-#line 1659 "snocone_parse.tab.c"
+#line 1660 "snocone_parse.tab.c"
     break;
 
   case 11: /* matched_stmt: while_head matched_stmt  */
-#line 263 "snocone_parse.y"
+#line 264 "snocone_parse.y"
                                         { sc_finalize_while_pst(st, (yyvsp[-1].whilehead), (yyvsp[-1].whilehead)->cond); }
-#line 1665 "snocone_parse.tab.c"
+#line 1666 "snocone_parse.tab.c"
     break;
 
   case 12: /* matched_stmt: do_head do_body T_WHILE T_LPAREN expr0 T_RPAREN T_SEMICOLON  */
-#line 265 "snocone_parse.y"
+#line 266 "snocone_parse.y"
                                         { sc_finalize_do_while_pst(st, (yyvsp[-6].dohead), (yyvsp[-2].expr)); }
-#line 1671 "snocone_parse.tab.c"
+#line 1672 "snocone_parse.tab.c"
     break;
 
   case 13: /* matched_stmt: for_head matched_stmt  */
-#line 267 "snocone_parse.y"
+#line 268 "snocone_parse.y"
                                         { sc_finalize_for_pst(st, (yyvsp[-1].forhead)); }
-#line 1677 "snocone_parse.tab.c"
+#line 1678 "snocone_parse.tab.c"
     break;
 
   case 14: /* matched_stmt: func_head T_LBRACE stmt_list T_RBRACE  */
-#line 269 "snocone_parse.y"
+#line 270 "snocone_parse.y"
                                         { sc_finalize_function_pst(st, (yyvsp[-3].funchead)); }
-#line 1683 "snocone_parse.tab.c"
+#line 1684 "snocone_parse.tab.c"
     break;
 
   case 15: /* matched_stmt: func_head T_LBRACE T_RBRACE  */
-#line 271 "snocone_parse.y"
+#line 272 "snocone_parse.y"
                                         { sc_finalize_function_pst(st, (yyvsp[-2].funchead)); }
-#line 1689 "snocone_parse.tab.c"
+#line 1690 "snocone_parse.tab.c"
     break;
 
   case 16: /* matched_stmt: switch_head T_LBRACE switch_body T_RBRACE  */
-#line 273 "snocone_parse.y"
+#line 274 "snocone_parse.y"
                                         { sc_finalize_switch_pst(st, (yyvsp[-3].switchhead)); }
-#line 1695 "snocone_parse.tab.c"
+#line 1696 "snocone_parse.tab.c"
     break;
 
   case 17: /* matched_stmt: switch_head T_LBRACE T_RBRACE  */
-#line 275 "snocone_parse.y"
+#line 276 "snocone_parse.y"
                                         { sc_finalize_switch_pst(st, (yyvsp[-2].switchhead)); }
-#line 1701 "snocone_parse.tab.c"
+#line 1702 "snocone_parse.tab.c"
     break;
 
   case 18: /* matched_stmt: T_STRUCT T_IDENT T_LBRACE struct_field_list T_RBRACE  */
-#line 277 "snocone_parse.y"
+#line 278 "snocone_parse.y"
                                         { sc_emit_struct(st, (yyvsp[-3].str), (yyvsp[-1].str)); free((yyvsp[-3].str)); free((yyvsp[-1].str)); }
-#line 1707 "snocone_parse.tab.c"
+#line 1708 "snocone_parse.tab.c"
     break;
 
   case 19: /* matched_stmt: T_STRUCT T_IDENT T_LBRACE T_RBRACE  */
-#line 279 "snocone_parse.y"
+#line 280 "snocone_parse.y"
                                         { sc_emit_struct(st, (yyvsp[-2].str), strdup("")); free((yyvsp[-2].str)); }
-#line 1713 "snocone_parse.tab.c"
+#line 1714 "snocone_parse.tab.c"
     break;
 
   case 21: /* unmatched_stmt: if_head stmt  */
-#line 284 "snocone_parse.y"
+#line 285 "snocone_parse.y"
                                         { sc_finalize_if_no_else_pst(st, (yyvsp[-1].ifhead)); }
-#line 1719 "snocone_parse.tab.c"
+#line 1720 "snocone_parse.tab.c"
     break;
 
   case 22: /* unmatched_stmt: if_head matched_stmt else_keyword unmatched_stmt  */
-#line 286 "snocone_parse.y"
+#line 287 "snocone_parse.y"
                                         { sc_finalize_if_else_pst(st, (yyvsp[-3].ifhead), (yyvsp[-1].stmt_ptr)); }
-#line 1725 "snocone_parse.tab.c"
+#line 1726 "snocone_parse.tab.c"
     break;
 
   case 23: /* unmatched_stmt: while_head unmatched_stmt  */
-#line 288 "snocone_parse.y"
+#line 289 "snocone_parse.y"
                                         { sc_finalize_while_pst(st, (yyvsp[-1].whilehead), (yyvsp[-1].whilehead)->cond); }
-#line 1731 "snocone_parse.tab.c"
+#line 1732 "snocone_parse.tab.c"
     break;
 
   case 24: /* unmatched_stmt: for_head unmatched_stmt  */
-#line 290 "snocone_parse.y"
+#line 291 "snocone_parse.y"
                                         { sc_finalize_for_pst(st, (yyvsp[-1].forhead)); }
-#line 1737 "snocone_parse.tab.c"
+#line 1738 "snocone_parse.tab.c"
     break;
 
   case 26: /* if_head: T_IF T_LPAREN expr0 T_RPAREN opt_head_sep  */
-#line 294 "snocone_parse.y"
+#line 295 "snocone_parse.y"
                                         { (yyval.ifhead) = sc_if_head_new(st, (yyvsp[-2].expr)); }
-#line 1743 "snocone_parse.tab.c"
+#line 1744 "snocone_parse.tab.c"
     break;
 
   case 27: /* while_head: T_WHILE T_LPAREN expr0 T_RPAREN opt_head_sep  */
-#line 297 "snocone_parse.y"
+#line 298 "snocone_parse.y"
                                         { sc_loop_push(st, NULL, NULL, 1);
                                           struct WhileHead *wh = calloc(1, sizeof *wh);
                                           wh->cond        = (yyvsp[-2].expr);
                                           wh->before_body = st->code->tail;
                                           (yyval.whilehead) = wh; }
-#line 1753 "snocone_parse.tab.c"
+#line 1754 "snocone_parse.tab.c"
     break;
 
   case 28: /* do_head: T_DO  */
-#line 303 "snocone_parse.y"
+#line 304 "snocone_parse.y"
                                     { sc_loop_push(st, NULL, NULL, 1);
                                       struct DoHead *dh = calloc(1, sizeof *dh);
                                       dh->before_body = st->code->tail;
                                       (yyval.dohead) = dh; }
-#line 1762 "snocone_parse.tab.c"
+#line 1763 "snocone_parse.tab.c"
     break;
 
   case 31: /* for_lead: T_FOR  */
-#line 311 "snocone_parse.y"
+#line 312 "snocone_parse.y"
                                      { }
-#line 1768 "snocone_parse.tab.c"
+#line 1769 "snocone_parse.tab.c"
     break;
 
   case 32: /* for_head: for_lead T_LPAREN expr0 T_SEMICOLON expr0 T_SEMICOLON expr0 T_RPAREN opt_head_sep  */
-#line 314 "snocone_parse.y"
-                                        { sc_append_stmt(st, (yyvsp[-6].expr));
-                                          sc_loop_push(st, NULL, NULL, 1);
-                                          (yyval.forhead) = sc_for_head_new_pst(st, (yyvsp[-4].expr), (yyvsp[-2].expr), st->code->tail); }
+#line 315 "snocone_parse.y"
+                                        { sc_loop_push(st, NULL, NULL, 1);
+                                          (yyval.forhead) = sc_for_head_new_pst(st, (yyvsp[-6].expr), (yyvsp[-4].expr), (yyvsp[-2].expr), st->code->tail); }
 #line 1776 "snocone_parse.tab.c"
     break;
 
@@ -2660,9 +2660,10 @@ static struct IfHead *sc_if_head_new(ScParseState *st, tree_t *cond) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* PST-SC-4e: slimmed ForHead carries only cond+step; snapshot/labels handled in grammar action */
-static struct ForHead *sc_for_head_new_pst(ScParseState *st, tree_t *cond, tree_t *step, STMT_t *before_body) {
+static struct ForHead *sc_for_head_new_pst(ScParseState *st, tree_t *init, tree_t *cond, tree_t *step, STMT_t *before_body) {
     (void)st;
     struct ForHead *h = calloc(1, sizeof *h);
+    h->init        = init;
     h->cond        = cond;
     h->step        = step;
     h->before_body = before_body;
@@ -2822,6 +2823,8 @@ static void sc_finalize_for_pst(ScParseState *st, struct ForHead *h)
 {
     tree_t    *body   = sc_collect_body(st, h->before_body);
     tree_t    *f      = ast_node_new(TT_FOR);
+    /* PST-SC-FOR-INIT: c[0]=init, c[1]=cond, c[2]=step, c[3]=body */
+    ast_push(f, h->init ? h->init : ast_node_new(TT_NUL));
     ast_push(f, h->cond);
     ast_push(f, h->step);
     ast_push(f, body);

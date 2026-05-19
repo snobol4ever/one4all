@@ -843,20 +843,25 @@ static void lower_do_while(const tree_t *t)
     free(lbl_cont); free(lbl_end);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* PST-SC-LABELS: lower TT_FOR(cond, step, TT_PROGRAM(body)). No QLIT label children.
- * Init lowered as preceding statement (PST-SC-FOR-INIT will fix that). Labels generated here. */
+/* PST-SC-FOR-INIT: lower TT_FOR(init, cond, step, body). Init is c[0] (was emitted as preceding stmt).
+ * Shape: c[0]=init (TT_NUL if absent), c[1]=cond, c[2]=step, c[3]=body. Labels generated internally. */
 static void lower_for(const tree_t *t)
 {
     LabelTable *tbl      = &g_labtab;
     char *lbl_cont = lower_fresh_label("_Lcont");
     char *lbl_end  = lower_fresh_label("_Lend");
+    /* emit init (c[0]) — skip if TT_NUL */
+    if (t->n > 0 && t->c[0] && t->c[0]->t != TT_NUL) {
+        lower_expr(t->c[0]); sm_emit(g_p, SM_VOID_POP);
+    }
     int top = g_p->count;
-    if (t->n < 1 || !t->c[0]) { free(lbl_cont); free(lbl_end); sm_emit(g_p, SM_PUSH_NULL); return; }
-    lower_expr(t->c[0]);
+    const tree_t *cond = (t->n > 1) ? t->c[1] : NULL;
+    if (!cond) { free(lbl_cont); free(lbl_end); sm_emit(g_p, SM_PUSH_NULL); return; }
+    lower_expr(cond);
     int jf = sm_emit_i(g_p, SM_JUMP_F, 0);
     sm_emit(g_p, SM_VOID_POP);
     loop_push(lbl_cont, lbl_end);
-    const tree_t *body = (t->n > 2) ? t->c[2] : NULL;
+    const tree_t *body = (t->n > 3) ? t->c[3] : NULL;
     if (body && body->t == TT_PROGRAM) {
         for (int i = 0; i < body->n; i++)
             if (body->c[i]) lower_stmt(body->c[i]);
@@ -865,7 +870,8 @@ static void lower_for(const tree_t *t)
     }
     loop_pop();
     labtab_define(tbl, lbl_cont, g_p->count);
-    if (t->n > 1 && t->c[1]) { lower_expr(t->c[1]); sm_emit(g_p, SM_VOID_POP); }
+    const tree_t *step = (t->n > 2) ? t->c[2] : NULL;
+    if (step) { lower_expr(step); sm_emit(g_p, SM_VOID_POP); }
     sm_emit_i(g_p, SM_JUMP, top);
     int exit_pos = g_p->count;
     sm_patch_jump(g_p, jf, exit_pos);
