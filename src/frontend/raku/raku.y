@@ -197,14 +197,14 @@ program
             if (all) {
                 for (int i = 0; i < all->count; i++) {
                     tree_t *e = all->items[i];
-                    if (!e || !(e->t==TT_FNC && e->_id == SUB_TAG_ID)) continue;
+                    if (!e || e->t != TT_SUB_DECL) continue;
                     add_proc(e);
                     all->items[i] = NULL;
                 }
                 int has_body = 0;
                 for (int i = 0; i < all->count; i++) if (all->items[i]) { has_body=1; break; }
                 if (has_body) {
-                    tree_t *mf = leaf_sval(TT_FNC, "main"); mf->_id = SUB_TAG_ID;
+                    tree_t *mf = leaf_sval(TT_SUB_DECL, "main");
                     tree_t *mn = ast_node_new(TT_VAR); mn->v.sval = intern("main");
                     expr_add_child(mf, mn);
                     for (int i = 0; i < all->count; i++)
@@ -397,7 +397,7 @@ class_decl
                     if (!item) continue;
                     if (item->t == TT_VAR) {
                         expr_add_child(rec, item);
-                    } else if (item->t == TT_FNC && item->_id == SUB_TAG_ID) {
+                    } else if (item->t == TT_SUB_DECL) {
                         char fullname[256];
                         snprintf(fullname, sizeof fullname, "%s__%s", cname, item->v.sval);
                         const char *fname = intern(fullname);
@@ -405,7 +405,6 @@ class_decl
                         item->v.sval = (char *)fname;
                         if (item->n > 0 && item->c[0]->t == TT_VAR)
                             item->c[0]->v.sval = (char *)fname;
-                        item->_id = 0;
                         add_proc(item);
                         body->items[i] = NULL;
                     }
@@ -426,8 +425,8 @@ class_body_list
           $$ = exprlist_append($1, fv); }
     | class_body_list KW_METHOD IDENT '(' param_list ')' block
         { ExprList *params = $5; int np = params ? params->count : 0;
-          tree_t *e = leaf_sval(TT_FNC, $3);
-          e->v.ival = (long long)(np + 1); e->_id = SUB_TAG_ID;
+          tree_t *e = leaf_sval(TT_SUB_DECL, $3);
+          e->v.ival = (long long)(np + 1);
           tree_t *nn = ast_node_new(TT_VAR); nn->v.sval = intern($3); expr_add_child(e, nn);
           expr_add_child(e, leaf_sval(TT_VAR, "self"));
           if (params) { for (int i = 0; i < np; i++) expr_add_child(e, params->items[i]); exprlist_free(params); }
@@ -436,8 +435,8 @@ class_body_list
           free($3);
           $$ = exprlist_append($1, e); }
     | class_body_list KW_METHOD IDENT '(' ')' block
-        { tree_t *e = leaf_sval(TT_FNC, $3);
-          e->v.ival = (long long)(1); e->_id = SUB_TAG_ID;
+        { tree_t *e = leaf_sval(TT_SUB_DECL, $3);
+          e->v.ival = (long long)(1);
           tree_t *nn = ast_node_new(TT_VAR); nn->v.sval = intern($3); expr_add_child(e, nn);
           expr_add_child(e, leaf_sval(TT_VAR, "self"));
           tree_t *body = $6;
@@ -636,11 +635,10 @@ static void raku_hoist_gather_in_expr(tree_t *e) {
     for (int i = 0; i < e->n; i++) raku_hoist_gather_in_expr(e->c[i]);
     if (e->t != TT_GATHER) return;
     char gname[32]; snprintf(gname, sizeof gname, "__gather_%d", g_gather_seq++);
-    tree_t *def = ast_node_new(TT_FNC); def->v.sval = intern(gname); def->_id = SUB_TAG_ID;
+    tree_t *def = ast_node_new(TT_SUB_DECL); def->v.sval = intern(gname);
     tree_t *dn  = ast_node_new(TT_VAR); dn->v.sval = intern(gname);
     expr_add_child(def, dn);
     for (int i = 0; i < e->n; i++) expr_add_child(def, e->c[i]);
-    def->_id = 0;
     if (g_gather_ndef < 256) g_gather_defs[g_gather_ndef++] = def;
     e->t      = TT_FNC;
     e->v.sval = intern(gname);
