@@ -1525,35 +1525,318 @@ static void ec_bb_break_net(IR_t * nd, FILE * out) {
     ec_net_escape_ldstr(out, chars); fprintf(out, "    newobj     instance void pat_%d_%d::.ctor(string)\n", sid, nid);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* EC-2 JVM helpers shared by ARB, ARBNO, CAT, ALT, LEN, POS/RPOS, TAB/RTAB, REM, FENCE, ABORT, ASSIGN_*. */
+static void ec_jvm_init_ms_only(FILE * out, const char * name) {
+    fprintf(out, ".method public <init>(Lbb/bb_box$MatchState;)V\n    .limit stack 2\n    .limit locals 2\n    aload_0\n    aload_1\n    invokespecial bb/bb_box/<init>(Lbb/bb_box$MatchState;)V\n    return\n.end method\n");
+    (void)name;
+}
+static void ec_jvm_init_ms_int(FILE * out, const char * name, const char * field) {
+    fprintf(out, ".method public <init>(Lbb/bb_box$MatchState;I)V\n    .limit stack 3\n    .limit locals 3\n    aload_0\n    aload_1\n    invokespecial bb/bb_box/<init>(Lbb/bb_box$MatchState;)V\n    aload_0\n    iload_2\n    putfield bb/bb_%s/%s I\n    aload_0\n    aconst_null\n    putfield bb/bb_%s/dyn Ljava/util/function/IntSupplier;\n    return\n.end method\n", name, field, name);
+}
+static void ec_jvm_val_helper(FILE * out, const char * name) {
+    fprintf(out, ".method private val()I\n    .limit stack 2\n    .limit locals 1\n    aload_0\n    getfield bb/bb_%s/dyn Ljava/util/function/IntSupplier;\n    ifnull %s_val_static\n    aload_0\n    getfield bb/bb_%s/dyn Ljava/util/function/IntSupplier;\n    invokeinterface java/util/function/IntSupplier/getAsInt()I 1\n    ireturn\n%s_val_static:\n    aload_0\n    getfield bb/bb_%s/n I\n    ireturn\n.end method\n", name, name, name, name, name);
+}
+static void ec_net_push_i4(FILE * out, int v) {
+    if (v >= 0 && v <= 8)          { fprintf(out, "    ldc.i4.%d\n", v); }
+    else if (v == -1)               { fprintf(out, "    ldc.i4.m1\n"); }
+    else if (v >= -128 && v <= 127) { fprintf(out, "    ldc.i4.s   %d\n", v); }
+    else                            { fprintf(out, "    ldc.i4     %d\n", v); }
+}
+static void ec_net_ctor_none(FILE * out, int sid, int nid) {
+    fprintf(out, "  .method public specialname rtspecialname instance void .ctor() cil managed\n  {\n    .maxstack 1\n    ldarg.0\n    call       instance void [mscorlib]System.Object::.ctor()\n    ret\n  }\n");
+    (void)sid; (void)nid;
+}
+static void ec_net_spec_zw(FILE * out) {
+    fprintf(out, "    call       valuetype [boxes]Snobol4.Runtime.Boxes.Spec [boxes]Snobol4.Runtime.Boxes.Spec::ZeroWidth(int32)\n");
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* EC-2: IR_PAT_ARB — unified template (JVM/JS/.NET). */
+static void ec_bb_arb_jvm(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd); int sid = 0; char tag[32]; snprintf(tag, sizeof tag, "arb_%d_%d", sid, nid);
+    ec_jvm_class_hdr(out, "arb");
+    fprintf(out, ".field private arb_count I\n.field private arb_start I\n");
+    ec_jvm_init_ms_only(out, "arb");
+    fprintf(out, ".method public \316\261()Lbb/bb_box$Spec;\n    .limit stack 5\n    .limit locals 1\n");
+    fprintf(out, "    aload_0\n    iconst_0\n    putfield bb/bb_arb/arb_count I\n");
+    fprintf(out, "    aload_0\n    aload_0\n    getfield bb/bb_arb/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/delta I\n    putfield bb/bb_arb/arb_start I\n");
+    fprintf(out, "    new bb/bb_box$Spec\n    dup\n    aload_0\n    getfield bb/bb_arb/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/delta I\n    iconst_0\n    invokespecial bb/bb_box$Spec/<init>(II)V\n    areturn\n.end method\n");
+    fprintf(out, ".method public \316\262()Lbb/bb_box$Spec;\n    .limit stack 5\n    .limit locals 1\n");
+    fprintf(out, "    aload_0\n    dup\n    getfield bb/bb_arb/arb_count I\n    iconst_1\n    iadd\n    putfield bb/bb_arb/arb_count I\n");
+    fprintf(out, "    aload_0\n    getfield bb/bb_arb/arb_start I\n    aload_0\n    getfield bb/bb_arb/arb_count I\n    iadd\n");
+    fprintf(out, "    aload_0\n    getfield bb/bb_arb/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/omega I\n    if_icmpgt %s_omega\n", tag);
+    fprintf(out, "    aload_0\n    getfield bb/bb_arb/ms Lbb/bb_box$MatchState;\n    aload_0\n    getfield bb/bb_arb/arb_start I\n    putfield bb/bb_box$MatchState/delta I\n");
+    fprintf(out, "    new bb/bb_box$Spec\n    dup\n    aload_0\n    getfield bb/bb_arb/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/delta I\n    aload_0\n    getfield bb/bb_arb/arb_count I\n    invokespecial bb/bb_box$Spec/<init>(II)V\n");
+    fprintf(out, "    aload_0\n    getfield bb/bb_arb/ms Lbb/bb_box$MatchState;\n    dup\n    getfield bb/bb_box$MatchState/delta I\n    aload_0\n    getfield bb/bb_arb/arb_count I\n    iadd\n    putfield bb/bb_box$MatchState/delta I\n");
+    fprintf(out, "    areturn\n%s_omega:\n    aconst_null\n    areturn\n.end method\n", tag);
+}
+static void ec_bb_arb_js(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd);
+    fprintf(out, "function make_pat_%d_%d(ms) { let delta = 0; let self = { succ: null, fail: null,\n", nd->ival, nid);
+    fprintf(out, "alpha() { delta = ms.omega - ms.delta; const r = ms.sigma.slice(ms.delta, ms.delta + delta); ms.delta += delta; self.succ.alpha(); return r; },\n");
+    fprintf(out, "beta() { if (delta <= 0) { self.fail.alpha(); return; } delta--; ms.delta--; const r = ms.sigma.slice(ms.delta, ms.delta + delta + 1); return r; }\n");
+    fprintf(out, "}; return self; }\n");
+}
+static void ec_bb_arb_net(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd); int sid = 0;
+    ec_net_class_hdr(out, sid, nid);
+    fprintf(out, "  .field private int32 _count\n  .field private int32 _start\n");
+    ec_net_ctor_none(out, sid, nid);
+    ec_net_alpha_hdr(out);
+    fprintf(out, "    .maxstack 2\n");
+    fprintf(out, "    ldarg.0\n    ldc.i4.0\n    stfld      int32 pat_%d_%d::_count\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldarg.1\n    ldfld      int32 [boxes]Snobol4.Runtime.Boxes.MatchState::Cursor\n    stfld      int32 pat_%d_%d::_start\n", sid, nid);
+    ec_net_cursor_load(out); ec_net_spec_zw(out); fprintf(out, "    ret\n  }\n");
+    ec_net_beta_hdr(out);
+    fprintf(out, "    .maxstack 3\n");
+    fprintf(out, "    ldarg.0\n    ldarg.0\n    ldfld      int32 pat_%d_%d::_count\n    ldc.i4.1\n    add\n    stfld      int32 pat_%d_%d::_count\n", sid, nid, sid, nid);
+    fprintf(out, "    ldarg.0\n    ldfld      int32 pat_%d_%d::_start\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldfld      int32 pat_%d_%d::_count\n    add\n", sid, nid);
+    fprintf(out, "    ldarg.1\n"); ec_net_ms_length(out);
+    fprintf(out, "    bgt        ARB_%d_%d_FAIL\n", sid, nid);
+    fprintf(out, "    ldarg.1\n    ldarg.0\n    ldfld      int32 pat_%d_%d::_start\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldfld      int32 pat_%d_%d::_count\n    add\n", sid, nid);
+    fprintf(out, "    stfld      int32 [boxes]Snobol4.Runtime.Boxes.MatchState::Cursor\n");
+    fprintf(out, "    ldarg.0\n    ldfld      int32 pat_%d_%d::_start\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldfld      int32 pat_%d_%d::_count\n", sid, nid);
+    ec_net_spec_of(out); fprintf(out, "    ret\n");
+    fprintf(out, "  ARB_%d_%d_FAIL:\n", sid, nid); ec_net_fail_ret(out); fprintf(out, "  }\n}\n");
+    fprintf(out, "    newobj     instance void pat_%d_%d::.ctor()\n", sid, nid);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* EC-2: IR_PAT_ARBNO — unified template (JVM/JS/.NET). */
+static void ec_bb_arbno_jvm(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd); int sid = 0; char tag[32]; snprintf(tag, sizeof tag, "arbno_%d_%d", sid, nid);
+    ec_jvm_class_hdr(out, "arbno");
+    fprintf(out, ".field private static final MAX_DEPTH I = 64\n");
+    fprintf(out, ".field private final body Lbb/bb_box;\n");
+    fprintf(out, ".field private final frame_start [I\n.field private final frame_match_st [I\n.field private final frame_match_ln [I\n");
+    fprintf(out, ".field private depth I\n");
+    fprintf(out, ".method public <init>(Lbb/bb_box$MatchState;Lbb/bb_box;)V\n    .limit stack 4\n    .limit locals 3\n");
+    fprintf(out, "    aload_0\n    aload_1\n    invokespecial bb/bb_box/<init>(Lbb/bb_box$MatchState;)V\n");
+    fprintf(out, "    aload_0\n    aload_2\n    putfield bb/bb_arbno/body Lbb/bb_box;\n");
+    fprintf(out, "    aload_0\n    bipush 64\n    newarray int\n    putfield bb/bb_arbno/frame_start [I\n");
+    fprintf(out, "    aload_0\n    bipush 64\n    newarray int\n    putfield bb/bb_arbno/frame_match_st [I\n");
+    fprintf(out, "    aload_0\n    bipush 64\n    newarray int\n    putfield bb/bb_arbno/frame_match_ln [I\n");
+    fprintf(out, "    return\n.end method\n");
+    fprintf(out, ".method public \316\261()Lbb/bb_box$Spec;\n    .limit stack 5\n    .limit locals 1\n");
+    fprintf(out, "    aload_0\n    iconst_0\n    putfield bb/bb_arbno/depth I\n");
+    fprintf(out, "    aload_0\n    getfield bb/bb_arbno/frame_match_st [I\n    iconst_0\n    aload_0\n    getfield bb/bb_arbno/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/delta I\n    iastore\n");
+    fprintf(out, "    aload_0\n    getfield bb/bb_arbno/frame_match_ln [I\n    iconst_0\n    iconst_0\n    iastore\n");
+    fprintf(out, "    aload_0\n    getfield bb/bb_arbno/frame_start [I\n    iconst_0\n    aload_0\n    getfield bb/bb_arbno/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/delta I\n    iastore\n");
+    fprintf(out, "    aload_0\n    invokevirtual bb/bb_arbno/tryBody()Lbb/bb_box$Spec;\n    areturn\n.end method\n");
+    fprintf(out, ".method public \316\262()Lbb/bb_box$Spec;\n    .limit stack 5\n    .limit locals 1\n");
+    fprintf(out, "    aload_0\n    getfield bb/bb_arbno/depth I\n    ifle %s_beta_omega\n", tag);
+    fprintf(out, "    aload_0\n    dup\n    getfield bb/bb_arbno/depth I\n    iconst_1\n    isub\n    putfield bb/bb_arbno/depth I\n");
+    fprintf(out, "    aload_0\n    getfield bb/bb_arbno/ms Lbb/bb_box$MatchState;\n    aload_0\n    getfield bb/bb_arbno/frame_start [I\n    aload_0\n    getfield bb/bb_arbno/depth I\n    iaload\n    putfield bb/bb_box$MatchState/delta I\n");
+    fprintf(out, "    new bb/bb_box$Spec\n    dup\n    aload_0\n    getfield bb/bb_arbno/frame_match_st [I\n    aload_0\n    getfield bb/bb_arbno/depth I\n    iaload\n    aload_0\n    getfield bb/bb_arbno/frame_match_ln [I\n    aload_0\n    getfield bb/bb_arbno/depth I\n    iaload\n    invokespecial bb/bb_box$Spec/<init>(II)V\n    areturn\n");
+    fprintf(out, "%s_beta_omega:\n    aconst_null\n    areturn\n.end method\n", tag);
+    fprintf(out, ".method private tryBody()Lbb/bb_box$Spec;\n    .limit stack 6\n    .limit locals 4\n%s_tryBody_loop:\n", tag);
+    fprintf(out, "    aload_0\n    getfield bb/bb_arbno/body Lbb/bb_box;\n    invokevirtual bb/bb_box/\316\261()Lbb/bb_box$Spec;\n    astore_1\n    aload_1\n    ifnull %s_tryBody_omega\n", tag);
+    fprintf(out, "    aload_0\n    getfield bb/bb_arbno/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/delta I\n    aload_0\n    getfield bb/bb_arbno/frame_start [I\n    aload_0\n    getfield bb/bb_arbno/depth I\n    iaload\n    if_icmpne %s_tryBody_advance\n", tag);
+    fprintf(out, "    new bb/bb_box$Spec\n    dup\n    aload_0\n    getfield bb/bb_arbno/frame_match_st [I\n    aload_0\n    getfield bb/bb_arbno/depth I\n    iaload\n    aload_0\n    getfield bb/bb_arbno/frame_match_ln [I\n    aload_0\n    getfield bb/bb_arbno/depth I\n    iaload\n    invokespecial bb/bb_box$Spec/<init>(II)V\n    areturn\n");
+    fprintf(out, "%s_tryBody_advance:\n", tag);
+    fprintf(out, "    aload_0\n    getfield bb/bb_arbno/frame_match_st [I\n    aload_0\n    getfield bb/bb_arbno/depth I\n    iaload\n    istore_2\n");
+    fprintf(out, "    aload_0\n    getfield bb/bb_arbno/frame_match_ln [I\n    aload_0\n    getfield bb/bb_arbno/depth I\n    iaload\n    aload_1\n    getfield bb/bb_box$Spec/len I\n    iadd\n");
+    fprintf(out, "    aload_0\n    getfield bb/bb_arbno/depth I\n    iconst_1\n    iadd\n    bipush 64\n    if_icmpge %s_tryBody_full\n", tag);
+    fprintf(out, "    aload_0\n    dup\n    getfield bb/bb_arbno/depth I\n    iconst_1\n    iadd\n    putfield bb/bb_arbno/depth I\n");
+    fprintf(out, "    aload_0\n    getfield bb/bb_arbno/frame_match_st [I\n    aload_0\n    getfield bb/bb_arbno/depth I\n    iload_2\n    iastore\n");
+    fprintf(out, "    istore 3\n    aload_0\n    getfield bb/bb_arbno/frame_match_ln [I\n    aload_0\n    getfield bb/bb_arbno/depth I\n    iload 3\n    iastore\n");
+    fprintf(out, "    aload_0\n    getfield bb/bb_arbno/frame_start [I\n    aload_0\n    getfield bb/bb_arbno/depth I\n    aload_0\n    getfield bb/bb_arbno/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/delta I\n    iastore\n");
+    fprintf(out, "    goto %s_tryBody_loop\n%s_tryBody_full:\n", tag, tag);
+    fprintf(out, "    new bb/bb_box$Spec\n    dup_x1\n    swap\n    iload_2\n    swap\n    invokespecial bb/bb_box$Spec/<init>(II)V\n    areturn\n");
+    fprintf(out, "%s_tryBody_omega:\n", tag);
+    fprintf(out, "    new bb/bb_box$Spec\n    dup\n    aload_0\n    getfield bb/bb_arbno/frame_match_st [I\n    aload_0\n    getfield bb/bb_arbno/depth I\n    iaload\n    aload_0\n    getfield bb/bb_arbno/frame_match_ln [I\n    aload_0\n    getfield bb/bb_arbno/depth I\n    iaload\n    invokespecial bb/bb_box$Spec/<init>(II)V\n    areturn\n.end method\n");
+}
+static void ec_bb_arbno_js(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd);
+    fprintf(out, "function make_pat_%d_%d(ms) { const stack = []; let self = { succ: null, fail: null,\n", nd->ival, nid);
+    fprintf(out, "alpha() { stack.length = 0; stack.push({ start: ms.delta }); while (true) { const frame = stack[stack.length - 1]; const br = self.body.alpha();\n");
+    fprintf(out, "if (br === null) { return ms.sigma.slice(stack[0].start, ms.delta - stack[0].start); }\n");
+    fprintf(out, "if (ms.delta === frame.start) { return ms.sigma.slice(stack[0].start, ms.delta - stack[0].start); }\n");
+    fprintf(out, "stack.push({ start: ms.delta }); } },\n");
+    fprintf(out, "beta() { if (stack.length <= 1) { self.fail.alpha(); return; } stack.pop(); const frame = stack[stack.length - 1]; ms.delta = frame.start; return ms.sigma.slice(stack[0].start, ms.delta - stack[0].start); }\n");
+    fprintf(out, "}; return self; }\n");
+}
+static void ec_bb_arbno_net(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd); int sid = 0;
+    ec_net_class_hdr(out, sid, nid);
+    fprintf(out, "  .field private class [boxes]Snobol4.Runtime.Boxes.IByrdBox _body\n");
+    fprintf(out, "  .field private int32[] _matchStart\n  .field private int32[] _matchLen\n");
+    fprintf(out, "  .field private int32[] _startStack\n  .field private int32   _depth\n");
+    fprintf(out, "  .method public specialname rtspecialname instance void .ctor(class [boxes]Snobol4.Runtime.Boxes.IByrdBox body) cil managed\n  {\n");
+    fprintf(out, "    .maxstack 2\n    ldarg.0\n    call       instance void [mscorlib]System.Object::.ctor()\n");
+    fprintf(out, "    ldarg.0\n    ldarg.1\n    stfld      class [boxes]Snobol4.Runtime.Boxes.IByrdBox pat_%d_%d::_body\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldc.i4     64\n    newarr     [mscorlib]System.Int32\n    stfld      int32[] pat_%d_%d::_matchStart\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldc.i4     64\n    newarr     [mscorlib]System.Int32\n    stfld      int32[] pat_%d_%d::_matchLen\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldc.i4     64\n    newarr     [mscorlib]System.Int32\n    stfld      int32[] pat_%d_%d::_startStack\n    ret\n  }\n", sid, nid);
+    ec_net_alpha_hdr(out);
+    fprintf(out, "    .maxstack 4\n    .locals init (int32 V_startHere, valuetype [boxes]Snobol4.Runtime.Boxes.Spec V_br)\n");
+    fprintf(out, "    ldarg.0\n    ldc.i4.0\n    stfld      int32 pat_%d_%d::_depth\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldfld      int32[] pat_%d_%d::_matchStart\n    ldc.i4.0\n", sid, nid); ec_net_cursor_load(out); fprintf(out, "    stelem.i4\n");
+    fprintf(out, "    ldarg.0\n    ldfld      int32[] pat_%d_%d::_matchLen\n    ldc.i4.0\n    ldc.i4.0\n    stelem.i4\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldfld      int32[] pat_%d_%d::_startStack\n    ldc.i4.0\n", sid, nid); ec_net_cursor_load(out); fprintf(out, "    stelem.i4\n");
+    fprintf(out, "  ARBNO_%d_%d_LOOP:\n", sid, nid); ec_net_cursor_load(out); fprintf(out, "    stloc.0\n");
+    fprintf(out, "    ldarg.0\n    ldfld      class [boxes]Snobol4.Runtime.Boxes.IByrdBox pat_%d_%d::_body\n    ldarg.1\n", sid, nid);
+    fprintf(out, "    callvirt   instance valuetype [boxes]Snobol4.Runtime.Boxes.Spec [boxes]Snobol4.Runtime.Boxes.IByrdBox::Alpha(class [boxes]Snobol4.Runtime.Boxes.MatchState)\n");
+    fprintf(out, "    stloc.1\n    ldloca.s   V_br\n    call       instance bool [boxes]Snobol4.Runtime.Boxes.Spec::get_IsFail()\n");
+    fprintf(out, "    brtrue     ARBNO_%d_%d_STOP\n", sid, nid); ec_net_cursor_load(out); fprintf(out, "    ldloc.0\n    beq        ARBNO_%d_%d_STOP\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldfld      int32 pat_%d_%d::_depth\n    ldc.i4     63\n    bge        ARBNO_%d_%d_STOP\n", sid, nid, sid, nid);
+    fprintf(out, "    ldarg.0\n    ldarg.0\n    ldfld      int32 pat_%d_%d::_depth\n    ldc.i4.1\n    add\n    stfld      int32 pat_%d_%d::_depth\n", sid, nid, sid, nid);
+    fprintf(out, "    ldarg.0\n    ldfld      int32[] pat_%d_%d::_matchStart\n    ldarg.0\n    ldfld      int32 pat_%d_%d::_depth\n", sid, nid, sid, nid);
+    fprintf(out, "    ldarg.0\n    ldfld      int32[] pat_%d_%d::_matchStart\n    ldc.i4.0\n    ldelem.i4\n    stelem.i4\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldfld      int32[] pat_%d_%d::_matchLen\n    ldarg.0\n    ldfld      int32 pat_%d_%d::_depth\n", sid, nid, sid, nid);
+    fprintf(out, "    ldarg.0\n    ldfld      int32[] pat_%d_%d::_matchLen\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldfld      int32 pat_%d_%d::_depth\n    ldc.i4.1\n    sub\n    ldelem.i4\n", sid, nid);
+    fprintf(out, "    ldloca.s   V_br\n    ldfld      int32 [boxes]Snobol4.Runtime.Boxes.Spec::Length\n    add\n    stelem.i4\n");
+    fprintf(out, "    ldarg.0\n    ldfld      int32[] pat_%d_%d::_startStack\n    ldarg.0\n    ldfld      int32 pat_%d_%d::_depth\n", sid, nid, sid, nid);
+    ec_net_cursor_load(out); fprintf(out, "    stelem.i4\n    br         ARBNO_%d_%d_LOOP\n", sid, nid);
+    fprintf(out, "  ARBNO_%d_%d_STOP:\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldfld      int32[] pat_%d_%d::_matchStart\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldfld      int32 pat_%d_%d::_depth\n    ldelem.i4\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldfld      int32[] pat_%d_%d::_matchLen\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldfld      int32 pat_%d_%d::_depth\n    ldelem.i4\n", sid, nid);
+    ec_net_spec_of(out); fprintf(out, "    ret\n  }\n");
+    ec_net_beta_hdr(out);
+    fprintf(out, "    .maxstack 3\n    ldarg.0\n    ldfld      int32 pat_%d_%d::_depth\n    ldc.i4.0\n    ble        ARBNO_%d_%d_BFAIL\n", sid, nid, sid, nid);
+    fprintf(out, "    ldarg.0\n    ldarg.0\n    ldfld      int32 pat_%d_%d::_depth\n    ldc.i4.1\n    sub\n    stfld      int32 pat_%d_%d::_depth\n", sid, nid, sid, nid);
+    fprintf(out, "    ldarg.1\n    ldarg.0\n    ldfld      int32[] pat_%d_%d::_startStack\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldfld      int32 pat_%d_%d::_depth\n    ldelem.i4\n", sid, nid);
+    fprintf(out, "    stfld      int32 [boxes]Snobol4.Runtime.Boxes.MatchState::Cursor\n");
+    fprintf(out, "    ldarg.0\n    ldfld      int32[] pat_%d_%d::_matchStart\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldfld      int32 pat_%d_%d::_depth\n    ldelem.i4\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldfld      int32[] pat_%d_%d::_matchLen\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldfld      int32 pat_%d_%d::_depth\n    ldelem.i4\n", sid, nid);
+    ec_net_spec_of(out); fprintf(out, "    ret\n  ARBNO_%d_%d_BFAIL:\n", sid, nid); ec_net_fail_ret(out); fprintf(out, "  }\n}\n");
+    fprintf(out, "    newobj     instance void pat_%d_%d::.ctor(class [boxes]Snobol4.Runtime.Boxes.IByrdBox)\n", sid, nid);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* EC-2: IR_PAT_CAT — unified template (JVM/JS/.NET). */
+static void ec_bb_cat_jvm(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd); int sid = 0; char tag[32]; snprintf(tag, sizeof tag, "seq_%d_%d", sid, nid);
+    ec_jvm_class_hdr(out, "seq");
+    fprintf(out, ".field private final left Lbb/bb_box;\n.field private final right Lbb/bb_box;\n");
+    fprintf(out, ".field private matched_start I\n.field private matched_len I\n");
+    fprintf(out, ".method public <init>(Lbb/bb_box$MatchState;Lbb/bb_box;Lbb/bb_box;)V\n    .limit stack 3\n    .limit locals 4\n");
+    fprintf(out, "    aload_0\n    aload_1\n    invokespecial bb/bb_box/<init>(Lbb/bb_box$MatchState;)V\n");
+    fprintf(out, "    aload_0\n    aload_2\n    putfield bb/bb_seq/left Lbb/bb_box;\n");
+    fprintf(out, "    aload_0\n    aload_3\n    putfield bb/bb_seq/right Lbb/bb_box;\n    return\n.end method\n");
+    fprintf(out, ".method public \316\261()Lbb/bb_box$Spec;\n    .limit stack 6\n    .limit locals 2\n");
+    fprintf(out, "    aload_0\n    aload_0\n    getfield bb/bb_seq/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/delta I\n    putfield bb/bb_seq/matched_start I\n");
+    fprintf(out, "    aload_0\n    iconst_0\n    putfield bb/bb_seq/matched_len I\n");
+    fprintf(out, "    aload_0\n    getfield bb/bb_seq/left Lbb/bb_box;\n    invokevirtual bb/bb_box/\316\261()Lbb/bb_box$Spec;\n    astore_1\n    aload_1\n    ifnull %s_omega\n", tag);
+    fprintf(out, "    aload_0\n    dup\n    getfield bb/bb_seq/matched_len I\n    aload_1\n    getfield bb/bb_box$Spec/len I\n    iadd\n    putfield bb/bb_seq/matched_len I\n");
+    fprintf(out, "    aload_0\n    invokevirtual bb/bb_seq/rightAlpha()Lbb/bb_box$Spec;\n    areturn\n");
+    fprintf(out, "%s_omega:\n    aconst_null\n    areturn\n.end method\n", tag);
+    fprintf(out, ".method public \316\262()Lbb/bb_box$Spec;\n    .limit stack 6\n    .limit locals 2\n");
+    fprintf(out, "    aload_0\n    getfield bb/bb_seq/right Lbb/bb_box;\n    invokevirtual bb/bb_box/\316\262()Lbb/bb_box$Spec;\n    astore_1\n    aload_1\n    ifnull %s_beta_right_omega\n", tag);
+    fprintf(out, "    new bb/bb_box$Spec\n    dup\n    aload_0\n    getfield bb/bb_seq/matched_start I\n    aload_0\n    getfield bb/bb_seq/matched_len I\n    aload_1\n    getfield bb/bb_box$Spec/len I\n    iadd\n    invokespecial bb/bb_box$Spec/<init>(II)V\n    areturn\n");
+    fprintf(out, "%s_beta_right_omega:\n    aload_0\n    invokevirtual bb/bb_seq/leftBeta()Lbb/bb_box$Spec;\n    areturn\n.end method\n", tag);
+    fprintf(out, ".method private rightAlpha()Lbb/bb_box$Spec;\n    .limit stack 6\n    .limit locals 2\n");
+    fprintf(out, "    aload_0\n    getfield bb/bb_seq/right Lbb/bb_box;\n    invokevirtual bb/bb_box/\316\261()Lbb/bb_box$Spec;\n    astore_1\n    aload_1\n    ifnull %s_rA_omega\n", tag);
+    fprintf(out, "    new bb/bb_box$Spec\n    dup\n    aload_0\n    getfield bb/bb_seq/matched_start I\n    aload_0\n    getfield bb/bb_seq/matched_len I\n    aload_1\n    getfield bb/bb_box$Spec/len I\n    iadd\n    invokespecial bb/bb_box$Spec/<init>(II)V\n    areturn\n");
+    fprintf(out, "%s_rA_omega:\n    aload_0\n    invokevirtual bb/bb_seq/leftBeta()Lbb/bb_box$Spec;\n    areturn\n.end method\n", tag);
+    fprintf(out, ".method private leftBeta()Lbb/bb_box$Spec;\n    .limit stack 6\n    .limit locals 2\n");
+    fprintf(out, "    aload_0\n    getfield bb/bb_seq/left Lbb/bb_box;\n    invokevirtual bb/bb_box/\316\262()Lbb/bb_box$Spec;\n    astore_1\n    aload_1\n    ifnull %s_lB_omega\n", tag);
+    fprintf(out, "    aload_0\n    aload_1\n    getfield bb/bb_box$Spec/len I\n    putfield bb/bb_seq/matched_len I\n");
+    fprintf(out, "    aload_0\n    invokevirtual bb/bb_seq/rightAlpha()Lbb/bb_box$Spec;\n    areturn\n");
+    fprintf(out, "%s_lB_omega:\n    aconst_null\n    areturn\n.end method\n", tag);
+}
+static void ec_bb_cat_js(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd);
+    fprintf(out, "function make_pat_%d_%d(ms) { let self = { succ: null, fail: null,\n", nd->ival, nid);
+    fprintf(out, "alpha() { const lr = self.left.alpha(); if (lr === null) { self.fail.alpha(); return; }\n");
+    fprintf(out, "let rr = self.right.alpha(); while (rr === null) { const lr2 = self.left.beta(); if (lr2 === null) { self.fail.alpha(); return; } rr = self.right.alpha(); }\n");
+    fprintf(out, "self.succ.alpha(); return rr; },\n");
+    fprintf(out, "beta() { let rr = self.right.beta(); while (rr === null) { const lr = self.left.beta(); if (lr === null) { self.fail.alpha(); return; } rr = self.right.alpha(); }\n");
+    fprintf(out, "return rr; }\n");
+    fprintf(out, "}; return self; }\n");
+}
+static void ec_bb_cat_net(IR_t * nd, FILE * out) {
+    int nid = ir_node_id(nd); int sid = 0;
+    ec_net_class_hdr(out, sid, nid);
+    fprintf(out, "  .field private class [boxes]Snobol4.Runtime.Boxes.IByrdBox _left\n");
+    fprintf(out, "  .field private class [boxes]Snobol4.Runtime.Boxes.IByrdBox _right\n");
+    fprintf(out, "  .field private int32 _mStart\n  .field private int32 _mLen\n");
+    fprintf(out, "  .method public specialname rtspecialname instance void .ctor(class [boxes]Snobol4.Runtime.Boxes.IByrdBox left, class [boxes]Snobol4.Runtime.Boxes.IByrdBox right) cil managed\n  {\n");
+    fprintf(out, "    .maxstack 2\n    ldarg.0\n    call       instance void [mscorlib]System.Object::.ctor()\n");
+    fprintf(out, "    ldarg.0\n    ldarg.1\n    stfld      class [boxes]Snobol4.Runtime.Boxes.IByrdBox pat_%d_%d::_left\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldarg.2\n    stfld      class [boxes]Snobol4.Runtime.Boxes.IByrdBox pat_%d_%d::_right\n    ret\n  }\n", sid, nid);
+    ec_net_alpha_hdr(out);
+    fprintf(out, "    .maxstack 3\n    .locals init (valuetype [boxes]Snobol4.Runtime.Boxes.Spec V_lr, valuetype [boxes]Snobol4.Runtime.Boxes.Spec V_rr)\n");
+    fprintf(out, "    ldarg.0\n"); ec_net_cursor_load(out); fprintf(out, "    stfld      int32 pat_%d_%d::_mStart\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldfld      class [boxes]Snobol4.Runtime.Boxes.IByrdBox pat_%d_%d::_left\n    ldarg.1\n", sid, nid);
+    fprintf(out, "    callvirt   instance valuetype [boxes]Snobol4.Runtime.Boxes.Spec [boxes]Snobol4.Runtime.Boxes.IByrdBox::Alpha(class [boxes]Snobol4.Runtime.Boxes.MatchState)\n");
+    fprintf(out, "    stloc.0\n    ldloca.s   V_lr\n    call       instance bool [boxes]Snobol4.Runtime.Boxes.Spec::get_IsFail()\n");
+    fprintf(out, "    brtrue     CAT_%d_%d_FAIL\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldloca.s   V_lr\n    ldfld      int32 [boxes]Snobol4.Runtime.Boxes.Spec::Length\n    stfld      int32 pat_%d_%d::_mLen\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldfld      class [boxes]Snobol4.Runtime.Boxes.IByrdBox pat_%d_%d::_right\n    ldarg.1\n", sid, nid);
+    fprintf(out, "    callvirt   instance valuetype [boxes]Snobol4.Runtime.Boxes.Spec [boxes]Snobol4.Runtime.Boxes.IByrdBox::Alpha(class [boxes]Snobol4.Runtime.Boxes.MatchState)\n");
+    fprintf(out, "    stloc.1\n    ldloca.s   V_rr\n    call       instance bool [boxes]Snobol4.Runtime.Boxes.Spec::get_IsFail()\n");
+    fprintf(out, "    brtrue     CAT_%d_%d_FAIL\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldfld      int32 pat_%d_%d::_mStart\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldfld      int32 pat_%d_%d::_mLen\n", sid, nid);
+    fprintf(out, "    ldloca.s   V_rr\n    ldfld      int32 [boxes]Snobol4.Runtime.Boxes.Spec::Length\n    add\n");
+    ec_net_spec_of(out); fprintf(out, "    ret\n  CAT_%d_%d_FAIL:\n", sid, nid); ec_net_fail_ret(out); fprintf(out, "  }\n");
+    ec_net_beta_hdr(out);
+    fprintf(out, "    .maxstack 2\n    .locals init (valuetype [boxes]Snobol4.Runtime.Boxes.Spec V_rr)\n");
+    fprintf(out, "    ldarg.0\n    ldfld      class [boxes]Snobol4.Runtime.Boxes.IByrdBox pat_%d_%d::_right\n    ldarg.1\n", sid, nid);
+    fprintf(out, "    callvirt   instance valuetype [boxes]Snobol4.Runtime.Boxes.Spec [boxes]Snobol4.Runtime.Boxes.IByrdBox::Beta(class [boxes]Snobol4.Runtime.Boxes.MatchState)\n");
+    fprintf(out, "    stloc.0\n    ldloca.s   V_rr\n    call       instance bool [boxes]Snobol4.Runtime.Boxes.Spec::get_IsFail()\n");
+    fprintf(out, "    brfalse    CAT_%d_%d_BNOK\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldfld      class [boxes]Snobol4.Runtime.Boxes.IByrdBox pat_%d_%d::_left\n    ldarg.1\n", sid, nid);
+    fprintf(out, "    callvirt   instance valuetype [boxes]Snobol4.Runtime.Boxes.Spec [boxes]Snobol4.Runtime.Boxes.IByrdBox::Beta(class [boxes]Snobol4.Runtime.Boxes.MatchState)\n");
+    fprintf(out, "    ret\n  CAT_%d_%d_BNOK:\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldfld      int32 pat_%d_%d::_mStart\n", sid, nid);
+    fprintf(out, "    ldarg.0\n    ldfld      int32 pat_%d_%d::_mLen\n", sid, nid);
+    fprintf(out, "    ldloca.s   V_rr\n    ldfld      int32 [boxes]Snobol4.Runtime.Boxes.Spec::Length\n    add\n");
+    ec_net_spec_of(out); fprintf(out, "    ret\n  }\n}\n");
+    fprintf(out, "    newobj     instance void pat_%d_%d::.ctor(class [boxes]Snobol4.Runtime.Boxes.IByrdBox, class [boxes]Snobol4.Runtime.Boxes.IByrdBox)\n", sid, nid);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* emit_bb_node — unified BB node emitter. Dispatches JVM/JS/NET arms; x86 arms remain in emit_bb.c.
-   EC-2: IR_PAT_LIT, IR_PAT_ANY, IR_PAT_NOTANY, IR_PAT_SPAN, IR_PAT_BREAK implemented. */
+   EC-2: IR_PAT_LIT, IR_PAT_ANY, IR_PAT_NOTANY, IR_PAT_SPAN, IR_PAT_BREAK, IR_PAT_ARB, IR_PAT_ARBNO, IR_PAT_CAT implemented. */
 int emit_bb_node(IR_t * nd, FILE * out) {
     if (!nd) return 1;
     switch (nd->t) {
     case IR_PAT_LIT:
-        if (IS_JVM) { ec_bb_lit_jvm(nd, out);    return 0; }
-        if (IS_JS)  { ec_bb_lit_js(nd, out);      return 0; }
-        if (IS_NET) { ec_bb_lit_net(nd, out);     return 0; }
+        if (IS_JVM) { ec_bb_lit_jvm(nd, out);      return 0; }
+        if (IS_JS)  { ec_bb_lit_js(nd, out);        return 0; }
+        if (IS_NET) { ec_bb_lit_net(nd, out);       return 0; }
         return 1;
     case IR_PAT_ANY:
-        if (IS_JVM) { ec_bb_any_jvm(nd, out);    return 0; }
-        if (IS_JS)  { ec_bb_any_js(nd, out);      return 0; }
-        if (IS_NET) { ec_bb_any_net(nd, out);     return 0; }
+        if (IS_JVM) { ec_bb_any_jvm(nd, out);      return 0; }
+        if (IS_JS)  { ec_bb_any_js(nd, out);        return 0; }
+        if (IS_NET) { ec_bb_any_net(nd, out);       return 0; }
         return 1;
     case IR_PAT_NOTANY:
-        if (IS_JVM) { ec_bb_notany_jvm(nd, out); return 0; }
-        if (IS_JS)  { ec_bb_notany_js(nd, out);   return 0; }
-        if (IS_NET) { ec_bb_notany_net(nd, out);  return 0; }
+        if (IS_JVM) { ec_bb_notany_jvm(nd, out);   return 0; }
+        if (IS_JS)  { ec_bb_notany_js(nd, out);     return 0; }
+        if (IS_NET) { ec_bb_notany_net(nd, out);    return 0; }
         return 1;
     case IR_PAT_SPAN:
-        if (IS_JVM) { ec_bb_span_jvm(nd, out);   return 0; }
-        if (IS_JS)  { ec_bb_span_js(nd, out);     return 0; }
-        if (IS_NET) { ec_bb_span_net(nd, out);    return 0; }
+        if (IS_JVM) { ec_bb_span_jvm(nd, out);     return 0; }
+        if (IS_JS)  { ec_bb_span_js(nd, out);       return 0; }
+        if (IS_NET) { ec_bb_span_net(nd, out);      return 0; }
         return 1;
     case IR_PAT_BREAK:
-        if (IS_JVM) { ec_bb_break_jvm(nd, out);  return 0; }
-        if (IS_JS)  { ec_bb_break_js(nd, out);    return 0; }
-        if (IS_NET) { ec_bb_break_net(nd, out);   return 0; }
+        if (IS_JVM) { ec_bb_break_jvm(nd, out);    return 0; }
+        if (IS_JS)  { ec_bb_break_js(nd, out);      return 0; }
+        if (IS_NET) { ec_bb_break_net(nd, out);     return 0; }
+        return 1;
+    case IR_PAT_ARB:
+        if (IS_JVM) { ec_bb_arb_jvm(nd, out);      return 0; }
+        if (IS_JS)  { ec_bb_arb_js(nd, out);        return 0; }
+        if (IS_NET) { ec_bb_arb_net(nd, out);       return 0; }
+        return 1;
+    case IR_PAT_ARBNO:
+        if (IS_JVM) { ec_bb_arbno_jvm(nd, out);    return 0; }
+        if (IS_JS)  { ec_bb_arbno_js(nd, out);      return 0; }
+        if (IS_NET) { ec_bb_arbno_net(nd, out);     return 0; }
+        return 1;
+    case IR_PAT_CAT:
+        if (IS_JVM) { ec_bb_cat_jvm(nd, out);      return 0; }
+        if (IS_JS)  { ec_bb_cat_js(nd, out);        return 0; }
+        if (IS_NET) { ec_bb_cat_net(nd, out);       return 0; }
         return 1;
     default:
         if (IS_JVM || IS_JS || IS_NET)
