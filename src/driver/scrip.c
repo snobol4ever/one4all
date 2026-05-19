@@ -27,7 +27,6 @@ extern void ir_set_print_width(int w);   /* --dump-width N: inline/multiline thr
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void ir_print_node_nl(const tree_t *e, FILE *f);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-extern int emit_wasm_program(const tree_t * ast_prog, FILE * out);
 #include "snobol4.h"
 #include "sil_macros.h"
 #include "snobol4_runtime_shim.h"
@@ -392,8 +391,8 @@ int main(int argc, char **argv)
                 return 1;
             }
         } else if (strcmp(target_name, "wasm") == 0) {
-            if (emit_wasm_program(ast_prog, stdout) != 0) {
-                fprintf(stderr, "scrip: emit_wasm_program failed\n");
+            if (emit_program(ast_prog, stdout, EMIT_WASM) != 0) {
+                fprintf(stderr, "scrip: emit_program(wasm) failed\n");
                 return 1;
             }
         }

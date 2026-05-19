@@ -99,7 +99,6 @@ RT_PIC_SRCS := \
     $(SRC)/emitter/SM_templates/sm_pat.c \
     $(SRC)/emitter/emit_bb.c \
     $(SRC)/emitter/emit_sm.c \
-    $(SRC)/emitter/emit_wasm.c \
     \
     $(SRC)/processor/bb_boxes.c \
     $(SRC)/processor/bb_broker.c \
@@ -289,7 +288,6 @@ scrip:
 	$(CC) $(CRT)   -c $(SRC)/processor/sm_jit_interp.c -o $(OBJ)/sm_jit_interp.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/emit_sm.c -o $(OBJ)/emit_sm.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/emit_bb.c -o $(OBJ)/emit_bb.o
-	$(CC) $(CRT)   -c $(SRC)/emitter/emit_wasm.c -o $(OBJ)/emit_wasm.o
 	$(CC) $(CRT)   -c $(SRC)/runtime/rt/rt.c   -o $(OBJ)/rt.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_globals.c -o $(OBJ)/interp_globals.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_label.c   -o $(OBJ)/interp_label.o
