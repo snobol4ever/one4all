@@ -73,15 +73,12 @@ typedef struct ScParseState {
     CODE_t        *code;
     const char    *filename;
     int            nerrors;
-    int            label_seq;
     char          *cur_func_name;
     LoopFrame    *loop_top;
     struct SwitchHead *cur_switch;
-    STMT_t            *if_before_body;    /* PST-SC-4b */
-    STMT_t            *func_before_body;  /* PST-SC-4g */
 } ScParseState;
 
-#line 85 "snocone_parse.tab.h"
+#line 82 "snocone_parse.tab.h"
 
 /* Token kinds.  */
 #ifndef SC_TOKENTYPE
@@ -182,7 +179,7 @@ typedef struct ScParseState {
 #if ! defined SC_STYPE && ! defined SC_STYPE_IS_DECLARED
 union SC_STYPE
 {
-#line 188 "snocone_parse.y"
+#line 186 "snocone_parse.y"
 
     tree_t *expr;
     char   *str;
@@ -196,7 +193,7 @@ union SC_STYPE
     struct SwitchHead *switchhead;
     STMT_t           *stmt_ptr;
 
-#line 200 "snocone_parse.tab.h"
+#line 197 "snocone_parse.tab.h"
 
 };
 typedef union SC_STYPE SC_STYPE;

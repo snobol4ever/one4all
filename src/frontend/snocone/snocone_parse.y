@@ -19,12 +19,9 @@ typedef struct ScParseState {
     CODE_t        *code;
     const char    *filename;
     int            nerrors;
-    int            label_seq;
     char          *cur_func_name;
     LoopFrame    *loop_top;
     struct SwitchHead *cur_switch;
-    STMT_t            *if_before_body;    /* PST-SC-4b */
-    STMT_t            *func_before_body;  /* PST-SC-4g */
 } ScParseState;
 }
 %code {
@@ -116,6 +113,7 @@ struct FuncHead {
     char   *name;
     char   *argstr;
     char   *prev_func;
+    STMT_t *before_body;  /* PST-SC-4n: snapshot taken in sc_func_head_new_pst; moved off ScParseState */
 };
 struct CaseEntry {
     char   *case_label;
@@ -622,7 +620,7 @@ static tree_t *sc_str_literal(const char *txt) {
 static char *sc_label_new(ScParseState *st, const char *prefix) {
     static int global_label_seq = 0;
     char buf[64];
-    (void)st->label_seq;
+    (void)st;
     snprintf(buf, sizeof buf, "%s_%04d", prefix, ++global_label_seq);
     return strdup(buf);
 }
@@ -648,14 +646,14 @@ static struct ForHead *sc_for_head_new_pst(ScParseState *st, tree_t *cond, tree_
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* PST-SC-4g (2026-05-16): func_head records name+argstr; no DEFINE call or goto emitted.
- * func_before_body snapshot taken so sc_finalize_function_pst can sc_collect_body. */
+ * PST-SC-4n: before_body snapshot stored in FuncHead, not ScParseState. */
 static struct FuncHead *sc_func_head_new_pst(ScParseState *st, char *name, char *argstr) {
     struct FuncHead *h  = calloc(1, sizeof *h);
     h->name             = strdup(name);
     h->argstr           = strdup(argstr);
     h->prev_func        = st->cur_func_name;
+    h->before_body      = st->code->tail;
     st->cur_func_name   = h->name;
-    st->func_before_body = st->code->tail;
     return h;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -663,7 +661,7 @@ static struct FuncHead *sc_func_head_new_pst(ScParseState *st, char *name, char 
  * lower.c lower_define emits: DEFINE(name(args)) call, skip-goto, entry label, body, end. */
 static void sc_finalize_function_pst(ScParseState *st, struct FuncHead *h)
 {
-    tree_t *body  = sc_collect_body(st, st->func_before_body);
+    tree_t *body  = sc_collect_body(st, h->before_body);
     int slen = strlen(h->name) + 1 + strlen(h->argstr) + 2;
     char *sig = malloc((size_t)slen);
     snprintf(sig, (size_t)slen, "%s(%s)", h->name, h->argstr);
