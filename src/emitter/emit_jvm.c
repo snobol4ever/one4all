@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "emit_ir.h"
+#include "emit_core.h"
 #include "sm_prog.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* emit_jvm.c — JVM Jasmin emitter for IR_t generator (BB) nodes.
@@ -1104,9 +1105,18 @@ int emit_jvm_program(const tree_t * ast_prog, FILE * out) {
     if (!ast_prog || !out) return 1;
     SM_Program * sm = sm_preamble(ast_prog);
     if (!sm) return 1;
+    /* EC-3-prep: install EMIT_JVM mode for the duration of this emission so
+       future SM_templates / BB_templates that read bb_emit_mode see the right
+       target. The silo itself doesn't yet read bb_emit_mode (its switch arms
+       hardcode JVM-specific output), so this is a no-op for current trunk
+       — only matters once SM_templates start dispatching via IS_JVM. */
+    bb_emit_mode_t saved_mode = bb_emit_mode;
+    FILE *         saved_out  = bb_emit_out;
+    emit_mode_set(EMIT_JVM, out);
     emit_jvm_prologue(NULL, out);
     emit_jvm_from_sm(sm, out);
     emit_jvm_epilogue(NULL, out);
+    emit_mode_set(saved_mode, saved_out);
     sm_prog_free(sm);
     return 0;
 }

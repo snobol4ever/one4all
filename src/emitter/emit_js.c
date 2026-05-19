@@ -3,6 +3,7 @@
 #include <string.h>
 #include <ctype.h>
 #include "emit_ir.h"
+#include "emit_core.h"
 #include "sm_prog.h"
 #include "../ast/ast.h"
 /*Forward declaration for sm_preamble (defined in scrip_sm.h) */
@@ -273,6 +274,12 @@ int emit_js_program(const tree_t * ast_prog, FILE * out) {
     if (!ast_prog || !out) return 1;
     SM_Program *sm = sm_preamble(ast_prog);
     if (!sm) return 1;
+    /* EC-3-prep: install EMIT_JS mode for the duration of this emission. See
+       parallel comment in emit_jvm_program — pure infrastructure today, the
+       silo doesn't yet read bb_emit_mode but future SM_templates will. */
+    bb_emit_mode_t saved_mode = bb_emit_mode;
+    FILE *         saved_out  = bb_emit_out;
+    emit_mode_set(EMIT_JS, out);
     /* Prologue: header + runtime require + _init. */
     fprintf(out, "'use strict';\n");
     fprintf(out, "const rt = require('/home/claude/one4all/src/runtime/js/sno_runtime.js');\n");
@@ -296,6 +303,7 @@ int emit_js_program(const tree_t * ast_prog, FILE * out) {
     fprintf(out, "loop: while (true) { switch (_pc) {\n");
     emit_js_from_sm(sm, out);
     emit_js_epilogue(NULL, out);
+    emit_mode_set(saved_mode, saved_out);
     sm_prog_free(sm);
     return 0;
 }
