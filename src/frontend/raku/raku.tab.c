@@ -754,8 +754,8 @@ static const yytype_int16 yyrline[] =
      477,   478,   479,   480,   483,   484,   485,   486,   487,   490,
      491,   492,   494,   496,   501,   502,   508,   512,   519,   524,
      529,   531,   533,   535,   537,   539,   542,   543,   546,   547,
-     548,   549,   550,   551,   552,   553,   558,   562,   564,   566,
-     568,   570,   572,   573,   578
+     548,   549,   550,   551,   552,   553,   557,   560,   562,   564,
+     566,   568,   570,   571,   576
 };
 #endif
 
@@ -2463,74 +2463,72 @@ yyreduce:
 
   case 125: /* atom: VAR_CAPTURE  */
 #line 554 "raku.y"
-        {
-          tree_t *c=make_call("raku_capture");
-          tree_t *idx=ast_node_new(TT_ILIT); idx->v.ival=(yyvsp[0].ival);
-          expr_add_child(c,idx); (yyval.node)=c; }
-#line 2471 "raku.tab.c"
+        { tree_t *c = ast_node_new(TT_CAPTURE);
+          tree_t *idx = ast_node_new(TT_ILIT); idx->v.ival = (yyvsp[0].ival);
+          ast_push(c, idx); (yyval.node) = c; }
+#line 2470 "raku.tab.c"
     break;
 
   case 126: /* atom: VAR_NAMED_CAPTURE  */
-#line 559 "raku.y"
-        {
-          tree_t *c=make_call("raku_named_capture");
-          expr_add_child(c,leaf_sval(TT_QLIT,(yyvsp[0].sval))); (yyval.node)=c; }
-#line 2479 "raku.tab.c"
+#line 558 "raku.y"
+        { tree_t *c = ast_node_new(TT_NAMED_CAPTURE);
+          ast_push(c, leaf_sval(TT_QLIT, (yyvsp[0].sval))); (yyval.node) = c; }
+#line 2477 "raku.tab.c"
     break;
 
   case 127: /* atom: VAR_ARRAY '[' expr ']'  */
-#line 563 "raku.y"
+#line 561 "raku.y"
         { tree_t *c=ast_node_new(TT_ARR_GET); ast_push(c,var_node((yyvsp[-3].sval))); ast_push(c,(yyvsp[-1].node)); (yyval.node)=c; }
-#line 2485 "raku.tab.c"
+#line 2483 "raku.tab.c"
     break;
 
   case 128: /* atom: VAR_HASH '<' IDENT '>'  */
-#line 565 "raku.y"
+#line 563 "raku.y"
         { tree_t *c=ast_node_new(TT_HASH_GET); ast_push(c,var_node((yyvsp[-3].sval))); ast_push(c,leaf_sval(TT_QLIT,(yyvsp[-1].sval))); (yyval.node)=c; }
-#line 2491 "raku.tab.c"
+#line 2489 "raku.tab.c"
     break;
 
   case 129: /* atom: VAR_HASH '{' expr '}'  */
-#line 567 "raku.y"
+#line 565 "raku.y"
         { tree_t *c=ast_node_new(TT_HASH_GET); ast_push(c,var_node((yyvsp[-3].sval))); ast_push(c,(yyvsp[-1].node)); (yyval.node)=c; }
-#line 2497 "raku.tab.c"
+#line 2495 "raku.tab.c"
     break;
 
   case 130: /* atom: KW_EXISTS VAR_HASH '<' IDENT '>'  */
-#line 569 "raku.y"
+#line 567 "raku.y"
         { tree_t *c=ast_node_new(TT_HASH_EXISTS); ast_push(c,var_node((yyvsp[-3].sval))); ast_push(c,leaf_sval(TT_QLIT,(yyvsp[-1].sval))); (yyval.node)=c; }
-#line 2503 "raku.tab.c"
+#line 2501 "raku.tab.c"
     break;
 
   case 131: /* atom: KW_EXISTS VAR_HASH '{' expr '}'  */
-#line 571 "raku.y"
+#line 569 "raku.y"
         { tree_t *c=ast_node_new(TT_HASH_EXISTS); ast_push(c,var_node((yyvsp[-3].sval))); ast_push(c,(yyvsp[-1].node)); (yyval.node)=c; }
-#line 2509 "raku.tab.c"
+#line 2507 "raku.tab.c"
     break;
 
   case 132: /* atom: IDENT  */
-#line 572 "raku.y"
+#line 570 "raku.y"
                       { (yyval.node)=var_node((yyvsp[0].sval)); }
-#line 2515 "raku.tab.c"
+#line 2513 "raku.tab.c"
     break;
 
   case 133: /* atom: VAR_TWIGIL  */
-#line 574 "raku.y"
+#line 572 "raku.y"
         { tree_t *fe=ast_node_new(TT_FIELD);
           fe->v.sval=(char*)intern((yyvsp[0].sval)); free((yyvsp[0].sval));
           expr_add_child(fe, leaf_sval(TT_VAR, "self"));
           (yyval.node)=fe; }
-#line 2524 "raku.tab.c"
+#line 2522 "raku.tab.c"
     break;
 
   case 134: /* atom: '(' expr ')'  */
-#line 578 "raku.y"
+#line 576 "raku.y"
                       { (yyval.node)=(yyvsp[-1].node); }
-#line 2530 "raku.tab.c"
+#line 2528 "raku.tab.c"
     break;
 
 
-#line 2534 "raku.tab.c"
+#line 2532 "raku.tab.c"
 
       default: break;
     }
@@ -2723,7 +2721,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 580 "raku.y"
+#line 578 "raku.y"
 
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void *raku_yy_scan_string(const char *);

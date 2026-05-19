@@ -1756,6 +1756,8 @@ static void lower_expr_inner(const tree_t *t)
         sm_emit_si(g_p, SM_CALL_FN, "raku_sort", (int64_t)nc);
         return;
     }
+    case TT_CAPTURE:       if (t->n >= 1) lower_expr(t->c[0]); sm_emit_si(g_p, SM_CALL_FN, "raku_capture",       1); return;
+    case TT_NAMED_CAPTURE: if (t->n >= 1) lower_expr(t->c[0]); sm_emit_si(g_p, SM_CALL_FN, "raku_named_capture", 1); return;
     case TT_ARR_GET:    if (t->n >= 2) { lower_expr(t->c[0]); lower_expr(t->c[1]); } sm_emit_si(g_p, SM_CALL_FN, "arr_get",      2); return;
     case TT_ARR_SET:    if (t->n >= 3) { lower_expr(t->c[0]); lower_expr(t->c[1]); lower_expr(t->c[2]); } sm_emit_si(g_p, SM_CALL_FN, "arr_set",   3); return;
     case TT_HASH_GET:   if (t->n >= 2) { lower_expr(t->c[0]); lower_expr(t->c[1]); } sm_emit_si(g_p, SM_CALL_FN, "hash_get",     2); return;

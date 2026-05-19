@@ -551,14 +551,12 @@ atom
     | VAR_ARRAY       { $$=var_node($1); }
     | VAR_HASH        { $$=var_node($1); }
     | VAR_CAPTURE
-        {
-          tree_t *c=make_call("raku_capture");
-          tree_t *idx=ast_node_new(TT_ILIT); idx->v.ival=$1;
-          expr_add_child(c,idx); $$=c; }
+        { tree_t *c = ast_node_new(TT_CAPTURE);
+          tree_t *idx = ast_node_new(TT_ILIT); idx->v.ival = $1;
+          ast_push(c, idx); $$ = c; }
     | VAR_NAMED_CAPTURE
-        {
-          tree_t *c=make_call("raku_named_capture");
-          expr_add_child(c,leaf_sval(TT_QLIT,$1)); $$=c; }
+        { tree_t *c = ast_node_new(TT_NAMED_CAPTURE);
+          ast_push(c, leaf_sval(TT_QLIT, $1)); $$ = c; }
     | VAR_ARRAY '[' expr ']'
         { tree_t *c=ast_node_new(TT_ARR_GET); ast_push(c,var_node($1)); ast_push(c,$3); $$=c; }
     | VAR_HASH '<' IDENT '>'
