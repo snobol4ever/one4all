@@ -4,6 +4,7 @@
 #pragma once
 #include "emit_core.h"
 #include "sm_prog.h"
+#include "sm_ctx.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>

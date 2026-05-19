@@ -188,4 +188,10 @@ void sm_mod       (const SM_Instr * instr, FILE * out);
 void sm_stno      (const SM_Instr * instr, FILE * out);
 void sm_acomp     (const SM_Instr * instr, FILE * out);
 void sm_lcomp     (const SM_Instr * instr, FILE * out);
+/*--- EC-3d SM control-flow templates (SM_templates/sm_control.c) -----------*/
+#include "SM_templates/sm_ctx.h"
+int  sm_jump      (const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out);
+int  sm_jump_s    (const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out);
+int  sm_jump_f    (const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out);
+int  sm_halt      (const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out);
 #endif

@@ -637,52 +637,9 @@ static void emit_jvm_one_instr(SM_Program * sm, int i, int n,
     case SM_MOD:      sm_mod(instr, out); break;
     case SM_ACOMP: sm_acomp(instr, out); break;
     case SM_LCOMP: sm_lcomp(instr, out); break;
-    case SM_JUMP: {
-        int target = (int)instr->a[0].i;
-        const char * end_lbl = in_body ? "sm_pc_body_end" : "sm_pc_fn_end";
-        if (target >= 0 && target < n && in_my_method[target]) fprintf(out, "    goto_w sm_pc_%d\n", target);
-        else if (target >= 0 && target < n) {
-            fprintf(out, "    invokestatic rt/SnoRt/halt_tos()V\n");
-            fprintf(out, "    iconst_0\n    invokestatic java/lang/System/exit(I)V\n");
-            fprintf(out, "    return\n");
-        }
-        else fprintf(out, "    goto_w %s\n", end_lbl);
-        break;
-    }
-    case SM_JUMP_S: {
-        int target = (int)instr->a[0].i;
-        if (target >= 0 && target < n && in_my_method[target]) {
-            fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n");
-            fprintf(out, "    ifeq sm_pc_%d_skip\n", i);
-            fprintf(out, "    goto_w sm_pc_%d\n", target);
-            fprintf(out, "sm_pc_%d_skip:\n", i);
-        } else if (target >= 0 && target < n) {
-            fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n");
-            fprintf(out, "    ifeq sm_pc_%d_skip\n", i);
-            fprintf(out, "    invokestatic rt/SnoRt/halt_tos()V\n");
-            fprintf(out, "    iconst_0\n    invokestatic java/lang/System/exit(I)V\n");
-            fprintf(out, "    return\n");
-            fprintf(out, "sm_pc_%d_skip:\n", i);
-        }
-        break;
-    }
-    case SM_JUMP_F: {
-        int target = (int)instr->a[0].i;
-        if (target >= 0 && target < n && in_my_method[target]) {
-            fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n");
-            fprintf(out, "    ifne sm_pc_%d_skip\n", i);
-            fprintf(out, "    goto_w sm_pc_%d\n", target);
-            fprintf(out, "sm_pc_%d_skip:\n", i);
-        } else if (target >= 0 && target < n) {
-            fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n");
-            fprintf(out, "    ifne sm_pc_%d_skip\n", i);
-            fprintf(out, "    invokestatic rt/SnoRt/halt_tos()V\n");
-            fprintf(out, "    iconst_0\n    invokestatic java/lang/System/exit(I)V\n");
-            fprintf(out, "    return\n");
-            fprintf(out, "sm_pc_%d_skip:\n", i);
-        }
-        break;
-    }
+    case SM_JUMP:   { sm_ctx_t ctx = {i, n, in_body, in_my_method}; sm_jump(instr, &ctx, out); break; }
+    case SM_JUMP_S: { sm_ctx_t ctx = {i, n, in_body, in_my_method}; sm_jump_s(instr, &ctx, out); break; }
+    case SM_JUMP_F: { sm_ctx_t ctx = {i, n, in_body, in_my_method}; sm_jump_f(instr, &ctx, out); break; }
     case SM_CALL_FN: case SM_SUSPEND_VALUE: {
         const char * cname = instr->a[0].s ? instr->a[0].s : "";
         if (!cname[0]) {
@@ -760,12 +717,7 @@ static void emit_jvm_one_instr(SM_Program * sm, int i, int n,
         fprintf(out, "    invokestatic rt/SnoRt/fn_return_push()V\n");
         fprintf(out, "    return\nsm_pc_%d_nf_skip:\n", i); break;
     case SM_DEFINE_ENTRY: case SM_DEFINE: break;
-    case SM_HALT: {
-        const char * end_lbl = in_body ? "sm_pc_body_end" : "sm_pc_fn_end";
-        fprintf(out, "    invokestatic rt/SnoRt/halt_tos()V\n");
-        fprintf(out, "    goto_w %s\n", end_lbl);
-        break;
-    }
+    case SM_HALT: { sm_ctx_t ctx = {i, n, in_body, in_my_method}; sm_halt(instr, &ctx, out); break; }
     case SM_PAT_LIT:
         jvm_emit_ldc_string(out, instr->a[0].s ? instr->a[0].s : "");
         fprintf(out, "    invokestatic rt/SnoPat/lit(Ljava/lang/String;)Lrt/SnoPat;\n");

@@ -336,22 +336,10 @@ int emit_js_from_sm(SM_Program * sm, FILE * out) {
         case SM_NEG:        sm_neg(instr, out); break;
         case SM_COERCE_NUM: sm_coerce_num(instr, out); break;
         case SM_EXP:        sm_exp(instr, out); break;
-        case SM_HALT:
-            fprintf(out, "break loop; ");
-            has_continue = 1;
-            break;
-        case SM_JUMP:
-            fprintf(out, "_pc = %lld; continue; ", instr->a[0].i);
-            has_continue = 1;
-            break;
-        case SM_JUMP_S:
-            fprintf(out, "if (rt.last_ok()) _pc = %lld; else _pc = %d; continue; ", instr->a[0].i, i + 1);
-            has_continue = 1;
-            break;
-        case SM_JUMP_F:
-            fprintf(out, "if (!rt.last_ok()) _pc = %lld; else _pc = %d; continue; ", instr->a[0].i, i + 1);
-            has_continue = 1;
-            break;
+        case SM_HALT:   { sm_ctx_t ctx = {i, sm->count, 0, NULL}; has_continue |= sm_halt(instr, &ctx, out); break; }
+        case SM_JUMP:   { sm_ctx_t ctx = {i, sm->count, 0, NULL}; has_continue |= sm_jump(instr, &ctx, out); break; }
+        case SM_JUMP_S: { sm_ctx_t ctx = {i, sm->count, 0, NULL}; has_continue |= sm_jump_s(instr, &ctx, out); break; }
+        case SM_JUMP_F: { sm_ctx_t ctx = {i, sm->count, 0, NULL}; has_continue |= sm_jump_f(instr, &ctx, out); break; }
         case SM_SUSPEND_VALUE:
             fprintf(out, "{ let _r = rt.call_or_jump(");
             js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");

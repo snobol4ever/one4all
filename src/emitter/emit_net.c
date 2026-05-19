@@ -819,11 +819,7 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
         case SM_MOD:        sm_mod(instr, out); break;
         case SM_ACOMP: sm_acomp(instr, out); break;
         case SM_LCOMP: sm_lcomp(instr, out); break;
-        case SM_HALT:
-            fprintf(out, "    call       void SnoRt::halt_tos()\n");
-            fprintf(out, "    br         NET_DONE\n");
-            has_continue = 1;
-            break;
+        case SM_HALT:   { sm_ctx_t ctx = {i, n, 0, NULL}; has_continue |= sm_halt(instr, &ctx, out); break; }
         case SM_LABEL:
             if (instr->a[2].i && instr->a[0].s) {
                 /* define_entry: set last_ok=true so the function-entry NRETURN_F
@@ -856,22 +852,9 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
                 }
             }
             break;
-        case SM_JUMP:
-            fprintf(out, "    ldc.i4     %lld\n    stloc      _pc\n    br         NET_DISPATCH\n", instr->a[0].i);
-            has_continue = 1;
-            break;
-        case SM_JUMP_S:
-            fprintf(out, "    call       bool SnoRt::last_ok()\n");
-            fprintf(out, "    brfalse    NET_L%d\n", i + 1);
-            fprintf(out, "    ldc.i4     %lld\n    stloc      _pc\n    br         NET_DISPATCH\n", instr->a[0].i);
-            has_continue = 1;
-            break;
-        case SM_JUMP_F:
-            fprintf(out, "    call       bool SnoRt::last_ok()\n");
-            fprintf(out, "    brtrue     NET_L%d\n", i + 1);
-            fprintf(out, "    ldc.i4     %lld\n    stloc      _pc\n    br         NET_DISPATCH\n", instr->a[0].i);
-            has_continue = 1;
-            break;
+        case SM_JUMP:   { sm_ctx_t ctx = {i, n, 0, NULL}; has_continue |= sm_jump(instr, &ctx, out); break; }
+        case SM_JUMP_S: { sm_ctx_t ctx = {i, n, 0, NULL}; has_continue |= sm_jump_s(instr, &ctx, out); break; }
+        case SM_JUMP_F: { sm_ctx_t ctx = {i, n, 0, NULL}; has_continue |= sm_jump_f(instr, &ctx, out); break; }
         case SM_SUSPEND_VALUE:
         case SM_CALL_FN: {
             const char * cname = instr->a[0].s ? instr->a[0].s : "";
