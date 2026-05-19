@@ -2326,19 +2326,19 @@ yyreduce:
 
   case 105: /* call_expr: IDENT '.' KW_NEW '(' named_arg_list ')'  */
 #line 503 "raku.y"
-        { tree_t *c=make_call("raku_new");
-          expr_add_child(c,leaf_sval(TT_QLIT,(yyvsp[-5].sval))); free((yyvsp[-5].sval));
-          ExprList *nargs=(yyvsp[-1].list);
-          if(nargs){ for(int i=0;i<nargs->count;i++) expr_add_child(c,nargs->items[i]); exprlist_free(nargs); }
-          (yyval.node)=c; }
+        { tree_t *c = ast_node_new(TT_NEW);
+          ast_push(c, leaf_sval(TT_QLIT, (yyvsp[-5].sval))); free((yyvsp[-5].sval));
+          ExprList *nargs = (yyvsp[-1].list);
+          if (nargs) { for (int i = 0; i < nargs->count; i++) ast_push(c, nargs->items[i]); exprlist_free(nargs); }
+          (yyval.node) = c; }
 #line 2335 "raku.tab.c"
     break;
 
   case 106: /* call_expr: IDENT '.' KW_NEW '(' ')'  */
 #line 509 "raku.y"
-        { tree_t *c=make_call("raku_new");
-          expr_add_child(c,leaf_sval(TT_QLIT,(yyvsp[-4].sval))); free((yyvsp[-4].sval));
-          (yyval.node)=c; }
+        { tree_t *c = ast_node_new(TT_NEW);
+          ast_push(c, leaf_sval(TT_QLIT, (yyvsp[-4].sval))); free((yyvsp[-4].sval));
+          (yyval.node) = c; }
 #line 2343 "raku.tab.c"
     break;
 

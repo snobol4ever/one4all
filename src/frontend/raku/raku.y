@@ -500,15 +500,15 @@ call_expr
           $$=e; }
     | IDENT '(' ')'  { $$=make_call($1); }
     | IDENT '.' KW_NEW '(' named_arg_list ')'
-        { tree_t *c=make_call("raku_new");
-          expr_add_child(c,leaf_sval(TT_QLIT,$1)); free($1);
-          ExprList *nargs=$5;
-          if(nargs){ for(int i=0;i<nargs->count;i++) expr_add_child(c,nargs->items[i]); exprlist_free(nargs); }
-          $$=c; }
+        { tree_t *c = ast_node_new(TT_NEW);
+          ast_push(c, leaf_sval(TT_QLIT, $1)); free($1);
+          ExprList *nargs = $5;
+          if (nargs) { for (int i = 0; i < nargs->count; i++) ast_push(c, nargs->items[i]); exprlist_free(nargs); }
+          $$ = c; }
     | IDENT '.' KW_NEW '(' ')'
-        { tree_t *c=make_call("raku_new");
-          expr_add_child(c,leaf_sval(TT_QLIT,$1)); free($1);
-          $$=c; }
+        { tree_t *c = ast_node_new(TT_NEW);
+          ast_push(c, leaf_sval(TT_QLIT, $1)); free($1);
+          $$ = c; }
     | atom '.' IDENT '(' arg_list ')'
         { tree_t *c=make_call("raku_mcall");
           expr_add_child(c,$1);
