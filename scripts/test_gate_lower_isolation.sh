@@ -38,10 +38,11 @@ ALLOW=(
     #   Owning relocation goal: extract IcnTkKind to src/include/icon_tk.h.
     "frontend/icon/icon_lex.h"
 
-    # icon_gen.h: codegen types used by lower_icn.c during Icon procedure
-    #   skeleton emission.  Closer to runtime than to lex/parse.
-    #   Owning relocation goal: move to src/runtime/interp/.
-    "frontend/icon/icon_gen.h"
+    # icon_gen.h: relocated to src/runtime/interp/ on 2026-05-20.  Allowlist
+    #   entry removed.  The header is pure Icon Byrd-box generator runtime
+    #   state (icn_to_state_t, icn_find_state_t, icn_bb_* function decls);
+    #   it never belonged under frontend/icon/ — no .c file under
+    #   src/frontend/ ever included it.
 
     # raku_driver.h: declares the raku runtime API (raku_match, raku_compile,
     #   raku_grep, raku_capture, raku_meth_register, raku_die, raku_exception,

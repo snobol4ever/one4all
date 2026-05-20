@@ -18,7 +18,7 @@
 #include "../frontend/icon/icon_driver.h"
 #include "../frontend/raku/raku_driver.h"
 #include "../frontend/rebus/rebus_lower.h"
-#include "../frontend/icon/icon_gen.h"
+#include "../runtime/interp/icon_gen.h"
 #include "../frontend/icon/icon_lex.h"    /* IcnTkKind — TK_AUG* for TT_AUGOP in unified interp */
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void ir_print_node   (const tree_t *e, FILE *f);

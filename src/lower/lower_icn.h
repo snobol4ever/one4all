@@ -2,7 +2,7 @@
 #define LOWER_ICN_H
 #include "BB.h"
 #include "../processor/bb_box.h"
-#include "../frontend/icon/icon_gen.h"
+#include "../runtime/interp/icon_gen.h"
 typedef struct { bb_node_t gen[2]; int which; } icn_alt_dcg_t;
 typedef struct { bb_node_t gen; int64_t max; int64_t count; } icn_lim_dcg_t;
 typedef struct { bb_node_t left; bb_node_t right; IcnBinopKind op; int is_relop; DESCR_t left_val; DESCR_t right_val; int phase; } icn_binop_dcg_t;

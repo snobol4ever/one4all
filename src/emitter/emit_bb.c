@@ -1,7 +1,7 @@
 #include "emit_bb.h"
 #include "emit_form.h"
 #include "emit_templates.h"
-#include "../frontend/icon/icon_gen.h"
+#include "../runtime/interp/icon_gen.h"
 #include "BB.h"
 #include "../rt/rt.h"
 #include <string.h>
