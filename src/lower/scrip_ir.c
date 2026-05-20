@@ -57,7 +57,7 @@ BB_t * BB_node_alloc(BB_graph_t * cfg, BB_op_t t) {
     return nd;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void BB_reset(BB_graph_t * cfg) {
+void bb_reset(BB_graph_t * cfg) {
     if (!cfg) return;
     for (int i = 0; i < cfg->n; i++) {
         BB_t * nd = cfg->all[i];
@@ -68,7 +68,7 @@ void BB_reset(BB_graph_t * cfg) {
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* Snapshot the mutable per-node state (value, counter, state) of every node in cfg. Used by BB_CALL to preserve the caller's activation across a recursive call into the same ir_body, since BB_reset+bb_exec_once on the callee wipes shared graph state. Caller frees with free(). */
+/* Snapshot the mutable per-node state (value, counter, state) of every node in cfg. Used by BB_CALL to preserve the caller's activation across a recursive call into the same ir_body, since bb_reset+bb_exec_once on the callee wipes shared graph state. Caller frees with free(). */
 IR_node_state_t * IR_snapshot_state(BB_graph_t * cfg) {
     if (!cfg || cfg->n <= 0) return NULL;
     IR_node_state_t * snap = (IR_node_state_t *)malloc((size_t)cfg->n * sizeof(IR_node_state_t));

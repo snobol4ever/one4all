@@ -125,8 +125,8 @@ typedef enum {
                         /* fresh; β: resume tail only (NEVER re-fire the head — preserves side-effect-once semantics  */
                         /* under every/while pumping). state==0 fresh, ==1 active.                                    */
     BB_INITIAL,         /* Icon `initial expr` — run c[0] on first ever entry to this procedure, no-op on subsequent.  */
-                        /* has-run flag stored in nd->ival3 (NOT cleared by BB_reset or IR_snapshot_state, so survives */
-                        /* recursive re-entry and the per-call BB_reset of the proc body). Always succeeds via γ.      */
+                        /* has-run flag stored in nd->ival3 (NOT cleared by bb_reset or IR_snapshot_state, so survives */
+                        /* recursive re-entry and the per-call bb_reset of the proc body). Always succeeds via γ.      */
     BB_ICN_LCONCAT,     /* Icon E1 ||| E2 list concat — c[0]/c[1] operands. If both args are icnlist values, builds a  */
                         /* fresh icnlist by appending all elements; otherwise falls back to string concat with         */
                         /* numeric coercion (matches TT_LCONCAT spec in legacy bb_eval_value). Dispatches via helper   */
@@ -174,7 +174,7 @@ BB_graph_t * BB_alloc(int max_nodes, int lang);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 BB_t       * BB_node_alloc(BB_graph_t * cfg, BB_op_t t);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void         BB_reset(BB_graph_t * cfg);
+void         bb_reset(BB_graph_t * cfg);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 typedef struct { DESCR_t value; int64_t counter; int state; } IR_node_state_t;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/

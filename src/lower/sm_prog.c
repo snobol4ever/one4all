@@ -166,7 +166,7 @@ int SM_label_named(SM_sequence_t *p, const char *name)
     return target;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int SM_label_pc_lookup(const SM_sequence_t *p, const char *name)
+int sm_label_pc_lookup(const SM_sequence_t *p, const char *name)
 {
     if (!p || !name) return -1;
     for (int i = 0; i < p->count; i++) {

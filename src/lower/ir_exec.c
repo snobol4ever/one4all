@@ -197,7 +197,7 @@ BB_t * bb_exec_node(BB_t * nd) {
             nd->value = out;
             return IS_FAIL_fn(out) ? nd->ω : nd->γ;
         }
-        /* User-defined proc: look up proc_table by name; if a BB graph exists, push frame and exec. Snapshot per-node state of the callee's graph around bb_exec_once so the caller's activation survives when the callee is the SAME proc (recursion shares the IR graph; without snapshot, the inner BB_reset wipes the caller's per-node value/counter/state, breaking e.g. BB_BINOP_GEN's read of nd->c[0]->value after a recursive-call right operand). */
+        /* User-defined proc: look up proc_table by name; if a BB graph exists, push frame and exec. Snapshot per-node state of the callee's graph around bb_exec_once so the caller's activation survives when the callee is the SAME proc (recursion shares the IR graph; without snapshot, the inner bb_reset wipes the caller's per-node value/counter/state, breaking e.g. BB_BINOP_GEN's read of nd->c[0]->value after a recursive-call right operand). */
         for (int _pi = 0; _pi < proc_count; _pi++) {
             if (!proc_table[_pi].name || strcmp(proc_table[_pi].name, nd->sval) != 0) continue;
             BB_graph_t *_cfg = bb_graph_of_proc(&proc_table[_pi]);
@@ -212,7 +212,7 @@ BB_t * bb_exec_node(BB_t * nd) {
             for (int _k = 0; _k < proc_table[_pi].nparams && _k < nargs && _k < FRAME_SLOT_MAX; _k++)
                 _f->env[_k] = args[_k];
             IR_node_state_t * _snap = IR_snapshot_state(_cfg);
-            BB_reset(_cfg);
+            bb_reset(_cfg);
             out = bb_exec_once(_cfg);
             if (frame_depth > 0 && FRAME.returning) { out = g_ir_return_val; FRAME.returning = 0; }
             frame_depth--;
@@ -393,7 +393,7 @@ BB_t * bb_exec_node(BB_t * nd) {
         /* Icon `initial expr` clause inside a procedure body. Executes c[0] only on the FIRST entry */
         /* to the proc; subsequent entries (including recursive re-entry) are no-ops. The first-run */
         /* flag lives in nd->ival3 which is unique among per-node mutable fields in that it is NOT  */
-        /* cleared by BB_reset or copied by IR_snapshot_state/IR_restore_state, so it survives both */
+        /* cleared by bb_reset or copied by IR_snapshot_state/IR_restore_state, so it survives both */
         /* the per-call reset and any recursive snapshot/restore around an inner call.              */
         /* Relies on existing build_proc_scope logic in lower.c which removes initial-assigned vars */
         /* from the local scope, so subsequent reads/writes of the var route through global NV and  */
@@ -458,7 +458,7 @@ BB_t * bb_exec_node(BB_t * nd) {
     }
     case BB_EVERY: {
         /* Icon every E [do B].  c[0]=generator expr (mandatory), c[1]=optional body.                                                                                                                       */
-        /* Statement consumer: drive c[0] to exhaustion within ONE outer bb_exec_node call.  c[0]'s state (counter, etc.) persists across the inner bb_exec_node calls because BB_reset is not invoked.   */
+        /* Statement consumer: drive c[0] to exhaustion within ONE outer bb_exec_node call.  c[0]'s state (counter, etc.) persists across the inner bb_exec_node calls because bb_reset is not invoked.   */
         /* every-loop in statement context always "succeeds" with &null after exhaustion — never propagates the generator's final FAIL upward.                                                              */
         /* Single-shot fast path: when c[0] is a structurally non-generator expression (recursive walk: generator IR kinds disqualify; BB_CALL to user proc with is_generator==0; BB_CALL to non-gen      */
         /* builtin with all-single-shot args), fire once.  Covers every fact(5) and every write(fact(5)) without naive TT_FNC blanket.  Generator IR kinds bail out (IR_ICN_*, BB_BINOP_GEN, BB_ALT,...).  */
@@ -1874,7 +1874,7 @@ BB_t * bb_exec_node(BB_t * nd) {
             Term **saved_env = g_pl_env;
             g_pl_env = callee_env;
             int mark = trail_mark(&g_pl_trail);
-            BB_reset(_bcfg);
+            bb_reset(_bcfg);
             DESCR_t res = bb_exec_once(_bcfg);
             if (IS_FAIL_fn(res)) { trail_unwind(&g_pl_trail, mark); g_pl_env = saved_env; free(callee_env); nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
             PlCallSt *cs = malloc(sizeof(PlCallSt));
@@ -2000,7 +2000,7 @@ BB_t * bb_exec_node(BB_t * nd) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t bb_exec_once(BB_graph_t * cfg) {
     if (!cfg || !cfg->entry) return FAILDESCR;
-    BB_reset(cfg);
+    bb_reset(cfg);
     BB_t * cur = cfg->entry;
     int safety = cfg->n * 64 + 256;
     while (cur && safety-- > 0) {
@@ -2029,7 +2029,7 @@ DESCR_t IR_exec_resume(BB_graph_t * cfg) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int bb_exec_pump(BB_graph_t * cfg, IR_body_fn body_fn, void * ctx) {
     if (!cfg || !cfg->entry) return 0;
-    BB_reset(cfg);
+    bb_reset(cfg);
     int ticks  = 0;
     int safety = cfg->n * 256 + 1024;
     BB_t * cur = cfg->entry;
@@ -2082,7 +2082,7 @@ int IR_exec_pat(BB_graph_t *cfg,
     int max_start = kw_anchor ? 0 : Ω;
     for (int start = 0; start <= max_start; start++) {
         Δ = start;
-        BB_reset(cfg);
+        bb_reset(cfg);
         DESCR_t result = bb_exec_once(cfg);
         if (!IS_FAIL_fn(result)) {
             match_start = start;

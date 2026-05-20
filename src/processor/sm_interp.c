@@ -1341,17 +1341,17 @@ int sm_interp_run_inner(SM_sequence_t *prog, SM_State *st)
             if (result.v == DT_FAIL || (!_data_first && !_data_set)) {
                 int body_pc = -1;
                 if (!_data_first && !_data_set && name) {
-                    body_pc = SM_label_pc_lookup(prog, name);
+                    body_pc = sm_label_pc_lookup(prog, name);
                     if (body_pc < 0) {
                         char uname[128]; size_t nl = strlen(name);
                         if (nl >= sizeof(uname)) nl = sizeof(uname)-1;
                         for (size_t _i = 0; _i <= nl; _i++)
                             uname[_i] = (char)toupper((unsigned char)name[_i]);
-                        body_pc = SM_label_pc_lookup(prog, uname);
+                        body_pc = sm_label_pc_lookup(prog, uname);
                     }
                     if (body_pc < 0) {
                         const char *entry = FUNC_ENTRY_fn(name);
-                        if (entry) body_pc = SM_label_pc_lookup(prog, entry);
+                        if (entry) body_pc = sm_label_pc_lookup(prog, entry);
                     }
                 }
                 if (body_pc >= 0 && st->call_depth < SM_CALL_STACK_MAX) {

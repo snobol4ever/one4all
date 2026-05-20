@@ -15,7 +15,7 @@ DESCR_t _eval_pat_impl_fn(DESCR_t pat) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int _label_exists_fn(const char *name) {
     if (1)
-        return SM_label_pc_lookup(&g_stage2.sm, name) >= 0;
+        return sm_label_pc_lookup(&g_stage2.sm, name) >= 0;
     return label_lookup(name) != NULL;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -62,7 +62,7 @@ DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
         if (!_body) _body = label_lookup(name);
     }
     if (!_body && FNCEX_fn(name)) {
-        if (0 || SM_label_pc_lookup(&g_stage2.sm, name) < 0)
+        if (0 || sm_label_pc_lookup(&g_stage2.sm, name) < 0)
             return APPLY_fn(name, args, nargs);
     }
     if (!_body) {
@@ -102,18 +102,18 @@ DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
         }
     }
     if (1) {
-        int body_pc = SM_label_pc_lookup(&g_stage2.sm, name);
+        int body_pc = sm_label_pc_lookup(&g_stage2.sm, name);
         if (body_pc < 0) {
             char uname[128]; size_t nl = strlen(name);
             if (nl < sizeof(uname)) {
                 for (size_t i = 0; i <= nl; i++)
                     uname[i] = (char)toupper((unsigned char)name[i]);
-                body_pc = SM_label_pc_lookup(&g_stage2.sm, uname);
+                body_pc = sm_label_pc_lookup(&g_stage2.sm, uname);
             }
         }
         if (body_pc < 0) {
             const char *_entry = FUNC_ENTRY_fn(name);
-            if (_entry) body_pc = SM_label_pc_lookup(&g_stage2.sm, _entry);
+            if (_entry) body_pc = sm_label_pc_lookup(&g_stage2.sm, _entry);
         }
         if (body_pc < 0) return FAILDESCR;
         SM_State nested;

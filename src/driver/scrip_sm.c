@@ -21,7 +21,7 @@ static void sm_resolve_proc_entry_pcs(SM_sequence_t *p)
                 proc_count);
     for (int i = 0; i < proc_count; i++) {
         const char *nm = proc_table[i].name;
-        int pc = nm ? SM_label_pc_lookup(p, nm) : -1;
+        int pc = nm ? sm_label_pc_lookup(p, nm) : -1;
         proc_table[i].entry_pc = pc;
         if (show)
             fprintf(stderr, "[CH-17a]   proc[%d] name=%-20s entry_pc=%d\n",
@@ -31,7 +31,7 @@ static void sm_resolve_proc_entry_pcs(SM_sequence_t *p)
     int pl_total = 0, pl_resolved = 0;
     for (int b = 0; b < PL_PRED_TABLE_SIZE_FWD; b++) {
         for (Pl_PredEntry *e = g_stage2.pl_pred_table.buckets[b]; e; e = e->next) {
-            int pc = e->key ? SM_label_pc_lookup(p, e->key) : -1;
+            int pc = e->key ? sm_label_pc_lookup(p, e->key) : -1;
             e->entry_pc = pc;
             pl_total++;
             if (pc >= 0) pl_resolved++;
