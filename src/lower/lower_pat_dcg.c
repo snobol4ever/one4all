@@ -188,6 +188,58 @@ static IR_block_t * build_node(IR_block_t * cfg, const tree_t * t, IR_t * sp, IR
         nd->α = nd; nd->β = fp; nd->γ = sp; nd->ω = fp;
         return nd;
     }
+    case TT_FNC: {
+        if (!t->v.sval || t->n < 1 || !t->c[0]) return NULL;
+        const char *fn = t->v.sval;
+        const tree_t *arg = t->c[0];
+        const char *sarg = (arg->t == TT_QLIT && arg->v.sval) ? arg->v.sval : NULL;
+        int64_t iarg = (arg->t == TT_ILIT) ? arg->v.ival : 0;
+        if (!strcmp(fn, "SPAN") && sarg) {
+            nd = IR_node_alloc(cfg, IR_PAT_SPAN);
+            nd->sval = sarg; nd->α = nd; nd->β = nd; nd->γ = sp; nd->ω = fp; return nd;
+        }
+        if (!strcmp(fn, "ANY") && sarg) {
+            nd = IR_node_alloc(cfg, IR_PAT_ANY);
+            nd->sval = sarg; nd->α = nd; nd->β = fp; nd->γ = sp; nd->ω = fp; return nd;
+        }
+        if ((!strcmp(fn, "BREAK") || !strcmp(fn, "BREAKX")) && sarg) {
+            nd = IR_node_alloc(cfg, IR_PAT_BREAK);
+            nd->sval = sarg; nd->α = nd; nd->β = fp; nd->γ = sp; nd->ω = fp; return nd;
+        }
+        if (!strcmp(fn, "NOTANY") && sarg) {
+            nd = IR_node_alloc(cfg, IR_PAT_NOTANY);
+            nd->sval = sarg; nd->α = nd; nd->β = fp; nd->γ = sp; nd->ω = fp; return nd;
+        }
+        if (!strcmp(fn, "LEN")) {
+            nd = IR_node_alloc(cfg, IR_PAT_LEN);
+            nd->ival = (arg->t == TT_ILIT) ? iarg : 0;
+            nd->α = nd; nd->β = fp; nd->γ = sp; nd->ω = fp; return nd;
+        }
+        if (!strcmp(fn, "POS")) {
+            nd = IR_node_alloc(cfg, IR_PAT_POS);
+            nd->ival = iarg; nd->n = 0;
+            nd->α = nd; nd->β = fp; nd->γ = sp; nd->ω = fp; return nd;
+        }
+        if (!strcmp(fn, "TAB")) {
+            nd = IR_node_alloc(cfg, IR_PAT_TAB);
+            nd->ival = iarg; nd->n = 0;
+            nd->α = nd; nd->β = fp; nd->γ = sp; nd->ω = fp; return nd;
+        }
+        if (!strcmp(fn, "ARBNO") && t->n == 1) {
+            IR_block_t *inner_blk = IR_alloc(count_tree(arg) * 8 + 32, IR_LANG_SNO);
+            if (!inner_blk) return NULL;
+            IR_t *inner_entry = build_node(inner_blk, arg, NULL, NULL);
+            if (!inner_entry) { IR_free(inner_blk); return NULL; }
+            inner_blk->entry = inner_entry;
+            nd = IR_node_alloc(cfg, IR_PAT_ARBNO);
+            int *pos_stack = (int *)GC_MALLOC(64 * sizeof(int));
+            void **storage = (void **)GC_MALLOC(2 * sizeof(void *));
+            storage[0] = inner_blk; storage[1] = pos_stack;
+            nd->c = (IR_t **)storage; nd->n = 64;
+            nd->α = nd; nd->β = nd; nd->γ = sp; nd->ω = fp; return nd;
+        }
+        return NULL;
+    }
     default:
         return NULL;
     }

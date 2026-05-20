@@ -425,6 +425,25 @@ void lower_pat_expr(const tree_t *t)
         lower_expr(ch); sm_emit(g_p, SM_PAT_DEREF);
         return;
     }
+    case TT_FNC:
+        if (t->v.sval && t->n == 1) {
+            const char *fn = t->v.sval;
+            if      (!strcmp(fn,"SPAN"))   { lower_expr(T0(t)); sm_emit(g_p, SM_PAT_SPAN);      return; }
+            else if (!strcmp(fn,"BREAK"))  { lower_expr(T0(t)); sm_emit(g_p, SM_PAT_BREAK);     return; }
+            else if (!strcmp(fn,"BREAKX")) { lower_expr(T0(t)); sm_emit(g_p, SM_PAT_BREAK);     return; }
+            else if (!strcmp(fn,"ANY"))    { lower_expr(T0(t)); sm_emit(g_p, SM_PAT_ANY);        return; }
+            else if (!strcmp(fn,"NOTANY")) { lower_expr(T0(t)); sm_emit(g_p, SM_PAT_NOTANY);     return; }
+            else if (!strcmp(fn,"LEN"))    { lower_expr(T0(t)); sm_emit(g_p, SM_PAT_LEN);        return; }
+            else if (!strcmp(fn,"POS"))    { lower_expr(T0(t)); sm_emit(g_p, SM_PAT_POS);        return; }
+            else if (!strcmp(fn,"RPOS"))   { lower_expr(T0(t)); sm_emit(g_p, SM_PAT_RPOS);       return; }
+            else if (!strcmp(fn,"TAB"))    { lower_expr(T0(t)); sm_emit(g_p, SM_PAT_TAB);        return; }
+            else if (!strcmp(fn,"RTAB"))   { lower_expr(T0(t)); sm_emit(g_p, SM_PAT_RTAB);       return; }
+            else if (!strcmp(fn,"ARBNO"))  { lower_pat_expr(T0(t)); sm_emit(g_p, SM_PAT_ARBNO);  return; }
+            else if (!strcmp(fn,"FENCE"))  { lower_pat_expr(T0(t)); sm_emit(g_p, SM_PAT_FENCE1); return; }
+        }
+        if (t->v.sval && t->n == 0 && !strcmp(t->v.sval,"FENCE")) { sm_emit(g_p, SM_PAT_FENCE0); return; }
+        lower_expr(t); sm_emit(g_p, SM_PAT_DEREF);
+        return;
     default:
         lower_expr(t); sm_emit(g_p, SM_PAT_DEREF);
         return;
@@ -476,6 +495,24 @@ static void lower_fnc(const tree_t *t)
         for (int i = 1; i < nargs; i++) lower_expr(t->c[i]);
         sm_emit_si(g_p, SM_CALL_FN, fn, (int64_t)(nargs - 1));
         return;
+    }
+    if (t->v.sval) {
+        const char *fn = t->v.sval;
+        if (nargs == 1) {
+            if      (!strcmp(fn,"SPAN"))   { lower_expr(T0(t)); sm_emit(g_p, SM_PAT_SPAN);      return; }
+            else if (!strcmp(fn,"BREAK"))  { lower_expr(T0(t)); sm_emit(g_p, SM_PAT_BREAK);     return; }
+            else if (!strcmp(fn,"BREAKX")) { lower_expr(T0(t)); sm_emit(g_p, SM_PAT_BREAK);      return; }
+            else if (!strcmp(fn,"ANY"))    { lower_expr(T0(t)); sm_emit(g_p, SM_PAT_ANY);        return; }
+            else if (!strcmp(fn,"NOTANY")) { lower_expr(T0(t)); sm_emit(g_p, SM_PAT_NOTANY);     return; }
+            else if (!strcmp(fn,"LEN"))    { lower_expr(T0(t)); sm_emit(g_p, SM_PAT_LEN);        return; }
+            else if (!strcmp(fn,"POS"))    { lower_expr(T0(t)); sm_emit(g_p, SM_PAT_POS);        return; }
+            else if (!strcmp(fn,"RPOS"))   { lower_expr(T0(t)); sm_emit(g_p, SM_PAT_RPOS);       return; }
+            else if (!strcmp(fn,"TAB"))    { lower_expr(T0(t)); sm_emit(g_p, SM_PAT_TAB);        return; }
+            else if (!strcmp(fn,"RTAB"))   { lower_expr(T0(t)); sm_emit(g_p, SM_PAT_RTAB);       return; }
+            else if (!strcmp(fn,"ARBNO"))  { lower_pat_expr(T0(t)); sm_emit(g_p, SM_PAT_ARBNO);  return; }
+            else if (!strcmp(fn,"FENCE"))  { lower_pat_expr(T0(t)); sm_emit(g_p, SM_PAT_FENCE1); return; }
+        }
+        if (nargs == 0 && !strcmp(fn,"FENCE")) { sm_emit(g_p, SM_PAT_FENCE0); return; }
     }
     for (int i = 0; i < nargs; i++) lower_expr(t->c[i]);
     sm_emit_si(g_p, SM_CALL_FN, t->v.sval ? t->v.sval : "", (int64_t)nargs);
@@ -586,7 +623,8 @@ static void lower_scan(const tree_t *t)
     sm_emit_i(g_p, SM_PUSH_LIT_I, 0);
     const char *sname = (subject->t == TT_VAR || subject->t == TT_KEYWORD) ? subject->v.sval : NULL;
     IR_block_t *pat_dcg = IR_lower_pat(pattern);
-    sm_emit_sii(g_p, SM_EXEC_STMT, sname, 0, (int64_t)sm_prog_dcg_add(g_p, pat_dcg));
+    int64_t dcg_idx = (pat_dcg && pat_dcg->entry) ? (int64_t)sm_prog_dcg_add(g_p, pat_dcg) : -1;
+    sm_emit_sii(g_p, SM_EXEC_STMT, sname, 0, dcg_idx);
     sm_emit_si(g_p, SM_PUSH_LIT_S, "", 0);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -1631,7 +1669,8 @@ void lower_stmt(const tree_t *s)
         const char *sname = (subject && (subject->t == TT_VAR
                               || subject->t == TT_KEYWORD)) ? subject->v.sval : NULL;
         IR_block_t *pat_dcg = IR_lower_pat(pattern);
-        sm_emit_sii(g_p, SM_EXEC_STMT, sname, (int64_t)has_eq, (int64_t)sm_prog_dcg_add(g_p, pat_dcg));
+        int64_t dcg_idx2 = (pat_dcg && pat_dcg->entry) ? (int64_t)sm_prog_dcg_add(g_p, pat_dcg) : -1;
+        sm_emit_sii(g_p, SM_EXEC_STMT, sname, (int64_t)has_eq, dcg_idx2);
         goto emit_gotos;
     }
     if (subject) {

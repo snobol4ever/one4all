@@ -495,7 +495,7 @@ expr15      : expr15 T_LBRACK exprlist T_RBRACK
                                   expr_add_child(idx, $1);
                                   for (int i = 0; i < $3->nchildren; i++)
                                       expr_add_child(idx, $3->children[i]);
-                                  free($3->children); free($3);
+                                  if ($3->c) free((char*)$3->c - sizeof(size_t)); free($3);
                                   $$ = idx; }
             | expr17
                                 { $$ = $1; }
@@ -508,7 +508,7 @@ exprlist    : exprlist_ne
 exprlist_ne : exprlist_ne T_COMMA expr0
                                 { tree_t *l = expr_new(TT_NUL);
                                   for (int i = 0; i < $1->nchildren; i++) expr_add_child(l, $1->children[i]);
-                                  free($1->children); free($1);
+                                  if ($1->c) free((char*)$1->c - sizeof(size_t)); free($1);
                                   expr_add_child(l, $3); $$ = l; }
             | expr0
                                 { tree_t *l = expr_new(TT_NUL); expr_add_child(l, $1); $$ = l; }
@@ -518,7 +518,7 @@ expr17      : T_CALL exprlist T_RPAREN
                                   e->sval = $1;
                                   for (int i = 0; i < $2->nchildren; i++)
                                       expr_add_child(e, $2->children[i]);
-                                  free($2->children); free($2);
+                                  if ($2->c) free((char*)$2->c - sizeof(size_t)); free($2);
                                   $$ = e; }
             | T_IDENT
                                 { tree_t *e = expr_new(TT_VAR);
@@ -541,7 +541,7 @@ expr17      : T_CALL exprlist T_RPAREN
                                   expr_add_child(a, $2);
                                   for (int i = 0; i < $4->nchildren; i++)
                                       expr_add_child(a, $4->children[i]);
-                                  free($4->children); free($4);
+                                  if ($4->c) free((char*)$4->c - sizeof(size_t)); free($4);
                                   $$ = a; }
             | T_LPAREN T_RPAREN
                                 { $$ = expr_new(TT_NUL); }
