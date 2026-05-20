@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
-"""test_gate_em_template_matrix.py — EC-UNI-8.3 gate (driven by .sh wrapper).
+"""test_gate_em_template_matrix.py — EC-UNI matrix gate (5-column).
 
 Scans each .c file under {SM,BB}_templates/, extracts every top-level fn body
 (string-literal-aware brace matching), and verifies each fn carries an arm
-(`IS_<BE>_<MODE>`) or n/a sentinel (`<BE>_<MODE>: n/a`) for every cell of
-the 5×2 backend×mode matrix.
+(`IS_<BE>`) or n/a sentinel (`<BE>: n/a`) for every cell of the 5-column
+backend matrix.
+
+Per AXIS CORRECTION (GOAL-HEADQUARTERS, 2026-05-19): text-vs-binary is a
+serializer choice INSIDE each backend's output layer, NOT a matrix column.
+The matrix is 5 wide: X86, JVM, JS, NET, WASM.
 
 BB_templates fns are exempt from the X86 row (BB x86 goes through
-emit_flat_body).  JS_BIN is the standing n/a everywhere.
+emit_flat_body, not emit_bb_node).
 """
 import pathlib
 import re
 import sys
 
 BACKENDS = ["X86", "JVM", "JS", "NET", "WASM"]
-MODES = ["TEXT", "BIN"]
 
 def skip_string(s, i):
     quote = s[i]
@@ -67,11 +70,13 @@ def extract_fns(text):
         body = text[open_brace + 1 : close - 1]
         yield name, body
 
-def cell_present(body, be, md):
-    """Return True if the body explicitly covers the (be, md) cell."""
-    if re.search(rf"IS_{be}_{md}\b", body):
+def cell_present(body, be):
+    """Return True if the body explicitly covers the <be> backend."""
+    # Word-boundary IS_<BE> guard (must not match longer suffixes like IS_X86_TEXT).
+    if re.search(rf"\bIS_{be}\b", body):
         return True
-    if re.search(rf"{be}_{md}: n/a", body):
+    # `<BE>: n/a ...` documented gap.
+    if re.search(rf"\b{be}\s*:\s*n/a", body):
         return True
     return False
 
@@ -83,18 +88,13 @@ def check_file(path, is_bb):
     for name, body in extract_fns(text):
         fn_count += 1
         for be in BACKENDS:
-            for md in MODES:
-                # BB_templates fns: X86 row auto-skipped (BB x86 -> emit_flat_body)
-                if is_bb and be == "X86":
-                    cell_checks += 1
-                    continue
-                # JS_BIN: standing n/a everywhere
-                if be == "JS" and md == "BIN":
-                    cell_checks += 1
-                    continue
+            # BB_templates fns: X86 row auto-skipped (BB x86 -> emit_flat_body)
+            if is_bb and be == "X86":
                 cell_checks += 1
-                if not cell_present(body, be, md):
-                    misses.append((path.name, name, f"IS_{be}_{md}"))
+                continue
+            cell_checks += 1
+            if not cell_present(body, be):
+                misses.append((path.name, name, f"IS_{be}"))
     return fn_count, cell_checks, misses
 
 def main():
