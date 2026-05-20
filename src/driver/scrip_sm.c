@@ -30,7 +30,7 @@ static void sm_resolve_proc_entry_pcs(SM_sequence_t *p)
     extern unsigned pl_pred_hash(const char *);
     int pl_total = 0, pl_resolved = 0;
     for (int b = 0; b < PL_PRED_TABLE_SIZE_FWD; b++) {
-        for (Pl_PredEntry *e = g_pl_pred_table.buckets[b]; e; e = e->next) {
+        for (Pl_PredEntry *e = g_stage2.pl_pred_table.buckets[b]; e; e = e->next) {
             int pc = e->key ? SM_label_pc_lookup(p, e->key) : -1;
             e->entry_pc = pc;
             pl_total++;

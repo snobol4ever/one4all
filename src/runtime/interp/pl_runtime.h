@@ -34,9 +34,9 @@ static inline BB_graph_t *bb_graph_of_pred(const Pl_PredEntry_BB *e)
         return g_stage2.sm.bb_table[e->bb_idx];
     return NULL;
 }
-/* ST2-1 reader shim: g_pl_pred_table redirects to g_stage2.
- *   Deleted in ST2-1b once all readers take `stage2_t *s2` directly. */
-#define g_pl_pred_table  (g_stage2.pl_pred_table)
+/* ST2-1b (2026-05-20): g_pl_pred_table shim macro deleted.  polyglot_init writes through
+ * s2->pl_pred_table; pl_runtime.c / scrip_sm.c / interp_hooks.c / lower.c readers use
+ * g_stage2.pl_pred_table literally (deep dispatch-loop sites don't carry an s2 parameter). */
 extern Trail         g_pl_trail;
 extern int           g_pl_cut_flag;
 extern Term        **g_pl_env;

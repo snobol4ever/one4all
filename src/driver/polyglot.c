@@ -57,7 +57,7 @@ void polyglot_init(stage2_t *s2, const tree_t *prog, uint32_t lang_mask)
     if (lang_mask & (1u << LANG_PL)) {
         g_fi8_pl_init_count++;
         prolog_atom_init();
-        memset(&g_pl_pred_table, 0, sizeof g_pl_pred_table);
+        memset(&s2->pl_pred_table, 0, sizeof s2->pl_pred_table);
         trail_init(&g_pl_trail);
         g_pl_cut_flag = 0;
         g_pl_env      = NULL;
@@ -135,7 +135,7 @@ void polyglot_init(stage2_t *s2, const tree_t *prog, uint32_t lang_mask)
         } else if (s_lang == LANG_PL) {
             tree_t *sub = subj;
             if ((sub->t == TT_CHOICE || sub->t == TT_CLAUSE) && sub->v.sval) {
-                pl_pred_table_insert(&g_pl_pred_table, sub->v.sval, sub);
+                pl_pred_table_insert(&s2->pl_pred_table, sub->v.sval, sub);
                 g_pl_active = 1;
                 if (strcmp(sub->v.sval, "main/0") == 0 && s2->module_registry.main_mod < 0)
                     s2->module_registry.main_mod = mod_idx;

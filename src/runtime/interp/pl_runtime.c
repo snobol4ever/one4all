@@ -19,9 +19,8 @@ extern tree_t *pl_assert_term(Term *t, int *functor_out, int *arity_out);
 #include <string.h>
 #include <ctype.h>
 #include <setjmp.h>
-/* ST2-1: g_pl_pred_table storage moved to stage2_t.  Legacy name in this TU
- * resolves to (*(Pl_PredTable*)g_stage2.pl_pred_table) via the
- * macro in pl_runtime.h.                                                    */
+/* ST2-1b (2026-05-20): pl_pred_table storage is g_stage2.pl_pred_table — the legacy
+ * g_pl_pred_table shim macro has been deleted.  Readers in this TU access it literally. */
 Trail         g_pl_trail;
 int           g_pl_cut_flag = 0;
 Term        **g_pl_env      = NULL;
@@ -43,7 +42,7 @@ DESCR_t pl_bb_dcg(void *zeta, int entry) {
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* pl_bb_lookup — find a predicate by name+arity in the BB-land registry.  Modes 2/3/4 use   */
-/* this exclusively; the AST-bearing g_pl_pred_table is mode-1-only after PJ-8.               */
+/* this exclusively; the AST-bearing g_stage2.pl_pred_table is mode-1-only after PJ-8.               */
 Pl_PredEntry_BB *pl_bb_lookup(const char *name, int arity) {
     if (!name) return NULL;
     for (int i = 0; i < g_pl_bb_count; i++)
@@ -185,21 +184,21 @@ tree_t *pl_pred_table_lookup(Pl_PredTable *pt, const char *key) {
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 tree_t *pl_pred_table_lookup_global(const char *key) {
-    return pl_pred_table_lookup(&g_pl_pred_table, key);
+    return pl_pred_table_lookup(&g_stage2.pl_pred_table, key);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 Pl_PredEntry *pl_pred_entry_lookup(const char *key) {
-    for (Pl_PredEntry *e = g_pl_pred_table.buckets[pl_pred_hash(key)]; e; e = e->next)
+    for (Pl_PredEntry *e = g_stage2.pl_pred_table.buckets[pl_pred_hash(key)]; e; e = e->next)
         if (e->key && strcmp(e->key, key) == 0) return e;
     return NULL;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static tree_t *pl_pred_table_get_or_create_choice(const char *key) {
-    tree_t *ch = pl_pred_table_lookup(&g_pl_pred_table, key);
+    tree_t *ch = pl_pred_table_lookup(&g_stage2.pl_pred_table, key);
     if (ch) return ch;
     ch = ast_node_new(TT_CHOICE);
     ch->v.sval = strdup(key);
-    pl_pred_table_insert(&g_pl_pred_table, ch->v.sval, ch);
+    pl_pred_table_insert(&g_stage2.pl_pred_table, ch->v.sval, ch);
     return ch;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -241,7 +240,7 @@ static int pl_retract_clause(Term *t) {
     }
     if (!fname) return 0;
     char key[256]; snprintf(key, sizeof key, "%s/%d", fname, arity);
-    tree_t *ch = pl_pred_table_lookup(&g_pl_pred_table, key);
+    tree_t *ch = pl_pred_table_lookup(&g_stage2.pl_pred_table, key);
     if (!ch || ch->n == 0) return 0;
     free(ch->c[0]);
     memmove(&ch->c[0], &ch->c[1], (ch->n - 1) * sizeof(tree_t *));
@@ -266,7 +265,7 @@ static int pl_abolish_pred(Term *t) {
     }
     if (!fname) return 0;
     char key[256]; snprintf(key, sizeof key, "%s/%d", fname, arity);
-    tree_t *ch = pl_pred_table_lookup(&g_pl_pred_table, key);
+    tree_t *ch = pl_pred_table_lookup(&g_stage2.pl_pred_table, key);
     if (!ch) return 1;
     ch->n = 0;
     return 1;
@@ -726,7 +725,7 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
             int arity = goal->n;
             if (is_pl_user_call(goal)) {
                 char ukey[256]; snprintf(ukey,sizeof ukey,"%s/%d",fn,arity);
-                tree_t *uch = pl_pred_table_lookup(&g_pl_pred_table, ukey);
+                tree_t *uch = pl_pred_table_lookup(&g_stage2.pl_pred_table, ukey);
                 if (uch) {
                     int ua = arity;
                     Term **uenv = ua ? pl_env_new(ua) : NULL;
@@ -832,7 +831,7 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                     if(!g) continue;
                     int ok = is_pl_user_call(g) ? ({
                         char key[256]; snprintf(key,sizeof key,"%s/%d",g->v.sval?g->v.sval:"",g->n);
-                        tree_t *ch=pl_pred_table_lookup(&g_pl_pred_table,key);
+                        tree_t *ch=pl_pred_table_lookup(&g_stage2.pl_pred_table,key);
                         int r=0;
                         if(ch){ int ca=g->n; Term **cargs=ca?malloc(ca*sizeof(Term*)):NULL;
                                  for(int a=0;a<ca;a++) cargs[a]=pl_unified_term_from_expr(g->c[a],env);
@@ -1624,7 +1623,7 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 if (!rfn) return 0;
                 int call_arity = rarity + 2;
                 char ukey[256]; snprintf(ukey, sizeof ukey, "%s/%d", rfn, call_arity);
-                tree_t *uch = pl_pred_table_lookup(&g_pl_pred_table, ukey);
+                tree_t *uch = pl_pred_table_lookup(&g_stage2.pl_pred_table, ukey);
                 if (!uch) return 0;
                 Term **uargs = pl_env_new(call_arity);
                 for (int ui = 0; ui < rarity; ui++) uargs[ui] = term_deref(rargs[ui]);
@@ -1684,7 +1683,7 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
             }
             {
                 char ukey[256]; snprintf(ukey, sizeof ukey, "%s/%d", fn, arity);
-                tree_t *uch = pl_pred_table_lookup(&g_pl_pred_table, ukey);
+                tree_t *uch = pl_pred_table_lookup(&g_stage2.pl_pred_table, ukey);
                 if (uch) {
                     Term **uargs = (arity > 0) ? pl_env_new(arity) : NULL;
                     Trail *utrail = &g_pl_trail;
@@ -1877,7 +1876,7 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                         char ukey[256];
                         snprintf(ukey,sizeof ukey,"%s/%d",
                                  goal_e->v.sval?goal_e->v.sval:"",goal_e->n);
-                        tree_t *uch=pl_pred_table_lookup(&g_pl_pred_table,ukey);
+                        tree_t *uch=pl_pred_table_lookup(&g_stage2.pl_pred_table,ukey);
                         if (uch && uch->n > 0) {
                             int ua=goal_e->n;
                             Term **uenv=ua?pl_env_new(ua):NULL;

@@ -79,7 +79,7 @@ DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
             }
             char pl_key[256];
             snprintf(pl_key, sizeof pl_key, "%s/%d", name, nargs);
-            tree_t *choice = pl_pred_table_lookup(&g_pl_pred_table, pl_key);
+            tree_t *choice = pl_pred_table_lookup(&g_stage2.pl_pred_table, pl_key);
             if (choice) {
                 Term **pl_args = (nargs > 0) ? pl_env_new(nargs) : NULL;
                 for (int _i = 0; _i < nargs; _i++)

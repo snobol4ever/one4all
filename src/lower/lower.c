@@ -1988,7 +1988,7 @@ static void lower_proc_skeletons(void)
         SM_patch_jump(g_p, skip, SM_label(g_p));
     }
     for (int b = 0; b < PL_PRED_TABLE_SIZE_FWD; b++) {
-        for (Pl_PredEntry *e = g_pl_pred_table.buckets[b]; e; e = e->next) {
+        for (Pl_PredEntry *e = g_stage2.pl_pred_table.buckets[b]; e; e = e->next) {
             if (!e->key || !*e->key) continue;
             emit_proc_stub(e->key);
             const char *slash = strrchr(e->key, '/');
