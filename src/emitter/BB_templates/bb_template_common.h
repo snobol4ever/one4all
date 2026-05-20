@@ -3,6 +3,7 @@
    Do NOT include this from emit_core.c — it lives in BB_templates/ only. */
 #pragma once
 #include "emit_core.h"
+#include "emit_globals.h"
 #include "sm_jit_interp.h"
 #include "emit_form.h"
 #include "emit_ir.h"

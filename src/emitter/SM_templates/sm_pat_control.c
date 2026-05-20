@@ -3,7 +3,8 @@
 /* EC-UNI-8.3-fixup: every fn carries the full backend × mode matrix; NET PAT
  * is a known stub so IS_NET_* cells are n/a sentinels. */
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_pat_fence0(const SM_t * instr, FILE * out) {
+void sm_pat_fence0(void) {
+    const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     if (IS_X86) { emit_sm_pat_fence0_dispatch(out, 0); return; }
     (void)instr;
     if (IS_JVM) { jvm_pat_noarg_push(out, "fence0()Lrt/SnoPat;"); return; }
@@ -12,7 +13,8 @@ void sm_pat_fence0(const SM_t * instr, FILE * out) {
     if (IS_WASM) { fprintf(out, "          (call $sno_pat_fence)\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_pat_fence1(const SM_t * instr, FILE * out) {
+void sm_pat_fence1(void) {
+    const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     if (IS_X86) { emit_sm_pat_fence1_dispatch(out, 0); return; }
     (void)instr;
     if (IS_JVM) { jvm_pat_pat_push(out, "fence1(Lrt/SnoPat;)Lrt/SnoPat;"); return; }
@@ -21,7 +23,8 @@ void sm_pat_fence1(const SM_t * instr, FILE * out) {
     if (IS_WASM) { fprintf(out, "          (call $sno_pat_fence)\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_pat_abort(const SM_t * instr, FILE * out) {
+void sm_pat_abort(void) {
+    const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     if (IS_X86) { emit_sm_pat_abort_dispatch(out, 0); return; }
     (void)instr;
     if (IS_JVM) { jvm_pat_noarg_push(out, "abort_()Lrt/SnoPat;"); return; }
@@ -30,7 +33,8 @@ void sm_pat_abort(const SM_t * instr, FILE * out) {
     if (IS_WASM) { fprintf(out, "          (call $sno_pat_abort)\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_pat_fail(const SM_t * instr, FILE * out) {
+void sm_pat_fail(void) {
+    const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     if (IS_X86) { emit_sm_pat_fail_dispatch(out, 0); return; }
     (void)instr;
     if (IS_JVM) { jvm_pat_noarg_push(out, "fail_()Lrt/SnoPat;"); return; }
@@ -39,7 +43,8 @@ void sm_pat_fail(const SM_t * instr, FILE * out) {
     if (IS_WASM) { fprintf(out, "          (call $sno_pat_fail)\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_pat_succeed(const SM_t * instr, FILE * out) {
+void sm_pat_succeed(void) {
+    const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     if (IS_X86) { emit_sm_pat_succeed_dispatch(out, 0); return; }
     (void)instr;
     if (IS_JVM) { jvm_pat_noarg_push(out, "succeed_()Lrt/SnoPat;"); return; }
@@ -48,7 +53,8 @@ void sm_pat_succeed(const SM_t * instr, FILE * out) {
     if (IS_WASM) { fprintf(out, "          (call $sno_pat_succeed)\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_pat_arbno(const SM_t * instr, FILE * out) {
+void sm_pat_arbno(void) {
+    const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     if (IS_X86) { emit_sm_pat_arbno_dispatch(out, 0); return; }
     (void)instr;
     if (IS_JVM) { jvm_pat_pat_push(out, "arbno(Lrt/SnoPat;)Lrt/SnoPat;"); return; }

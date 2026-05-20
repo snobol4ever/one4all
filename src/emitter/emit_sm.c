@@ -2926,28 +2926,28 @@ static int dispatch_one_x86(FILE *out, const SM_t *ins, int pc) {
     g_emit.i = pc; g_emit.instr = ins; g_emit.out = out;
     switch ((int)ins->op) {
         /* sm_push_pop_lits.c */
-        case SM_PUSH_LIT_I:        sm_push_lit_i(ins, out);    return 0;
+        case SM_PUSH_LIT_I:        sm_push_lit_i();    return 0;
         case SM_PUSH_LIT_S:
-        case SM_PUSH_LIT_CS:       sm_push_lit_s(ins, out);    return 0;
-        case SM_PUSH_LIT_F:        sm_push_lit_f(ins, out);    return 0;
-        case SM_PUSH_NULL:         sm_push_null(ins, out);     return 0;
-        case SM_VOID_POP:          sm_void_pop(ins, out);      return 0;
-        case SM_PUSH_VAR:          sm_push_var(ins, out);      return 0;
-        case SM_STORE_VAR:         sm_store_var(ins, out);     return 0;
+        case SM_PUSH_LIT_CS:       sm_push_lit_s();    return 0;
+        case SM_PUSH_LIT_F:        sm_push_lit_f();    return 0;
+        case SM_PUSH_NULL:         sm_push_null();     return 0;
+        case SM_VOID_POP:          sm_void_pop();      return 0;
+        case SM_PUSH_VAR:          sm_push_var();      return 0;
+        case SM_STORE_VAR:         sm_store_var();     return 0;
         /* sm_arith.c */
-        case SM_CONCAT:            sm_concat(ins, out);        return 0;
-        case SM_NEG:               sm_neg(ins, out);           return 0;
-        case SM_COERCE_NUM:        sm_coerce_num(ins, out);    return 0;
-        case SM_EXP:               sm_exp(ins, out);           return 0;
-        case SM_ADD:               sm_add(ins, out);           return 0;
-        case SM_SUB:               sm_sub(ins, out);           return 0;
-        case SM_MUL:               sm_mul(ins, out);           return 0;
-        case SM_DIV:               sm_div(ins, out);           return 0;
-        case SM_MOD:               sm_mod(ins, out);           return 0;
+        case SM_CONCAT:            sm_concat();        return 0;
+        case SM_NEG:               sm_neg();           return 0;
+        case SM_COERCE_NUM:        sm_coerce_num();    return 0;
+        case SM_EXP:               sm_exp();           return 0;
+        case SM_ADD:               sm_add();           return 0;
+        case SM_SUB:               sm_sub();           return 0;
+        case SM_MUL:               sm_mul();           return 0;
+        case SM_DIV:               sm_div();           return 0;
+        case SM_MOD:               sm_mod();           return 0;
         /* sm_compare.c — SM_STNO requires SrcLines which is private to emit_sm.c (NULL shim returns OK; comment annotation only). */
-        case SM_STNO:              sm_stno(ins, out);          return 0;
-        case SM_ACOMP:             sm_acomp(ins, out);         return 0;
-        case SM_LCOMP:             sm_lcomp(ins, out);         return 0;
+        case SM_STNO:              sm_stno();          return 0;
+        case SM_ACOMP:             sm_acomp();         return 0;
+        case SM_LCOMP:             sm_lcomp();         return 0;
         /* sm_control.c — EC-UNI-10(b): parameterless, read g_emit */
         case SM_JUMP:              (void)sm_jump();    return 0;
         case SM_JUMP_S:            (void)sm_jump_s();  return 0;
@@ -2963,36 +2963,36 @@ static int dispatch_one_x86(FILE *out, const SM_t *ins, int pc) {
         case SM_NRETURN_S:
         case SM_NRETURN_F:         (void)sm_nreturn(); return 0;
         /* sm_pat.c — pat opcodes + exec_stmt */
-        case SM_PAT_LIT:           sm_pat_lit(ins, out);                return 0;
-        case SM_PAT_ANY:           sm_pat_any_i(ins, pc, out);          return 0;
-        case SM_PAT_NOTANY:        sm_pat_notany(ins, pc, out);         return 0;
-        case SM_PAT_SPAN:          sm_pat_span(ins, pc, out);           return 0;
-        case SM_PAT_BREAK:         sm_pat_break(ins, pc, out);          return 0;
-        case SM_PAT_LEN:           sm_pat_len(ins, out);                return 0;
-        case SM_PAT_POS:           sm_pat_pos(ins, out);                return 0;
-        case SM_PAT_RPOS:          sm_pat_rpos(ins, out);               return 0;
-        case SM_PAT_TAB:           sm_pat_tab(ins, out);                return 0;
-        case SM_PAT_RTAB:          sm_pat_rtab(ins, out);               return 0;
-        case SM_PAT_ARB:           sm_pat_arb(ins, out);                return 0;
-        case SM_PAT_REM:           sm_pat_rem(ins, out);                return 0;
-        case SM_PAT_BAL:           sm_pat_bal(ins, out);                return 0;
-        case SM_PAT_FENCE0:        sm_pat_fence0(ins, out);             return 0;
-        case SM_PAT_FENCE1:        sm_pat_fence1(ins, out);             return 0;
-        case SM_PAT_ABORT:         sm_pat_abort(ins, out);              return 0;
-        case SM_PAT_FAIL:          sm_pat_fail(ins, out);               return 0;
-        case SM_PAT_SUCCEED:       sm_pat_succeed(ins, out);            return 0;
-        case SM_PAT_EPS:           sm_pat_eps(ins, out);                return 0;
-        case SM_PAT_DEREF:         sm_pat_deref(ins, out);              return 0;
-        case SM_PAT_ARBNO:         sm_pat_arbno(ins, out);              return 0;
-        case SM_PAT_CAT:           sm_pat_cat(ins, out);                return 0;
-        case SM_PAT_ALT:           sm_pat_alt(ins, out);                return 0;
-        case SM_PAT_REFNAME:       sm_pat_refname(ins, out);            return 0;
-        case SM_PAT_CAPTURE:       sm_pat_capture(ins, out);            return 0;
-        case SM_PAT_CAPTURE_FN:    sm_pat_capture_fn(ins, out);         return 0;
-        case SM_PAT_CAPTURE_FN_ARGS: sm_pat_capture_fn_args(ins, out);  return 0;
-        case SM_PAT_USERCALL:      sm_pat_usercall(ins, out);           return 0;
-        case SM_PAT_USERCALL_ARGS: sm_pat_usercall_args(ins, out);      return 0;
-        case SM_EXEC_STMT:         sm_exec_stmt(ins, out);              return 0;
+        case SM_PAT_LIT:           sm_pat_lit();                return 0;
+        case SM_PAT_ANY:           sm_pat_any_i();          return 0;
+        case SM_PAT_NOTANY:        sm_pat_notany();         return 0;
+        case SM_PAT_SPAN:          sm_pat_span();           return 0;
+        case SM_PAT_BREAK:         sm_pat_break();          return 0;
+        case SM_PAT_LEN:           sm_pat_len();                return 0;
+        case SM_PAT_POS:           sm_pat_pos();                return 0;
+        case SM_PAT_RPOS:          sm_pat_rpos();               return 0;
+        case SM_PAT_TAB:           sm_pat_tab();                return 0;
+        case SM_PAT_RTAB:          sm_pat_rtab();               return 0;
+        case SM_PAT_ARB:           sm_pat_arb();                return 0;
+        case SM_PAT_REM:           sm_pat_rem();                return 0;
+        case SM_PAT_BAL:           sm_pat_bal();                return 0;
+        case SM_PAT_FENCE0:        sm_pat_fence0();             return 0;
+        case SM_PAT_FENCE1:        sm_pat_fence1();             return 0;
+        case SM_PAT_ABORT:         sm_pat_abort();              return 0;
+        case SM_PAT_FAIL:          sm_pat_fail();               return 0;
+        case SM_PAT_SUCCEED:       sm_pat_succeed();            return 0;
+        case SM_PAT_EPS:           sm_pat_eps();                return 0;
+        case SM_PAT_DEREF:         sm_pat_deref();              return 0;
+        case SM_PAT_ARBNO:         sm_pat_arbno();              return 0;
+        case SM_PAT_CAT:           sm_pat_cat();                return 0;
+        case SM_PAT_ALT:           sm_pat_alt();                return 0;
+        case SM_PAT_REFNAME:       sm_pat_refname();            return 0;
+        case SM_PAT_CAPTURE:       sm_pat_capture();            return 0;
+        case SM_PAT_CAPTURE_FN:    sm_pat_capture_fn();         return 0;
+        case SM_PAT_CAPTURE_FN_ARGS: sm_pat_capture_fn_args();  return 0;
+        case SM_PAT_USERCALL:      sm_pat_usercall();           return 0;
+        case SM_PAT_USERCALL_ARGS: sm_pat_usercall_args();      return 0;
+        case SM_EXEC_STMT:         sm_exec_stmt();              return 0;
         default:                   return -1;  /* uncovered by templates — caller falls through */
     }
 }

@@ -1,7 +1,8 @@
 #include "sm_template_common.h"
 #include "emit_sm.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_stno(const SM_t * instr, FILE * out) {
+void sm_stno(void) {
+    const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     if (IS_X86) { emit_sm_stno_template(out, instr); return; }
     if (IS_JVM) { jvm_push_int2(out, (long)instr->a[0].i); fprintf(out, "    i2l\n    invokestatic rt/SnoRt/set_stno(J)V\n"); return; }
     if (IS_JS) { fprintf(out, "rt.set_stno(%lld); ", (long long)instr->a[0].i); return; }
@@ -9,7 +10,8 @@ void sm_stno(const SM_t * instr, FILE * out) {
     if (IS_WASM) { fprintf(out, "          (call $sno_set_stno (i32.const %lld))\n", (long long)instr->a[0].i); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_acomp(const SM_t * instr, FILE * out) {
+void sm_acomp(void) {
+    const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     if (IS_X86) { emit_sm_acomp_dispatch(out, instr, 0); return; }
     if (IS_JVM) { jvm_push_int2(out, (long)instr->a[0].i); fprintf(out, "    invokestatic rt/SnoRt/acomp(I)V\n"); return; }
     if (IS_JS) { return; }
@@ -17,7 +19,8 @@ void sm_acomp(const SM_t * instr, FILE * out) {
     if (IS_WASM) { fprintf(out, "          (call $sno_acomp (i32.const %lld))\n", (long long)instr->a[0].i); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_lcomp(const SM_t * instr, FILE * out) {
+void sm_lcomp(void) {
+    const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     if (IS_X86) { emit_sm_lcomp_dispatch(out, instr, 0); return; }
     if (IS_JVM) { jvm_push_int2(out, (long)instr->a[0].i); fprintf(out, "    invokestatic rt/SnoRt/lcomp(I)V\n"); return; }
     if (IS_JS) { return; }

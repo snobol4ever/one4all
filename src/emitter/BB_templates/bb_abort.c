@@ -1,6 +1,7 @@
 #include "bb_template_common.h"
 
-void bb_abort(BB_t * nd, FILE * out) {
+void bb_abort(void) {
+    BB_t * nd = g_emit.node; FILE * out = g_emit.out;
     int nid = bb_node_id(nd); int sid = 0;
     if (IS_JVM) {
         jvm_class_hdr(out, "abort");

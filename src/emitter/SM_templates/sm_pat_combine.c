@@ -3,7 +3,8 @@
 /* EC-UNI-8.3-fixup: every fn carries the full backend × mode matrix; NET PAT
  * is a known stub so IS_NET_* cells are n/a sentinels. */
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_pat_cat(const SM_t * instr, FILE * out) {
+void sm_pat_cat(void) {
+    const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     if (IS_X86) { emit_sm_pat_cat_dispatch(out, 0); return; }
     (void)instr;
     if (IS_JVM) { jvm_pat_2pat_push(out, "cat(Lrt/SnoPat;Lrt/SnoPat;)Lrt/SnoPat;"); return; }
@@ -12,7 +13,8 @@ void sm_pat_cat(const SM_t * instr, FILE * out) {
     if (IS_WASM) { fprintf(out, "          (call $sno_pat_cat)\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_pat_alt(const SM_t * instr, FILE * out) {
+void sm_pat_alt(void) {
+    const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     if (IS_X86) { emit_sm_pat_alt_dispatch(out, 0); return; }
     (void)instr;
     if (IS_JVM) { jvm_pat_2pat_push(out, "alt(Lrt/SnoPat;Lrt/SnoPat;)Lrt/SnoPat;"); return; }
@@ -21,7 +23,8 @@ void sm_pat_alt(const SM_t * instr, FILE * out) {
     if (IS_WASM) { fprintf(out, "          (call $sno_pat_alt)\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_pat_capture(const SM_t * instr, FILE * out) {
+void sm_pat_capture(void) {
+    const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     if (IS_X86) { emit_sm_pat_capture_template(out, instr); return; }
     const char * s = instr->a[0].s ? instr->a[0].s : ""; int kind = (int)instr->a[1].i;
     if (IS_JVM) {
@@ -36,7 +39,8 @@ void sm_pat_capture(const SM_t * instr, FILE * out) {
     if (IS_WASM) { int addr = wasm_intern_name(s); fprintf(out, "          (call $sno_pat_capture (i32.const 0x%x) (i32.const %lld) (i32.const %lld))\n", addr, (long long)instr->a[1].i, (long long)instr->a[2].i); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_pat_capture_fn(const SM_t * instr, FILE * out) {
+void sm_pat_capture_fn(void) {
+    const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     if (IS_X86) { emit_sm_pat_capture_fn_template(out, instr); return; }
     const char * fname = instr->a[0].s ? instr->a[0].s : ""; const char * namelist = instr->a[2].s ? instr->a[2].s : "";
     if (IS_JVM) {
@@ -51,7 +55,8 @@ void sm_pat_capture_fn(const SM_t * instr, FILE * out) {
     if (IS_WASM) { fprintf(out, "          ;; SM_PAT_CAPTURE_FN not yet implemented\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_pat_capture_fn_args(const SM_t * instr, FILE * out) {
+void sm_pat_capture_fn_args(void) {
+    const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     if (IS_X86) { emit_sm_pat_capture_fn_args_template(out, instr); return; }
     const char * fname = instr->a[0].s ? instr->a[0].s : ""; int nargs = (int)instr->a[2].i;
     if (IS_JVM) {
@@ -68,7 +73,8 @@ void sm_pat_capture_fn_args(const SM_t * instr, FILE * out) {
     if (IS_WASM) { fprintf(out, "          ;; SM_PAT_CAPTURE_FN_ARGS not yet implemented\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_pat_usercall(const SM_t * instr, FILE * out) {
+void sm_pat_usercall(void) {
+    const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     if (IS_X86) { emit_sm_pat_usercall_template(out, instr); return; }
     const char * fname = instr->a[0].s ? instr->a[0].s : "";
     if (IS_JVM) { jvm_emit_ldc_string(out, fname); fprintf(out, "    invokestatic rt/SnoPat/usercall(Ljava/lang/String;)Lrt/SnoPat;\n    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n"); return; }
@@ -77,7 +83,8 @@ void sm_pat_usercall(const SM_t * instr, FILE * out) {
     if (IS_WASM) { fprintf(out, "          ;; SM_PAT_USERCALL not yet implemented\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_pat_usercall_args(const SM_t * instr, FILE * out) {
+void sm_pat_usercall_args(void) {
+    const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     if (IS_X86) { emit_sm_pat_usercall_args_template(out, instr); return; }
     const char * fname = instr->a[0].s ? instr->a[0].s : ""; int nargs = (int)instr->a[1].i;
     if (IS_JVM) {
@@ -92,7 +99,8 @@ void sm_pat_usercall_args(const SM_t * instr, FILE * out) {
     if (IS_WASM) { fprintf(out, "          ;; SM_PAT_USERCALL_ARGS not yet implemented\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_exec_stmt(const SM_t * instr, FILE * out) {
+void sm_exec_stmt(void) {
+    const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     if (IS_X86) { emit_sm_exec_stmt_template(out, instr); return; }
     /* IS_JVM: n/a — SM_EXEC_STMT has no JVM arm */
     if (IS_JS) { fprintf(out, "rt.exec_stmt("); js_escape(out, instr->a[0].s ? instr->a[0].s : ""); fprintf(out, ", %lld); ", instr->a[1].i); return; }

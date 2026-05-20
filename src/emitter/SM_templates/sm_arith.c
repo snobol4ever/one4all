@@ -1,7 +1,8 @@
 #include "sm_template_common.h"
 #include "emit_sm.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_concat(const SM_t * instr, FILE * out) {
+void sm_concat(void) {
+    const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     (void)instr;
     if (IS_X86) { emit_sm_concat_dispatch(out, 0); return; }
     if (IS_JVM) { fprintf(out, "    invokestatic rt/SnoRt/concat()V\n"); return; }
@@ -10,7 +11,8 @@ void sm_concat(const SM_t * instr, FILE * out) {
     if (IS_WASM) { fprintf(out, "          (call $sno_concat)\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_neg(const SM_t * instr, FILE * out) {
+void sm_neg(void) {
+    const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     (void)instr;
     if (IS_X86) { emit_sm_neg_dispatch(out, 0); return; }
     if (IS_JVM) { fprintf(out, "    invokestatic rt/SnoRt/neg()V\n"); return; }
@@ -19,7 +21,8 @@ void sm_neg(const SM_t * instr, FILE * out) {
     if (IS_WASM) { fprintf(out, "          (call $sno_neg)\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_coerce_num(const SM_t * instr, FILE * out) {
+void sm_coerce_num(void) {
+    const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     (void)instr;
     if (IS_X86) { emit_sm_coerce_num_dispatch(out, 0); return; }
     if (IS_JVM) { fprintf(out, "    invokestatic rt/SnoRt/coerce_num()V\n"); return; }
@@ -28,7 +31,8 @@ void sm_coerce_num(const SM_t * instr, FILE * out) {
     if (IS_WASM) { fprintf(out, "          (call $sno_coerce_num)\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_exp(const SM_t * instr, FILE * out) {
+void sm_exp(void) {
+    const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     (void)instr;
     if (IS_X86) { emit_sm_exp_dispatch(out, 0); return; }
     if (IS_JVM) { fprintf(out, "    invokestatic rt/SnoRt/exp_op()V\n"); return; }
@@ -37,7 +41,8 @@ void sm_exp(const SM_t * instr, FILE * out) {
     if (IS_WASM) { fprintf(out, "          (call $sno_exp_op)\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_add(const SM_t * instr, FILE * out) {
+void sm_add(void) {
+    const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     if (IS_X86) { edp4_sm_arith(out, instr, 0); return; }
     (void)instr;
     if (IS_JVM) { fprintf(out, "    bipush 0\n    invokestatic rt/SnoRt/arith(I)V\n"); return; }
@@ -46,7 +51,8 @@ void sm_add(const SM_t * instr, FILE * out) {
     if (IS_WASM) { fprintf(out, "          (call $sno_arith (i32.const 0))\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_sub(const SM_t * instr, FILE * out) {
+void sm_sub(void) {
+    const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     if (IS_X86) { edp4_sm_arith(out, instr, 0); return; }
     (void)instr;
     if (IS_JVM) { fprintf(out, "    bipush 1\n    invokestatic rt/SnoRt/arith(I)V\n"); return; }
@@ -55,7 +61,8 @@ void sm_sub(const SM_t * instr, FILE * out) {
     if (IS_WASM) { fprintf(out, "          (call $sno_arith (i32.const 1))\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_mul(const SM_t * instr, FILE * out) {
+void sm_mul(void) {
+    const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     if (IS_X86) { edp4_sm_arith(out, instr, 0); return; }
     (void)instr;
     if (IS_JVM) { fprintf(out, "    bipush 2\n    invokestatic rt/SnoRt/arith(I)V\n"); return; }
@@ -64,7 +71,8 @@ void sm_mul(const SM_t * instr, FILE * out) {
     if (IS_WASM) { fprintf(out, "          (call $sno_arith (i32.const 2))\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_div(const SM_t * instr, FILE * out) {
+void sm_div(void) {
+    const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     if (IS_X86) { edp4_sm_arith(out, instr, 0); return; }
     (void)instr;
     if (IS_JVM) { fprintf(out, "    bipush 3\n    invokestatic rt/SnoRt/arith(I)V\n"); return; }
@@ -73,7 +81,8 @@ void sm_div(const SM_t * instr, FILE * out) {
     if (IS_WASM) { fprintf(out, "          (call $sno_arith (i32.const 3))\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_mod(const SM_t * instr, FILE * out) {
+void sm_mod(void) {
+    const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     if (IS_X86) { edp4_sm_arith(out, instr, 0); return; }
     (void)instr;
     if (IS_JVM) { fprintf(out, "    invokestatic rt/SnoRt/mod()V\n"); return; }
