@@ -2222,3 +2222,13 @@ int emit_program(const tree_t * ast_prog, FILE * out, bb_emit_mode_t mode) {
     sm_prog_free(sm);
     return 0;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* EC-UNI-0: emit_sm_dispatch — unified per-instruction walk that will replace
+ *   emit_walk_codegen (x86), emit_jvm_from_sm, emit_js_from_sm, emit_net_from_sm, emit_wasm_from_sm.
+ * Each SM opcode dispatches through its sm_<opcode> template function which carries arms for every backend.
+ * EC-UNI-0 wires only the scaffold — every mode returns -1 (unsupported) until later steps fill in arms.
+ * No call sites yet; safe by construction. */
+int emit_sm_dispatch(SM_Program * sm, FILE * out, bb_emit_mode_t mode) {
+    (void)sm; (void)out; (void)mode;
+    return -1;
+}

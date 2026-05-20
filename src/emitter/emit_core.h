@@ -11,7 +11,20 @@
 #include <stdio.h>
 #include <stdarg.h>
 /*--- emit mode -----------------------------------------------------------*/
-typedef enum { EMIT_TEXT = 0, EMIT_BINARY_WIRED = 1, EMIT_BINARY_BROKERED = 2, EMIT_MACRO_DEF = 3, EMIT_TEXT_INLINE = 4, EMIT_JVM = 5, EMIT_JS = 6, EMIT_NET = 7, EMIT_WASM = 8 } bb_emit_mode_t;
+typedef enum {
+    EMIT_TEXT             = 0,   /* x86-64 GAS text   */
+    EMIT_BINARY_WIRED     = 1,   /* x86-64 binary, wired BBs    */
+    EMIT_BINARY_BROKERED  = 2,   /* x86-64 binary, brokered BBs */
+    EMIT_MACRO_DEF        = 3,   /* GAS macro library emission  */
+    EMIT_TEXT_INLINE      = 4,   /* x86-64 GAS text, inline mode */
+    EMIT_JVM              = 5,   /* JVM Jasmin text   */
+    EMIT_JS               = 6,   /* JavaScript text   */
+    EMIT_NET              = 7,   /* MSIL .NET text    */
+    EMIT_WASM             = 8,   /* WASM WAT text     */
+    EMIT_BIN_JVM          = 9,   /* (EC-UNI future) binary JVM .class bytes */
+    EMIT_BIN_NET          = 10,  /* (EC-UNI future) binary .NET IL bytes    */
+    EMIT_BIN_WASM         = 11   /* (EC-UNI future) binary WASM bytes       */
+} bb_emit_mode_t;
 #define EMIT_BINARY     EMIT_BINARY_WIRED
 #define IS_TEXT     (bb_emit_mode != EMIT_BINARY_WIRED && bb_emit_mode != EMIT_BINARY_BROKERED)
 #define IS_BIN      (bb_emit_mode == EMIT_BINARY_WIRED || bb_emit_mode == EMIT_BINARY_BROKERED)
@@ -21,6 +34,14 @@ typedef enum { EMIT_TEXT = 0, EMIT_BINARY_WIRED = 1, EMIT_BINARY_BROKERED = 2, E
 #define IS_JS       (bb_emit_mode == EMIT_JS)
 #define IS_NET      (bb_emit_mode == EMIT_NET)
 #define IS_WASM     (bb_emit_mode == EMIT_WASM)
+/* EC-UNI: x86 mode-cluster macros (refine the legacy IS_TEXT semantic) */
+#define IS_X86_TEXT  (bb_emit_mode == EMIT_TEXT || bb_emit_mode == EMIT_TEXT_INLINE || bb_emit_mode == EMIT_MACRO_DEF)
+#define IS_X86_BIN   (bb_emit_mode == EMIT_BINARY_WIRED || bb_emit_mode == EMIT_BINARY_BROKERED)
+#define IS_X86       (IS_X86_TEXT || IS_X86_BIN)
+/* EC-UNI: stubs — IS_BIN_JVM/NET/WASM dispatch to be added per template fn in later steps */
+#define IS_BIN_JVM   (bb_emit_mode == EMIT_BIN_JVM)
+#define IS_BIN_NET   (bb_emit_mode == EMIT_BIN_NET)
+#define IS_BIN_WASM  (bb_emit_mode == EMIT_BIN_WASM)
 /*--- label ---------------------------------------------------------------*/
 #define BB_LABEL_NAME_MAX   80
 #define BB_LABEL_UNRESOLVED (-1)
@@ -235,4 +256,12 @@ int  emit_prologue(IR_block_t * cfg, FILE * out);
 int  emit_epilogue(IR_block_t * cfg, FILE * out);
 struct tree_t;
 int  emit_program(const struct tree_t * ast_prog, FILE * out, bb_emit_mode_t mode);
+/* EC-UNI-0: unified SM walk — scaffold. Walks SM_Program and dispatches each instruction
+ * through SM_template functions. Future EC-UNI steps wire backends progressively:
+ *   EC-UNI-1..2: x86 GAS text arms                  → returns 0 for EMIT_TEXT*
+ *   EC-UNI-5:   JVM/JS/NET inline switches removed  → returns 0 for EMIT_JVM/JS/NET
+ *   EC-UNI-6:   x86 binary arms                     → returns 0 for EMIT_BINARY_*
+ *   EC-UNI-7:   binary JVM/.NET/WASM future arms    → returns 0 for EMIT_BIN_*
+ * Today (EC-UNI-0): returns -1 (unsupported) for every mode — scaffold only, no callers yet. */
+int  emit_sm_dispatch(SM_Program * sm, FILE * out, bb_emit_mode_t mode);
 #endif
