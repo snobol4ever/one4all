@@ -14,9 +14,9 @@
 #include "driver/polyglot.h"
 #include "lower.h"
 #include "SM.h"
-/* ST2-1: g_registry storage moved to stage2_t.  Legacy name in this TU
- * resolves to (*(ScripModuleRegistry*)g_stage2.module_registry)
- * via the macro in interp.h.                                                */
+/* ST2-1b (2026-05-20): g_registry shim macro deleted.  polyglot_init now
+ * reads/writes module_registry through its s2 parameter (s2->module_registry).
+ * Single reader; the macro had no other call sites. */
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static inline int           s_int(const tree_t *s, const char *tag) {
     const char *v = stmt_attr_str(stmt_attr_find(s, tag)); return v ? atoi(v) : 0; }
@@ -43,7 +43,6 @@ int g_fi8_pl_init_count  = 0;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void polyglot_init(stage2_t *s2, const tree_t *prog, uint32_t lang_mask)
 {
-    (void)s2;
     if (!prog) return;
     label_table_build(s2, prog);
     prescan_defines(prog);
@@ -64,8 +63,8 @@ void polyglot_init(stage2_t *s2, const tree_t *prog, uint32_t lang_mask)
         g_pl_env      = NULL;
         g_pl_active   = 0;
     }
-    memset(&g_registry, 0, sizeof g_registry);
-    g_registry.main_mod = -1;
+    memset(&s2->module_registry, 0, sizeof s2->module_registry);
+    s2->module_registry.main_mod = -1;
     int cur_lang = -1;
     int mod_idx  = -1;
     for (int _ci = 0; _ci < prog->n; _ci++) {
@@ -73,10 +72,10 @@ void polyglot_init(stage2_t *s2, const tree_t *prog, uint32_t lang_mask)
         if (!s || (s->t != TT_STMT && s->t != TT_END)) continue;
         int s_lang = s_int(s, ":lang");
         if (s_lang != cur_lang) {
-            if (g_registry.nmod < SCRIP_MOD_MAX) {
+            if (s2->module_registry.nmod < SCRIP_MOD_MAX) {
                 cur_lang = s_lang;
-                mod_idx  = g_registry.nmod++;
-                ScripModule *m = &g_registry.mods[mod_idx];
+                mod_idx  = s2->module_registry.nmod++;
+                ScripModule *m = &s2->module_registry.mods[mod_idx];
                 m->lang             = s_lang;
                 m->name             = NULL;
                 m->first            = s;
@@ -89,8 +88,8 @@ void polyglot_init(stage2_t *s2, const tree_t *prog, uint32_t lang_mask)
             }
         }
         if (mod_idx >= 0) {
-            g_registry.mods[mod_idx].last = s;
-            g_registry.mods[mod_idx].nstmts++;
+            s2->module_registry.mods[mod_idx].last = s;
+            s2->module_registry.mods[mod_idx].nstmts++;
         }
         tree_t *subj = s_expr(s, ":subj");
         if (!subj) continue;
@@ -125,9 +124,9 @@ void polyglot_init(stage2_t *s2, const tree_t *prog, uint32_t lang_mask)
                         ? (proc->t == TT_PROC_DECL && proc->n >= 2 ? proc->c[1]->n : 0)
                         : (int)proc->v.ival;
                     proc_count++;
-                    if (mod_idx >= 0) g_registry.mods[mod_idx].nprocs++;
-                    if (strcmp(name, "main") == 0 && g_registry.main_mod < 0)
-                        g_registry.main_mod = mod_idx;
+                    if (mod_idx >= 0) s2->module_registry.mods[mod_idx].nprocs++;
+                    if (strcmp(name, "main") == 0 && s2->module_registry.main_mod < 0)
+                        s2->module_registry.main_mod = mod_idx;
                 }
             }
             if (proc->t == TT_RECORD) {
@@ -138,13 +137,13 @@ void polyglot_init(stage2_t *s2, const tree_t *prog, uint32_t lang_mask)
             if ((sub->t == TT_CHOICE || sub->t == TT_CLAUSE) && sub->v.sval) {
                 pl_pred_table_insert(&g_pl_pred_table, sub->v.sval, sub);
                 g_pl_active = 1;
-                if (strcmp(sub->v.sval, "main/0") == 0 && g_registry.main_mod < 0)
-                    g_registry.main_mod = mod_idx;
+                if (strcmp(sub->v.sval, "main/0") == 0 && s2->module_registry.main_mod < 0)
+                    s2->module_registry.main_mod = mod_idx;
             }
         } else if (s_lang == LANG_SNO) {
             const char *lbl = stmt_attr_str(stmt_attr_find(s, ":lbl"));
             if (mod_idx >= 0 && lbl && *lbl)
-                g_registry.mods[mod_idx].sno_label_count++;
+                s2->module_registry.mods[mod_idx].sno_label_count++;
         }
     }
 }

@@ -10,8 +10,8 @@ extern int g_polyglot;
 #define SCRIP_MOD_MAX STAGE2_MOD_MAX
 /* ScripModule / ScripModuleRegistry are defined canonically in stage2.h. */
 /* ST2-1 reader shims: legacy global names redirect to fields of g_stage2.
- *   Deleted in ST2-1b once all readers take `stage2_t *s2` directly.       */
-#define g_registry   (g_stage2.module_registry)
+ *   ST2-1b (2026-05-20): g_registry shim deleted (polyglot_init swept to s2->module_registry).
+ *   Deleted further shims as readers migrate to take `stage2_t *s2` directly.       */
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void polyglot_init(stage2_t *s2, const tree_t *prog, uint32_t lang_mask);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
