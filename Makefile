@@ -322,11 +322,11 @@ scrip:
 scrip-interp: scrip
 	@ln -sf scrip scrip-interp
 
-# ── test_emit_io — EC-UNI-11 self-test for Layer-3 string-builder primitives ──
+# ── test_emit_io — EC-UNI-11/12 self-test for Layer-3 string-builder primitives ──
 # Standalone; no scrip dependency.  Runs in <100 ms.
 test_emit_io:
-	$(CC) -O0 -g -Wall -I$(SRC) -I$(SRC)/include -I$(SRC)/emitter \
-	    $(SRC)/emitter/emit_io.c $(SRC)/emitter/test_emit_io.c -o /tmp/test_emit_io
+	$(CC) -O0 -g -Wall -I$(SRC) -I$(SRC)/include -I$(SRC)/lower -I$(SRC)/processor -I$(SRC)/emitter -I$(SRC)/runtime/snobol4 -I$(SRC)/runtime \
+	    $(SRC)/emitter/emit_io.c $(SRC)/emitter/emit_globals.c $(SRC)/emitter/test_emit_io.c -o /tmp/test_emit_io
 	/tmp/test_emit_io
 	@echo "OK  test_emit_io"
 

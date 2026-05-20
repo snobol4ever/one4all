@@ -64,4 +64,12 @@ typedef struct {
 emit_io_saved_t emit_io_save    (void);
 void            emit_io_restore (emit_io_saved_t saved);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* Mode flag — EC-UNI-12 transitional.  Default 0 (passthrough): primitives write directly to
+ * g_emit.out so output order matches direct fprintf(g_emit.out, ...) from Layer-2 helpers
+ * (which the EC-UNI-12 sweep does not touch — those move at EC-UNI-13/14).  Set to 1 to enable
+ * the original two-buffer design; tests and post-EC-UNI-14 normal flow will use it.
+ * The mode is process-global. */
+void emit_io_set_buffered(int on);
+int  emit_io_is_buffered (void);
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 #endif

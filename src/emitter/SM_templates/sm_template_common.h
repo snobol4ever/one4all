@@ -5,6 +5,7 @@
 #include "emit_core.h"
 #include "SM.h"
 #include "emit_globals.h"
+#include "emit_io.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>

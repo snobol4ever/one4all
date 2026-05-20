@@ -174,6 +174,10 @@ static int test_save_restore(void) {
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int main(void) {
+    /* EC-UNI-12: primitives default to passthrough (write through to g_emit.out).  This test
+     * exercises the buffered mode explicitly, since the buffer + flush hook is what we are
+     * scaffolding for future use. */
+    emit_io_set_buffered(1);
     int rc = 0;
     rc |= test_text_basic();
     rc |= test_text_growth();
@@ -181,6 +185,7 @@ int main(void) {
     rc |= test_flush();
     rc |= test_empty_safe();
     rc |= test_save_restore();
+    emit_io_set_buffered(0);
     if (rc) { fprintf(stderr, "test_emit_io: FAILED\n"); return 1; }
     printf("test_emit_io: PASS (6/6)\n");
     return 0;

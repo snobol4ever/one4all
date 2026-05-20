@@ -4,6 +4,7 @@
 #pragma once
 #include "emit_core.h"
 #include "emit_globals.h"
+#include "emit_io.h"
 #include "sm_jit_interp.h"
 #include "emit_form.h"
 #include "emit_ir.h"

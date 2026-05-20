@@ -8,10 +8,10 @@ void sm_pat_lit(void) {
     const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     if (IS_X86) { emit_sm_pat_lit_template(out, instr); return; }
     const char * s = instr->a[0].s ? instr->a[0].s : "";
-    if (IS_JVM) { jvm_emit_ldc_string(out, s); fprintf(out, "    invokestatic rt/SnoPat/lit(Ljava/lang/String;)Lrt/SnoPat;\n    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n"); return; }
-    if (IS_JS) { fprintf(out, "rt.pat_lit("); js_escape(out, s); fprintf(out, "); "); return; }
+    if (IS_JVM) { jvm_emit_ldc_string(out, s); emit_textf("    invokestatic rt/SnoPat/lit(Ljava/lang/String;)Lrt/SnoPat;\n    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n"); return; }
+    if (IS_JS) { emit_textf("rt.pat_lit("); js_escape(out, s); emit_textf("); "); return; }
     /* IS_NET: n/a — NET PAT stub */
-    if (IS_WASM) { int addr = wasm_intern_str(s); fprintf(out, "          (call $sno_pat_lit (i32.const 0x%x) (i32.const %d))\n", addr, (int)strlen(s)); return; }
+    if (IS_WASM) { int addr = wasm_intern_str(s); emit_textf("          (call $sno_pat_lit (i32.const 0x%x) (i32.const %d))\n", addr, (int)strlen(s)); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void sm_pat_any(void) {
@@ -19,9 +19,9 @@ void sm_pat_any(void) {
     if (IS_X86) { emit_sm_pat_any_dispatch(out, 0); return; }
     (void)instr;
     if (IS_JVM) { jvm_pat_str_push(out, 0, "any", "any(Ljava/lang/String;)Lrt/SnoPat;"); return; }
-    if (IS_JS) { fprintf(out, "rt.pat_any(); "); return; }
+    if (IS_JS) { emit_textf("rt.pat_any(); "); return; }
     /* IS_NET: n/a — NET PAT stub */
-    if (IS_WASM) { fprintf(out, "          (call $sno_pat_any)\n"); return; }
+    if (IS_WASM) { emit_textf("          (call $sno_pat_any)\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void sm_pat_any_i(void) {
@@ -29,9 +29,9 @@ void sm_pat_any_i(void) {
     if (IS_X86) { emit_sm_pat_any_dispatch(out, 0); return; }
     (void)instr;
     if (IS_JVM) { jvm_pat_str_push(out, i, "any", "any(Ljava/lang/String;)Lrt/SnoPat;"); return; }
-    if (IS_JS) { fprintf(out, "rt.pat_any(); "); return; }
+    if (IS_JS) { emit_textf("rt.pat_any(); "); return; }
     /* IS_NET: n/a — NET PAT stub */
-    if (IS_WASM) { fprintf(out, "          (call $sno_pat_any)\n"); return; }
+    if (IS_WASM) { emit_textf("          (call $sno_pat_any)\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void sm_pat_notany(void) {
@@ -39,9 +39,9 @@ void sm_pat_notany(void) {
     if (IS_X86) { emit_sm_pat_notany_dispatch(out, 0); return; }
     (void)instr;
     if (IS_JVM) { jvm_pat_str_push(out, i, "nany", "notany(Ljava/lang/String;)Lrt/SnoPat;"); return; }
-    if (IS_JS) { fprintf(out, "rt.pat_notany(); "); return; }
+    if (IS_JS) { emit_textf("rt.pat_notany(); "); return; }
     /* IS_NET: n/a — NET PAT stub */
-    if (IS_WASM) { fprintf(out, "          (call $sno_pat_notany)\n"); return; }
+    if (IS_WASM) { emit_textf("          (call $sno_pat_notany)\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void sm_pat_span(void) {
@@ -49,9 +49,9 @@ void sm_pat_span(void) {
     if (IS_X86) { emit_sm_pat_span_dispatch(out, 0); return; }
     (void)instr;
     if (IS_JVM) { jvm_pat_str_push(out, i, "span", "span(Ljava/lang/String;)Lrt/SnoPat;"); return; }
-    if (IS_JS) { fprintf(out, "rt.pat_span(); "); return; }
+    if (IS_JS) { emit_textf("rt.pat_span(); "); return; }
     /* IS_NET: n/a — NET PAT stub */
-    if (IS_WASM) { fprintf(out, "          (call $sno_pat_span)\n"); return; }
+    if (IS_WASM) { emit_textf("          (call $sno_pat_span)\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void sm_pat_break(void) {
@@ -59,29 +59,29 @@ void sm_pat_break(void) {
     if (IS_X86) { emit_sm_pat_break_dispatch(out, 0); return; }
     (void)instr;
     if (IS_JVM) { jvm_pat_str_push(out, i, "brk", "brk(Ljava/lang/String;)Lrt/SnoPat;"); return; }
-    if (IS_JS) { fprintf(out, "rt.pat_break(); "); return; }
+    if (IS_JS) { emit_textf("rt.pat_break(); "); return; }
     /* IS_NET: n/a — NET PAT stub */
-    if (IS_WASM) { fprintf(out, "          (call $sno_pat_break)\n"); return; }
+    if (IS_WASM) { emit_textf("          (call $sno_pat_break)\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void sm_pat_refname(void) {
     const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     if (IS_X86) { emit_sm_pat_refname_template(out, instr); return; }
     const char * s = instr->a[0].s ? instr->a[0].s : "";
-    if (IS_JVM) { jvm_emit_ldc_string(out, s); fprintf(out, "    invokestatic rt/SnoPat/refname(Ljava/lang/String;)Lrt/SnoPat;\n    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n"); return; }
-    if (IS_JS) { fprintf(out, "rt.pat_refname("); js_escape(out, s); fprintf(out, "); "); return; }
+    if (IS_JVM) { jvm_emit_ldc_string(out, s); emit_textf("    invokestatic rt/SnoPat/refname(Ljava/lang/String;)Lrt/SnoPat;\n    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n"); return; }
+    if (IS_JS) { emit_textf("rt.pat_refname("); js_escape(out, s); emit_textf("); "); return; }
     /* IS_NET: n/a — NET PAT stub */
-    if (IS_WASM) { int addr = wasm_intern_name(s); fprintf(out, "          (call $sno_pat_refname (i32.const 0x%x) (i32.const %lld))\n", addr, (long long)instr->a[1].i); return; }
+    if (IS_WASM) { int addr = wasm_intern_name(s); emit_textf("          (call $sno_pat_refname (i32.const 0x%x) (i32.const %lld))\n", addr, (long long)instr->a[1].i); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void sm_pat_deref(void) {
     const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     if (IS_X86) { emit_sm_pat_deref_dispatch(out, 0); return; }
     (void)instr;
-    if (IS_JVM) { fprintf(out, "    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;\n    invokestatic rt/SnoPat/deref(Ljava/lang/Object;)Lrt/SnoPat;\n    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n"); return; }
-    if (IS_JS) { fprintf(out, "rt.pat_deref(); "); return; }
+    if (IS_JVM) { emit_textf("    invokestatic rt/SnoRt/pop_obj()Ljava/lang/Object;\n    invokestatic rt/SnoPat/deref(Ljava/lang/Object;)Lrt/SnoPat;\n    invokestatic rt/SnoRt/push_obj(Ljava/lang/Object;)V\n"); return; }
+    if (IS_JS) { emit_textf("rt.pat_deref(); "); return; }
     /* IS_NET: n/a — NET PAT stub */
-    if (IS_WASM) { fprintf(out, "          (call $sno_pat_deref)\n"); return; }
+    if (IS_WASM) { emit_textf("          (call $sno_pat_deref)\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void sm_pat_arb(void) {
@@ -89,7 +89,7 @@ void sm_pat_arb(void) {
     if (IS_X86) { emit_sm_pat_arb_dispatch(out, 0); return; }
     (void)instr;
     if (IS_JVM) { jvm_pat_noarg_push(out, "arb()Lrt/SnoPat;"); return; }
-    if (IS_JS) { fprintf(out, "rt.pat_arb(); "); return; }
+    if (IS_JS) { emit_textf("rt.pat_arb(); "); return; }
     /* IS_NET: n/a — NET PAT stub */
-    if (IS_WASM) { fprintf(out, "          (call $sno_pat_arb)\n"); return; }
+    if (IS_WASM) { emit_textf("          (call $sno_pat_arb)\n"); return; }
 }

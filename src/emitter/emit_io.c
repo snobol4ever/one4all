@@ -1,8 +1,28 @@
-/* emit_io.c — EC-UNI-11: Layer-3 string-builder primitives.  Header documents shape. */
+/* emit_io.c — EC-UNI-11/12: Layer-3 string-builder primitives.  Header documents shape.
+ *
+ * Mode flag (EC-UNI-12): `g_emit_io_buffered`.
+ *   - 0 (default, passthrough): emit_text* and emit_byte* write directly to g_emit.out.
+ *     emit_io_flush is a no-op.  This is the mode used during EC-UNI-12, while templates
+ *     still call Layer-2 helpers in emit_sm.c / emit_bb.c that themselves write directly
+ *     to FILE * — output order is preserved.  Byte identity holds.
+ *   - 1 (buffered): the original two-buffer design.  emit_text* appends to g_text_buf,
+ *     emit_byte* appends to g_bin_buf, emit_io_flush writes text-then-binary on demand.
+ *     Activated by the self-test (test_emit_io.c) so the buffer code stays exercised.
+ *     Will be activated tree-wide once EC-UNI-13/14 absorb the last helper into templates
+ *     and no other writer touches g_emit.out during a pass.
+ *
+ * The mode is process-global, set once.  Tests that need buffered behavior bracket their
+ * call sequence with emit_io_set_buffered(1) / emit_io_set_buffered(0). */
 #include "emit_io.h"
+#include "emit_globals.h"
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* Mode flag.  0 = passthrough to g_emit.out; 1 = buffered. */
+static int             g_emit_io_buffered = 0;
+void emit_io_set_buffered(int on) { g_emit_io_buffered = on ? 1 : 0; }
+int  emit_io_is_buffered (void)   { return g_emit_io_buffered; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* Two private buffers.  Module-static.  Single-threaded by construction. */
 static char *          g_text_buf = NULL;
@@ -38,6 +58,11 @@ void emit_text(const char * s) {
     if (!s) return;
     size_t n = strlen(s);
     if (n == 0) return;
+    if (!g_emit_io_buffered) {
+        /* Passthrough: write straight to g_emit.out.  EC-UNI-12 transitional mode. */
+        if (g_emit.out) fwrite(s, 1, n, g_emit.out);
+        return;
+    }
     text_grow_to(g_text_len + n + 1);  /* +1 for trailing NUL we maintain for emit_io_text_ptr() */
     memcpy(g_text_buf + g_text_len, s, n);
     g_text_len += n;
@@ -46,6 +71,15 @@ void emit_text(const char * s) {
 void emit_textf(const char * fmt, ...) {
     if (!fmt) return;
     va_list ap;
+    if (!g_emit_io_buffered) {
+        /* Passthrough: write straight to g_emit.out.  EC-UNI-12 transitional mode. */
+        if (g_emit.out) {
+            va_start(ap, fmt);
+            vfprintf(g_emit.out, fmt, ap);
+            va_end(ap);
+        }
+        return;
+    }
     /* First pass: ask vsnprintf how many bytes it would write into 0 bytes. */
     va_start(ap, fmt);
     int need = vsnprintf(NULL, 0, fmt, ap);
@@ -61,11 +95,19 @@ void emit_textf(const char * fmt, ...) {
     g_text_buf[g_text_len] = '\0';
 }
 void emit_byte(unsigned char b) {
+    if (!g_emit_io_buffered) {
+        if (g_emit.out) fputc(b, g_emit.out);
+        return;
+    }
     bin_grow_to(g_bin_len + 1);
     g_bin_buf[g_bin_len++] = b;
 }
 void emit_bytes(const unsigned char * p, int n) {
     if (!p || n <= 0) return;
+    if (!g_emit_io_buffered) {
+        if (g_emit.out) fwrite(p, 1, (size_t)n, g_emit.out);
+        return;
+    }
     bin_grow_to(g_bin_len + (size_t)n);
     memcpy(g_bin_buf + g_bin_len, p, (size_t)n);
     g_bin_len += (size_t)n;
