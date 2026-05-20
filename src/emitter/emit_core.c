@@ -1757,10 +1757,10 @@ static char ** net_parse_define_proto(const char * proto, char ** out_fname, int
     params[count] = NULL; *out_n = count; return params;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* EC-5: ir_node_id / ir_is_generator / ir_walk — moved from emit_ir.c. */
-int ir_node_id(BB_t * nd) { return (int)((uintptr_t)nd % 100000u); }
+/* EC-5: bb_node_id / bb_is_generator / bb_walk — moved from emit_ir.c. */
+int bb_node_id(BB_t * nd) { return (int)((uintptr_t)nd % 100000u); }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int ir_is_generator(BB_op_t k) {
+int bb_is_generator(BB_op_t k) {
     if (k >= BB_PAT_LIT   && k <= BB_PAT_CALLOUT)  return 1;
     if (k >= BB_PL_CHOICE && k <= BB_PL_CALL)      return 1;
     if (k >= BB_ICN_TO    && k <= BB_ICN_PROC_GEN) return 1;
@@ -1772,21 +1772,21 @@ int ir_is_generator(BB_op_t k) {
 #define IR_WALK_MAX 4096
 static int g_visited[IR_WALK_MAX];
 static int g_vcount = 0;
-static void ir_walk_rec(BB_t * nd, void (*visit)(BB_t *, void *), void * ctx) {
+static void bb_walk_rec(BB_t * nd, void (*visit)(BB_t *, void *), void * ctx) {
     if (!nd) return;
-    int id = ir_node_id(nd);
+    int id = bb_node_id(nd);
     for (int i = 0; i < g_vcount; i++) if (g_visited[i] == id) return;
     if (g_vcount < IR_WALK_MAX) g_visited[g_vcount++] = id;
     visit(nd, ctx);
-    ir_walk_rec(nd->α, visit, ctx); ir_walk_rec(nd->β, visit, ctx);
-    ir_walk_rec(nd->γ, visit, ctx); ir_walk_rec(nd->ω, visit, ctx);
-    if (nd->c) for (int i = 0; i < nd->n; i++) ir_walk_rec(nd->c[i], visit, ctx);
+    bb_walk_rec(nd->α, visit, ctx); bb_walk_rec(nd->β, visit, ctx);
+    bb_walk_rec(nd->γ, visit, ctx); bb_walk_rec(nd->ω, visit, ctx);
+    if (nd->c) for (int i = 0; i < nd->n; i++) bb_walk_rec(nd->c[i], visit, ctx);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void ir_walk(BB_graph_t * cfg, void (*visit)(BB_t *, void *), void * ctx) {
+void bb_walk(BB_graph_t * cfg, void (*visit)(BB_t *, void *), void * ctx) {
     if (!cfg || !cfg->entry) return;
     g_vcount = 0;
-    ir_walk_rec(cfg->entry, visit, ctx);
+    bb_walk_rec(cfg->entry, visit, ctx);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* EC-5: emit_jvm_from_sm — moved from emit_jvm.c (method-split SM walk). */

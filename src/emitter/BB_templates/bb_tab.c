@@ -1,7 +1,7 @@
 #include "bb_template_common.h"
 
 void bb_tab(BB_t * nd, FILE * out) {
-    int nid = ir_node_id(nd); int sid = 0; int rtab = (nd->ival2 != 0);
+    int nid = bb_node_id(nd); int sid = 0; int rtab = (nd->ival2 != 0);
     if (IS_BIN) return; /* x86 binary: emit_flat_body path, not emit_bb_node */
     if (IS_JVM) {
         const char * name = rtab ? "rtab" : "tab"; char tag[32]; snprintf(tag, sizeof tag, "%s_%d_%d", name, sid, nid);

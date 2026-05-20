@@ -1,7 +1,7 @@
 #include "bb_template_common.h"
 
 void bb_rem(BB_t * nd, FILE * out) {
-    int nid = ir_node_id(nd); int sid = 0; (void)sid;
+    int nid = bb_node_id(nd); int sid = 0; (void)sid;
     if (IS_BIN) return; /* x86 binary: emit_flat_body path, not emit_bb_node */
     if (IS_JVM) {
         jvm_class_hdr(out, "rem"); jvm_init_ms_only(out, "rem");

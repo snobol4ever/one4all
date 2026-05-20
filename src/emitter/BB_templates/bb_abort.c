@@ -1,7 +1,7 @@
 #include "bb_template_common.h"
 
 void bb_abort(BB_t * nd, FILE * out) {
-    int nid = ir_node_id(nd); int sid = 0;
+    int nid = bb_node_id(nd); int sid = 0;
     if (IS_JVM) {
         jvm_class_hdr(out, "abort");
         fprintf(out, ".inner class public static final abort_exception inner bb/bb_abort$AbortException outer bb/bb_abort\n");
