@@ -11,6 +11,7 @@
 #include "lower_pl.h"
 #include "../../runtime/interp/icn_runtime.h"
 #include "../../runtime/interp/pl_runtime.h"
+#include "../../driver/polyglot.h"
 #include "../../frontend/icon/icon_lex.h"
 #include "../../frontend/raku/raku_driver.h"
 #include <stdio.h>
@@ -2064,11 +2065,12 @@ static void lower_gather_hoist_pass(const tree_t * prog) {
     ((tree_t *)prog)->n = new_n;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-SM_sequence_t *lower(const ParserOutput *po)
+SM_sequence_t *lower(const tree_t *prog)
 {
-    if (!po) return NULL;
-    const tree_t *prog = po->prog;
     if (!prog || prog->t != TT_PROGRAM) return NULL;
+    /* Pre-lower sidecar build — single point of truth.  Was previously parser_output_build at the driver.                                                                                              */
+    /* polyglot_init internally calls label_table_build + prescan_defines, then populates proc_table (Icon/Raku) and g_pl_pred_table (Prolog), and builds g_registry (per-language module spans).        */
+    polyglot_init(prog, polyglot_lang_mask(prog));
     g_p            = SM_seq_new();
     g_in_proc_body = 0;
     g_proc_scope   = NULL;

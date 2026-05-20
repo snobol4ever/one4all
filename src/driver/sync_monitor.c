@@ -197,8 +197,7 @@ static int snap_diff(const ExecSnapshot *a, const char *a_name,
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int sync_monitor_run(const tree_t *prog, int verbose, const char *sno_path) {
-    ParserOutput po = { .prog = prog, .lang_mask = 0 };
-    SM_sequence_t *sm_prog = lower(&po);
+    SM_sequence_t *sm_prog = lower(prog);
     if (!sm_prog) { fprintf(stderr, "sync_monitor: sm_lower failed\n"); return -1; }
     if (sm_image_init() != 0) {
         fprintf(stderr, "sync_monitor: sm_image_init failed\n");

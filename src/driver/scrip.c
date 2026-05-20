@@ -341,10 +341,7 @@ int main(int argc, char **argv)
     g_opt_trace   = opt_trace;
     g_opt_dump_bb = dump_bb;
     if (dump_sm && !mode_interp) {
-        label_table_build(ast_prog);
-        prescan_defines(ast_prog);
-        ParserOutput po = { .prog = ast_prog, .lang_mask = 0 };
-        SM_sequence_t *sm0 = lower(&po);
+        SM_sequence_t *sm0 = lower(ast_prog);
         if (!sm0) { fprintf(stderr, "scrip: sm_lower failed\n"); return 1; }
         sm_seq_print(sm0, stdout);
         SM_seq_free(sm0);
@@ -400,8 +397,6 @@ int main(int argc, char **argv)
         return 0;
     }
     if (mode_monitor) {
-        label_table_build(ast_prog);
-        prescan_defines(ast_prog);
         g_sno_err_active = 1;
         int div_stmt = sync_monitor_run(ast_prog, 1, input_path);
         if (div_stmt != 0) {

@@ -137,7 +137,6 @@ RT_PIC_SRCS := \
     $(SRC)/driver/stmt_ast.c \
     $(SRC)/driver/sync_monitor.c \
     $(SRC)/driver/polyglot.c \
-    $(SRC)/driver/parser_output.c \
     $(SRC)/ast/ast_print.c \
     $(SRC)/frontend/snobol4/snobol4.tab.c \
     $(SRC)/frontend/snobol4/snobol4.lex.c \
@@ -311,7 +310,6 @@ scrip:
 	$(CC) $(CRT)   -c $(SRC)/driver/stmt_ast.c       -o $(OBJ)/stmt_ast.o
 	$(CC) $(CRT)   -c $(SRC)/driver/sync_monitor.c -o $(OBJ)/sync_monitor.o
 	$(CC) $(CRT)   -c $(SRC)/driver/polyglot.c -o $(OBJ)/polyglot.o
-	$(CC) $(CRT)   -c $(SRC)/driver/parser_output.c -o $(OBJ)/parser_output.o
 	$(CC) $(CRT)   -c $(SRC)/driver/scrip.c  -o $(OBJ)/scrip_driver.o
 	$(CC) -m64 -no-pie $(OBJ)/*.o $(LIBS) -o scrip
 	@echo "Built: scrip"
