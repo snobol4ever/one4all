@@ -3,7 +3,7 @@
 void bb_arbno(IR_t * nd, FILE * out) {
     int nid = ir_node_id(nd); int sid = 0;
     if (IS_BIN) return; /* x86 binary: emit_flat_body path, not emit_bb_node */
-    if (IS_JVM_TEXT) {
+    if (IS_JVM) {
         char tag[32]; snprintf(tag, sizeof tag, "arbno_%d_%d", sid, nid);
         jvm_class_hdr(out, "arbno");
         fprintf(out, ".field private static final MAX_DEPTH I = 64\n");
@@ -47,8 +47,7 @@ void bb_arbno(IR_t * nd, FILE * out) {
         fprintf(out, "    new bb/bb_box$Spec\n    dup\n    aload_0\n    getfield bb/bb_arbno/frame_match_st [I\n    aload_0\n    getfield bb/bb_arbno/depth I\n    iaload\n    aload_0\n    getfield bb/bb_arbno/frame_match_ln [I\n    aload_0\n    getfield bb/bb_arbno/depth I\n    iaload\n    invokespecial bb/bb_box$Spec/<init>(II)V\n    areturn\n.end method\n");
         return;
     }
-    if (IS_JVM_BIN)  { /* EC-UNI-7 owed: binary .class bytes */ return; }
-    if (IS_JS_TEXT) {
+    if (IS_JS) {
         fprintf(out, "function make_pat_%d_%d(ms) { const stack = []; let self = { succ: null, fail: null,\n", nd->ival, nid);
         fprintf(out, "alpha() { stack.length = 0; stack.push({ start: ms.delta }); while (true) { const frame = stack[stack.length - 1]; const br = self.body.alpha();\n");
         fprintf(out, "if (br === null) { return ms.sigma.slice(stack[0].start, ms.delta - stack[0].start); }\n");
@@ -58,8 +57,7 @@ void bb_arbno(IR_t * nd, FILE * out) {
         fprintf(out, "}; return self; }\n");
         return;
     }
-    /* IS_JS_BIN: n/a — JS has no binary form */
-    if (IS_NET_TEXT) {
+    if (IS_NET) {
         net_class_hdr(out, sid, nid);
         fprintf(out, "  .field private class [boxes]Snobol4.Runtime.Boxes.IByrdBox _body\n");
         fprintf(out, "  .field private int32[] _matchStart\n  .field private int32[] _matchLen\n");
@@ -110,7 +108,5 @@ void bb_arbno(IR_t * nd, FILE * out) {
         net_spec_of(out); fprintf(out, "    ret\n  ARBNO_%d_%d_BFAIL:\n", sid, nid); net_fail_ret(out); fprintf(out, "  }\n}\n");
         fprintf(out, "    newobj     instance void pat_%d_%d::.ctor(class [boxes]Snobol4.Runtime.Boxes.IByrdBox)\n", sid, nid);
     }
-    if (IS_NET_BIN)  { /* EC-UNI-7 owed: binary .NET IL bytes */ return; }
-    /* IS_WASM_TEXT: n/a — BB WASM never landed in original code */
-    /* IS_WASM_BIN: n/a — BB WASM never landed in original code */
+    /* IS_WASM: n/a — BB WASM never landed in original code */
 }

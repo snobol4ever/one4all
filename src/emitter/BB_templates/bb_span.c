@@ -3,7 +3,7 @@
 void bb_span(IR_t * nd, FILE * out) {
     int nid = ir_node_id(nd); int sid = 0;
     if (IS_BIN) return; /* x86 binary: emit_flat_body path, not emit_bb_node */
-    if (IS_JVM_TEXT) {
+    if (IS_JVM) {
         char tag[32]; snprintf(tag, sizeof tag, "span_%d_%d", sid, nid);
         jvm_class_hdr(out, "span"); fprintf(out, ".field private final chars Ljava/lang/String;\n.field private matched_len I\n"); jvm_init_ms_str(out, "span", "chars");
         fprintf(out, ".method public \316\261()Lbb/bb_box$Spec;\n    .limit stack 6\n    .limit locals 3\n");
@@ -21,14 +21,12 @@ void bb_span(IR_t * nd, FILE * out) {
         fprintf(out, "    aload_0\n    getfield bb/bb_span/ms Lbb/bb_box$MatchState;\n    dup\n    getfield bb/bb_box$MatchState/delta I\n    aload_0\n    getfield bb/bb_span/matched_len I\n    isub\n    putfield bb/bb_box$MatchState/delta I\n    aconst_null\n    areturn\n.end method\n");
         return;
     }
-    if (IS_JVM_BIN)  { /* EC-UNI-7 owed: binary .class bytes */ return; }
-    if (IS_JS_TEXT) {
+    if (IS_JS) {
         fprintf(out, "function make_pat_%d_%d(ms) { const chars = ", nd->ival, nid); js_escape(out, nd->sval);
         fprintf(out, "; let delta = 0; let self = { succ: null, fail: null,\nalpha() { delta = 0; while (ms.delta + delta < ms.omega && chars.indexOf(ms.sigma[ms.delta + delta]) >= 0) delta++; if (delta <= 0) { self.fail.alpha(); return; } const r = ms.sigma.slice(ms.delta, ms.delta + delta); ms.delta += delta; self.succ.alpha(); return r; },\nbeta() { ms.delta -= delta; self.fail.alpha(); }\n}; return self; }\n");
         return;
     }
-    /* IS_JS_BIN: n/a — JS has no binary form */
-    if (IS_NET_TEXT) {
+    if (IS_NET) {
         const char * chars = nd->sval ? nd->sval : "";
         net_class_hdr(out, sid, nid); fprintf(out, "  .field private string _chars\n  .field private int32  _count\n");
         fprintf(out, "  .method public specialname rtspecialname instance void .ctor(string chars) cil managed\n  {\n    .maxstack 3\n    ldarg.0\n    call       instance void [mscorlib]System.Object::.ctor()\n");
@@ -42,7 +40,5 @@ void bb_span(IR_t * nd, FILE * out) {
         fprintf(out, "    ldarg.0\n    ldfld      int32 pat_%d_%d::_count\n    sub\n    stfld      int32 [boxes]Snobol4.Runtime.Boxes.MatchState::Cursor\n", sid, nid); net_fail_ret(out); fprintf(out, "  }\n}\n");
         net_escape_ldstr(out, chars); fprintf(out, "    newobj     instance void pat_%d_%d::.ctor(string)\n", sid, nid);
     }
-    if (IS_NET_BIN)  { /* EC-UNI-7 owed: binary .NET IL bytes */ return; }
-    /* IS_WASM_TEXT: n/a — BB WASM never landed in original code */
-    /* IS_WASM_BIN: n/a — BB WASM never landed in original code */
+    /* IS_WASM: n/a — BB WASM never landed in original code */
 }

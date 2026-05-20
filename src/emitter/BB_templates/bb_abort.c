@@ -2,7 +2,7 @@
 
 void bb_abort(IR_t * nd, FILE * out) {
     int nid = ir_node_id(nd); int sid = 0;
-    if (IS_JVM_TEXT) {
+    if (IS_JVM) {
         jvm_class_hdr(out, "abort");
         fprintf(out, ".inner class public static final abort_exception inner bb/bb_abort$AbortException outer bb/bb_abort\n");
         jvm_init_ms_only(out, "abort");
@@ -10,21 +10,17 @@ void bb_abort(IR_t * nd, FILE * out) {
         fprintf(out, ".method public \316\262()Lbb/bb_box$Spec;\n    .limit stack 2\n    .limit locals 1\n    new bb/bb_abort$AbortException\n    dup\n    invokespecial bb/bb_abort$AbortException/<init>()V\n    athrow\n.end method\n");
         (void)sid; (void)nid; return;
     }
-    if (IS_JVM_BIN)  { /* EC-UNI-7 owed: binary .class bytes */ return; }
-    if (IS_JS_TEXT) {
+    if (IS_JS) {
         fprintf(out, "function make_pat_%d_%d(ms) { let self = { succ: null, fail: null,\n", nd->ival, nid);
         fprintf(out, "alpha() { self.fail.alpha(); return null; },\nbeta() { self.fail.alpha(); return null; }\n}; return self; }\n");
         return;
     }
-    /* IS_JS_BIN: n/a — JS has no binary form */
-    if (IS_NET_TEXT) {
+    if (IS_NET) {
         net_class_hdr(out, sid, nid); net_ctor_none(out, sid, nid);
         net_alpha_hdr(out); fprintf(out, "    .maxstack 1\n"); net_fail_ret(out); fprintf(out, "  }\n");
         net_beta_hdr(out); fprintf(out, "    .maxstack 1\n"); net_fail_ret(out); fprintf(out, "  }\n}\n");
         fprintf(out, "    newobj     instance void pat_%d_%d::.ctor()\n", sid, nid);
         return;
     }
-    if (IS_NET_BIN)  { /* EC-UNI-7 owed: binary .NET IL bytes */ return; }
-    /* IS_WASM_TEXT: n/a — BB WASM never landed in original code */
-    /* IS_WASM_BIN: n/a — BB WASM never landed in original code */
+    /* IS_WASM: n/a — BB WASM never landed in original code */
 }

@@ -2,10 +2,9 @@
 #include "emit_sm.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int sm_jump(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
-    if (IS_X86_TEXT) return emit_sm_jump_line(out, instr, 0);
-    if (IS_X86_BIN)  { /* EC-UNI-6 owed: wired binary path; legacy emit_walk_codegen handles today */ return 0; }
+    if (IS_X86) return emit_sm_jump_line(out, instr, 0);
     int target = (int)instr->a[0].i;
-    if (IS_JVM_TEXT) {
+    if (IS_JVM) {
         const char * end_lbl = ctx->in_body ? "sm_pc_body_end" : "sm_pc_fn_end";
         if (target >= 0 && target < ctx->n && ctx->in_my_method && ctx->in_my_method[target])
             fprintf(out, "    goto_w sm_pc_%d\n", target);
@@ -16,21 +15,16 @@ int sm_jump(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
         } else fprintf(out, "    goto_w %s\n", end_lbl);
         return 0;
     }
-    if (IS_JVM_BIN)  { /* EC-UNI-7 owed: binary .class bytes */ return; }
-    if (IS_JS_TEXT)   { fprintf(out, "_pc = %lld; continue; ", (long long)instr->a[0].i); return 1; }
-    /* IS_JS_BIN: n/a — JS has no binary form */
-    if (IS_NET_TEXT)  { fprintf(out, "    ldc.i4     %lld\n    stloc      _pc\n    br         NET_DISPATCH\n", (long long)instr->a[0].i); return 1; }
-    if (IS_NET_BIN)  { /* EC-UNI-7 owed: binary .NET IL bytes */ return; }
-    if (IS_WASM_TEXT) { fprintf(out, "          (i32.const %lld) (local.set $pc) (br $lp)\n", (long long)instr->a[0].i); return 1; }
-    if (IS_WASM_BIN) { /* EC-UNI-7 owed: binary WASM bytes */ return; }
+    if (IS_JS)   { fprintf(out, "_pc = %lld; continue; ", (long long)instr->a[0].i); return 1; }
+    if (IS_NET)  { fprintf(out, "    ldc.i4     %lld\n    stloc      _pc\n    br         NET_DISPATCH\n", (long long)instr->a[0].i); return 1; }
+    if (IS_WASM) { fprintf(out, "          (i32.const %lld) (local.set $pc) (br $lp)\n", (long long)instr->a[0].i); return 1; }
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int sm_jump_s(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
-    if (IS_X86_TEXT) return emit_sm_jump_s_line(out, instr, 0);
-    if (IS_X86_BIN)  { /* EC-UNI-6 owed: wired binary path; legacy emit_walk_codegen handles today */ return 0; }
+    if (IS_X86) return emit_sm_jump_s_line(out, instr, 0);
     int target = (int)instr->a[0].i; int i = ctx->i;
-    if (IS_JVM_TEXT) {
+    if (IS_JVM) {
         if (target >= 0 && target < ctx->n && ctx->in_my_method && ctx->in_my_method[target]) {
             fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n");
             fprintf(out, "    ifeq sm_pc_%d_skip\n", i);
@@ -45,21 +39,16 @@ int sm_jump_s(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
         }
         return 0;
     }
-    if (IS_JVM_BIN)  { /* EC-UNI-7 owed: binary .class bytes */ return; }
-    if (IS_JS_TEXT)   { fprintf(out, "if (rt.last_ok()) _pc = %lld; else _pc = %d; continue; ", (long long)instr->a[0].i, i + 1); return 1; }
-    /* IS_JS_BIN: n/a — JS has no binary form */
-    if (IS_NET_TEXT)  { fprintf(out, "    call       bool SnoRt::last_ok()\n    brfalse    NET_L%d\n    ldc.i4     %lld\n    stloc      _pc\n    br         NET_DISPATCH\n", i + 1, (long long)instr->a[0].i); return 1; }
-    if (IS_NET_BIN)  { /* EC-UNI-7 owed: binary .NET IL bytes */ return; }
-    if (IS_WASM_TEXT) { fprintf(out, "          (if (call $sno_last_ok)\n            (then (i32.const %lld) (local.set $pc))\n            (else (i32.const %d)   (local.set $pc)))\n          (br $lp)\n", (long long)instr->a[0].i, i + 1); return 1; }
-    if (IS_WASM_BIN) { /* EC-UNI-7 owed: binary WASM bytes */ return; }
+    if (IS_JS)   { fprintf(out, "if (rt.last_ok()) _pc = %lld; else _pc = %d; continue; ", (long long)instr->a[0].i, i + 1); return 1; }
+    if (IS_NET)  { fprintf(out, "    call       bool SnoRt::last_ok()\n    brfalse    NET_L%d\n    ldc.i4     %lld\n    stloc      _pc\n    br         NET_DISPATCH\n", i + 1, (long long)instr->a[0].i); return 1; }
+    if (IS_WASM) { fprintf(out, "          (if (call $sno_last_ok)\n            (then (i32.const %lld) (local.set $pc))\n            (else (i32.const %d)   (local.set $pc)))\n          (br $lp)\n", (long long)instr->a[0].i, i + 1); return 1; }
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int sm_jump_f(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
-    if (IS_X86_TEXT) return emit_sm_jump_f_line(out, instr, 0);
-    if (IS_X86_BIN)  { /* EC-UNI-6 owed: wired binary path; legacy emit_walk_codegen handles today */ return 0; }
+    if (IS_X86) return emit_sm_jump_f_line(out, instr, 0);
     int target = (int)instr->a[0].i; int i = ctx->i;
-    if (IS_JVM_TEXT) {
+    if (IS_JVM) {
         if (target >= 0 && target < ctx->n && ctx->in_my_method && ctx->in_my_method[target]) {
             fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n");
             fprintf(out, "    ifne sm_pc_%d_skip\n", i);
@@ -74,12 +63,8 @@ int sm_jump_f(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
         }
         return 0;
     }
-    if (IS_JVM_BIN)  { /* EC-UNI-7 owed: binary .class bytes */ return; }
-    if (IS_JS_TEXT)   { fprintf(out, "if (!rt.last_ok()) _pc = %lld; else _pc = %d; continue; ", (long long)instr->a[0].i, i + 1); return 1; }
-    /* IS_JS_BIN: n/a — JS has no binary form */
-    if (IS_NET_TEXT)  { fprintf(out, "    call       bool SnoRt::last_ok()\n    brtrue     NET_L%d\n    ldc.i4     %lld\n    stloc      _pc\n    br         NET_DISPATCH\n", i + 1, (long long)instr->a[0].i); return 1; }
-    if (IS_NET_BIN)  { /* EC-UNI-7 owed: binary .NET IL bytes */ return; }
-    if (IS_WASM_TEXT) { fprintf(out, "          (if (i32.eqz (call $sno_last_ok))\n            (then (i32.const %lld) (local.set $pc))\n            (else (i32.const %d)   (local.set $pc)))\n          (br $lp)\n", (long long)instr->a[0].i, i + 1); return 1; }
-    if (IS_WASM_BIN) { /* EC-UNI-7 owed: binary WASM bytes */ return; }
+    if (IS_JS)   { fprintf(out, "if (!rt.last_ok()) _pc = %lld; else _pc = %d; continue; ", (long long)instr->a[0].i, i + 1); return 1; }
+    if (IS_NET)  { fprintf(out, "    call       bool SnoRt::last_ok()\n    brtrue     NET_L%d\n    ldc.i4     %lld\n    stloc      _pc\n    br         NET_DISPATCH\n", i + 1, (long long)instr->a[0].i); return 1; }
+    if (IS_WASM) { fprintf(out, "          (if (i32.eqz (call $sno_last_ok))\n            (then (i32.const %lld) (local.set $pc))\n            (else (i32.const %d)   (local.set $pc)))\n          (br $lp)\n", (long long)instr->a[0].i, i + 1); return 1; }
     return 0;
 }
