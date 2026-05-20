@@ -1,14 +1,18 @@
 #include "sm_template_common.h"
+#include "emit_globals.h"
 #include "emit_sm.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_jump(const SM_t * instr, const sm_ctx_t * ctx, FILE * out) {
+/* EC-UNI-10(b): parameterless; reads g_emit.instr / g_emit.i / g_emit.n / g_emit.in_body / g_emit.in_my_method / g_emit.out. */
+int sm_jump(void) {
+    const SM_t * instr = g_emit.instr;
+    FILE *       out   = g_emit.out;
     if (IS_X86) return emit_sm_jump_line(out, instr, 0);
     int target = (int)instr->a[0].i;
     if (IS_JVM) {
-        const char * end_lbl = ctx->in_body ? "sm_pc_body_end" : "sm_pc_fn_end";
-        if (target >= 0 && target < ctx->n && ctx->in_my_method && ctx->in_my_method[target])
+        const char * end_lbl = g_emit.in_body ? "sm_pc_body_end" : "sm_pc_fn_end";
+        if (target >= 0 && target < g_emit.n && g_emit.in_my_method && g_emit.in_my_method[target])
             fprintf(out, "    goto_w sm_pc_%d\n", target);
-        else if (target >= 0 && target < ctx->n) {
+        else if (target >= 0 && target < g_emit.n) {
             fprintf(out, "    invokestatic rt/SnoRt/halt_tos()V\n");
             fprintf(out, "    iconst_0\n    invokestatic java/lang/System/exit(I)V\n");
             fprintf(out, "    return\n");
@@ -21,16 +25,18 @@ int sm_jump(const SM_t * instr, const sm_ctx_t * ctx, FILE * out) {
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_jump_s(const SM_t * instr, const sm_ctx_t * ctx, FILE * out) {
+int sm_jump_s(void) {
+    const SM_t * instr = g_emit.instr;
+    FILE *       out   = g_emit.out;
     if (IS_X86) return emit_sm_jump_s_line(out, instr, 0);
-    int target = (int)instr->a[0].i; int i = ctx->i;
+    int target = (int)instr->a[0].i; int i = g_emit.i;
     if (IS_JVM) {
-        if (target >= 0 && target < ctx->n && ctx->in_my_method && ctx->in_my_method[target]) {
+        if (target >= 0 && target < g_emit.n && g_emit.in_my_method && g_emit.in_my_method[target]) {
             fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n");
             fprintf(out, "    ifeq sm_pc_%d_skip\n", i);
             fprintf(out, "    goto_w sm_pc_%d\n", target);
             fprintf(out, "sm_pc_%d_skip:\n", i);
-        } else if (target >= 0 && target < ctx->n) {
+        } else if (target >= 0 && target < g_emit.n) {
             fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n");
             fprintf(out, "    ifeq sm_pc_%d_skip\n", i);
             fprintf(out, "    invokestatic rt/SnoRt/halt_tos()V\n");
@@ -45,16 +51,18 @@ int sm_jump_s(const SM_t * instr, const sm_ctx_t * ctx, FILE * out) {
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_jump_f(const SM_t * instr, const sm_ctx_t * ctx, FILE * out) {
+int sm_jump_f(void) {
+    const SM_t * instr = g_emit.instr;
+    FILE *       out   = g_emit.out;
     if (IS_X86) return emit_sm_jump_f_line(out, instr, 0);
-    int target = (int)instr->a[0].i; int i = ctx->i;
+    int target = (int)instr->a[0].i; int i = g_emit.i;
     if (IS_JVM) {
-        if (target >= 0 && target < ctx->n && ctx->in_my_method && ctx->in_my_method[target]) {
+        if (target >= 0 && target < g_emit.n && g_emit.in_my_method && g_emit.in_my_method[target]) {
             fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n");
             fprintf(out, "    ifne sm_pc_%d_skip\n", i);
             fprintf(out, "    goto_w sm_pc_%d\n", target);
             fprintf(out, "sm_pc_%d_skip:\n", i);
-        } else if (target >= 0 && target < ctx->n) {
+        } else if (target >= 0 && target < g_emit.n) {
             fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n");
             fprintf(out, "    ifne sm_pc_%d_skip\n", i);
             fprintf(out, "    invokestatic rt/SnoRt/halt_tos()V\n");

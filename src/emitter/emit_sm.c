@@ -1,4 +1,5 @@
 #include "emit_sm.h"
+#include "emit_globals.h"
 #include "emit_templates.h"
 #include "emit_form.h"
 #include "SM_templates/sm_templates.h"
@@ -2026,7 +2027,7 @@ int emit_sm_lcomp_dispatch(FILE *out, const SM_t *ins, int pc)
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* EC-UNI-2b: public shim for SM_template fn sm_stno — calls the static dispatcher with NULL SrcLines.
- * EC-UNI-3 will route SrcLines through emit_sm_dispatch via a file-scope static (or sm_ctx_t extension). */
+ * EC-UNI-3 will route SrcLines through emit_sm_dispatch via g_emit.srclines (EC-UNI-10(a) added that field). */
 int emit_sm_stno_template(FILE *out, const SM_t *ins)
 {
     return emit_sm_stno_dispatch(out, ins, 0, NULL);
@@ -2920,7 +2921,9 @@ static int dispatch_one_x86(FILE *out, const SM_t *ins, int pc) {
     /* Templates dispatch on IS_X86; make sure mode is set. Legacy path relies on individual
      * dispatchers calling emitter_init_text — we have to ensure it for the very first opcode too. */
     emit_mode_set(TEXT_MODE(), out);
-    sm_ctx_t ctx = { 0 }; ctx.i = pc;
+    /* EC-UNI-10(b): set g_emit per-call.  Sidecars (in_my_method, pc_to_fn etc.) are unused by
+     * the x86 arms of the 7 ctx-bearing templates; only g_emit.i/instr/out matter for this path. */
+    g_emit.i = pc; g_emit.instr = ins; g_emit.out = out;
     switch ((int)ins->op) {
         /* sm_push_pop_lits.c */
         case SM_PUSH_LIT_I:        sm_push_lit_i(ins, out);    return 0;
@@ -2945,20 +2948,20 @@ static int dispatch_one_x86(FILE *out, const SM_t *ins, int pc) {
         case SM_STNO:              sm_stno(ins, out);          return 0;
         case SM_ACOMP:             sm_acomp(ins, out);         return 0;
         case SM_LCOMP:             sm_lcomp(ins, out);         return 0;
-        /* sm_control.c */
-        case SM_JUMP:              (void)sm_jump(ins, &ctx, out);    return 0;
-        case SM_JUMP_S:            (void)sm_jump_s(ins, &ctx, out);  return 0;
-        case SM_JUMP_F:            (void)sm_jump_f(ins, &ctx, out);  return 0;
-        case SM_HALT:              (void)sm_halt(ins, &ctx, out);    return 0;
-        case SM_RETURN:            (void)sm_return(ins, &ctx, out);  return 0;
+        /* sm_control.c — EC-UNI-10(b): parameterless, read g_emit */
+        case SM_JUMP:              (void)sm_jump();    return 0;
+        case SM_JUMP_S:            (void)sm_jump_s();  return 0;
+        case SM_JUMP_F:            (void)sm_jump_f();  return 0;
+        case SM_HALT:              (void)sm_halt();    return 0;
+        case SM_RETURN:            (void)sm_return();  return 0;
         case SM_FRETURN:
         case SM_RETURN_S:
         case SM_RETURN_F:
         case SM_FRETURN_S:
-        case SM_FRETURN_F:         (void)sm_freturn(ins, &ctx, out); return 0;
+        case SM_FRETURN_F:         (void)sm_freturn(); return 0;
         case SM_NRETURN:
         case SM_NRETURN_S:
-        case SM_NRETURN_F:         (void)sm_nreturn(ins, &ctx, out); return 0;
+        case SM_NRETURN_F:         (void)sm_nreturn(); return 0;
         /* sm_pat.c — pat opcodes + exec_stmt */
         case SM_PAT_LIT:           sm_pat_lit(ins, out);                return 0;
         case SM_PAT_ANY:           sm_pat_any_i(ins, pc, out);          return 0;

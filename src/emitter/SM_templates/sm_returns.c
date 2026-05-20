@@ -1,11 +1,15 @@
 #include "sm_template_common.h"
+#include "emit_globals.h"
 #include "emit_sm.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_return(const SM_t * instr, const sm_ctx_t * ctx, FILE * out) {
+/* EC-UNI-10(b): parameterless; reads g_emit.instr / g_emit.i / g_emit.n / g_emit.pc_to_fn / g_emit.fn_names / g_emit.out. */
+int sm_return(void) {
+    const SM_t * instr = g_emit.instr;
+    FILE *       out   = g_emit.out;
     if (IS_X86) return emit_sm_return_template(out, instr);
-    int op = (int)instr->op, i = ctx->i;
+    int op = (int)instr->op, i = g_emit.i;
     if (IS_JVM) {
-        jvm_ret_guard(SM_RETURN_S, SM_RETURN_F, op, i, "rs", out);
+        jvm_ret_guard(SM_RETURN_S, SM_RETURN_F, op, "rs");
         jvm_push_int2(out, 0); jvm_push_int2(out, 1);
         fprintf(out, "    invokestatic rt/SnoRt/do_return(II)I\n    pop\n");
         fprintf(out, "    invokestatic rt/SnoRt/fn_return_push()V\n    return\n");
@@ -19,9 +23,9 @@ int sm_return(const SM_t * instr, const sm_ctx_t * ctx, FILE * out) {
         if (op == SM_RETURN_F) { fprintf(out, "{ let _r = rt.fn_return(0, 2); if (_r === -1) { _pc = %d; continue; } if (_r === -2) { break loop; } _pc = _r; continue; } ", i + 1); return 1; }
     }
     if (IS_NET) {
-        int fk = (i >= 0 && i < ctx->n && ctx->pc_to_fn) ? ctx->pc_to_fn[i] : -1;
-        const char * fname = (fk >= 0 && ctx->fn_names) ? ctx->fn_names[fk] : NULL;
-        net_ret_guard(SM_RETURN_S, SM_RETURN_F, op, i, out);
+        int fk = (i >= 0 && i < g_emit.n && g_emit.pc_to_fn) ? g_emit.pc_to_fn[i] : -1;
+        const char * fname = (fk >= 0 && g_emit.fn_names) ? g_emit.fn_names[fk] : NULL;
+        net_ret_guard(SM_RETURN_S, SM_RETURN_F, op);
         if (fname) { net_escape_ldstr(out, fname); fprintf(out, "    call       void SnoRt::push_var(string)\n"); }
         else fprintf(out, "    call       void SnoRt::push_null()\n");
         fprintf(out, "    call       void SnoRt::frame_exit()\n");
@@ -37,11 +41,13 @@ int sm_return(const SM_t * instr, const sm_ctx_t * ctx, FILE * out) {
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_freturn(const SM_t * instr, const sm_ctx_t * ctx, FILE * out) {
+int sm_freturn(void) {
+    const SM_t * instr = g_emit.instr;
+    FILE *       out   = g_emit.out;
     if (IS_X86) return emit_sm_return_template(out, instr);
-    int op = (int)instr->op, i = ctx->i;
+    int op = (int)instr->op, i = g_emit.i;
     if (IS_JVM) {
-        jvm_ret_guard(SM_FRETURN_S, SM_FRETURN_F, op, i, "fs", out);
+        jvm_ret_guard(SM_FRETURN_S, SM_FRETURN_F, op, "fs");
         jvm_push_int2(out, 1); jvm_push_int2(out, 0);
         fprintf(out, "    invokestatic rt/SnoRt/do_return(II)I\n    pop\n");
         fprintf(out, "    invokestatic rt/SnoRt/fn_return_push()V\n    return\n");
@@ -55,7 +61,7 @@ int sm_freturn(const SM_t * instr, const sm_ctx_t * ctx, FILE * out) {
         if (op == SM_FRETURN_F) { fprintf(out, "{ let _r = rt.fn_return(1, 2); if (_r === -1) { _pc = %d; continue; } if (_r === -2) { break loop; } _pc = _r; continue; } ", i + 1); return 1; }
     }
     if (IS_NET) {
-        net_ret_guard(SM_FRETURN_S, SM_FRETURN_F, op, i, out);
+        net_ret_guard(SM_FRETURN_S, SM_FRETURN_F, op);
         fprintf(out, "    call       void SnoRt::push_null()\n    call       void SnoRt::frame_exit()\n");
         net_push_i4(out, 1); net_push_i4(out, 0);
         fprintf(out, "    call       void SnoRt::do_return(int32, bool)\n    call       int32 SnoRt::pop_ret_pc()\n    stloc      _pc\n    br         NET_DISPATCH\n");
@@ -69,11 +75,13 @@ int sm_freturn(const SM_t * instr, const sm_ctx_t * ctx, FILE * out) {
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_nreturn(const SM_t * instr, const sm_ctx_t * ctx, FILE * out) {
+int sm_nreturn(void) {
+    const SM_t * instr = g_emit.instr;
+    FILE *       out   = g_emit.out;
     if (IS_X86) return emit_sm_return_template(out, instr);
-    int op = (int)instr->op, i = ctx->i;
+    int op = (int)instr->op, i = g_emit.i;
     if (IS_JVM) {
-        jvm_ret_guard(SM_NRETURN_S, SM_NRETURN_F, op, i, "ns", out);
+        jvm_ret_guard(SM_NRETURN_S, SM_NRETURN_F, op, "ns");
         jvm_push_int2(out, 2); jvm_push_int2(out, 0);
         fprintf(out, "    invokestatic rt/SnoRt/do_return(II)I\n    pop\n");
         fprintf(out, "    invokestatic rt/SnoRt/fn_return_push()V\n    return\n");
@@ -87,9 +95,9 @@ int sm_nreturn(const SM_t * instr, const sm_ctx_t * ctx, FILE * out) {
         if (op == SM_NRETURN_F) { fprintf(out, "{ let _r = rt.fn_return(2, 2); if (_r === -1) { _pc = %d; continue; } if (_r === -2) { break loop; } _pc = _r; continue; } ", i + 1); return 1; }
     }
     if (IS_NET) {
-        int fk = (i >= 0 && i < ctx->n && ctx->pc_to_fn) ? ctx->pc_to_fn[i] : -1;
-        const char * fname = (fk >= 0 && ctx->fn_names) ? ctx->fn_names[fk] : NULL;
-        net_ret_guard(SM_NRETURN_S, SM_NRETURN_F, op, i, out);
+        int fk = (i >= 0 && i < g_emit.n && g_emit.pc_to_fn) ? g_emit.pc_to_fn[i] : -1;
+        const char * fname = (fk >= 0 && g_emit.fn_names) ? g_emit.fn_names[fk] : NULL;
+        net_ret_guard(SM_NRETURN_S, SM_NRETURN_F, op);
         if (fname) { net_escape_ldstr(out, fname); fprintf(out, "    call       void SnoRt::push_var(string)\n"); }
         else fprintf(out, "    call       void SnoRt::push_null()\n");
         fprintf(out, "    call       void SnoRt::frame_exit()\n");

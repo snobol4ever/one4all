@@ -4,7 +4,7 @@
 #pragma once
 #include "emit_core.h"
 #include "SM.h"
-#include "sm_ctx.h"
+#include "emit_globals.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -23,15 +23,23 @@ int wasm_intern_name(const char * s);
 /* EC-UNI-8.1: shared inline helpers, moved from per-family-file `static` to
  * `static inline` so each per-opcode split TU can use them without an external
  * link symbol. Each helper takes its own copy in every TU that uses it (zero
- * extra symbols at link time, zero behavioural change). */
+ * extra symbols at link time, zero behavioural change).
+ *
+ * EC-UNI-10(b): Layer-2 ret-guard helpers now read from g_emit; `op` and `sfx`
+ * stay as parameters because they vary per call site (multiple op-variants
+ * share one helper). */
 
-/* JVM last_ok guard for _S/_F return variants (was static in sm_control.c). */
-static inline void jvm_ret_guard(int op_s, int op_f, int op, int i, const char * sfx, FILE * out) {
+/* JVM last_ok guard for _S/_F return variants. */
+static inline void jvm_ret_guard(int op_s, int op_f, int op, const char * sfx) {
+    FILE * out = g_emit.out;
+    int i = g_emit.i;
     if (op == op_s) { fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n    ifeq sm_pc_%d_%s_skip\n", i, sfx); }
     if (op == op_f) { fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n    ifne sm_pc_%d_%s_skip\n", i, sfx); }
 }
-/* NET last_ok guard for _S/_F return variants (was static in sm_control.c). */
-static inline void net_ret_guard(int op_s, int op_f, int op, int i, FILE * out) {
+/* NET last_ok guard for _S/_F return variants. */
+static inline void net_ret_guard(int op_s, int op_f, int op) {
+    FILE * out = g_emit.out;
+    int i = g_emit.i;
     if (op == op_s) { fprintf(out, "    call       bool SnoRt::last_ok()\n    brfalse    NET_L%d\n", i + 1); }
     if (op == op_f) { fprintf(out, "    call       bool SnoRt::last_ok()\n    brtrue     NET_L%d\n",  i + 1); }
 }

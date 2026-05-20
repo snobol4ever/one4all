@@ -1497,7 +1497,9 @@ static int emit_wasm_from_sm(SM_sequence_t * sm, FILE * out) {
     for (int i = 0; i < n; i++) {
         SM_t * ins = &sm->instrs[i];
         int has_jump = 0;
-        sm_ctx_t ctx = {i, n, 0, NULL, NULL, NULL, 0};
+        g_emit.i = i; g_emit.n = n; g_emit.instr = ins;
+        g_emit.in_body = 0; g_emit.in_my_method = NULL;
+        g_emit.pc_to_fn = NULL; g_emit.fn_names = NULL; g_emit.fn_count = 0;
         fprintf(out, "        (if (i32.eq (local.get $pc) (i32.const %d)) (then\n", i);
         switch (ins->op) {
         case SM_STNO:                                    sm_stno(ins, out);                       break;
@@ -1522,13 +1524,13 @@ static int emit_wasm_from_sm(SM_sequence_t * sm, FILE * out) {
         case SM_ACOMP:                                   sm_acomp(ins, out);                      break;
         case SM_INCR:                                    sm_add(ins, out);                        break;
         case SM_DECR:                                    sm_sub(ins, out);                        break;
-        case SM_HALT:         has_jump = sm_halt(ins, &ctx, out);                                 break;
-        case SM_JUMP:         has_jump = sm_jump(ins, &ctx, out);                                 break;
-        case SM_JUMP_S:       has_jump = sm_jump_s(ins, &ctx, out);                              break;
-        case SM_JUMP_F:       has_jump = sm_jump_f(ins, &ctx, out);                              break;
-        case SM_RETURN:   case SM_RETURN_S:   case SM_RETURN_F:   has_jump = sm_return(ins, &ctx, out);  break;
-        case SM_FRETURN:  case SM_FRETURN_S:  case SM_FRETURN_F:  has_jump = sm_freturn(ins, &ctx, out); break;
-        case SM_NRETURN:  case SM_NRETURN_S:  case SM_NRETURN_F:  has_jump = sm_nreturn(ins, &ctx, out); break;
+        case SM_HALT:         has_jump = sm_halt();                                               break;
+        case SM_JUMP:         has_jump = sm_jump();                                               break;
+        case SM_JUMP_S:       has_jump = sm_jump_s();                                             break;
+        case SM_JUMP_F:       has_jump = sm_jump_f();                                             break;
+        case SM_RETURN:   case SM_RETURN_S:   case SM_RETURN_F:   has_jump = sm_return();    break;
+        case SM_FRETURN:  case SM_FRETURN_S:  case SM_FRETURN_F:  has_jump = sm_freturn();   break;
+        case SM_NRETURN:  case SM_NRETURN_S:  case SM_NRETURN_F:  has_jump = sm_nreturn();   break;
         case SM_PAT_LIT:                                 sm_pat_lit(ins, out);                    break;
         case SM_PAT_ANY:                                 sm_pat_any_i(ins, i, out);               break;
         case SM_PAT_NOTANY:                              sm_pat_notany(ins, i, out);               break;
@@ -1794,6 +1796,9 @@ void bb_walk(BB_graph_t * cfg, void (*visit)(BB_t *, void *), void * ctx) {
 /* EC-5: emit_jvm_from_sm — moved from emit_jvm.c (method-split SM walk). */
 static void emit_jvm_one_instr(SM_sequence_t * sm, int i, int n, const char ** fn_names, const int * fn_pcs, int fn_count, int in_body, const char * in_my_method, FILE * out) {
     SM_t * instr = &sm->instrs[i];
+    g_emit.i = i; g_emit.n = n; g_emit.instr = instr;
+    g_emit.in_body = in_body; g_emit.in_my_method = in_my_method;
+    g_emit.pc_to_fn = NULL; g_emit.fn_names = fn_names; g_emit.fn_count = fn_count;
     switch (instr->op) {
     case SM_LABEL: break;
     case SM_STNO:  sm_stno(instr, out); break;
@@ -1815,9 +1820,9 @@ static void emit_jvm_one_instr(SM_sequence_t * sm, int i, int n, const char ** f
     case SM_MOD:       sm_mod(instr, out); break;
     case SM_ACOMP:     sm_acomp(instr, out); break;
     case SM_LCOMP:     sm_lcomp(instr, out); break;
-    case SM_JUMP:   { sm_ctx_t ctx = {i, n, in_body, in_my_method}; sm_jump(instr, &ctx, out); break; }
-    case SM_JUMP_S: { sm_ctx_t ctx = {i, n, in_body, in_my_method}; sm_jump_s(instr, &ctx, out); break; }
-    case SM_JUMP_F: { sm_ctx_t ctx = {i, n, in_body, in_my_method}; sm_jump_f(instr, &ctx, out); break; }
+    case SM_JUMP:   { sm_jump();   break; }
+    case SM_JUMP_S: { sm_jump_s(); break; }
+    case SM_JUMP_F: { sm_jump_f(); break; }
     case SM_CALL_FN: case SM_SUSPEND_VALUE: {
         const char * cname = instr->a[0].s ? instr->a[0].s : "";
         if (!cname[0]) {
@@ -1838,11 +1843,11 @@ static void emit_jvm_one_instr(SM_sequence_t * sm, int i, int n, const char ** f
         }
         break;
     }
-    case SM_RETURN:   case SM_RETURN_S:  case SM_RETURN_F:  { sm_ctx_t ctx = {i}; sm_return(instr, &ctx, out); break; }
-    case SM_FRETURN:  case SM_FRETURN_S: case SM_FRETURN_F: { sm_ctx_t ctx = {i}; sm_freturn(instr, &ctx, out); break; }
-    case SM_NRETURN:  case SM_NRETURN_S: case SM_NRETURN_F: { sm_ctx_t ctx = {i}; sm_nreturn(instr, &ctx, out); break; }
+    case SM_RETURN:   case SM_RETURN_S:  case SM_RETURN_F:  { sm_return();  break; }
+    case SM_FRETURN:  case SM_FRETURN_S: case SM_FRETURN_F: { sm_freturn(); break; }
+    case SM_NRETURN:  case SM_NRETURN_S: case SM_NRETURN_F: { sm_nreturn(); break; }
     case SM_DEFINE_ENTRY: case SM_DEFINE: break;
-    case SM_HALT: { sm_ctx_t ctx = {i, n, in_body, in_my_method}; sm_halt(instr, &ctx, out); break; }
+    case SM_HALT: { sm_halt(); break; }
     case SM_PAT_LIT:             sm_pat_lit(instr, out); break;
     case SM_PAT_ANY:             sm_pat_any_i(instr, i, out); break;
     case SM_PAT_NOTANY:          sm_pat_notany(instr, i, out); break;
@@ -1961,6 +1966,9 @@ static int emit_js_from_sm(SM_sequence_t * sm, FILE * out) {
     if (!sm || !out || sm->count == 0) return 0;
     for (int i = 0; i < sm->count; i++) {
         SM_t * instr = &sm->instrs[i];
+        g_emit.i = i; g_emit.n = sm->count; g_emit.instr = instr;
+        g_emit.in_body = 0; g_emit.in_my_method = NULL;
+        g_emit.pc_to_fn = NULL; g_emit.fn_names = NULL; g_emit.fn_count = 0;
         fprintf(out, "case %d: ", i);
         int has_continue = 0;
         switch (instr->op) {
@@ -1982,10 +1990,10 @@ static int emit_js_from_sm(SM_sequence_t * sm, FILE * out) {
         case SM_NEG:               sm_neg(instr, out); break;
         case SM_COERCE_NUM:        sm_coerce_num(instr, out); break;
         case SM_EXP:               sm_exp(instr, out); break;
-        case SM_HALT:   { sm_ctx_t ctx = {i, sm->count, 0, NULL}; has_continue |= sm_halt(instr, &ctx, out); break; }
-        case SM_JUMP:   { sm_ctx_t ctx = {i, sm->count, 0, NULL}; has_continue |= sm_jump(instr, &ctx, out); break; }
-        case SM_JUMP_S: { sm_ctx_t ctx = {i, sm->count, 0, NULL}; has_continue |= sm_jump_s(instr, &ctx, out); break; }
-        case SM_JUMP_F: { sm_ctx_t ctx = {i, sm->count, 0, NULL}; has_continue |= sm_jump_f(instr, &ctx, out); break; }
+        case SM_HALT:   { has_continue |= sm_halt();   break; }
+        case SM_JUMP:   { has_continue |= sm_jump();   break; }
+        case SM_JUMP_S: { has_continue |= sm_jump_s(); break; }
+        case SM_JUMP_F: { has_continue |= sm_jump_f(); break; }
         case SM_SUSPEND_VALUE:
             fprintf(out, "{ let _r = rt.call_or_jump("); js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
             fprintf(out, ", %lld, %d); if (_r >= 0) { _pc = _r; continue; } } ", instr->a[1].i, i + 1);
@@ -1993,9 +2001,9 @@ static int emit_js_from_sm(SM_sequence_t * sm, FILE * out) {
         case SM_CALL_FN:
             fprintf(out, "{ let _r = rt.call_or_jump("); js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
             fprintf(out, ", %lld, %d); if (_r >= 0) { _pc = _r; continue; } } ", instr->a[1].i, i + 1); break;
-        case SM_RETURN:   case SM_RETURN_S:  case SM_RETURN_F:  { sm_ctx_t ctx = {i}; has_continue |= sm_return(instr, &ctx, out); break; }
-        case SM_FRETURN:  case SM_FRETURN_S: case SM_FRETURN_F: { sm_ctx_t ctx = {i}; has_continue |= sm_freturn(instr, &ctx, out); break; }
-        case SM_NRETURN:  case SM_NRETURN_S: case SM_NRETURN_F: { sm_ctx_t ctx = {i}; has_continue |= sm_nreturn(instr, &ctx, out); break; }
+        case SM_RETURN:   case SM_RETURN_S:  case SM_RETURN_F:  { has_continue |= sm_return();  break; }
+        case SM_FRETURN:  case SM_FRETURN_S: case SM_FRETURN_F: { has_continue |= sm_freturn(); break; }
+        case SM_NRETURN:  case SM_NRETURN_S: case SM_NRETURN_F: { has_continue |= sm_nreturn(); break; }
         case SM_DEFINE_ENTRY: break;
         case SM_PUSH_EXPRESSION: fprintf(out, "rt.push_null(); "); break;
         case SM_PAT_LIT:             sm_pat_lit(instr, out); break;
@@ -2084,6 +2092,9 @@ static int emit_net_from_sm(SM_sequence_t * sm, FILE * out) {
     fprintf(out, ")\n    br         NET_DONE\n");
     for (int i = 0; i < n; i++) {
         SM_t * instr = &sm->instrs[i];
+        g_emit.i = i; g_emit.n = n; g_emit.instr = instr;
+        g_emit.in_body = 0; g_emit.in_my_method = NULL;
+        g_emit.pc_to_fn = pc_to_fn; g_emit.fn_names = fn_names; g_emit.fn_count = fn_count;
         fprintf(out, "  NET_L%d:\n", i);
         int has_continue = 0;
         switch (instr->op) {
@@ -2106,7 +2117,7 @@ static int emit_net_from_sm(SM_sequence_t * sm, FILE * out) {
         case SM_MOD:        sm_mod(instr, out); break;
         case SM_ACOMP:      sm_acomp(instr, out); break;
         case SM_LCOMP:      sm_lcomp(instr, out); break;
-        case SM_HALT:   { sm_ctx_t ctx = {i, n, 0, NULL}; has_continue |= sm_halt(instr, &ctx, out); break; }
+        case SM_HALT:   { has_continue |= sm_halt(); break; }
         case SM_LABEL:
             if (instr->a[2].i && instr->a[0].s) {
                 int k = -1;
@@ -2120,9 +2131,9 @@ static int emit_net_from_sm(SM_sequence_t * sm, FILE * out) {
                 }
             }
             break;
-        case SM_JUMP:   { sm_ctx_t ctx = {i, n, 0, NULL}; has_continue |= sm_jump(instr, &ctx, out); break; }
-        case SM_JUMP_S: { sm_ctx_t ctx = {i, n, 0, NULL}; has_continue |= sm_jump_s(instr, &ctx, out); break; }
-        case SM_JUMP_F: { sm_ctx_t ctx = {i, n, 0, NULL}; has_continue |= sm_jump_f(instr, &ctx, out); break; }
+        case SM_JUMP:   { has_continue |= sm_jump();   break; }
+        case SM_JUMP_S: { has_continue |= sm_jump_s(); break; }
+        case SM_JUMP_F: { has_continue |= sm_jump_f(); break; }
         case SM_SUSPEND_VALUE: case SM_CALL_FN: {
             const char * cname = instr->a[0].s ? instr->a[0].s : "";
             int entry_pc = -1;
@@ -2144,9 +2155,9 @@ static int emit_net_from_sm(SM_sequence_t * sm, FILE * out) {
             }
             break;
         }
-        case SM_RETURN:  case SM_RETURN_S:  case SM_RETURN_F:  { sm_ctx_t ctx = {i, n, 0, NULL, pc_to_fn, fn_names, fn_count}; has_continue |= sm_return(instr, &ctx, out); break; }
-        case SM_FRETURN: case SM_FRETURN_S: case SM_FRETURN_F: { sm_ctx_t ctx = {i, n, 0, NULL, pc_to_fn, fn_names, fn_count}; has_continue |= sm_freturn(instr, &ctx, out); break; }
-        case SM_NRETURN: case SM_NRETURN_S: case SM_NRETURN_F: { sm_ctx_t ctx = {i, n, 0, NULL, pc_to_fn, fn_names, fn_count}; has_continue |= sm_nreturn(instr, &ctx, out); break; }
+        case SM_RETURN:  case SM_RETURN_S:  case SM_RETURN_F:  { has_continue |= sm_return();  break; }
+        case SM_FRETURN: case SM_FRETURN_S: case SM_FRETURN_F: { has_continue |= sm_freturn(); break; }
+        case SM_NRETURN: case SM_NRETURN_S: case SM_NRETURN_F: { has_continue |= sm_nreturn(); break; }
         case SM_DEFINE_ENTRY: case SM_DEFINE: case SM_EXEC_STMT: {
             int has_repl = (int)instr->a[1].i; const char * subj_name = instr->a[0].s ? instr->a[0].s : "";
             if (has_repl) fprintf(out, "    pop\n");

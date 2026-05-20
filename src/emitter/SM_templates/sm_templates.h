@@ -6,7 +6,6 @@
    correspond to physical files. */
 #pragma once
 #include "emit_core.h"
-#include "SM_templates/sm_ctx.h"
 #include "SM.h"
 /* group: push/pop literals & variables */
 void sm_push_lit_i(const SM_t * instr, FILE * out);
@@ -30,14 +29,14 @@ void sm_mod       (const SM_t * instr, FILE * out);
 void sm_stno      (const SM_t * instr, FILE * out);
 void sm_acomp     (const SM_t * instr, FILE * out);
 void sm_lcomp     (const SM_t * instr, FILE * out);
-/* group: control flow (jump/halt/return) */
-int  sm_jump      (const SM_t * instr, const sm_ctx_t * ctx, FILE * out);
-int  sm_jump_s    (const SM_t * instr, const sm_ctx_t * ctx, FILE * out);
-int  sm_jump_f    (const SM_t * instr, const sm_ctx_t * ctx, FILE * out);
-int  sm_halt      (const SM_t * instr, const sm_ctx_t * ctx, FILE * out);
-int  sm_return    (const SM_t * instr, const sm_ctx_t * ctx, FILE * out);
-int  sm_freturn   (const SM_t * instr, const sm_ctx_t * ctx, FILE * out);
-int  sm_nreturn   (const SM_t * instr, const sm_ctx_t * ctx, FILE * out);
+/* group: control flow (jump/halt/return) — EC-UNI-10(b): parameterless, read from g_emit */
+int  sm_jump      (void);
+int  sm_jump_s    (void);
+int  sm_jump_f    (void);
+int  sm_halt      (void);
+int  sm_return    (void);
+int  sm_freturn   (void);
+int  sm_nreturn   (void);
 /* group: SM_PAT_* + SM_EXEC_STMT */
 void sm_pat_lit          (const SM_t * instr, FILE * out);
 void sm_pat_any          (const SM_t * instr, FILE * out);
