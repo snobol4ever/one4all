@@ -341,10 +341,10 @@ int main(int argc, char **argv)
     g_opt_trace   = opt_trace;
     g_opt_dump_bb = dump_bb;
     if (dump_sm && !mode_interp) {
-        SM_sequence_t *sm0 = lower(ast_prog);
-        if (!sm0) { fprintf(stderr, "scrip: sm_lower failed\n"); return 1; }
-        sm_seq_print(sm0, stdout);
-        SM_seq_free(sm0);
+        stage2_t *s2 = lower(ast_prog);
+        if (!s2) { fprintf(stderr, "scrip: sm_lower failed\n"); return 1; }
+        sm_seq_print(&s2->sm, stdout);
+        /* g_stage2 is global; no free */
         return 0;
     }
     if (dump_sno) {
@@ -362,14 +362,15 @@ int main(int argc, char **argv)
     if (mode_compile_x86) {
         g_emit_inline = 0;
         g_bb_emit_format  = opt_bb_format;
-        SM_sequence_t *sm = sm_preamble(ast_prog);
-        if (!sm) return 1;
+        stage2_t *s2 = sm_preamble(ast_prog);
+        if (!s2) return 1;
+        SM_sequence_t *sm = &s2->sm;
         if (sm_codegen_text(sm, stdout, input_path) != 0) {
             fprintf(stderr, "scrip: sm_codegen_text failed\n");
-            SM_seq_free(sm);
+            /* g_stage2 is global; no free */
             return 1;
         }
-        SM_seq_free(sm);
+        /* g_stage2 is global; no free */
         return 0;
     }
     if (mode_compile && target_name && strcmp(target_name, "x86") != 0) {
@@ -405,39 +406,41 @@ int main(int argc, char **argv)
         }
         return 0;
     } else if (mode_interp) {
-        SM_sequence_t *sm = sm_preamble(ast_prog);
-        if (!sm) return 1;
+        stage2_t *s2 = sm_preamble(ast_prog);
+        if (!s2) return 1;
+        SM_sequence_t *sm = &s2->sm;
         if (dump_sm) {
             sm_seq_print(sm, stdout);
-            SM_seq_free(sm);
+            /* g_stage2 is global; no free */
             return 0;
         }
         sm_run_with_recovery(sm, sm_interp_run);
-        SM_seq_free(sm);
+        /* g_stage2 is global; no free */
     } else if (mode_run) {
-        SM_sequence_t *sm = sm_preamble(ast_prog);
-        if (!sm) return 1;
-        if (dump_sm) { sm_seq_print(sm, stdout); SM_seq_free(sm); return 0; }
+        stage2_t *s2 = sm_preamble(ast_prog);
+        if (!s2) return 1;
+        SM_sequence_t *sm = &s2->sm;
+        if (dump_sm) { sm_seq_print(sm, stdout); /* g_stage2 is global; no free */ return 0; }
         if (sm_image_init() != 0) {
             fprintf(stderr, "scrip: sm_image_init failed\n");
-            SM_seq_free(sm); return 1;
+            /* g_stage2 is global; no free */ return 1;
         }
         if (SM_codegen(sm) != 0) {
             fprintf(stderr, "scrip: SM_codegen failed\n");
-            SM_seq_free(sm); return 1;
+            /* g_stage2 is global; no free */ return 1;
         }
         sm_run_with_recovery(sm, sm_jit_run);
-        SM_seq_free(sm);
+        /* g_stage2 is global; no free */
     } else if (has_non_sno) {
-        SM_sequence_t *sm = sm_preamble(ast_prog);
-        if (!sm) return 1;
-        sm_run_with_recovery(sm, sm_interp_run);
-        SM_seq_free(sm);
+        stage2_t *s2 = sm_preamble(ast_prog);
+        if (!s2) return 1;
+        sm_run_with_recovery(&s2->sm, sm_interp_run);
+        /* g_stage2 is global; no free */
     } else {
-        SM_sequence_t *sm = sm_preamble(ast_prog);
-        if (!sm) return 1;
-        sm_run_with_recovery(sm, sm_interp_run);
-        SM_seq_free(sm);
+        stage2_t *s2 = sm_preamble(ast_prog);
+        if (!s2) return 1;
+        sm_run_with_recovery(&s2->sm, sm_interp_run);
+        /* g_stage2 is global; no free */
     }
     if (opt_bench) {
         clock_gettime(CLOCK_MONOTONIC, &_t3);

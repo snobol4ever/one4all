@@ -45,10 +45,10 @@ static void sm_resolve_proc_entry_pcs(SM_sequence_t *p)
                 pl_total, pl_resolved);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-SM_sequence_t *sm_preamble(const tree_t *ast_prog){
+stage2_t *sm_preamble(const tree_t *ast_prog){
     g_sno_err_active = 1;
-    SM_sequence_t *sm = lower(ast_prog);
-    if (!sm) {
+    stage2_t *s2 = lower(ast_prog);
+    if (!s2) {
         fprintf(stderr, "scrip: sm_lower failed\n");
         return NULL;
     }
@@ -56,9 +56,8 @@ SM_sequence_t *sm_preamble(const tree_t *ast_prog){
         extern int g_lang;
         g_lang = LANG_ICN;
     }
-    sm_resolve_proc_entry_pcs(sm);
-    g_current_SM_seq = sm;
-    return sm;
+    sm_resolve_proc_entry_pcs(&s2->sm);
+    return s2;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void sm_run_with_recovery(SM_sequence_t *sm, sm_runner_fn runner)

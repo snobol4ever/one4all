@@ -1,9 +1,11 @@
 #include "interp_private.h"
-LabelEntry label_table[LABEL_MAX];
-int label_count = 0;
+/* ST2-1: label_table[] and label_count storage moved to stage2_t.  Legacy
+ * names in this file refer to the active stage2_t via the macros declared
+ * in interp_private.h.  label_table_build now takes the stage2 explicitly. */
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void label_table_build(const tree_t *prog)
+void label_table_build(stage2_t *s2, const tree_t *prog)
 {
+    (void)s2;
     label_count = 0;
     if (!prog) return;
     for (int i = 0; i < prog->n && label_count < LABEL_MAX; i++) {

@@ -8,14 +8,16 @@
 #include "bb_broker.h"
 #include "BB.h"
 #include "SM.h"
-#define PL_PRED_TABLE_SIZE_FWD 256
+#include "stage2.h"
+#define PL_PRED_TABLE_SIZE_FWD STAGE2_PL_PRED_TABLE_SIZE
 #define PL_SCOPE_SLOT_MAX       64
 #define PL_BB_TABLE_MAX       256
 typedef struct Pl_PredEntry_t {
     const char *key; tree_t *choice; struct Pl_PredEntry_t *next;
     int entry_pc;
 } Pl_PredEntry;
-typedef struct { Pl_PredEntry *buckets[PL_PRED_TABLE_SIZE_FWD]; } Pl_PredTable;
+/* Pl_PredTable is defined canonically in stage2.h.  Its single instance lives
+ * inside the active stage2_t (s2_pl_pred_table).  See reader shim below.    */
 typedef struct { const char *name; int slot; } PlScopeEnt;
 typedef struct { PlScopeEnt e[PL_SCOPE_SLOT_MAX]; int n; } PlScope;
 /* IR-CONSOLIDATE-DCG step 1: see icn_runtime.h for the parallel IcnProcEntry change. */
@@ -26,11 +28,13 @@ extern int             g_pl_bb_count;
 static inline BB_graph_t *bb_graph_of_pred(const Pl_PredEntry_BB *e)
 {
     if (!e) return NULL;
-    if (g_current_SM_seq && e->bb_idx >= 0 && e->bb_idx < g_current_SM_seq->bb_count)
-        return g_current_SM_seq->bb_table[e->bb_idx];
+    if (e->bb_idx >= 0 && e->bb_idx < g_stage2.sm.bb_count)
+        return g_stage2.sm.bb_table[e->bb_idx];
     return e->ir_body;
 }
-extern Pl_PredTable  g_pl_pred_table;
+/* ST2-1 reader shim: g_pl_pred_table redirects to g_stage2.
+ *   Deleted in ST2-1b once all readers take `stage2_t *s2` directly. */
+#define g_pl_pred_table  (g_stage2.pl_pred_table)
 extern Trail         g_pl_trail;
 extern int           g_pl_cut_flag;
 extern Term        **g_pl_env;

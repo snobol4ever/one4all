@@ -135,16 +135,19 @@ typedef struct {
     SM_op_t   op;
     SM_arg_t  a[SM_MAX_OPERANDS];
 } SM_t;
-typedef struct {
-    SM_t    *instrs;
-    int          count;
-    int          cap;
-    const char **stno_labels;
-    int          stno_labels_cap;
-    int          stno_count;
-    struct BB_graph_t **bb_table;
-    int          bb_count;
-    int          bb_cap;
+/* SM_sequence_t — the SM opcode array and what the array needs.
+ * This is the SM stream, nothing more.  The stage 2 handoff struct that
+ * carries it across the boundary to interp/emit lives in stage2.h.         */
+typedef struct SM_sequence_t {
+    SM_t                 *instrs;
+    int                   count;
+    int                   cap;
+    const char          **stno_labels;
+    int                   stno_labels_cap;
+    int                   stno_count;
+    struct BB_graph_t   **bb_table;
+    int                   bb_count;
+    int                   bb_cap;
 } SM_sequence_t;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 SM_sequence_t *SM_seq_new(void);
@@ -174,7 +177,7 @@ int SM_seq_bb_add(SM_sequence_t *p, struct BB_graph_t *cfg);
 int SM_label(SM_sequence_t *p);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int SM_label_named(SM_sequence_t *p, const char *name);
-extern SM_sequence_t *g_current_SM_seq;
+/* (&g_stage2) — see stage2.h (single declaration). */
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int SM_label_pc_lookup(const SM_sequence_t *p, const char *name);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/

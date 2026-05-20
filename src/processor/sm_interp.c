@@ -283,8 +283,6 @@ int sm_interp_run_inner(SM_sequence_t *prog, SM_State *st)
             val = NV_GET_fn(name);
             { extern int g_lang;
             if (g_lang == LANG_ICN && (val.v == DT_S || val.v == DT_SNUL)) {
-                extern int proc_count;
-                extern IcnProcEntry proc_table[];
                 for (int _pi = 0; _pi < proc_count; _pi++) {
                     if (proc_table[_pi].name && strcmp(proc_table[_pi].name, name) == 0) {
                         val.v    = DT_E;
@@ -615,7 +613,7 @@ int sm_interp_run_inner(SM_sequence_t *prog, SM_State *st)
             DESCR_t subj_d = sm_pop(st);
             DESCR_t pat_d  = sm_pop(st);
             const char *sname = ins->a[0].s;
-            BB_graph_t *pat_bb = (int)ins->a[2].i >= 0 ? g_current_SM_seq->bb_table[(int)ins->a[2].i] : NULL;
+            BB_graph_t *pat_bb = (int)ins->a[2].i >= 0 ? g_stage2.sm.bb_table[(int)ins->a[2].i] : NULL;
             int ok;
             if (pat_bb) {
                 ok = IR_exec_pat(pat_bb, sname, &subj_d,
@@ -764,7 +762,7 @@ int sm_interp_run_inner(SM_sequence_t *prog, SM_State *st)
             break;
         }
         case SM_EXEC_BB: {
-            BB_graph_t * cfg = g_current_SM_seq->bb_table[(int)ins->a[0].i];
+            BB_graph_t * cfg = g_stage2.sm.bb_table[(int)ins->a[0].i];
             DESCR_t _val;
             if (!cfg) { _val = FAILDESCR; }
             else if (ins->a[1].i == 0) { ins->a[1].i = 1; _val = bb_exec_once(cfg); }
@@ -775,7 +773,7 @@ int sm_interp_run_inner(SM_sequence_t *prog, SM_State *st)
             break;
         }
         case SM_PUMP_BB: {
-            BB_graph_t * cfg = g_current_SM_seq->bb_table[(int)ins->a[0].i];
+            BB_graph_t * cfg = g_stage2.sm.bb_table[(int)ins->a[0].i];
             int _ticks = cfg ? bb_exec_pump(cfg, NULL, NULL) : 0;
             st->last_ok = (_ticks > 0);
             sm_push(st, INTVAL(_ticks));
@@ -1318,9 +1316,7 @@ int sm_interp_run_inner(SM_sequence_t *prog, SM_State *st)
                     }
                 }
             }
-            if (name && g_current_SM_seq) {
-                extern int proc_count;
-                extern IcnProcEntry proc_table[];
+            if (name && 1) {
                 for (int _pi = 0; _pi < proc_count; _pi++) {
                     if (proc_table[_pi].entry_pc >= 0 &&
                         proc_table[_pi].name &&
@@ -1669,7 +1665,7 @@ extern jmp_buf     g_sno_err_jmp;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t sm_call_expression(int entry_pc)
 {
-    SM_sequence_t *prog = g_current_SM_seq;
+    SM_sequence_t *prog = &g_stage2.sm;
     if (!prog || entry_pc < 0 || entry_pc >= prog->count) {
         fprintf(stderr, "sm_call_expression: invalid entry_pc %d\n", entry_pc);
         return FAILDESCR;
@@ -1717,7 +1713,7 @@ GeneratorState *generator_state_new_proc(int pi, DESCR_t *args, int nargs)
 {
     if (pi < 0 || pi >= proc_count) return NULL;
     int entry_pc = proc_table[pi].entry_pc;
-    if (entry_pc < 0 || !g_current_SM_seq) return NULL;
+    if (entry_pc < 0 || 0) return NULL;
     if (frame_depth >= FRAME_STACK_MAX) return NULL;
     IcnFrame *f = &frame_stack[frame_depth++];
     memset(f, 0, sizeof *f);
@@ -1746,7 +1742,7 @@ GeneratorState *generator_state_new_proc(int pi, DESCR_t *args, int nargs)
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int bb_broker_drive_sm(GeneratorState *gs, void (*body_fn)(DESCR_t val, void *arg), void *arg)
 {
-    SM_sequence_t *prog = g_current_SM_seq;
+    SM_sequence_t *prog = &g_stage2.sm;
     if (!prog || !gs || gs->started == 2) return 0;
     int ticks = 0;
     for (;;) {
@@ -1780,7 +1776,7 @@ int bb_broker_drive_sm(GeneratorState *gs, void (*body_fn)(DESCR_t val, void *ar
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int bb_broker_drive_sm_one(GeneratorState *gs, DESCR_t *out)
 {
-    SM_sequence_t *prog = g_current_SM_seq;
+    SM_sequence_t *prog = &g_stage2.sm;
     if (!prog || !gs || gs->started == 2) { *out = FAILDESCR; return 0; }
     if (gs->saved_frame_depth > 0) frame_depth = gs->saved_frame_depth;
     SM_State *st = GC_malloc(sizeof(SM_State));

@@ -4,10 +4,10 @@
 #include "../../frontend/snobol4/scrip_cc.h"
 #include "../ast/ast.h"
 #include "../../runtime/interp/icn_runtime.h"
-typedef struct { char *name; int instr_idx; } LabelEntry;
+typedef struct { char *name; int instr_idx; } LabTabEntry;
 typedef struct { int jump_instr_idx; char *target_name; } PatchEntry;
 typedef struct {
-    LabelEntry *labels;  int nlabels,  labels_cap;
+    LabTabEntry *labels;  int nlabels,  labels_cap;
     PatchEntry *patches; int npatches, patches_cap;
 } LabelTable;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/

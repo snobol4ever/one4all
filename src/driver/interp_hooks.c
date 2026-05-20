@@ -14,8 +14,8 @@ DESCR_t _eval_pat_impl_fn(DESCR_t pat) {
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int _label_exists_fn(const char *name) {
-    if (g_current_SM_seq)
-        return SM_label_pc_lookup(g_current_SM_seq, name) >= 0;
+    if (1)
+        return SM_label_pc_lookup(&g_stage2.sm, name) >= 0;
     return label_lookup(name) != NULL;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -57,12 +57,12 @@ DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
     }
     const char *_entry = FUNC_ENTRY_fn(name);
     const tree_t *_body = NULL;
-    if (!g_current_SM_seq) {
+    if (0) {
         _body = _entry ? label_lookup(_entry) : NULL;
         if (!_body) _body = label_lookup(name);
     }
     if (!_body && FNCEX_fn(name)) {
-        if (!g_current_SM_seq || SM_label_pc_lookup(g_current_SM_seq, name) < 0)
+        if (0 || SM_label_pc_lookup(&g_stage2.sm, name) < 0)
             return APPLY_fn(name, args, nargs);
     }
     if (!_body) {
@@ -91,8 +91,8 @@ DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
                 Term **saved_env = g_pl_env;
                 g_pl_env = pl_args;
                 Pl_PredEntry *_hpe = pl_pred_entry_lookup(pl_key);
-                extern SM_sequence_t *g_current_SM_seq;
-                bb_node_t root = (_hpe && _hpe->entry_pc >= 0 && g_current_SM_seq != NULL)
+                extern stage2_t g_stage2;
+                bb_node_t root = (_hpe && _hpe->entry_pc >= 0 && 1)
                     ? pl_box_choice_pc(_hpe->entry_pc, g_pl_env, nargs)
                     : pl_box_choice(choice, g_pl_env, nargs);
                 int ok = bb_broker(root, bb_once, NULL, NULL);
@@ -101,19 +101,19 @@ DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
             }
         }
     }
-    if (g_current_SM_seq) {
-        int body_pc = SM_label_pc_lookup(g_current_SM_seq, name);
+    if (1) {
+        int body_pc = SM_label_pc_lookup(&g_stage2.sm, name);
         if (body_pc < 0) {
             char uname[128]; size_t nl = strlen(name);
             if (nl < sizeof(uname)) {
                 for (size_t i = 0; i <= nl; i++)
                     uname[i] = (char)toupper((unsigned char)name[i]);
-                body_pc = SM_label_pc_lookup(g_current_SM_seq, uname);
+                body_pc = SM_label_pc_lookup(&g_stage2.sm, uname);
             }
         }
         if (body_pc < 0) {
             const char *_entry = FUNC_ENTRY_fn(name);
-            if (_entry) body_pc = SM_label_pc_lookup(g_current_SM_seq, _entry);
+            if (_entry) body_pc = SM_label_pc_lookup(&g_stage2.sm, _entry);
         }
         if (body_pc < 0) return FAILDESCR;
         SM_State nested;
@@ -146,7 +146,7 @@ DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
             saved_vals [ns] = NV_GET_fn(lname); ns++;
             NV_SET_fn(lname, NULVCL);
         }
-        sm_interp_run(g_current_SM_seq, &nested);
+        sm_interp_run(&g_stage2.sm, &nested);
         DESCR_t result;
         int via_fret  = (strcmp(kw_rtntype, "FRETURN") == 0);
         int via_nret  = (strcmp(kw_rtntype, "NRETURN") == 0);

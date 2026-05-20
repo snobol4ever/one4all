@@ -181,7 +181,7 @@ BB_t * bb_exec_node(BB_t * nd) {
             if (!proc_table[_pi0].name || strcmp(proc_table[_pi0].name, nd->sval) != 0) continue;
             if (!proc_table[_pi0].is_generator) break;  /* fall through to builtins/standard path */
             if (bb_graph_of_proc(&proc_table[_pi0])) break;        /* let bb_graph path handle it (standard) */
-            if (proc_table[_pi0].entry_pc < 0 || !g_current_SM_seq) break;
+            if (proc_table[_pi0].entry_pc < 0) break;
             GeneratorState *pgs = generator_state_new_proc(_pi0, args, nargs);
             if (!pgs) break;
             DESCR_t v;

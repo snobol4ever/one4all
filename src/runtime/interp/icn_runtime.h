@@ -6,9 +6,10 @@
 #include "icon_gen.h"
 #include "BB.h"
 #include "SM.h"
-#define FRAME_SLOT_MAX        64
+#include "stage2.h"
+#define FRAME_SLOT_MAX        STAGE2_FRAME_SLOT_MAX
 #define CORO_STACK_SZ         (1024 * 1024)
-#define PROC_TABLE_MAX       256
+#define PROC_TABLE_MAX        STAGE2_PROC_TABLE_MAX
 #define FRAME_DEPTH_MAX         16
 #define FRAME_STACK_MAX      256
 #define EVERY_GEN_SLOT_MAX    16
@@ -16,13 +17,10 @@
 #define GLOBAL_MAX      64
 struct GeneratorState;
 typedef struct { tree_t *node; long cur; const char *sval; } IcnGenEntry_d;
-typedef struct { const char *name; int slot; } IcnScopeEnt;
-typedef struct { IcnScopeEnt e[FRAME_SLOT_MAX]; int n; } IcnScope;
-/* IR-CONSOLIDATE-DCG step 1: bb_idx is the index into g_current_SM_seq->bb_table[]
- * where this proc's BB graph lives.  Both ir_body and bb_idx are valid during the
- * migration (steps 2–4); ir_body will be deleted in step 5 and consumers will reach
- * the graph exclusively through bb_idx.  bb_idx == -1 means "no body yet / unset". */
-typedef struct { const char *name; tree_t *proc; int entry_pc; int nparams; IcnScope lower_sc; BB_graph_t *ir_body; int bb_idx; int is_generator; } IcnProcEntry;
+/* IcnScopeEnt, IcnScope, IcnProcEntry are defined canonically in stage2.h.
+ * IR-CONSOLIDATE-DCG step 1: bb_idx is the index into g_stage2.sm.bb_table[]
+ * where this proc's BB graph lives.  Both ir_body and bb_idx are valid during
+ * the migration (steps 2–4); ir_body will be deleted in step 5.            */
 typedef struct {
     DESCR_t       env[FRAME_SLOT_MAX];
     int           env_n;
@@ -39,8 +37,10 @@ typedef struct {
     tree_t       *suspend_do;
     struct GeneratorState *every_gen[EVERY_GEN_SLOT_MAX];
 } IcnFrame;
-extern IcnProcEntry proc_table[PROC_TABLE_MAX];
-extern int          proc_count;
+/* ST2-1 reader shim: proc_table / proc_count redirect into g_stage2.
+ *   Deleted in ST2-1b once all readers take `stage2_t *s2` directly. */
+#define proc_table  (g_stage2.proc_table)
+#define proc_count  (g_stage2.proc_count)
 /* IR-CONSOLIDATE-DCG step 3: strangler helper.  Prefers the SM_sequence_t's bb_table
  * (the consolidated path); falls back to ir_body when no SM_sequence_t is bound (e.g.
  * mode-4 standalone-binary runtime) or when bb_idx is unset.  Step 5 will retire the
@@ -48,8 +48,8 @@ extern int          proc_count;
 static inline BB_graph_t *bb_graph_of_proc(const IcnProcEntry *e)
 {
     if (!e) return NULL;
-    if (g_current_SM_seq && e->bb_idx >= 0 && e->bb_idx < g_current_SM_seq->bb_count)
-        return g_current_SM_seq->bb_table[e->bb_idx];
+    if (e->bb_idx >= 0 && e->bb_idx < g_stage2.sm.bb_count)
+        return g_stage2.sm.bb_table[e->bb_idx];
     return e->ir_body;
 }
 extern int          g_lang;

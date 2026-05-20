@@ -14,7 +14,9 @@
 #include "driver/polyglot.h"
 #include "lower.h"
 #include "SM.h"
-ScripModuleRegistry g_registry;
+/* ST2-1: g_registry storage moved to stage2_t.  Legacy name in this TU
+ * resolves to (*(ScripModuleRegistry*)g_stage2.module_registry)
+ * via the macro in interp.h.                                                */
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static inline int           s_int(const tree_t *s, const char *tag) {
     const char *v = stmt_attr_str(stmt_attr_find(s, tag)); return v ? atoi(v) : 0; }
@@ -39,10 +41,11 @@ uint32_t polyglot_lang_mask(const tree_t *prog)
 int g_fi8_icn_init_count = 0;
 int g_fi8_pl_init_count  = 0;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void polyglot_init(const tree_t *prog, uint32_t lang_mask)
+void polyglot_init(stage2_t *s2, const tree_t *prog, uint32_t lang_mask)
 {
+    (void)s2;
     if (!prog) return;
-    label_table_build(prog);
+    label_table_build(s2, prog);
     prescan_defines(prog);
     if (lang_mask & ((1u << LANG_ICN) | (1u << LANG_RAKU))) {
         g_fi8_icn_init_count++;
@@ -82,7 +85,7 @@ void polyglot_init(const tree_t *prog, uint32_t lang_mask)
                 m->sno_label_start  = label_count;
                 m->sno_label_count  = 0;
                 m->icn_proc_start   = proc_count;
-                m->proc_count       = 0;
+                m->nprocs            = 0;
             }
         }
         if (mod_idx >= 0) {
@@ -122,7 +125,7 @@ void polyglot_init(const tree_t *prog, uint32_t lang_mask)
                         ? (proc->t == TT_PROC_DECL && proc->n >= 2 ? proc->c[1]->n : 0)
                         : (int)proc->v.ival;
                     proc_count++;
-                    if (mod_idx >= 0) g_registry.mods[mod_idx].proc_count++;
+                    if (mod_idx >= 0) g_registry.mods[mod_idx].nprocs++;
                     if (strcmp(name, "main") == 0 && g_registry.main_mod < 0)
                         g_registry.main_mod = mod_idx;
                 }

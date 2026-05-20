@@ -38,6 +38,9 @@ void lower_stmt    (const tree_t *s);
 /* through to the standard SM lowering lets Icon expressions emit the same SM ops as every    */
 /* other language.  Outer comment retained for archaeology.                                    */
 #define ICN_BB_EVAL(t) do { (void)(t); } while(0)
+/* g_p is a view alias of &g_stage2.sm — kept as a separate name only so the
+ * hundreds of SM_emit(g_p, ...) call sites in the handlers stay unchanged.
+ * Set at the top of lower(); never independently mutated.                  */
 static SM_sequence_t  *g_p;
 static LabelTable   g_labtab;
 static int          g_in_proc_body;
@@ -2065,13 +2068,18 @@ static void lower_gather_hoist_pass(const tree_t * prog) {
     ((tree_t *)prog)->n = new_n;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-SM_sequence_t *lower(const tree_t *prog)
+stage2_t *lower(const tree_t *prog)
 {
     if (!prog || prog->t != TT_PROGRAM) return NULL;
-    /* Pre-lower sidecar build — single point of truth.  Was previously parser_output_build at the driver.                                                                                              */
-    /* polyglot_init internally calls label_table_build + prescan_defines, then populates proc_table (Icon/Raku) and g_pl_pred_table (Prolog), and builds g_registry (per-language module spans).        */
-    polyglot_init(prog, polyglot_lang_mask(prog));
-    g_p            = SM_seq_new();
+    /* The Stage 2 build target is the global g_stage2 — there is only one.
+     * Reset its dynamic state to a clean slate for this pass.
+     * g_p is a view alias of &g_stage2.sm so the hundreds of SM_emit(g_p, ...)
+     * call sites in the handlers stay unchanged.                              */
+    stage2_reset();
+    g_p = &g_stage2.sm;
+    /* Pre-lower sidecar build — fills g_stage2.label_table, proc_table,
+     * pl_pred_table, and module_registry directly (no separate globals).      */
+    polyglot_init(&g_stage2, prog, polyglot_lang_mask(prog));
     g_in_proc_body = 0;
     g_proc_scope   = NULL;
     g_loop_label_seq = 0;
@@ -2112,5 +2120,7 @@ SM_sequence_t *lower(const tree_t *prog)
         }
         fprintf(stderr, "\n");
     }
-    return g_p;
+    /* Snapshot the program-level primary language into the handoff.        */
+    g_stage2.lang = g_lang;
+    return &g_stage2;
 }

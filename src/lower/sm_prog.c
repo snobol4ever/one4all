@@ -1,33 +1,71 @@
 #include "SM.h"
 #include "BB.h"
+#include "stage2.h"
 #include <string.h>
 #include <stdlib.h>
-SM_sequence_t *g_current_SM_seq = NULL;
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+/*── The one Stage 2 build target (in .bss).  See stage2.h. ──────────────*/
+stage2_t g_stage2;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-SM_sequence_t *SM_seq_new(void)
+/* Initialize the SM_sequence_t in place.  Called by SM_seq_new() and by
+ * stage2_reset() for the embedded SM piece.  Allocates the dynamic arrays
+ * (instrs / stno_labels / bb_table) but not the struct itself.              */
+static void sm_seq_init(SM_sequence_t *p)
 {
-    SM_sequence_t *p = calloc(1, sizeof *p);
-    p->cap    = 64;
-    p->instrs = calloc((size_t)p->cap, sizeof(SM_t));
+    p->cap             = 64;
+    p->count           = 0;
+    p->instrs          = calloc((size_t)p->cap, sizeof(SM_t));
     p->stno_labels_cap = 64;
     p->stno_labels     = calloc((size_t)p->stno_labels_cap, sizeof(const char *));
     p->stno_count      = 0;
-    p->bb_cap         = 16;
-    p->bb_count       = 0;
-    p->bb_table       = calloc((size_t)p->bb_cap, sizeof(BB_graph_t *));
+    p->bb_cap          = 16;
+    p->bb_count        = 0;
+    p->bb_table        = calloc((size_t)p->bb_cap, sizeof(BB_graph_t *));
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* Deinitialize the SM_sequence_t in place — frees the dynamic arrays but
+ * not the struct itself.  Mirror of sm_seq_init.                            */
+static void sm_seq_deinit(SM_sequence_t *p)
+{
+    free(p->instrs);      p->instrs      = NULL;
+    free(p->stno_labels); p->stno_labels = NULL;
+    free(p->bb_table);    p->bb_table    = NULL;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* SM_seq_new — heap-allocate a standalone SM_sequence_t.  Used by tests
+ * that exercise the SM stream without going through lower / stage2.        */
+SM_sequence_t *SM_seq_new(void)
+{
+    SM_sequence_t *p = calloc(1, sizeof *p);
+    sm_seq_init(p);
     return p;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void SM_seq_free(SM_sequence_t *p)
 {
     if (!p) return;
-    free(p->instrs);
-    free(p->stno_labels);
-    free(p->bb_table);
+    sm_seq_deinit(p);
     free(p);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* stage2_reset — clear the global stage2 to a clean state.  Called by
+ * lower() at the top of every pass.  Frees the previous build's dynamic SM
+ * arrays (idempotent: NULL-safe inside sm_seq_deinit) and re-initializes
+ * them; zeros every sidecar count and the pl_pred_table buckets; resets
+ * the module_registry main_mod sentinel.                                    */
+void stage2_reset(void)
+{
+    sm_seq_deinit(&g_stage2.sm);
+    sm_seq_init  (&g_stage2.sm);
+    g_stage2.label_count = 0;
+    g_stage2.proc_count  = 0;
+    memset(&g_stage2.pl_pred_table,   0, sizeof g_stage2.pl_pred_table);
+    memset(&g_stage2.module_registry, 0, sizeof g_stage2.module_registry);
+    g_stage2.module_registry.main_mod = -1;
+    g_stage2.lang = 0;
+    /* label_table[] and proc_table[] are left as-is — their contents will
+     * be overwritten as the new pass walks them up to the new counts.
+     * (Avoids touching ~150KB of memory each call.)                          */
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int _grow(SM_sequence_t *p)

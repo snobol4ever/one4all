@@ -22,8 +22,9 @@ extern bb_node_t icn_bb_make_proc_box(tree_t *proc, DESCR_t *args, int nargs);
     } } while (0)
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t NV_SET_fn(const char *name, DESCR_t val);
-IcnProcEntry proc_table[PROC_TABLE_MAX];
-int          proc_count = 0;
+/* ST2-1: proc_table[] and proc_count storage moved to stage2_t.
+ * Legacy names in this TU resolve to (g_stage2.proc_table) and
+ * (g_stage2.proc_count) via the macros in icn_runtime.h.       */
 int          g_lang         = 0;
 tree_t      *g_icn_root     = NULL;
 int g_sm_dispatch_active = 0;
@@ -246,8 +247,8 @@ DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs)
 DESCR_t proc_table_call(int pi, DESCR_t *args, int nargs)
 {
     if (pi < 0 || pi >= proc_count) return FAILDESCR;
-    extern SM_sequence_t *g_current_SM_seq;
-    if (proc_table[pi].entry_pc >= 0 && g_current_SM_seq != NULL)
+    extern stage2_t g_stage2;
+    if (proc_table[pi].entry_pc >= 0 && 1)
         return sm_call_proc(proc_table[pi].entry_pc, proc_table[pi].nparams, args, nargs);
     return FAILDESCR;
 }
@@ -364,7 +365,7 @@ bb_node_t icn_bb_pump_proc_by_name(const char *name, DESCR_t *args, int nargs) {
         /* IJ-SUSPEND-PUMP-WIRE: generator proc (TT_SUSPEND present) without ir_body — route through */
         /* GeneratorState + BB_ICN_PROC_GEN, the same mechanism icn_bb_build uses on the AST path.   */
         /* is_generator was set at lower time (lower.c lower_proc_skeletons) so no AST walk here.    */
-        if (proc_table[i].is_generator && proc_table[i].entry_pc >= 0 && g_current_SM_seq) {
+        if (proc_table[i].is_generator && proc_table[i].entry_pc >= 0 && 1) {
             GeneratorState *pgs = generator_state_new_proc(i, args, nargs);
             if (pgs) {
                 BB_graph_t *pcfg = lower_icn_proc_gen(pgs);

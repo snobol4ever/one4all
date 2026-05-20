@@ -19,7 +19,9 @@ extern tree_t *pl_assert_term(Term *t, int *functor_out, int *arity_out);
 #include <string.h>
 #include <ctype.h>
 #include <setjmp.h>
-Pl_PredTable  g_pl_pred_table;
+/* ST2-1: g_pl_pred_table storage moved to stage2_t.  Legacy name in this TU
+ * resolves to (*(Pl_PredTable*)g_stage2.pl_pred_table) via the
+ * macro in pl_runtime.h.                                                    */
 Trail         g_pl_trail;
 int           g_pl_cut_flag = 0;
 Term        **g_pl_env      = NULL;
@@ -1631,8 +1633,8 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 Term **saved_env = g_pl_env;
                 g_pl_env = uargs;
                 Pl_PredEntry *_upe1 = pl_pred_entry_lookup(ukey);
-                /* g_current_SM_seq comes from SM.h via pl_runtime.h */
-                bb_node_t uroot = (_upe1 && _upe1->entry_pc >= 0 && g_current_SM_seq != NULL)
+                /* (&g_stage2) comes from SM.h via pl_runtime.h */
+                bb_node_t uroot = (_upe1 && _upe1->entry_pc >= 0 && 1)
                     ? pl_box_choice_pc(_upe1->entry_pc, g_pl_env, call_arity)
                     : pl_box_choice(uch, g_pl_env, call_arity);
                 int uok = bb_broker(uroot, bb_once, NULL, NULL);
@@ -1694,8 +1696,8 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                         Term **saved_env = g_pl_env;
                         g_pl_env = uargs;
                         Pl_PredEntry *_upe2 = pl_pred_entry_lookup(ukey);
-                        /* g_current_SM_seq comes from SM.h via pl_runtime.h */
-                        bb_node_t uroot = (_upe2 && _upe2->entry_pc >= 0 && g_current_SM_seq != NULL)
+                        /* (&g_stage2) comes from SM.h via pl_runtime.h */
+                        bb_node_t uroot = (_upe2 && _upe2->entry_pc >= 0 && 1)
                             ? pl_box_choice_pc(_upe2->entry_pc, g_pl_env, arity)
                             : pl_box_choice(uch, g_pl_env, arity);
                         uok = bb_broker(uroot, bb_once, NULL, NULL);

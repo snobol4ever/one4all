@@ -388,7 +388,7 @@ static void h_bb_pump_sm(void)
         return;
     }
     int entry_pc = (int)d.i;
-    SM_sequence_t *prog = g_current_SM_seq;
+    SM_sequence_t *prog = &g_stage2.sm;
     if (!prog || entry_pc < 0 || entry_pc >= prog->count) {
         STATE->last_ok = 0;
         return;
@@ -680,7 +680,7 @@ static void h_exec_stmt(void)
     DESCR_t pat_d  = POP();
     const char *sn = CUR_INS->a[0].s;
     int ok;
-    BB_graph_t *pat_bb = (int)CUR_INS->a[2].i >= 0 ? g_current_SM_seq->bb_table[(int)CUR_INS->a[2].i] : NULL;
+    BB_graph_t *pat_bb = (int)CUR_INS->a[2].i >= 0 ? g_stage2.sm.bb_table[(int)CUR_INS->a[2].i] : NULL;
     if (pat_bb) {
         ok = IR_exec_pat(pat_bb, sn, &subj_d, has_repl ? &repl : NULL, has_repl);
     } else {

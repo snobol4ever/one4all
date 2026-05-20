@@ -3,36 +3,25 @@
 #include <stdint.h>
 #include <setjmp.h>
 #include "frontend/snobol4/scrip_cc.h"
+#include "stage2.h"
 extern int g_opt_trace;
 extern int g_opt_dump_bb;
 extern int g_polyglot;
-#define SCRIP_MOD_MAX 64
-typedef struct {
-    int              lang;
-    const char      *name;
-    const tree_t     *first;
-    const tree_t     *last;
-    int              nstmts;
-    int              sno_label_start;
-    int              sno_label_count;
-    int              icn_proc_start;
-    int              proc_count;
-} ScripModule;
-typedef struct {
-    ScripModule  mods[SCRIP_MOD_MAX];
-    int          nmod;
-    int          main_mod;
-} ScripModuleRegistry;
-extern ScripModuleRegistry g_registry;
+#define SCRIP_MOD_MAX STAGE2_MOD_MAX
+/* ScripModule / ScripModuleRegistry are defined canonically in stage2.h. */
+/* ST2-1 reader shims: legacy global names redirect to fields of g_stage2.
+ *   Deleted in ST2-1b once all readers take `stage2_t *s2` directly.       */
+#define g_registry   (g_stage2.module_registry)
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void polyglot_init(const tree_t *prog, uint32_t lang_mask);
+void polyglot_init(stage2_t *s2, const tree_t *prog, uint32_t lang_mask);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 uint32_t polyglot_lang_mask(const tree_t *prog);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void icn_record_register(const char *spec);
-extern int label_count;
+#define label_table  (g_stage2.label_table)
+#define label_count  (g_stage2.label_count)
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void    label_table_build(const tree_t *prog);
+void    label_table_build(stage2_t *s2, const tree_t *prog);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 const tree_t *label_lookup(const char *name);
 extern const tree_t *g_exec_prog;

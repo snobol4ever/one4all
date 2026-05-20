@@ -1,4 +1,5 @@
 #include "SM.h"
+#include "stage2.h"
 #include "sm_interp.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -215,7 +216,7 @@ static void test_generator_suspend_resume(void)
     printf("--- test_generator_suspend_resume ---\n");
     nv_reset();
     gen_count = 0;
-    SM_sequence_t *p = SM_seq_new();
+    stage2_reset(); SM_sequence_t *p = &g_stage2.sm;
     SM_emit_i(p, SM_PUSH_LIT_I, 10);
     SM_emit(p, SM_SUSPEND);
     SM_emit_i(p, SM_PUSH_LIT_I, 20);
@@ -223,11 +224,8 @@ static void test_generator_suspend_resume(void)
     SM_emit_i(p, SM_PUSH_LIT_I, 30);
     SM_emit(p, SM_SUSPEND);
     SM_emit(p, SM_RETURN);
-    SM_sequence_t *saved_prog = g_current_SM_seq;
-    g_current_SM_seq = p;
     GeneratorState *gs   = generator_state_new(0);
     int         ticks = bb_broker_drive_sm(gs, collect_gen_val, NULL);
-    g_current_SM_seq = saved_prog;
     CHECK(ticks == 3, "generator: tick count == 3");
     CHECK(gen_count == 3, "generator: body_fn called 3 times");
     CHECK(gen_collected[0] == 10, "generator: first yield == 10");
@@ -237,7 +235,7 @@ static void test_generator_suspend_resume(void)
     int ticks2 = bb_broker_drive_sm(gs, collect_gen_val, NULL);
     CHECK(ticks2 == 0, "generator: re-drive exhausted gen returns 0");
     CHECK(gen_count == 0, "generator: body_fn not called after exhaustion");
-    SM_seq_free(p);
+    /* g_stage2 is global; next stage2_reset cleans up */
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void test_gen_locals_survive_suspend(void)
@@ -245,7 +243,7 @@ static void test_gen_locals_survive_suspend(void)
     printf("--- test_gen_locals_survive_suspend ---\n");
     nv_reset();
     gen_count = 0;
-    SM_sequence_t *p = SM_seq_new();
+    stage2_reset(); SM_sequence_t *p = &g_stage2.sm;
     SM_emit_i(p, SM_PUSH_LIT_I, 100);
     SM_emit_i(p, SM_STORE_GLOCAL, 0);
     SM_emit(p, SM_SUSPEND);
@@ -258,24 +256,21 @@ static void test_gen_locals_survive_suspend(void)
     SM_emit_i(p, SM_STORE_GLOCAL, 0);
     SM_emit(p, SM_SUSPEND);
     SM_emit(p, SM_RETURN);
-    SM_sequence_t *saved_prog = g_current_SM_seq;
-    g_current_SM_seq = p;
     GeneratorState *gs    = generator_state_new(0);
     int         ticks = bb_broker_drive_sm(gs, collect_gen_val, NULL);
-    g_current_SM_seq = saved_prog;
     CHECK(ticks == 3, "gen-locals: tick count == 3");
     CHECK(gen_count == 3, "gen-locals: body_fn called 3 times");
     CHECK(gen_collected[0] == 100, "gen-locals: first yield == 100");
     CHECK(gen_collected[1] == 101, "gen-locals: second yield == 101 (locals survived)");
     CHECK(gen_collected[2] == 102, "gen-locals: third yield == 102 (locals survived twice)");
-    SM_seq_free(p);
+    /* g_stage2 is global; next stage2_reset cleans up */
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void test_gen_locals_isolated_per_invocation(void)
 {
     printf("--- test_gen_locals_isolated_per_invocation ---\n");
     nv_reset();
-    SM_sequence_t *p = SM_seq_new();
+    stage2_reset(); SM_sequence_t *p = &g_stage2.sm;
     SM_emit_i(p, SM_PUSH_LIT_I, 100);
     SM_emit_i(p, SM_STORE_GLOCAL, 0);
     SM_emit(p, SM_SUSPEND);
@@ -284,8 +279,6 @@ static void test_gen_locals_isolated_per_invocation(void)
     SM_emit_i(p, SM_STORE_GLOCAL, 0);
     SM_emit(p, SM_SUSPEND);
     SM_emit(p, SM_RETURN);
-    SM_sequence_t *saved_prog = g_current_SM_seq;
-    g_current_SM_seq = p;
     gen_count = 0;
     GeneratorState *gs_a = generator_state_new(0);
     int ticks_a = bb_broker_drive_sm(gs_a, collect_gen_val, NULL);
@@ -296,14 +289,13 @@ static void test_gen_locals_isolated_per_invocation(void)
     int ticks_b = bb_broker_drive_sm(gs_b, collect_gen_val, NULL);
     int64_t b_first  = gen_collected[0];
     int64_t b_second = gen_collected[1];
-    g_current_SM_seq = saved_prog;
     CHECK(ticks_a == 2, "gen-isolation: first invocation ticks == 2");
     CHECK(ticks_b == 2, "gen-isolation: second invocation ticks == 2");
     CHECK(a_first == 100,  "gen-isolation: a yields 100");
     CHECK(a_second == 101, "gen-isolation: a yields 101");
     CHECK(b_first == 100,  "gen-isolation: b also yields 100 (locals are fresh)");
     CHECK(b_second == 101, "gen-isolation: b also yields 101");
-    SM_seq_free(p);
+    /* g_stage2 is global; next stage2_reset cleans up */
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int main(void)

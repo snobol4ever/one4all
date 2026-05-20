@@ -73,10 +73,9 @@ void  raku_fh_free(int idx);
 const char *define_spec_from_expr(tree_t *subj);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 const char *define_entry_from_expr(tree_t *subj);
-#define LABEL_MAX 4096
-typedef struct { const char *name; const tree_t *stmt; } LabelEntry;
-extern LabelEntry label_table[LABEL_MAX];
-extern int        label_count;
+#include "stage2.h"
+#include "interp.h"   /* label_table / label_count / g_registry shims live here, with ScripModule definitions */
+#define LABEL_MAX STAGE2_LABEL_MAX
 #define CALL_STACK_MAX 256
 #define SHADOW_MAX 32
 typedef struct { char name[64]; DESCR_t val; } ShadowEntry;

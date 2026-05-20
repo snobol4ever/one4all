@@ -10,7 +10,7 @@
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void labtab_init(LabelTable *lt)
 {
-    lt->labels   = GC_MALLOC(LABTAB_INIT * sizeof(LabelEntry));
+    lt->labels   = GC_MALLOC(LABTAB_INIT * sizeof(LabTabEntry));
     lt->labels_cap = LABTAB_INIT; lt->nlabels = 0;
     lt->patches  = GC_MALLOC(LABTAB_INIT * sizeof(PatchEntry));
     lt->patches_cap = LABTAB_INIT; lt->npatches = 0;
@@ -22,7 +22,7 @@ void labtab_define(LabelTable *lt, const char *name, int instr_idx)
 {
     if (lt->nlabels >= lt->labels_cap) {
         lt->labels_cap *= 2;
-        lt->labels = GC_REALLOC(lt->labels, lt->labels_cap * sizeof(LabelEntry));
+        lt->labels = GC_REALLOC(lt->labels, lt->labels_cap * sizeof(LabTabEntry));
     }
     lt->labels[lt->nlabels].name      = GC_strdup(name);
     lt->labels[lt->nlabels].instr_idx = instr_idx;

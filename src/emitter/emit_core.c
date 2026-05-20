@@ -1,4 +1,5 @@
 #include "emit_core.h"
+#include "stage2.h"
 #include "BB_templates/bb_templates.h"
 #include "SM_templates/sm_templates.h"
 #include "sm_jit_interp.h"
@@ -2169,8 +2170,9 @@ static int emit_net_from_sm(SM_sequence_t * sm, FILE * out) {
 /* EC-5: emit_program — unified entry point replacing emit_jvm_program/emit_js_program/emit_net_program. */
 int emit_program(const tree_t * ast_prog, FILE * out, bb_emit_mode_t mode) {
     if (!ast_prog || !out) return 1;
-    SM_sequence_t * sm = sm_preamble(ast_prog);
-    if (!sm) return 1;
+    stage2_t * s2 = sm_preamble(ast_prog);
+    if (!s2) return 1;
+    SM_sequence_t * sm = &s2->sm;
     bb_emit_mode_t saved_mode = bb_emit_mode;
     FILE *         saved_out  = bb_emit_out;
     emit_mode_set(mode, out);
@@ -2197,7 +2199,7 @@ int emit_program(const tree_t * ast_prog, FILE * out, bb_emit_mode_t mode) {
         fprintf(out, "  )\n");
         emit_epilogue(NULL, out);
         emit_mode_set(saved_mode, saved_out);
-        SM_seq_free(sm);
+        /* g_stage2 is global; no free */
         return 0;
     }
     emit_prologue(NULL, out);
@@ -2219,7 +2221,7 @@ int emit_program(const tree_t * ast_prog, FILE * out, bb_emit_mode_t mode) {
     } else if (IS_NET) emit_net_from_sm(sm, out);
     emit_epilogue(NULL, out);
     emit_mode_set(saved_mode, saved_out);
-    SM_seq_free(sm);
+    /* g_stage2 is global; no free */
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
