@@ -42,6 +42,17 @@ typedef enum {
 #define IS_BIN_JVM   (bb_emit_mode == EMIT_BIN_JVM)
 #define IS_BIN_NET   (bb_emit_mode == EMIT_BIN_NET)
 #define IS_BIN_WASM  (bb_emit_mode == EMIT_BIN_WASM)
+/* EC-UNI-8.2: explicit per-backend × per-mode matrix. Every template fn carries either an
+ * arm or an `n/a` comment for each cell. JS has no binary form: IS_JS_BIN is permanently
+ * false and every IS_JS_BIN arm is a documented no-op. */
+#define IS_JVM_TEXT  (bb_emit_mode == EMIT_JVM)
+#define IS_JVM_BIN   (bb_emit_mode == EMIT_BIN_JVM)
+#define IS_JS_TEXT   (bb_emit_mode == EMIT_JS)
+#define IS_JS_BIN    (0)                              /* n/a — JS has no binary form */
+#define IS_NET_TEXT  (bb_emit_mode == EMIT_NET)
+#define IS_NET_BIN   (bb_emit_mode == EMIT_BIN_NET)
+#define IS_WASM_TEXT (bb_emit_mode == EMIT_WASM)
+#define IS_WASM_BIN  (bb_emit_mode == EMIT_BIN_WASM)
 /*--- label ---------------------------------------------------------------*/
 #define BB_LABEL_NAME_MAX   80
 #define BB_LABEL_UNRESOLVED (-1)
