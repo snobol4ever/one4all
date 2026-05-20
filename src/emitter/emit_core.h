@@ -27,10 +27,21 @@ typedef enum {
 #define IS_BIN      (bb_emit_mode == EMIT_BINARY_WIRED || bb_emit_mode == EMIT_BINARY_BROKERED)
 #define IS_WIRED    (bb_emit_mode == EMIT_BINARY_WIRED)
 #define IS_BROKERED (bb_emit_mode == EMIT_BINARY_BROKERED)
-/* EC-UNI matrix: one IS_<BE> per backend (5 columns).  Text-vs-binary is
- * a serializer choice INSIDE each backend's output layer, NOT a matrix
- * column — see GOAL-HEADQUARTERS § AXIS CORRECTION.  Each template fn
- * carries exactly one arm per macro below. */
+/* EC-UNI matrix: one IS_<BE> per backend (5 columns).  Text-vs-binary —
+ * and the various x86 text sub-modes — are serializer choices INSIDE each
+ * backend's output layer, NOT matrix columns.  See GOAL-HEADQUARTERS §
+ * AXIS CORRECTION.
+ *
+ * IS_X86 covers all FIVE x86 modes uniformly:
+ *   EMIT_TEXT             — GAS text (normal invocation)
+ *   EMIT_TEXT_INLINE      — GAS text (inline form for hot paths)
+ *   EMIT_MACRO_DEF        — GAS macro-definition pass
+ *   EMIT_BINARY_WIRED     — binary machine code, wired BBs
+ *   EMIT_BINARY_BROKERED  — binary machine code, brokered BBs
+ * The dispatcher below the template (e.g. emit_halt_line,
+ * emit_sm_<op>_dispatch) consults bb_emit_mode and TEXT_MODE() to choose
+ * the actual output form.  Each template fn carries exactly ONE arm
+ * per macro below. */
 #define IS_X86      (bb_emit_mode == EMIT_TEXT \
                   || bb_emit_mode == EMIT_TEXT_INLINE \
                   || bb_emit_mode == EMIT_MACRO_DEF \

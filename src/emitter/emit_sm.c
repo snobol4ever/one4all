@@ -2910,10 +2910,10 @@ static void emit_sm_uni_env_init(void) {
     if (v && *v && *v != '0') g_emit_use_unified_dispatch = 1;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* dispatch_one_x86_text — try to handle one SM_Instr via the template path. Returns 0 on success, -1 if the
+/* dispatch_one_x86 — try to handle one SM_Instr via the template path. Returns 0 on success, -1 if the
  * opcode is not yet covered by templates (caller falls through to the legacy switch). Mode must be EMIT_TEXT.
  * Only the 52 opcodes across the 5 SM_template files are covered today. */
-static int dispatch_one_x86_text(FILE *out, const SM_Instr *ins, int pc) {
+static int dispatch_one_x86(FILE *out, const SM_Instr *ins, int pc) {
     /* Templates dispatch on IS_X86; make sure mode is set. Legacy path relies on individual
      * dispatchers calling emitter_init_text — we have to ensure it for the very first opcode too. */
     emit_mode_set(TEXT_MODE(), out);
@@ -3073,7 +3073,7 @@ int emit_walk_codegen(SM_Program *prog, FILE *out, const char *src_path)
          * On success continue. On -1 (uncovered opcode) fall through to the legacy switch.
          * With the flag off this branch costs one predictable-not-taken compare per iteration. */
         if (g_emit_use_unified_dispatch) {
-            int urc = dispatch_one_x86_text(out, ins, pc);
+            int urc = dispatch_one_x86(out, ins, pc);
             if (urc == 0) continue;
         }
         int rc;
