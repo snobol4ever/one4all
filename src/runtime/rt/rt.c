@@ -207,12 +207,12 @@ void rt_register_expressions(const rt_expression_entry *tbl)
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* PJ-9d: Mode-4 Prolog predicate registry — populates g_dcg_table at standalone-binary startup. */
-/* The emitter walks each populated entry of g_dcg_table at scrip-emit time and emits a builder fn per predicate, */
+/* PJ-9d: Mode-4 Prolog predicate registry — populates g_pl_bb_table at standalone-binary startup. */
+/* The emitter walks each populated entry of g_pl_bb_table at scrip-emit time and emits a builder fn per predicate, */
 /* plus a .Lpl_registry table (name, arity, builder_fn). Right after rt_register_expressions, main calls          */
 /* rt_register_predicates_pl(.Lpl_registry) — that helper invokes each builder, which calls back into             */
 /* rt_pl_b_begin / rt_pl_b_node / rt_pl_b_kids / rt_pl_b_entry / rt_pl_b_end_register to reconstruct the          */
-/* BB_graph_t graph and hand it off to pl_dcg_register. Once registered, rt_pl_once finds the predicate.         */
+/* BB_graph_t graph and hand it off to pl_bb_register. Once registered, rt_pl_once finds the predicate.         */
 #include "../../include/BB.h"
 #include "../interp/pl_runtime.h"
 static BB_graph_t * g_pl_b_cfg     = NULL;
@@ -279,7 +279,7 @@ void rt_pl_b_end_register(const char *name, int arity)
         g_pl_b_cfg->entry = g_pl_b_nodes[g_pl_b_entry_i];
     else if (g_pl_b_node_n > 0)
         g_pl_b_cfg->entry = g_pl_b_nodes[0];
-    (void)pl_dcg_register(name, arity, g_pl_b_cfg);
+    (void)pl_bb_register(name, arity, g_pl_b_cfg);
     free(g_pl_b_nodes);
     g_pl_b_cfg     = NULL;
     g_pl_b_nodes   = NULL;
@@ -875,7 +875,7 @@ void rt_pl_once(const char *name, int arity)
     const char *q = strrchr(name, '/');
     int eff_arity = arity;
     if (q && eff_arity == 0) eff_arity = atoi(q + 1);
-    Pl_PredEntry_BB *bb = pl_dcg_lookup(name, eff_arity);
+    Pl_PredEntry_BB *bb = pl_bb_lookup(name, eff_arity);
     if (bb && bb->ir_body) {
         Term **saved_env = g_pl_env;
         pl_bb_env_push(16);

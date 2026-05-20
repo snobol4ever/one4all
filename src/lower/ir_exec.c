@@ -1747,7 +1747,7 @@ BB_t * bb_exec_node(BB_t * nd) {
             if (gen->t == BB_PL_CALL) {
                 PlCallSt *cs = (PlCallSt *)gen->opaque;
                 char rkey[128]; snprintf(rkey, sizeof rkey, "%s/%d", gen->sval, (int)gen->ival2);
-                Pl_PredEntry_BB *rbb = pl_dcg_lookup(rkey, (int)gen->ival2);
+                Pl_PredEntry_BB *rbb = pl_bb_lookup(rkey, (int)gen->ival2);
                 if (!rbb || !rbb->ir_body) { free(cs); gen->opaque = NULL; gen->state = 0; backtrack_from = found; continue; }
                 trail_unwind(&g_pl_trail, cs->trail_mark);
                 g_pl_env = cs->callee_env;
@@ -1842,7 +1842,7 @@ BB_t * bb_exec_node(BB_t * nd) {
         const char *callee = nd->sval; int carity = (int)nd->ival2;
         if (!callee) { nd->value = FAILDESCR; return nd->ω; }
         char key[128]; snprintf(key, sizeof key, "%s/%d", callee, carity);
-        Pl_PredEntry_BB *bb = pl_dcg_lookup(key, carity);
+        Pl_PredEntry_BB *bb = pl_bb_lookup(key, carity);
         if (!bb || !bb->ir_body) { nd->value = FAILDESCR; return nd->ω; }
         typedef struct { Term **callee_env; Term **saved_env; int trail_mark; int nslots; } PlCallSt;
         if (nd->state == 0) {

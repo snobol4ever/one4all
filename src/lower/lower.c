@@ -482,8 +482,8 @@ static void lower_fnc(const tree_t *t)
         if (g_lang == LANG_ICN && is_upto && cset && hay) {
             BB_graph_t *cfg = lower_icn_upto(cset, hay);
             if (cfg) {
-                int dcg_idx = SM_seq_dcg_add(g_p, cfg);
-                int idx = SM_emit_i(g_p, SM_EXEC_BB, (int64_t)dcg_idx);
+                int bb_idx = SM_seq_bb_add(g_p, cfg);
+                int idx = SM_emit_i(g_p, SM_EXEC_BB, (int64_t)bb_idx);
                 (void)idx;
                 return;
             }
@@ -622,9 +622,9 @@ static void lower_scan(const tree_t *t)
     lower_expr(subject);
     SM_emit_i(g_p, SM_PUSH_LIT_I, 0);
     const char *sname = (subject->t == TT_VAR || subject->t == TT_KEYWORD) ? subject->v.sval : NULL;
-    BB_graph_t *pat_dcg = BB_lower_pat(pattern);
-    int64_t dcg_idx = (pat_dcg && pat_dcg->entry) ? (int64_t)SM_seq_dcg_add(g_p, pat_dcg) : -1;
-    SM_emit_sii(g_p, SM_EXEC_STMT, sname, 0, dcg_idx);
+    BB_graph_t *pat_bb = BB_lower_pat(pattern);
+    int64_t bb_idx = (pat_bb && pat_bb->entry) ? (int64_t)SM_seq_bb_add(g_p, pat_bb) : -1;
+    SM_emit_sii(g_p, SM_EXEC_STMT, sname, 0, bb_idx);
     SM_emit_si(g_p, SM_PUSH_LIT_S, "", 0);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -1584,7 +1584,7 @@ void lower_stmt(const tree_t *s)
     if (lang == LANG_PL) {
         if (subject && subject->t == TT_CHOICE && subject->v.sval) {
             /* Top-level TT_CHOICE-subject statements are predicate DEFINITIONS, not calls.
-             * The predicate is already registered in g_dcg_table by lower_proc_skeletons()
+             * The predicate is already registered in g_pl_bb_table by lower_proc_skeletons()
              * and its SM stub label is emitted by emit_proc_stub().  Emitting
              * SM_BB_ONCE_PROC here would invoke every defined predicate at program
              * start, which corrupts execution for any program with multiple predicates.
@@ -1668,9 +1668,9 @@ void lower_stmt(const tree_t *s)
         else                       SM_emit_i(g_p, SM_PUSH_LIT_I, 0);
         const char *sname = (subject && (subject->t == TT_VAR
                               || subject->t == TT_KEYWORD)) ? subject->v.sval : NULL;
-        BB_graph_t *pat_dcg = BB_lower_pat(pattern);
-        int64_t dcg_idx2 = (pat_dcg && pat_dcg->entry) ? (int64_t)SM_seq_dcg_add(g_p, pat_dcg) : -1;
-        SM_emit_sii(g_p, SM_EXEC_STMT, sname, (int64_t)has_eq, dcg_idx2);
+        BB_graph_t *pat_bb = BB_lower_pat(pattern);
+        int64_t bb_idx2 = (pat_bb && pat_bb->entry) ? (int64_t)SM_seq_bb_add(g_p, pat_bb) : -1;
+        SM_emit_sii(g_p, SM_EXEC_STMT, sname, (int64_t)has_eq, bb_idx2);
         goto emit_gotos;
     }
     if (subject) {
@@ -1941,11 +1941,11 @@ static void lower_proc_skeletons(void)
             /* Attempt to lower body to an BB_graph_t DCG.  When successful, runtime icn_bb_pump_proc_by_name */
             /* uses it directly via icn_bb_dcg, bypassing SM entirely.  When NULL, legacy SM path runs.        */
             proc_table[pi].ir_body = lower_icn_proc_body(proc);
-            /* IR-CONSOLIDATE-DCG step 2: attach the BB graph to SM_sequence_t's dcg_table.
+            /* IR-CONSOLIDATE-DCG step 2: attach the BB graph to SM_sequence_t's bb_table.
              * proc_table[].ir_body remains a duplicate pointer during the migration; step 5
-             * will delete the field and consumers will reach the graph through dcg_idx only. */
-            proc_table[pi].dcg_idx = proc_table[pi].ir_body
-                ? SM_seq_dcg_add(g_p, proc_table[pi].ir_body) : -1;
+             * will delete the field and consumers will reach the graph through bb_idx only. */
+            proc_table[pi].bb_idx = proc_table[pi].ir_body
+                ? SM_seq_bb_add(g_p, proc_table[pi].ir_body) : -1;
             /* Detect generator procs: any BB_SUSPEND in the lowered body marks the proc as a generator. BB_EVERY consults this bit at BB_CALL time to decide whether to pump-to-exhaustion or fire once. */
             /* IJ-SUSPEND-PUMP-WIRE: also walk the AST for TT_SUSPEND so suspend-bearing procs whose ir_body  */
             /* lowering returns NULL (e.g. because lower_icn_expr_node has no TT_SUSPEND case) are still      */
@@ -1993,12 +1993,12 @@ static void lower_proc_skeletons(void)
             const char *slash = strrchr(e->key, '/');
             int arity = slash ? atoi(slash + 1) : 0;
             BB_graph_t *ir_body = lower_pl_predicate(e->choice);
-            Pl_PredEntry_BB *bb = pl_dcg_register(e->key, arity, ir_body);
+            Pl_PredEntry_BB *bb = pl_bb_register(e->key, arity, ir_body);
             /* IR-CONSOLIDATE-DCG step 2: attach the Prolog BB graph to SM_sequence_t's
-             * dcg_table.  Compile-time only — the mode-4 standalone-binary path through
+             * bb_table.  Compile-time only — the mode-4 standalone-binary path through
              * rt_pl_b_end_register has no SM_sequence_t and continues to use ir_body
              * directly.  ir_body remains a duplicate pointer here during the migration. */
-            if (bb) bb->dcg_idx = ir_body ? SM_seq_dcg_add(g_p, ir_body) : -1;
+            if (bb) bb->bb_idx = ir_body ? SM_seq_bb_add(g_p, ir_body) : -1;
             if (bb && e->choice) {
                 PlScope sc; sc.n = 0;
                 bb->lower_sc = sc;

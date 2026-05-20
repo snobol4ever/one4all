@@ -24,8 +24,8 @@ Trail         g_pl_trail;
 int           g_pl_cut_flag = 0;
 Term        **g_pl_env      = NULL;
 int           g_pl_active   = 0;
-Pl_PredEntry_BB g_dcg_table[PL_DCG_TABLE_MAX];
-int             g_dcg_count = 0;
+Pl_PredEntry_BB g_pl_bb_table[PL_BB_TABLE_MAX];
+int             g_pl_bb_count = 0;
 typedef struct { BB_graph_t *cfg; int first; } pl_dcg_state_t;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* pl_bb_dcg — Prolog BB-land DCG driver.  Infrastructure bridge mirror of icn_bb_dcg.        */
@@ -40,40 +40,40 @@ DESCR_t pl_bb_dcg(void *zeta, int entry) {
     return v;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* pl_dcg_lookup — find a predicate by name+arity in the BB-land registry.  Modes 2/3/4 use   */
+/* pl_bb_lookup — find a predicate by name+arity in the BB-land registry.  Modes 2/3/4 use   */
 /* this exclusively; the AST-bearing g_pl_pred_table is mode-1-only after PJ-8.               */
-Pl_PredEntry_BB *pl_dcg_lookup(const char *name, int arity) {
+Pl_PredEntry_BB *pl_bb_lookup(const char *name, int arity) {
     if (!name) return NULL;
-    for (int i = 0; i < g_dcg_count; i++)
-        if (g_dcg_table[i].arity == arity && g_dcg_table[i].name && strcmp(g_dcg_table[i].name, name) == 0)
-            return &g_dcg_table[i];
+    for (int i = 0; i < g_pl_bb_count; i++)
+        if (g_pl_bb_table[i].arity == arity && g_pl_bb_table[i].name && strcmp(g_pl_bb_table[i].name, name) == 0)
+            return &g_pl_bb_table[i];
     return NULL;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* pl_dcg_register — add or update an entry in the BB-land predicate registry.  Returns the   */
+/* pl_bb_register — add or update an entry in the BB-land predicate registry.  Returns the   */
 /* entry pointer on success, NULL on capacity exhaustion.  Idempotent on (name, arity).        */
-Pl_PredEntry_BB *pl_dcg_register(const char *name, int arity, BB_graph_t *ir_body) {
+Pl_PredEntry_BB *pl_bb_register(const char *name, int arity, BB_graph_t *ir_body) {
     if (!name) return NULL;
-    Pl_PredEntry_BB *existing = pl_dcg_lookup(name, arity);
+    Pl_PredEntry_BB *existing = pl_bb_lookup(name, arity);
     if (existing) { existing->ir_body = ir_body; return existing; }
-    if (g_dcg_count >= PL_DCG_TABLE_MAX) return NULL;
-    Pl_PredEntry_BB *e = &g_dcg_table[g_dcg_count++];
+    if (g_pl_bb_count >= PL_BB_TABLE_MAX) return NULL;
+    Pl_PredEntry_BB *e = &g_pl_bb_table[g_pl_bb_count++];
     e->name = strdup(name);
     e->arity = arity;
     e->ir_body = ir_body;
-    e->dcg_idx = -1;        /* IR-CONSOLIDATE-DCG step 2: caller sets dcg_idx when an SM_sequence_t exists (compile-time lowering); mode-4 rt.c registration leaves it -1. */
+    e->bb_idx = -1;        /* IR-CONSOLIDATE-DCG step 2: caller sets bb_idx when an SM_sequence_t exists (compile-time lowering); mode-4 rt.c registration leaves it -1. */
     e->lower_sc.n = 0;
     return e;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* pl_bb_once_proc_by_name — build bb_node_t for a Prolog predicate call (bb_once mode).       */
-/* Mirrors icn_bb_pump_proc_by_name.  Returns {NULL,NULL,0} when predicate not in dcg_table    */
+/* Mirrors icn_bb_pump_proc_by_name.  Returns {NULL,NULL,0} when predicate not in bb_table    */
 /* or ir_body is NULL (caller falls through to [NO-AST] stub until PJ-4 fills IR).             */
 bb_node_t pl_bb_once_proc_by_name(const char *name, int arity) {
     if (!name) return (bb_node_t){ NULL, NULL, 0 };
     const char *sl = strrchr(name, '/');
     if (sl && arity == 0) arity = atoi(sl + 1);
-    Pl_PredEntry_BB *bb = pl_dcg_lookup(name, arity);
+    Pl_PredEntry_BB *bb = pl_bb_lookup(name, arity);
     if (!bb || !bb->ir_body) return (bb_node_t){ NULL, NULL, 0 };
     pl_dcg_state_t *dz = calloc(1, sizeof(*dz));
     dz->cfg   = bb->ir_body;

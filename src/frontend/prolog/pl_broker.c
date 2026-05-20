@@ -1,5 +1,6 @@
 #include "frontend/prolog/pl_broker.h"
 #include "frontend/prolog/pl_interp.h"
+#include "SM.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static inline DESCR_t pl_gamma(void) { return descr_bool(1); }
 typedef struct { int fired; } pl_true_t;
@@ -361,7 +362,6 @@ typedef struct { int entry_pc; int fired; } pl_expression_t;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static DESCR_t pl_chunk_fn(void *zeta, int entry) {
     extern DESCR_t sm_call_expression(int);
-    extern void *g_current_SM_seq;
     pl_expression_t *z = zeta;
     if (entry == β || z->fired) return FAILDESCR;
     z->fired = 1;

@@ -15,9 +15,9 @@ SM_sequence_t *SM_seq_new(void)
     p->stno_labels_cap = 64;
     p->stno_labels     = calloc((size_t)p->stno_labels_cap, sizeof(const char *));
     p->stno_count      = 0;
-    p->dcg_cap         = 16;
-    p->dcg_count       = 0;
-    p->dcg_table       = calloc((size_t)p->dcg_cap, sizeof(BB_graph_t *));
+    p->bb_cap         = 16;
+    p->bb_count       = 0;
+    p->bb_table       = calloc((size_t)p->bb_cap, sizeof(BB_graph_t *));
     return p;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -26,7 +26,7 @@ void SM_seq_free(SM_sequence_t *p)
     if (!p) return;
     free(p->instrs);
     free(p->stno_labels);
-    free(p->dcg_table);
+    free(p->bb_table);
     free(p);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -273,14 +273,14 @@ void sm_seq_print(const SM_sequence_t *p, FILE *out)
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int SM_seq_dcg_add(SM_sequence_t *p, struct BB_graph_t *cfg) {
+int SM_seq_bb_add(SM_sequence_t *p, struct BB_graph_t *cfg) {
     if (!cfg) return -1;
-    if (p->dcg_count >= p->dcg_cap) {
-        p->dcg_cap *= 2;
-        p->dcg_table = realloc(p->dcg_table, (size_t)p->dcg_cap * sizeof(BB_graph_t *));
+    if (p->bb_count >= p->bb_cap) {
+        p->bb_cap *= 2;
+        p->bb_table = realloc(p->bb_table, (size_t)p->bb_cap * sizeof(BB_graph_t *));
     }
-    int idx = p->dcg_count++;
-    p->dcg_table[idx] = cfg;
+    int idx = p->bb_count++;
+    p->bb_table[idx] = cfg;
     return idx;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/

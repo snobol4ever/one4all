@@ -1388,7 +1388,7 @@ static int emit_expression_registry(FILE *out, const SM_sequence_t *prog)
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* PJ-9d: emit Mode-4 Prolog predicate-registry — one builder fn per predicate + a registry table.            */
-/* Reads g_dcg_table (populated by lower_proc_skeletons at scrip-compile-time) and emits the assembly that    */
+/* Reads g_pl_bb_table (populated by lower_proc_skeletons at scrip-compile-time) and emits the assembly that    */
 /* reconstructs each BB_graph_t* graph at standalone-binary startup. Layout per rt_predicate_entry_t:         */
 /*   { const char *name; int arity; rt_pl_builder_fn builder; } — 24 bytes (8 + 4 + 4 pad + 8).               */
 /* Builder fn calls rt_pl_b_begin / rt_pl_b_node / rt_pl_b_kids / rt_pl_b_entry / rt_pl_b_end_register.       */
@@ -1540,8 +1540,8 @@ static int emit_pl_builder_fn(FILE *out, int pred_idx, const Pl_PredEntry_BB *en
 /* and just emits the registry table + builder fns referencing those .S<n> labels.                        */
 static void pl_pre_intern_pred_names(void)
 {
-    for (int i = 0; i < g_dcg_count; i++) {
-        const Pl_PredEntry_BB *e = &g_dcg_table[i];
+    for (int i = 0; i < g_pl_bb_count; i++) {
+        const Pl_PredEntry_BB *e = &g_pl_bb_table[i];
         if (!e->name) continue;
         strtab_intern(e->name);
         if (!e->ir_body) continue;
@@ -1558,20 +1558,20 @@ static void pl_pre_intern_pred_names(void)
 static int emit_pl_predicate_registry(FILE *out)
 {
     int n = 0;
-    for (int i = 0; i < g_dcg_count; i++) {
-        if (g_dcg_table[i].name && g_dcg_table[i].ir_body) n++;
+    for (int i = 0; i < g_pl_bb_count; i++) {
+        if (g_pl_bb_table[i].name && g_pl_bb_table[i].ir_body) n++;
     }
     if (n == 0) return 0;
-    for (int i = 0; i < g_dcg_count; i++) {
-        const Pl_PredEntry_BB *e = &g_dcg_table[i];
+    for (int i = 0; i < g_pl_bb_count; i++) {
+        const Pl_PredEntry_BB *e = &g_pl_bb_table[i];
         if (!e->name || !e->ir_body) continue;
         if (emit_pl_builder_fn(out, i, e) != 0) return -1;
     }
     if (emit_three_column_line(out, "", ".section", ".data", NULL) != 0) return -1;
     if (emit_three_column_line(out, "", ".align",   "8",     NULL) != 0) return -1;
     if (emit_three_column_line(out, ".Lpl_registry:", "", "", NULL) != 0) return -1;
-    for (int i = 0; i < g_dcg_count; i++) {
-        const Pl_PredEntry_BB *e = &g_dcg_table[i];
+    for (int i = 0; i < g_pl_bb_count; i++) {
+        const Pl_PredEntry_BB *e = &g_pl_bb_table[i];
         if (!e->name || !e->ir_body) continue;
         char name_arg[64], arity_arg[32], fn_arg[64];
         strtab_label(name_arg, sizeof(name_arg), e->name);

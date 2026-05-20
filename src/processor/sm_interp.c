@@ -615,10 +615,10 @@ int sm_interp_run_inner(SM_sequence_t *prog, SM_State *st)
             DESCR_t subj_d = sm_pop(st);
             DESCR_t pat_d  = sm_pop(st);
             const char *sname = ins->a[0].s;
-            BB_graph_t *pat_dcg = (int)ins->a[2].i >= 0 ? g_current_SM_seq->dcg_table[(int)ins->a[2].i] : NULL;
+            BB_graph_t *pat_bb = (int)ins->a[2].i >= 0 ? g_current_SM_seq->bb_table[(int)ins->a[2].i] : NULL;
             int ok;
-            if (pat_dcg) {
-                ok = IR_exec_pat(pat_dcg, sname, &subj_d,
+            if (pat_bb) {
+                ok = IR_exec_pat(pat_bb, sname, &subj_d,
                                  has_repl ? &repl : NULL, has_repl);
             } else {
                 ok = exec_stmt(sname, &subj_d, pat_d,
@@ -764,7 +764,7 @@ int sm_interp_run_inner(SM_sequence_t *prog, SM_State *st)
             break;
         }
         case SM_EXEC_BB: {
-            BB_graph_t * cfg = g_current_SM_seq->dcg_table[(int)ins->a[0].i];
+            BB_graph_t * cfg = g_current_SM_seq->bb_table[(int)ins->a[0].i];
             DESCR_t _val;
             if (!cfg) { _val = FAILDESCR; }
             else if (ins->a[1].i == 0) { ins->a[1].i = 1; _val = bb_exec_once(cfg); }
@@ -775,7 +775,7 @@ int sm_interp_run_inner(SM_sequence_t *prog, SM_State *st)
             break;
         }
         case SM_PUMP_BB: {
-            BB_graph_t * cfg = g_current_SM_seq->dcg_table[(int)ins->a[0].i];
+            BB_graph_t * cfg = g_current_SM_seq->bb_table[(int)ins->a[0].i];
             int _ticks = cfg ? bb_exec_pump(cfg, NULL, NULL) : 0;
             st->last_ok = (_ticks > 0);
             sm_push(st, INTVAL(_ticks));
