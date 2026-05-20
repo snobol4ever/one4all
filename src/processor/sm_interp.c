@@ -283,11 +283,11 @@ int sm_interp_run_inner(SM_sequence_t *prog, SM_State *st)
             val = NV_GET_fn(name);
             { extern int g_lang;
             if (g_lang == LANG_ICN && (val.v == DT_S || val.v == DT_SNUL)) {
-                for (int _pi = 0; _pi < proc_count; _pi++) {
-                    if (proc_table[_pi].name && strcmp(proc_table[_pi].name, name) == 0) {
+                for (int _pi = 0; _pi < g_stage2.proc_count; _pi++) {
+                    if (g_stage2.proc_table[_pi].name && strcmp(g_stage2.proc_table[_pi].name, name) == 0) {
                         val.v    = DT_E;
                         val.slen = (uint32_t)_pi;
-                        val.i    = proc_table[_pi].entry_pc;
+                        val.i    = g_stage2.proc_table[_pi].entry_pc;
                         break;
                     }
                 }
@@ -1285,20 +1285,20 @@ int sm_interp_run_inner(SM_sequence_t *prog, SM_State *st)
                 if (_pv_slot >= 0) {
                     DESCR_t _pv = icn_frame_env_load(_pv_slot);
                     if (_pv.v == DT_E) {
-                        for (int _pi = 0; _pi < proc_count; _pi++) {
-                            if (proc_table[_pi].entry_pc == (int)_pv.i) {
-                                DESCR_t _pr = sm_call_proc(proc_table[_pi].entry_pc,
-                                                            proc_table[_pi].nparams,
+                        for (int _pi = 0; _pi < g_stage2.proc_count; _pi++) {
+                            if (g_stage2.proc_table[_pi].entry_pc == (int)_pv.i) {
+                                DESCR_t _pr = sm_call_proc(g_stage2.proc_table[_pi].entry_pc,
+                                                            g_stage2.proc_table[_pi].nparams,
                                                             args, nargs);
                                 sm_push(st, _pr);
                                 st->last_ok = (_pr.v != DT_FAIL);
                                 goto sm_call_done;
                             }
                         }
-                        if (_pv.slen < (uint32_t)proc_count) {
+                        if (_pv.slen < (uint32_t)g_stage2.proc_count) {
                             int _pi = (int)_pv.slen;
-                            DESCR_t _pr = sm_call_proc(proc_table[_pi].entry_pc,
-                                                        proc_table[_pi].nparams,
+                            DESCR_t _pr = sm_call_proc(g_stage2.proc_table[_pi].entry_pc,
+                                                        g_stage2.proc_table[_pi].nparams,
                                                         args, nargs);
                             sm_push(st, _pr);
                             st->last_ok = (_pr.v != DT_FAIL);
@@ -1317,12 +1317,12 @@ int sm_interp_run_inner(SM_sequence_t *prog, SM_State *st)
                 }
             }
             if (name && 1) {
-                for (int _pi = 0; _pi < proc_count; _pi++) {
-                    if (proc_table[_pi].entry_pc >= 0 &&
-                        proc_table[_pi].name &&
-                        strcmp(proc_table[_pi].name, name) == 0) {
-                        DESCR_t _pr = sm_call_proc(proc_table[_pi].entry_pc,
-                                                    proc_table[_pi].nparams,
+                for (int _pi = 0; _pi < g_stage2.proc_count; _pi++) {
+                    if (g_stage2.proc_table[_pi].entry_pc >= 0 &&
+                        g_stage2.proc_table[_pi].name &&
+                        strcmp(g_stage2.proc_table[_pi].name, name) == 0) {
+                        DESCR_t _pr = sm_call_proc(g_stage2.proc_table[_pi].entry_pc,
+                                                    g_stage2.proc_table[_pi].nparams,
                                                     args, nargs);
                         sm_push(st, _pr);
                         st->last_ok = (_pr.v != DT_FAIL);
@@ -1711,20 +1711,20 @@ GeneratorState *generator_state_new(int entry_pc)
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 GeneratorState *generator_state_new_proc(int pi, DESCR_t *args, int nargs)
 {
-    if (pi < 0 || pi >= proc_count) return NULL;
-    int entry_pc = proc_table[pi].entry_pc;
+    if (pi < 0 || pi >= g_stage2.proc_count) return NULL;
+    int entry_pc = g_stage2.proc_table[pi].entry_pc;
     if (entry_pc < 0 || 0) return NULL;
     if (frame_depth >= FRAME_STACK_MAX) return NULL;
     IcnFrame *f = &frame_stack[frame_depth++];
     memset(f, 0, sizeof *f);
-    int nparams = proc_table[pi].nparams;
+    int nparams = g_stage2.proc_table[pi].nparams;
     int nslots = (nparams > 0) ? nparams : 1;
     if (nslots > FRAME_SLOT_MAX) nslots = FRAME_SLOT_MAX;
     f->env_n = nslots;
     for (int i = 0; i < nparams && i < nargs && i < FRAME_SLOT_MAX; i++) f->env[i] = args[i];
     fprintf(stderr, "[NO-AST] sm_call_proc tree walk removed: scope must be prebuilt at lower time\n");
-    f->sc = proc_table[pi].lower_sc;
-    int total_slots = proc_table[pi].lower_sc.n;
+    f->sc = g_stage2.proc_table[pi].lower_sc;
+    int total_slots = g_stage2.proc_table[pi].lower_sc.n;
     if (total_slots > f->env_n) f->env_n = total_slots;
     GeneratorState *gs = GC_malloc(sizeof(GeneratorState));
     memset(gs, 0, sizeof *gs);

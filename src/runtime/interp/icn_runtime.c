@@ -23,8 +23,9 @@ extern bb_node_t icn_bb_make_proc_box(tree_t *proc, DESCR_t *args, int nargs);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern DESCR_t NV_SET_fn(const char *name, DESCR_t val);
 /* ST2-1: proc_table[] and proc_count storage moved to stage2_t.
- * Legacy names in this TU resolve to (g_stage2.proc_table) and
- * (g_stage2.proc_count) via the macros in icn_runtime.h.       */
+ * ST2-1b proc_table/proc_count sub-step (this commit): all 32 readers
+ * in this TU sweep to g_stage2.proc_table / g_stage2.proc_count
+ * literally.  Shim macros deleted from icn_runtime.h.                  */
 int          g_lang         = 0;
 tree_t      *g_icn_root     = NULL;
 int g_sm_dispatch_active = 0;
@@ -94,9 +95,9 @@ static int              static_n = 0;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int static_proc_entry_pc(const char *proc_name) {
     if (!proc_name) return -1;
-    for (int i = 0; i < proc_count; i++)
-        if (proc_table[i].name && strcmp(proc_table[i].name, proc_name) == 0)
-            return proc_table[i].entry_pc;
+    for (int i = 0; i < g_stage2.proc_count; i++)
+        if (g_stage2.proc_table[i].name && strcmp(g_stage2.proc_table[i].name, proc_name) == 0)
+            return g_stage2.proc_table[i].entry_pc;
     return -1;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -191,18 +192,18 @@ DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs)
     int found_pi = -1;
     tree_t *found_proc = NULL;
     {
-        for (int i = 0; i < proc_count; i++) {
-            if (proc_table[i].entry_pc == entry_pc) { found_pi = i; break; }
+        for (int i = 0; i < g_stage2.proc_count; i++) {
+            if (g_stage2.proc_table[i].entry_pc == entry_pc) { found_pi = i; break; }
         }
-        if (found_pi >= 0 && proc_table[found_pi].proc) {
-            found_proc = proc_table[found_pi].proc;
+        if (found_pi >= 0 && g_stage2.proc_table[found_pi].proc) {
+            found_proc = g_stage2.proc_table[found_pi].proc;
             tree_t *body_nd = (found_proc->t == TT_PROC_DECL && found_proc->n >= 3) ? found_proc->c[2] : NULL;
             if (body_nd) for (int bi = 0; bi < body_nd->n; bi++)
-                icn_scope_patch(&proc_table[found_pi].lower_sc, body_nd->c[bi]);
-            int total_slots = proc_table[found_pi].lower_sc.n;
+                icn_scope_patch(&g_stage2.proc_table[found_pi].lower_sc, body_nd->c[bi]);
+            int total_slots = g_stage2.proc_table[found_pi].lower_sc.n;
             if (total_slots > f->env_n) f->env_n = total_slots;
-            f->sc = proc_table[found_pi].lower_sc;
-            IcnScope *sc = &proc_table[found_pi].lower_sc;
+            f->sc = g_stage2.proc_table[found_pi].lower_sc;
+            IcnScope *sc = &g_stage2.proc_table[found_pi].lower_sc;
             IcnFrame *parent_f = (frame_depth >= 2) ? &frame_stack[frame_depth - 2] : NULL;
             for (int bi = 0; body_nd && bi < body_nd->n; bi++) {
                 tree_t *st = body_nd->c[bi];
@@ -225,7 +226,7 @@ DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs)
     }
     DESCR_t result = sm_call_expression(entry_pc);
     if (found_pi >= 0 && found_proc) {
-        IcnScope *sc = &proc_table[found_pi].lower_sc;
+        IcnScope *sc = &g_stage2.proc_table[found_pi].lower_sc;
         tree_t *body_nd2 = (found_proc->t == TT_PROC_DECL && found_proc->n >= 3) ? found_proc->c[2] : NULL;
         for (int bi = 0; body_nd2 && bi < body_nd2->n; bi++) {
             tree_t *st = body_nd2->c[bi];
@@ -246,10 +247,10 @@ DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs)
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t proc_table_call(int pi, DESCR_t *args, int nargs)
 {
-    if (pi < 0 || pi >= proc_count) return FAILDESCR;
+    if (pi < 0 || pi >= g_stage2.proc_count) return FAILDESCR;
     extern stage2_t g_stage2;
-    if (proc_table[pi].entry_pc >= 0 && 1)
-        return sm_call_proc(proc_table[pi].entry_pc, proc_table[pi].nparams, args, nargs);
+    if (g_stage2.proc_table[pi].entry_pc >= 0 && 1)
+        return sm_call_proc(g_stage2.proc_table[pi].entry_pc, g_stage2.proc_table[pi].nparams, args, nargs);
     return FAILDESCR;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -340,21 +341,21 @@ DESCR_t icn_bb_dcg(void *zeta, int entry) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 bb_node_t icn_bb_pump_proc_by_name(const char *name, DESCR_t *args, int nargs) {
     if (!name) return (bb_node_t){ NULL, NULL, 0 };
-    for (int i = 0; i < proc_count; i++) {
-        if (strcmp(proc_table[i].name, name) != 0) continue;
+    for (int i = 0; i < g_stage2.proc_count; i++) {
+        if (strcmp(g_stage2.proc_table[i].name, name) != 0) continue;
         /* AST → IR → BB path: when an BB_graph_t body exists, drive it via icn_bb_dcg.   */
         /* This bypasses SM entirely: no proc_table_call, no sm_call_expression.            */
-        BB_graph_t *_cfg_i = bb_graph_of_proc(&proc_table[i]);
+        BB_graph_t *_cfg_i = bb_graph_of_proc(&g_stage2.proc_table[i]);
         if (_cfg_i) {
             if (frame_depth < FRAME_STACK_MAX) {
                 IcnFrame *f = &frame_stack[frame_depth++];
                 memset(f, 0, sizeof *f);
-                IcnScope sc_local = proc_table[i].lower_sc;
+                IcnScope sc_local = g_stage2.proc_table[i].lower_sc;
                 f->sc       = sc_local;
                 int nslots = sc_local.n > 0 ? sc_local.n : 1;
                 if (nslots > FRAME_SLOT_MAX) nslots = FRAME_SLOT_MAX;
                 f->env_n    = nslots;
-                for (int k = 0; k < proc_table[i].nparams && k < nargs && k < FRAME_SLOT_MAX; k++)
+                for (int k = 0; k < g_stage2.proc_table[i].nparams && k < nargs && k < FRAME_SLOT_MAX; k++)
                     f->env[k] = args[k];
             }
             icn_dcg_state_t *dz = calloc(1, sizeof(*dz));
@@ -365,7 +366,7 @@ bb_node_t icn_bb_pump_proc_by_name(const char *name, DESCR_t *args, int nargs) {
         /* IJ-SUSPEND-PUMP-WIRE: generator proc (TT_SUSPEND present) without ir_body — route through */
         /* GeneratorState + BB_ICN_PROC_GEN, the same mechanism icn_bb_build uses on the AST path.   */
         /* is_generator was set at lower time (lower.c lower_proc_skeletons) so no AST walk here.    */
-        if (proc_table[i].is_generator && proc_table[i].entry_pc >= 0 && 1) {
+        if (g_stage2.proc_table[i].is_generator && g_stage2.proc_table[i].entry_pc >= 0 && 1) {
             GeneratorState *pgs = generator_state_new_proc(i, args, nargs);
             if (pgs) {
                 BB_graph_t *pcfg = lower_icn_proc_gen(pgs);
@@ -434,11 +435,11 @@ DESCR_t icn_lconcat_d(DESCR_t a, DESCR_t b) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t icn_proc_as_value(const char *name) {
     if (!name || name[0] == '&') return FAILDESCR;
-    for (int i = 0; i < proc_count; i++) {
-        if (proc_table[i].name && strcmp(proc_table[i].name, name) == 0) {
+    for (int i = 0; i < g_stage2.proc_count; i++) {
+        if (g_stage2.proc_table[i].name && strcmp(g_stage2.proc_table[i].name, name) == 0) {
             DESCR_t pv; pv.v = DT_E;
             pv.slen = (uint32_t)i;
-            pv.i    = proc_table[i].entry_pc;
+            pv.i    = g_stage2.proc_table[i].entry_pc;
             return pv;
         }
     }
@@ -462,7 +463,7 @@ DESCR_t icn_proc_as_value(const char *name) {
 /* DAI (IJ-DEL-ICN-AST, DAI-5b-2): icn_bb_build deleted. The Icon-specific tree_t* AST-walking BB     */
 /* builder is gone. Mode-1 Icon executes via the universal interp_eval walker which routes Icon kinds */
 /* through ir_exec.c (BB_graph_t walker); the tree_t* path through the Icon walker was vestigial.     */
-/* icn_bb_dcg, icn_bb_pump_proc_by_name, proc_table machinery above remain (used by modes 2/3/4).     */
+/* icn_bb_dcg, icn_bb_pump_proc_by_name, g_stage2.proc_table machinery above remain (used by modes 2/3/4).     */
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 #include "../../driver/interp_private.h"
@@ -742,9 +743,9 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
     if (!strcmp(fn,"args") && nargs == 1) {
         DESCR_t a = args[0];
         if (a.v == DT_E) {
-            for (int i=0;i<proc_count;i++) {
-                if (proc_table[i].entry_pc == (int)a.i) {
-                    *out = INTVAL(proc_table[i].nparams <= 0 ? -2 : proc_table[i].nparams);
+            for (int i=0;i<g_stage2.proc_count;i++) {
+                if (g_stage2.proc_table[i].entry_pc == (int)a.i) {
+                    *out = INTVAL(g_stage2.proc_table[i].nparams <= 0 ? -2 : g_stage2.proc_table[i].nparams);
                     return 1;
                 }
             }
@@ -759,12 +760,12 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         const char *pname = VARVAL_fn(args[0]);
         int arity = (int)to_int(args[1]);
         if (!pname) { *out = FAILDESCR; return 1; }
-        for (int i = 0; i < proc_count; i++) {
-            if (proc_table[i].name && strcmp(proc_table[i].name, pname) == 0) {
-                if (arity < 0 || proc_table[i].nparams == arity || proc_table[i].nparams <= 0) {
+        for (int i = 0; i < g_stage2.proc_count; i++) {
+            if (g_stage2.proc_table[i].name && strcmp(g_stage2.proc_table[i].name, pname) == 0) {
+                if (arity < 0 || g_stage2.proc_table[i].nparams == arity || g_stage2.proc_table[i].nparams <= 0) {
                     DESCR_t pv; pv.v = DT_E;
                     pv.slen = (uint32_t)(arity >= 0 ? arity : 0);
-                    pv.i    = proc_table[i].entry_pc;
+                    pv.i    = g_stage2.proc_table[i].entry_pc;
                     *out = pv; return 1;
                 }
             }
@@ -820,9 +821,9 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         }
         if (av.v==DT_DATA)       { *out = STRVAL("record"); return 1; }
         if (av.v==DT_E) {
-            for (int i=0;i<proc_count;i++)
-                if (proc_table[i].entry_pc==(int)av.i)
-                    { snprintf(buf,128,"procedure %s",proc_table[i].name); *out=STRVAL(buf); return 1; }
+            for (int i=0;i<g_stage2.proc_count;i++)
+                if (g_stage2.proc_table[i].entry_pc==(int)av.i)
+                    { snprintf(buf,128,"procedure %s",g_stage2.proc_table[i].name); *out=STRVAL(buf); return 1; }
             snprintf(buf,128,"procedure"); *out=STRVAL(buf); return 1;
         }
         if (IS_CSET_fn(av)) {
@@ -885,9 +886,9 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         }
         if (av.v == DT_E) {
             char *buf = GC_malloc(128);
-            for (int i=0;i<proc_count;i++)
-                if (proc_table[i].entry_pc==(int)av.i)
-                    { snprintf(buf,128,"procedure %s",proc_table[i].name); *out=STRVAL(buf); return 1; }
+            for (int i=0;i<g_stage2.proc_count;i++)
+                if (g_stage2.proc_table[i].entry_pc==(int)av.i)
+                    { snprintf(buf,128,"procedure %s",g_stage2.proc_table[i].name); *out=STRVAL(buf); return 1; }
             snprintf(buf,128,"procedure"); *out=STRVAL(buf); return 1;
         }
         DESCR_t one_out = FAILDESCR;
@@ -1870,8 +1871,8 @@ DESCR_t icn_call_builtin(tree_t *call, DESCR_t *args, int nargs) {
     }
     DESCR_t a0 = nargs > 0 ? args[0] : NULVCL;
     DESCR_t a1 = nargs > 1 ? args[1] : NULVCL;
-    for (int i = 0; i < proc_count; i++) {
-        if (!strcmp(proc_table[i].name, fn))
+    for (int i = 0; i < g_stage2.proc_count; i++) {
+        if (!strcmp(g_stage2.proc_table[i].name, fn))
             return proc_table_call(i, args, nargs);
     }
     {

@@ -135,8 +135,8 @@ static void emit_var_load(const char *vn)
 {
     if (g_in_proc_body && g_proc_scope && vn[0] && vn[0] != '&') {
         if (g_lang == LANG_ICN) {
-            for (int _pi = 0; _pi < proc_count; _pi++) {
-                if (proc_table[_pi].name && strcmp(proc_table[_pi].name, vn) == 0) {
+            for (int _pi = 0; _pi < g_stage2.proc_count; _pi++) {
+                if (g_stage2.proc_table[_pi].name && strcmp(g_stage2.proc_table[_pi].name, vn) == 0) {
                     SM_emit_s(g_p, SM_PUSH_VAR, vn);
                     return;
                 }
@@ -1932,33 +1932,33 @@ static void emit_proc_stub(const char *name)
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void lower_proc_skeletons(void)
 {
-    for (int pi = 0; pi < proc_count; pi++) {
-        const char *nm = proc_table[pi].name;
+    for (int pi = 0; pi < g_stage2.proc_count; pi++) {
+        const char *nm = g_stage2.proc_table[pi].name;
         if (!nm || !*nm) continue;
-        tree_t *proc = proc_table[pi].proc;
+        tree_t *proc = g_stage2.proc_table[pi].proc;
         int skip = SM_emit_i(g_p, SM_JUMP, 0);
         SM_label_named(g_p, nm);
         if (proc) {
             int body_start = 0;
             IcnScope sc; build_proc_scope(&sc, proc, body_start);
-            proc_table[pi].lower_sc = sc;
+            g_stage2.proc_table[pi].lower_sc = sc;
             /* Attempt to lower body to an BB_graph_t DCG.  When successful, runtime icn_bb_pump_proc_by_name */
             /* uses it directly via icn_bb_dcg, bypassing SM entirely.  When NULL, legacy SM path runs.        */
             BB_graph_t *_irb = lower_icn_proc_body(proc);
             /* IR-CONSOLIDATE-DCG step 5 (2026-05-20): the BB graph reaches consumers only through
              * g_stage2.sm.bb_table[bb_idx].  The duplicate proc_table[].ir_body field is gone. */
-            proc_table[pi].bb_idx = _irb ? SM_seq_bb_add(g_p, _irb) : -1;
+            g_stage2.proc_table[pi].bb_idx = _irb ? SM_seq_bb_add(g_p, _irb) : -1;
             /* Detect generator procs: any BB_SUSPEND in the lowered body marks the proc as a generator. BB_EVERY consults this bit at BB_CALL time to decide whether to pump-to-exhaustion or fire once. */
             /* IJ-SUSPEND-PUMP-WIRE: also walk the AST for TT_SUSPEND so suspend-bearing procs whose BB-graph  */
             /* lowering returns NULL (e.g. because lower_icn_expr_node has no TT_SUSPEND case) are still       */
             /* marked as generators.  icn_bb_pump_proc_by_name then routes them through GeneratorState.        */
-            proc_table[pi].is_generator = 0;
+            g_stage2.proc_table[pi].is_generator = 0;
             if (_irb) {
                 for (int _k = 0; _k < _irb->n; _k++) {
-                    if (_irb->all[_k] && _irb->all[_k]->t == BB_SUSPEND) { proc_table[pi].is_generator = 1; break; }
+                    if (_irb->all[_k] && _irb->all[_k]->t == BB_SUSPEND) { g_stage2.proc_table[pi].is_generator = 1; break; }
                 }
             }
-            if (!proc_table[pi].is_generator) {
+            if (!g_stage2.proc_table[pi].is_generator) {
                 /* AST walk: this runs at lower time, NOT in mode 2/3/4. The bit is consumed by runtime */
                 /* paths that need a synchronous read of "is this a generator proc?" without re-walking. */
                 tree_t *stack[256]; int sp = 0;
@@ -1966,12 +1966,12 @@ static void lower_proc_skeletons(void)
                 while (sp > 0) {
                     tree_t *n = stack[--sp];
                     if (!n) continue;
-                    if (n->t == TT_SUSPEND) { proc_table[pi].is_generator = 1; break; }
+                    if (n->t == TT_SUSPEND) { g_stage2.proc_table[pi].is_generator = 1; break; }
                     for (int _ci = 0; _ci < n->n && sp < 254; _ci++) if (n->c[_ci]) stack[sp++] = n->c[_ci];
                 }
             }
             g_proc_scope = &sc; g_in_proc_body = 1;
-            g_in_gen_proc_body = proc_table[pi].is_generator;  /* IJ-SUSPEND: emit real SM for gen procs */
+            g_in_gen_proc_body = g_stage2.proc_table[pi].is_generator;  /* IJ-SUSPEND: emit real SM for gen procs */
             g_lang = LANG_ICN;
             {
                 tree_t *bnd = (proc->t == TT_PROC_DECL && proc->n >= 3) ? proc->c[2] : NULL;

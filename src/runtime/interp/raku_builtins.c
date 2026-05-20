@@ -510,9 +510,9 @@ int raku_try_call_builtin(tree_t *call, DESCR_t *__rk_out) {
                 char procname[256];
                 snprintf(procname, sizeof procname, "%s__%s", cname, mname);
                 int pi;
-                for (pi = 0; pi < proc_count; pi++)
-                    if (strcmp(proc_table[pi].name, procname) == 0) break;
-                if (pi >= proc_count) { *__rk_out = FAILDESCR; return 1; }
+                for (pi = 0; pi < g_stage2.proc_count; pi++)
+                    if (strcmp(g_stage2.proc_table[pi].name, procname) == 0) break;
+                if (pi >= g_stage2.proc_count) { *__rk_out = FAILDESCR; return 1; }
                 int nextra = call->n - 3;
                 int total  = 1 + nextra;
                 DESCR_t *callargs = GC_malloc((size_t)total * sizeof(DESCR_t));

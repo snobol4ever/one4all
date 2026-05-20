@@ -66,8 +66,8 @@ DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
             return APPLY_fn(name, args, nargs);
     }
     if (!_body) {
-        for (int _i = 0; _i < proc_count; _i++) {
-            if (strcmp(proc_table[_i].name, name) == 0) {
+        for (int _i = 0; _i < g_stage2.proc_count; _i++) {
+            if (strcmp(g_stage2.proc_table[_i].name, name) == 0) {
                 return proc_table_call(_i, args, nargs);
             }
         }

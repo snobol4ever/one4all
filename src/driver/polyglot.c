@@ -48,7 +48,7 @@ void polyglot_init(stage2_t *s2, const tree_t *prog, uint32_t lang_mask)
     prescan_defines(prog);
     if (lang_mask & ((1u << LANG_ICN) | (1u << LANG_RAKU))) {
         g_fi8_icn_init_count++;
-        proc_count = 0; global_count = 0;
+        s2->proc_count = 0; global_count = 0;
         frame_depth = 0;
         memset(frame_stack, 0, sizeof frame_stack);
         scan_subj = ""; scan_pos = 1; scan_depth = 0;
@@ -83,7 +83,7 @@ void polyglot_init(stage2_t *s2, const tree_t *prog, uint32_t lang_mask)
                 m->nstmts           = 0;
                 m->sno_label_start  = s2->label_count;
                 m->sno_label_count  = 0;
-                m->icn_proc_start   = proc_count;
+                m->icn_proc_start   = s2->proc_count;
                 m->nprocs            = 0;
             }
         }
@@ -115,15 +115,15 @@ void polyglot_init(stage2_t *s2, const tree_t *prog, uint32_t lang_mask)
             }
             if ((proc->t == TT_FNC || proc->t == TT_PROC_DECL || proc->t == TT_SUB_DECL) && proc->v.sval && *proc->v.sval) {
                 const char *name = proc->v.sval;
-                if (proc_count < PROC_TABLE_MAX) {
-                    proc_table[proc_count].name     = name;
-                    proc_table[proc_count].proc     = proc;
-                    proc_table[proc_count].entry_pc = -1;
-                    proc_table[proc_count].bb_idx  = -1;       /* IR-CONSOLIDATE-DCG step 2: set in lower.c when ir_body is built. */
-                    proc_table[proc_count].nparams  = (s_lang == LANG_ICN)
+                if (s2->proc_count < PROC_TABLE_MAX) {
+                    s2->proc_table[s2->proc_count].name     = name;
+                    s2->proc_table[s2->proc_count].proc     = proc;
+                    s2->proc_table[s2->proc_count].entry_pc = -1;
+                    s2->proc_table[s2->proc_count].bb_idx  = -1;       /* IR-CONSOLIDATE-DCG step 2: set in lower.c when ir_body is built. */
+                    s2->proc_table[s2->proc_count].nparams  = (s_lang == LANG_ICN)
                         ? (proc->t == TT_PROC_DECL && proc->n >= 2 ? proc->c[1]->n : 0)
                         : (int)proc->v.ival;
-                    proc_count++;
+                    s2->proc_count++;
                     if (mod_idx >= 0) s2->module_registry.mods[mod_idx].nprocs++;
                     if (strcmp(name, "main") == 0 && s2->module_registry.main_mod < 0)
                         s2->module_registry.main_mod = mod_idx;

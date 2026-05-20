@@ -36,10 +36,11 @@ typedef struct {
     tree_t       *suspend_do;
     struct GeneratorState *every_gen[EVERY_GEN_SLOT_MAX];
 } IcnFrame;
-/* ST2-1 reader shim: proc_table / proc_count redirect into g_stage2.
- *   Deleted in ST2-1b once all readers take `stage2_t *s2` directly. */
-#define proc_table  (g_stage2.proc_table)
-#define proc_count  (g_stage2.proc_count)
+/* ST2-1b proc_table / proc_count sub-step (this commit): the legacy
+ * reader shim macros were deleted.  All readers now resolve to
+ * g_stage2.proc_table / g_stage2.proc_count directly (deep dispatch
+ * paths that don't carry stage2_t *s2) or to s2->proc_table /
+ * s2->proc_count (polyglot_init, sm_resolve_proc_entry_pcs).            */
 /* IR-CONSOLIDATE-DCG step 5 (2026-05-20): single-structure lookup — the BB graph for
  * this proc lives at g_stage2.sm.bb_table[bb_idx].  Returns NULL when bb_idx is unset
  * (proc body did not lower to BB) or out of range. */

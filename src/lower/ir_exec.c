@@ -50,10 +50,10 @@ static int ir_is_single_shot(BB_t * e) {
         return 0;
     case BB_CALL: {
         if (!e->sval) return 1;
-        for (int _pi = 0; _pi < proc_count; _pi++) {
-            if (!proc_table[_pi].name || strcmp(proc_table[_pi].name, e->sval) != 0) continue;
-            if (!bb_graph_of_proc(&proc_table[_pi])) return 0;
-            if (proc_table[_pi].is_generator) return 0;
+        for (int _pi = 0; _pi < g_stage2.proc_count; _pi++) {
+            if (!g_stage2.proc_table[_pi].name || strcmp(g_stage2.proc_table[_pi].name, e->sval) != 0) continue;
+            if (!bb_graph_of_proc(&g_stage2.proc_table[_pi])) return 0;
+            if (g_stage2.proc_table[_pi].is_generator) return 0;
             for (int _j = 0; _j < e->n; _j++) if (!ir_is_single_shot(e->c[_j])) return 0;
             return 1;
         }
@@ -177,11 +177,11 @@ BB_t * bb_exec_node(BB_t * nd) {
         /* The "upto" builtin's scan-context guard (`scan_pos > 0 || nargs >= 2`) was true by       */
         /* default (polyglot.c initializes scan_pos=1), so user-defined upto was shadowed.          */
         /* User generator procs take priority — they correspond to source-level `procedure upto`.   */
-        for (int _pi0 = 0; _pi0 < proc_count; _pi0++) {
-            if (!proc_table[_pi0].name || strcmp(proc_table[_pi0].name, nd->sval) != 0) continue;
-            if (!proc_table[_pi0].is_generator) break;  /* fall through to builtins/standard path */
-            if (bb_graph_of_proc(&proc_table[_pi0])) break;        /* let bb_graph path handle it (standard) */
-            if (proc_table[_pi0].entry_pc < 0) break;
+        for (int _pi0 = 0; _pi0 < g_stage2.proc_count; _pi0++) {
+            if (!g_stage2.proc_table[_pi0].name || strcmp(g_stage2.proc_table[_pi0].name, nd->sval) != 0) continue;
+            if (!g_stage2.proc_table[_pi0].is_generator) break;  /* fall through to builtins/standard path */
+            if (bb_graph_of_proc(&g_stage2.proc_table[_pi0])) break;        /* let bb_graph path handle it (standard) */
+            if (g_stage2.proc_table[_pi0].entry_pc < 0) break;
             GeneratorState *pgs = generator_state_new_proc(_pi0, args, nargs);
             if (!pgs) break;
             DESCR_t v;
@@ -197,19 +197,19 @@ BB_t * bb_exec_node(BB_t * nd) {
             nd->value = out;
             return IS_FAIL_fn(out) ? nd->ω : nd->γ;
         }
-        /* User-defined proc: look up proc_table by name; if a BB graph exists, push frame and exec. Snapshot per-node state of the callee's graph around bb_exec_once so the caller's activation survives when the callee is the SAME proc (recursion shares the IR graph; without snapshot, the inner bb_reset wipes the caller's per-node value/counter/state, breaking e.g. BB_BINOP_GEN's read of nd->c[0]->value after a recursive-call right operand). */
-        for (int _pi = 0; _pi < proc_count; _pi++) {
-            if (!proc_table[_pi].name || strcmp(proc_table[_pi].name, nd->sval) != 0) continue;
-            BB_graph_t *_cfg = bb_graph_of_proc(&proc_table[_pi]);
+        /* User-defined proc: look up g_stage2.proc_table by name; if a BB graph exists, push frame and exec. Snapshot per-node state of the callee's graph around bb_exec_once so the caller's activation survives when the callee is the SAME proc (recursion shares the IR graph; without snapshot, the inner bb_reset wipes the caller's per-node value/counter/state, breaking e.g. BB_BINOP_GEN's read of nd->c[0]->value after a recursive-call right operand). */
+        for (int _pi = 0; _pi < g_stage2.proc_count; _pi++) {
+            if (!g_stage2.proc_table[_pi].name || strcmp(g_stage2.proc_table[_pi].name, nd->sval) != 0) continue;
+            BB_graph_t *_cfg = bb_graph_of_proc(&g_stage2.proc_table[_pi]);
             if (!_cfg) break;
             if (frame_depth >= FRAME_STACK_MAX) break;
             IcnFrame *_f = &frame_stack[frame_depth++];
             memset(_f, 0, sizeof *_f);
-            _f->sc   = proc_table[_pi].lower_sc;
+            _f->sc   = g_stage2.proc_table[_pi].lower_sc;
             int _nsl = _f->sc.n > 0 ? _f->sc.n : 1;
             if (_nsl > FRAME_SLOT_MAX) _nsl = FRAME_SLOT_MAX;
             _f->env_n = _nsl;
-            for (int _k = 0; _k < proc_table[_pi].nparams && _k < nargs && _k < FRAME_SLOT_MAX; _k++)
+            for (int _k = 0; _k < g_stage2.proc_table[_pi].nparams && _k < nargs && _k < FRAME_SLOT_MAX; _k++)
                 _f->env[_k] = args[_k];
             IR_node_state_t * _snap = IR_snapshot_state(_cfg);
             bb_reset(_cfg);
