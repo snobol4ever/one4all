@@ -138,6 +138,12 @@ int emit_sm_call_dispatch               (FILE *out, const SM_t *ins, int pc);
 int emit_sm_define_entry_dispatch       (FILE *out, const SM_t *ins, int pc, const SM_sequence_t *prog);
 int emit_sm_define_dispatch             (FILE *out, const SM_t *ins, int pc);
 extern int g_in_define_body;
+/* EC-UNI-13(d): exposed for SM_templates/sm_bb_calls.c IS_X86 arm.  SM_BB_ONCE_PROC
+ * routes through rt_pl_once (PJ-9c Prolog predicate invocation); SM_BB_PUMP_PROC
+ * emits a direct `call .L<entry_pc>` to the Icon proc's SM-lowered body (IJ-HELLO-3).
+ * JVM/JS/NET/WASM arms are no-ops — those backends never emit these opcodes today. */
+int emit_sm_bb_once_proc_dispatch       (FILE *out, const SM_t *ins, int pc);
+int emit_sm_bb_pump_proc_dispatch       (FILE *out, const SM_t *ins, int pc);
 /* EC-UNI-3: feature flag — when non-zero, emit_walk_codegen routes the 52 templated opcodes through
  * SM_template fns (which call the same dispatchers under IS_X86). Byte-identical by construction. */
 extern int g_emit_use_unified_dispatch;

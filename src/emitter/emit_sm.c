@@ -2051,7 +2051,7 @@ int emit_sm_call_dispatch(FILE *out, const SM_t *ins, int pc)
 /* in g_sm_templates[] mapped to rt_pl_once (defined in src/runtime/rt/rt.c).  IJ-HELLO-4b (2026-05-18) flipped         */
 /* this from rt_bb_once_proc → rt_pl_once to break the brokered-import chain; the bb_broker layer is bypassed in       */
 /* favor of a direct bb_exec_once call on the predicate's BB_graph_t.                                                    */
-static int emit_sm_bb_once_proc_dispatch(FILE *out, const SM_t *ins, int pc)
+int emit_sm_bb_once_proc_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     const char *name  = ins->a[0].s ? ins->a[0].s : "";
@@ -2074,7 +2074,7 @@ static int emit_sm_bb_once_proc_dispatch(FILE *out, const SM_t *ins, int pc)
 /*   • zero runtime helper invocation (no rt_bb_pump_proc, no bb_broker, no _usercall_hook)                              */
 /*   • zero new BB_graph_t* walker (existing SM template machinery handles the body)                                     */
 /*   • zero new asm macros (CALL_EXPRESSION already exists for SM_CALL_EXPRESSION)                                       */
-static int emit_sm_bb_pump_proc_dispatch(FILE *out, const SM_t *ins, int pc)
+int emit_sm_bb_pump_proc_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     const char *name = ins->a[0].s ? ins->a[0].s : "";
@@ -3000,6 +3000,9 @@ static int dispatch_one_x86(FILE *out, const SM_t *ins, int pc) {
         /* sm_defines.c — EC-UNI-13(c) */
         case SM_DEFINE_ENTRY:      (void)sm_define_entry();     return 0;
         case SM_DEFINE:            (void)sm_define();           return 0;
+        /* sm_bb_calls.c — EC-UNI-13(d) */
+        case SM_BB_ONCE_PROC:      (void)sm_bb_once_proc();     return 0;
+        case SM_BB_PUMP_PROC:      (void)sm_bb_pump_proc();     return 0;
         default:                   return -1;  /* uncovered by templates — caller falls through */
     }
 }

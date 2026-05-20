@@ -82,3 +82,9 @@ int  sm_suspend_value    (void);
  * convention as sm_call_fn, but all arms currently return 0 (no terminal jump). */
 int  sm_define_entry     (void);
 int  sm_define           (void);
+/* group: bb_calls — EC-UNI-13(d): SM_BB_ONCE_PROC and SM_BB_PUMP_PROC.  Today only
+ * the IS_X86 arm carries logic (PJ-9c Prolog rt_pl_once + IJ-HELLO-3 Icon proc
+ * direct call); IS_JVM/JS/NET/WASM are honest no-op stubs matching the silo
+ * walkers' `default: break;` fallthrough.  Return 0 (no terminal jump). */
+int  sm_bb_once_proc     (void);
+int  sm_bb_pump_proc     (void);
