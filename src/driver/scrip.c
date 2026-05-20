@@ -343,7 +343,8 @@ int main(int argc, char **argv)
     if (dump_sm && !mode_interp) {
         label_table_build(ast_prog);
         prescan_defines(ast_prog);
-        SM_sequence_t *sm0 = lower(ast_prog);
+        ParserOutput po = { .prog = ast_prog, .lang_mask = 0 };
+        SM_sequence_t *sm0 = lower(&po);
         if (!sm0) { fprintf(stderr, "scrip: sm_lower failed\n"); return 1; }
         sm_seq_print(sm0, stdout);
         SM_seq_free(sm0);

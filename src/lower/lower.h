@@ -2,6 +2,7 @@
 #define LOWER_H
 #include "SM.h"
 #include "../../ast/ast.h"
+#include "parser_output.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-SM_sequence_t *lower(const tree_t *prog);
+SM_sequence_t *lower(const ParserOutput *po);
 #endif

@@ -2064,8 +2064,10 @@ static void lower_gather_hoist_pass(const tree_t * prog) {
     ((tree_t *)prog)->n = new_n;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-SM_sequence_t *lower(const tree_t *prog)
+SM_sequence_t *lower(const ParserOutput *po)
 {
+    if (!po) return NULL;
+    const tree_t *prog = po->prog;
     if (!prog || prog->t != TT_PROGRAM) return NULL;
     g_p            = SM_seq_new();
     g_in_proc_body = 0;

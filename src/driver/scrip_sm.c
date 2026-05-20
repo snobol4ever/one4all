@@ -46,17 +46,14 @@ static void sm_resolve_proc_entry_pcs(SM_sequence_t *p)
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 SM_sequence_t *sm_preamble(const tree_t *ast_prog){
-    label_table_build(ast_prog);
-    prescan_defines(ast_prog);
+    ParserOutput po = parser_output_build(ast_prog);
     g_sno_err_active = 1;
-    uint32_t lang_mask = polyglot_lang_mask(ast_prog);
-    polyglot_init(ast_prog, lang_mask);
-    SM_sequence_t *sm = lower(ast_prog);
+    SM_sequence_t *sm = lower(&po);
     if (!sm) {
         fprintf(stderr, "scrip: sm_lower failed\n");
         return NULL;
     }
-    if (lang_mask & (1u << LANG_ICN)) {
+    if (po.lang_mask & (1u << LANG_ICN)) {
         extern int g_lang;
         g_lang = LANG_ICN;
     }
