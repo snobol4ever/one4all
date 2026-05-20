@@ -74,9 +74,10 @@ bb_node_t pl_bb_once_proc_by_name(const char *name, int arity) {
     const char *sl = strrchr(name, '/');
     if (sl && arity == 0) arity = atoi(sl + 1);
     Pl_PredEntry_BB *bb = pl_bb_lookup(name, arity);
-    if (!bb || !bb->ir_body) return (bb_node_t){ NULL, NULL, 0 };
+    BB_graph_t *_cfg = bb_graph_of_pred(bb);
+    if (!_cfg) return (bb_node_t){ NULL, NULL, 0 };
     pl_dcg_state_t *dz = calloc(1, sizeof(*dz));
-    dz->cfg   = bb->ir_body;
+    dz->cfg   = _cfg;
     dz->first = 1;
     return (bb_node_t){ pl_bb_dcg, dz, 0 };
 }

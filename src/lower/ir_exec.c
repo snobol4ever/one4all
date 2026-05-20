@@ -52,7 +52,7 @@ static int ir_is_single_shot(BB_t * e) {
         if (!e->sval) return 1;
         for (int _pi = 0; _pi < proc_count; _pi++) {
             if (!proc_table[_pi].name || strcmp(proc_table[_pi].name, e->sval) != 0) continue;
-            if (!proc_table[_pi].ir_body) return 0;
+            if (!bb_graph_of_proc(&proc_table[_pi])) return 0;
             if (proc_table[_pi].is_generator) return 0;
             for (int _j = 0; _j < e->n; _j++) if (!ir_is_single_shot(e->c[_j])) return 0;
             return 1;
@@ -180,7 +180,7 @@ BB_t * bb_exec_node(BB_t * nd) {
         for (int _pi0 = 0; _pi0 < proc_count; _pi0++) {
             if (!proc_table[_pi0].name || strcmp(proc_table[_pi0].name, nd->sval) != 0) continue;
             if (!proc_table[_pi0].is_generator) break;  /* fall through to builtins/standard path */
-            if (proc_table[_pi0].ir_body) break;        /* let ir_body path handle it (standard) */
+            if (bb_graph_of_proc(&proc_table[_pi0])) break;        /* let bb_graph path handle it (standard) */
             if (proc_table[_pi0].entry_pc < 0 || !g_current_SM_seq) break;
             GeneratorState *pgs = generator_state_new_proc(_pi0, args, nargs);
             if (!pgs) break;
@@ -197,10 +197,11 @@ BB_t * bb_exec_node(BB_t * nd) {
             nd->value = out;
             return IS_FAIL_fn(out) ? nd->ω : nd->γ;
         }
-        /* User-defined proc: look up proc_table by name; if ir_body exists, push frame and exec. Snapshot per-node state of the callee's ir_body around bb_exec_once so the caller's activation survives when the callee is the SAME proc (recursion shares the IR graph; without snapshot, the inner BB_reset wipes the caller's per-node value/counter/state, breaking e.g. BB_BINOP_GEN's read of nd->c[0]->value after a recursive-call right operand). */
+        /* User-defined proc: look up proc_table by name; if a BB graph exists, push frame and exec. Snapshot per-node state of the callee's graph around bb_exec_once so the caller's activation survives when the callee is the SAME proc (recursion shares the IR graph; without snapshot, the inner BB_reset wipes the caller's per-node value/counter/state, breaking e.g. BB_BINOP_GEN's read of nd->c[0]->value after a recursive-call right operand). */
         for (int _pi = 0; _pi < proc_count; _pi++) {
             if (!proc_table[_pi].name || strcmp(proc_table[_pi].name, nd->sval) != 0) continue;
-            if (!proc_table[_pi].ir_body) break;
+            BB_graph_t *_cfg = bb_graph_of_proc(&proc_table[_pi]);
+            if (!_cfg) break;
             if (frame_depth >= FRAME_STACK_MAX) break;
             IcnFrame *_f = &frame_stack[frame_depth++];
             memset(_f, 0, sizeof *_f);
@@ -210,12 +211,12 @@ BB_t * bb_exec_node(BB_t * nd) {
             _f->env_n = _nsl;
             for (int _k = 0; _k < proc_table[_pi].nparams && _k < nargs && _k < FRAME_SLOT_MAX; _k++)
                 _f->env[_k] = args[_k];
-            IR_node_state_t * _snap = IR_snapshot_state(proc_table[_pi].ir_body);
-            BB_reset(proc_table[_pi].ir_body);
-            out = bb_exec_once(proc_table[_pi].ir_body);
+            IR_node_state_t * _snap = IR_snapshot_state(_cfg);
+            BB_reset(_cfg);
+            out = bb_exec_once(_cfg);
             if (frame_depth > 0 && FRAME.returning) { out = g_ir_return_val; FRAME.returning = 0; }
             frame_depth--;
-            IR_restore_state(proc_table[_pi].ir_body, _snap);
+            IR_restore_state(_cfg, _snap);
             nd->value = out;
             return IS_FAIL_fn(out) ? nd->ω : nd->γ;
         }
@@ -1748,11 +1749,12 @@ BB_t * bb_exec_node(BB_t * nd) {
                 PlCallSt *cs = (PlCallSt *)gen->opaque;
                 char rkey[128]; snprintf(rkey, sizeof rkey, "%s/%d", gen->sval, (int)gen->ival2);
                 Pl_PredEntry_BB *rbb = pl_bb_lookup(rkey, (int)gen->ival2);
-                if (!rbb || !rbb->ir_body) { free(cs); gen->opaque = NULL; gen->state = 0; backtrack_from = found; continue; }
+                BB_graph_t *_rcfg = bb_graph_of_pred(rbb);
+                if (!_rcfg) { free(cs); gen->opaque = NULL; gen->state = 0; backtrack_from = found; continue; }
                 trail_unwind(&g_pl_trail, cs->trail_mark);
                 g_pl_env = cs->callee_env;
                 cs->trail_mark = trail_mark(&g_pl_trail);
-                DESCR_t res2 = IR_exec_resume(rbb->ir_body);
+                DESCR_t res2 = IR_exec_resume(_rcfg);
                 if (IS_FAIL_fn(res2)) {
                     g_pl_env = cs->saved_env;
                     free(cs); gen->opaque = NULL; gen->state = 0;
@@ -1843,7 +1845,8 @@ BB_t * bb_exec_node(BB_t * nd) {
         if (!callee) { nd->value = FAILDESCR; return nd->ω; }
         char key[128]; snprintf(key, sizeof key, "%s/%d", callee, carity);
         Pl_PredEntry_BB *bb = pl_bb_lookup(key, carity);
-        if (!bb || !bb->ir_body) { nd->value = FAILDESCR; return nd->ω; }
+        BB_graph_t *_bcfg = bb_graph_of_pred(bb);
+        if (!_bcfg) { nd->value = FAILDESCR; return nd->ω; }
         typedef struct { Term **callee_env; Term **saved_env; int trail_mark; int nslots; } PlCallSt;
         if (nd->state == 0) {
             /* Fresh call: allocate env, bind args, call once */
@@ -1871,8 +1874,8 @@ BB_t * bb_exec_node(BB_t * nd) {
             Term **saved_env = g_pl_env;
             g_pl_env = callee_env;
             int mark = trail_mark(&g_pl_trail);
-            BB_reset(bb->ir_body);
-            DESCR_t res = bb_exec_once(bb->ir_body);
+            BB_reset(_bcfg);
+            DESCR_t res = bb_exec_once(_bcfg);
             if (IS_FAIL_fn(res)) { trail_unwind(&g_pl_trail, mark); g_pl_env = saved_env; free(callee_env); nd->state = 0; nd->value = FAILDESCR; return nd->ω; }
             PlCallSt *cs = malloc(sizeof(PlCallSt));
             cs->callee_env = callee_env; cs->saved_env = saved_env; cs->trail_mark = mark; cs->nslots = nslots;

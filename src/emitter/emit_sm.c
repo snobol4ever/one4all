@@ -17,6 +17,7 @@
 /* The Icon proc body has already been lowered into the SM stream by lower_proc_skeletons() and the entry_pc   */
 /* set by sm_resolve_proc_entry_pcs(); we just need to emit `call .L<entry_pc>` from this dispatch handler.    */
 #include "../runtime/interp/icn_runtime.h"
+#include "../runtime/interp/pl_runtime.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_sm_nullary_rt(const char *macro_name, const char *rt_fn)
 {
@@ -1485,8 +1486,9 @@ static int emit_pl_kids_rodata_for_pred(FILE *out, int pred_idx, const BB_graph_
 /* Emit one builder function: .Lpl_builder_<pred_idx>: replays the cfg via runtime builder helpers. */
 static int emit_pl_builder_fn(FILE *out, int pred_idx, const Pl_PredEntry_BB *entry)
 {
-    if (!entry || !entry->ir_body) return 0;
-    const BB_graph_t *cfg = entry->ir_body;
+    if (!entry) return 0;
+    const BB_graph_t *cfg = bb_graph_of_pred(entry);
+    if (!cfg) return 0;
     if (emit_pl_kids_rodata_for_pred(out, pred_idx, cfg) != 0) return -1;
     char lbl[64];
     snprintf(lbl, sizeof(lbl), ".Lpl_builder_%d:", pred_idx);
@@ -1544,9 +1546,10 @@ static void pl_pre_intern_pred_names(void)
         const Pl_PredEntry_BB *e = &g_pl_bb_table[i];
         if (!e->name) continue;
         strtab_intern(e->name);
-        if (!e->ir_body) continue;
-        for (int j = 0; j < e->ir_body->n; j++) {
-            const BB_t *nd = e->ir_body->all[j];
+        const BB_graph_t *_cfg = bb_graph_of_pred(e);
+        if (!_cfg) continue;
+        for (int j = 0; j < _cfg->n; j++) {
+            const BB_t *nd = _cfg->all[j];
             if (!nd) continue;
             if (pl_ir_kind_uses_sval((int)nd->t) && nd->sval) strtab_intern(nd->sval);
         }
@@ -1559,12 +1562,12 @@ static int emit_pl_predicate_registry(FILE *out)
 {
     int n = 0;
     for (int i = 0; i < g_pl_bb_count; i++) {
-        if (g_pl_bb_table[i].name && g_pl_bb_table[i].ir_body) n++;
+        if (g_pl_bb_table[i].name && bb_graph_of_pred(&g_pl_bb_table[i])) n++;
     }
     if (n == 0) return 0;
     for (int i = 0; i < g_pl_bb_count; i++) {
         const Pl_PredEntry_BB *e = &g_pl_bb_table[i];
-        if (!e->name || !e->ir_body) continue;
+        if (!e->name || !bb_graph_of_pred(e)) continue;
         if (emit_pl_builder_fn(out, i, e) != 0) return -1;
     }
     if (emit_three_column_line(out, "", ".section", ".data", NULL) != 0) return -1;
@@ -1572,7 +1575,7 @@ static int emit_pl_predicate_registry(FILE *out)
     if (emit_three_column_line(out, ".Lpl_registry:", "", "", NULL) != 0) return -1;
     for (int i = 0; i < g_pl_bb_count; i++) {
         const Pl_PredEntry_BB *e = &g_pl_bb_table[i];
-        if (!e->name || !e->ir_body) continue;
+        if (!e->name || !bb_graph_of_pred(e)) continue;
         char name_arg[64], arity_arg[32], fn_arg[64];
         strtab_label(name_arg, sizeof(name_arg), e->name);
         snprintf(arity_arg, sizeof(arity_arg), "%d", e->arity);

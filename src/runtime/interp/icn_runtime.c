@@ -343,7 +343,8 @@ bb_node_t icn_bb_pump_proc_by_name(const char *name, DESCR_t *args, int nargs) {
         if (strcmp(proc_table[i].name, name) != 0) continue;
         /* AST → IR → BB path: when an BB_graph_t body exists, drive it via icn_bb_dcg.   */
         /* This bypasses SM entirely: no proc_table_call, no sm_call_expression.            */
-        if (proc_table[i].ir_body) {
+        BB_graph_t *_cfg_i = bb_graph_of_proc(&proc_table[i]);
+        if (_cfg_i) {
             if (frame_depth < FRAME_STACK_MAX) {
                 IcnFrame *f = &frame_stack[frame_depth++];
                 memset(f, 0, sizeof *f);
@@ -356,7 +357,7 @@ bb_node_t icn_bb_pump_proc_by_name(const char *name, DESCR_t *args, int nargs) {
                     f->env[k] = args[k];
             }
             icn_dcg_state_t *dz = calloc(1, sizeof(*dz));
-            dz->cfg = proc_table[i].ir_body;
+            dz->cfg = _cfg_i;
             dz->first = 1;
             return (bb_node_t){ icn_bb_dcg, dz, 0 };
         }

@@ -876,10 +876,11 @@ void rt_pl_once(const char *name, int arity)
     int eff_arity = arity;
     if (q && eff_arity == 0) eff_arity = atoi(q + 1);
     Pl_PredEntry_BB *bb = pl_bb_lookup(name, eff_arity);
-    if (bb && bb->ir_body) {
+    BB_graph_t *_cfg = bb_graph_of_pred(bb);
+    if (_cfg) {
         Term **saved_env = g_pl_env;
         pl_bb_env_push(16);
-        (void)bb_exec_once(bb->ir_body);
+        (void)bb_exec_once(_cfg);
         pl_bb_env_pop(saved_env);
     } else {
         fprintf(stderr, "[NO-AST] SM_BB_ONCE_PROC stub: needs fresh SM/BB lowering\n");
