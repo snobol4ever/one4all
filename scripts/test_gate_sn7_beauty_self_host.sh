@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # scripts/test_gate_sn7_beauty_self_host.sh — SN-7 gate:
-# every *_driver.sno in corpus/programs/snobol4/beauty/, under --interp,
+# every *_driver.sno in corpus/programs/snobol4/beauty_suite/, under --interp,
 # --interp, --run,
 # diff=0 vs its pre-baked .ref file (SPITBOL ground truth where valid; some
 # drivers have .ref files that reflect correct behavior SPITBOL itself fails
@@ -11,7 +11,7 @@
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIP="${SCRIP:-$HERE/../scrip}"
 CORPUS="${CORPUS:-/home/claude/corpus}"
-BEAUTY="$CORPUS/programs/snobol4/beauty"
+BEAUTY="$CORPUS/programs/snobol4/beauty_suite"
 TIMEOUT="${TIMEOUT:-30}"
 
 if [ ! -x "$SCRIP" ]; then

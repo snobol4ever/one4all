@@ -55,7 +55,7 @@ xcheck "goto" "$T"
 rm -f "$T"
 
 # Beauty drivers — if corpus present
-BEAUTY=/home/claude/corpus/programs/snobol4/beauty
+BEAUTY=/home/claude/corpus/programs/snobol4/beauty_suite
 for driver in omega gen tdump alpha; do
     f="$BEAUTY/${driver}_driver.sno"
     ref="$BEAUTY/${driver}_driver.ref"

@@ -21,7 +21,7 @@ from pathlib import Path
 
 SBL   = '/home/claude/x64/bin/sbl'
 SCRIP = '/home/claude/one4all/scrip'
-BEAUTY = Path('/home/claude/corpus/programs/snobol4/beauty')
+BEAUTY = Path('/home/claude/corpus/programs/snobol4/beauty_suite')
 OUT    = Path('/home/claude/corpus/programs/snobol4/subexpr')
 
 CRASH_INCLUDES = {'FENCE.sno', 'io.sno'}

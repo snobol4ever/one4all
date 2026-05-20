@@ -9,7 +9,7 @@ INTERP="${INTERP:-$HERE/../scrip}"
 CORPUS="/home/claude/corpus"
 TIMEOUT="${TIMEOUT:-10}"
 INC="$CORPUS/programs/snobol4/demo/inc"
-BEAUTY="$CORPUS/programs/snobol4/beauty"
+BEAUTY="$CORPUS/programs/snobol4/beauty_suite"
 DEMO="$CORPUS/programs/snobol4/demo"
 
 # ── corpus guard ──────────────────────────────────────────────────────────────
