@@ -3,7 +3,7 @@
 void bb_notany(IR_t * nd, FILE * out) {
     int nid = ir_node_id(nd); int sid = 0;
     if (IS_BIN) return; /* x86 binary: emit_flat_body path, not emit_bb_node */
-    if (IS_JVM) {
+    if (IS_JVM_TEXT) {
         char tag[32]; snprintf(tag, sizeof tag, "notany_%d_%d", sid, nid);
         jvm_class_hdr(out, "notany"); fprintf(out, ".field private final chars Ljava/lang/String;\n"); jvm_init_ms_str(out, "notany", "chars");
         fprintf(out, ".method public \316\261()Lbb/bb_box$Spec;\n    .limit stack 5\n    .limit locals 2\n");
@@ -22,12 +22,14 @@ void bb_notany(IR_t * nd, FILE * out) {
         fprintf(out, "    aconst_null\n    areturn\n.end method\n");
         return;
     }
-    if (IS_JS) {
+    if (IS_JVM_BIN)  { /* EC-UNI-7 owed: binary .class bytes */ return; }
+    if (IS_JS_TEXT) {
         fprintf(out, "function make_pat_%d_%d(ms) { const chars = ", nd->ival, nid); js_escape(out, nd->sval);
         fprintf(out, "; let self = { succ: null, fail: null,\nalpha() { if (ms.delta >= ms.omega || chars.indexOf(ms.sigma[ms.delta]) >= 0) { self.fail.alpha(); return; } const r = ms.sigma.slice(ms.delta, ms.delta + 1); ms.delta++; self.succ.alpha(); return r; },\nbeta() { ms.delta--; self.fail.alpha(); }\n}; return self; }\n");
         return;
     }
-    if (IS_NET) {
+    /* IS_JS_BIN: n/a — JS has no binary form */
+    if (IS_NET_TEXT) {
         const char * chars = nd->sval ? nd->sval : "";
         net_charset_class(out, sid, nid, "NOTANY"); net_alpha_hdr(out);
         fprintf(out, "    .maxstack 3\n    .locals init (valuetype [boxes]Snobol4.Runtime.Boxes.Spec V_r)\n    ldarg.1\n"); net_cursor_load(out);
@@ -39,4 +41,5 @@ void bb_notany(IR_t * nd, FILE * out) {
         fprintf(out, "    ldc.i4.1\n    sub\n    stfld      int32 [boxes]Snobol4.Runtime.Boxes.MatchState::Cursor\n"); net_fail_ret(out); fprintf(out, "  }\n}\n");
         net_escape_ldstr(out, chars); fprintf(out, "    newobj     instance void pat_%d_%d::.ctor(string)\n", sid, nid);
     }
+    if (IS_NET_BIN)  { /* EC-UNI-7 owed: binary .NET IL bytes */ return; }
 }

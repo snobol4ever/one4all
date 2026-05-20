@@ -3,7 +3,7 @@
 void bb_alt(IR_t * nd, FILE * out) {
     int nid = ir_node_id(nd); int sid = 0;
     if (IS_BIN) return; /* x86 binary: emit_flat_body path, not emit_bb_node */
-    if (IS_JVM) {
+    if (IS_JVM_TEXT) {
         char tag[32]; snprintf(tag, sizeof tag, "alt_%d_%d", sid, nid);
         jvm_class_hdr(out, "alt");
         fprintf(out, ".field private final children [Lbb/bb_box;\n.field private final n I\n.field private current I\n.field private position I\n");
@@ -28,14 +28,16 @@ void bb_alt(IR_t * nd, FILE * out) {
         fprintf(out, "%s_try_omega:\n    aconst_null\n    areturn\n.end method\n", tag);
         return;
     }
-    if (IS_JS) {
+    if (IS_JVM_BIN)  { /* EC-UNI-7 owed: binary .class bytes */ return; }
+    if (IS_JS_TEXT) {
         fprintf(out, "function make_pat_%d_%d(ms) { const children = self.children || []; let idx = 0; let self = { succ: null, fail: null,\n", nd->ival, nid);
         fprintf(out, "alpha() { idx = 0; while (idx < children.length) { const r = children[idx].alpha(); if (r !== null) { self.succ.alpha(); return r; } idx++; } self.fail.alpha(); return null; },\n");
         fprintf(out, "beta() { idx--; if (idx >= 0 && idx < children.length) { const r = children[idx].beta(); if (r !== null) { return r; } return self.beta(); } self.fail.alpha(); return null; }\n");
         fprintf(out, "}; return self; }\n");
         return;
     }
-    if (IS_NET) {
+    /* IS_JS_BIN: n/a — JS has no binary form */
+    if (IS_NET_TEXT) {
         net_class_hdr(out, sid, nid);
         fprintf(out, "  .field private class [boxes]Snobol4.Runtime.Boxes.IByrdBox[] _children\n  .field private int32 _idx\n  .field private int32 _savedPos\n");
         fprintf(out, "  .method public specialname rtspecialname instance void .ctor(class [boxes]Snobol4.Runtime.Boxes.IByrdBox[] children) cil managed\n  {\n");
@@ -72,4 +74,5 @@ void bb_alt(IR_t * nd, FILE * out) {
         fprintf(out, "    brtrue     ALT_%d_%d_BLOOP\n    ldloc.0\n    ret\n  ALT_%d_%d_BFAIL:\n", sid, nid, sid, nid); net_fail_ret(out); fprintf(out, "  }\n}\n");
         fprintf(out, "    newobj     instance void pat_%d_%d::.ctor(class [boxes]Snobol4.Runtime.Boxes.IByrdBox[])\n", sid, nid);
     }
+    if (IS_NET_BIN)  { /* EC-UNI-7 owed: binary .NET IL bytes */ return; }
 }

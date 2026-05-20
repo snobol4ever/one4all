@@ -3,7 +3,7 @@
 void bb_arb(IR_t * nd, FILE * out) {
     int nid = ir_node_id(nd); int sid = 0;
     if (IS_BIN) return; /* x86 binary: emit_flat_body path, not emit_bb_node */
-    if (IS_JVM) {
+    if (IS_JVM_TEXT) {
         char tag[32]; snprintf(tag, sizeof tag, "arb_%d_%d", sid, nid);
         jvm_class_hdr(out, "arb");
         fprintf(out, ".field private arb_count I\n.field private arb_start I\n");
@@ -22,14 +22,16 @@ void bb_arb(IR_t * nd, FILE * out) {
         fprintf(out, "    areturn\n%s_omega:\n    aconst_null\n    areturn\n.end method\n", tag);
         return;
     }
-    if (IS_JS) {
+    if (IS_JVM_BIN)  { /* EC-UNI-7 owed: binary .class bytes */ return; }
+    if (IS_JS_TEXT) {
         fprintf(out, "function make_pat_%d_%d(ms) { let delta = 0; let self = { succ: null, fail: null,\n", nd->ival, nid);
         fprintf(out, "alpha() { delta = ms.omega - ms.delta; const r = ms.sigma.slice(ms.delta, ms.delta + delta); ms.delta += delta; self.succ.alpha(); return r; },\n");
         fprintf(out, "beta() { if (delta <= 0) { self.fail.alpha(); return; } delta--; ms.delta--; const r = ms.sigma.slice(ms.delta, ms.delta + delta + 1); return r; }\n");
         fprintf(out, "}; return self; }\n");
         return;
     }
-    if (IS_NET) {
+    /* IS_JS_BIN: n/a — JS has no binary form */
+    if (IS_NET_TEXT) {
         net_class_hdr(out, sid, nid);
         fprintf(out, "  .field private int32 _count\n  .field private int32 _start\n");
         net_ctor_none(out, sid, nid);
@@ -54,4 +56,5 @@ void bb_arb(IR_t * nd, FILE * out) {
         fprintf(out, "  ARB_%d_%d_FAIL:\n", sid, nid); net_fail_ret(out); fprintf(out, "  }\n}\n");
         fprintf(out, "    newobj     instance void pat_%d_%d::.ctor()\n", sid, nid);
     }
+    if (IS_NET_BIN)  { /* EC-UNI-7 owed: binary .NET IL bytes */ return; }
 }

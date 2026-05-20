@@ -3,7 +3,7 @@
 void bb_cat(IR_t * nd, FILE * out) {
     int nid = ir_node_id(nd); int sid = 0;
     if (IS_BIN) return; /* x86 binary: emit_flat_body path, not emit_bb_node */
-    if (IS_JVM) {
+    if (IS_JVM_TEXT) {
         char tag[32]; snprintf(tag, sizeof tag, "seq_%d_%d", sid, nid);
         jvm_class_hdr(out, "seq");
         fprintf(out, ".field private final left Lbb/bb_box;\n.field private final right Lbb/bb_box;\n");
@@ -34,7 +34,8 @@ void bb_cat(IR_t * nd, FILE * out) {
         fprintf(out, "%s_lB_omega:\n    aconst_null\n    areturn\n.end method\n", tag);
         return;
     }
-    if (IS_JS) {
+    if (IS_JVM_BIN)  { /* EC-UNI-7 owed: binary .class bytes */ return; }
+    if (IS_JS_TEXT) {
         fprintf(out, "function make_pat_%d_%d(ms) { let self = { succ: null, fail: null,\n", nd->ival, nid);
         fprintf(out, "alpha() { const lr = self.left.alpha(); if (lr === null) { self.fail.alpha(); return; }\n");
         fprintf(out, "let rr = self.right.alpha(); while (rr === null) { const lr2 = self.left.beta(); if (lr2 === null) { self.fail.alpha(); return; } rr = self.right.alpha(); }\n");
@@ -44,7 +45,8 @@ void bb_cat(IR_t * nd, FILE * out) {
         fprintf(out, "}; return self; }\n");
         return;
     }
-    if (IS_NET) {
+    /* IS_JS_BIN: n/a — JS has no binary form */
+    if (IS_NET_TEXT) {
         net_class_hdr(out, sid, nid);
         fprintf(out, "  .field private class [boxes]Snobol4.Runtime.Boxes.IByrdBox _left\n");
         fprintf(out, "  .field private class [boxes]Snobol4.Runtime.Boxes.IByrdBox _right\n");
@@ -84,4 +86,5 @@ void bb_cat(IR_t * nd, FILE * out) {
         net_spec_of(out); fprintf(out, "    ret\n  }\n}\n");
         fprintf(out, "    newobj     instance void pat_%d_%d::.ctor(class [boxes]Snobol4.Runtime.Boxes.IByrdBox, class [boxes]Snobol4.Runtime.Boxes.IByrdBox)\n", sid, nid);
     }
+    if (IS_NET_BIN)  { /* EC-UNI-7 owed: binary .NET IL bytes */ return; }
 }

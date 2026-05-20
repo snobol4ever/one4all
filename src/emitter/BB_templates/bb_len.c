@@ -3,7 +3,7 @@
 void bb_len(IR_t * nd, FILE * out) {
     int nid = ir_node_id(nd); int sid = 0;
     if (IS_BIN) return; /* x86 binary: emit_flat_body path, not emit_bb_node */
-    if (IS_JVM) {
+    if (IS_JVM_TEXT) {
         char tag[32]; snprintf(tag, sizeof tag, "len_%d_%d", sid, nid);
         jvm_class_hdr(out, "len");
         fprintf(out, ".field private final n I\n.field private final dyn Ljava/util/function/IntSupplier;\n");
@@ -20,7 +20,8 @@ void bb_len(IR_t * nd, FILE * out) {
         fprintf(out, "    aconst_null\n    areturn\n.end method\n");
         return;
     }
-    if (IS_JS) {
+    if (IS_JVM_BIN)  { /* EC-UNI-7 owed: binary .class bytes */ return; }
+    if (IS_JS_TEXT) {
         int64_t n = nd->ival;
         fprintf(out, "function make_pat_%d_%d(ms) { const n = %ld; let self = { succ: null, fail: null,\n", nd->ival, nid, n);
         fprintf(out, "alpha() { if (ms.delta + n > ms.omega) { self.fail.alpha(); return; } const r = ms.sigma.slice(ms.delta, ms.delta + n); ms.delta += n; self.succ.alpha(); return r; },\n");
@@ -28,7 +29,8 @@ void bb_len(IR_t * nd, FILE * out) {
         fprintf(out, "}; return self; }\n");
         return;
     }
-    if (IS_NET) {
+    /* IS_JS_BIN: n/a — JS has no binary form */
+    if (IS_NET_TEXT) {
         int n = (int)nd->ival;
         net_class_hdr(out, sid, nid);
         fprintf(out, "  .field private int32 _n\n");
@@ -50,4 +52,5 @@ void bb_len(IR_t * nd, FILE * out) {
         fprintf(out, "    stfld      int32 [boxes]Snobol4.Runtime.Boxes.MatchState::Cursor\n"); net_fail_ret(out); fprintf(out, "  }\n}\n");
         net_push_i4(out, n); fprintf(out, "    newobj     instance void pat_%d_%d::.ctor(int32)\n", sid, nid);
     }
+    if (IS_NET_BIN)  { /* EC-UNI-7 owed: binary .NET IL bytes */ return; }
 }

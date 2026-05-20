@@ -3,7 +3,7 @@
 void bb_lit(IR_t * nd, FILE * out) {
     int nid = ir_node_id(nd); int sid = 0;
     if (IS_BIN) return; /* x86 binary: emit_flat_body path, not emit_bb_node */
-    if (IS_JVM) {
+    if (IS_JVM_TEXT) {
         char tag[32]; snprintf(tag, sizeof tag, "lit_%d_%d", sid, nid);
         jvm_class_hdr(out, "lit");
         fprintf(out, ".field private final lit Ljava/lang/String;\n");
@@ -39,7 +39,8 @@ void bb_lit(IR_t * nd, FILE * out) {
         fprintf(out, "    aconst_null\n    areturn\n.end method\n");
         return;
     }
-    if (IS_JS) {
+    if (IS_JVM_BIN)  { /* EC-UNI-7 owed: binary .class bytes */ return; }
+    if (IS_JS_TEXT) {
         fprintf(out, "function make_pat_%d_%d(ms) { const lit = ", nd->ival, nid);
         js_escape(out, nd->sval);
         fprintf(out, "; const len = lit.length; let self = { succ: null, fail: null,\n");
@@ -48,7 +49,8 @@ void bb_lit(IR_t * nd, FILE * out) {
         fprintf(out, "}; return self; }\n");
         return;
     }
-    if (IS_NET) {
+    /* IS_JS_BIN: n/a — JS has no binary form */
+    if (IS_NET_TEXT) {
         const char * lit = nd->sval ? nd->sval : "";
         net_class_hdr(out, sid, nid);
         fprintf(out, "  .field private string _lit\n  .field private int32  _len\n");
@@ -95,4 +97,5 @@ void bb_lit(IR_t * nd, FILE * out) {
         net_escape_ldstr(out, lit);
         fprintf(out, "    newobj     instance void pat_%d_%d::.ctor(string)\n", sid, nid);
     }
+    if (IS_NET_BIN)  { /* EC-UNI-7 owed: binary .NET IL bytes */ return; }
 }
