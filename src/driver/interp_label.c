@@ -1,21 +1,21 @@
 #include "interp_private.h"
-/* ST2-1: label_table[] and label_count storage moved to stage2_t.  Legacy
- * names in this file refer to the active stage2_t via the macros declared
- * in interp_private.h.  label_table_build now takes the stage2 explicitly. */
+/* ST2-1b (2026-05-20): label_table[] and label_count shim macros deleted.  Producer
+ * label_table_build threads s2 directly into the table.  Reader label_lookup, called
+ * from interp_call.c / interp_hooks.c sites that don't carry an s2 parameter, reads
+ * g_stage2.label_table / .label_count literally — same storage, no name aliasing. */
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void label_table_build(stage2_t *s2, const tree_t *prog)
 {
-    (void)s2;
-    label_count = 0;
+    s2->label_count = 0;
     if (!prog) return;
-    for (int i = 0; i < prog->n && label_count < LABEL_MAX; i++) {
+    for (int i = 0; i < prog->n && s2->label_count < LABEL_MAX; i++) {
         const tree_t *s = prog->c[i];
         if (!s || (s->t != TT_STMT && s->t != TT_END)) continue;
         const char *lbl = stmt_attr_str(stmt_attr_find(s, ":lbl"));
         if (lbl && *lbl) {
-            label_table[label_count].name = strdup(lbl);
-            label_table[label_count].stmt = s;
-            label_count++;
+            s2->label_table[s2->label_count].name = strdup(lbl);
+            s2->label_table[s2->label_count].stmt = s;
+            s2->label_count++;
         }
     }
 }
@@ -23,9 +23,9 @@ void label_table_build(stage2_t *s2, const tree_t *prog)
 const tree_t *label_lookup(const char *name)
 {
     if (!name || !*name) return NULL;
-    for (int i = 0; i < label_count; i++)
-        if (strcmp(label_table[i].name, name) == 0)
-            return label_table[i].stmt;
+    for (int i = 0; i < g_stage2.label_count; i++)
+        if (strcmp(g_stage2.label_table[i].name, name) == 0)
+            return g_stage2.label_table[i].stmt;
     return NULL;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/

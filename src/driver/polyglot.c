@@ -81,7 +81,7 @@ void polyglot_init(stage2_t *s2, const tree_t *prog, uint32_t lang_mask)
                 m->first            = s;
                 m->last             = s;
                 m->nstmts           = 0;
-                m->sno_label_start  = label_count;
+                m->sno_label_start  = s2->label_count;
                 m->sno_label_count  = 0;
                 m->icn_proc_start   = proc_count;
                 m->nprocs            = 0;

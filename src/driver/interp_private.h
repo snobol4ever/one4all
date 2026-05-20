@@ -74,7 +74,7 @@ const char *define_spec_from_expr(tree_t *subj);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 const char *define_entry_from_expr(tree_t *subj);
 #include "stage2.h"
-#include "interp.h"   /* label_table / label_count shims live here, with ScripModule definitions (g_registry shim deleted in ST2-1b) */
+#include "interp.h"   /* ScripModule definitions (g_registry shim deleted in ST2-1b g_registry sub-step; label_table/label_count shims deleted in ST2-1b label sub-step) */
 #define LABEL_MAX STAGE2_LABEL_MAX
 #define CALL_STACK_MAX 256
 #define SHADOW_MAX 32

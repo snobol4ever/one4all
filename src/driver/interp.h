@@ -18,8 +18,9 @@ void polyglot_init(stage2_t *s2, const tree_t *prog, uint32_t lang_mask);
 uint32_t polyglot_lang_mask(const tree_t *prog);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void icn_record_register(const char *spec);
-#define label_table  (g_stage2.label_table)
-#define label_count  (g_stage2.label_count)
+/* ST2-1b (2026-05-20): label_table / label_count shim macros deleted.  Producer
+ * label_table_build threads s2->label_table / s2->label_count; reader label_lookup
+ * reads g_stage2.label_table / g_stage2.label_count literally.                       */
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void    label_table_build(stage2_t *s2, const tree_t *prog);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
