@@ -1,4 +1,5 @@
 #include "emit_core.h"
+#include "emit_globals.h"
 #include "stage2.h"
 #include "BB_templates/bb_templates.h"
 #include "SM_templates/sm_templates.h"
@@ -2175,6 +2176,14 @@ int emit_program(const tree_t * ast_prog, FILE * out, bb_emit_mode_t mode) {
     SM_sequence_t * sm = &s2->sm;
     bb_emit_mode_t saved_mode = bb_emit_mode;
     FILE *         saved_out  = bb_emit_out;
+    /* EC-UNI-10(a): populate g_emit.  Pass-wide fields are set once here at entry; per-instruction
+     * and per-BB-node fields are set by the dispatcher loops in EC-UNI-10(b)/(c).  Save/restore
+     * the prior g_emit so nested emit_program invocations don't trample each other. */
+    sm_emit_t saved_g_emit = g_emit;
+    g_emit.backend   = (int)mode;
+    g_emit.is_binary = (mode == EMIT_BINARY_WIRED || mode == EMIT_BINARY_BROKERED);
+    g_emit.out       = out;
+    g_emit.prog      = sm;
     emit_mode_set(mode, out);
     if (IS_WASM) {
         wasm_strtab_reset();
@@ -2199,6 +2208,7 @@ int emit_program(const tree_t * ast_prog, FILE * out, bb_emit_mode_t mode) {
         fprintf(out, "  )\n");
         emit_epilogue(NULL, out);
         emit_mode_set(saved_mode, saved_out);
+        g_emit = saved_g_emit;
         /* g_stage2 is global; no free */
         return 0;
     }
@@ -2221,6 +2231,7 @@ int emit_program(const tree_t * ast_prog, FILE * out, bb_emit_mode_t mode) {
     } else if (IS_NET) emit_net_from_sm(sm, out);
     emit_epilogue(NULL, out);
     emit_mode_set(saved_mode, saved_out);
+    g_emit = saved_g_emit;
     /* g_stage2 is global; no free */
     return 0;
 }

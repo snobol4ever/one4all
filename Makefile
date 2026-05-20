@@ -76,6 +76,7 @@ RT_PIC_SRCS := \
     $(SRC)/runtime/snobol4/eval_pat.c \
     $(SRC)/processor/bb_pool.c \
     $(SRC)/emitter/emit_core.c \
+    $(SRC)/emitter/emit_globals.c \
     $(SRC)/emitter/BB_templates/bb_lit.c \
     $(SRC)/emitter/BB_templates/bb_any.c \
     $(SRC)/emitter/BB_templates/bb_notany.c \
@@ -222,6 +223,7 @@ scrip:
 	$(CC) $(CRT)   -c $(SRC)/runtime/snobol4/eval_pat.c                   -o $(OBJ)/eval_pat.o
 	$(CC) $(CRT)   -c $(SRC)/processor/bb_pool.c                    -o $(OBJ)/bb_pool.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/emit_core.c               -o $(OBJ)/emit_core.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/emit_globals.c            -o $(OBJ)/emit_globals.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_lit.c      -o $(OBJ)/bb_lit.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_any.c      -o $(OBJ)/bb_any.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_notany.c   -o $(OBJ)/bb_notany.o
