@@ -68,6 +68,14 @@ void emit_sm_op_return_s     (void);         void emit_sm_op_return_f    (void);
 void emit_sm_op_freturn_s    (void);         void emit_sm_op_freturn_f   (void);
 void emit_sm_op_nreturn_s    (void);         void emit_sm_op_nreturn_f   (void);
 void emit_sm_op_unhandled    (int opc);
+/* EC-UNI-1: x86 GAS text dispatchers — exposed so SM_template fns can call them from IS_X86_TEXT arms. */
+int emit_push_lit_i_line       (FILE *out, const SM_Instr *ins, int pc);
+int emit_sm_push_lit_s_dispatch(FILE *out, const SM_Instr *ins, int pc);
+int emit_sm_push_lit_f_dispatch(FILE *out, const SM_Instr *ins, int pc);
+int emit_sm_push_var_dispatch  (FILE *out, const SM_Instr *ins, int pc);
+int emit_sm_store_var_dispatch (FILE *out, const SM_Instr *ins, int pc);
+int emit_sm_push_null_dispatch (FILE *out, int pc);
+int emit_sm_pop                (FILE *out, int pc);
 /*---- compat macros -------------------------------------------------------*/
 #define sm_codegen_text(prog,out,src)  emit_walk_codegen(prog,out,src)
 #define flat_is_eligible_node(nd)      emit_flat_eligible(nd)

@@ -1757,7 +1757,7 @@ static int emit_halt_line(FILE *out, int pc)
     return emit_sm_rtcall(out, sm_template_lookup(SM_HALT), NULL);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_push_lit_i_line(FILE *out, const SM_Instr *ins, int pc)
+int emit_push_lit_i_line(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     return emit_sm_int64(out, sm_template_lookup(SM_PUSH_LIT_I),
@@ -1765,7 +1765,7 @@ static int emit_push_lit_i_line(FILE *out, const SM_Instr *ins, int pc)
 }
 __attribute__((unused))
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_push_lit_s_dispatch(FILE *out, const SM_Instr *ins, int pc)
+int emit_sm_push_lit_s_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     const char *s    = ins->a[0].s ? ins->a[0].s : "";
@@ -1778,7 +1778,7 @@ static int emit_sm_push_lit_s_dispatch(FILE *out, const SM_Instr *ins, int pc)
                              lbl, (int)slen, anno);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_push_var_dispatch(FILE *out, const SM_Instr *ins, int pc)
+int emit_sm_push_var_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     const char *name = ins->a[0].s ? ins->a[0].s : "";
@@ -1788,7 +1788,7 @@ static int emit_sm_push_var_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return emit_sm_lbl(out, sm_template_lookup(SM_PUSH_VAR), lbl, anno);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_store_var_dispatch(FILE *out, const SM_Instr *ins, int pc)
+int emit_sm_store_var_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     const char *name = ins->a[0].s ? ins->a[0].s : "";
@@ -1798,7 +1798,7 @@ static int emit_sm_store_var_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return emit_sm_lbl(out, sm_template_lookup(SM_STORE_VAR), lbl, anno);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_pop(FILE *out, int pc)
+int emit_sm_pop(FILE *out, int pc)
 {
     (void)pc;
     emitter_init_text(out, TEXT_MODE_INVOCATION);
@@ -1933,7 +1933,7 @@ static int emit_sm_concat_dispatch(FILE *out, int pc)
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_push_null_dispatch(FILE *out, int pc)
+int emit_sm_push_null_dispatch(FILE *out, int pc)
 {
     (void)pc;
     emit_mode_set(TEXT_MODE(), out);
@@ -1973,7 +1973,7 @@ static int emit_sm_exp_dispatch(FILE *out, int pc)
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_push_lit_f_dispatch(FILE *out, const SM_Instr *ins, int pc)
+int emit_sm_push_lit_f_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     emit_mode_set(TEXT_MODE(), out);
