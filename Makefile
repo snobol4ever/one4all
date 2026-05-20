@@ -92,63 +92,16 @@ RT_PIC_SRCS := \
     $(SRC)/emitter/BB_templates/bb_fence.c \
     $(SRC)/emitter/BB_templates/bb_abort.c \
     $(SRC)/emitter/BB_templates/bb_capture.c \
-    $(SRC)/emitter/SM_templates/sm_acomp.c \
-    $(SRC)/emitter/SM_templates/sm_add.c \
-    $(SRC)/emitter/SM_templates/sm_coerce_num.c \
-    $(SRC)/emitter/SM_templates/sm_concat.c \
-    $(SRC)/emitter/SM_templates/sm_div.c \
-    $(SRC)/emitter/SM_templates/sm_exec_stmt.c \
-    $(SRC)/emitter/SM_templates/sm_exp.c \
-    $(SRC)/emitter/SM_templates/sm_freturn.c \
+    $(SRC)/emitter/SM_templates/sm_arith.c \
+    $(SRC)/emitter/SM_templates/sm_compare.c \
     $(SRC)/emitter/SM_templates/sm_halt.c \
-    $(SRC)/emitter/SM_templates/sm_jump.c \
-    $(SRC)/emitter/SM_templates/sm_jump_f.c \
-    $(SRC)/emitter/SM_templates/sm_jump_s.c \
-    $(SRC)/emitter/SM_templates/sm_lcomp.c \
-    $(SRC)/emitter/SM_templates/sm_mod.c \
-    $(SRC)/emitter/SM_templates/sm_mul.c \
-    $(SRC)/emitter/SM_templates/sm_neg.c \
-    $(SRC)/emitter/SM_templates/sm_nreturn.c \
-    $(SRC)/emitter/SM_templates/sm_pat_abort.c \
-    $(SRC)/emitter/SM_templates/sm_pat_alt.c \
-    $(SRC)/emitter/SM_templates/sm_pat_any.c \
-    $(SRC)/emitter/SM_templates/sm_pat_any_i.c \
-    $(SRC)/emitter/SM_templates/sm_pat_arb.c \
-    $(SRC)/emitter/SM_templates/sm_pat_arbno.c \
-    $(SRC)/emitter/SM_templates/sm_pat_bal.c \
-    $(SRC)/emitter/SM_templates/sm_pat_break.c \
-    $(SRC)/emitter/SM_templates/sm_pat_capture.c \
-    $(SRC)/emitter/SM_templates/sm_pat_capture_fn.c \
-    $(SRC)/emitter/SM_templates/sm_pat_capture_fn_args.c \
-    $(SRC)/emitter/SM_templates/sm_pat_cat.c \
-    $(SRC)/emitter/SM_templates/sm_pat_deref.c \
-    $(SRC)/emitter/SM_templates/sm_pat_eps.c \
-    $(SRC)/emitter/SM_templates/sm_pat_fail.c \
-    $(SRC)/emitter/SM_templates/sm_pat_fence0.c \
-    $(SRC)/emitter/SM_templates/sm_pat_fence1.c \
-    $(SRC)/emitter/SM_templates/sm_pat_len.c \
-    $(SRC)/emitter/SM_templates/sm_pat_lit.c \
-    $(SRC)/emitter/SM_templates/sm_pat_notany.c \
-    $(SRC)/emitter/SM_templates/sm_pat_pos.c \
-    $(SRC)/emitter/SM_templates/sm_pat_refname.c \
-    $(SRC)/emitter/SM_templates/sm_pat_rem.c \
-    $(SRC)/emitter/SM_templates/sm_pat_rpos.c \
-    $(SRC)/emitter/SM_templates/sm_pat_rtab.c \
-    $(SRC)/emitter/SM_templates/sm_pat_span.c \
-    $(SRC)/emitter/SM_templates/sm_pat_succeed.c \
-    $(SRC)/emitter/SM_templates/sm_pat_tab.c \
-    $(SRC)/emitter/SM_templates/sm_pat_usercall.c \
-    $(SRC)/emitter/SM_templates/sm_pat_usercall_args.c \
-    $(SRC)/emitter/SM_templates/sm_push_lit_f.c \
-    $(SRC)/emitter/SM_templates/sm_push_lit_i.c \
-    $(SRC)/emitter/SM_templates/sm_push_lit_s.c \
-    $(SRC)/emitter/SM_templates/sm_push_null.c \
-    $(SRC)/emitter/SM_templates/sm_push_var.c \
-    $(SRC)/emitter/SM_templates/sm_return.c \
-    $(SRC)/emitter/SM_templates/sm_stno.c \
-    $(SRC)/emitter/SM_templates/sm_store_var.c \
-    $(SRC)/emitter/SM_templates/sm_sub.c \
-    $(SRC)/emitter/SM_templates/sm_void_pop.c \
+    $(SRC)/emitter/SM_templates/sm_jumps.c \
+    $(SRC)/emitter/SM_templates/sm_pat_anchors.c \
+    $(SRC)/emitter/SM_templates/sm_pat_combine.c \
+    $(SRC)/emitter/SM_templates/sm_pat_control.c \
+    $(SRC)/emitter/SM_templates/sm_pat_position.c \
+    $(SRC)/emitter/SM_templates/sm_push_pop_lits.c \
+    $(SRC)/emitter/SM_templates/sm_returns.c \
     $(SRC)/emitter/emit_bb.c \
     $(SRC)/emitter/emit_sm.c \
     \
@@ -285,63 +238,16 @@ scrip:
 	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_fence.c    -o $(OBJ)/bb_fence.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_abort.c    -o $(OBJ)/bb_abort.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_capture.c  -o $(OBJ)/bb_capture.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_acomp.c -o $(OBJ)/sm_acomp.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_add.c -o $(OBJ)/sm_add.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_coerce_num.c -o $(OBJ)/sm_coerce_num.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_concat.c -o $(OBJ)/sm_concat.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_div.c -o $(OBJ)/sm_div.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_exec_stmt.c -o $(OBJ)/sm_exec_stmt.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_exp.c -o $(OBJ)/sm_exp.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_freturn.c -o $(OBJ)/sm_freturn.o
+	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_arith.c -o $(OBJ)/sm_arith.o
+	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_compare.c -o $(OBJ)/sm_compare.o
 	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_halt.c -o $(OBJ)/sm_halt.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_jump.c -o $(OBJ)/sm_jump.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_jump_f.c -o $(OBJ)/sm_jump_f.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_jump_s.c -o $(OBJ)/sm_jump_s.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_lcomp.c -o $(OBJ)/sm_lcomp.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_mod.c -o $(OBJ)/sm_mod.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_mul.c -o $(OBJ)/sm_mul.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_neg.c -o $(OBJ)/sm_neg.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_nreturn.c -o $(OBJ)/sm_nreturn.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_abort.c -o $(OBJ)/sm_pat_abort.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_alt.c -o $(OBJ)/sm_pat_alt.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_any.c -o $(OBJ)/sm_pat_any.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_any_i.c -o $(OBJ)/sm_pat_any_i.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_arb.c -o $(OBJ)/sm_pat_arb.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_arbno.c -o $(OBJ)/sm_pat_arbno.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_bal.c -o $(OBJ)/sm_pat_bal.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_break.c -o $(OBJ)/sm_pat_break.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_capture.c -o $(OBJ)/sm_pat_capture.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_capture_fn.c -o $(OBJ)/sm_pat_capture_fn.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_capture_fn_args.c -o $(OBJ)/sm_pat_capture_fn_args.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_cat.c -o $(OBJ)/sm_pat_cat.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_deref.c -o $(OBJ)/sm_pat_deref.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_eps.c -o $(OBJ)/sm_pat_eps.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_fail.c -o $(OBJ)/sm_pat_fail.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_fence0.c -o $(OBJ)/sm_pat_fence0.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_fence1.c -o $(OBJ)/sm_pat_fence1.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_len.c -o $(OBJ)/sm_pat_len.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_lit.c -o $(OBJ)/sm_pat_lit.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_notany.c -o $(OBJ)/sm_pat_notany.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_pos.c -o $(OBJ)/sm_pat_pos.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_refname.c -o $(OBJ)/sm_pat_refname.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_rem.c -o $(OBJ)/sm_pat_rem.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_rpos.c -o $(OBJ)/sm_pat_rpos.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_rtab.c -o $(OBJ)/sm_pat_rtab.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_span.c -o $(OBJ)/sm_pat_span.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_succeed.c -o $(OBJ)/sm_pat_succeed.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_tab.c -o $(OBJ)/sm_pat_tab.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_usercall.c -o $(OBJ)/sm_pat_usercall.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_usercall_args.c -o $(OBJ)/sm_pat_usercall_args.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_push_lit_f.c -o $(OBJ)/sm_push_lit_f.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_push_lit_i.c -o $(OBJ)/sm_push_lit_i.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_push_lit_s.c -o $(OBJ)/sm_push_lit_s.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_push_null.c -o $(OBJ)/sm_push_null.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_push_var.c -o $(OBJ)/sm_push_var.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_return.c -o $(OBJ)/sm_return.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_stno.c -o $(OBJ)/sm_stno.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_store_var.c -o $(OBJ)/sm_store_var.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_sub.c -o $(OBJ)/sm_sub.o
-	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_void_pop.c -o $(OBJ)/sm_void_pop.o
+	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_jumps.c -o $(OBJ)/sm_jumps.o
+	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_anchors.c -o $(OBJ)/sm_pat_anchors.o
+	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_combine.c -o $(OBJ)/sm_pat_combine.o
+	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_control.c -o $(OBJ)/sm_pat_control.o
+	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_position.c -o $(OBJ)/sm_pat_position.o
+	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_push_pop_lits.c -o $(OBJ)/sm_push_pop_lits.o
+	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_returns.c -o $(OBJ)/sm_returns.o
 	$(CC) $(CRT) -c $(SRC)/processor/bb_boxes.c -o $(OBJ)/bb_boxes.o
 	$(CC) $(CRT) -c $(SRC)/processor/bb_broker.c -o $(OBJ)/bb_broker.o
 	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -DIR_DEFINE_NAMES \

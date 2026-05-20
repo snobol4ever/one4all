@@ -1,8 +1,6 @@
 #include "sm_template_common.h"
 #include "emit_sm.h"
-
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* sm_halt — SM_HALT: end execution. */
 int sm_halt(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
     (void)instr;
     if (IS_X86_TEXT) return emit_halt_line(out, 0);
