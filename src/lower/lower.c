@@ -1941,6 +1941,11 @@ static void lower_proc_skeletons(void)
             /* Attempt to lower body to an BB_graph_t DCG.  When successful, runtime icn_bb_pump_proc_by_name */
             /* uses it directly via icn_bb_dcg, bypassing SM entirely.  When NULL, legacy SM path runs.        */
             proc_table[pi].ir_body = lower_icn_proc_body(proc);
+            /* IR-CONSOLIDATE-DCG step 2: attach the BB graph to SM_sequence_t's dcg_table.
+             * proc_table[].ir_body remains a duplicate pointer during the migration; step 5
+             * will delete the field and consumers will reach the graph through dcg_idx only. */
+            proc_table[pi].dcg_idx = proc_table[pi].ir_body
+                ? SM_seq_dcg_add(g_p, proc_table[pi].ir_body) : -1;
             /* Detect generator procs: any BB_SUSPEND in the lowered body marks the proc as a generator. BB_EVERY consults this bit at BB_CALL time to decide whether to pump-to-exhaustion or fire once. */
             /* IJ-SUSPEND-PUMP-WIRE: also walk the AST for TT_SUSPEND so suspend-bearing procs whose ir_body  */
             /* lowering returns NULL (e.g. because lower_icn_expr_node has no TT_SUSPEND case) are still      */
@@ -1989,6 +1994,11 @@ static void lower_proc_skeletons(void)
             int arity = slash ? atoi(slash + 1) : 0;
             BB_graph_t *ir_body = lower_pl_predicate(e->choice);
             Pl_PredEntry_BB *bb = pl_dcg_register(e->key, arity, ir_body);
+            /* IR-CONSOLIDATE-DCG step 2: attach the Prolog BB graph to SM_sequence_t's
+             * dcg_table.  Compile-time only — the mode-4 standalone-binary path through
+             * rt_pl_b_end_register has no SM_sequence_t and continues to use ir_body
+             * directly.  ir_body remains a duplicate pointer here during the migration. */
+            if (bb) bb->dcg_idx = ir_body ? SM_seq_dcg_add(g_p, ir_body) : -1;
             if (bb && e->choice) {
                 PlScope sc; sc.n = 0;
                 bb->lower_sc = sc;

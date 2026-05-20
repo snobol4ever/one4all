@@ -5,6 +5,7 @@
 #include "bb_broker.h"
 #include "../../frontend/icon/icon_gen.h"
 #include "BB.h"
+#include "SM.h"
 #define FRAME_SLOT_MAX        64
 #define CORO_STACK_SZ         (1024 * 1024)
 #define PROC_TABLE_MAX       256
@@ -17,7 +18,11 @@ struct GeneratorState;
 typedef struct { tree_t *node; long cur; const char *sval; } IcnGenEntry_d;
 typedef struct { const char *name; int slot; } IcnScopeEnt;
 typedef struct { IcnScopeEnt e[FRAME_SLOT_MAX]; int n; } IcnScope;
-typedef struct { const char *name; tree_t *proc; int entry_pc; int nparams; IcnScope lower_sc; BB_graph_t *ir_body; int is_generator; } IcnProcEntry;
+/* IR-CONSOLIDATE-DCG step 1: dcg_idx is the index into g_current_SM_seq->dcg_table[]
+ * where this proc's BB graph lives.  Both ir_body and dcg_idx are valid during the
+ * migration (steps 2–4); ir_body will be deleted in step 5 and consumers will reach
+ * the graph exclusively through dcg_idx.  dcg_idx == -1 means "no body yet / unset". */
+typedef struct { const char *name; tree_t *proc; int entry_pc; int nparams; IcnScope lower_sc; BB_graph_t *ir_body; int dcg_idx; int is_generator; } IcnProcEntry;
 typedef struct {
     DESCR_t       env[FRAME_SLOT_MAX];
     int           env_n;
@@ -36,6 +41,17 @@ typedef struct {
 } IcnFrame;
 extern IcnProcEntry proc_table[PROC_TABLE_MAX];
 extern int          proc_count;
+/* IR-CONSOLIDATE-DCG step 3: strangler helper.  Prefers the SM_sequence_t's dcg_table
+ * (the consolidated path); falls back to ir_body when no SM_sequence_t is bound (e.g.
+ * mode-4 standalone-binary runtime) or when dcg_idx is unset.  Step 5 will retire the
+ * fallback once all callers go through this and the ir_body field is deleted. */
+static inline BB_graph_t *bb_graph_of_proc(const IcnProcEntry *e)
+{
+    if (!e) return NULL;
+    if (g_current_SM_seq && e->dcg_idx >= 0 && e->dcg_idx < g_current_SM_seq->dcg_count)
+        return g_current_SM_seq->dcg_table[e->dcg_idx];
+    return e->ir_body;
+}
 extern int          g_lang;
 extern tree_t      *g_icn_root;
 extern IcnFrame     frame_stack[FRAME_STACK_MAX];

@@ -117,6 +117,7 @@ void polyglot_init(const tree_t *prog, uint32_t lang_mask)
                     proc_table[proc_count].name     = name;
                     proc_table[proc_count].proc     = proc;
                     proc_table[proc_count].entry_pc = -1;
+                    proc_table[proc_count].dcg_idx  = -1;       /* IR-CONSOLIDATE-DCG step 2: set in lower.c when ir_body is built. */
                     proc_table[proc_count].nparams  = (s_lang == LANG_ICN)
                         ? (proc->t == TT_PROC_DECL && proc->n >= 2 ? proc->c[1]->n : 0)
                         : (int)proc->v.ival;

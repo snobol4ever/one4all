@@ -61,6 +61,7 @@ Pl_PredEntry_BB *pl_dcg_register(const char *name, int arity, BB_graph_t *ir_bod
     e->name = strdup(name);
     e->arity = arity;
     e->ir_body = ir_body;
+    e->dcg_idx = -1;        /* IR-CONSOLIDATE-DCG step 2: caller sets dcg_idx when an SM_sequence_t exists (compile-time lowering); mode-4 rt.c registration leaves it -1. */
     e->lower_sc.n = 0;
     return e;
 }
@@ -1629,7 +1630,7 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 Term **saved_env = g_pl_env;
                 g_pl_env = uargs;
                 Pl_PredEntry *_upe1 = pl_pred_entry_lookup(ukey);
-                extern void *g_current_SM_seq;
+                /* g_current_SM_seq comes from SM.h via pl_runtime.h */
                 bb_node_t uroot = (_upe1 && _upe1->entry_pc >= 0 && g_current_SM_seq != NULL)
                     ? pl_box_choice_pc(_upe1->entry_pc, g_pl_env, call_arity)
                     : pl_box_choice(uch, g_pl_env, call_arity);
@@ -1692,7 +1693,7 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                         Term **saved_env = g_pl_env;
                         g_pl_env = uargs;
                         Pl_PredEntry *_upe2 = pl_pred_entry_lookup(ukey);
-                        extern void *g_current_SM_seq;
+                        /* g_current_SM_seq comes from SM.h via pl_runtime.h */
                         bb_node_t uroot = (_upe2 && _upe2->entry_pc >= 0 && g_current_SM_seq != NULL)
                             ? pl_box_choice_pc(_upe2->entry_pc, g_pl_env, arity)
                             : pl_box_choice(uch, g_pl_env, arity);

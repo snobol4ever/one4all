@@ -7,6 +7,7 @@
 #include "../../frontend/prolog/prolog_runtime.h"
 #include "bb_broker.h"
 #include "BB.h"
+#include "SM.h"
 #define PL_PRED_TABLE_SIZE_FWD 256
 #define PL_SCOPE_SLOT_MAX       64
 #define PL_DCG_TABLE_MAX       256
@@ -17,9 +18,18 @@ typedef struct Pl_PredEntry_t {
 typedef struct { Pl_PredEntry *buckets[PL_PRED_TABLE_SIZE_FWD]; } Pl_PredTable;
 typedef struct { const char *name; int slot; } PlScopeEnt;
 typedef struct { PlScopeEnt e[PL_SCOPE_SLOT_MAX]; int n; } PlScope;
-typedef struct { const char *name; int arity; BB_graph_t *ir_body; PlScope lower_sc; } Pl_PredEntry_BB;
+/* IR-CONSOLIDATE-DCG step 1: see icn_runtime.h for the parallel IcnProcEntry change. */
+typedef struct { const char *name; int arity; BB_graph_t *ir_body; int dcg_idx; PlScope lower_sc; } Pl_PredEntry_BB;
 extern Pl_PredEntry_BB g_dcg_table[PL_DCG_TABLE_MAX];
 extern int             g_dcg_count;
+/* IR-CONSOLIDATE-DCG step 3: strangler helper, see icn_runtime.h bb_graph_of_proc. */
+static inline BB_graph_t *bb_graph_of_pred(const Pl_PredEntry_BB *e)
+{
+    if (!e) return NULL;
+    if (g_current_SM_seq && e->dcg_idx >= 0 && e->dcg_idx < g_current_SM_seq->dcg_count)
+        return g_current_SM_seq->dcg_table[e->dcg_idx];
+    return e->ir_body;
+}
 extern Pl_PredTable  g_pl_pred_table;
 extern Trail         g_pl_trail;
 extern int           g_pl_cut_flag;
