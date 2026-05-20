@@ -2160,49 +2160,49 @@ static int emit_sm_define_dispatch(FILE *out, const SM_Instr *ins, int pc) {
     return emit_sm_noop(out, sm_template_lookup(SM_DEFINE), anno);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int  emit_sm_pat_span_dispatch   (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_span);     return 0; }
+int  emit_sm_pat_span_dispatch   (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_span);     return 0; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int  emit_sm_pat_break_dispatch  (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_break);    return 0; }
+int  emit_sm_pat_break_dispatch  (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_break);    return 0; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int  emit_sm_pat_any_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_any);      return 0; }
+int  emit_sm_pat_any_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_any);      return 0; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int  emit_sm_pat_notany_dispatch (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_notany);   return 0; }
+int  emit_sm_pat_notany_dispatch (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_notany);   return 0; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int  emit_sm_pat_len_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_len);      return 0; }
+int  emit_sm_pat_len_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_len);      return 0; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int  emit_sm_pat_pos_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_pos);      return 0; }
+int  emit_sm_pat_pos_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_pos);      return 0; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int  emit_sm_pat_rpos_dispatch   (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_rpos);     return 0; }
+int  emit_sm_pat_rpos_dispatch   (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_rpos);     return 0; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int  emit_sm_pat_tab_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_tab);      return 0; }
+int  emit_sm_pat_tab_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_tab);      return 0; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int  emit_sm_pat_rtab_dispatch   (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_rtab);     return 0; }
+int  emit_sm_pat_rtab_dispatch   (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_rtab);     return 0; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int  emit_sm_pat_arb_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_arb);      return 0; }
+int  emit_sm_pat_arb_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_arb);      return 0; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int  emit_sm_pat_arbno_dispatch  (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_arbno);    return 0; }
+int  emit_sm_pat_arbno_dispatch  (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_arbno);    return 0; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int  emit_sm_pat_rem_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_rem);      return 0; }
+int  emit_sm_pat_rem_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_rem);      return 0; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int  emit_sm_pat_fence0_dispatch (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_fence);    return 0; }
+int  emit_sm_pat_fence0_dispatch (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_fence);    return 0; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int  emit_sm_pat_fence1_dispatch (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_fence1);   return 0; }
+int  emit_sm_pat_fence1_dispatch (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_fence1);   return 0; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int  emit_sm_pat_fail_dispatch   (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_fail);     return 0; }
+int  emit_sm_pat_fail_dispatch   (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_fail);     return 0; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int  emit_sm_pat_abort_dispatch  (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_abort);    return 0; }
+int  emit_sm_pat_abort_dispatch  (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_abort);    return 0; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int  emit_sm_pat_succeed_dispatch(FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_succeed);  return 0; }
+int  emit_sm_pat_succeed_dispatch(FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_succeed);  return 0; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int  emit_sm_pat_bal_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_bal);      return 0; }
+int  emit_sm_pat_bal_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_bal);      return 0; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int  emit_sm_pat_eps_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_eps);      return 0; }
+int  emit_sm_pat_eps_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_eps);      return 0; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int  emit_sm_pat_cat_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_cat);      return 0; }
+int  emit_sm_pat_cat_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_cat);      return 0; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int  emit_sm_pat_alt_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_alt);      return 0; }
+int  emit_sm_pat_alt_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_alt);      return 0; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int  emit_sm_pat_deref_dispatch  (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_deref);    return 0; }
+int  emit_sm_pat_deref_dispatch  (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_deref);    return 0; }
 /*------------------------------------------------------------------------------------------------------------------------------------*/
 /* Phase-2 simulator (EC-BB-UNIFY-2): builds IR_t* pattern trees from an SM_Instr window.                                              */
 /*                                                                                                                                     */
@@ -2883,6 +2883,19 @@ static int emit_sm_exec_stmt_variant(FILE *out, const SM_Instr *ins, int pc)
     a.anno  = anno[0] ? anno : NULL;
     return emit_sm_template(out, sm_template_lookup(SM_EXEC_STMT), &a);
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* EC-UNI-2d: public shims for non-uniform pat dispatchers + exec_stmt.
+ * Each shim takes (FILE *out, const SM_Instr *ins) and calls its static
+ * dispatcher with pc=0 — pc is only used inside dispatchers as (void)pc.
+ * Private types (sm_op_template_t, emit_sm_args_t, pat_arg_label) stay inside emit_sm.c. */
+int emit_sm_pat_lit_template            (FILE *out, const SM_Instr *ins) { return emit_sm_pat_lit_dispatch(out, ins, 0); }
+int emit_sm_pat_refname_template        (FILE *out, const SM_Instr *ins) { return emit_sm_pat_refname_dispatch(out, ins, 0); }
+int emit_sm_pat_capture_template        (FILE *out, const SM_Instr *ins) { return emit_sm_pat_capture_dispatch(out, ins, 0); }
+int emit_sm_pat_capture_fn_template     (FILE *out, const SM_Instr *ins) { return emit_sm_pat_capture_fn_dispatch(out, ins, 0); }
+int emit_sm_pat_capture_fn_args_template(FILE *out, const SM_Instr *ins) { return emit_sm_pat_capture_fn_args_dispatch(out, ins, 0); }
+int emit_sm_pat_usercall_template       (FILE *out, const SM_Instr *ins) { return emit_sm_pat_usercall_dispatch(out, ins, 0); }
+int emit_sm_pat_usercall_args_template  (FILE *out, const SM_Instr *ins) { return emit_sm_pat_usercall_args_dispatch(out, ins, 0); }
+int emit_sm_exec_stmt_template          (FILE *out, const SM_Instr *ins) { return emit_sm_exec_stmt_variant(out, ins, 0); }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int edp4_sm_unhandled(FILE *out, const SM_Instr *ins, int pc)
 {

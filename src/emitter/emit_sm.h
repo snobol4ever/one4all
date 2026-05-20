@@ -95,6 +95,39 @@ int emit_sm_jump_f_line        (FILE *out, const SM_Instr *ins, int pc);
 int emit_sm_return_dispatch    (FILE *out, int pc);
 int emit_sm_return_variant_dispatch(FILE *out, sm_opcode_t op, int pc, const SM_Program *prog);
 int emit_sm_return_template    (FILE *out, const SM_Instr *ins);   /* shim — passes NULL SM_Program for NRETURN comment annotation */
+/* EC-UNI-2d: pat family x86 dispatchers — uniform `(FILE *, int pc)` dispatchers un-staticed for direct template use. */
+int emit_sm_pat_span_dispatch    (FILE *out, int pc);
+int emit_sm_pat_break_dispatch   (FILE *out, int pc);
+int emit_sm_pat_any_dispatch     (FILE *out, int pc);
+int emit_sm_pat_notany_dispatch  (FILE *out, int pc);
+int emit_sm_pat_len_dispatch     (FILE *out, int pc);
+int emit_sm_pat_pos_dispatch     (FILE *out, int pc);
+int emit_sm_pat_rpos_dispatch    (FILE *out, int pc);
+int emit_sm_pat_tab_dispatch     (FILE *out, int pc);
+int emit_sm_pat_rtab_dispatch    (FILE *out, int pc);
+int emit_sm_pat_arb_dispatch     (FILE *out, int pc);
+int emit_sm_pat_arbno_dispatch   (FILE *out, int pc);
+int emit_sm_pat_rem_dispatch     (FILE *out, int pc);
+int emit_sm_pat_fence0_dispatch  (FILE *out, int pc);
+int emit_sm_pat_fence1_dispatch  (FILE *out, int pc);
+int emit_sm_pat_fail_dispatch    (FILE *out, int pc);
+int emit_sm_pat_abort_dispatch   (FILE *out, int pc);
+int emit_sm_pat_succeed_dispatch (FILE *out, int pc);
+int emit_sm_pat_bal_dispatch     (FILE *out, int pc);
+int emit_sm_pat_eps_dispatch     (FILE *out, int pc);
+int emit_sm_pat_cat_dispatch     (FILE *out, int pc);
+int emit_sm_pat_alt_dispatch     (FILE *out, int pc);
+int emit_sm_pat_deref_dispatch   (FILE *out, int pc);
+/* EC-UNI-2d: pat family x86 shims — non-uniform dispatchers wrapped to (FILE *, const SM_Instr *) signature.
+ * Private types (sm_op_template_t, emit_sm_args_t, pat_arg_label) stay inside emit_sm.c via these shims. */
+int emit_sm_pat_lit_template            (FILE *out, const SM_Instr *ins);
+int emit_sm_pat_refname_template        (FILE *out, const SM_Instr *ins);
+int emit_sm_pat_capture_template        (FILE *out, const SM_Instr *ins);
+int emit_sm_pat_capture_fn_template     (FILE *out, const SM_Instr *ins);
+int emit_sm_pat_capture_fn_args_template(FILE *out, const SM_Instr *ins);
+int emit_sm_pat_usercall_template       (FILE *out, const SM_Instr *ins);
+int emit_sm_pat_usercall_args_template  (FILE *out, const SM_Instr *ins);
+int emit_sm_exec_stmt_template          (FILE *out, const SM_Instr *ins);
 /*---- compat macros -------------------------------------------------------*/
 #define sm_codegen_text(prog,out,src)  emit_walk_codegen(prog,out,src)
 #define flat_is_eligible_node(nd)      emit_flat_eligible(nd)
