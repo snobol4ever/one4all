@@ -1229,7 +1229,7 @@ void jvm_emit_ldc_string(FILE * out, const char * s) {
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* EC-2 helpers — shared across JVM/JS/.NET arms; removed from silos in EC-5. */
-#include "IR.h"
+#include "BB.h"
 #include "emit_ir.h"
 void js_escape(FILE * out, const char * s) {
     fprintf(out, "\"");
@@ -1335,26 +1335,26 @@ void net_spec_zw(FILE * out) {
 
 /* emit_bb_node — one call per BB kind; each bb_* function handles all modes internally.
    EC-2b COMPLETE: 18 kinds, each with IS_TEXT/IS_BIN/IS_JVM/IS_JS/IS_NET arms in one function. */
-int emit_bb_node(IR_t * nd, FILE * out) {
+int emit_bb_node(BB_t * nd, FILE * out) {
     if (!nd) return 1;
     switch (nd->t) {
-    case IR_PAT_LIT:         bb_lit(nd, out);         return 0;
-    case IR_PAT_ANY:         bb_any(nd, out);         return 0;
-    case IR_PAT_NOTANY:      bb_notany(nd, out);      return 0;
-    case IR_PAT_SPAN:        bb_span(nd, out);        return 0;
-    case IR_PAT_BREAK:       bb_break(nd, out);       return 0;
-    case IR_PAT_ARB:         bb_arb(nd, out);         return 0;
-    case IR_PAT_ARBNO:       bb_arbno(nd, out);       return 0;
-    case IR_PAT_CAT:         bb_cat(nd, out);         return 0;
-    case IR_PAT_ALT:         bb_alt(nd, out);         return 0;
-    case IR_PAT_LEN:         bb_len(nd, out);         return 0;
-    case IR_PAT_POS:         bb_pos(nd, out);         return 0;
-    case IR_PAT_TAB:         bb_tab(nd, out);         return 0;
-    case IR_PAT_REM:         bb_rem(nd, out);         return 0;
-    case IR_PAT_FENCE:       bb_fence(nd, out);       return 0;
-    case IR_PAT_ABORT:       bb_abort(nd, out);       return 0;
-    case IR_PAT_ASSIGN_IMM:  bb_capture(nd, out, 1); return 0;
-    case IR_PAT_ASSIGN_COND: bb_capture(nd, out, 0); return 0;
+    case BB_PAT_LIT:         bb_lit(nd, out);         return 0;
+    case BB_PAT_ANY:         bb_any(nd, out);         return 0;
+    case BB_PAT_NOTANY:      bb_notany(nd, out);      return 0;
+    case BB_PAT_SPAN:        bb_span(nd, out);        return 0;
+    case BB_PAT_BREAK:       bb_break(nd, out);       return 0;
+    case BB_PAT_ARB:         bb_arb(nd, out);         return 0;
+    case BB_PAT_ARBNO:       bb_arbno(nd, out);       return 0;
+    case BB_PAT_CAT:         bb_cat(nd, out);         return 0;
+    case BB_PAT_ALT:         bb_alt(nd, out);         return 0;
+    case BB_PAT_LEN:         bb_len(nd, out);         return 0;
+    case BB_PAT_POS:         bb_pos(nd, out);         return 0;
+    case BB_PAT_TAB:         bb_tab(nd, out);         return 0;
+    case BB_PAT_REM:         bb_rem(nd, out);         return 0;
+    case BB_PAT_FENCE:       bb_fence(nd, out);       return 0;
+    case BB_PAT_ABORT:       bb_abort(nd, out);       return 0;
+    case BB_PAT_ASSIGN_IMM:  bb_capture(nd, out, 1); return 0;
+    case BB_PAT_ASSIGN_COND: bb_capture(nd, out, 0); return 0;
     default:
         fprintf(out, "; [emit_bb_node: kind=%d unhandled]\n", (int)nd->t);
         return 1;
@@ -1471,9 +1471,9 @@ static int wasm_parse_define_signature(WasmUserFn * fn, const char * sig) {
     return 1;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void wasm_pre_scan_userfns(SM_Program * sm) {
+static void wasm_pre_scan_userfns(SM_sequence_t * sm) {
     for (int i = 0; i < sm->count && g_wasm_userfns_n < WASM_USERFNS_MAX; i++) {
-        SM_Instr * ins = &sm->instrs[i];
+        SM_t * ins = &sm->instrs[i];
         if (ins->op != SM_LABEL) continue;
         const char * lbl = ins->a[0].s;
         if (!lbl || !strstr(lbl, "(")) continue;
@@ -1487,13 +1487,13 @@ static void wasm_pre_scan_userfns(SM_Program * sm) {
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* EC-WASM-SM: emit_wasm_from_sm — now delegates to SM_template functions (one per opcode). */
-static int emit_wasm_from_sm(SM_Program * sm, FILE * out) {
+static int emit_wasm_from_sm(SM_sequence_t * sm, FILE * out) {
     if (!sm || !out || sm->count == 0) return 0;
     int n = sm->count;
     fprintf(out, "    (block $done\n");
     fprintf(out, "      (loop $lp\n");
     for (int i = 0; i < n; i++) {
-        SM_Instr * ins = &sm->instrs[i];
+        SM_t * ins = &sm->instrs[i];
         int has_jump = 0;
         sm_ctx_t ctx = {i, n, 0, NULL, NULL, NULL, 0};
         fprintf(out, "        (if (i32.eq (local.get $pc) (i32.const %d)) (then\n", i);
@@ -1594,7 +1594,7 @@ static int emit_wasm_from_sm(SM_Program * sm, FILE * out) {
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* EC-4: unified emit_prologue / emit_epilogue — mode-dispatched, replaces per-silo static fns. */
-int emit_prologue(IR_block_t * cfg, FILE * out) {
+int emit_prologue(BB_graph_t * cfg, FILE * out) {
     (void)cfg;
     if (IS_JVM) {
         fprintf(out, "; JVM Jasmin output — generated by scrip --jit-emit --target=jvm\n");
@@ -1693,7 +1693,7 @@ int emit_prologue(IR_block_t * cfg, FILE * out) {
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int emit_epilogue(IR_block_t * cfg, FILE * out) {
+int emit_epilogue(BB_graph_t * cfg, FILE * out) {
     (void)cfg;
     if (IS_JVM) { return 0; }
     if (IS_JS) {
@@ -1758,21 +1758,21 @@ static char ** net_parse_define_proto(const char * proto, char ** out_fname, int
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* EC-5: ir_node_id / ir_is_generator / ir_walk — moved from emit_ir.c. */
-int ir_node_id(IR_t * nd) { return (int)((uintptr_t)nd % 100000u); }
+int ir_node_id(BB_t * nd) { return (int)((uintptr_t)nd % 100000u); }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int ir_is_generator(IR_e k) {
-    if (k >= IR_PAT_LIT   && k <= IR_PAT_CALLOUT)  return 1;
-    if (k >= IR_PL_CHOICE && k <= IR_PL_CALL)      return 1;
-    if (k >= IR_ICN_TO    && k <= IR_ICN_PROC_GEN) return 1;
-    if (k == IR_SCAN || k == IR_ALTERNATE || k == IR_TO_BY ||
-        k == IR_EVERY || k == IR_WHILE    || k == IR_LIMIT || k == IR_SUSPEND) return 1;
+int ir_is_generator(BB_op_t k) {
+    if (k >= BB_PAT_LIT   && k <= BB_PAT_CALLOUT)  return 1;
+    if (k >= BB_PL_CHOICE && k <= BB_PL_CALL)      return 1;
+    if (k >= BB_ICN_TO    && k <= BB_ICN_PROC_GEN) return 1;
+    if (k == BB_SCAN || k == BB_ALTERNATE || k == BB_TO_BY ||
+        k == BB_EVERY || k == BB_WHILE    || k == BB_LIMIT || k == BB_SUSPEND) return 1;
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 #define IR_WALK_MAX 4096
 static int g_visited[IR_WALK_MAX];
 static int g_vcount = 0;
-static void ir_walk_rec(IR_t * nd, void (*visit)(IR_t *, void *), void * ctx) {
+static void ir_walk_rec(BB_t * nd, void (*visit)(BB_t *, void *), void * ctx) {
     if (!nd) return;
     int id = ir_node_id(nd);
     for (int i = 0; i < g_vcount; i++) if (g_visited[i] == id) return;
@@ -1783,15 +1783,15 @@ static void ir_walk_rec(IR_t * nd, void (*visit)(IR_t *, void *), void * ctx) {
     if (nd->c) for (int i = 0; i < nd->n; i++) ir_walk_rec(nd->c[i], visit, ctx);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void ir_walk(IR_block_t * cfg, void (*visit)(IR_t *, void *), void * ctx) {
+void ir_walk(BB_graph_t * cfg, void (*visit)(BB_t *, void *), void * ctx) {
     if (!cfg || !cfg->entry) return;
     g_vcount = 0;
     ir_walk_rec(cfg->entry, visit, ctx);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* EC-5: emit_jvm_from_sm — moved from emit_jvm.c (method-split SM walk). */
-static void emit_jvm_one_instr(SM_Program * sm, int i, int n, const char ** fn_names, const int * fn_pcs, int fn_count, int in_body, const char * in_my_method, FILE * out) {
-    SM_Instr * instr = &sm->instrs[i];
+static void emit_jvm_one_instr(SM_sequence_t * sm, int i, int n, const char ** fn_names, const int * fn_pcs, int fn_count, int in_body, const char * in_my_method, FILE * out) {
+    SM_t * instr = &sm->instrs[i];
     switch (instr->op) {
     case SM_LABEL: break;
     case SM_STNO:  sm_stno(instr, out); break;
@@ -1880,7 +1880,7 @@ static void emit_jvm_one_instr(SM_Program * sm, int i, int n, const char ** fn_n
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void emit_jvm_sm_range(SM_Program * sm, int lo, int hi, int n, const char ** fn_names, const int * fn_pcs, int fn_count, FILE * out) {
+static void emit_jvm_sm_range(SM_sequence_t * sm, int lo, int hi, int n, const char ** fn_names, const int * fn_pcs, int fn_count, FILE * out) {
     char * in_my = (char *)calloc((size_t)n, 1);
     for (int i = lo; i < hi; i++) in_my[i] = 1;
     fprintf(out, "    ; \xe2\x94\x80\xe2\x94\x80 SM instructions %d..%d \xe2\x94\x80\xe2\x94\x80\n", lo, hi - 1);
@@ -1889,7 +1889,7 @@ static void emit_jvm_sm_range(SM_Program * sm, int lo, int hi, int n, const char
     free(in_my);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_jvm_from_sm(SM_Program * sm, FILE * out) {
+static int emit_jvm_from_sm(SM_sequence_t * sm, FILE * out) {
     if (!sm || !out) return 0;
     int n = sm->count; if (n == 0) return 0;
     int * fn_pcs = (int *)calloc((size_t)n, sizeof(int));
@@ -1897,7 +1897,7 @@ static int emit_jvm_from_sm(SM_Program * sm, FILE * out) {
     const char ** fn_names = (const char **)calloc((size_t)n, sizeof(const char *));
     int fn_count = 0;
     for (int i = 0; i < n; i++) {
-        SM_Instr * ins = &sm->instrs[i];
+        SM_t * ins = &sm->instrs[i];
         if (ins->op == SM_LABEL && ins->a[2].i && ins->a[0].s) { fn_pcs[fn_count] = i; fn_names[fn_count] = ins->a[0].s; fn_count++; }
     }
     int * group_ends = (int *)calloc((size_t)fn_count, sizeof(int));
@@ -1905,7 +1905,7 @@ static int emit_jvm_from_sm(SM_Program * sm, FILE * out) {
     for (int k = 0; k < fn_count; k++) {
         int p = fn_pcs[k];
         for (int j = p - 1; j >= 0; j--) {
-            SM_Instr * pi = &sm->instrs[j];
+            SM_t * pi = &sm->instrs[j];
             if (pi->op == SM_LABEL && pi->a[2].i) break;
             if (pi->op == SM_LABEL) break;
             if (pi->op == SM_HALT) break;
@@ -1955,10 +1955,10 @@ static void js_escape_string(FILE * out, const char * s) {
     fprintf(out, "\"");
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_js_from_sm(SM_Program * sm, FILE * out) {
+static int emit_js_from_sm(SM_sequence_t * sm, FILE * out) {
     if (!sm || !out || sm->count == 0) return 0;
     for (int i = 0; i < sm->count; i++) {
-        SM_Instr * instr = &sm->instrs[i];
+        SM_t * instr = &sm->instrs[i];
         fprintf(out, "case %d: ", i);
         int has_continue = 0;
         switch (instr->op) {
@@ -2033,7 +2033,7 @@ static int emit_js_from_sm(SM_Program * sm, FILE * out) {
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* EC-5: emit_net_from_sm — moved from emit_net.c. */
-static int emit_net_from_sm(SM_Program * sm, FILE * out) {
+static int emit_net_from_sm(SM_sequence_t * sm, FILE * out) {
     if (!sm || !out) return 0;
     int n = sm->count;
     int * fn_pcs = NULL; const char ** fn_names = NULL; char *** fn_params = NULL;
@@ -2046,14 +2046,14 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
         pc_to_fn = (int *)malloc((size_t)n * sizeof(int));
         for (int p = 0; p < n; p++) pc_to_fn[p] = -1;
         for (int i = 0; i < n; i++) {
-            SM_Instr * ins = &sm->instrs[i];
+            SM_t * ins = &sm->instrs[i];
             if (ins->op == SM_LABEL && ins->a[2].i && ins->a[0].s) { fn_pcs[fn_count] = i; fn_names[fn_count] = ins->a[0].s; fn_count++; }
         }
         for (int i = 1; i < n; i++) {
-            SM_Instr * ins = &sm->instrs[i];
+            SM_t * ins = &sm->instrs[i];
             if (ins->op != SM_CALL_FN && ins->op != SM_SUSPEND_VALUE) continue;
             if (!ins->a[0].s || strcmp(ins->a[0].s, "DEFINE") != 0) continue;
-            SM_Instr * prev = &sm->instrs[i - 1];
+            SM_t * prev = &sm->instrs[i - 1];
             if (prev->op != SM_PUSH_LIT_S && prev->op != SM_PUSH_LIT_CS) continue;
             if (!prev->a[0].s) continue;
             char * fname = NULL; int npar = 0;
@@ -2069,7 +2069,7 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
         for (int k = 0; k < fn_count; k++) {
             int entry = fn_pcs[k], around_target = -1;
             for (int p = entry - 1; p >= 0; p--) {
-                SM_Instr * pi = &sm->instrs[p];
+                SM_t * pi = &sm->instrs[p];
                 if (pi->op == SM_JUMP && (int)pi->a[0].i > entry) { around_target = (int)pi->a[0].i; break; }
             }
             int body_end = (around_target > 0) ? around_target - 1 : entry;
@@ -2081,7 +2081,7 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
     for (int i = 0; i < n; i++) { fprintf(out, "NET_L%d", i); if (i < n - 1) fprintf(out, ", "); }
     fprintf(out, ")\n    br         NET_DONE\n");
     for (int i = 0; i < n; i++) {
-        SM_Instr * instr = &sm->instrs[i];
+        SM_t * instr = &sm->instrs[i];
         fprintf(out, "  NET_L%d:\n", i);
         int has_continue = 0;
         switch (instr->op) {
@@ -2169,7 +2169,7 @@ static int emit_net_from_sm(SM_Program * sm, FILE * out) {
 /* EC-5: emit_program — unified entry point replacing emit_jvm_program/emit_js_program/emit_net_program. */
 int emit_program(const tree_t * ast_prog, FILE * out, bb_emit_mode_t mode) {
     if (!ast_prog || !out) return 1;
-    SM_Program * sm = sm_preamble(ast_prog);
+    SM_sequence_t * sm = sm_preamble(ast_prog);
     if (!sm) return 1;
     bb_emit_mode_t saved_mode = bb_emit_mode;
     FILE *         saved_out  = bb_emit_out;
@@ -2178,7 +2178,7 @@ int emit_program(const tree_t * ast_prog, FILE * out, bb_emit_mode_t mode) {
         wasm_strtab_reset();
         wasm_userfns_reset();
         for (int i = 0; i < sm->count; i++) {
-            SM_Instr * ins = &sm->instrs[i];
+            SM_t * ins = &sm->instrs[i];
             if ((ins->op == SM_PUSH_LIT_S || ins->op == SM_PUSH_LIT_CS) && ins->a[0].s) wasm_intern_str(ins->a[0].s);
             else if ((ins->op == SM_PUSH_VAR || ins->op == SM_STORE_VAR || ins->op == SM_CALL_FN || ins->op == SM_SUSPEND_VALUE) && ins->a[0].s) wasm_intern_name(ins->a[0].s);
             else if (ins->op == SM_PAT_LIT && ins->a[0].s) wasm_intern_str(ins->a[0].s);
@@ -2197,7 +2197,7 @@ int emit_program(const tree_t * ast_prog, FILE * out, bb_emit_mode_t mode) {
         fprintf(out, "  )\n");
         emit_epilogue(NULL, out);
         emit_mode_set(saved_mode, saved_out);
-        sm_prog_free(sm);
+        SM_seq_free(sm);
         return 0;
     }
     emit_prologue(NULL, out);
@@ -2206,7 +2206,7 @@ int emit_program(const tree_t * ast_prog, FILE * out, bb_emit_mode_t mode) {
         fprintf(out, "rt._register_label_pcs({");
         int first = 1;
         for (int i = 0; i < sm->count; i++) {
-            SM_Instr * in = &sm->instrs[i];
+            SM_t * in = &sm->instrs[i];
             if (in->op == SM_LABEL && in->a[0].s && in->a[0].s[0]) {
                 if (!first) fprintf(out, ",");
                 js_escape_string(out, in->a[0].s);
@@ -2219,7 +2219,7 @@ int emit_program(const tree_t * ast_prog, FILE * out, bb_emit_mode_t mode) {
     } else if (IS_NET) emit_net_from_sm(sm, out);
     emit_epilogue(NULL, out);
     emit_mode_set(saved_mode, saved_out);
-    sm_prog_free(sm);
+    SM_seq_free(sm);
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -2228,7 +2228,7 @@ int emit_program(const tree_t * ast_prog, FILE * out, bb_emit_mode_t mode) {
  * Each SM opcode dispatches through its sm_<opcode> template function which carries arms for every backend.
  * EC-UNI-0 wires only the scaffold — every mode returns -1 (unsupported) until later steps fill in arms.
  * No call sites yet; safe by construction. */
-int emit_sm_dispatch(SM_Program * sm, FILE * out, bb_emit_mode_t mode) {
+int emit_sm_dispatch(SM_sequence_t * sm, FILE * out, bb_emit_mode_t mode) {
     (void)sm; (void)out; (void)mode;
     return -1;
 }

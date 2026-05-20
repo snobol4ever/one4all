@@ -30,7 +30,7 @@ extern void ir_print_node_nl(const tree_t *e, FILE *f);
 #include "snobol4_runtime_shim.h"
 #include "lower.h"
 #include "sm_interp.h"
-#include "sm_prog.h"
+#include "SM.h"
 #include "bb_build.h"
 #include "sm_jit_interp.h"
 #include "sm_image.h"

@@ -10,7 +10,7 @@ int bb_broker(bb_node_t root, BrokerMode mode, void (*body_fn)(DESCR_t val, void
     if (!root.fn) return 0;
     fn = (univ_box_fn)root.fn;
     switch (mode) {
-    case BB_SCAN:
+    case bb_scan:
         for (scan = 0; scan <= Ω; scan++) {
             Δ   = scan;
             val = fn(root.ζ, α);
@@ -22,7 +22,7 @@ int bb_broker(bb_node_t root, BrokerMode mode, void (*body_fn)(DESCR_t val, void
             }
         }
         return 0;
-    case BB_PUMP:
+    case bb_pump:
         val = fn(root.ζ, α);
         if (IS_FAIL_fn(val)) return 0;
         if (body_fn) body_fn(val, arg);
@@ -34,7 +34,7 @@ int bb_broker(bb_node_t root, BrokerMode mode, void (*body_fn)(DESCR_t val, void
             ticks++;
         }
         return ticks;
-    case BB_ONCE:
+    case bb_once:
         val = fn(root.ζ, α);
         if (IS_FAIL_fn(val)) return 0;
         if (body_fn) body_fn(val, arg);

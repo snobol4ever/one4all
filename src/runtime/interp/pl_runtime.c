@@ -26,17 +26,17 @@ Term        **g_pl_env      = NULL;
 int           g_pl_active   = 0;
 Pl_PredEntry_BB g_dcg_table[PL_DCG_TABLE_MAX];
 int             g_dcg_count = 0;
-typedef struct { IR_block_t *cfg; int first; } pl_dcg_state_t;
+typedef struct { BB_graph_t *cfg; int first; } pl_dcg_state_t;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* pl_bb_dcg — Prolog BB-land DCG driver.  Infrastructure bridge mirror of icn_bb_dcg.        */
-/* Not a Byrd box: it dispatches to IR_exec_once / IR_exec_resume which own the four-port      */
+/* Not a Byrd box: it dispatches to bb_exec_once / IR_exec_resume which own the four-port      */
 /* logic.  α-entry resets the run-once flag; subsequent calls invoke IR_exec_resume for        */
-/* clause-by-clause retry with trail unwind handled inside the IR_t executors.                 */
+/* clause-by-clause retry with trail unwind handled inside the BB_t executors.                 */
 DESCR_t pl_bb_dcg(void *zeta, int entry) {
     pl_dcg_state_t *z = (pl_dcg_state_t *)zeta;
     if (!z || !z->cfg) return FAILDESCR;
     if (entry == α) { z->first = 1; }
-    DESCR_t v = z->first ? (z->first = 0, IR_exec_once(z->cfg)) : IR_exec_resume(z->cfg);
+    DESCR_t v = z->first ? (z->first = 0, bb_exec_once(z->cfg)) : IR_exec_resume(z->cfg);
     return v;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -52,7 +52,7 @@ Pl_PredEntry_BB *pl_dcg_lookup(const char *name, int arity) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* pl_dcg_register — add or update an entry in the BB-land predicate registry.  Returns the   */
 /* entry pointer on success, NULL on capacity exhaustion.  Idempotent on (name, arity).        */
-Pl_PredEntry_BB *pl_dcg_register(const char *name, int arity, IR_block_t *ir_body) {
+Pl_PredEntry_BB *pl_dcg_register(const char *name, int arity, BB_graph_t *ir_body) {
     if (!name) return NULL;
     Pl_PredEntry_BB *existing = pl_dcg_lookup(name, arity);
     if (existing) { existing->ir_body = ir_body; return existing; }
@@ -65,7 +65,7 @@ Pl_PredEntry_BB *pl_dcg_register(const char *name, int arity, IR_block_t *ir_bod
     return e;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* pl_bb_once_proc_by_name — build bb_node_t for a Prolog predicate call (BB_ONCE mode).       */
+/* pl_bb_once_proc_by_name — build bb_node_t for a Prolog predicate call (bb_once mode).       */
 /* Mirrors icn_bb_pump_proc_by_name.  Returns {NULL,NULL,0} when predicate not in dcg_table    */
 /* or ir_body is NULL (caller falls through to [NO-AST] stub until PJ-4 fills IR).             */
 bb_node_t pl_bb_once_proc_by_name(const char *name, int arity) {
@@ -1629,11 +1629,11 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                 Term **saved_env = g_pl_env;
                 g_pl_env = uargs;
                 Pl_PredEntry *_upe1 = pl_pred_entry_lookup(ukey);
-                extern void *g_current_sm_prog;
-                bb_node_t uroot = (_upe1 && _upe1->entry_pc >= 0 && g_current_sm_prog != NULL)
+                extern void *g_current_SM_seq;
+                bb_node_t uroot = (_upe1 && _upe1->entry_pc >= 0 && g_current_SM_seq != NULL)
                     ? pl_box_choice_pc(_upe1->entry_pc, g_pl_env, call_arity)
                     : pl_box_choice(uch, g_pl_env, call_arity);
-                int uok = bb_broker(uroot, BB_ONCE, NULL, NULL);
+                int uok = bb_broker(uroot, bb_once, NULL, NULL);
                 g_pl_env = saved_env;
                 if (!uok) trail_unwind(utrail, umark);
                 if (uargs) free(uargs);
@@ -1692,11 +1692,11 @@ int interp_exec_pl_builtin(tree_t *goal, Term **env) {
                         Term **saved_env = g_pl_env;
                         g_pl_env = uargs;
                         Pl_PredEntry *_upe2 = pl_pred_entry_lookup(ukey);
-                        extern void *g_current_sm_prog;
-                        bb_node_t uroot = (_upe2 && _upe2->entry_pc >= 0 && g_current_sm_prog != NULL)
+                        extern void *g_current_SM_seq;
+                        bb_node_t uroot = (_upe2 && _upe2->entry_pc >= 0 && g_current_SM_seq != NULL)
                             ? pl_box_choice_pc(_upe2->entry_pc, g_pl_env, arity)
                             : pl_box_choice(uch, g_pl_env, arity);
-                        uok = bb_broker(uroot, BB_ONCE, NULL, NULL);
+                        uok = bb_broker(uroot, bb_once, NULL, NULL);
                         g_pl_env = saved_env;
                     }
                     if (!uok) trail_unwind(utrail, umark);

@@ -1,6 +1,6 @@
 #include "bb_template_common.h"
 
-void bb_rem(IR_t * nd, FILE * out) {
+void bb_rem(BB_t * nd, FILE * out) {
     int nid = ir_node_id(nd); int sid = 0; (void)sid;
     if (IS_BIN) return; /* x86 binary: emit_flat_body path, not emit_bb_node */
     if (IS_JVM) {

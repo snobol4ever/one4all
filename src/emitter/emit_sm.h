@@ -1,18 +1,18 @@
 #ifndef EMIT_SM_H
 #define EMIT_SM_H
 #include "emit_core.h"
-#include "sm_prog.h"
+#include "SM.h"
 #include "emit_bb.h"
-#include "IR.h"
+#include "BB.h"
 #include <stdio.h>
 /*---- SM opcode walker (mode-4 text codegen) ------------------------------*/
 void emit_sm_selftest(void);
-int  emit_walk_codegen(SM_Program * prog, FILE * out, const char * src_path);
-/* EC-BB-UNIFY-2: phase-2 simulator returns an IR_t* pattern root built into the caller-supplied cfg arena (NULL on empty window). */
-IR_t * emit_walk_phase2(const SM_Program * prog, int phase2_start, int phase2_end, IR_block_t * cfg, int * out_variant);
+int  emit_walk_codegen(SM_sequence_t * prog, FILE * out, const char * src_path);
+/* EC-BB-UNIFY-2: phase-2 simulator returns an BB_t* pattern root built into the caller-supplied cfg arena (NULL on empty window). */
+BB_t * emit_walk_phase2(const SM_sequence_t * prog, int phase2_start, int phase2_end, BB_graph_t * cfg, int * out_variant);
 /*---- flat-glob eligibility -----------------------------------------------*/
-int  emit_flat_eligible (const IR_t * nd);
-int  emit_flat_invariant(const IR_t * nd);
+int  emit_flat_eligible (const BB_t * nd);
+int  emit_flat_invariant(const BB_t * nd);
 extern int g_emit_inline;
 /*---- SM opcode template dispatch (called by walker) ----------------------*/
 void emit_sm_op_label        (int pc);
@@ -69,32 +69,32 @@ void emit_sm_op_freturn_s    (void);         void emit_sm_op_freturn_f   (void);
 void emit_sm_op_nreturn_s    (void);         void emit_sm_op_nreturn_f   (void);
 void emit_sm_op_unhandled    (int opc);
 /* EC-UNI-1: x86 GAS text dispatchers — exposed so SM_template fns can call them from IS_X86 arms. */
-int emit_push_lit_i_line       (FILE *out, const SM_Instr *ins, int pc);
-int emit_sm_push_lit_s_dispatch(FILE *out, const SM_Instr *ins, int pc);
-int emit_sm_push_lit_f_dispatch(FILE *out, const SM_Instr *ins, int pc);
-int emit_sm_push_var_dispatch  (FILE *out, const SM_Instr *ins, int pc);
-int emit_sm_store_var_dispatch (FILE *out, const SM_Instr *ins, int pc);
+int emit_push_lit_i_line       (FILE *out, const SM_t *ins, int pc);
+int emit_sm_push_lit_s_dispatch(FILE *out, const SM_t *ins, int pc);
+int emit_sm_push_lit_f_dispatch(FILE *out, const SM_t *ins, int pc);
+int emit_sm_push_var_dispatch  (FILE *out, const SM_t *ins, int pc);
+int emit_sm_store_var_dispatch (FILE *out, const SM_t *ins, int pc);
 int emit_sm_push_null_dispatch (FILE *out, int pc);
 int emit_sm_pop                (FILE *out, int pc);
 /* EC-UNI-2: arith family x86 dispatchers */
-int edp4_sm_arith              (FILE *out, const SM_Instr *ins, int pc);  /* SM_ADD/SUB/MUL/DIV/MOD */
+int edp4_sm_arith              (FILE *out, const SM_t *ins, int pc);  /* SM_ADD/SUB/MUL/DIV/MOD */
 int emit_sm_concat_dispatch    (FILE *out, int pc);
 int emit_sm_neg_dispatch       (FILE *out, int pc);
 int emit_sm_coerce_num_dispatch(FILE *out, int pc);
 int emit_sm_exp_dispatch       (FILE *out, int pc);
 /* EC-UNI-2: compare family x86 dispatchers */
-int emit_sm_stno_template      (FILE *out, const SM_Instr *ins);     /* shim — passes NULL SrcLines */
-int emit_sm_acomp_dispatch     (FILE *out, const SM_Instr *ins, int pc);
-int emit_sm_lcomp_dispatch     (FILE *out, const SM_Instr *ins, int pc);
+int emit_sm_stno_template      (FILE *out, const SM_t *ins);     /* shim — passes NULL SrcLines */
+int emit_sm_acomp_dispatch     (FILE *out, const SM_t *ins, int pc);
+int emit_sm_lcomp_dispatch     (FILE *out, const SM_t *ins, int pc);
 /* EC-UNI-2: control family x86 dispatchers (jump/halt) */
 int emit_halt_line             (FILE *out, int pc);
-int emit_sm_jump_line          (FILE *out, const SM_Instr *ins, int pc);
-int emit_sm_jump_s_line        (FILE *out, const SM_Instr *ins, int pc);
-int emit_sm_jump_f_line        (FILE *out, const SM_Instr *ins, int pc);
+int emit_sm_jump_line          (FILE *out, const SM_t *ins, int pc);
+int emit_sm_jump_s_line        (FILE *out, const SM_t *ins, int pc);
+int emit_sm_jump_f_line        (FILE *out, const SM_t *ins, int pc);
 /* EC-UNI-2: return family x86 dispatchers + shim */
 int emit_sm_return_dispatch    (FILE *out, int pc);
-int emit_sm_return_variant_dispatch(FILE *out, sm_opcode_t op, int pc, const SM_Program *prog);
-int emit_sm_return_template    (FILE *out, const SM_Instr *ins);   /* shim — passes NULL SM_Program for NRETURN comment annotation */
+int emit_sm_return_variant_dispatch(FILE *out, SM_op_t op, int pc, const SM_sequence_t *prog);
+int emit_sm_return_template    (FILE *out, const SM_t *ins);   /* shim — passes NULL SM_sequence_t for NRETURN comment annotation */
 /* EC-UNI-2d: pat family x86 dispatchers — uniform `(FILE *, int pc)` dispatchers un-staticed for direct template use. */
 int emit_sm_pat_span_dispatch    (FILE *out, int pc);
 int emit_sm_pat_break_dispatch   (FILE *out, int pc);
@@ -118,16 +118,16 @@ int emit_sm_pat_eps_dispatch     (FILE *out, int pc);
 int emit_sm_pat_cat_dispatch     (FILE *out, int pc);
 int emit_sm_pat_alt_dispatch     (FILE *out, int pc);
 int emit_sm_pat_deref_dispatch   (FILE *out, int pc);
-/* EC-UNI-2d: pat family x86 shims — non-uniform dispatchers wrapped to (FILE *, const SM_Instr *) signature.
+/* EC-UNI-2d: pat family x86 shims — non-uniform dispatchers wrapped to (FILE *, const SM_t *) signature.
  * Private types (sm_op_template_t, emit_sm_args_t, pat_arg_label) stay inside emit_sm.c via these shims. */
-int emit_sm_pat_lit_template            (FILE *out, const SM_Instr *ins);
-int emit_sm_pat_refname_template        (FILE *out, const SM_Instr *ins);
-int emit_sm_pat_capture_template        (FILE *out, const SM_Instr *ins);
-int emit_sm_pat_capture_fn_template     (FILE *out, const SM_Instr *ins);
-int emit_sm_pat_capture_fn_args_template(FILE *out, const SM_Instr *ins);
-int emit_sm_pat_usercall_template       (FILE *out, const SM_Instr *ins);
-int emit_sm_pat_usercall_args_template  (FILE *out, const SM_Instr *ins);
-int emit_sm_exec_stmt_template          (FILE *out, const SM_Instr *ins);
+int emit_sm_pat_lit_template            (FILE *out, const SM_t *ins);
+int emit_sm_pat_refname_template        (FILE *out, const SM_t *ins);
+int emit_sm_pat_capture_template        (FILE *out, const SM_t *ins);
+int emit_sm_pat_capture_fn_template     (FILE *out, const SM_t *ins);
+int emit_sm_pat_capture_fn_args_template(FILE *out, const SM_t *ins);
+int emit_sm_pat_usercall_template       (FILE *out, const SM_t *ins);
+int emit_sm_pat_usercall_args_template  (FILE *out, const SM_t *ins);
+int emit_sm_exec_stmt_template          (FILE *out, const SM_t *ins);
 /* EC-UNI-3: feature flag — when non-zero, emit_walk_codegen routes the 52 templated opcodes through
  * SM_template fns (which call the same dispatchers under IS_X86). Byte-identical by construction. */
 extern int g_emit_use_unified_dispatch;

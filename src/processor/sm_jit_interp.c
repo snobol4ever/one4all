@@ -1,6 +1,6 @@
 #include "sm_jit_interp.h"
 #include "sm_image.h"
-#include "sm_prog.h"
+#include "SM.h"
 #include "sm_interp.h"
 #include "snobol4.h"
 #include "sil_macros.h"
@@ -22,7 +22,7 @@ extern int    g_ast_pump_active     ;
 #include "coerce.h"
 #include <setjmp.h>
 #include <gc/gc.h>
-static SM_Program *g_jit_prog   = NULL;
+static SM_sequence_t *g_jit_prog   = NULL;
 static SM_State   *g_jit_state  = NULL;
 static int         g_jit_halted = 0;
 int      g_jit_step_limit = 0;
@@ -292,7 +292,7 @@ static void h_bb_once_proc(void)
         extern Term **g_pl_env;
         Term **saved_env = g_pl_env;
         pl_bb_env_push(16);
-        int ok = bb_broker(node, BB_ONCE, NULL, NULL);
+        int ok = bb_broker(node, bb_once, NULL, NULL);
         pl_bb_env_pop(saved_env);
         STATE->last_ok = (ok > 0);
     } else {
@@ -319,7 +319,7 @@ static void h_bb_pump_proc(void)
         return;
     }
     g_ast_pump_active++;
-    int ticks = bb_broker(node, BB_PUMP, jit_pump_print, NULL);
+    int ticks = bb_broker(node, bb_pump, jit_pump_print, NULL);
     g_ast_pump_active--;
     STATE->last_ok = (ticks > 0);
 }
@@ -388,7 +388,7 @@ static void h_bb_pump_sm(void)
         return;
     }
     int entry_pc = (int)d.i;
-    SM_Program *prog = g_current_sm_prog;
+    SM_sequence_t *prog = g_current_SM_seq;
     if (!prog || entry_pc < 0 || entry_pc >= prog->count) {
         STATE->last_ok = 0;
         return;
@@ -680,7 +680,7 @@ static void h_exec_stmt(void)
     DESCR_t pat_d  = POP();
     const char *sn = CUR_INS->a[0].s;
     int ok;
-    IR_block_t *pat_dcg = (int)CUR_INS->a[2].i >= 0 ? g_current_sm_prog->dcg_table[(int)CUR_INS->a[2].i] : NULL;
+    BB_graph_t *pat_dcg = (int)CUR_INS->a[2].i >= 0 ? g_current_SM_seq->dcg_table[(int)CUR_INS->a[2].i] : NULL;
     if (pat_dcg) {
         ok = IR_exec_pat(pat_dcg, sn, &subj_d, has_repl ? &repl : NULL, has_repl);
     } else {
@@ -857,17 +857,17 @@ static void h_call(void)
     if (result.v == DT_FAIL || (!_data_first && !_data_set)) {
         int body_pc = -1;
         if (!_data_first && !_data_set && name) {
-            body_pc = sm_label_pc_lookup(g_jit_prog, name);
+            body_pc = SM_label_pc_lookup(g_jit_prog, name);
             if (body_pc < 0) {
                 char uname[128]; size_t nl = strlen(name);
                 if (nl >= sizeof(uname)) nl = sizeof(uname) - 1;
                 for (size_t _i = 0; _i <= nl; _i++)
                     uname[_i] = (char)toupper((unsigned char)name[_i]);
-                body_pc = sm_label_pc_lookup(g_jit_prog, uname);
+                body_pc = SM_label_pc_lookup(g_jit_prog, uname);
             }
             if (body_pc < 0) {
                 const char *entry = FUNC_ENTRY_fn(name);
-                if (entry) body_pc = sm_label_pc_lookup(g_jit_prog, entry);
+                if (entry) body_pc = SM_label_pc_lookup(g_jit_prog, entry);
             }
         }
         if (body_pc >= 0 && STATE->call_depth < SM_CALL_STACK_MAX) {
@@ -984,7 +984,7 @@ static void h_store_frame(void)
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void h_unimpl(void)
 {
-    fprintf(stderr, "sm_codegen: unimplemented opcode %d (%s) at sm-pc=%d\n",
+    fprintf(stderr, "SM_codegen: unimplemented opcode %d (%s) at sm-pc=%d\n",
             (int)CUR_INS->op, sm_opcode_name(CUR_INS->op), STATE->pc - 1);
     STATE->last_ok = 0;
 }
@@ -1087,7 +1087,7 @@ static uint8_t **g_blob_addrs = NULL;
 static int       g_blob_count = 0;
 static size_t    g_trampoline_offset = 0;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static size_t emit_trampoline(SM_Program *prog)
+static size_t emit_trampoline(SM_sequence_t *prog)
 {
     size_t off = seg_offset(SEG_CODE);
     seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x8b);
@@ -1214,7 +1214,7 @@ static void emit_label_blob(size_t trampoline_abs_off)
     seg_u32(SEG_CODE, (uint32_t)rel);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_codegen(SM_Program *prog)
+int SM_codegen(SM_sequence_t *prog)
 {
     init_handler_table();
     if (g_blob_addrs) { free(g_blob_addrs); g_blob_addrs = NULL; }
@@ -1225,7 +1225,7 @@ int sm_codegen(SM_Program *prog)
     }
     g_blob_addrs = (uint8_t **)calloc((size_t)prog->count, sizeof(uint8_t *));
     if (!g_blob_addrs) {
-        fprintf(stderr, "sm_codegen: g_blob_addrs allocation failed\n");
+        fprintf(stderr, "SM_codegen: g_blob_addrs allocation failed\n");
         return -1;
     }
     g_trampoline_offset = emit_trampoline(prog);
@@ -1235,7 +1235,7 @@ int sm_codegen(SM_Program *prog)
     jump_indices    = (int    *)calloc((size_t)prog->count * 2, sizeof(int));
     jump_rel32_offs = (size_t *)calloc((size_t)prog->count * 2, sizeof(size_t));
     if (!jump_indices || !jump_rel32_offs) {
-        fprintf(stderr, "sm_codegen: jump-patch buffers allocation failed\n");
+        fprintf(stderr, "SM_codegen: jump-patch buffers allocation failed\n");
         free(jump_indices); free(jump_rel32_offs);
         free(g_blob_addrs); g_blob_addrs = NULL;
         return -1;
@@ -1243,7 +1243,7 @@ int sm_codegen(SM_Program *prog)
     for (int i = 0; i < prog->count; i++) {
         size_t off_before = seg_offset(SEG_CODE);
         g_blob_addrs[i] = scrip_segs[SEG_CODE].base + off_before;
-        sm_opcode_t op = prog->instrs[i].op;
+        SM_op_t op = prog->instrs[i].op;
         switch (op) {
         case SM_HALT:
             emit_halt_blob();
@@ -1298,7 +1298,7 @@ int sm_codegen(SM_Program *prog)
             target_pc = -ji - 1;
         }
         if (target_pc < 0 || target_pc >= prog->count) {
-            fprintf(stderr, "sm_codegen: jump at pc=%d targets out-of-range pc=%d (count=%d)\n",
+            fprintf(stderr, "SM_codegen: jump at pc=%d targets out-of-range pc=%d (count=%d)\n",
                     source_pc, target_pc, prog->count);
             continue;
         }
@@ -1322,7 +1322,7 @@ void sm_jit_unwind_call_stack(SM_State *st)
     st->sp = 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_jit_run(SM_Program *prog, SM_State *st)
+int sm_jit_run(SM_sequence_t *prog, SM_State *st)
 {
     g_jit_prog   = prog;
     g_jit_state  = st;
@@ -1349,7 +1349,7 @@ int sm_jit_run(SM_Program *prog, SM_State *st)
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_jit_run_steps(SM_Program *prog, SM_State *st, int n) {
+int sm_jit_run_steps(SM_sequence_t *prog, SM_State *st, int n) {
     g_jit_step_limit = n;
     g_jit_steps_done = 0;
     int rc = 0;

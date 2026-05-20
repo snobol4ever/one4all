@@ -1,7 +1,7 @@
 #ifndef LOWER_H
 #define LOWER_H
-#include "sm_prog.h"
+#include "SM.h"
 #include "../../ast/ast.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-SM_Program *lower(const tree_t *prog);
+SM_sequence_t *lower(const tree_t *prog);
 #endif

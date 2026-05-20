@@ -1,7 +1,7 @@
 #include "sm_template_common.h"
 #include "emit_sm.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_jump(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
+int sm_jump(const SM_t * instr, const sm_ctx_t * ctx, FILE * out) {
     if (IS_X86) return emit_sm_jump_line(out, instr, 0);
     int target = (int)instr->a[0].i;
     if (IS_JVM) {
@@ -21,7 +21,7 @@ int sm_jump(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_jump_s(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
+int sm_jump_s(const SM_t * instr, const sm_ctx_t * ctx, FILE * out) {
     if (IS_X86) return emit_sm_jump_s_line(out, instr, 0);
     int target = (int)instr->a[0].i; int i = ctx->i;
     if (IS_JVM) {
@@ -45,7 +45,7 @@ int sm_jump_s(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_jump_f(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
+int sm_jump_f(const SM_t * instr, const sm_ctx_t * ctx, FILE * out) {
     if (IS_X86) return emit_sm_jump_f_line(out, instr, 0);
     int target = (int)instr->a[0].i; int i = ctx->i;
     if (IS_JVM) {

@@ -6,7 +6,7 @@
 #include "runtime/interp/icn_runtime.h"
 #include "runtime/interp/pl_runtime.h"
 #include "lower.h"
-#include "sm_prog.h"
+#include "SM.h"
 #include "sm_interp.h"
 #include "sm_jit_interp.h"
 #include "sm_image.h"
@@ -197,15 +197,15 @@ static int snap_diff(const ExecSnapshot *a, const char *a_name,
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int sync_monitor_run(const tree_t *prog, int verbose, const char *sno_path) {
-    SM_Program *sm_prog = lower(prog);
+    SM_sequence_t *sm_prog = lower(prog);
     if (!sm_prog) { fprintf(stderr, "sync_monitor: sm_lower failed\n"); return -1; }
     if (sm_image_init() != 0) {
         fprintf(stderr, "sync_monitor: sm_image_init failed\n");
-        sm_prog_free(sm_prog); return -1;
+        SM_seq_free(sm_prog); return -1;
     }
-    if (sm_codegen(sm_prog) != 0) {
-        fprintf(stderr, "sync_monitor: sm_codegen failed\n");
-        sm_prog_free(sm_prog); return -1;
+    if (SM_codegen(sm_prog) != 0) {
+        fprintf(stderr, "sync_monitor: SM_codegen failed\n");
+        SM_seq_free(sm_prog); return -1;
     }
     ExecSnapshot baseline = {0};
     exec_snapshot_take(&baseline);
@@ -346,6 +346,6 @@ int sync_monitor_run(const tree_t *prog, int verbose, const char *sno_path) {
     exec_snapshot_free(&sm_path);
     exec_snapshot_free(&jit_path);
     exec_snapshot_free(&baseline);
-    sm_prog_free(sm_prog);
+    SM_seq_free(sm_prog);
     return diverge_at;
 }

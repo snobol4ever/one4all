@@ -1,6 +1,6 @@
 #include "bb_template_common.h"
 
-void bb_fence(IR_t * nd, FILE * out) {
+void bb_fence(BB_t * nd, FILE * out) {
     int nid = ir_node_id(nd); int sid = 0;
     if (IS_JVM) {
         jvm_class_hdr(out, "fence"); jvm_init_ms_only(out, "fence");

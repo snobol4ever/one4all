@@ -1,36 +1,36 @@
-#include "IR.h"
+#include "BB.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 static const char * kind_names[IR_E_COUNT] = {
-    "IR_LIT_I", "IR_LIT_S", "IR_LIT_F", "IR_LIT_NUL",
-    "IR_VAR", "IR_ASSIGN", "IR_AUGOP", "IR_BINOP", "IR_UNOP", "IR_CALL",
-    "IR_SEQ", "IR_FAIL", "IR_SUCCEED", "IR_GOTO", "IR_RETURN", "IR_IF",
-    "IR_ALTERNATE", "IR_TO_BY", "IR_EVERY", "IR_WHILE", "IR_UNTIL", "IR_LIMIT", "IR_SUSPEND", "IR_PROC",
-    "IR_SCAN", "IR_NONNULL", "IR_INTERROGATE",
-    "IR_PAT_LIT", "IR_PAT_ANY", "IR_PAT_SPAN", "IR_PAT_BREAK", "IR_PAT_ARB",
-    "IR_PAT_ARBNO", "IR_PAT_CAT", "IR_PAT_ALT",
-    "IR_PAT_ASSIGN_IMM", "IR_PAT_ASSIGN_COND",
-    "IR_PAT_LEN", "IR_PAT_NOTANY",
-    "IR_PAT_POS", "IR_PAT_TAB", "IR_PAT_REM", "IR_PAT_FENCE", "IR_PAT_ABORT", "IR_PAT_CALLOUT",
-    "IR_PL_CHOICE", "IR_PL_UNIFY", "IR_PL_CUT", "IR_PL_CALL",
-    [IR_SWAP] = "IR_SWAP",
-    [IR_SEQ_EXPR] = "IR_SEQ_EXPR",
-    [IR_INITIAL] = "IR_INITIAL",
-    [IR_ICN_LCONCAT] = "IR_ICN_LCONCAT",
-    [IR_ICN_FIND_GEN] = "IR_ICN_FIND_GEN",
-    [IR_ICN_SEQ_GEN] = "IR_ICN_SEQ_GEN"
+    "BB_LIT_I", "BB_LIT_S", "BB_LIT_F", "BB_LIT_NUL",
+    "BB_VAR", "BB_ASSIGN", "BB_AUGOP", "BB_BINOP", "BB_UNOP", "BB_CALL",
+    "BB_SEQ", "BB_FAIL", "BB_SUCCEED", "BB_GOTO", "BB_RETURN", "BB_IF",
+    "BB_ALTERNATE", "BB_TO_BY", "BB_EVERY", "BB_WHILE", "BB_UNTIL", "BB_LIMIT", "BB_SUSPEND", "BB_PROC",
+    "BB_SCAN", "BB_NONNULL", "BB_INTERROGATE",
+    "BB_PAT_LIT", "BB_PAT_ANY", "BB_PAT_SPAN", "BB_PAT_BREAK", "BB_PAT_ARB",
+    "BB_PAT_ARBNO", "BB_PAT_CAT", "BB_PAT_ALT",
+    "BB_PAT_ASSIGN_IMM", "BB_PAT_ASSIGN_COND",
+    "BB_PAT_LEN", "BB_PAT_NOTANY",
+    "BB_PAT_POS", "BB_PAT_TAB", "BB_PAT_REM", "BB_PAT_FENCE", "BB_PAT_ABORT", "BB_PAT_CALLOUT",
+    "BB_PL_CHOICE", "BB_PL_UNIFY", "BB_PL_CUT", "BB_PL_CALL",
+    [BB_SWAP] = "BB_SWAP",
+    [BB_SEQ_EXPR] = "BB_SEQ_EXPR",
+    [BB_INITIAL] = "BB_INITIAL",
+    [BB_ICN_LCONCAT] = "BB_ICN_LCONCAT",
+    [BB_ICN_FIND_GEN] = "BB_ICN_FIND_GEN",
+    [BB_ICN_SEQ_GEN] = "BB_ICN_SEQ_GEN"
 };
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-const char * IR_e_name(IR_e k) {
+const char * IR_e_name(BB_op_t k) {
     if (k >= 0 && k < IR_E_COUNT) return kind_names[k];
-    return "IR_UNKNOWN";
+    return "BB_UNKNOWN";
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-IR_block_t * IR_alloc(int max_nodes, int lang) {
-    IR_block_t * cfg = calloc(1, sizeof(IR_block_t));
+BB_graph_t * BB_alloc(int max_nodes, int lang) {
+    BB_graph_t * cfg = calloc(1, sizeof(BB_graph_t));
     if (!cfg) return NULL;
-    cfg->all  = calloc((size_t)max_nodes, sizeof(IR_t *));
+    cfg->all  = calloc((size_t)max_nodes, sizeof(BB_t *));
     if (!cfg->all) { free(cfg); return NULL; }
     cfg->n    = 0;
     cfg->max  = max_nodes;
@@ -39,8 +39,8 @@ IR_block_t * IR_alloc(int max_nodes, int lang) {
     return cfg;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-IR_t * IR_node_alloc(IR_block_t * cfg, IR_e t) {
-    IR_t * nd = calloc(1, sizeof(IR_t));
+BB_t * BB_node_alloc(BB_graph_t * cfg, BB_op_t t) {
+    BB_t * nd = calloc(1, sizeof(BB_t));
     if (!nd) return NULL;
     nd->t       = t;
     nd->α       = nd;
@@ -57,10 +57,10 @@ IR_t * IR_node_alloc(IR_block_t * cfg, IR_e t) {
     return nd;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void IR_reset(IR_block_t * cfg) {
+void BB_reset(BB_graph_t * cfg) {
     if (!cfg) return;
     for (int i = 0; i < cfg->n; i++) {
-        IR_t * nd = cfg->all[i];
+        BB_t * nd = cfg->all[i];
         if (!nd) continue;
         nd->value   = FAILDESCR;
         nd->counter = 0;
@@ -68,13 +68,13 @@ void IR_reset(IR_block_t * cfg) {
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* Snapshot the mutable per-node state (value, counter, state) of every node in cfg. Used by IR_CALL to preserve the caller's activation across a recursive call into the same ir_body, since IR_reset+IR_exec_once on the callee wipes shared graph state. Caller frees with free(). */
-IR_node_state_t * IR_snapshot_state(IR_block_t * cfg) {
+/* Snapshot the mutable per-node state (value, counter, state) of every node in cfg. Used by BB_CALL to preserve the caller's activation across a recursive call into the same ir_body, since BB_reset+bb_exec_once on the callee wipes shared graph state. Caller frees with free(). */
+IR_node_state_t * IR_snapshot_state(BB_graph_t * cfg) {
     if (!cfg || cfg->n <= 0) return NULL;
     IR_node_state_t * snap = (IR_node_state_t *)malloc((size_t)cfg->n * sizeof(IR_node_state_t));
     if (!snap) return NULL;
     for (int i = 0; i < cfg->n; i++) {
-        IR_t * nd = cfg->all[i];
+        BB_t * nd = cfg->all[i];
         if (!nd) { snap[i].value = FAILDESCR; snap[i].counter = 0; snap[i].state = 0; continue; }
         snap[i].value   = nd->value;
         snap[i].counter = nd->counter;
@@ -84,10 +84,10 @@ IR_node_state_t * IR_snapshot_state(IR_block_t * cfg) {
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* Restore the per-node state snapshot taken by IR_snapshot_state and free the snapshot buffer. Safe to call with snap==NULL (no-op). */
-void IR_restore_state(IR_block_t * cfg, IR_node_state_t * snap) {
+void IR_restore_state(BB_graph_t * cfg, IR_node_state_t * snap) {
     if (!cfg || !snap) { free(snap); return; }
     for (int i = 0; i < cfg->n; i++) {
-        IR_t * nd = cfg->all[i];
+        BB_t * nd = cfg->all[i];
         if (!nd) continue;
         nd->value   = snap[i].value;
         nd->counter = snap[i].counter;
@@ -96,10 +96,10 @@ void IR_restore_state(IR_block_t * cfg, IR_node_state_t * snap) {
     free(snap);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void IR_free(IR_block_t * cfg) {
+void BB_free(BB_graph_t * cfg) {
     if (!cfg) return;
     for (int i = 0; i < cfg->n; i++) {
-        IR_t * nd = cfg->all[i];
+        BB_t * nd = cfg->all[i];
         if (!nd) continue;
         free(nd->c);
         free(nd);
@@ -108,17 +108,17 @@ void IR_free(IR_block_t * cfg) {
     free(cfg);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void print_port(FILE * fp, const char * label, const IR_t * nd) {
+static void print_port(FILE * fp, const char * label, const BB_t * nd) {
     fprintf(fp, " %s=%s", label, nd ? "set" : "NULL");
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void IR_print(const IR_block_t * cfg, FILE * fp) {
-    if (!cfg) { fprintf(fp, "(null IR_block_t)\n"); return; }
+void bb_print(const BB_graph_t * cfg, FILE * fp) {
+    if (!cfg) { fprintf(fp, "(null BB_graph_t)\n"); return; }
     static const char * lang_names[] = { "?", "SNO", "SCO", "REB", "ICN", "PL", "RKU" };
     const char * lname = (cfg->lang >= 1 && cfg->lang <= 6) ? lang_names[cfg->lang] : "?";
-    fprintf(fp, "IR_block_t lang=%s n=%d entry=%s\n", lname, cfg->n, cfg->entry ? "set" : "NULL");
+    fprintf(fp, "BB_graph_t lang=%s n=%d entry=%s\n", lname, cfg->n, cfg->entry ? "set" : "NULL");
     for (int i = 0; i < cfg->n; i++) {
-        const IR_t * nd = cfg->all[i];
+        const BB_t * nd = cfg->all[i];
         if (!nd) continue;
         fprintf(fp, "  [%d] %s", i, IR_e_name(nd->t));
         print_port(fp, "α", nd->α);
@@ -131,10 +131,10 @@ void IR_print(const IR_block_t * cfg, FILE * fp) {
             fprintf(fp, "]");
         }
         switch (nd->t) {
-            case IR_LIT_I: fprintf(fp, " ival=%lld", (long long)nd->ival); break;
-            case IR_LIT_F: fprintf(fp, " dval=%g",   nd->dval);             break;
-            case IR_LIT_S: fprintf(fp, " sval=\"%s\"", nd->sval ? nd->sval : ""); break;
-            case IR_VAR:   fprintf(fp, " var=\"%s\"",  nd->sval ? nd->sval : ""); break;
+            case BB_LIT_I: fprintf(fp, " ival=%lld", (long long)nd->ival); break;
+            case BB_LIT_F: fprintf(fp, " dval=%g",   nd->dval);             break;
+            case BB_LIT_S: fprintf(fp, " sval=\"%s\"", nd->sval ? nd->sval : ""); break;
+            case BB_VAR:   fprintf(fp, " var=\"%s\"",  nd->sval ? nd->sval : ""); break;
             default: break;
         }
         fprintf(fp, "\n");

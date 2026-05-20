@@ -1,5 +1,5 @@
 #include "lower_icn.h"
-#include "IR.h"
+#include "BB.h"
 #include "snobol4.h"
 #include "coerce.h"
 #include "ast.h"
@@ -10,11 +10,11 @@
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern int is_suspendable(tree_t *e);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-IR_block_t *lower_icn_upto(const char *cset, const char *hay) {
+BB_graph_t *lower_icn_upto(const char *cset, const char *hay) {
     if (!cset || !hay) return NULL;
-    IR_block_t *cfg = IR_alloc(4, IR_LANG_ICN);
+    BB_graph_t *cfg = BB_alloc(4, IR_LANG_ICN);
     if (!cfg) return NULL;
-    IR_t *nd = IR_node_alloc(cfg, IR_ICN_UPTO);
+    BB_t *nd = BB_node_alloc(cfg, BB_ICN_UPTO);
     if (!nd) return NULL;
     nd->sval    = cset;
     nd->sval2   = hay;
@@ -86,11 +86,11 @@ DESCR_t icn_binop_apply(IcnBinopKind op, DESCR_t lv, DESCR_t rv, int *rel_fail) 
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 #include "sm_interp.h"
-IR_block_t *lower_icn_proc_gen(GeneratorState *gs) {
+BB_graph_t *lower_icn_proc_gen(GeneratorState *gs) {
     if (!gs) return NULL;
-    IR_block_t *cfg = IR_alloc(4, IR_LANG_ICN);
+    BB_graph_t *cfg = BB_alloc(4, IR_LANG_ICN);
     if (!cfg) return NULL;
-    IR_t *nd = IR_node_alloc(cfg, IR_ICN_PROC_GEN);
+    BB_t *nd = BB_node_alloc(cfg, BB_ICN_PROC_GEN);
     if (!nd) return NULL;
     nd->opaque = (void *)gs;
     nd->α      = nd;
@@ -101,34 +101,34 @@ IR_block_t *lower_icn_proc_gen(GeneratorState *gs) {
     return cfg;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* lower_icn_expr_node — recursively lower a single Icon AST expr to an IR_t* inside cfg.                                                                                                                  */
+/* lower_icn_expr_node — recursively lower a single Icon AST expr to an BB_t* inside cfg.                                                                                                                  */
 /* Returns NULL when the expression kind isn't yet supported.  Caller is responsible for falling back.                                                                                                     */
-static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e);
+static BB_t *lower_icn_expr_node(BB_graph_t *cfg, tree_t *e);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
+static BB_t *lower_icn_expr_node(BB_graph_t *cfg, tree_t *e) {
     if (!cfg || !e) return NULL;
     switch (e->t) {
     case TT_ILIT: {
-        IR_t *nd = IR_node_alloc(cfg, IR_LIT_I);
+        BB_t *nd = BB_node_alloc(cfg, BB_LIT_I);
         if (!nd) return NULL;
         nd->ival = e->v.ival;
         return nd;
     }
     case TT_FLIT: {
-        IR_t *nd = IR_node_alloc(cfg, IR_LIT_F);
+        BB_t *nd = BB_node_alloc(cfg, BB_LIT_F);
         if (!nd) return NULL;
         nd->dval = e->v.dval;
         return nd;
     }
     case TT_QLIT: {
-        IR_t *nd = IR_node_alloc(cfg, IR_LIT_S);
+        BB_t *nd = BB_node_alloc(cfg, BB_LIT_S);
         if (!nd) return NULL;
         nd->sval = e->v.sval ? e->v.sval : "";
         return nd;
     }
     case TT_CSET: {
         /* Icon 'aeiou' cset literal.  Runtime represents csets as strings (one char per member). */
-        IR_t *nd = IR_node_alloc(cfg, IR_LIT_S);
+        BB_t *nd = BB_node_alloc(cfg, BB_LIT_S);
         if (!nd) return NULL;
         nd->sval = e->v.sval ? e->v.sval : "";
         return nd;
@@ -136,36 +136,36 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     case TT_VAR: {
         if (!e->v.sval) return NULL;
         if (e->v.sval[0] == '&') {
-            IR_t *nd = IR_node_alloc(cfg, IR_ICN_KEYWORD);
+            BB_t *nd = BB_node_alloc(cfg, BB_ICN_KEYWORD);
             if (!nd) return NULL;
             nd->sval = e->v.sval;
             return nd;
         }
-        IR_t *nd = IR_node_alloc(cfg, IR_VAR);
+        BB_t *nd = BB_node_alloc(cfg, BB_VAR);
         if (!nd) return NULL;
         nd->sval = e->v.sval;
         return nd;
     }
     case TT_KEYWORD: {
         if (!e->v.sval) return NULL;
-        IR_t *nd = IR_node_alloc(cfg, IR_ICN_KEYWORD);
+        BB_t *nd = BB_node_alloc(cfg, BB_ICN_KEYWORD);
         if (!nd) return NULL;
         nd->sval = e->v.sval;
         return nd;
     }
     case TT_SCAN: {
         if (e->n < 1 || !e->c[0]) return NULL;
-        IR_t *subj = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *subj = lower_icn_expr_node(cfg, e->c[0]);
         if (!subj) return NULL;
-        IR_t *body = NULL;
+        BB_t *body = NULL;
         if (e->n >= 2 && e->c[1]) {
             body = lower_icn_expr_node(cfg, e->c[1]);
             if (!body) return NULL;
         }
-        IR_t *nd = IR_node_alloc(cfg, IR_ICN_SCAN);
+        BB_t *nd = BB_node_alloc(cfg, BB_ICN_SCAN);
         if (!nd) return NULL;
         int nc = body ? 2 : 1;
-        nd->c = calloc((size_t)nc, sizeof(IR_t *));
+        nd->c = calloc((size_t)nc, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = subj;
         if (body) nd->c[1] = body;
@@ -174,36 +174,36 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     }
     case TT_ASSIGN: {
         if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
-        /* TT_FIELD lhs: obj.field := rhs  → IR_ICN_FIELD_SET                                      */
+        /* TT_FIELD lhs: obj.field := rhs  → BB_ICN_FIELD_SET                                      */
         if (e->c[0]->t == TT_FIELD) {
             const char *fname = ICN_FIELD_NAME(e->c[0]);
             if (!fname) return NULL;
-            IR_t *obj = lower_icn_expr_node(cfg, e->c[0]->c[0]);
+            BB_t *obj = lower_icn_expr_node(cfg, e->c[0]->c[0]);
             if (!obj) return NULL;
-            IR_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
+            BB_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
             if (!rhs) return NULL;
-            IR_t *nd = IR_node_alloc(cfg, IR_ICN_FIELD_SET);
+            BB_t *nd = BB_node_alloc(cfg, BB_ICN_FIELD_SET);
             if (!nd) return NULL;
             nd->sval = fname;
-            nd->c = calloc(2, sizeof(IR_t *));
+            nd->c = calloc(2, sizeof(BB_t *));
             if (!nd->c) return NULL;
             nd->c[0] = obj;
             nd->c[1] = rhs;
             nd->n    = 2;
             return nd;
         }
-        /* TT_IDX lhs: base[idx] := rhs  → IR_ICN_IDX_SET                                         */
+        /* TT_IDX lhs: base[idx] := rhs  → BB_ICN_IDX_SET                                         */
         if (e->c[0]->t == TT_IDX) {
             if (e->c[0]->n < 2 || !e->c[0]->c[0] || !e->c[0]->c[1]) return NULL;
-            IR_t *base = lower_icn_expr_node(cfg, e->c[0]->c[0]);
+            BB_t *base = lower_icn_expr_node(cfg, e->c[0]->c[0]);
             if (!base) return NULL;
-            IR_t *idx  = lower_icn_expr_node(cfg, e->c[0]->c[1]);
+            BB_t *idx  = lower_icn_expr_node(cfg, e->c[0]->c[1]);
             if (!idx) return NULL;
-            IR_t *rhs  = lower_icn_expr_node(cfg, e->c[1]);
+            BB_t *rhs  = lower_icn_expr_node(cfg, e->c[1]);
             if (!rhs) return NULL;
-            IR_t *nd = IR_node_alloc(cfg, IR_ICN_IDX_SET);
+            BB_t *nd = BB_node_alloc(cfg, BB_ICN_IDX_SET);
             if (!nd) return NULL;
-            nd->c = calloc(3, sizeof(IR_t *));
+            nd->c = calloc(3, sizeof(BB_t *));
             if (!nd->c) return NULL;
             nd->c[0] = base;
             nd->c[1] = idx;
@@ -213,13 +213,13 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         }
         if (e->c[0]->t != TT_VAR) return NULL;
         if (e->c[0]->v.sval && e->c[0]->v.sval[0] == '&') return NULL;
-        IR_t *lhs = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *lhs = lower_icn_expr_node(cfg, e->c[0]);
         if (!lhs) return NULL;
-        IR_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
+        BB_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
         if (!rhs) return NULL;
-        IR_t *nd = IR_node_alloc(cfg, IR_ASSIGN);
+        BB_t *nd = BB_node_alloc(cfg, BB_ASSIGN);
         if (!nd) return NULL;
-        nd->c = calloc(2, sizeof(IR_t *));
+        nd->c = calloc(2, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = lhs;
         nd->c[1] = rhs;
@@ -227,20 +227,20 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         return nd;
     }
     case TT_SWAP: {
-        /* Icon x :=: y swap. Two variable operands; lower both as IR_VAR (no recursion needed since   */
+        /* Icon x :=: y swap. Two variable operands; lower both as BB_VAR (no recursion needed since   */
         /* the executor reads slots directly).  Reject keyword vars (leading &) and non-TT_VAR forms   */
-        /* — those require lvalue forms that aren't supported yet (parallel to IR_ASSIGN restriction). */
+        /* — those require lvalue forms that aren't supported yet (parallel to BB_ASSIGN restriction). */
         if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
         if (e->c[0]->t != TT_VAR || e->c[1]->t != TT_VAR) return NULL;
         if (!e->c[0]->v.sval || !e->c[1]->v.sval) return NULL;
         if (e->c[0]->v.sval[0] == '&' || e->c[1]->v.sval[0] == '&') return NULL;
-        IR_t *lhs = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *lhs = lower_icn_expr_node(cfg, e->c[0]);
         if (!lhs) return NULL;
-        IR_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
+        BB_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
         if (!rhs) return NULL;
-        IR_t *nd = IR_node_alloc(cfg, IR_SWAP);
+        BB_t *nd = BB_node_alloc(cfg, BB_SWAP);
         if (!nd) return NULL;
-        nd->c = calloc(2, sizeof(IR_t *));
+        nd->c = calloc(2, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = lhs;
         nd->c[1] = rhs;
@@ -250,67 +250,67 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     case TT_FNC: {
         if (e->n < 1 || !e->c[0] || e->c[0]->t != TT_VAR || !e->c[0]->v.sval) return NULL;
         int nargs = e->n - 1;
-        /* key(t) — lower to IR_ICN_KEY_GEN, a true generator yielding every key.                  */
+        /* key(t) — lower to BB_ICN_KEY_GEN, a true generator yielding every key.                  */
         if (nargs == 1 && strcmp(e->c[0]->v.sval, "key") == 0 && e->c[1]) {
-            IR_t *tbl = lower_icn_expr_node(cfg, e->c[1]);
+            BB_t *tbl = lower_icn_expr_node(cfg, e->c[1]);
             if (!tbl) return NULL;
-            IR_t *nd = IR_node_alloc(cfg, IR_ICN_KEY_GEN);
+            BB_t *nd = BB_node_alloc(cfg, BB_ICN_KEY_GEN);
             if (!nd) return NULL;
-            nd->c = calloc(1, sizeof(IR_t *));
+            nd->c = calloc(1, sizeof(BB_t *));
             if (!nd->c) return NULL;
             nd->c[0] = tbl;
             nd->n    = 1;
             return nd;
         }
-        /* find(needle, hay[, start[, stop]]) — lower to IR_ICN_FIND_GEN.  In Icon, find is a true */
+        /* find(needle, hay[, start[, stop]]) — lower to BB_ICN_FIND_GEN.  In Icon, find is a true */
         /* generator that yields every match position. The 1-arg form (find(needle) — search in   */
         /* &subject) is NOT lowered specially here because scan-context handling is downstream;    */
-        /* fall through to IR_CALL which routes through icn_try_call_builtin_by_name for that.    */
+        /* fall through to BB_CALL which routes through icn_try_call_builtin_by_name for that.    */
         if ((nargs == 2 || nargs == 3 || nargs == 4)
             && strcmp(e->c[0]->v.sval, "find") == 0
             && e->c[1] && e->c[2]) {
-            IR_t **args2 = calloc((size_t)nargs, sizeof(IR_t *));
+            BB_t **args2 = calloc((size_t)nargs, sizeof(BB_t *));
             if (!args2) return NULL;
             for (int j = 0; j < nargs; j++) {
                 args2[j] = lower_icn_expr_node(cfg, e->c[1+j]);
                 if (!args2[j]) { free(args2); return NULL; }
             }
-            IR_t *nd = IR_node_alloc(cfg, IR_ICN_FIND_GEN);
+            BB_t *nd = BB_node_alloc(cfg, BB_ICN_FIND_GEN);
             if (!nd) { free(args2); return NULL; }
             nd->c = args2;
             nd->n = nargs;
             return nd;
         }
         /* seq([start [, step]]) — infinite arithmetic progression.  Defaults to seq(1, 1) when no */
-        /* args.  Always lowers to IR_ICN_SEQ_GEN — must be paired with a limiting consumer (every  */
-        /* with break, IR_LIMIT via `\ N`).  Without a limit, IR_ICN_SEQ_GEN runs forever.          */
+        /* args.  Always lowers to BB_ICN_SEQ_GEN — must be paired with a limiting consumer (every  */
+        /* with break, BB_LIMIT via `\ N`).  Without a limit, BB_ICN_SEQ_GEN runs forever.          */
         if ((nargs == 0 || nargs == 1 || nargs == 2)
             && strcmp(e->c[0]->v.sval, "seq") == 0) {
-            IR_t **args2 = NULL;
+            BB_t **args2 = NULL;
             if (nargs > 0) {
-                args2 = calloc((size_t)nargs, sizeof(IR_t *));
+                args2 = calloc((size_t)nargs, sizeof(BB_t *));
                 if (!args2) return NULL;
                 for (int j = 0; j < nargs; j++) {
                     args2[j] = lower_icn_expr_node(cfg, e->c[1+j]);
                     if (!args2[j]) { free(args2); return NULL; }
                 }
             }
-            IR_t *nd = IR_node_alloc(cfg, IR_ICN_SEQ_GEN);
+            BB_t *nd = BB_node_alloc(cfg, BB_ICN_SEQ_GEN);
             if (!nd) { free(args2); return NULL; }
             nd->c = args2;
             nd->n = nargs;
             return nd;
         }
-        IR_t **args = NULL;
+        BB_t **args = NULL;
         if (nargs > 0) {
-            args = calloc((size_t)nargs, sizeof(IR_t *));
+            args = calloc((size_t)nargs, sizeof(BB_t *));
             if (!args) return NULL;
             for (int j = 0; j < nargs; j++) {
                 args[j] = lower_icn_expr_node(cfg, e->c[1+j]);
                 if (!args[j]) { free(args); return NULL; }
             }
         }
-        IR_t *nd = IR_node_alloc(cfg, IR_CALL);
+        BB_t *nd = BB_node_alloc(cfg, BB_CALL);
         if (!nd) { if (args) free(args); return NULL; }
         nd->sval = e->c[0]->v.sval;
         nd->c    = args;
@@ -320,10 +320,10 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     case TT_IF: {
         /* if cond then E1 else E2.  c[0]=cond, c[1]=then (optional), c[2]=else (optional).                                                                                                                 */
         if (e->n < 1 || !e->c[0]) return NULL;
-        IR_t *cond = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *cond = lower_icn_expr_node(cfg, e->c[0]);
         if (!cond) return NULL;
-        IR_t *then_nd = NULL;
-        IR_t *else_nd = NULL;
+        BB_t *then_nd = NULL;
+        BB_t *else_nd = NULL;
         if (e->n >= 2 && e->c[1]) {
             then_nd = lower_icn_expr_node(cfg, e->c[1]);
             if (!then_nd) return NULL;
@@ -332,10 +332,10 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
             else_nd = lower_icn_expr_node(cfg, e->c[2]);
             if (!else_nd) return NULL;
         }
-        IR_t *nd = IR_node_alloc(cfg, IR_IF);
+        BB_t *nd = BB_node_alloc(cfg, BB_IF);
         if (!nd) return NULL;
         int nc = else_nd ? 3 : (then_nd ? 2 : 1);
-        nd->c = calloc((size_t)nc, sizeof(IR_t *));
+        nd->c = calloc((size_t)nc, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = cond;
         if (nc >= 2) nd->c[1] = then_nd;
@@ -344,11 +344,11 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         return nd;
     }
     case TT_TO: {
-        /* Icon `lo to hi` generator. Emit IR_ICN_TO. If both bounds are literal ints, store them            */
+        /* Icon `lo to hi` generator. Emit BB_ICN_TO. If both bounds are literal ints, store them            */
         /* directly in ival/ival2. Otherwise recursively lower the bound expressions as c[0]/c[1] —         */
-        /* the IR_ICN_TO executor evaluates them on the α path to seed the counter.                         */
+        /* the BB_ICN_TO executor evaluates them on the α path to seed the counter.                         */
         if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
-        IR_t *nd = IR_node_alloc(cfg, IR_ICN_TO);
+        BB_t *nd = BB_node_alloc(cfg, BB_ICN_TO);
         if (!nd) return NULL;
         if (e->c[0]->t == TT_ILIT && e->c[1]->t == TT_ILIT) {
             nd->ival    = e->c[0]->v.ival;
@@ -357,11 +357,11 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
             nd->state   = 0;
             return nd;
         }
-        IR_t *lo = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *lo = lower_icn_expr_node(cfg, e->c[0]);
         if (!lo) return NULL;
-        IR_t *hi = lower_icn_expr_node(cfg, e->c[1]);
+        BB_t *hi = lower_icn_expr_node(cfg, e->c[1]);
         if (!hi) return NULL;
-        nd->c = calloc(2, sizeof(IR_t *));
+        nd->c = calloc(2, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = lo;
         nd->c[1] = hi;
@@ -372,12 +372,12 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     case TT_TO_BY: {
         /* Icon `lo to hi by step` generator — IJ-TOBY-REAL: supports integer and real-typed bounds.        */
         /* n=2: lo to hi (step defaults to +1). n=3: lo to hi by step.                                      */
-        /* Emit IR_TO_BY with c[0]=lo, c[1]=hi, c[2]=step (if n>=3). The executor reads DT_R bounds.        */
+        /* Emit BB_TO_BY with c[0]=lo, c[1]=hi, c[2]=step (if n>=3). The executor reads DT_R bounds.        */
         if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
-        IR_t *nd = IR_node_alloc(cfg, IR_TO_BY);
+        BB_t *nd = BB_node_alloc(cfg, BB_TO_BY);
         if (!nd) return NULL;
         int nc = (e->n >= 3 && e->c[2]) ? 3 : 2;
-        nd->c = calloc((size_t)nc, sizeof(IR_t *));
+        nd->c = calloc((size_t)nc, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = lower_icn_expr_node(cfg, e->c[0]);
         nd->c[1] = lower_icn_expr_node(cfg, e->c[1]);
@@ -392,19 +392,19 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     }
     case TT_EVERY: {
         /* every E [do B].  c[0]=generator expr (required), c[1]=body (optional).                                                                                                                            */
-        /* Statement consumer: IR_EVERY drives c[0] to exhaustion in a single outer IR_exec_node call.                                                                                                       */
+        /* Statement consumer: BB_EVERY drives c[0] to exhaustion in a single outer bb_exec_node call.                                                                                                       */
         if (e->n < 1 || !e->c[0]) return NULL;
-        IR_t *gen = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *gen = lower_icn_expr_node(cfg, e->c[0]);
         if (!gen) return NULL;
-        IR_t *body = NULL;
+        BB_t *body = NULL;
         if (e->n >= 2 && e->c[1]) {
             body = lower_icn_expr_node(cfg, e->c[1]);
             if (!body) return NULL;
         }
-        IR_t *nd = IR_node_alloc(cfg, IR_EVERY);
+        BB_t *nd = BB_node_alloc(cfg, BB_EVERY);
         if (!nd) return NULL;
         int nc = body ? 2 : 1;
-        nd->c = calloc((size_t)nc, sizeof(IR_t *));
+        nd->c = calloc((size_t)nc, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = gen;
         if (body) nd->c[1] = body;
@@ -415,17 +415,17 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     case TT_UNTIL: {
         /* while C [do B] / until C [do B].  c[0]=cond, c[1]=body (optional).                                                                                                                                */
         if (e->n < 1 || !e->c[0]) return NULL;
-        IR_t *cond = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *cond = lower_icn_expr_node(cfg, e->c[0]);
         if (!cond) return NULL;
-        IR_t *body = NULL;
+        BB_t *body = NULL;
         if (e->n >= 2 && e->c[1]) {
             body = lower_icn_expr_node(cfg, e->c[1]);
             if (!body) return NULL;
         }
-        IR_t *nd = IR_node_alloc(cfg, e->t == TT_WHILE ? IR_WHILE : IR_UNTIL);
+        BB_t *nd = BB_node_alloc(cfg, e->t == TT_WHILE ? BB_WHILE : BB_UNTIL);
         if (!nd) return NULL;
         int nc = body ? 2 : 1;
-        nd->c = calloc((size_t)nc, sizeof(IR_t *));
+        nd->c = calloc((size_t)nc, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = cond;
         if (body) nd->c[1] = body;
@@ -434,21 +434,21 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     }
     case TT_SEQ_EXPR: {
         /* Icon (e1; e2; ... ; en) paren-seq and {s1; s2; ...} brace-blocks in expression position.    */
-        /* Lower to IR_SEQ_EXPR which returns the last child's value (Icon "value-of-last" semantics) */
-        /* rather than IR_SEQ which always fails (proc-body-falls-off-end semantics).  IR_SEQ_EXPR    */
+        /* Lower to BB_SEQ_EXPR which returns the last child's value (Icon "value-of-last" semantics) */
+        /* rather than BB_SEQ which always fails (proc-body-falls-off-end semantics).  BB_SEQ_EXPR    */
         /* also provides α/β generator semantics so that, when pumped as a generator, the head        */
-        /* statements fire only once and only the tail is resumed.  Loop drivers (IR_EVERY/IR_WHILE/  */
-        /* IR_UNTIL) reset c[body]->state=0 between iterations so that statement-context bodies       */
+        /* statements fire only once and only the tail is resumed.  Loop drivers (BB_EVERY/BB_WHILE/  */
+        /* BB_UNTIL) reset c[body]->state=0 between iterations so that statement-context bodies       */
         /* fully re-execute each iteration.                                                           */
         if (e->n < 1) return NULL;
-        IR_t **stmts = calloc((size_t)e->n, sizeof(IR_t *));
+        BB_t **stmts = calloc((size_t)e->n, sizeof(BB_t *));
         if (!stmts) return NULL;
         for (int j = 0; j < e->n; j++) {
             if (!e->c[j]) { free(stmts); return NULL; }
             stmts[j] = lower_icn_expr_node(cfg, e->c[j]);
             if (!stmts[j]) { free(stmts); return NULL; }
         }
-        IR_t *nd = IR_node_alloc(cfg, IR_SEQ_EXPR);
+        BB_t *nd = BB_node_alloc(cfg, BB_SEQ_EXPR);
         if (!nd) { free(stmts); return NULL; }
         nd->c = stmts;
         nd->n = e->n;
@@ -458,16 +458,16 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     case TT_LT:  case TT_LE:  case TT_GT:  case TT_GE:  case TT_EQ:  case TT_NE:
     case TT_CAT: {
         /* Plain or generator-aware binop. If either operand is suspendable (a generator), emit       */
-        /* IR_BINOP_GEN which yields the full cross-product; else emit IR_BINOP (single-shot).        */
+        /* BB_BINOP_GEN which yields the full cross-product; else emit BB_BINOP (single-shot).        */
         if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
-        IR_t *lhs = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *lhs = lower_icn_expr_node(cfg, e->c[0]);
         if (!lhs) return NULL;
-        IR_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
+        BB_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
         if (!rhs) return NULL;
         int is_gen = is_suspendable(e->c[0]) || is_suspendable(e->c[1]);
-        IR_t *nd = IR_node_alloc(cfg, is_gen ? IR_BINOP_GEN : IR_BINOP);
+        BB_t *nd = BB_node_alloc(cfg, is_gen ? BB_BINOP_GEN : BB_BINOP);
         if (!nd) return NULL;
-        nd->c = calloc(2, sizeof(IR_t *));
+        nd->c = calloc(2, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = lhs;
         nd->c[1] = rhs;
@@ -499,17 +499,17 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         /* Icon E1 ||| E2 list concat.  Single-shot binop with dual-mode dispatch (list-list →       */
         /* fresh icnlist; otherwise → string concat with coercion).  Mirrors the AST-walking         */
         /* TT_LCONCAT case in icn_value.c::bb_eval_value which routes through icn_lconcat_d.  We     */
-        /* do NOT use IR_BINOP_GEN because lconcat is not a generator — even with generative         */
+        /* do NOT use BB_BINOP_GEN because lconcat is not a generator — even with generative         */
         /* operands the result is a single value (cross-product semantics are not Icon's spec for    */
         /* this operator).                                                                           */
         if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
-        IR_t *lhs = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *lhs = lower_icn_expr_node(cfg, e->c[0]);
         if (!lhs) return NULL;
-        IR_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
+        BB_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
         if (!rhs) return NULL;
-        IR_t *nd = IR_node_alloc(cfg, IR_ICN_LCONCAT);
+        BB_t *nd = BB_node_alloc(cfg, BB_ICN_LCONCAT);
         if (!nd) return NULL;
-        nd->c = calloc(2, sizeof(IR_t *));
+        nd->c = calloc(2, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = lhs;
         nd->c[1] = rhs;
@@ -521,26 +521,26 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     case TT_STATIC_DECL: {
         /* `local x;`, `static x;`, `global x;` — scope declarations.                                                                                                                                          */
         /* Scope is built at lower time (proc_table[i].lower_sc); these are no-ops at IR exec time.                                                                                                            */
-        /* Emit IR_SUCCEED which returns NULVCL via nd->γ.                                                                                                                                                    */
-        IR_t *nd = IR_node_alloc(cfg, IR_SUCCEED);
+        /* Emit BB_SUCCEED which returns NULVCL via nd->γ.                                                                                                                                                    */
+        BB_t *nd = BB_node_alloc(cfg, BB_SUCCEED);
         if (!nd) return NULL;
         return nd;
     }
     case TT_INITIAL: {
         /* Icon `initial expr` — body-of-proc one-shot.  Lower the child expression and wrap in       */
-        /* IR_INITIAL which uses nd->ival3 as a graph-persistent has-run flag.  If the AST has no      */
-        /* expr child (degenerate), behaves like IR_SUCCEED.  Common shapes:                          */
+        /* BB_INITIAL which uses nd->ival3 as a graph-persistent has-run flag.  If the AST has no      */
+        /* expr child (degenerate), behaves like BB_SUCCEED.  Common shapes:                          */
         /*   initial x := 10;            → TT_INITIAL(c[0]=TT_ASSIGN(x,10))                            */
         /*   initial { s1; s2; ... };    → TT_INITIAL(c[0]=TT_SEQ_EXPR(s1,s2,...))                     */
         if (e->n < 1 || !e->c[0]) {
-            IR_t *nd = IR_node_alloc(cfg, IR_SUCCEED);
+            BB_t *nd = BB_node_alloc(cfg, BB_SUCCEED);
             return nd;
         }
-        IR_t *body = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *body = lower_icn_expr_node(cfg, e->c[0]);
         if (!body) return NULL;
-        IR_t *nd = IR_node_alloc(cfg, IR_INITIAL);
+        BB_t *nd = BB_node_alloc(cfg, BB_INITIAL);
         if (!nd) return NULL;
-        nd->c = calloc(1, sizeof(IR_t *));
+        nd->c = calloc(1, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = body;
         nd->n = 1;
@@ -549,12 +549,12 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     }
     case TT_RETURN: {
         /* Icon return [E]. One optional child c[0]=return expression.                               */
-        IR_t *nd = IR_node_alloc(cfg, IR_RETURN);
+        BB_t *nd = BB_node_alloc(cfg, BB_RETURN);
         if (!nd) return NULL;
         if (e->n >= 1 && e->c[0]) {
-            IR_t *retval = lower_icn_expr_node(cfg, e->c[0]);
+            BB_t *retval = lower_icn_expr_node(cfg, e->c[0]);
             if (!retval) return NULL;
-            nd->c = calloc(1, sizeof(IR_t *));
+            nd->c = calloc(1, sizeof(BB_t *));
             if (!nd->c) return NULL;
             nd->c[0] = retval;
             nd->n = 1;
@@ -563,15 +563,15 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     }
     case TT_SEQ: {
         /* Icon E1 & E2 conjunction. Both must succeed; if E1 fails whole expr fails; returns E2.   */
-        /* Lower as IR_IF(cond=E1, then=E2): succeeds with E2's value only when E1 succeeds.        */
+        /* Lower as BB_IF(cond=E1, then=E2): succeeds with E2's value only when E1 succeeds.        */
         if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
-        IR_t *e1 = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *e1 = lower_icn_expr_node(cfg, e->c[0]);
         if (!e1) return NULL;
-        IR_t *e2 = lower_icn_expr_node(cfg, e->c[1]);
+        BB_t *e2 = lower_icn_expr_node(cfg, e->c[1]);
         if (!e2) return NULL;
-        IR_t *nd = IR_node_alloc(cfg, IR_IF);
+        BB_t *nd = BB_node_alloc(cfg, BB_IF);
         if (!nd) return NULL;
-        nd->c = calloc(2, sizeof(IR_t *));
+        nd->c = calloc(2, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = e1; nd->c[1] = e2; nd->n = 2;
         return nd;
@@ -579,11 +579,11 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     case TT_SIZE: {
         /* Icon *E — string/list/table size. One child: the expression.                              */
         if (e->n < 1 || !e->c[0]) return NULL;
-        IR_t *inner = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *inner = lower_icn_expr_node(cfg, e->c[0]);
         if (!inner) return NULL;
-        IR_t *nd = IR_node_alloc(cfg, IR_SIZE);
+        BB_t *nd = BB_node_alloc(cfg, BB_SIZE);
         if (!nd) return NULL;
-        nd->c = calloc(1, sizeof(IR_t *));
+        nd->c = calloc(1, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = inner;
         nd->n = 1;
@@ -593,13 +593,13 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         /* Icon s[i] subscript. c[0]=base, c[1]=index. Always 2-arg (icon_parse e_binary).              */
         /* Executor calls subscript_get for type-dispatched access (strings/lists/tables).              */
         if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
-        IR_t *base = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *base = lower_icn_expr_node(cfg, e->c[0]);
         if (!base) return NULL;
-        IR_t *idx  = lower_icn_expr_node(cfg, e->c[1]);
+        BB_t *idx  = lower_icn_expr_node(cfg, e->c[1]);
         if (!idx) return NULL;
-        IR_t *nd = IR_node_alloc(cfg, IR_ICN_IDX);
+        BB_t *nd = BB_node_alloc(cfg, BB_ICN_IDX);
         if (!nd) return NULL;
-        nd->c = calloc(2, sizeof(IR_t *));
+        nd->c = calloc(2, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = base;
         nd->c[1] = idx;
@@ -613,15 +613,15 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         /* nd->ival encodes kind: 0=RANGE (i:j), 1=PLUS (i+:n), 2=MINUS (i-:n). Executor transforms      */
         /* PLUS/MINUS to absolute bounds before calling subscript_get2 (which expects RANGE form).       */
         if (e->n < 3 || !e->c[0] || !e->c[1] || !e->c[2]) return NULL;
-        IR_t *base = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *base = lower_icn_expr_node(cfg, e->c[0]);
         if (!base) return NULL;
-        IR_t *i1   = lower_icn_expr_node(cfg, e->c[1]);
+        BB_t *i1   = lower_icn_expr_node(cfg, e->c[1]);
         if (!i1) return NULL;
-        IR_t *i2   = lower_icn_expr_node(cfg, e->c[2]);
+        BB_t *i2   = lower_icn_expr_node(cfg, e->c[2]);
         if (!i2) return NULL;
-        IR_t *nd = IR_node_alloc(cfg, IR_ICN_SECTION);
+        BB_t *nd = BB_node_alloc(cfg, BB_ICN_SECTION);
         if (!nd) return NULL;
-        nd->c = calloc(3, sizeof(IR_t *));
+        nd->c = calloc(3, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = base;
         nd->c[1] = i1;
@@ -633,14 +633,14 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     case TT_CASE: {
         /* Icon case E of { K1: V1; ...; default: VD }. c[0]=sel, then key/val pairs, opt default. */
         if (e->n < 1 || !e->c[0]) return NULL;
-        IR_t **children = calloc((size_t)e->n, sizeof(IR_t *));
+        BB_t **children = calloc((size_t)e->n, sizeof(BB_t *));
         if (!children) return NULL;
         for (int j = 0; j < e->n; j++) {
             if (!e->c[j]) { free(children); return NULL; }
             children[j] = lower_icn_expr_node(cfg, e->c[j]);
             if (!children[j]) { free(children); return NULL; }
         }
-        IR_t *nd = IR_node_alloc(cfg, IR_CASE);
+        BB_t *nd = BB_node_alloc(cfg, BB_CASE);
         if (!nd) { free(children); return NULL; }
         nd->c = children;
         nd->n = e->n;
@@ -649,13 +649,13 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     case TT_LLT: case TT_LLE: case TT_LGT: case TT_LGE: case TT_LEQ: case TT_LNE: {
         /* Icon string relational operators: <<  <<=  >>  >>=  ==  ~=                               */
         if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
-        IR_t *lhs = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *lhs = lower_icn_expr_node(cfg, e->c[0]);
         if (!lhs) return NULL;
-        IR_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
+        BB_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
         if (!rhs) return NULL;
-        IR_t *nd = IR_node_alloc(cfg, IR_BINOP);
+        BB_t *nd = BB_node_alloc(cfg, BB_BINOP);
         if (!nd) return NULL;
-        nd->c = calloc(2, sizeof(IR_t *));
+        nd->c = calloc(2, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = lhs; nd->c[1] = rhs; nd->n = 2;
         IcnBinopKind op;
@@ -675,11 +675,11 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     case TT_NOT: {
         /* Icon `not E`. Succeeds with &null if E fails; fails if E succeeds. One child c[0]=E.     */
         if (e->n < 1 || !e->c[0]) return NULL;
-        IR_t *inner = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *inner = lower_icn_expr_node(cfg, e->c[0]);
         if (!inner) return NULL;
-        IR_t *nd = IR_node_alloc(cfg, IR_NOT);
+        BB_t *nd = BB_node_alloc(cfg, BB_NOT);
         if (!nd) return NULL;
-        nd->c = calloc(1, sizeof(IR_t *));
+        nd->c = calloc(1, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = inner;
         nd->n = 1;
@@ -687,27 +687,27 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     }
     case TT_REPEAT: {
         if (e->n < 1 || !e->c[0]) return NULL;
-        IR_t *body = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *body = lower_icn_expr_node(cfg, e->c[0]);
         if (!body) return NULL;
-        IR_t *nd = IR_node_alloc(cfg, IR_REPEAT);
+        BB_t *nd = BB_node_alloc(cfg, BB_REPEAT);
         if (!nd) return NULL;
-        nd->c = calloc(1, sizeof(IR_t *));
+        nd->c = calloc(1, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = body;
         nd->n = 1;
         return nd;
     }
     case TT_ALTERNATE: {
-        /* Icon A|B|C alternation — n-ary.  Lower all arms; emit IR_ALT with nd->c[0..n-1].        */
+        /* Icon A|B|C alternation — n-ary.  Lower all arms; emit BB_ALT with nd->c[0..n-1].        */
         if (e->n < 1) return NULL;
-        IR_t **arms = calloc((size_t)e->n, sizeof(IR_t *));
+        BB_t **arms = calloc((size_t)e->n, sizeof(BB_t *));
         if (!arms) return NULL;
         for (int j = 0; j < e->n; j++) {
             if (!e->c[j]) { free(arms); return NULL; }
             arms[j] = lower_icn_expr_node(cfg, e->c[j]);
             if (!arms[j]) { free(arms); return NULL; }
         }
-        IR_t *nd = IR_node_alloc(cfg, IR_ALT);
+        BB_t *nd = BB_node_alloc(cfg, BB_ALT);
         if (!nd) { free(arms); return NULL; }
         nd->c = arms;
         nd->n = e->n;
@@ -715,16 +715,16 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     }
     case TT_LIMIT: {
         /* Icon gen \ N — limit a generator to N yields. c[0]=gen, c[1]=N. Always 2-child binary node    */
-        /* (icon_parse e_binary at line 241). N may be a literal, var, or expression.  IR_LIMIT executor */
+        /* (icon_parse e_binary at line 241). N may be a literal, var, or expression.  BB_LIMIT executor */
         /* evaluates c[1] once on alpha, pumps c[0] up to N times via beta, then fails.                  */
         if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
-        IR_t *gen = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *gen = lower_icn_expr_node(cfg, e->c[0]);
         if (!gen) return NULL;
-        IR_t *lim = lower_icn_expr_node(cfg, e->c[1]);
+        BB_t *lim = lower_icn_expr_node(cfg, e->c[1]);
         if (!lim) return NULL;
-        IR_t *nd = IR_node_alloc(cfg, IR_LIMIT);
+        BB_t *nd = BB_node_alloc(cfg, BB_LIMIT);
         if (!nd) return NULL;
-        nd->c = calloc(2, sizeof(IR_t *));
+        nd->c = calloc(2, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = gen;
         nd->c[1] = lim;
@@ -733,11 +733,11 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     }
     case TT_AUGOP: {
         /* Icon x +:= rhs etc.  TT_AUGOP: c[0]=lhs (var), c[1]=rhs. v.ival=IcnTkKind of augop.    */
-        /* Lower as: tmp = lhs op rhs; lhs := tmp.  Use IR_BINOP + IR_ASSIGN.                      */
+        /* Lower as: tmp = lhs op rhs; lhs := tmp.  Use BB_BINOP + BB_ASSIGN.                      */
         if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
-        IR_t *lhs = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *lhs = lower_icn_expr_node(cfg, e->c[0]);
         if (!lhs) return NULL;
-        IR_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
+        BB_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
         if (!rhs) return NULL;
         IcnBinopKind op = ICN_BINOP_ADD;
         int is_relop = 0;
@@ -757,22 +757,22 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         case AUGOP_NE:     op = ICN_BINOP_NE;  is_relop = 1; break;
         default:           return NULL;
         }
-        IR_t *binop = IR_node_alloc(cfg, IR_BINOP);
+        BB_t *binop = BB_node_alloc(cfg, BB_BINOP);
         if (!binop) return NULL;
-        binop->c = calloc(2, sizeof(IR_t *));
+        binop->c = calloc(2, sizeof(BB_t *));
         if (!binop->c) return NULL;
         binop->c[0] = lhs;
         binop->c[1] = rhs;
         binop->n    = 2;
         binop->ival  = (int64_t)op;
         binop->ival2 = (int64_t)is_relop;
-        IR_t *asgn = IR_node_alloc(cfg, IR_ASSIGN);
+        BB_t *asgn = BB_node_alloc(cfg, BB_ASSIGN);
         if (!asgn) return NULL;
-        asgn->c = calloc(2, sizeof(IR_t *));
+        asgn->c = calloc(2, sizeof(BB_t *));
         if (!asgn->c) return NULL;
-        /* lhs must be a fresh IR_VAR node pointing to same variable as c[0].                       */
+        /* lhs must be a fresh BB_VAR node pointing to same variable as c[0].                       */
         /* Re-lower e->c[0] to get a writable lvalue ref.                                           */
-        IR_t *lhs2 = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *lhs2 = lower_icn_expr_node(cfg, e->c[0]);
         if (!lhs2) return NULL;
         asgn->c[0] = lhs2;
         asgn->c[1] = binop;
@@ -780,26 +780,26 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         return asgn;
     }
     case TT_LOOP_BREAK: {
-        IR_t *nd = IR_node_alloc(cfg, IR_BREAK);
+        BB_t *nd = BB_node_alloc(cfg, BB_BREAK);
         return nd;
     }
     case TT_LOOP_NEXT: {
-        IR_t *nd = IR_node_alloc(cfg, IR_NEXT);
+        BB_t *nd = BB_node_alloc(cfg, BB_NEXT);
         return nd;
     }
     case TT_PROC_FAIL: {
-        IR_t *nd = IR_node_alloc(cfg, IR_FAIL);
+        BB_t *nd = BB_node_alloc(cfg, BB_FAIL);
         return nd;
     }
     case TT_IDENTICAL: {
         if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
-        IR_t *lhs = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *lhs = lower_icn_expr_node(cfg, e->c[0]);
         if (!lhs) return NULL;
-        IR_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
+        BB_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
         if (!rhs) return NULL;
-        IR_t *nd = IR_node_alloc(cfg, IR_IDENTICAL);
+        BB_t *nd = BB_node_alloc(cfg, BB_IDENTICAL);
         if (!nd) return NULL;
-        nd->c = calloc(2, sizeof(IR_t *));
+        nd->c = calloc(2, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = lhs;
         nd->c[1] = rhs;
@@ -808,11 +808,11 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     }
     case TT_NONNULL: {
         if (e->n < 1 || !e->c[0]) return NULL;
-        IR_t *inner = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *inner = lower_icn_expr_node(cfg, e->c[0]);
         if (!inner) return NULL;
-        IR_t *nd = IR_node_alloc(cfg, IR_NONNULL);
+        BB_t *nd = BB_node_alloc(cfg, BB_NONNULL);
         if (!nd) return NULL;
-        nd->c = calloc(1, sizeof(IR_t *));
+        nd->c = calloc(1, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = inner;
         nd->n    = 1;
@@ -820,14 +820,14 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     }
     case TT_NULL: {
         if (e->n < 1 || !e->c[0]) {
-            IR_t *nd = IR_node_alloc(cfg, IR_LIT_NUL);
+            BB_t *nd = BB_node_alloc(cfg, BB_LIT_NUL);
             return nd;
         }
-        IR_t *inner = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *inner = lower_icn_expr_node(cfg, e->c[0]);
         if (!inner) return NULL;
-        IR_t *nd = IR_node_alloc(cfg, IR_NULL_TEST);
+        BB_t *nd = BB_node_alloc(cfg, BB_NULL_TEST);
         if (!nd) return NULL;
-        nd->c = calloc(1, sizeof(IR_t *));
+        nd->c = calloc(1, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = inner;
         nd->n    = 1;
@@ -835,25 +835,25 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     }
     case TT_RANDOM: {
         if (e->n < 1 || !e->c[0]) return NULL;
-        IR_t *inner = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *inner = lower_icn_expr_node(cfg, e->c[0]);
         if (!inner) return NULL;
-        IR_t *nd = IR_node_alloc(cfg, IR_RANDOM);
+        BB_t *nd = BB_node_alloc(cfg, BB_RANDOM);
         if (!nd) return NULL;
-        nd->c = calloc(1, sizeof(IR_t *));
+        nd->c = calloc(1, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = inner;
         nd->n    = 1;
         return nd;
     }
     case TT_MATCH_UNARY: {
-        /* Icon =E unary match.  Lowers to IR_CALL("match", inner) — scan builtin. */
+        /* Icon =E unary match.  Lowers to BB_CALL("match", inner) — scan builtin. */
         if (e->n < 1 || !e->c[0]) return NULL;
-        IR_t *inner = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *inner = lower_icn_expr_node(cfg, e->c[0]);
         if (!inner) return NULL;
-        IR_t *nd = IR_node_alloc(cfg, IR_CALL);
+        BB_t *nd = BB_node_alloc(cfg, BB_CALL);
         if (!nd) return NULL;
         nd->sval = "match";
-        nd->c = calloc(1, sizeof(IR_t *));
+        nd->c = calloc(1, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = inner;
         nd->n    = 1;
@@ -862,11 +862,11 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     case TT_MNS: {
         /* Icon -E unary minus.  Numeric negation of c[0] via icn_binop_apply(SUB, 0, x).            */
         if (e->n < 1 || !e->c[0]) return NULL;
-        IR_t *inner = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *inner = lower_icn_expr_node(cfg, e->c[0]);
         if (!inner) return NULL;
-        IR_t *nd = IR_node_alloc(cfg, IR_NEG);
+        BB_t *nd = BB_node_alloc(cfg, BB_NEG);
         if (!nd) return NULL;
-        nd->c = calloc(1, sizeof(IR_t *));
+        nd->c = calloc(1, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = inner;
         nd->n    = 1;
@@ -875,11 +875,11 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     case TT_PLS: {
         /* Icon +E unary plus.  Numeric coerce of c[0] via icn_binop_apply(ADD, 0, x).               */
         if (e->n < 1 || !e->c[0]) return NULL;
-        IR_t *inner = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *inner = lower_icn_expr_node(cfg, e->c[0]);
         if (!inner) return NULL;
-        IR_t *nd = IR_node_alloc(cfg, IR_POS);
+        BB_t *nd = BB_node_alloc(cfg, BB_POS);
         if (!nd) return NULL;
-        nd->c = calloc(1, sizeof(IR_t *));
+        nd->c = calloc(1, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = inner;
         nd->n    = 1;
@@ -889,11 +889,11 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         /* Icon ~E cset complement.  Lowered IR node coerces operand to string at runtime and        */
         /* invokes icn_cset_complement against the 256-char universal cset.                          */
         if (e->n < 1 || !e->c[0]) return NULL;
-        IR_t *inner = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *inner = lower_icn_expr_node(cfg, e->c[0]);
         if (!inner) return NULL;
-        IR_t *nd = IR_node_alloc(cfg, IR_CSET_COMPL);
+        BB_t *nd = BB_node_alloc(cfg, BB_CSET_COMPL);
         if (!nd) return NULL;
-        nd->c = calloc(1, sizeof(IR_t *));
+        nd->c = calloc(1, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = inner;
         nd->n    = 1;
@@ -905,16 +905,16 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         /* Icon cset binops E1++E2 / E1--E2 / E1**E2.  Lower both operands, allocate matching IR     */
         /* node.  Executor coerces operands to strings and merges via icn_cset_{union,diff,inter}.   */
         if (e->n < 2 || !e->c[0] || !e->c[1]) return NULL;
-        IR_t *lhs = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *lhs = lower_icn_expr_node(cfg, e->c[0]);
         if (!lhs) return NULL;
-        IR_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
+        BB_t *rhs = lower_icn_expr_node(cfg, e->c[1]);
         if (!rhs) return NULL;
-        IR_e kind = (e->t == TT_CSET_UNION) ? IR_CSET_UNION
-                  : (e->t == TT_CSET_DIFF)  ? IR_CSET_DIFF
-                                            : IR_CSET_INTER;
-        IR_t *nd = IR_node_alloc(cfg, kind);
+        BB_op_t kind = (e->t == TT_CSET_UNION) ? BB_CSET_UNION
+                  : (e->t == TT_CSET_DIFF)  ? BB_CSET_DIFF
+                                            : BB_CSET_INTER;
+        BB_t *nd = BB_node_alloc(cfg, kind);
         if (!nd) return NULL;
-        nd->c = calloc(2, sizeof(IR_t *));
+        nd->c = calloc(2, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = lhs;
         nd->c[1] = rhs;
@@ -923,15 +923,15 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     }
     case TT_FIELD: {
         /* Icon obj.field read.  c[0]=object expr, c[1]=TT_VAR(fieldname).                        */
-        /* Lower to IR_ICN_FIELD_GET: evaluates c[0] at runtime, calls data_field_ptr(sval, obj). */
+        /* Lower to BB_ICN_FIELD_GET: evaluates c[0] at runtime, calls data_field_ptr(sval, obj). */
         const char *fname = ICN_FIELD_NAME(e);
         if (!fname || e->n < 1 || !e->c[0]) return NULL;
-        IR_t *obj = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *obj = lower_icn_expr_node(cfg, e->c[0]);
         if (!obj) return NULL;
-        IR_t *nd = IR_node_alloc(cfg, IR_ICN_FIELD_GET);
+        BB_t *nd = BB_node_alloc(cfg, BB_ICN_FIELD_GET);
         if (!nd) return NULL;
         nd->sval = fname;
-        nd->c = calloc(1, sizeof(IR_t *));
+        nd->c = calloc(1, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = obj;
         nd->n    = 1;
@@ -939,7 +939,7 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     }
     case TT_RECORD: {
         /* Icon `record T(f1,f2,...)` type declaration statement.                                   */
-        /* Build spec string "T(f1,f2,...)" and emit IR_ICN_RECORD_DEF to register the type once.  */
+        /* Build spec string "T(f1,f2,...)" and emit BB_ICN_RECORD_DEF to register the type once.  */
         if (!e->v.sval) return NULL;
         char spec[512]; int pos = 0;
         pos += snprintf(spec+pos, sizeof(spec)-pos, "%s(", e->v.sval);
@@ -950,24 +950,24 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         }
         if (pos < (int)sizeof(spec)-1) spec[pos++] = ')';
         spec[pos] = '\0';
-        IR_t *nd = IR_node_alloc(cfg, IR_ICN_RECORD_DEF);
+        BB_t *nd = BB_node_alloc(cfg, BB_ICN_RECORD_DEF);
         if (!nd) return NULL;
         nd->sval = GC_strdup(spec);
         nd->n    = 0;
         return nd;
     }
     case TT_MAKELIST: {
-        /* Icon [e1, e2, ..., eN] list constructor.  Lower each element as an IR_CALL arg child,      */
-        /* then route through IR_CALL("MAKELIST", n_args) → icn_try_call_builtin_by_name which         */
+        /* Icon [e1, e2, ..., eN] list constructor.  Lower each element as an BB_CALL arg child,      */
+        /* then route through BB_CALL("MAKELIST", n_args) → icn_try_call_builtin_by_name which         */
         /* allocates the DATINST_t with icn_type="list", frame_elems, and frame_size fields.           */
         int n = e->n;
-        IR_t **args = (n > 0) ? calloc((size_t)n, sizeof(IR_t *)) : NULL;
+        BB_t **args = (n > 0) ? calloc((size_t)n, sizeof(BB_t *)) : NULL;
         for (int j = 0; j < n; j++) {
             if (!e->c[j]) { if (args) free(args); return NULL; }
             args[j] = lower_icn_expr_node(cfg, e->c[j]);
             if (!args[j]) { free(args); return NULL; }
         }
-        IR_t *nd = IR_node_alloc(cfg, IR_CALL);
+        BB_t *nd = BB_node_alloc(cfg, BB_CALL);
         if (!nd) { if (args) free(args); return NULL; }
         nd->sval = "MAKELIST";
         nd->c    = args;
@@ -976,14 +976,14 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
     }
     case TT_ITERATE: {
         /* Icon !L list/string/structure iteration.  c[0] is the iterable expression.                  */
-        /* Lower to IR_ICN_LIST_BANG: α resets pos to 0, β advances, γ on success, ω on exhaustion.  */
-        /* Supports DT_DATA lists (icn_type="list") and falls through to IR_ICN_ITERATE for strings.  */
+        /* Lower to BB_ICN_LIST_BANG: α resets pos to 0, β advances, γ on success, ω on exhaustion.  */
+        /* Supports DT_DATA lists (icn_type="list") and falls through to BB_ICN_ITERATE for strings.  */
         if (e->n < 1 || !e->c[0]) return NULL;
-        IR_t *inner = lower_icn_expr_node(cfg, e->c[0]);
+        BB_t *inner = lower_icn_expr_node(cfg, e->c[0]);
         if (!inner) return NULL;
-        IR_t *nd = IR_node_alloc(cfg, IR_ICN_LIST_BANG);
+        BB_t *nd = BB_node_alloc(cfg, BB_ICN_LIST_BANG);
         if (!nd) return NULL;
-        nd->c = calloc(1, sizeof(IR_t *));
+        nd->c = calloc(1, sizeof(BB_t *));
         if (!nd->c) return NULL;
         nd->c[0] = inner;
         nd->n    = 1;
@@ -993,29 +993,29 @@ static IR_t *lower_icn_expr_node(IR_block_t *cfg, tree_t *e) {
         return NULL;
     }
 }
-/* lower_icn_proc_body — build IR_block_t* for an Icon procedure body.                                                                                                                                     */
+/* lower_icn_proc_body — build BB_graph_t* for an Icon procedure body.                                                                                                                                     */
 /* Input: the TT_PROC_DECL AST node. c[0]=TT_VAR(name), c[1]=TT_VLIST(params), c[2]=TT_PROGRAM(body).                                                                                                       */
 /* Returns NULL if any statement cannot be lowered yet — caller falls back to legacy SM path.                                                                                                              */
-/* The resulting block: IR_SEQ over the body statements; body fails (FAILDESCR) so bb_broker exits after one tick.                                                                                         */
-IR_block_t *lower_icn_proc_body(tree_t *proc) {
+/* The resulting block: BB_SEQ over the body statements; body fails (FAILDESCR) so bb_broker exits after one tick.                                                                                         */
+BB_graph_t *lower_icn_proc_body(tree_t *proc) {
     if (!proc || proc->t != TT_PROC_DECL) return NULL;
     tree_t *body_node = (proc->n >= 3) ? proc->c[2] : NULL;
     int n_stmts = body_node ? body_node->n : 0;
     if (n_stmts <= 0) return NULL;
-    IR_block_t *cfg = IR_alloc(4096, IR_LANG_ICN);
+    BB_graph_t *cfg = BB_alloc(4096, IR_LANG_ICN);
     if (!cfg) return NULL;
-    IR_t **stmt_nodes = calloc((size_t)n_stmts, sizeof(IR_t *));
-    if (!stmt_nodes) { IR_free(cfg); return NULL; }
+    BB_t **stmt_nodes = calloc((size_t)n_stmts, sizeof(BB_t *));
+    if (!stmt_nodes) { BB_free(cfg); return NULL; }
     int built = 0;
     for (int i = 0; i < n_stmts; i++) {
         tree_t *st = body_node->c[i];
         if (!st) continue;
-        IR_t *nd = lower_icn_expr_node(cfg, st);
-        if (!nd) { free(stmt_nodes); IR_free(cfg); return NULL; }
+        BB_t *nd = lower_icn_expr_node(cfg, st);
+        if (!nd) { free(stmt_nodes); BB_free(cfg); return NULL; }
         stmt_nodes[built++] = nd;
     }
-    IR_t *seq = IR_node_alloc(cfg, IR_SEQ);
-    if (!seq) { free(stmt_nodes); IR_free(cfg); return NULL; }
+    BB_t *seq = BB_node_alloc(cfg, BB_SEQ);
+    if (!seq) { free(stmt_nodes); BB_free(cfg); return NULL; }
     seq->c = stmt_nodes;
     seq->n = built;
     cfg->entry = seq;

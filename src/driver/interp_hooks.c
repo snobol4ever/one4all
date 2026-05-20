@@ -14,8 +14,8 @@ DESCR_t _eval_pat_impl_fn(DESCR_t pat) {
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int _label_exists_fn(const char *name) {
-    if (g_current_sm_prog)
-        return sm_label_pc_lookup(g_current_sm_prog, name) >= 0;
+    if (g_current_SM_seq)
+        return SM_label_pc_lookup(g_current_SM_seq, name) >= 0;
     return label_lookup(name) != NULL;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -57,12 +57,12 @@ DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
     }
     const char *_entry = FUNC_ENTRY_fn(name);
     const tree_t *_body = NULL;
-    if (!g_current_sm_prog) {
+    if (!g_current_SM_seq) {
         _body = _entry ? label_lookup(_entry) : NULL;
         if (!_body) _body = label_lookup(name);
     }
     if (!_body && FNCEX_fn(name)) {
-        if (!g_current_sm_prog || sm_label_pc_lookup(g_current_sm_prog, name) < 0)
+        if (!g_current_SM_seq || SM_label_pc_lookup(g_current_SM_seq, name) < 0)
             return APPLY_fn(name, args, nargs);
     }
     if (!_body) {
@@ -91,29 +91,29 @@ DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
                 Term **saved_env = g_pl_env;
                 g_pl_env = pl_args;
                 Pl_PredEntry *_hpe = pl_pred_entry_lookup(pl_key);
-                extern SM_Program *g_current_sm_prog;
-                bb_node_t root = (_hpe && _hpe->entry_pc >= 0 && g_current_sm_prog != NULL)
+                extern SM_sequence_t *g_current_SM_seq;
+                bb_node_t root = (_hpe && _hpe->entry_pc >= 0 && g_current_SM_seq != NULL)
                     ? pl_box_choice_pc(_hpe->entry_pc, g_pl_env, nargs)
                     : pl_box_choice(choice, g_pl_env, nargs);
-                int ok = bb_broker(root, BB_ONCE, NULL, NULL);
+                int ok = bb_broker(root, bb_once, NULL, NULL);
                 g_pl_env = saved_env;
                 return ok ? INTVAL(1) : FAILDESCR;
             }
         }
     }
-    if (g_current_sm_prog) {
-        int body_pc = sm_label_pc_lookup(g_current_sm_prog, name);
+    if (g_current_SM_seq) {
+        int body_pc = SM_label_pc_lookup(g_current_SM_seq, name);
         if (body_pc < 0) {
             char uname[128]; size_t nl = strlen(name);
             if (nl < sizeof(uname)) {
                 for (size_t i = 0; i <= nl; i++)
                     uname[i] = (char)toupper((unsigned char)name[i]);
-                body_pc = sm_label_pc_lookup(g_current_sm_prog, uname);
+                body_pc = SM_label_pc_lookup(g_current_SM_seq, uname);
             }
         }
         if (body_pc < 0) {
             const char *_entry = FUNC_ENTRY_fn(name);
-            if (_entry) body_pc = sm_label_pc_lookup(g_current_sm_prog, _entry);
+            if (_entry) body_pc = SM_label_pc_lookup(g_current_SM_seq, _entry);
         }
         if (body_pc < 0) return FAILDESCR;
         SM_State nested;
@@ -146,7 +146,7 @@ DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
             saved_vals [ns] = NV_GET_fn(lname); ns++;
             NV_SET_fn(lname, NULVCL);
         }
-        sm_interp_run(g_current_sm_prog, &nested);
+        sm_interp_run(g_current_SM_seq, &nested);
         DESCR_t result;
         int via_fret  = (strcmp(kw_rtntype, "FRETURN") == 0);
         int via_nret  = (strcmp(kw_rtntype, "NRETURN") == 0);

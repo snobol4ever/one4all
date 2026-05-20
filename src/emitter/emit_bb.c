@@ -2,7 +2,7 @@
 #include "emit_form.h"
 #include "emit_templates.h"
 #include "../frontend/icon/icon_gen.h"
-#include "IR.h"
+#include "BB.h"
 #include "../rt/rt.h"
 #include <string.h>
 #include <stdio.h>
@@ -601,10 +601,10 @@ static char   g_flat_data_buf[FLAT_DATA_BUF_MAX];
 static size_t g_flat_data_len    = 0;
 static int    g_flat_data_active = 0;
 #define CHILD_CACHE_MAX 64
-static struct { IR_t *key; bb_box_fn fn; char text_lbl[80]; } g_child_cache[CHILD_CACHE_MAX];
+static struct { BB_t *key; bb_box_fn fn; char text_lbl[80]; } g_child_cache[CHILD_CACHE_MAX];
 static int g_child_cache_n = 0;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static bb_box_fn child_cache_get(IR_t *p) {
+static bb_box_fn child_cache_get(BB_t *p) {
     for (int i = 0; i < g_child_cache_n; i++) if (g_child_cache[i].key == p) return g_child_cache[i].fn;
     return NULL;
 }
@@ -614,7 +614,7 @@ static const char *child_cache_get_lbl(bb_box_fn fn) {
     return NULL;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void child_cache_put(IR_t *p, bb_box_fn fn) {
+static void child_cache_put(BB_t *p, bb_box_fn fn) {
     if (g_child_cache_n < CHILD_CACHE_MAX) { g_child_cache[g_child_cache_n].key = p; g_child_cache[g_child_cache_n].fn = fn; g_child_cache[g_child_cache_n].text_lbl[0] = '\0'; g_child_cache_n++; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -796,9 +796,9 @@ void emit_flat_banner_rule(char ch) {
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_flat_ir_banner(void) { if (!g_is_text) return; emit_flat_banner_rule('='); }
-static void emit_flat_ir(IR_t *nd, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
+static void emit_flat_ir(BB_t *nd, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void emit_flat_ir_fence(IR_t *nd, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β) {
+static void emit_flat_ir_fence(BB_t *nd, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β) {
     if (!nd || nd->n == 0) { emit_bb_xfnce(lbl_succ, lbl_fail, lbl_β); return; }
     int id = g_flat_node_id++;
     bb_label_t child_γ, child_ω;
@@ -813,7 +813,7 @@ static void emit_flat_ir_fence(IR_t *nd, bb_label_t *lbl_succ, bb_label_t *lbl_f
     emit_jmp_label(lbl_fail, JMP_JMP);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void emit_flat_ir_cat(IR_t *nd, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β) {
+static void emit_flat_ir_cat(BB_t *nd, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β) {
     int id = g_flat_node_id++;
     bb_label_t mid_γ, right_ω, left_β, right_β, xcat_ω;
     emit_label_initf(&mid_γ,   "xcat%d_γ",         id);
@@ -861,7 +861,7 @@ static void emit_flat_ir_cat(IR_t *nd, bb_label_t *lbl_succ, bb_label_t *lbl_fai
     emit_label_define_bb(&xcat_ω);  emit_jmp_label(lbl_fail, JMP_JMP);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void emit_flat_ir_alt(IR_t *nd, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β) {
+static void emit_flat_ir_alt(BB_t *nd, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β) {
     int id = g_flat_node_id++;
     int nc = nd ? nd->n : 0;
     if (nc == 0) { emit_label_define_bb(lbl_β); emit_jmp_label(lbl_fail, JMP_JMP); return; }
@@ -882,38 +882,38 @@ static void emit_flat_ir_alt(IR_t *nd, bb_label_t *lbl_succ, bb_label_t *lbl_fai
     emit_label_define_bb(lbl_β); emit_jmp_label(&ci_βs[0], JMP_JMP);
 }
 extern int memcmp(const void *, const void *, size_t);
-static void emit_flat_ir(IR_t *nd, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β) {
+static void emit_flat_ir(BB_t *nd, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β) {
     if (!nd) { emit_bb_xeps(lbl_succ, lbl_fail, lbl_β); return; }
     switch (nd->t) {
-    case IR_PAT_LIT: {
+    case BB_PAT_LIT: {
         const char *lit = nd->sval ? nd->sval : "";
         const char *lit_label = (g_flat_intern_str && g_is_text) ? g_flat_intern_str(lit) : NULL;
         emit_bb_xchr(lit, lit_label, lbl_succ, lbl_fail, lbl_β);
         break;
     }
-    case IR_PAT_ARB:    emit_bb_xfarb(lbl_succ, lbl_fail, lbl_β); break;
-    case IR_PAT_REM:    emit_bb_xstar(lbl_succ, lbl_fail, lbl_β); break;
-    case IR_PAT_SPAN:   emit_bb_charset(NULL, "bb_span",   "SPAN",   nd->sval?nd->sval:"", lbl_succ, lbl_fail, lbl_β); break;
-    case IR_PAT_ANY:    emit_bb_charset(NULL, "bb_any",    "ANY",    nd->sval?nd->sval:"", lbl_succ, lbl_fail, lbl_β); break;
-    case IR_PAT_BREAK:  emit_bb_charset(NULL, "bb_brk",    "BREAK",  nd->sval?nd->sval:"", lbl_succ, lbl_fail, lbl_β); break;
-    case IR_PAT_NOTANY: emit_bb_charset(NULL, "bb_notany", "NOTANY", nd->sval?nd->sval:"", lbl_succ, lbl_fail, lbl_β); break;
-    case IR_PAT_LEN:    emit_bb_xlnth((long long)nd->ival, lbl_succ, lbl_fail, lbl_β); break;
-    case IR_PAT_POS:    if (nd->n) emit_bb_xrpsi((int)nd->ival, lbl_succ, lbl_fail, lbl_β);
+    case BB_PAT_ARB:    emit_bb_xfarb(lbl_succ, lbl_fail, lbl_β); break;
+    case BB_PAT_REM:    emit_bb_xstar(lbl_succ, lbl_fail, lbl_β); break;
+    case BB_PAT_SPAN:   emit_bb_charset(NULL, "bb_span",   "SPAN",   nd->sval?nd->sval:"", lbl_succ, lbl_fail, lbl_β); break;
+    case BB_PAT_ANY:    emit_bb_charset(NULL, "bb_any",    "ANY",    nd->sval?nd->sval:"", lbl_succ, lbl_fail, lbl_β); break;
+    case BB_PAT_BREAK:  emit_bb_charset(NULL, "bb_brk",    "BREAK",  nd->sval?nd->sval:"", lbl_succ, lbl_fail, lbl_β); break;
+    case BB_PAT_NOTANY: emit_bb_charset(NULL, "bb_notany", "NOTANY", nd->sval?nd->sval:"", lbl_succ, lbl_fail, lbl_β); break;
+    case BB_PAT_LEN:    emit_bb_xlnth((long long)nd->ival, lbl_succ, lbl_fail, lbl_β); break;
+    case BB_PAT_POS:    if (nd->n) emit_bb_xrpsi((int)nd->ival, lbl_succ, lbl_fail, lbl_β);
                         else       emit_bb_xposi ((int)nd->ival, lbl_succ, lbl_fail, lbl_β); break;
-    case IR_PAT_TAB:    if (nd->n) emit_bb_xrtb ((long long)nd->ival, lbl_succ, lbl_fail, lbl_β);
+    case BB_PAT_TAB:    if (nd->n) emit_bb_xrtb ((long long)nd->ival, lbl_succ, lbl_fail, lbl_β);
                         else       emit_bb_xtb   ((long long)nd->ival, lbl_succ, lbl_fail, lbl_β); break;
-    case IR_PAT_FENCE:  emit_flat_ir_fence(nd, lbl_succ, lbl_fail, lbl_β); break;
-    case IR_PAT_ABORT:  emit_bb_xfail(lbl_succ, lbl_fail, lbl_β); break;
-    case IR_PAT_CAT:    emit_flat_ir_cat(nd, lbl_succ, lbl_fail, lbl_β); break;
-    case IR_PAT_ALT:    emit_flat_ir_alt(nd, lbl_succ, lbl_fail, lbl_β); break;
-    case IR_PAT_ARBNO: {
-        IR_t *ch = (nd->n > 0) ? nd->c[0] : NULL;
+    case BB_PAT_FENCE:  emit_flat_ir_fence(nd, lbl_succ, lbl_fail, lbl_β); break;
+    case BB_PAT_ABORT:  emit_bb_xfail(lbl_succ, lbl_fail, lbl_β); break;
+    case BB_PAT_CAT:    emit_flat_ir_cat(nd, lbl_succ, lbl_fail, lbl_β); break;
+    case BB_PAT_ALT:    emit_flat_ir_alt(nd, lbl_succ, lbl_fail, lbl_β); break;
+    case BB_PAT_ARBNO: {
+        BB_t *ch = (nd->n > 0) ? nd->c[0] : NULL;
         bb_box_fn cfn = ch ? child_cache_get(ch) : NULL;
         emit_bb_xarbn(cfn, lbl_succ, lbl_fail, lbl_β);
         break;
     }
-    case IR_PAT_ASSIGN_IMM: {
-        IR_t *ch = (nd->n > 0) ? nd->c[0] : NULL;
+    case BB_PAT_ASSIGN_IMM: {
+        BB_t *ch = (nd->n > 0) ? nd->c[0] : NULL;
         bb_box_fn cfn = ch ? child_cache_get(ch) : NULL;
         const char *vn = nd->sval ? nd->sval : "";
         if (nd->value.v == DT_N && nd->value.slen == 1 && nd->value.ptr) {
@@ -936,8 +936,8 @@ static void emit_flat_ir(IR_t *nd, bb_label_t *lbl_succ, bb_label_t *lbl_fail, b
         }
         break;
     }
-    case IR_PAT_ASSIGN_COND: {
-        IR_t *ch = (nd->n > 0) ? nd->c[0] : NULL;
+    case BB_PAT_ASSIGN_COND: {
+        BB_t *ch = (nd->n > 0) ? nd->c[0] : NULL;
         bb_box_fn cfn = ch ? child_cache_get(ch) : NULL;
         const char *vn = nd->sval ? nd->sval : "";
         if (nd->value.v == DT_N && nd->value.slen == 1 && nd->value.ptr) {
@@ -968,7 +968,7 @@ static void emit_flat_ir(IR_t *nd, bb_label_t *lbl_succ, bb_label_t *lbl_fail, b
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_flat_body(IR_t *nd, const char *prefix, int text_externalise, int brokered) {
+static int emit_flat_body(BB_t *nd, const char *prefix, int text_externalise, int brokered) {
     bb_label_t lbl_α, lbl_α_body, lbl_succ, lbl_fail, lbl_β;
     emit_label_initf(&lbl_α,      "%s_α",      prefix);
     emit_label_initf(&lbl_α_body, "%s_α_body", prefix);
@@ -1013,10 +1013,10 @@ static int emit_flat_body(IR_t *nd, const char *prefix, int text_externalise, in
 static int g_in_prebuild = 0;
 static int g_text_child_counter = 0;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void pre_build_children_text(IR_t *nd, FILE *out, const char *base_prefix) {
+static void pre_build_children_text(BB_t *nd, FILE *out, const char *base_prefix) {
     if (!nd) return;
-    if (nd->t == IR_PAT_ARBNO || nd->t == IR_PAT_ASSIGN_COND || nd->t == IR_PAT_ASSIGN_IMM || nd->t == IR_PAT_CALLOUT) {
-        IR_t *ch = (nd->n > 0) ? nd->c[0] : NULL;
+    if (nd->t == BB_PAT_ARBNO || nd->t == BB_PAT_ASSIGN_COND || nd->t == BB_PAT_ASSIGN_IMM || nd->t == BB_PAT_CALLOUT) {
+        BB_t *ch = (nd->n > 0) ? nd->c[0] : NULL;
         if (ch && !child_cache_get(ch)) {
             pre_build_children_text(ch, out, base_prefix);
             char child_prefix[120];
@@ -1036,13 +1036,13 @@ static void pre_build_children_text(IR_t *nd, FILE *out, const char *base_prefix
     for (int i = 0; i < nd->n; i++) pre_build_children_text(nd->c[i], out, base_prefix);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void pre_build_children(IR_t *nd) {
+static void pre_build_children(BB_t *nd) {
     if (!nd) return;
-    if (nd->t == IR_PAT_ARBNO || nd->t == IR_PAT_ASSIGN_COND || nd->t == IR_PAT_ASSIGN_IMM || nd->t == IR_PAT_CALLOUT) {
-        IR_t *ch = (nd->n > 0) ? nd->c[0] : NULL;
+    if (nd->t == BB_PAT_ARBNO || nd->t == BB_PAT_ASSIGN_COND || nd->t == BB_PAT_ASSIGN_IMM || nd->t == BB_PAT_CALLOUT) {
+        BB_t *ch = (nd->n > 0) ? nd->c[0] : NULL;
         if (ch && !child_cache_get(ch)) {
             pre_build_children(ch);
-            bb_box_fn fn = (nd->t == IR_PAT_ARBNO || nd->t == IR_PAT_ASSIGN_COND || nd->t == IR_PAT_ASSIGN_IMM) ? bb_build_brokered(ch) : bb_build_flat(ch);
+            bb_box_fn fn = (nd->t == BB_PAT_ARBNO || nd->t == BB_PAT_ASSIGN_COND || nd->t == BB_PAT_ASSIGN_IMM) ? bb_build_brokered(ch) : bb_build_flat(ch);
             if (!fn) fn = bb_build_brokered(ch);
             child_cache_put(ch, fn);
         }
@@ -1051,7 +1051,7 @@ static void pre_build_children(IR_t *nd) {
     for (int i = 0; i < nd->n; i++) pre_build_children(nd->c[i]);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-bb_box_fn bb_build_flat(IR_t *nd) {
+bb_box_fn bb_build_flat(BB_t *nd) {
     bb_buf_t buf = bb_alloc(FLAT_BUF_MAX);
     if (!buf) return NULL;
     if (!g_in_prebuild) { g_child_cache_n = 0; g_in_prebuild = 1; pre_build_children(nd); g_in_prebuild = 0; }
@@ -1065,7 +1065,7 @@ bb_box_fn bb_build_flat(IR_t *nd) {
     return (bb_box_fn)buf;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-bb_box_fn bb_build_brokered(IR_t *nd) {
+bb_box_fn bb_build_brokered(BB_t *nd) {
     bb_buf_t buf = bb_alloc(FLAT_BUF_MAX);
     if (!buf) return NULL;
     if (!g_in_prebuild) { g_child_cache_n = 0; g_in_prebuild = 1; pre_build_children(nd); g_in_prebuild = 0; }
@@ -1082,7 +1082,7 @@ bb_box_fn bb_build_brokered(IR_t *nd) {
     return (bb_box_fn)buf;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int emit_flat_build(IR_t *nd, FILE *out, const char *prefix) {
+int emit_flat_build(BB_t *nd, FILE *out, const char *prefix) {
     g_child_cache_n = 0;
     g_text_child_counter = 0;
     pre_build_children_text(nd, out, prefix);
@@ -1093,7 +1093,7 @@ int emit_flat_build(IR_t *nd, FILE *out, const char *prefix) {
     return rc;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void emit_bb_register_child_label(IR_t *nd, const char *α_label) {
+void emit_bb_register_child_label(BB_t *nd, const char *α_label) {
     bb_box_fn fn = child_cache_get(nd);
     if (fn) child_cache_set_lbl(fn, α_label);
 }

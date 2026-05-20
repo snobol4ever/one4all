@@ -3,7 +3,7 @@
 #include "emit_form.h"
 #include "SM_templates/sm_templates.h"
 #include "../rt/rt.h"
-#include "IR.h"
+#include "BB.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -1241,11 +1241,11 @@ static void strtab_escape(char *out, size_t outsz, const char *s)
     if (j < outsz) out[j] = '\0';
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void strtab_collect(const SM_Program *prog)
+static void strtab_collect(const SM_sequence_t *prog)
 {
     strtab_reset();
     for (int i = 0; i < prog->count; i++) {
-        const SM_Instr *ins = &prog->instrs[i];
+        const SM_t *ins = &prog->instrs[i];
         switch (ins->op) {
         case SM_PUSH_LIT_S:
         case SM_PUSH_LIT_CS:
@@ -1279,7 +1279,7 @@ static void strtab_collect(const SM_Program *prog)
 static uint8_t *g_pc_used_as_target = NULL;
 static int      g_pc_used_count     = 0;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int pc_used_alloc(const SM_Program *prog)
+static int pc_used_alloc(const SM_sequence_t *prog)
 {
     if (g_pc_used_as_target) {
         free(g_pc_used_as_target);
@@ -1357,11 +1357,11 @@ static int strtab_emit_rodata(FILE *out)
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_expression_registry(FILE *out, const SM_Program *prog)
+static int emit_expression_registry(FILE *out, const SM_sequence_t *prog)
 {
     int n = 0;
     for (int i = 0; i < prog->count; i++) {
-        const SM_Instr *ins = &prog->instrs[i];
+        const SM_t *ins = &prog->instrs[i];
         if (ins->op == SM_LABEL && ins->a[0].s && *ins->a[0].s && ins->a[2].i == 1)
             n++;
     }
@@ -1370,7 +1370,7 @@ static int emit_expression_registry(FILE *out, const SM_Program *prog)
     if (emit_three_column_line(out, "", ".align",   "8",     NULL) != 0) return -1;
     if (emit_three_column_line(out, ".Lexpression_registry:", "", "", NULL) != 0) return -1;
     for (int i = 0; i < prog->count; i++) {
-        const SM_Instr *ins = &prog->instrs[i];
+        const SM_t *ins = &prog->instrs[i];
         if (ins->op != SM_LABEL || !ins->a[0].s || !*ins->a[0].s || ins->a[2].i != 1) continue;
         int str_idx = strtab_lookup(ins->a[0].s);
         if (str_idx < 0) continue;
@@ -1389,23 +1389,23 @@ static int emit_expression_registry(FILE *out, const SM_Program *prog)
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* PJ-9d: emit Mode-4 Prolog predicate-registry — one builder fn per predicate + a registry table.            */
 /* Reads g_dcg_table (populated by lower_proc_skeletons at scrip-compile-time) and emits the assembly that    */
-/* reconstructs each IR_block_t* graph at standalone-binary startup. Layout per rt_predicate_entry_t:         */
+/* reconstructs each BB_graph_t* graph at standalone-binary startup. Layout per rt_predicate_entry_t:         */
 /*   { const char *name; int arity; rt_pl_builder_fn builder; } — 24 bytes (8 + 4 + 4 pad + 8).               */
 /* Builder fn calls rt_pl_b_begin / rt_pl_b_node / rt_pl_b_kids / rt_pl_b_entry / rt_pl_b_end_register.       */
 #include "../runtime/interp/pl_runtime.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* IR_t's first union holds {ival, dval, sval} — same storage. Only some kinds put a real string ptr in it; */
+/* BB_t's first union holds {ival, dval, sval} — same storage. Only some kinds put a real string ptr in it; */
 /* others put an integer or double. Touching nd->sval as a char* when the kind doesn't use it dereferences */
 /* whatever bits ival left there, which segfaults. The kinds below are the ones lower_pl.c sets sval on    */
-/* with a real string pointer. IR_PL_VAR is excluded: lower_pl.c:16 copies e->v.sval but e->v is a tree_t   */
-/* union holding the slot integer, so sval is garbage; the runtime never reads it for IR_PL_VAR anyway.    */
+/* with a real string pointer. BB_PL_VAR is excluded: lower_pl.c:16 copies e->v.sval but e->v is a tree_t   */
+/* union holding the slot integer, so sval is garbage; the runtime never reads it for BB_PL_VAR anyway.    */
 static int pl_ir_kind_uses_sval(int kind)
 {
     switch (kind) {
-        case IR_PL_ATOM:
-        case IR_PL_BUILTIN:
-        case IR_PL_ARITH:
-        case IR_PL_CALL:
+        case BB_PL_ATOM:
+        case BB_PL_BUILTIN:
+        case BB_PL_ARITH:
+        case BB_PL_CALL:
             return 1;
         default:
             return 0;
@@ -1449,12 +1449,12 @@ static int emit_pl_b_kids_call(FILE *out, int pred_idx, int node_idx, const char
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* Pre-emit a .rodata block holding the kids-index arrays for one predicate. Returns 0 on success.            */
 /* For each node with c[]!=NULL emits .Lpl_kids_<pred>_<node>: .int k0,k1,... and remembers the label.        */
-static int emit_pl_kids_rodata_for_pred(FILE *out, int pred_idx, const IR_block_t *cfg)
+static int emit_pl_kids_rodata_for_pred(FILE *out, int pred_idx, const BB_graph_t *cfg)
 {
     if (!cfg) return 0;
     int any = 0;
     for (int i = 0; i < cfg->n; i++) {
-        const IR_t *nd = cfg->all[i];
+        const BB_t *nd = cfg->all[i];
         if (!nd || !nd->c || nd->n <= 0) continue;
         any = 1; break;
     }
@@ -1462,7 +1462,7 @@ static int emit_pl_kids_rodata_for_pred(FILE *out, int pred_idx, const IR_block_
     if (emit_three_column_line(out, "", ".section", ".rodata", NULL) != 0) return -1;
     if (emit_three_column_line(out, "", ".align",   "4",       NULL) != 0) return -1;
     for (int i = 0; i < cfg->n; i++) {
-        const IR_t *nd = cfg->all[i];
+        const BB_t *nd = cfg->all[i];
         if (!nd || !nd->c || nd->n <= 0) continue;
         char lbl[64];
         snprintf(lbl, sizeof(lbl), ".Lpl_kids_%d_%d:", pred_idx, i);
@@ -1486,7 +1486,7 @@ static int emit_pl_kids_rodata_for_pred(FILE *out, int pred_idx, const IR_block_
 static int emit_pl_builder_fn(FILE *out, int pred_idx, const Pl_PredEntry_BB *entry)
 {
     if (!entry || !entry->ir_body) return 0;
-    const IR_block_t *cfg = entry->ir_body;
+    const BB_graph_t *cfg = entry->ir_body;
     if (emit_pl_kids_rodata_for_pred(out, pred_idx, cfg) != 0) return -1;
     char lbl[64];
     snprintf(lbl, sizeof(lbl), ".Lpl_builder_%d:", pred_idx);
@@ -1498,7 +1498,7 @@ static int emit_pl_builder_fn(FILE *out, int pred_idx, const Pl_PredEntry_BB *en
     if (emit_three_column_line(out, "", "mov",  arg, NULL) != 0) return -1;
     if (emit_three_column_line(out, "", "call", "rt_pl_b_begin@PLT", NULL) != 0) return -1;
     for (int i = 0; i < cfg->n; i++) {
-        const IR_t *nd = cfg->all[i];
+        const BB_t *nd = cfg->all[i];
         if (!nd) {
             if (emit_pl_b_node_call(out, 0, 0, NULL, 0) != 0) return -1;
             continue;
@@ -1509,7 +1509,7 @@ static int emit_pl_builder_fn(FILE *out, int pred_idx, const Pl_PredEntry_BB *en
         if (emit_pl_b_node_call(out, (int)nd->t, ival, sval, nd->ival2) != 0) return -1;
     }
     for (int i = 0; i < cfg->n; i++) {
-        const IR_t *nd = cfg->all[i];
+        const BB_t *nd = cfg->all[i];
         if (!nd || !nd->c || nd->n <= 0) continue;
         char kids_lbl[64];
         snprintf(kids_lbl, sizeof(kids_lbl), ".Lpl_kids_%d_%d", pred_idx, i);
@@ -1536,7 +1536,7 @@ static int emit_pl_builder_fn(FILE *out, int pred_idx, const Pl_PredEntry_BB *en
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* PJ-9d two-phase split: pl_pre_intern_pred_names runs BEFORE strtab_emit_rodata so that .S<n> labels    */
-/* are created for every predicate name and every IR_t.sval string. emit_pl_predicate_registry runs AFTER */
+/* are created for every predicate name and every BB_t.sval string. emit_pl_predicate_registry runs AFTER */
 /* and just emits the registry table + builder fns referencing those .S<n> labels.                        */
 static void pl_pre_intern_pred_names(void)
 {
@@ -1546,7 +1546,7 @@ static void pl_pre_intern_pred_names(void)
         strtab_intern(e->name);
         if (!e->ir_body) continue;
         for (int j = 0; j < e->ir_body->n; j++) {
-            const IR_t *nd = e->ir_body->all[j];
+            const BB_t *nd = e->ir_body->all[j];
             if (!nd) continue;
             if (pl_ir_kind_uses_sval((int)nd->t) && nd->sval) strtab_intern(nd->sval);
         }
@@ -1758,7 +1758,7 @@ int emit_halt_line(FILE *out, int pc)
     return emit_sm_rtcall(out, sm_template_lookup(SM_HALT), NULL);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int emit_push_lit_i_line(FILE *out, const SM_Instr *ins, int pc)
+int emit_push_lit_i_line(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     return emit_sm_int64(out, sm_template_lookup(SM_PUSH_LIT_I),
@@ -1766,7 +1766,7 @@ int emit_push_lit_i_line(FILE *out, const SM_Instr *ins, int pc)
 }
 __attribute__((unused))
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int emit_sm_push_lit_s_dispatch(FILE *out, const SM_Instr *ins, int pc)
+int emit_sm_push_lit_s_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     const char *s    = ins->a[0].s ? ins->a[0].s : "";
@@ -1779,7 +1779,7 @@ int emit_sm_push_lit_s_dispatch(FILE *out, const SM_Instr *ins, int pc)
                              lbl, (int)slen, anno);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int emit_sm_push_var_dispatch(FILE *out, const SM_Instr *ins, int pc)
+int emit_sm_push_var_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     const char *name = ins->a[0].s ? ins->a[0].s : "";
@@ -1789,7 +1789,7 @@ int emit_sm_push_var_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return emit_sm_lbl(out, sm_template_lookup(SM_PUSH_VAR), lbl, anno);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int emit_sm_store_var_dispatch(FILE *out, const SM_Instr *ins, int pc)
+int emit_sm_store_var_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     const char *name = ins->a[0].s ? ins->a[0].s : "";
@@ -1808,7 +1808,7 @@ int emit_sm_pop(FILE *out, int pc)
 }
 __attribute__((unused))
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int edp4_sm_arith(FILE *out, const SM_Instr *ins, int pc)
+int edp4_sm_arith(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     const sm_op_template_t *t = sm_template_lookup(ins->op);
@@ -1818,7 +1818,7 @@ int edp4_sm_arith(FILE *out, const SM_Instr *ins, int pc)
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_label_dispatch(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_label_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)ins; (void)pc;
     emit_mode_set(TEXT_MODE(), out);
@@ -1826,7 +1826,7 @@ static int emit_sm_label_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int emit_sm_jump_line(FILE *out, const SM_Instr *ins, int pc)
+int emit_sm_jump_line(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     const sm_op_template_t *t = sm_template_lookup(SM_JUMP);
@@ -1837,7 +1837,7 @@ int emit_sm_jump_line(FILE *out, const SM_Instr *ins, int pc)
     return render_call_line(out, t, &a);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int emit_sm_jump_s_line(FILE *out, const SM_Instr *ins, int pc)
+int emit_sm_jump_s_line(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     const sm_op_template_t *t = sm_template_lookup(SM_JUMP_S);
@@ -1848,7 +1848,7 @@ int emit_sm_jump_s_line(FILE *out, const SM_Instr *ins, int pc)
     return render_call_line(out, t, &a);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int emit_sm_jump_f_line(FILE *out, const SM_Instr *ins, int pc)
+int emit_sm_jump_f_line(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     const sm_op_template_t *t = sm_template_lookup(SM_JUMP_F);
@@ -1868,7 +1868,7 @@ int edp4_emit_push_expression(FILE *out, const sm_op_template_t *t,
     return emit_sm_template(out, t, &a);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_push_expression_dispatch(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_push_expression_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     return edp4_emit_push_expression(out, sm_template_lookup(SM_PUSH_EXPRESSION),
@@ -1882,7 +1882,7 @@ int edp4_emit_call_expression(FILE *out, const sm_op_template_t *t, int target_p
     return emit_sm_template(out, t, &a);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_call_expression_dispatch(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_call_expression_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     return edp4_emit_call_expression(out, sm_template_lookup(SM_CALL_EXPRESSION),
@@ -1896,7 +1896,7 @@ int emit_sm_return_dispatch(FILE *out, int pc)
     return emit_sm_ret(out, sm_template_lookup(SM_RETURN), NULL);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_stno_dispatch(FILE *out, const SM_Instr *ins, int pc,
+static int emit_sm_stno_dispatch(FILE *out, const SM_t *ins, int pc,
                         const SrcLines *sl)
 {
     (void)pc;
@@ -1974,7 +1974,7 @@ int emit_sm_exp_dispatch(FILE *out, int pc)
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int emit_sm_push_lit_f_dispatch(FILE *out, const SM_Instr *ins, int pc)
+int emit_sm_push_lit_f_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     emit_mode_set(TEXT_MODE(), out);
@@ -1982,7 +1982,7 @@ int emit_sm_push_lit_f_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_push_expr_dispatch(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_push_expr_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     emit_mode_set(TEXT_MODE(), out);
@@ -1990,7 +1990,7 @@ static int emit_sm_push_expr_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_incr_dispatch(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_incr_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     emit_mode_set(TEXT_MODE(), out);
@@ -1998,7 +1998,7 @@ static int emit_sm_incr_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_decr_dispatch(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_decr_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     emit_mode_set(TEXT_MODE(), out);
@@ -2006,7 +2006,7 @@ static int emit_sm_decr_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int emit_sm_acomp_dispatch(FILE *out, const SM_Instr *ins, int pc)
+int emit_sm_acomp_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     emit_mode_set(TEXT_MODE(), out);
@@ -2014,7 +2014,7 @@ int emit_sm_acomp_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int emit_sm_lcomp_dispatch(FILE *out, const SM_Instr *ins, int pc)
+int emit_sm_lcomp_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     emit_mode_set(TEXT_MODE(), out);
@@ -2024,12 +2024,12 @@ int emit_sm_lcomp_dispatch(FILE *out, const SM_Instr *ins, int pc)
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* EC-UNI-2b: public shim for SM_template fn sm_stno — calls the static dispatcher with NULL SrcLines.
  * EC-UNI-3 will route SrcLines through emit_sm_dispatch via a file-scope static (or sm_ctx_t extension). */
-int emit_sm_stno_template(FILE *out, const SM_Instr *ins)
+int emit_sm_stno_template(FILE *out, const SM_t *ins)
 {
     return emit_sm_stno_dispatch(out, ins, 0, NULL);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_call_dispatch(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_call_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     const char *name  = ins->a[0].s ? ins->a[0].s : "";
@@ -2045,8 +2045,8 @@ static int emit_sm_call_dispatch(FILE *out, const SM_Instr *ins, int pc)
 /* Mirrors emit_sm_call_dispatch — operands are (name string, arity int), template is SM_TPL_LBL_INT32                  */
 /* in g_sm_templates[] mapped to rt_pl_once (defined in src/runtime/rt/rt.c).  IJ-HELLO-4b (2026-05-18) flipped         */
 /* this from rt_bb_once_proc → rt_pl_once to break the brokered-import chain; the bb_broker layer is bypassed in       */
-/* favor of a direct IR_exec_once call on the predicate's IR_block_t.                                                    */
-static int emit_sm_bb_once_proc_dispatch(FILE *out, const SM_Instr *ins, int pc)
+/* favor of a direct bb_exec_once call on the predicate's BB_graph_t.                                                    */
+static int emit_sm_bb_once_proc_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     const char *name  = ins->a[0].s ? ins->a[0].s : "";
@@ -2067,9 +2067,9 @@ static int emit_sm_bb_once_proc_dispatch(FILE *out, const SM_Instr *ins, int pc)
 /* plain x86 call, no broker, no rt-helper.  SM_RETURN at body end (= `ret`) returns to us, and the dispatch loop       */
 /* falls through to the immediately-following SM_HALT.  This is the architectural endpoint of IJ-HELLO-3:                */
 /*   • zero runtime helper invocation (no rt_bb_pump_proc, no bb_broker, no _usercall_hook)                              */
-/*   • zero new IR_block_t* walker (existing SM template machinery handles the body)                                     */
+/*   • zero new BB_graph_t* walker (existing SM template machinery handles the body)                                     */
 /*   • zero new asm macros (CALL_EXPRESSION already exists for SM_CALL_EXPRESSION)                                       */
-static int emit_sm_bb_pump_proc_dispatch(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_bb_pump_proc_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     const char *name = ins->a[0].s ? ins->a[0].s : "";
@@ -2098,7 +2098,7 @@ static int emit_sm_bb_pump_proc_dispatch(FILE *out, const SM_Instr *ins, int pc)
 }
 __attribute__((unused))
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int emit_sm_return_variant_dispatch(FILE *out, sm_opcode_t op, int pc, const SM_Program *prog)
+int emit_sm_return_variant_dispatch(FILE *out, SM_op_t op, int pc, const SM_sequence_t *prog)
 {
     int kind = 0;
     if (op == SM_FRETURN || op == SM_FRETURN_S || op == SM_FRETURN_F) kind = 1;
@@ -2109,7 +2109,7 @@ int emit_sm_return_variant_dispatch(FILE *out, sm_opcode_t op, int pc, const SM_
     if (kind == 2 && prog) {
         const char *fname = NULL;
         for (int i = pc - 1; i >= 0 && !fname; i--) {
-            const SM_Instr *si = &prog->instrs[i];
+            const SM_t *si = &prog->instrs[i];
             if (si->op == SM_LABEL && si->a[0].s) {
                 fname = si->a[0].s;
                 break;
@@ -2127,9 +2127,9 @@ int emit_sm_return_variant_dispatch(FILE *out, sm_opcode_t op, int pc, const SM_
 /* EC-UNI-2c: public shim for the sm_return / sm_freturn / sm_nreturn template fns.
  * Dispatches plain SM_RETURN to emit_sm_return_dispatch (handles g_in_define_body); other 8 variants
  * (FRETURN/NRETURN ± _S/_F) go to emit_sm_return_variant_dispatch. NRETURN's function-name comment
- * annotation requires the SM_Program* — we pass NULL today (template ctx has no prog yet); the
+ * annotation requires the SM_sequence_t* — we pass NULL today (template ctx has no prog yet); the
  * annotation gracefully degrades to a generic banner. Machine code is byte-identical. */
-int emit_sm_return_template(FILE *out, const SM_Instr *ins)
+int emit_sm_return_template(FILE *out, const SM_t *ins)
 {
     if (ins->op == SM_RETURN) return emit_sm_return_dispatch(out, 0);
     return emit_sm_return_variant_dispatch(out, ins->op, 0, NULL);
@@ -2143,7 +2143,7 @@ static void edp4_label_then(FILE *out, void (*fn)(emitter_t *))
     fn(NULL);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_define_entry_dispatch(FILE *out, const SM_Instr *ins, int pc, const SM_Program *prog) {
+static int emit_sm_define_entry_dispatch(FILE *out, const SM_t *ins, int pc, const SM_sequence_t *prog) {
     (void)ins;
     const char *name = (pc > 0 && prog->instrs[pc-1].a[0].s) ? prog->instrs[pc-1].a[0].s : "";
     char anno[80]; snprintf(anno, sizeof(anno), "# %s", name);
@@ -2154,7 +2154,7 @@ static int emit_sm_define_entry_dispatch(FILE *out, const SM_Instr *ins, int pc,
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_define_dispatch(FILE *out, const SM_Instr *ins, int pc) {
+static int emit_sm_define_dispatch(FILE *out, const SM_t *ins, int pc) {
     (void)pc;
     const char *name = ins->a[0].s ? ins->a[0].s : "";
     char anno[80]; snprintf(anno, sizeof(anno), "# %s", name);
@@ -2205,11 +2205,11 @@ int  emit_sm_pat_alt_dispatch    (FILE *out, int pc)  { (void)pc; edp4_label_the
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int  emit_sm_pat_deref_dispatch  (FILE *out, int pc)  { (void)pc; edp4_label_then(out, emit_sm_pat_deref);    return 0; }
 /*------------------------------------------------------------------------------------------------------------------------------------*/
-/* Phase-2 simulator (EC-BB-UNIFY-2): builds IR_t* pattern trees from an SM_Instr window.                                              */
+/* Phase-2 simulator (EC-BB-UNIFY-2): builds BB_t* pattern trees from an SM_t window.                                              */
 /*                                                                                                                                     */
 /* The simulator walks the SM stream and mimics what the runtime stack would do — but instead of calling pat_* PATND_t constructors    */
-/* at compile time, it allocates IR_t nodes from an IR_block_t cfg. Each SimVal carries either a constant operand (string/int) or a    */
-/* pattern IR_t* — the same descriptor-tag distinction the runtime makes, just in compile-time IR_t space.                             */
+/* at compile time, it allocates BB_t nodes from an BB_graph_t cfg. Each SimVal carries either a constant operand (string/int) or a    */
+/* pattern BB_t* — the same descriptor-tag distinction the runtime makes, just in compile-time BB_t space.                             */
 /*                                                                                                                                     */
 /* The PATND_t world remains alive at runtime (pat_* in rt.c and snobol4_pattern.c are still @PLT-live from emitted asm); this conver- */
 /* sion removes the compile-time-only PATND_t path that fed emit_flat_build / emit_flat_eligible / emit_flat_invariant.                */
@@ -2217,7 +2217,7 @@ int  emit_sm_pat_deref_dispatch  (FILE *out, int pc)  { (void)pc; edp4_label_the
 #define PHASE2_SIM_DEPTH  128
 typedef struct {
     /* exactly one of these is set, governed by tag */
-    IR_t       * pat;       /* tag==SIMV_PAT: built IR pattern node                          */
+    BB_t       * pat;       /* tag==SIMV_PAT: built IR pattern node                          */
     const char * sval;      /* tag==SIMV_CS:  constant string operand                        */
     int64_t      ival;      /* tag==SIMV_CI:  constant int operand                           */
     enum { SIMV_PAT, SIMV_CS, SIMV_CI, SIMV_VARIANT } tag;
@@ -2242,7 +2242,7 @@ static SimVal simstack_pop(SimStack *ss)
     return v;
 }
 /*------------------------------------------------------------------------------------------------------------------------------------*/
-static SimVal simv_pat(IR_t *nd, int is_variant) {
+static SimVal simv_pat(BB_t *nd, int is_variant) {
     SimVal v; v.tag = SIMV_PAT; v.pat = nd; v.sval = NULL; v.ival = 0; v.is_variant = is_variant; return v;
 }
 /*------------------------------------------------------------------------------------------------------------------------------------*/
@@ -2259,14 +2259,14 @@ static SimVal simv_variant(void) {
 }
 /*------------------------------------------------------------------------------------------------------------------------------------*/
 /* Build a nullary IR pat node (LIT/ARB/REM/SPAN/.../FENCE/ABORT). */
-static IR_t * pat_node_alloc(IR_block_t *cfg, IR_e t) {
-    return IR_node_alloc(cfg, t);
+static BB_t * pat_node_alloc(BB_graph_t *cfg, BB_op_t t) {
+    return BB_node_alloc(cfg, t);
 }
 /*------------------------------------------------------------------------------------------------------------------------------------*/
-/* Attach n children to an IR_t* node, allocating the c[] array. */
-static void pat_set_children(IR_t *nd, IR_t **ch, int n) {
+/* Attach n children to an BB_t* node, allocating the c[] array. */
+static void pat_set_children(BB_t *nd, BB_t **ch, int n) {
     if (!nd || n <= 0) return;
-    nd->c = (IR_t **)calloc((size_t)n, sizeof(IR_t *));
+    nd->c = (BB_t **)calloc((size_t)n, sizeof(BB_t *));
     if (!nd->c) return;
     for (int i = 0; i < n; i++) nd->c[i] = ch[i];
     nd->n = n;
@@ -2274,8 +2274,8 @@ static void pat_set_children(IR_t *nd, IR_t **ch, int n) {
 /*------------------------------------------------------------------------------------------------------------------------------------*/
 /* Build a charset IR pat node: SPAN/BREAK/ANY/NOTANY take an sval (cset). If the popped arg isn't a constant string, the node still   */
 /* materialises with an empty sval — the variant-ness flag carries through so it's marked ineligible downstream.                       */
-static IR_t * pat_node_charset(IR_block_t *cfg, IR_e t, const SimVal *arg) {
-    IR_t *nd = IR_node_alloc(cfg, t);
+static BB_t * pat_node_charset(BB_graph_t *cfg, BB_op_t t, const SimVal *arg) {
+    BB_t *nd = BB_node_alloc(cfg, t);
     if (!nd) return NULL;
     nd->sval = (arg && arg->tag == SIMV_CS && arg->sval) ? arg->sval : "";
     return nd;
@@ -2283,51 +2283,51 @@ static IR_t * pat_node_charset(IR_block_t *cfg, IR_e t, const SimVal *arg) {
 /*------------------------------------------------------------------------------------------------------------------------------------*/
 /* Build an int-arg IR pat node: LEN/POS/RPOS/TAB/RTAB carry the int in ival. RPOS/RTAB use nd->n!=0 as the "reverse" flag (emit_bb.c  */
 /* line 901-904: `if (nd->n) emit_bb_xrpsi(...) else emit_bb_xposi(...)`). We set n=1 for RPOS/RTAB, n=0 for POS/TAB.                  */
-static IR_t * pat_node_intarg(IR_block_t *cfg, IR_e t, int reverse, const SimVal *arg) {
-    IR_t *nd = IR_node_alloc(cfg, t);
+static BB_t * pat_node_intarg(BB_graph_t *cfg, BB_op_t t, int reverse, const SimVal *arg) {
+    BB_t *nd = BB_node_alloc(cfg, t);
     if (!nd) return NULL;
     nd->ival = (arg && arg->tag == SIMV_CI) ? arg->ival : 0;
     nd->n    = reverse ? 1 : 0;  /* encodes RPOS/RTAB vs POS/TAB for emit_flat_ir */
     return nd;
 }
 /*------------------------------------------------------------------------------------------------------------------------------------*/
-/* Map XKIND-style kinds we never produce here (XNME/XFNME/XCALLCAP/XVAR) onto IR_e equivalents for the eligibility check:             */
-/*   XVAR     → has no IR_e analogue (walker never builds runtime-var-as-pattern); not produced.                                       */
-/*   XNME     → IR_PAT_ASSIGN_COND                                                                                                     */
-/*   XFNME    → IR_PAT_ASSIGN_IMM                                                                                                      */
-/*   XCALLCAP → IR_PAT_CALLOUT                                                                                                         */
-/* So the invariant rule "XNME/XFNME/XCALLCAP ⇒ ineligible" becomes "IR_PAT_ASSIGN_IMM/ASSIGN_COND/CALLOUT ⇒ ineligible".               */
-int emit_flat_eligible(const IR_t *nd)
+/* Map XKIND-style kinds we never produce here (XNME/XFNME/XCALLCAP/XVAR) onto BB_op_t equivalents for the eligibility check:             */
+/*   XVAR     → has no BB_op_t analogue (walker never builds runtime-var-as-pattern); not produced.                                       */
+/*   XNME     → BB_PAT_ASSIGN_COND                                                                                                     */
+/*   XFNME    → BB_PAT_ASSIGN_IMM                                                                                                      */
+/*   XCALLCAP → BB_PAT_CALLOUT                                                                                                         */
+/* So the invariant rule "XNME/XFNME/XCALLCAP ⇒ ineligible" becomes "BB_PAT_ASSIGN_IMM/ASSIGN_COND/CALLOUT ⇒ ineligible".               */
+int emit_flat_eligible(const BB_t *nd)
 {
     if (!nd) return 1;
     /* Old check was "kind != XVAR". The walker no longer constructs anything like XVAR (var_as_pattern is a runtime-only path), so    */
-    /* the IR_t version always returns 1. Kept as a hook for symmetry with the legacy API.                                             */
+    /* the BB_t version always returns 1. Kept as a hook for symmetry with the legacy API.                                             */
     return 1;
 }
 /*------------------------------------------------------------------------------------------------------------------------------------*/
-int emit_flat_invariant(const IR_t *nd)
+int emit_flat_invariant(const BB_t *nd)
 {
     if (!nd) return 1;
     if (!emit_flat_eligible(nd)) return 0;
-    if (nd->t == IR_PAT_CAT && nd->n > 2) return 0;
-    if (nd->t == IR_PAT_ASSIGN_IMM || nd->t == IR_PAT_ASSIGN_COND || nd->t == IR_PAT_CALLOUT) return 0;
+    if (nd->t == BB_PAT_CAT && nd->n > 2) return 0;
+    if (nd->t == BB_PAT_ASSIGN_IMM || nd->t == BB_PAT_ASSIGN_COND || nd->t == BB_PAT_CALLOUT) return 0;
     for (int i = 0; i < nd->n; i++)
         if (!emit_flat_invariant(nd->c[i])) return 0;
     return 1;
 }
 /*------------------------------------------------------------------------------------------------------------------------------------*/
-/* Build IR_t* pattern tree from an SM stream window. Returns the root IR node (NULL on empty window). cfg owns the lifetime of all    */
-/* allocated nodes. Caller is responsible for IR_free(cfg) when the window is no longer needed.                                        */
-IR_t * emit_walk_phase2(const SM_Program *prog,
+/* Build BB_t* pattern tree from an SM stream window. Returns the root IR node (NULL on empty window). cfg owns the lifetime of all    */
+/* allocated nodes. Caller is responsible for BB_free(cfg) when the window is no longer needed.                                        */
+BB_t * emit_walk_phase2(const SM_sequence_t *prog,
                          int phase2_start, int phase2_end,
-                         IR_block_t *cfg, int *out_variant)
+                         BB_graph_t *cfg, int *out_variant)
 {
     SimStack ss;
     simstack_init(&ss);
     int has_variant = 0;
     if (!cfg) { *out_variant = 1; return NULL; }
     for (int pc = phase2_start; pc < phase2_end; pc++) {
-        const SM_Instr *ins = &prog->instrs[pc];
+        const SM_t *ins = &prog->instrs[pc];
         switch (ins->op) {
         case SM_PUSH_LIT_S:
         case SM_PUSH_LIT_CS:
@@ -2341,113 +2341,113 @@ IR_t * emit_walk_phase2(const SM_Program *prog,
             has_variant = 1;
             break;
         case SM_PAT_EPS: {
-            /* IR has no IR_PAT_EPS; use NULL (emit_flat_ir treats NULL as xeps). */
+            /* IR has no BB_PAT_EPS; use NULL (emit_flat_ir treats NULL as xeps). */
             simstack_push(&ss, simv_pat(NULL, 0));
             break;
         }
         case SM_PAT_ARB: {
-            IR_t *nd = pat_node_alloc(cfg, IR_PAT_ARB);
+            BB_t *nd = pat_node_alloc(cfg, BB_PAT_ARB);
             simstack_push(&ss, simv_pat(nd, 0));
             break;
         }
         case SM_PAT_REM: {
-            IR_t *nd = pat_node_alloc(cfg, IR_PAT_REM);
+            BB_t *nd = pat_node_alloc(cfg, BB_PAT_REM);
             simstack_push(&ss, simv_pat(nd, 0));
             break;
         }
         case SM_PAT_FAIL:
         case SM_PAT_SUCCEED:
         case SM_PAT_BAL: {
-            /* No IR_PAT_FAIL/SUCCEED/BAL today; emit_flat_ir falls through default to jmp lbl_fail. Mark variant so the window is     */
+            /* No BB_PAT_FAIL/SUCCEED/BAL today; emit_flat_ir falls through default to jmp lbl_fail. Mark variant so the window is     */
             /* not selected as invariant — runtime path handles these correctly.                                                       */
             simstack_push(&ss, simv_variant());
             has_variant = 1;
             break;
         }
         case SM_PAT_ABORT: {
-            IR_t *nd = pat_node_alloc(cfg, IR_PAT_ABORT);
+            BB_t *nd = pat_node_alloc(cfg, BB_PAT_ABORT);
             simstack_push(&ss, simv_pat(nd, 0));
             break;
         }
         case SM_PAT_FENCE0: {
-            IR_t *nd = pat_node_alloc(cfg, IR_PAT_FENCE);
+            BB_t *nd = pat_node_alloc(cfg, BB_PAT_FENCE);
             simstack_push(&ss, simv_pat(nd, 0));
             break;
         }
         case SM_PAT_LIT: {
-            IR_t *nd = pat_node_alloc(cfg, IR_PAT_LIT);
+            BB_t *nd = pat_node_alloc(cfg, BB_PAT_LIT);
             nd->sval = ins->a[0].s ? ins->a[0].s : "";
             simstack_push(&ss, simv_pat(nd, 0));
             break;
         }
         case SM_PAT_SPAN: {
             SimVal arg = simstack_pop(&ss);
-            IR_t *nd = pat_node_charset(cfg, IR_PAT_SPAN, &arg);
+            BB_t *nd = pat_node_charset(cfg, BB_PAT_SPAN, &arg);
             simstack_push(&ss, simv_pat(nd, arg.is_variant));
             if (arg.is_variant) has_variant = 1;
             break;
         }
         case SM_PAT_BREAK: {
             SimVal arg = simstack_pop(&ss);
-            IR_t *nd = pat_node_charset(cfg, IR_PAT_BREAK, &arg);
+            BB_t *nd = pat_node_charset(cfg, BB_PAT_BREAK, &arg);
             simstack_push(&ss, simv_pat(nd, arg.is_variant));
             if (arg.is_variant) has_variant = 1;
             break;
         }
         case SM_PAT_ANY: {
             SimVal arg = simstack_pop(&ss);
-            IR_t *nd = pat_node_charset(cfg, IR_PAT_ANY, &arg);
+            BB_t *nd = pat_node_charset(cfg, BB_PAT_ANY, &arg);
             simstack_push(&ss, simv_pat(nd, arg.is_variant));
             if (arg.is_variant) has_variant = 1;
             break;
         }
         case SM_PAT_NOTANY: {
             SimVal arg = simstack_pop(&ss);
-            IR_t *nd = pat_node_charset(cfg, IR_PAT_NOTANY, &arg);
+            BB_t *nd = pat_node_charset(cfg, BB_PAT_NOTANY, &arg);
             simstack_push(&ss, simv_pat(nd, arg.is_variant));
             if (arg.is_variant) has_variant = 1;
             break;
         }
         case SM_PAT_LEN: {
             SimVal arg = simstack_pop(&ss);
-            IR_t *nd = pat_node_intarg(cfg, IR_PAT_LEN, 0, &arg);
+            BB_t *nd = pat_node_intarg(cfg, BB_PAT_LEN, 0, &arg);
             simstack_push(&ss, simv_pat(nd, arg.is_variant));
             if (arg.is_variant) has_variant = 1;
             break;
         }
         case SM_PAT_POS: {
             SimVal arg = simstack_pop(&ss);
-            IR_t *nd = pat_node_intarg(cfg, IR_PAT_POS, 0, &arg);
+            BB_t *nd = pat_node_intarg(cfg, BB_PAT_POS, 0, &arg);
             simstack_push(&ss, simv_pat(nd, arg.is_variant));
             if (arg.is_variant) has_variant = 1;
             break;
         }
         case SM_PAT_RPOS: {
             SimVal arg = simstack_pop(&ss);
-            IR_t *nd = pat_node_intarg(cfg, IR_PAT_POS, 1, &arg);  /* n=1 ⇒ rpos */
+            BB_t *nd = pat_node_intarg(cfg, BB_PAT_POS, 1, &arg);  /* n=1 ⇒ rpos */
             simstack_push(&ss, simv_pat(nd, arg.is_variant));
             if (arg.is_variant) has_variant = 1;
             break;
         }
         case SM_PAT_TAB: {
             SimVal arg = simstack_pop(&ss);
-            IR_t *nd = pat_node_intarg(cfg, IR_PAT_TAB, 0, &arg);
+            BB_t *nd = pat_node_intarg(cfg, BB_PAT_TAB, 0, &arg);
             simstack_push(&ss, simv_pat(nd, arg.is_variant));
             if (arg.is_variant) has_variant = 1;
             break;
         }
         case SM_PAT_RTAB: {
             SimVal arg = simstack_pop(&ss);
-            IR_t *nd = pat_node_intarg(cfg, IR_PAT_TAB, 1, &arg);  /* n=1 ⇒ rtab */
+            BB_t *nd = pat_node_intarg(cfg, BB_PAT_TAB, 1, &arg);  /* n=1 ⇒ rtab */
             simstack_push(&ss, simv_pat(nd, arg.is_variant));
             if (arg.is_variant) has_variant = 1;
             break;
         }
         case SM_PAT_ARBNO: {
             SimVal inner = simstack_pop(&ss);
-            IR_t *nd = pat_node_alloc(cfg, IR_PAT_ARBNO);
+            BB_t *nd = pat_node_alloc(cfg, BB_PAT_ARBNO);
             if (inner.tag == SIMV_PAT && inner.pat) {
-                IR_t *ch[1] = { inner.pat };
+                BB_t *ch[1] = { inner.pat };
                 pat_set_children(nd, ch, 1);
             }
             simstack_push(&ss, simv_pat(nd, inner.is_variant));
@@ -2456,9 +2456,9 @@ IR_t * emit_walk_phase2(const SM_Program *prog,
         }
         case SM_PAT_FENCE1: {
             SimVal inner = simstack_pop(&ss);
-            IR_t *nd = pat_node_alloc(cfg, IR_PAT_FENCE);
+            BB_t *nd = pat_node_alloc(cfg, BB_PAT_FENCE);
             if (inner.tag == SIMV_PAT && inner.pat) {
-                IR_t *ch[1] = { inner.pat };
+                BB_t *ch[1] = { inner.pat };
                 pat_set_children(nd, ch, 1);
             }
             simstack_push(&ss, simv_pat(nd, inner.is_variant));
@@ -2468,8 +2468,8 @@ IR_t * emit_walk_phase2(const SM_Program *prog,
         case SM_PAT_CAT: {
             SimVal right = simstack_pop(&ss);
             SimVal left  = simstack_pop(&ss);
-            IR_t *nd = pat_node_alloc(cfg, IR_PAT_CAT);
-            IR_t *ch[2] = {
+            BB_t *nd = pat_node_alloc(cfg, BB_PAT_CAT);
+            BB_t *ch[2] = {
                 (left.tag  == SIMV_PAT) ? left.pat  : NULL,
                 (right.tag == SIMV_PAT) ? right.pat : NULL
             };
@@ -2482,8 +2482,8 @@ IR_t * emit_walk_phase2(const SM_Program *prog,
         case SM_PAT_ALT: {
             SimVal right = simstack_pop(&ss);
             SimVal left  = simstack_pop(&ss);
-            IR_t *nd = pat_node_alloc(cfg, IR_PAT_ALT);
-            IR_t *ch[2] = {
+            BB_t *nd = pat_node_alloc(cfg, BB_PAT_ALT);
+            BB_t *ch[2] = {
                 (left.tag  == SIMV_PAT) ? left.pat  : NULL,
                 (right.tag == SIMV_PAT) ? right.pat : NULL
             };
@@ -2494,7 +2494,7 @@ IR_t * emit_walk_phase2(const SM_Program *prog,
             break;
         }
         case SM_PAT_DEREF: {
-            /* Indirect var-ref: no compile-time-eligible IR_e analogue. Mark variant. */
+            /* Indirect var-ref: no compile-time-eligible BB_op_t analogue. Mark variant. */
             (void)simstack_pop(&ss);
             simstack_push(&ss, simv_variant());
             has_variant = 1;
@@ -2510,10 +2510,10 @@ IR_t * emit_walk_phase2(const SM_Program *prog,
             SimVal child = simstack_pop(&ss);
             const char *vname = ins->a[0].s ? ins->a[0].s : "";
             int kind = (int)ins->a[1].i;
-            IR_t *nd = pat_node_alloc(cfg, (kind == 1) ? IR_PAT_ASSIGN_IMM : IR_PAT_ASSIGN_COND);
+            BB_t *nd = pat_node_alloc(cfg, (kind == 1) ? BB_PAT_ASSIGN_IMM : BB_PAT_ASSIGN_COND);
             nd->sval = vname;
             if (child.tag == SIMV_PAT && child.pat) {
-                IR_t *ch[1] = { child.pat };
+                BB_t *ch[1] = { child.pat };
                 pat_set_children(nd, ch, 1);
             }
             simstack_push(&ss, simv_pat(nd, child.is_variant));
@@ -2526,10 +2526,10 @@ IR_t * emit_walk_phase2(const SM_Program *prog,
         case SM_PAT_USERCALL_ARGS: {
             SimVal child = simstack_pop(&ss);
             const char *fname = ins->a[0].s ? ins->a[0].s : "";
-            IR_t *nd = pat_node_alloc(cfg, IR_PAT_CALLOUT);
+            BB_t *nd = pat_node_alloc(cfg, BB_PAT_CALLOUT);
             nd->sval = fname;
             if (child.tag == SIMV_PAT && child.pat) {
-                IR_t *ch[1] = { child.pat };
+                BB_t *ch[1] = { child.pat };
                 pat_set_children(nd, ch, 1);
             }
             simstack_push(&ss, simv_pat(nd, 1));
@@ -2556,8 +2556,8 @@ typedef struct {
     int           exec_stmt_pc;
     int           pat_id;
     int           is_invariant;
-    IR_t        * root;     /* compile-time pattern IR built by emit_walk_phase2 (NULL for empty windows) */
-    IR_block_t  * cfg;      /* arena owning root and any descendants                                       */
+    BB_t        * root;     /* compile-time pattern IR built by emit_walk_phase2 (NULL for empty windows) */
+    BB_graph_t  * cfg;      /* arena owning root and any descendants                                       */
 } pattern_window_t;
 static pattern_window_t g_pat_windows[MAX_PATTERN_WINDOWS];
 static int              g_pat_windows_n   = 0;
@@ -2568,7 +2568,7 @@ static void pattern_windows_reset(void)
     /* Release any cfgs from a prior codegen pass before zeroing the array. */
     for (int i = 0; i < g_pat_windows_n; i++) {
         if (g_pat_windows[i].cfg) {
-            IR_free(g_pat_windows[i].cfg);
+            BB_free(g_pat_windows[i].cfg);
             g_pat_windows[i].cfg = NULL;
         }
         g_pat_windows[i].root = NULL;
@@ -2597,13 +2597,13 @@ static int pattern_window_for_exec_stmt(int pc)
     return -1;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void pattern_windows_collect(const SM_Program *prog)
+static void pattern_windows_collect(const SM_sequence_t *prog)
 {
     pattern_windows_reset();
     pc_used_alloc(prog);
     int stmt_start = 0;
     for (int pc = 0; pc < prog->count; pc++) {
-        const SM_Instr *ins = &prog->instrs[pc];
+        const SM_t *ins = &prog->instrs[pc];
         switch (ins->op) {
         case SM_JUMP:
         case SM_JUMP_S:
@@ -2650,9 +2650,9 @@ static void pattern_windows_collect(const SM_Program *prog)
         /* Allocate a cfg sized for the worst-case node count of this window (each SM_PAT instruction emits at most one IR node). */
         int win_len = phase2_end - stmt_start;
         if (win_len < 1) win_len = 1;
-        IR_block_t *cfg = IR_alloc(win_len + 8, IR_LANG_SNO);
+        BB_graph_t *cfg = BB_alloc(win_len + 8, IR_LANG_SNO);
         int has_variant = 0;
-        IR_t *root = emit_walk_phase2(prog, stmt_start, phase2_end, cfg, &has_variant);
+        BB_t *root = emit_walk_phase2(prog, stmt_start, phase2_end, cfg, &has_variant);
         pattern_window_t *w = &g_pat_windows[g_pat_windows_n++];
         w->phase2_start = stmt_start;
         w->phase2_end   = phase2_end;
@@ -2681,7 +2681,7 @@ static int emit_pattern_blobs(FILE *out)
         if (!w->is_invariant) continue;
         char prefix[64];
         snprintf(prefix, sizeof(prefix), "pat_%d", w->pat_id);
-        IR_t *p = w->root;
+        BB_t *p = w->root;
         if (!p) { w->is_invariant = 0; continue; }
         if (emit_flat_build(p, out, prefix) != 0) {
             w->is_invariant = 0;
@@ -2694,7 +2694,7 @@ static int emit_pattern_blobs(FILE *out)
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_exec_stmt_blob(FILE *out, const SM_Instr *ins, int pc, int win_idx)
+static int emit_sm_exec_stmt_blob(FILE *out, const SM_t *ins, int pc, int win_idx)
 {
     pattern_window_t *w = &g_pat_windows[win_idx];
     const char *sname = ins->a[0].s;
@@ -2731,7 +2731,7 @@ static int emit_sm_exec_stmt_blob(FILE *out, const SM_Instr *ins, int pc, int wi
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_pat_baked(FILE *out, const SM_Instr *ins, int pc, int win_idx)
+static int emit_sm_pat_baked(FILE *out, const SM_t *ins, int pc, int win_idx)
 {
     pattern_window_t *w = &g_pat_windows[win_idx];
     const sm_op_template_t *t = sm_template_lookup(ins->op);
@@ -2767,7 +2767,7 @@ static const char *pat_arg_label(char *lbl_buf, size_t lbl_buf_n,
     return lbl_buf;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_pat_lit_dispatch(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_pat_lit_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     char lbl[64], anno[128];
@@ -2780,7 +2780,7 @@ static int emit_sm_pat_lit_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return emit_sm_lblopt(out, sm_template_lookup(SM_PAT_LIT), l, NULL);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_pat_refname_dispatch(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_pat_refname_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     char lbl[64], anno[128];
@@ -2793,7 +2793,7 @@ static int emit_sm_pat_refname_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return emit_sm_lblopt(out, sm_template_lookup(SM_PAT_REFNAME), l, NULL);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_pat_capture_dispatch(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_pat_capture_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     char lbl[64], anno[80];
@@ -2808,7 +2808,7 @@ static int emit_sm_pat_capture_dispatch(FILE *out, const SM_Instr *ins, int pc)
                                 l, kind, anno);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_pat_capture_fn_dispatch(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_pat_capture_fn_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     char fname_lbl[64], nl_lbl[64], anno[160];
@@ -2823,7 +2823,7 @@ static int emit_sm_pat_capture_fn_dispatch(FILE *out, const SM_Instr *ins, int p
                               fl, is_imm, nl, anno);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_pat_capture_fn_args_dispatch(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_pat_capture_fn_args_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     char fname_lbl[64], anno[128];
@@ -2837,7 +2837,7 @@ static int emit_sm_pat_capture_fn_args_dispatch(FILE *out, const SM_Instr *ins, 
                                    fl, is_imm, nargs, anno);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_pat_usercall_dispatch(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_pat_usercall_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     char lbl[64], anno[128];
@@ -2850,7 +2850,7 @@ static int emit_sm_pat_usercall_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return emit_sm_lblopt(out, sm_template_lookup(SM_PAT_USERCALL), l, NULL);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_pat_usercall_args_dispatch(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_pat_usercall_args_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     char lbl[64], anno[128];
@@ -2865,7 +2865,7 @@ static int emit_sm_pat_usercall_args_dispatch(FILE *out, const SM_Instr *ins, in
                                 l, nargs, NULL);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_exec_stmt_variant(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_exec_stmt_variant(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     const char *sname = ins->a[0].s;
@@ -2886,17 +2886,17 @@ static int emit_sm_exec_stmt_variant(FILE *out, const SM_Instr *ins, int pc)
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* EC-UNI-2d: public shims for non-uniform pat dispatchers + exec_stmt.
- * Each shim takes (FILE *out, const SM_Instr *ins) and calls its static
+ * Each shim takes (FILE *out, const SM_t *ins) and calls its static
  * dispatcher with pc=0 — pc is only used inside dispatchers as (void)pc.
  * Private types (sm_op_template_t, emit_sm_args_t, pat_arg_label) stay inside emit_sm.c. */
-int emit_sm_pat_lit_template            (FILE *out, const SM_Instr *ins) { return emit_sm_pat_lit_dispatch(out, ins, 0); }
-int emit_sm_pat_refname_template        (FILE *out, const SM_Instr *ins) { return emit_sm_pat_refname_dispatch(out, ins, 0); }
-int emit_sm_pat_capture_template        (FILE *out, const SM_Instr *ins) { return emit_sm_pat_capture_dispatch(out, ins, 0); }
-int emit_sm_pat_capture_fn_template     (FILE *out, const SM_Instr *ins) { return emit_sm_pat_capture_fn_dispatch(out, ins, 0); }
-int emit_sm_pat_capture_fn_args_template(FILE *out, const SM_Instr *ins) { return emit_sm_pat_capture_fn_args_dispatch(out, ins, 0); }
-int emit_sm_pat_usercall_template       (FILE *out, const SM_Instr *ins) { return emit_sm_pat_usercall_dispatch(out, ins, 0); }
-int emit_sm_pat_usercall_args_template  (FILE *out, const SM_Instr *ins) { return emit_sm_pat_usercall_args_dispatch(out, ins, 0); }
-int emit_sm_exec_stmt_template          (FILE *out, const SM_Instr *ins) { return emit_sm_exec_stmt_variant(out, ins, 0); }
+int emit_sm_pat_lit_template            (FILE *out, const SM_t *ins) { return emit_sm_pat_lit_dispatch(out, ins, 0); }
+int emit_sm_pat_refname_template        (FILE *out, const SM_t *ins) { return emit_sm_pat_refname_dispatch(out, ins, 0); }
+int emit_sm_pat_capture_template        (FILE *out, const SM_t *ins) { return emit_sm_pat_capture_dispatch(out, ins, 0); }
+int emit_sm_pat_capture_fn_template     (FILE *out, const SM_t *ins) { return emit_sm_pat_capture_fn_dispatch(out, ins, 0); }
+int emit_sm_pat_capture_fn_args_template(FILE *out, const SM_t *ins) { return emit_sm_pat_capture_fn_args_dispatch(out, ins, 0); }
+int emit_sm_pat_usercall_template       (FILE *out, const SM_t *ins) { return emit_sm_pat_usercall_dispatch(out, ins, 0); }
+int emit_sm_pat_usercall_args_template  (FILE *out, const SM_t *ins) { return emit_sm_pat_usercall_args_dispatch(out, ins, 0); }
+int emit_sm_exec_stmt_template          (FILE *out, const SM_t *ins) { return emit_sm_exec_stmt_variant(out, ins, 0); }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* EC-UNI-3: feature flag for unified-dispatch path. When 0 (default), emit_walk_codegen runs unchanged.
  * When 1, each opcode covered by an SM_template fn is routed through the template (which calls the same
@@ -2910,10 +2910,10 @@ static void emit_sm_uni_env_init(void) {
     if (v && *v && *v != '0') g_emit_use_unified_dispatch = 1;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* dispatch_one_x86 — try to handle one SM_Instr via the template path. Returns 0 on success, -1 if the
+/* dispatch_one_x86 — try to handle one SM_t via the template path. Returns 0 on success, -1 if the
  * opcode is not yet covered by templates (caller falls through to the legacy switch). Mode must be EMIT_TEXT.
  * Only the 52 opcodes across the 5 SM_template files are covered today. */
-static int dispatch_one_x86(FILE *out, const SM_Instr *ins, int pc) {
+static int dispatch_one_x86(FILE *out, const SM_t *ins, int pc) {
     /* Templates dispatch on IS_X86; make sure mode is set. Legacy path relies on individual
      * dispatchers calling emitter_init_text — we have to ensure it for the very first opcode too. */
     emit_mode_set(TEXT_MODE(), out);
@@ -2991,7 +2991,7 @@ static int dispatch_one_x86(FILE *out, const SM_Instr *ins, int pc) {
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int edp4_sm_unhandled(FILE *out, const SM_Instr *ins, int pc)
+static int edp4_sm_unhandled(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     char anno[64];
@@ -3002,7 +3002,7 @@ static int edp4_sm_unhandled(FILE *out, const SM_Instr *ins, int pc)
     return emit_sm_template(out, sm_template_unhandled(), &a);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int emit_walk_codegen(SM_Program *prog, FILE *out, const char *src_path)
+int emit_walk_codegen(SM_sequence_t *prog, FILE *out, const char *src_path)
 {
     assert(prog != NULL);
     assert(out  != NULL);
@@ -3036,7 +3036,7 @@ int emit_walk_codegen(SM_Program *prog, FILE *out, const char *src_path)
         return -1;
     }
     for (int pc = 0; pc < prog->count; pc++) {
-        const SM_Instr *ins = &prog->instrs[pc];
+        const SM_t *ins = &prog->instrs[pc];
         {
             const char *leftover = emit_sm_consume_pc_label();
             if (leftover && *leftover)

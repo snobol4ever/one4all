@@ -2,7 +2,7 @@
 #define SM_INTERP_H
 #include <stdlib.h>
 #include <setjmp.h>
-#include "sm_prog.h"
+#include "SM.h"
 #include "snobol4.h"
 /*================================================================================================================================================================================*/
 #define SM_CALL_STACK_MAX 256
@@ -49,9 +49,9 @@ typedef struct {
     int          call_depth;
 } SM_State;
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int  sm_interp_run        (SM_Program * prog, SM_State * st);
-int  sm_interp_run_inner  (SM_Program * prog, SM_State * st);
-int  sm_interp_run_steps  (SM_Program * prog, SM_State * st, int n);
+int  sm_interp_run        (SM_sequence_t * prog, SM_State * st);
+int  sm_interp_run_inner  (SM_sequence_t * prog, SM_State * st);
+int  sm_interp_run_steps  (SM_sequence_t * prog, SM_State * st, int n);
 void sm_state_init        (SM_State * st);
 void sm_push              (SM_State * st, DESCR_t d);
 DESCR_t sm_pop            (SM_State * st);

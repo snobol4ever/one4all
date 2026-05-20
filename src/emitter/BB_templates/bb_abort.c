@@ -1,6 +1,6 @@
 #include "bb_template_common.h"
 
-void bb_abort(IR_t * nd, FILE * out) {
+void bb_abort(BB_t * nd, FILE * out) {
     int nid = ir_node_id(nd); int sid = 0;
     if (IS_JVM) {
         jvm_class_hdr(out, "abort");

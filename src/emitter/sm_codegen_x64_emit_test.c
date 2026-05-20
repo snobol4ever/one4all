@@ -1,10 +1,10 @@
-#include "sm_prog.h"
+#include "SM.h"
 #include "emit_sm.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_to(const char *path, SM_Program *p)
+static int emit_to(const char *path, SM_sequence_t *p)
 {
     FILE *out = fopen(path, "w");
     if (!out) { perror(path); return 1; }
@@ -188,12 +188,12 @@ int main(int argc, char **argv)
         return 2;
     }
     {
-        SM_Program *p = sm_prog_new();
-        if (!p) { fprintf(stderr, "sm_prog_new failed\n"); return 1; }
-        sm_emit_i(p, SM_PUSH_LIT_I, 42);
-        sm_emit(p, SM_HALT);
+        SM_sequence_t *p = SM_seq_new();
+        if (!p) { fprintf(stderr, "SM_seq_new failed\n"); return 1; }
+        SM_emit_i(p, SM_PUSH_LIT_I, 42);
+        SM_emit(p, SM_HALT);
         int rc = emit_to(argv[1], p);
-        sm_prog_free(p);
+        SM_seq_free(p);
         if (rc != 0) {
             fprintf(stderr, "sm_codegen_x64_emit failed for EM-2 program\n");
             return 1;
@@ -201,16 +201,16 @@ int main(int argc, char **argv)
     }
     if (argc < 3) return 0;
     {
-        SM_Program *p = sm_prog_new();
-        if (!p) { fprintf(stderr, "sm_prog_new failed\n"); return 1; }
-        sm_emit_i(p, SM_PUSH_LIT_I, 2);
-        sm_emit_i(p, SM_PUSH_LIT_I, 3);
-        sm_emit(p,  SM_ADD);
-        sm_emit_i(p, SM_PUSH_LIT_I, 4);
-        sm_emit(p,  SM_MUL);
-        sm_emit(p,  SM_HALT);
+        SM_sequence_t *p = SM_seq_new();
+        if (!p) { fprintf(stderr, "SM_seq_new failed\n"); return 1; }
+        SM_emit_i(p, SM_PUSH_LIT_I, 2);
+        SM_emit_i(p, SM_PUSH_LIT_I, 3);
+        SM_emit(p,  SM_ADD);
+        SM_emit_i(p, SM_PUSH_LIT_I, 4);
+        SM_emit(p,  SM_MUL);
+        SM_emit(p,  SM_HALT);
         int rc = emit_to(argv[2], p);
-        sm_prog_free(p);
+        SM_seq_free(p);
         if (rc != 0) {
             fprintf(stderr, "sm_codegen_x64_emit failed for EM-3 program\n");
             return 1;
@@ -218,28 +218,28 @@ int main(int argc, char **argv)
     }
     if (argc < 4) return 0;
     {
-        SM_Program *p = sm_prog_new();
-        if (!p) { fprintf(stderr, "sm_prog_new failed\n"); return 1; }
-        sm_emit_i(p, SM_PUSH_LIT_I, 100);
-        int j_skip = sm_emit_i(p, SM_JUMP, 0);
-        sm_emit_i(p, SM_PUSH_LIT_I, 99);
-        sm_emit(p,   SM_HALT);
-        int L_skip = sm_label(p);
-        sm_emit_i(p, SM_PUSH_LIT_I, -58);
-        sm_emit(p,   SM_ADD);
-        int j_dead = sm_emit_i(p, SM_JUMP_F, 0);
-        int j_final= sm_emit_i(p, SM_JUMP_S, 0);
-        sm_emit_i(p, SM_PUSH_LIT_I, 77);
-        sm_emit(p,   SM_HALT);
-        int L_dead = sm_label(p);
-        sm_emit(p,   SM_HALT);
-        int L_final= sm_label(p);
-        sm_emit(p,   SM_HALT);
-        sm_patch_jump(p, j_skip,  L_skip);
-        sm_patch_jump(p, j_dead,  L_dead);
-        sm_patch_jump(p, j_final, L_final);
+        SM_sequence_t *p = SM_seq_new();
+        if (!p) { fprintf(stderr, "SM_seq_new failed\n"); return 1; }
+        SM_emit_i(p, SM_PUSH_LIT_I, 100);
+        int j_skip = SM_emit_i(p, SM_JUMP, 0);
+        SM_emit_i(p, SM_PUSH_LIT_I, 99);
+        SM_emit(p,   SM_HALT);
+        int L_skip = SM_label(p);
+        SM_emit_i(p, SM_PUSH_LIT_I, -58);
+        SM_emit(p,   SM_ADD);
+        int j_dead = SM_emit_i(p, SM_JUMP_F, 0);
+        int j_final= SM_emit_i(p, SM_JUMP_S, 0);
+        SM_emit_i(p, SM_PUSH_LIT_I, 77);
+        SM_emit(p,   SM_HALT);
+        int L_dead = SM_label(p);
+        SM_emit(p,   SM_HALT);
+        int L_final= SM_label(p);
+        SM_emit(p,   SM_HALT);
+        SM_patch_jump(p, j_skip,  L_skip);
+        SM_patch_jump(p, j_dead,  L_dead);
+        SM_patch_jump(p, j_final, L_final);
         int rc = emit_to(argv[3], p);
-        sm_prog_free(p);
+        SM_seq_free(p);
         if (rc != 0) {
             fprintf(stderr, "sm_codegen_x64_emit failed for EM-4a program\n");
             return 1;
@@ -247,17 +247,17 @@ int main(int argc, char **argv)
     }
     if (argc < 5) return 0;
     {
-        SM_Program *p = sm_prog_new();
-        if (!p) { fprintf(stderr, "sm_prog_new failed\n"); return 1; }
-        sm_emit_i(p, SM_PUSH_LIT_I, 3);
-        int L_top = sm_label(p);
-        sm_emit_i(p, SM_PUSH_LIT_I, 1);
-        sm_emit(p,   SM_SUB);
-        int j_back = sm_emit_i(p, SM_JUMP_F, 0);
-        sm_emit(p,   SM_HALT);
-        sm_patch_jump(p, j_back, L_top);
+        SM_sequence_t *p = SM_seq_new();
+        if (!p) { fprintf(stderr, "SM_seq_new failed\n"); return 1; }
+        SM_emit_i(p, SM_PUSH_LIT_I, 3);
+        int L_top = SM_label(p);
+        SM_emit_i(p, SM_PUSH_LIT_I, 1);
+        SM_emit(p,   SM_SUB);
+        int j_back = SM_emit_i(p, SM_JUMP_F, 0);
+        SM_emit(p,   SM_HALT);
+        SM_patch_jump(p, j_back, L_top);
         int rc = emit_to(argv[4], p);
-        sm_prog_free(p);
+        SM_seq_free(p);
         if (rc != 0) {
             fprintf(stderr, "sm_codegen_x64_emit failed for EM-4b program\n");
             return 1;
@@ -265,25 +265,25 @@ int main(int argc, char **argv)
     }
     if (argc < 6) return 0;
     {
-        SM_Program *p = sm_prog_new();
-        if (!p) { fprintf(stderr, "sm_prog_new failed\n"); return 1; }
-        sm_emit_i(p, SM_PUSH_LIT_I, 0);
-        sm_emit(p,   SM_VOID_POP);
-        int j_main = sm_emit_i(p, SM_JUMP, 0);
-        int L_b    = sm_label(p);
-        sm_emit_i(p, SM_PUSH_LIT_I, 7);
-        sm_emit(p,   SM_RETURN);
-        int L_a    = sm_label(p);
-        sm_emit_ii(p, SM_CALL_EXPRESSION, (int64_t)L_b, 0);
-        sm_emit_i(p, SM_PUSH_LIT_I, 6);
-        sm_emit(p,   SM_ADD);
-        sm_emit(p,   SM_RETURN);
-        int L_main = sm_label(p);
-        sm_emit_ii(p, SM_CALL_EXPRESSION, (int64_t)L_a, 0);
-        sm_emit(p,   SM_HALT);
-        sm_patch_jump(p, j_main, L_main);
+        SM_sequence_t *p = SM_seq_new();
+        if (!p) { fprintf(stderr, "SM_seq_new failed\n"); return 1; }
+        SM_emit_i(p, SM_PUSH_LIT_I, 0);
+        SM_emit(p,   SM_VOID_POP);
+        int j_main = SM_emit_i(p, SM_JUMP, 0);
+        int L_b    = SM_label(p);
+        SM_emit_i(p, SM_PUSH_LIT_I, 7);
+        SM_emit(p,   SM_RETURN);
+        int L_a    = SM_label(p);
+        SM_emit_ii(p, SM_CALL_EXPRESSION, (int64_t)L_b, 0);
+        SM_emit_i(p, SM_PUSH_LIT_I, 6);
+        SM_emit(p,   SM_ADD);
+        SM_emit(p,   SM_RETURN);
+        int L_main = SM_label(p);
+        SM_emit_ii(p, SM_CALL_EXPRESSION, (int64_t)L_a, 0);
+        SM_emit(p,   SM_HALT);
+        SM_patch_jump(p, j_main, L_main);
         int rc = emit_to(argv[5], p);
-        sm_prog_free(p);
+        SM_seq_free(p);
         if (rc != 0) {
             fprintf(stderr, "sm_codegen_x64_emit failed for EM-5 program\n");
             return 1;
@@ -291,14 +291,14 @@ int main(int argc, char **argv)
     }
     if (argc < 7) return 0;
     {
-        SM_Program *p = sm_prog_new();
-        if (!p) { fprintf(stderr, "sm_prog_new failed\n"); return 1; }
-        sm_emit_ii(p, SM_PUSH_EXPRESSION, 99, 2);
-        sm_emit(p,   SM_VOID_POP);
-        sm_emit_i(p, SM_PUSH_LIT_I, 21);
-        sm_emit(p,   SM_HALT);
+        SM_sequence_t *p = SM_seq_new();
+        if (!p) { fprintf(stderr, "SM_seq_new failed\n"); return 1; }
+        SM_emit_ii(p, SM_PUSH_EXPRESSION, 99, 2);
+        SM_emit(p,   SM_VOID_POP);
+        SM_emit_i(p, SM_PUSH_LIT_I, 21);
+        SM_emit(p,   SM_HALT);
         int rc = emit_to(argv[6], p);
-        sm_prog_free(p);
+        SM_seq_free(p);
         if (rc != 0) {
             fprintf(stderr, "sm_codegen_x64_emit failed for EM-5b program\n");
             return 1;

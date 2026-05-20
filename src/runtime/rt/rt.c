@@ -7,7 +7,7 @@
 #include "../../processor/bb_pool.h"
 #include "bb_build.h"
 #include "../../ast/ast.h"                  /* TT_EQ/TT_NE/TT_LT/TT_LE/TT_GT/TT_GE/TT_L* for rt_acomp/rt_lcomp */
-#include "../../include/sm_prog.h"          /* SM_EXP for rt_exp delegation to shared_arith */
+#include "../../include/SM.h"          /* SM_EXP for rt_exp delegation to shared_arith */
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -212,11 +212,11 @@ void rt_register_expressions(const rt_expression_entry *tbl)
 /* plus a .Lpl_registry table (name, arity, builder_fn). Right after rt_register_expressions, main calls          */
 /* rt_register_predicates_pl(.Lpl_registry) — that helper invokes each builder, which calls back into             */
 /* rt_pl_b_begin / rt_pl_b_node / rt_pl_b_kids / rt_pl_b_entry / rt_pl_b_end_register to reconstruct the          */
-/* IR_block_t graph and hand it off to pl_dcg_register. Once registered, rt_pl_once finds the predicate.         */
-#include "../../include/IR.h"
+/* BB_graph_t graph and hand it off to pl_dcg_register. Once registered, rt_pl_once finds the predicate.         */
+#include "../../include/BB.h"
 #include "../interp/pl_runtime.h"
-static IR_block_t * g_pl_b_cfg     = NULL;
-static IR_t      ** g_pl_b_nodes   = NULL;
+static BB_graph_t * g_pl_b_cfg     = NULL;
+static BB_t      ** g_pl_b_nodes   = NULL;
 static int          g_pl_b_node_n  = 0;
 static int          g_pl_b_max     = 0;
 static int          g_pl_b_entry_i = -1;
@@ -232,8 +232,8 @@ void rt_register_predicates_pl(const rt_predicate_entry_t *tbl)
 void rt_pl_b_begin(int max_nodes)
 {
     if (max_nodes <= 0) max_nodes = 1;
-    g_pl_b_cfg     = IR_alloc(max_nodes, IR_LANG_PL);
-    g_pl_b_nodes   = (IR_t **)calloc((size_t)max_nodes, sizeof(IR_t *));
+    g_pl_b_cfg     = BB_alloc(max_nodes, IR_LANG_PL);
+    g_pl_b_nodes   = (BB_t **)calloc((size_t)max_nodes, sizeof(BB_t *));
     g_pl_b_node_n  = 0;
     g_pl_b_max     = max_nodes;
     g_pl_b_entry_i = -1;
@@ -242,7 +242,7 @@ void rt_pl_b_begin(int max_nodes)
 int rt_pl_b_node(int kind, int64_t ival, const char *sval, int64_t ival2)
 {
     if (!g_pl_b_cfg || g_pl_b_node_n >= g_pl_b_max) return -1;
-    IR_t *nd = IR_node_alloc(g_pl_b_cfg, (IR_e)kind);
+    BB_t *nd = BB_node_alloc(g_pl_b_cfg, (BB_op_t)kind);
     if (!nd) return -1;
     if (sval) nd->sval = sval;
     else      nd->ival = ival;
@@ -255,9 +255,9 @@ int rt_pl_b_node(int kind, int64_t ival, const char *sval, int64_t ival2)
 void rt_pl_b_kids(int node_idx, const int *kid_idxs, int n)
 {
     if (node_idx < 0 || node_idx >= g_pl_b_node_n || n <= 0 || !kid_idxs) return;
-    IR_t *parent = g_pl_b_nodes[node_idx];
+    BB_t *parent = g_pl_b_nodes[node_idx];
     if (!parent) return;
-    IR_t **kids = (IR_t **)calloc((size_t)n, sizeof(IR_t *));
+    BB_t **kids = (BB_t **)calloc((size_t)n, sizeof(BB_t *));
     if (!kids) return;
     for (int i = 0; i < n; i++) {
         int ki = kid_idxs[i];
@@ -861,11 +861,11 @@ void rt_unhandled_sm(int op)
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* rt_pl_once — Mode 4 wired runtime helper for SM_BB_ONCE_PROC (IJ-HELLO-4b 2026-05-18).                                */
-/* Same name+arity lookup as the deleted rt_bb_once_proc, but calls IR_exec_once on the predicate's IR_block_t directly  */
-/* instead of routing through bb_broker.  The IR_block_t walker (src/lower/ir_exec.c) is the permitted infrastructure   */
+/* Same name+arity lookup as the deleted rt_bb_once_proc, but calls bb_exec_once on the predicate's BB_graph_t directly  */
+/* instead of routing through bb_broker.  The BB_graph_t walker (src/lower/ir_exec.c) is the permitted infrastructure   */
 /* DCG driver — it is to Prolog what ir_exec.c's IR walker is to Icon: a four-port-aware tree executor that does NOT   */
 /* walk tree_t* AST nodes.  Eliminating the bb_broker call from this path breaks the brokered-import chain in the      */
-/* emitted binary: `nm hello.bin | grep ' U bb_broker'` returns empty.  The IR_block_t graph itself is still            */
+/* emitted binary: `nm hello.bin | grep ' U bb_broker'` returns empty.  The BB_graph_t graph itself is still            */
 /* constructed at startup via rt_register_predicates_pl + rt_pl_b_* builder API — that machinery is unchanged.          */
 /* Env push/pop semantics mirror the deleted rt_bb_once_proc exactly.                                                    */
 #include "../interp/pl_runtime.h"
@@ -879,7 +879,7 @@ void rt_pl_once(const char *name, int arity)
     if (bb && bb->ir_body) {
         Term **saved_env = g_pl_env;
         pl_bb_env_push(16);
-        (void)IR_exec_once(bb->ir_body);
+        (void)bb_exec_once(bb->ir_body);
         pl_bb_env_pop(saved_env);
     } else {
         fprintf(stderr, "[NO-AST] SM_BB_ONCE_PROC stub: needs fresh SM/BB lowering\n");
@@ -1125,7 +1125,7 @@ int rt_do_nreturn(const char *fname, int cond)
     return g_native_chunk_depth > 0 ? 2 : 1;
 }
 #include "sm_interp.h"
-#include "sm_prog.h"
+#include "SM.h"
 __attribute__((weak)) DESCR_t sm_call_expression(int entry_pc)
 {
     fprintf(stderr,
@@ -1133,7 +1133,7 @@ __attribute__((weak)) DESCR_t sm_call_expression(int entry_pc)
         "not yet wired in EM-6.  Add to EM-10 scope.\n", entry_pc);
     abort();
 }
-__attribute__((weak)) const char *sm_opcode_name(sm_opcode_t op)
+__attribute__((weak)) const char *sm_opcode_name(SM_op_t op)
 {
     (void)op;
     return "?";

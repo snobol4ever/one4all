@@ -4,17 +4,17 @@
 #include "bb_pool.h"
 #include "snobol4.h"
 #include "bb_box.h"
-#include "IR.h"
+#include "BB.h"
 #include <stdio.h>
 /*---- flat-glob builder API -----------------------------------------------*/
-bb_box_fn bb_build_flat    (IR_t * nd);
-bb_box_fn bb_build_brokered(IR_t * nd);
-int  emit_flat_build        (IR_t * nd, FILE * out, const char * prefix);
+bb_box_fn bb_build_flat    (BB_t * nd);
+bb_box_fn bb_build_brokered(BB_t * nd);
+int  emit_flat_build        (BB_t * nd, FILE * out, const char * prefix);
 void emit_flat_set_intern_str(const char * (*fn)(const char *));
 void emit_flat_reset        (void);
 int  emit_bb_macro_library_to_path(const char * path);
 void emit_flat_set_cap_fixup(void (*cb)(void * cap_ptr, const char * child_alpha_label));
-void emit_bb_register_child_label(IR_t * nd, const char * alpha_label);
+void emit_bb_register_child_label(BB_t * nd, const char * alpha_label);
 void emit_flat_banner_rule  (char ch);
 extern int g_flat_node_id;
 /*---- section / data emitters ---------------------------------------------*/

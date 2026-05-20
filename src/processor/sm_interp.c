@@ -1,5 +1,5 @@
 #include "sm_interp.h"
-#include "sm_prog.h"
+#include "SM.h"
 #include "coerce.h"
 #include "ir_exec.h"
 #include <stdio.h>
@@ -185,7 +185,7 @@ static void nv_fold_set(const char *raw, DESCR_t val) {
     NV_SET_fn(n, val);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_interp_run(SM_Program *prog, SM_State *st)
+int sm_interp_run(SM_sequence_t *prog, SM_State *st)
 {
     int was_active = g_sm_dispatch_active;
     g_sm_dispatch_active = 1;
@@ -194,10 +194,10 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
     return _rc;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_interp_run_inner(SM_Program *prog, SM_State *st)
+int sm_interp_run_inner(SM_sequence_t *prog, SM_State *st)
 {
     while (st->pc < prog->count) {
-        SM_Instr *ins = &prog->instrs[st->pc];
+        SM_t *ins = &prog->instrs[st->pc];
         st->pc++;
         switch (ins->op) {
         case SM_LABEL:
@@ -615,7 +615,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             DESCR_t subj_d = sm_pop(st);
             DESCR_t pat_d  = sm_pop(st);
             const char *sname = ins->a[0].s;
-            IR_block_t *pat_dcg = (int)ins->a[2].i >= 0 ? g_current_sm_prog->dcg_table[(int)ins->a[2].i] : NULL;
+            BB_graph_t *pat_dcg = (int)ins->a[2].i >= 0 ? g_current_SM_seq->dcg_table[(int)ins->a[2].i] : NULL;
             int ok;
             if (pat_dcg) {
                 ok = IR_exec_pat(pat_dcg, sname, &subj_d,
@@ -654,7 +654,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 extern Term **g_pl_env;
                 Term **saved_env = g_pl_env;
                 pl_bb_env_push(16);
-                int ok = bb_broker(node, BB_ONCE, NULL, NULL);
+                int ok = bb_broker(node, bb_once, NULL, NULL);
                 pl_bb_env_pop(saved_env);
                 st->last_ok = (ok > 0);
             } else {
@@ -679,7 +679,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             }
             g_ast_pump_active++;
             { extern int g_lang; int saved_lang = g_lang; g_lang = LANG_ICN;
-            int ticks = bb_broker(node, BB_PUMP, pump_print, NULL);
+            int ticks = bb_broker(node, bb_pump, pump_print, NULL);
             g_lang = saved_lang;
             g_ast_pump_active--;
             st->last_ok = (ticks > 0); }
@@ -764,10 +764,10 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             break;
         }
         case SM_EXEC_BB: {
-            IR_block_t * cfg = g_current_sm_prog->dcg_table[(int)ins->a[0].i];
+            BB_graph_t * cfg = g_current_SM_seq->dcg_table[(int)ins->a[0].i];
             DESCR_t _val;
             if (!cfg) { _val = FAILDESCR; }
-            else if (ins->a[1].i == 0) { ins->a[1].i = 1; _val = IR_exec_once(cfg); }
+            else if (ins->a[1].i == 0) { ins->a[1].i = 1; _val = bb_exec_once(cfg); }
             else                        { _val = IR_exec_resume(cfg); }
             if (IS_FAIL_fn(_val)) ins->a[1].i = 0;
             st->last_ok = !IS_FAIL_fn(_val);
@@ -775,8 +775,8 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             break;
         }
         case SM_PUMP_BB: {
-            IR_block_t * cfg = g_current_sm_prog->dcg_table[(int)ins->a[0].i];
-            int _ticks = cfg ? IR_exec_pump(cfg, NULL, NULL) : 0;
+            BB_graph_t * cfg = g_current_SM_seq->dcg_table[(int)ins->a[0].i];
+            int _ticks = cfg ? bb_exec_pump(cfg, NULL, NULL) : 0;
             st->last_ok = (_ticks > 0);
             sm_push(st, INTVAL(_ticks));
             break;
@@ -1318,7 +1318,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                     }
                 }
             }
-            if (name && g_current_sm_prog) {
+            if (name && g_current_SM_seq) {
                 extern int proc_count;
                 extern IcnProcEntry proc_table[];
                 for (int _pi = 0; _pi < proc_count; _pi++) {
@@ -1345,17 +1345,17 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             if (result.v == DT_FAIL || (!_data_first && !_data_set)) {
                 int body_pc = -1;
                 if (!_data_first && !_data_set && name) {
-                    body_pc = sm_label_pc_lookup(prog, name);
+                    body_pc = SM_label_pc_lookup(prog, name);
                     if (body_pc < 0) {
                         char uname[128]; size_t nl = strlen(name);
                         if (nl >= sizeof(uname)) nl = sizeof(uname)-1;
                         for (size_t _i = 0; _i <= nl; _i++)
                             uname[_i] = (char)toupper((unsigned char)name[_i]);
-                        body_pc = sm_label_pc_lookup(prog, uname);
+                        body_pc = SM_label_pc_lookup(prog, uname);
                     }
                     if (body_pc < 0) {
                         const char *entry = FUNC_ENTRY_fn(name);
-                        if (entry) body_pc = sm_label_pc_lookup(prog, entry);
+                        if (entry) body_pc = SM_label_pc_lookup(prog, entry);
                     }
                 }
                 if (body_pc >= 0 && st->call_depth < SM_CALL_STACK_MAX) {
@@ -1652,7 +1652,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_interp_run_steps(SM_Program *prog, SM_State *st, int n) {
+int sm_interp_run_steps(SM_sequence_t *prog, SM_State *st, int n) {
     g_sm_step_limit = n;
     g_sm_steps_done = 0;
     int rc = 0;
@@ -1669,7 +1669,7 @@ extern jmp_buf     g_sno_err_jmp;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t sm_call_expression(int entry_pc)
 {
-    SM_Program *prog = g_current_sm_prog;
+    SM_sequence_t *prog = g_current_SM_seq;
     if (!prog || entry_pc < 0 || entry_pc >= prog->count) {
         fprintf(stderr, "sm_call_expression: invalid entry_pc %d\n", entry_pc);
         return FAILDESCR;
@@ -1717,7 +1717,7 @@ GeneratorState *generator_state_new_proc(int pi, DESCR_t *args, int nargs)
 {
     if (pi < 0 || pi >= proc_count) return NULL;
     int entry_pc = proc_table[pi].entry_pc;
-    if (entry_pc < 0 || !g_current_sm_prog) return NULL;
+    if (entry_pc < 0 || !g_current_SM_seq) return NULL;
     if (frame_depth >= FRAME_STACK_MAX) return NULL;
     IcnFrame *f = &frame_stack[frame_depth++];
     memset(f, 0, sizeof *f);
@@ -1746,7 +1746,7 @@ GeneratorState *generator_state_new_proc(int pi, DESCR_t *args, int nargs)
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int bb_broker_drive_sm(GeneratorState *gs, void (*body_fn)(DESCR_t val, void *arg), void *arg)
 {
-    SM_Program *prog = g_current_sm_prog;
+    SM_sequence_t *prog = g_current_SM_seq;
     if (!prog || !gs || gs->started == 2) return 0;
     int ticks = 0;
     for (;;) {
@@ -1780,7 +1780,7 @@ int bb_broker_drive_sm(GeneratorState *gs, void (*body_fn)(DESCR_t val, void *ar
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int bb_broker_drive_sm_one(GeneratorState *gs, DESCR_t *out)
 {
-    SM_Program *prog = g_current_sm_prog;
+    SM_sequence_t *prog = g_current_SM_seq;
     if (!prog || !gs || gs->started == 2) { *out = FAILDESCR; return 0; }
     if (gs->saved_frame_depth > 0) frame_depth = gs->saved_frame_depth;
     SM_State *st = GC_malloc(sizeof(SM_State));

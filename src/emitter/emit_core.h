@@ -5,7 +5,7 @@
 #define TEXT_MODE_DEFINITION  1
 #include "bb_pool.h"
 #include "x86_opcodes.h"
-#include "IR.h"
+#include "BB.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -192,85 +192,85 @@ void bb_insn_mov_rax_mem_rcx  (void);              void bb_insn_movsxd_rcx_r10me
 void bb_insn_lea_rax_rax_rcx  (void);              void bb_insn_mov_rdi_rax      (void);
 void bb_insn_add_eax_imm32    (uint32_t v);        void bb_insn_cmp_eax_mem_rcx  (void);
 /*--- EC unified BB node emitter (EC-2+) ------------------------------------*/
-struct IR_t;
-int emit_bb_node(struct IR_t * nd, FILE * out);
+struct BB_t;
+int emit_bb_node(struct BB_t * nd, FILE * out);
 /*--- EC-3 JVM scalar helpers (promoted from static in emit_jvm.c) ----------*/
 void jvm_push_int2(FILE * out, long v);
 void jvm_emit_ldc_string(FILE * out, const char * s);
 /*--- EC-3 SM push/pop literal templates (SM_templates/sm_push_pop_lits.c) --*/
-#include "sm_prog.h"
-void sm_push_lit_i(const SM_Instr * instr, FILE * out);
-void sm_push_lit_s(const SM_Instr * instr, FILE * out);
-void sm_push_lit_f(const SM_Instr * instr, FILE * out);
-void sm_push_null (const SM_Instr * instr, FILE * out);
-void sm_void_pop  (const SM_Instr * instr, FILE * out);
-void sm_push_var  (const SM_Instr * instr, FILE * out);
-void sm_store_var (const SM_Instr * instr, FILE * out);
+#include "SM.h"
+void sm_push_lit_i(const SM_t * instr, FILE * out);
+void sm_push_lit_s(const SM_t * instr, FILE * out);
+void sm_push_lit_f(const SM_t * instr, FILE * out);
+void sm_push_null (const SM_t * instr, FILE * out);
+void sm_void_pop  (const SM_t * instr, FILE * out);
+void sm_push_var  (const SM_t * instr, FILE * out);
+void sm_store_var (const SM_t * instr, FILE * out);
 /*--- EC-3 SM arithmetic templates (SM_templates/sm_arith.c) ----------------*/
-void sm_concat    (const SM_Instr * instr, FILE * out);
-void sm_neg       (const SM_Instr * instr, FILE * out);
-void sm_coerce_num(const SM_Instr * instr, FILE * out);
-void sm_exp       (const SM_Instr * instr, FILE * out);
-void sm_add       (const SM_Instr * instr, FILE * out);
-void sm_sub       (const SM_Instr * instr, FILE * out);
-void sm_mul       (const SM_Instr * instr, FILE * out);
-void sm_div       (const SM_Instr * instr, FILE * out);
-void sm_mod       (const SM_Instr * instr, FILE * out);
+void sm_concat    (const SM_t * instr, FILE * out);
+void sm_neg       (const SM_t * instr, FILE * out);
+void sm_coerce_num(const SM_t * instr, FILE * out);
+void sm_exp       (const SM_t * instr, FILE * out);
+void sm_add       (const SM_t * instr, FILE * out);
+void sm_sub       (const SM_t * instr, FILE * out);
+void sm_mul       (const SM_t * instr, FILE * out);
+void sm_div       (const SM_t * instr, FILE * out);
+void sm_mod       (const SM_t * instr, FILE * out);
 /*--- EC-3c SM compare/stno templates (SM_templates/sm_compare.c) -----------*/
-void sm_stno      (const SM_Instr * instr, FILE * out);
-void sm_acomp     (const SM_Instr * instr, FILE * out);
-void sm_lcomp     (const SM_Instr * instr, FILE * out);
+void sm_stno      (const SM_t * instr, FILE * out);
+void sm_acomp     (const SM_t * instr, FILE * out);
+void sm_lcomp     (const SM_t * instr, FILE * out);
 /*--- EC-3d SM control-flow templates (SM_templates/sm_control.c) -----------*/
 #include "SM_templates/sm_ctx.h"
-int  sm_jump      (const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out);
-int  sm_jump_s    (const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out);
-int  sm_jump_f    (const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out);
-int  sm_halt      (const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out);
-int  sm_return    (const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out);
-int  sm_freturn   (const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out);
-int  sm_nreturn   (const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out);
+int  sm_jump      (const SM_t * instr, const sm_ctx_t * ctx, FILE * out);
+int  sm_jump_s    (const SM_t * instr, const sm_ctx_t * ctx, FILE * out);
+int  sm_jump_f    (const SM_t * instr, const sm_ctx_t * ctx, FILE * out);
+int  sm_halt      (const SM_t * instr, const sm_ctx_t * ctx, FILE * out);
+int  sm_return    (const SM_t * instr, const sm_ctx_t * ctx, FILE * out);
+int  sm_freturn   (const SM_t * instr, const sm_ctx_t * ctx, FILE * out);
+int  sm_nreturn   (const SM_t * instr, const sm_ctx_t * ctx, FILE * out);
 /*--- EC-3f SM_PAT_* templates (SM_templates/sm_pat.c) ----------------------*/
-void sm_pat_lit          (const SM_Instr * instr, FILE * out);
-void sm_pat_any_i        (const SM_Instr * instr, int i, FILE * out);
-void sm_pat_notany       (const SM_Instr * instr, int i, FILE * out);
-void sm_pat_span         (const SM_Instr * instr, int i, FILE * out);
-void sm_pat_break        (const SM_Instr * instr, int i, FILE * out);
-void sm_pat_len          (const SM_Instr * instr, FILE * out);
-void sm_pat_pos          (const SM_Instr * instr, FILE * out);
-void sm_pat_rpos         (const SM_Instr * instr, FILE * out);
-void sm_pat_tab          (const SM_Instr * instr, FILE * out);
-void sm_pat_rtab         (const SM_Instr * instr, FILE * out);
-void sm_pat_arb          (const SM_Instr * instr, FILE * out);
-void sm_pat_rem          (const SM_Instr * instr, FILE * out);
-void sm_pat_bal          (const SM_Instr * instr, FILE * out);
-void sm_pat_fence0       (const SM_Instr * instr, FILE * out);
-void sm_pat_abort        (const SM_Instr * instr, FILE * out);
-void sm_pat_fail         (const SM_Instr * instr, FILE * out);
-void sm_pat_succeed      (const SM_Instr * instr, FILE * out);
-void sm_pat_eps          (const SM_Instr * instr, FILE * out);
-void sm_pat_deref        (const SM_Instr * instr, FILE * out);
-void sm_pat_arbno        (const SM_Instr * instr, FILE * out);
-void sm_pat_fence1       (const SM_Instr * instr, FILE * out);
-void sm_pat_cat          (const SM_Instr * instr, FILE * out);
-void sm_pat_alt          (const SM_Instr * instr, FILE * out);
-void sm_pat_refname      (const SM_Instr * instr, FILE * out);
-void sm_pat_capture      (const SM_Instr * instr, FILE * out);
-void sm_pat_capture_fn   (const SM_Instr * instr, FILE * out);
-void sm_pat_capture_fn_args(const SM_Instr * instr, FILE * out);
-void sm_pat_usercall     (const SM_Instr * instr, FILE * out);
-void sm_pat_usercall_args(const SM_Instr * instr, FILE * out);
-void sm_exec_stmt        (const SM_Instr * instr, FILE * out);
+void sm_pat_lit          (const SM_t * instr, FILE * out);
+void sm_pat_any_i        (const SM_t * instr, int i, FILE * out);
+void sm_pat_notany       (const SM_t * instr, int i, FILE * out);
+void sm_pat_span         (const SM_t * instr, int i, FILE * out);
+void sm_pat_break        (const SM_t * instr, int i, FILE * out);
+void sm_pat_len          (const SM_t * instr, FILE * out);
+void sm_pat_pos          (const SM_t * instr, FILE * out);
+void sm_pat_rpos         (const SM_t * instr, FILE * out);
+void sm_pat_tab          (const SM_t * instr, FILE * out);
+void sm_pat_rtab         (const SM_t * instr, FILE * out);
+void sm_pat_arb          (const SM_t * instr, FILE * out);
+void sm_pat_rem          (const SM_t * instr, FILE * out);
+void sm_pat_bal          (const SM_t * instr, FILE * out);
+void sm_pat_fence0       (const SM_t * instr, FILE * out);
+void sm_pat_abort        (const SM_t * instr, FILE * out);
+void sm_pat_fail         (const SM_t * instr, FILE * out);
+void sm_pat_succeed      (const SM_t * instr, FILE * out);
+void sm_pat_eps          (const SM_t * instr, FILE * out);
+void sm_pat_deref        (const SM_t * instr, FILE * out);
+void sm_pat_arbno        (const SM_t * instr, FILE * out);
+void sm_pat_fence1       (const SM_t * instr, FILE * out);
+void sm_pat_cat          (const SM_t * instr, FILE * out);
+void sm_pat_alt          (const SM_t * instr, FILE * out);
+void sm_pat_refname      (const SM_t * instr, FILE * out);
+void sm_pat_capture      (const SM_t * instr, FILE * out);
+void sm_pat_capture_fn   (const SM_t * instr, FILE * out);
+void sm_pat_capture_fn_args(const SM_t * instr, FILE * out);
+void sm_pat_usercall     (const SM_t * instr, FILE * out);
+void sm_pat_usercall_args(const SM_t * instr, FILE * out);
+void sm_exec_stmt        (const SM_t * instr, FILE * out);
 /*--- EC-4: unified prologue/epilogue (emit_core.c) — replaces per-silo statics ----------*/
-int  emit_prologue(IR_block_t * cfg, FILE * out);
-int  emit_epilogue(IR_block_t * cfg, FILE * out);
+int  emit_prologue(BB_graph_t * cfg, FILE * out);
+int  emit_epilogue(BB_graph_t * cfg, FILE * out);
 struct tree_t;
 int  emit_program(const struct tree_t * ast_prog, FILE * out, bb_emit_mode_t mode);
-/* EC-UNI-0: unified SM walk — scaffold. Walks SM_Program and dispatches each instruction
+/* EC-UNI-0: unified SM walk — scaffold. Walks SM_sequence_t and dispatches each instruction
  * through SM_template functions. Future EC-UNI steps wire backends progressively:
  *   EC-UNI-1..2: x86 GAS text arms                  → returns 0 for EMIT_TEXT*
  *   EC-UNI-5:   JVM/JS/NET inline switches removed  → returns 0 for EMIT_JVM/JS/NET
  *   EC-UNI-6:   x86 binary arms                     → returns 0 for EMIT_BINARY_*
  *   EC-UNI-7:   binary JVM/.NET/WASM future arms    → returns 0 for EMIT_BIN_*
  * Today (EC-UNI-0): returns -1 (unsupported) for every mode — scaffold only, no callers yet. */
-int  emit_sm_dispatch(SM_Program * sm, FILE * out, bb_emit_mode_t mode);
+int  emit_sm_dispatch(SM_sequence_t * sm, FILE * out, bb_emit_mode_t mode);
 #endif

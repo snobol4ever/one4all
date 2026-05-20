@@ -121,7 +121,7 @@ static inline tree_t * ast_node_new(tree_e kind) {
 /* TT_FIELD layout: c[0]=object expr, c[1]=TT_VAR(field_name). Use this macro everywhere. */
 #define ICN_FIELD_NAME(e) ((e)->n >= 2 && (e)->c[1] ? (e)->c[1]->v.sval : NULL)
 /*================================================================================================================================================================================*/
-#ifdef IR_DEFINE_NAMES
+#ifdef BB_DEFINE_NAMES
 static const char * const tt_e_name[TT_KIND_COUNT] = {
     [TT_QLIT]             = "TT_QLIT",           [TT_ILIT]             = "TT_ILIT",           [TT_FLIT]             = "TT_FLIT",
     [TT_CSET]             = "TT_CSET",           [TT_NUL]              = "TT_NUL",

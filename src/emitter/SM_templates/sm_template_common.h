@@ -3,7 +3,7 @@
    Do NOT include this from emit_core.c — it lives in SM_templates/ only. */
 #pragma once
 #include "emit_core.h"
-#include "sm_prog.h"
+#include "SM.h"
 #include "sm_ctx.h"
 #include <stdio.h>
 #include <string.h>

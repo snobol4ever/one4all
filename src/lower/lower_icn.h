@@ -1,39 +1,39 @@
 #ifndef LOWER_ICN_H
 #define LOWER_ICN_H
-#include "IR.h"
+#include "BB.h"
 #include "../processor/bb_box.h"
 #include "../frontend/icon/icon_gen.h"
 typedef struct { bb_node_t gen[2]; int which; } icn_alt_dcg_t;
 typedef struct { bb_node_t gen; int64_t max; int64_t count; } icn_lim_dcg_t;
 typedef struct { bb_node_t left; bb_node_t right; IcnBinopKind op; int is_relop; DESCR_t left_val; DESCR_t right_val; int phase; } icn_binop_dcg_t;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-IR_block_t *lower_icn_upto(const char *cset, const char *hay);
+BB_graph_t *lower_icn_upto(const char *cset, const char *hay);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-IR_block_t *lower_icn_to(int64_t lo, int64_t hi);
+BB_graph_t *lower_icn_to(int64_t lo, int64_t hi);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-IR_block_t *lower_icn_to_nested(icn_to_nested_state_t *z);
+BB_graph_t *lower_icn_to_nested(icn_to_nested_state_t *z);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* lower_icn_every removed (DAI-1, IJ-DEL-ICN-AST). */
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-IR_block_t *lower_icn_to_by(int64_t lo, int64_t hi, int64_t step);
+BB_graph_t *lower_icn_to_by(int64_t lo, int64_t hi, int64_t step);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-IR_block_t *lower_icn_iterate(const char *str, int64_t len);
+BB_graph_t *lower_icn_iterate(const char *str, int64_t len);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-IR_block_t *lower_icn_alternate(bb_node_t left, bb_node_t right);
+BB_graph_t *lower_icn_alternate(bb_node_t left, bb_node_t right);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-IR_block_t *lower_icn_limit(bb_node_t gen, int64_t max);
+BB_graph_t *lower_icn_limit(bb_node_t gen, int64_t max);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-IR_block_t *lower_icn_binop(bb_node_t left, bb_node_t right, IcnBinopKind op, int is_relop);
+BB_graph_t *lower_icn_binop(bb_node_t left, bb_node_t right, IcnBinopKind op, int is_relop);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t icn_binop_apply(IcnBinopKind op, DESCR_t lv, DESCR_t rv, int *rel_fail);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 struct GeneratorState;
-IR_block_t *lower_icn_proc_gen(struct GeneratorState *gs);
+BB_graph_t *lower_icn_proc_gen(struct GeneratorState *gs);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 struct tree_t;
-IR_block_t *lower_icn_proc_body(struct tree_t *proc);
+BB_graph_t *lower_icn_proc_body(struct tree_t *proc);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* lower_icn_expr_top — build IR_block_t* for a single Icon expression (top-level wrapper).                                                                                                            */
+/* lower_icn_expr_top — build BB_graph_t* for a single Icon expression (top-level wrapper).                                                                                                            */
 /* Returns NULL when the expr kind isn't yet supported (caller falls back).                                                                                                                            */
-IR_block_t *lower_icn_expr_top(struct tree_t *e);
+BB_graph_t *lower_icn_expr_top(struct tree_t *e);
 #endif

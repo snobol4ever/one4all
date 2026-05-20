@@ -29,7 +29,7 @@ DESCR_t descr_to_str_icn(DESCR_t d)
     return FAILDESCR;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t shared_arith(DESCR_t l, DESCR_t r, sm_opcode_t op)
+DESCR_t shared_arith(DESCR_t l, DESCR_t r, SM_op_t op)
 {
     if (l.v == DT_I && r.v == DT_I) {
         switch (op) {

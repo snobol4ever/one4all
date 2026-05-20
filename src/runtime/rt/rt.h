@@ -148,16 +148,16 @@ typedef struct {
 void rt_register_expressions(const rt_expression_entry *tbl);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* PJ-9d: Mode-4 Prolog predicate registry — populates g_dcg_table at standalone-binary startup. */
-/* Each entry names a predicate and its builder fn; the builder reconstructs the IR_block_t at first call. */
+/* Each entry names a predicate and its builder fn; the builder reconstructs the BB_graph_t at first call. */
 typedef void (*rt_pl_builder_fn)(void);
 typedef struct { const char *name; int arity; rt_pl_builder_fn builder; } rt_predicate_entry_t;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void rt_register_predicates_pl(const rt_predicate_entry_t *tbl);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* PJ-9d builder helpers — minimal API the per-predicate builder fns call to reconstruct IR_block_t graphs. */
+/* PJ-9d builder helpers — minimal API the per-predicate builder fns call to reconstruct BB_graph_t graphs. */
 /* The current predicate-under-construction is a single hidden global owned by rt.c. Builders interleave:   */
-/*   rt_pl_b_begin(N)  → allocate IR_block_t with capacity N                                                */
-/*   rt_pl_b_node(...) → allocate one IR_t node, set scalar fields, return its index                       */
+/*   rt_pl_b_begin(N)  → allocate BB_graph_t with capacity N                                                */
+/*   rt_pl_b_node(...) → allocate one BB_t node, set scalar fields, return its index                       */
 /*   rt_pl_b_kids(...) → attach child-pointer array to a node (kids identified by their indices)            */
 /*   rt_pl_b_entry(i)  → mark node i as the entry of the cfg                                                */
 /*   rt_pl_b_end_register(name, arity) → register completed cfg into g_dcg_table and clear builder state    */
@@ -172,7 +172,7 @@ void rt_pl_b_entry(int node_idx);
 void rt_pl_b_end_register(const char *name, int arity);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* rt_pl_once — IJ-HELLO-4b wired runtime helper for SM_BB_ONCE_PROC.  Looks up the named Prolog */
-/* predicate in g_dcg_table and calls IR_exec_once on its IR_block_t directly — does NOT invoke  */
+/* predicate in g_dcg_table and calls bb_exec_once on its BB_graph_t directly — does NOT invoke  */
 /* bb_broker, so the emitted standalone binary's import closure contains neither bb_broker nor   */
 /* a brokered shim.  See rt.c::rt_pl_once for the full body.  Replaced the deleted               */
 /* rt_bb_once_proc which previously routed Prolog mode-4 dispatch through bb_broker.             */

@@ -1,5 +1,5 @@
 #include "lower_ctx.h"
-#include "sm_prog.h"
+#include "SM.h"
 #include "../../runtime/interp/icn_runtime.h"
 #include "../ast/ast.h"
 #include <stdio.h>
@@ -47,7 +47,7 @@ void labtab_patch_later(LabelTable *lt, int jump_instr_idx, const char *name)
     lt->npatches++;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int labtab_resolve(LabelTable *lt, SM_Program *p)
+int labtab_resolve(LabelTable *lt, SM_sequence_t *p)
 {
     int ok = 0;
     for (int i = 0; i < lt->npatches; i++) {
@@ -58,7 +58,7 @@ int labtab_resolve(LabelTable *lt, SM_Program *p)
             target = p->count > 0 ? p->count - 1 : 0;
             ok = -1;
         }
-        sm_patch_jump(p, lt->patches[i].jump_instr_idx, target);
+        SM_patch_jump(p, lt->patches[i].jump_instr_idx, target);
     }
     return ok;
 }

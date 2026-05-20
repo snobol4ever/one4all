@@ -4,7 +4,7 @@
  * Two axes:
  *   scrip-interp axis: macros/inlines used directly in C RT functions
  *     (snobol4.c, argval.c, invoke.c, nmd.c, eval_code.c, stmt_exec.c)
- *   SM_Program axis: the SM_INCR/SM_DECR/SM_ACOMP/SM_RCOMP/SM_LCOMP/
+ *   SM_sequence_t axis: the SM_INCR/SM_DECR/SM_ACOMP/SM_RCOMP/SM_LCOMP/
  *     SM_TRIM/SM_SPCINT/SM_SPREAL dispatch cases in sm_interp.c call
  *     the inline functions defined here. The x86 emitter writes assembly
  *     instructions (call lexcmp, cmp rax rbx, etc.) — not C — that
@@ -72,7 +72,7 @@
  * GROUP 2 — Type tests and comparisons
  *
  * scrip-interp axis: C conditionals in RT functions.
- * SM_Program axis: SM_ACOMP, SM_RCOMP, SM_LCOMP dispatch to ACOMP/RCOMP
+ * SM_sequence_t axis: SM_ACOMP, SM_RCOMP, SM_LCOMP dispatch to ACOMP/RCOMP
  *   defined below; the x86 emitter writes cmp/ucomisd assembly directly.
  * ═══════════════════════════════════════════════════════════════════════ */
 
@@ -140,7 +140,7 @@ static inline int RCOMP(DESCR_t a, DESCR_t b) {
  * GROUP 3 — Arithmetic on addresses/integers
  *
  * scrip-interp axis: inline C arithmetic.
- * SM_Program axis: SM_INCR n / SM_DECR n dispatch to INCRA/DECRA.
+ * SM_sequence_t axis: SM_INCR n / SM_DECR n dispatch to INCRA/DECRA.
  *   x86 emitter: writes  add rax,imm  /  sub rax,imm  directly.
  * ═══════════════════════════════════════════════════════════════════════ */
 
@@ -167,7 +167,7 @@ DESCR_t EXP_R_fn(DESCR_t base, DESCR_t exp); /* SIL EXREAL: real ** real    */
  * from DESCR_t via descr_slen() and .s.  No separate SPEC struct.
  *
  * scrip-interp axis: C function calls.
- * SM_Program axis: SM_TRIM, SM_SPCINT, SM_SPREAL dispatch to fns below.
+ * SM_sequence_t axis: SM_TRIM, SM_SPCINT, SM_SPREAL dispatch to fns below.
  *   x86 emitter: writes  call trimsp / call spcint / call spreal  +
  *   conditional branch on return value (assembly call + test + jz).
  * ═══════════════════════════════════════════════════════════════════════ */
@@ -229,7 +229,7 @@ int LCOMP_fn(const char *s1, size_t l1, const char *s2, size_t l2);
  * ═══════════════════════════════════════════════════════════════════════ */
 
 /* SM_JUMP_INDIR — SIL BRANIC d,0
- * scrip-interp: pc = (SM_Instr *)d.ptr; continue;
+ * scrip-interp: pc = (SM_t *)d.ptr; continue;
  * x86 emitter:  jmp [rax]   (FF E0 — indirect jump through register) */
 /* (no C macro needed; sm_interp.c handles inline) */
 

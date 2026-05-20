@@ -6,7 +6,7 @@
 #include "../../frontend/prolog/term.h"
 #include "../../frontend/prolog/prolog_runtime.h"
 #include "bb_broker.h"
-#include "IR.h"
+#include "BB.h"
 #define PL_PRED_TABLE_SIZE_FWD 256
 #define PL_SCOPE_SLOT_MAX       64
 #define PL_DCG_TABLE_MAX       256
@@ -17,7 +17,7 @@ typedef struct Pl_PredEntry_t {
 typedef struct { Pl_PredEntry *buckets[PL_PRED_TABLE_SIZE_FWD]; } Pl_PredTable;
 typedef struct { const char *name; int slot; } PlScopeEnt;
 typedef struct { PlScopeEnt e[PL_SCOPE_SLOT_MAX]; int n; } PlScope;
-typedef struct { const char *name; int arity; IR_block_t *ir_body; PlScope lower_sc; } Pl_PredEntry_BB;
+typedef struct { const char *name; int arity; BB_graph_t *ir_body; PlScope lower_sc; } Pl_PredEntry_BB;
 extern Pl_PredEntry_BB g_dcg_table[PL_DCG_TABLE_MAX];
 extern int             g_dcg_count;
 extern Pl_PredTable  g_pl_pred_table;
@@ -48,7 +48,7 @@ DESCR_t pl_bb_dcg(void *zeta, int entry);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 Pl_PredEntry_BB *pl_dcg_lookup(const char *name, int arity);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-Pl_PredEntry_BB *pl_dcg_register(const char *name, int arity, IR_block_t *ir_body);
+Pl_PredEntry_BB *pl_dcg_register(const char *name, int arity, BB_graph_t *ir_body);
 bb_node_t pl_bb_once_proc_by_name(const char *name, int arity);
 void pl_bb_env_push(int nslots);
 void pl_bb_env_pop(Term **saved);

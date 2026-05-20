@@ -1,12 +1,12 @@
 #ifndef SCRIP_SM_H
 #define SCRIP_SM_H
-#include "sm_prog.h"
+#include "SM.h"
 #include "sm_interp.h"
 #include "../ast/ast.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-SM_Program *sm_preamble(const tree_t *ast_prog);
+SM_sequence_t *sm_preamble(const tree_t *ast_prog);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-typedef int (*sm_runner_fn)(SM_Program *prog, SM_State *st);
+typedef int (*sm_runner_fn)(SM_sequence_t *prog, SM_State *st);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_run_with_recovery(SM_Program *sm, sm_runner_fn runner);
+void sm_run_with_recovery(SM_sequence_t *sm, sm_runner_fn runner);
 #endif

@@ -4,7 +4,7 @@
 #include "scrip_sm.h"
 #include "lower.h"
 #include "../frontend/snobol4/scrip_cc.h"
-#include "sm_prog.h"
+#include "SM.h"
 #include "sm_jit_interp.h"
 #include "../runtime/interp/icn_runtime.h"
 #include "../runtime/interp/pl_runtime.h"
@@ -13,7 +13,7 @@
 extern int g_sno_err_active;
 extern jmp_buf g_sno_err_jmp;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void sm_resolve_proc_entry_pcs(SM_Program *p)
+static void sm_resolve_proc_entry_pcs(SM_sequence_t *p)
 {
     int show = getenv("SCRIP_PROC_ENTRY_PCS") != NULL;
     if (show)
@@ -21,7 +21,7 @@ static void sm_resolve_proc_entry_pcs(SM_Program *p)
                 proc_count);
     for (int i = 0; i < proc_count; i++) {
         const char *nm = proc_table[i].name;
-        int pc = nm ? sm_label_pc_lookup(p, nm) : -1;
+        int pc = nm ? SM_label_pc_lookup(p, nm) : -1;
         proc_table[i].entry_pc = pc;
         if (show)
             fprintf(stderr, "[CH-17a]   proc[%d] name=%-20s entry_pc=%d\n",
@@ -31,7 +31,7 @@ static void sm_resolve_proc_entry_pcs(SM_Program *p)
     int pl_total = 0, pl_resolved = 0;
     for (int b = 0; b < PL_PRED_TABLE_SIZE_FWD; b++) {
         for (Pl_PredEntry *e = g_pl_pred_table.buckets[b]; e; e = e->next) {
-            int pc = e->key ? sm_label_pc_lookup(p, e->key) : -1;
+            int pc = e->key ? SM_label_pc_lookup(p, e->key) : -1;
             e->entry_pc = pc;
             pl_total++;
             if (pc >= 0) pl_resolved++;
@@ -45,13 +45,13 @@ static void sm_resolve_proc_entry_pcs(SM_Program *p)
                 pl_total, pl_resolved);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-SM_Program *sm_preamble(const tree_t *ast_prog){
+SM_sequence_t *sm_preamble(const tree_t *ast_prog){
     label_table_build(ast_prog);
     prescan_defines(ast_prog);
     g_sno_err_active = 1;
     uint32_t lang_mask = polyglot_lang_mask(ast_prog);
     polyglot_init(ast_prog, lang_mask);
-    SM_Program *sm = lower(ast_prog);
+    SM_sequence_t *sm = lower(ast_prog);
     if (!sm) {
         fprintf(stderr, "scrip: sm_lower failed\n");
         return NULL;
@@ -61,11 +61,11 @@ SM_Program *sm_preamble(const tree_t *ast_prog){
         g_lang = LANG_ICN;
     }
     sm_resolve_proc_entry_pcs(sm);
-    g_current_sm_prog = sm;
+    g_current_SM_seq = sm;
     return sm;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_run_with_recovery(SM_Program *sm, sm_runner_fn runner)
+void sm_run_with_recovery(SM_sequence_t *sm, sm_runner_fn runner)
 {
     SM_State st;
     sm_state_init(&st);

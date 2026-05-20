@@ -32,7 +32,7 @@ extern void ir_print_node_nl(const tree_t *e, FILE *f);
 #include "snobol4_runtime_shim.h"
 #include "lower.h"
 #include "sm_interp.h"
-#include "sm_prog.h"
+#include "SM.h"
 #include "bb_build.h"
 #include "sm_jit_interp.h"
 #include "emit_sm.h"
@@ -145,8 +145,8 @@ int main(int argc, char **argv)
             "usage: scrip [mode] [bb] [options] <file> [-- program-args...]\n"
             "\n"
             "Execution modes (default: --run):\n"
-            "  --interp         interpret SM_Program via dispatch loop\n"
-            "  --run            SM_Program -> x86 bytes -> mmap slab -> jump in  [DEFAULT]\n"
+            "  --interp         interpret SM_sequence_t via dispatch loop\n"
+            "  --run            SM_sequence_t -> x86 bytes -> mmap slab -> jump in  [DEFAULT]\n"
             "  --compile        emit standalone x86-64 asm to stdout (links libscrip_rt.so)\n"
             "  --target=ARCH    emit code for the named backend (x86, jvm, js, wasm); implies --compile\n"
             "  --monitor        in-process sync comparator (AST vs SM vs JIT)\n"
@@ -157,7 +157,7 @@ int main(int argc, char **argv)
             "\n"
             "Diagnostic options:\n"
             "  --dump-ast       print AST after frontend\n"
-            "  --dump-sm        print SM_Program after lowering\n"
+            "  --dump-sm        print SM_sequence_t after lowering\n"
             "  --dump-bb        print BB-GRAPH for each statement\n"
             "  --dump-sno       transpile AST to portable SNOBOL4 source (GOAL-PARSER-SC-TRANSPILE.md SCT-1)\n"
             "  --trace          MONITOR trace output (diff vs CSNOBOL4)\n"
@@ -343,10 +343,10 @@ int main(int argc, char **argv)
     if (dump_sm && !mode_interp) {
         label_table_build(ast_prog);
         prescan_defines(ast_prog);
-        SM_Program *sm0 = lower(ast_prog);
+        SM_sequence_t *sm0 = lower(ast_prog);
         if (!sm0) { fprintf(stderr, "scrip: sm_lower failed\n"); return 1; }
-        sm_prog_print(sm0, stdout);
-        sm_prog_free(sm0);
+        sm_seq_print(sm0, stdout);
+        SM_seq_free(sm0);
         return 0;
     }
     if (dump_sno) {
@@ -364,14 +364,14 @@ int main(int argc, char **argv)
     if (mode_compile_x86) {
         g_emit_inline = 0;
         g_bb_emit_format  = opt_bb_format;
-        SM_Program *sm = sm_preamble(ast_prog);
+        SM_sequence_t *sm = sm_preamble(ast_prog);
         if (!sm) return 1;
         if (sm_codegen_text(sm, stdout, input_path) != 0) {
             fprintf(stderr, "scrip: sm_codegen_text failed\n");
-            sm_prog_free(sm);
+            SM_seq_free(sm);
             return 1;
         }
-        sm_prog_free(sm);
+        SM_seq_free(sm);
         return 0;
     }
     if (mode_compile && target_name && strcmp(target_name, "x86") != 0) {
@@ -409,39 +409,39 @@ int main(int argc, char **argv)
         }
         return 0;
     } else if (mode_interp) {
-        SM_Program *sm = sm_preamble(ast_prog);
+        SM_sequence_t *sm = sm_preamble(ast_prog);
         if (!sm) return 1;
         if (dump_sm) {
-            sm_prog_print(sm, stdout);
-            sm_prog_free(sm);
+            sm_seq_print(sm, stdout);
+            SM_seq_free(sm);
             return 0;
         }
         sm_run_with_recovery(sm, sm_interp_run);
-        sm_prog_free(sm);
+        SM_seq_free(sm);
     } else if (mode_run) {
-        SM_Program *sm = sm_preamble(ast_prog);
+        SM_sequence_t *sm = sm_preamble(ast_prog);
         if (!sm) return 1;
-        if (dump_sm) { sm_prog_print(sm, stdout); sm_prog_free(sm); return 0; }
+        if (dump_sm) { sm_seq_print(sm, stdout); SM_seq_free(sm); return 0; }
         if (sm_image_init() != 0) {
             fprintf(stderr, "scrip: sm_image_init failed\n");
-            sm_prog_free(sm); return 1;
+            SM_seq_free(sm); return 1;
         }
-        if (sm_codegen(sm) != 0) {
-            fprintf(stderr, "scrip: sm_codegen failed\n");
-            sm_prog_free(sm); return 1;
+        if (SM_codegen(sm) != 0) {
+            fprintf(stderr, "scrip: SM_codegen failed\n");
+            SM_seq_free(sm); return 1;
         }
         sm_run_with_recovery(sm, sm_jit_run);
-        sm_prog_free(sm);
+        SM_seq_free(sm);
     } else if (has_non_sno) {
-        SM_Program *sm = sm_preamble(ast_prog);
+        SM_sequence_t *sm = sm_preamble(ast_prog);
         if (!sm) return 1;
         sm_run_with_recovery(sm, sm_interp_run);
-        sm_prog_free(sm);
+        SM_seq_free(sm);
     } else {
-        SM_Program *sm = sm_preamble(ast_prog);
+        SM_sequence_t *sm = sm_preamble(ast_prog);
         if (!sm) return 1;
         sm_run_with_recovery(sm, sm_interp_run);
-        sm_prog_free(sm);
+        SM_seq_free(sm);
     }
     if (opt_bench) {
         clock_gettime(CLOCK_MONOTONIC, &_t3);

@@ -1,7 +1,7 @@
 #include "sm_template_common.h"
 #include "emit_sm.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_halt(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
+int sm_halt(const SM_t * instr, const sm_ctx_t * ctx, FILE * out) {
     (void)instr;
     if (IS_X86) return emit_halt_line(out, 0);
     if (IS_JVM) {

@@ -1,7 +1,7 @@
 #include "sm_template_common.h"
 #include "emit_sm.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_return(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
+int sm_return(const SM_t * instr, const sm_ctx_t * ctx, FILE * out) {
     if (IS_X86) return emit_sm_return_template(out, instr);
     int op = (int)instr->op, i = ctx->i;
     if (IS_JVM) {
@@ -37,7 +37,7 @@ int sm_return(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_freturn(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
+int sm_freturn(const SM_t * instr, const sm_ctx_t * ctx, FILE * out) {
     if (IS_X86) return emit_sm_return_template(out, instr);
     int op = (int)instr->op, i = ctx->i;
     if (IS_JVM) {
@@ -69,7 +69,7 @@ int sm_freturn(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_nreturn(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
+int sm_nreturn(const SM_t * instr, const sm_ctx_t * ctx, FILE * out) {
     if (IS_X86) return emit_sm_return_template(out, instr);
     int op = (int)instr->op, i = ctx->i;
     if (IS_JVM) {

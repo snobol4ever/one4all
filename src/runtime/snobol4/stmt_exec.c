@@ -344,7 +344,7 @@ int exec_stmt(const char  *subj_name,
     NAME_ctx_enter(&scan_ctx);
     int saved_Ω = Ω;
     if (kw_anchor) Ω = 0;
-    int ticks = bb_broker(root, BB_SCAN, scan_body_fn_u9, &scan_res);
+    int ticks = bb_broker(root, bb_scan, scan_body_fn_u9, &scan_res);
     Ω = saved_Ω;
     if (ticks > 0) {
         match_start = scan_res.start;

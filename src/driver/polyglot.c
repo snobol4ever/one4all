@@ -13,7 +13,7 @@
 #include "driver/interp.h"
 #include "driver/polyglot.h"
 #include "lower.h"
-#include "sm_prog.h"
+#include "SM.h"
 ScripModuleRegistry g_registry;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static inline int           s_int(const tree_t *s, const char *tag) {

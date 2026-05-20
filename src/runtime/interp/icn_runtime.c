@@ -246,8 +246,8 @@ DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs)
 DESCR_t proc_table_call(int pi, DESCR_t *args, int nargs)
 {
     if (pi < 0 || pi >= proc_count) return FAILDESCR;
-    extern SM_Program *g_current_sm_prog;
-    if (proc_table[pi].entry_pc >= 0 && g_current_sm_prog != NULL)
+    extern SM_sequence_t *g_current_SM_seq;
+    if (proc_table[pi].entry_pc >= 0 && g_current_SM_seq != NULL)
         return sm_call_proc(proc_table[pi].entry_pc, proc_table[pi].nparams, args, nargs);
     return FAILDESCR;
 }
@@ -327,13 +327,13 @@ static DESCR_t icn_bb_oneshot(void *zeta, int entry) {
     if (!z->fired && !IS_FAIL_fn(z->val)) { z->fired = 1; return z->val; }
     return FAILDESCR;
 }
-typedef struct { IR_block_t *cfg; int first; } icn_dcg_state_t;
+typedef struct { BB_graph_t *cfg; int first; } icn_dcg_state_t;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t icn_bb_dcg(void *zeta, int entry) {
     icn_dcg_state_t *z = (icn_dcg_state_t *)zeta;
     if (!z || !z->cfg) return FAILDESCR;
     if (entry == α) { z->first = 1; }
-    DESCR_t v = z->first ? (z->first=0, IR_exec_once(z->cfg)) : IR_exec_resume(z->cfg);
+    DESCR_t v = z->first ? (z->first=0, bb_exec_once(z->cfg)) : IR_exec_resume(z->cfg);
     return v;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -341,7 +341,7 @@ bb_node_t icn_bb_pump_proc_by_name(const char *name, DESCR_t *args, int nargs) {
     if (!name) return (bb_node_t){ NULL, NULL, 0 };
     for (int i = 0; i < proc_count; i++) {
         if (strcmp(proc_table[i].name, name) != 0) continue;
-        /* AST → IR → BB path: when an IR_block_t body exists, drive it via icn_bb_dcg.   */
+        /* AST → IR → BB path: when an BB_graph_t body exists, drive it via icn_bb_dcg.   */
         /* This bypasses SM entirely: no proc_table_call, no sm_call_expression.            */
         if (proc_table[i].ir_body) {
             if (frame_depth < FRAME_STACK_MAX) {
@@ -361,12 +361,12 @@ bb_node_t icn_bb_pump_proc_by_name(const char *name, DESCR_t *args, int nargs) {
             return (bb_node_t){ icn_bb_dcg, dz, 0 };
         }
         /* IJ-SUSPEND-PUMP-WIRE: generator proc (TT_SUSPEND present) without ir_body — route through */
-        /* GeneratorState + IR_ICN_PROC_GEN, the same mechanism icn_bb_build uses on the AST path.   */
+        /* GeneratorState + BB_ICN_PROC_GEN, the same mechanism icn_bb_build uses on the AST path.   */
         /* is_generator was set at lower time (lower.c lower_proc_skeletons) so no AST walk here.    */
-        if (proc_table[i].is_generator && proc_table[i].entry_pc >= 0 && g_current_sm_prog) {
+        if (proc_table[i].is_generator && proc_table[i].entry_pc >= 0 && g_current_SM_seq) {
             GeneratorState *pgs = generator_state_new_proc(i, args, nargs);
             if (pgs) {
-                IR_block_t *pcfg = lower_icn_proc_gen(pgs);
+                BB_graph_t *pcfg = lower_icn_proc_gen(pgs);
                 if (pcfg) {
                     icn_dcg_state_t *pdz = calloc(1, sizeof(*pdz));
                     pdz->cfg = pcfg; pdz->first = 1;
@@ -382,7 +382,7 @@ bb_node_t icn_bb_pump_proc_by_name(const char *name, DESCR_t *args, int nargs) {
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* DESCR_t-input helpers relocated from icn_value.c during DAI-5b. Used externally by ir_exec.c       */
-/* (icn_lconcat_d → IR_ICN_LCONCAT executor), interp_eval.c (icn_proc_as_value → coercion at TT_FNC), */
+/* (icn_lconcat_d → BB_ICN_LCONCAT executor), interp_eval.c (icn_proc_as_value → coercion at TT_FNC), */
 /* and lower.c (icn_proc_as_value → lower-time literal folding). Internal helper icn_str_concat_d is  */
 /* the string-concat fallback used by icn_lconcat_d when operands are not both lists.                 */
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -459,7 +459,7 @@ DESCR_t icn_proc_as_value(const char *name) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* DAI (IJ-DEL-ICN-AST, DAI-5b-2): icn_bb_build deleted. The Icon-specific tree_t* AST-walking BB     */
 /* builder is gone. Mode-1 Icon executes via the universal interp_eval walker which routes Icon kinds */
-/* through ir_exec.c (IR_block_t walker); the tree_t* path through the Icon walker was vestigial.     */
+/* through ir_exec.c (BB_graph_t walker); the tree_t* path through the Icon walker was vestigial.     */
 /* icn_bb_dcg, icn_bb_pump_proc_by_name, proc_table machinery above remain (used by modes 2/3/4).     */
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/

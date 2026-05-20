@@ -75,7 +75,7 @@ extern atp_t  * bb_atp_new(const char * varname);
 int exec_stmt_blob(const char * subj_name, DESCR_t * subj_var, bb_box_fn root_fn, DESCR_t * repl, int has_repl);
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 typedef DESCR_t (*univ_box_fn)(void * zeta, int entry);
-typedef enum { BB_SCAN, BB_PUMP, BB_ONCE } BrokerMode;
+typedef enum { bb_scan, bb_pump, bb_once } BrokerMode;
 void exec_stmt_pool_reset(void);
 /*================================================================================================================================================================================*/
 #endif

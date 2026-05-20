@@ -1,27 +1,27 @@
-#include "sm_prog.h"
-#include "IR.h"
+#include "SM.h"
+#include "BB.h"
 #include <string.h>
 #include <stdlib.h>
-SM_Program *g_current_sm_prog = NULL;
+SM_sequence_t *g_current_SM_seq = NULL;
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-SM_Program *sm_prog_new(void)
+SM_sequence_t *SM_seq_new(void)
 {
-    SM_Program *p = calloc(1, sizeof *p);
+    SM_sequence_t *p = calloc(1, sizeof *p);
     p->cap    = 64;
-    p->instrs = calloc((size_t)p->cap, sizeof(SM_Instr));
+    p->instrs = calloc((size_t)p->cap, sizeof(SM_t));
     p->stno_labels_cap = 64;
     p->stno_labels     = calloc((size_t)p->stno_labels_cap, sizeof(const char *));
     p->stno_count      = 0;
     p->dcg_cap         = 16;
     p->dcg_count       = 0;
-    p->dcg_table       = calloc((size_t)p->dcg_cap, sizeof(IR_block_t *));
+    p->dcg_table       = calloc((size_t)p->dcg_cap, sizeof(BB_graph_t *));
     return p;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_prog_free(SM_Program *p)
+void SM_seq_free(SM_sequence_t *p)
 {
     if (!p) return;
     free(p->instrs);
@@ -30,26 +30,26 @@ void sm_prog_free(SM_Program *p)
     free(p);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int _grow(SM_Program *p)
+static int _grow(SM_sequence_t *p)
 {
     if (p->count >= p->cap) {
         p->cap *= 2;
-        p->instrs = realloc(p->instrs, (size_t)p->cap * sizeof(SM_Instr));
+        p->instrs = realloc(p->instrs, (size_t)p->cap * sizeof(SM_t));
     }
     int idx = p->count++;
-    memset(&p->instrs[idx], 0, sizeof(SM_Instr));
-    p->instrs[idx].op = (sm_opcode_t)0;
+    memset(&p->instrs[idx], 0, sizeof(SM_t));
+    p->instrs[idx].op = (SM_op_t)0;
     return idx;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_emit(SM_Program *p, sm_opcode_t op)
+int SM_emit(SM_sequence_t *p, SM_op_t op)
 {
     int idx = _grow(p);
     p->instrs[idx].op = op;
     return idx;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_emit_s(SM_Program *p, sm_opcode_t op, const char *s)
+int SM_emit_s(SM_sequence_t *p, SM_op_t op, const char *s)
 {
     int idx = _grow(p);
     p->instrs[idx].op   = op;
@@ -57,7 +57,7 @@ int sm_emit_s(SM_Program *p, sm_opcode_t op, const char *s)
     return idx;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_emit_i(SM_Program *p, sm_opcode_t op, int64_t i)
+int SM_emit_i(SM_sequence_t *p, SM_op_t op, int64_t i)
 {
     int idx = _grow(p);
     p->instrs[idx].op      = op;
@@ -65,7 +65,7 @@ int sm_emit_i(SM_Program *p, sm_opcode_t op, int64_t i)
     return idx;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_emit_ptr(SM_Program *p, sm_opcode_t op, void *ptr)
+int SM_emit_ptr(SM_sequence_t *p, SM_op_t op, void *ptr)
 {
     int idx = _grow(p);
     p->instrs[idx].op        = op;
@@ -73,7 +73,7 @@ int sm_emit_ptr(SM_Program *p, sm_opcode_t op, void *ptr)
     return idx;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_emit_f(SM_Program *p, sm_opcode_t op, double f)
+int SM_emit_f(SM_sequence_t *p, SM_op_t op, double f)
 {
     int idx = _grow(p);
     p->instrs[idx].op      = op;
@@ -81,7 +81,7 @@ int sm_emit_f(SM_Program *p, sm_opcode_t op, double f)
     return idx;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_emit_si(SM_Program *p, sm_opcode_t op, const char *s, int64_t i)
+int SM_emit_si(SM_sequence_t *p, SM_op_t op, const char *s, int64_t i)
 {
     int idx = _grow(p);
     p->instrs[idx].op      = op;
@@ -90,7 +90,7 @@ int sm_emit_si(SM_Program *p, sm_opcode_t op, const char *s, int64_t i)
     return idx;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_emit_sip(SM_Program *p, sm_opcode_t op, const char *s, int64_t i, void *ptr)
+int SM_emit_sip(SM_sequence_t *p, SM_op_t op, const char *s, int64_t i, void *ptr)
 {
     int idx = _grow(p);
     p->instrs[idx].op      = op;
@@ -100,7 +100,7 @@ int sm_emit_sip(SM_Program *p, sm_opcode_t op, const char *s, int64_t i, void *p
     return idx;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_emit_ii(SM_Program *p, sm_opcode_t op, int64_t i0, int64_t i1)
+int SM_emit_ii(SM_sequence_t *p, SM_op_t op, int64_t i0, int64_t i1)
 {
     int idx = _grow(p);
     p->instrs[idx].op      = op;
@@ -109,7 +109,7 @@ int sm_emit_ii(SM_Program *p, sm_opcode_t op, int64_t i0, int64_t i1)
     return idx;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_label(SM_Program *p)
+int SM_label(SM_sequence_t *p)
 {
     int target = p->count;   /* index of *next* instruction after this label */
     int idx = _grow(p);
@@ -118,7 +118,7 @@ int sm_label(SM_Program *p)
     return target;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_label_named(SM_Program *p, const char *name)
+int SM_label_named(SM_sequence_t *p, const char *name)
 {
     int target = p->count;
     int idx = _grow(p);
@@ -128,7 +128,7 @@ int sm_label_named(SM_Program *p, const char *name)
     return target;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_label_pc_lookup(const SM_Program *p, const char *name)
+int SM_label_pc_lookup(const SM_sequence_t *p, const char *name)
 {
     if (!p || !name) return -1;
     for (int i = 0; i < p->count; i++) {
@@ -139,12 +139,12 @@ int sm_label_pc_lookup(const SM_Program *p, const char *name)
     return -1;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_patch_jump(SM_Program *p, int jump_idx, int target_label)
+void SM_patch_jump(SM_sequence_t *p, int jump_idx, int target_label)
 {
     p->instrs[jump_idx].a[0].i = (int64_t)target_label;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_stno_label_record(SM_Program *p, int stno, const char *label)
+void SM_stno_label_record(SM_sequence_t *p, int stno, const char *label)
 {
     if (stno <= 0) return;
     if (stno >= p->stno_labels_cap) {
@@ -183,19 +183,19 @@ static const char *opnames[SM_OPCODE_COUNT] = {
     "SM_LOAD_FRAME","SM_STORE_FRAME",
 };
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-const char *sm_opcode_name(sm_opcode_t op)
+const char *sm_opcode_name(SM_op_t op)
 {
     if (op >= 0 && op < SM_OPCODE_COUNT) return opnames[op];
     return "SM_UNKNOWN";
 }
 #include <stdio.h>
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_prog_print(const SM_Program *p, FILE *out)
+void sm_seq_print(const SM_sequence_t *p, FILE *out)
 {
-    if (!p) { fprintf(out, "(null SM_Program)\n"); return; }
-    fprintf(out, "; SM_Program  count=%d\n", p->count);
+    if (!p) { fprintf(out, "(null SM_sequence_t)\n"); return; }
+    fprintf(out, "; SM_sequence_t  count=%d\n", p->count);
     for (int i = 0; i < p->count; i++) {
-        const SM_Instr *in = &p->instrs[i];
+        const SM_t *in = &p->instrs[i];
         const char *name = sm_opcode_name(in->op);
         fprintf(out, "%4d  %-20s", i, name);
         switch (in->op) {
@@ -273,18 +273,18 @@ void sm_prog_print(const SM_Program *p, FILE *out)
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_prog_dcg_add(SM_Program *p, struct IR_block_t *cfg) {
+int SM_seq_dcg_add(SM_sequence_t *p, struct BB_graph_t *cfg) {
     if (!cfg) return -1;
     if (p->dcg_count >= p->dcg_cap) {
         p->dcg_cap *= 2;
-        p->dcg_table = realloc(p->dcg_table, (size_t)p->dcg_cap * sizeof(IR_block_t *));
+        p->dcg_table = realloc(p->dcg_table, (size_t)p->dcg_cap * sizeof(BB_graph_t *));
     }
     int idx = p->dcg_count++;
     p->dcg_table[idx] = cfg;
     return idx;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_emit_sii(SM_Program *p, sm_opcode_t op, const char *s, int64_t i0, int64_t i1) {
+int SM_emit_sii(SM_sequence_t *p, SM_op_t op, const char *s, int64_t i0, int64_t i1) {
     int idx = _grow(p);
     p->instrs[idx].op    = op;
     p->instrs[idx].a[0].s = s;

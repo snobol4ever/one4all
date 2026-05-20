@@ -1,8 +1,8 @@
 #pragma once
 #ifndef LOWER_PAT_DCG_H
 #define LOWER_PAT_DCG_H
-#include "IR.h"
+#include "BB.h"
 #include "../ast/ast.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-IR_block_t * IR_lower_pat(const tree_t * pat_tree);
+BB_graph_t * BB_lower_pat(const tree_t * pat_tree);
 #endif

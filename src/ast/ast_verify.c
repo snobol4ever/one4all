@@ -1,4 +1,4 @@
-#define IR_DEFINE_NAMES
+#define BB_DEFINE_NAMES
 #include "scrip_cc.h"
 #include <stdio.h>
 #include <string.h>

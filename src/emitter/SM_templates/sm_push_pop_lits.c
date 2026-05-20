@@ -1,7 +1,7 @@
 #include "sm_template_common.h"
 #include "emit_sm.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_push_lit_i(const SM_Instr * instr, FILE * out) {
+void sm_push_lit_i(const SM_t * instr, FILE * out) {
     if (IS_X86) { emit_push_lit_i_line(out, instr, 0); return; }
     if (IS_JVM) { jvm_push_int2(out, (long)instr->a[0].i); fprintf(out, "    i2l\n    invokestatic rt/SnoRt/push_int(J)V\n"); return; }
     if (IS_JS)  { fprintf(out, "rt.push_int(%lld); ", (long long)instr->a[0].i); return; }
@@ -9,7 +9,7 @@ void sm_push_lit_i(const SM_Instr * instr, FILE * out) {
     if (IS_WASM){ fprintf(out, "          (call $sno_push_int (i32.const %lld))\n", (long long)instr->a[0].i); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_push_lit_s(const SM_Instr * instr, FILE * out) {
+void sm_push_lit_s(const SM_t * instr, FILE * out) {
     if (IS_X86) { emit_sm_push_lit_s_dispatch(out, instr, 0); return; }
     const char * s = instr->a[0].s ? instr->a[0].s : "";
     if (IS_JVM) { jvm_emit_ldc_string(out, s); fprintf(out, "    invokestatic rt/SnoRt/push_str(Ljava/lang/String;)V\n"); return; }
@@ -18,7 +18,7 @@ void sm_push_lit_s(const SM_Instr * instr, FILE * out) {
     if (IS_WASM){ int addr = wasm_intern_str(s); fprintf(out, "          (call $sno_push_str (i32.const 0x%x) (i32.const %d))\n", addr, (int)strlen(s)); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_push_lit_f(const SM_Instr * instr, FILE * out) {
+void sm_push_lit_f(const SM_t * instr, FILE * out) {
     if (IS_X86) { emit_sm_push_lit_f_dispatch(out, instr, 0); return; }
     if (IS_JVM) { fprintf(out, "    ldc2_w %.17g\n    invokestatic rt/SnoRt/push_real(D)V\n", instr->a[0].f); return; }
     if (IS_JS)  { fprintf(out, "rt.push_real_bits(%.17g); ", instr->a[0].f); return; }
@@ -26,7 +26,7 @@ void sm_push_lit_f(const SM_Instr * instr, FILE * out) {
     if (IS_WASM){ fprintf(out, "          (call $sno_push_real (f64.const %.17g))\n", instr->a[0].f); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_push_null(const SM_Instr * instr, FILE * out) {
+void sm_push_null(const SM_t * instr, FILE * out) {
     (void)instr;
     if (IS_X86) { emit_sm_push_null_dispatch(out, 0); return; }
     if (IS_JVM) { fprintf(out, "    invokestatic rt/SnoRt/push_null()V\n"); return; }
@@ -35,7 +35,7 @@ void sm_push_null(const SM_Instr * instr, FILE * out) {
     if (IS_WASM){ fprintf(out, "          (call $sno_push_null)\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_void_pop(const SM_Instr * instr, FILE * out) {
+void sm_void_pop(const SM_t * instr, FILE * out) {
     (void)instr;
     if (IS_X86) { emit_sm_pop(out, 0); return; }
     if (IS_JVM) { fprintf(out, "    invokestatic rt/SnoRt/pop_void()V\n"); return; }
@@ -44,7 +44,7 @@ void sm_void_pop(const SM_Instr * instr, FILE * out) {
     if (IS_WASM){ fprintf(out, "          (call $sno_pop_void)\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_push_var(const SM_Instr * instr, FILE * out) {
+void sm_push_var(const SM_t * instr, FILE * out) {
     if (IS_X86) { emit_sm_push_var_dispatch(out, instr, 0); return; }
     const char * s = instr->a[0].s ? instr->a[0].s : "";
     if (IS_JVM) { jvm_emit_ldc_string(out, s); fprintf(out, "    invokestatic rt/SnoRt/push_var(Ljava/lang/String;)V\n"); return; }
@@ -53,7 +53,7 @@ void sm_push_var(const SM_Instr * instr, FILE * out) {
     if (IS_WASM){ int addr = wasm_intern_name(s); fprintf(out, "          (call $sno_push_var (i32.const 0x%x) (i32.const %d))\n", addr, (int)strlen(s)); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_store_var(const SM_Instr * instr, FILE * out) {
+void sm_store_var(const SM_t * instr, FILE * out) {
     if (IS_X86) { emit_sm_store_var_dispatch(out, instr, 0); return; }
     const char * s = instr->a[0].s ? instr->a[0].s : "";
     if (IS_JVM) { jvm_emit_ldc_string(out, s); fprintf(out, "    invokestatic rt/SnoRt/store_var(Ljava/lang/String;)V\n"); return; }

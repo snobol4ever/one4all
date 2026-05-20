@@ -6,19 +6,19 @@
 #include "emit_ir.h"
 #include <stdio.h>
 
-void bb_lit    (IR_t *nd, FILE *out);
-void bb_any    (IR_t *nd, FILE *out);
-void bb_notany (IR_t *nd, FILE *out);
-void bb_span   (IR_t *nd, FILE *out);
-void bb_break  (IR_t *nd, FILE *out);
-void bb_arb    (IR_t *nd, FILE *out);
-void bb_arbno  (IR_t *nd, FILE *out);
-void bb_cat    (IR_t *nd, FILE *out);
-void bb_alt    (IR_t *nd, FILE *out);
-void bb_len    (IR_t *nd, FILE *out);
-void bb_pos    (IR_t *nd, FILE *out);
-void bb_tab    (IR_t *nd, FILE *out);
-void bb_rem    (IR_t *nd, FILE *out);
-void bb_fence  (IR_t *nd, FILE *out);
-void bb_abort  (IR_t *nd, FILE *out);
-void bb_capture(IR_t *nd, FILE *out, int imm);
+void bb_lit    (BB_t *nd, FILE *out);
+void bb_any    (BB_t *nd, FILE *out);
+void bb_notany (BB_t *nd, FILE *out);
+void bb_span   (BB_t *nd, FILE *out);
+void bb_break  (BB_t *nd, FILE *out);
+void bb_arb    (BB_t *nd, FILE *out);
+void bb_arbno  (BB_t *nd, FILE *out);
+void bb_cat    (BB_t *nd, FILE *out);
+void bb_alt    (BB_t *nd, FILE *out);
+void bb_len    (BB_t *nd, FILE *out);
+void bb_pos    (BB_t *nd, FILE *out);
+void bb_tab    (BB_t *nd, FILE *out);
+void bb_rem    (BB_t *nd, FILE *out);
+void bb_fence  (BB_t *nd, FILE *out);
+void bb_abort  (BB_t *nd, FILE *out);
+void bb_capture(BB_t *nd, FILE *out, int imm);

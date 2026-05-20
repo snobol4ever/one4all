@@ -116,73 +116,73 @@ typedef enum {
     SM_EXEC_BB,
     SM_PUMP_BB,
     SM_OPCODE_COUNT
-} sm_opcode_t;
+} SM_op_t;
 typedef union {
     int64_t     i;
     double      f;
     const char *s;
     int         b;
     void       *ptr;        /* frozen pointer (tree_t* for SM_PUSH_EXPR, etc.) */
-} sm_operand_t;
+} SM_arg_t;
 typedef struct {
     int entry_pc;
     int arity;
-} SmExpression_t;
+} SM_expr_t;
 #define SM_INTERP_SUSPENDED  1
 typedef struct GeneratorState GeneratorState;
 #define SM_MAX_OPERANDS 3
 typedef struct {
-    sm_opcode_t   op;
-    sm_operand_t  a[SM_MAX_OPERANDS];
-} SM_Instr;
+    SM_op_t   op;
+    SM_arg_t  a[SM_MAX_OPERANDS];
+} SM_t;
 typedef struct {
-    SM_Instr    *instrs;
+    SM_t    *instrs;
     int          count;
     int          cap;
     const char **stno_labels;
     int          stno_labels_cap;
     int          stno_count;
-    struct IR_block_t **dcg_table;
+    struct BB_graph_t **dcg_table;
     int          dcg_count;
     int          dcg_cap;
-} SM_Program;
+} SM_sequence_t;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-SM_Program *sm_prog_new(void);
+SM_sequence_t *SM_seq_new(void);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void        sm_prog_free(SM_Program *p);
+void        SM_seq_free(SM_sequence_t *p);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_emit(SM_Program *p, sm_opcode_t op);
+int SM_emit(SM_sequence_t *p, SM_op_t op);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_emit_s(SM_Program *p, sm_opcode_t op, const char *s);
+int SM_emit_s(SM_sequence_t *p, SM_op_t op, const char *s);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_emit_i(SM_Program *p, sm_opcode_t op, int64_t i);
+int SM_emit_i(SM_sequence_t *p, SM_op_t op, int64_t i);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_emit_f(SM_Program *p, sm_opcode_t op, double f);
+int SM_emit_f(SM_sequence_t *p, SM_op_t op, double f);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_emit_ptr(SM_Program *p, sm_opcode_t op, void *ptr);
+int SM_emit_ptr(SM_sequence_t *p, SM_op_t op, void *ptr);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_emit_si(SM_Program *p, sm_opcode_t op, const char *s, int64_t i);
+int SM_emit_si(SM_sequence_t *p, SM_op_t op, const char *s, int64_t i);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_emit_sip(SM_Program *p, sm_opcode_t op, const char *s, int64_t i, void *ptr);
+int SM_emit_sip(SM_sequence_t *p, SM_op_t op, const char *s, int64_t i, void *ptr);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_emit_ii(SM_Program *p, sm_opcode_t op, int64_t i0, int64_t i1);
+int SM_emit_ii(SM_sequence_t *p, SM_op_t op, int64_t i0, int64_t i1);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_emit_sii(SM_Program *p, sm_opcode_t op, const char *s, int64_t i0, int64_t i1);
+int SM_emit_sii(SM_sequence_t *p, SM_op_t op, const char *s, int64_t i0, int64_t i1);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_prog_dcg_add(SM_Program *p, struct IR_block_t *cfg);
+int SM_seq_dcg_add(SM_sequence_t *p, struct BB_graph_t *cfg);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_label(SM_Program *p);
+int SM_label(SM_sequence_t *p);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_label_named(SM_Program *p, const char *name);
-extern SM_Program *g_current_sm_prog;
+int SM_label_named(SM_sequence_t *p, const char *name);
+extern SM_sequence_t *g_current_SM_seq;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-int sm_label_pc_lookup(const SM_Program *p, const char *name);
+int SM_label_pc_lookup(const SM_sequence_t *p, const char *name);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_patch_jump(SM_Program *p, int jump_idx, int target_label);
+void SM_patch_jump(SM_sequence_t *p, int jump_idx, int target_label);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_stno_label_record(SM_Program *p, int stno, const char *label);
+void SM_stno_label_record(SM_sequence_t *p, int stno, const char *label);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-void sm_prog_print(const SM_Program *p, FILE *out);
+void sm_seq_print(const SM_sequence_t *p, FILE *out);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-const char *sm_opcode_name(sm_opcode_t op);
+const char *sm_opcode_name(SM_op_t op);
 #endif
