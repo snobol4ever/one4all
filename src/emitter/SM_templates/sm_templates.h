@@ -78,3 +78,7 @@ void sm_exec_stmt        (void);
  * silo walker's per-iteration fallthrough; 0 = walker should emit its own next-pc step). */
 int  sm_call_fn          (void);
 int  sm_suspend_value    (void);
+/* group: define — EC-UNI-13(c): SM_DEFINE_ENTRY and SM_DEFINE.  Same return-value
+ * convention as sm_call_fn, but all arms currently return 0 (no terminal jump). */
+int  sm_define_entry     (void);
+int  sm_define           (void);

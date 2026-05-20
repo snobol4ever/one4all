@@ -1098,7 +1098,7 @@ const char *emit_sm_consume_pc_label(void);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void emit_sm_set_pc_label(const char *lbl);
 int g_emit_inline = 0;
-static int g_in_define_body = 0;
+int g_in_define_body = 0;
 #define TEXT_MODE() (g_emit_inline ? EMIT_TEXT_INLINE : EMIT_TEXT)
 typedef struct {
     char       *buf;
@@ -2148,7 +2148,7 @@ static void edp4_label_then(FILE *out, void (*fn)(emitter_t *))
     fn(NULL);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_define_entry_dispatch(FILE *out, const SM_t *ins, int pc, const SM_sequence_t *prog) {
+int emit_sm_define_entry_dispatch(FILE *out, const SM_t *ins, int pc, const SM_sequence_t *prog) {
     (void)ins;
     const char *name = (pc > 0 && prog->instrs[pc-1].a[0].s) ? prog->instrs[pc-1].a[0].s : "";
     char anno[80]; snprintf(anno, sizeof(anno), "# %s", name);
@@ -2159,7 +2159,7 @@ static int emit_sm_define_entry_dispatch(FILE *out, const SM_t *ins, int pc, con
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_define_dispatch(FILE *out, const SM_t *ins, int pc) {
+int emit_sm_define_dispatch(FILE *out, const SM_t *ins, int pc) {
     (void)pc;
     const char *name = ins->a[0].s ? ins->a[0].s : "";
     char anno[80]; snprintf(anno, sizeof(anno), "# %s", name);
@@ -2997,6 +2997,9 @@ static int dispatch_one_x86(FILE *out, const SM_t *ins, int pc) {
         /* sm_calls.c — EC-UNI-13(b) */
         case SM_CALL_FN:           (void)sm_call_fn();          return 0;
         case SM_SUSPEND_VALUE:     (void)sm_suspend_value();    return 0;
+        /* sm_defines.c — EC-UNI-13(c) */
+        case SM_DEFINE_ENTRY:      (void)sm_define_entry();     return 0;
+        case SM_DEFINE:            (void)sm_define();           return 0;
         default:                   return -1;  /* uncovered by templates — caller falls through */
     }
 }

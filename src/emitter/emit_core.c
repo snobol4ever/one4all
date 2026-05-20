@@ -1567,7 +1567,9 @@ static int emit_wasm_from_sm(SM_sequence_t * sm, FILE * out) {
         case SM_PAT_CAPTURE_FN_ARGS:                     sm_pat_capture_fn_args();        break;
         case SM_PAT_USERCALL:                            sm_pat_usercall();               break;
         case SM_PAT_USERCALL_ARGS:                       sm_pat_usercall_args();          break;
-        case SM_EXEC_STMT:    case SM_DEFINE_ENTRY: case SM_DEFINE: sm_exec_stmt();      break;
+        case SM_EXEC_STMT:    sm_exec_stmt(); break;
+        case SM_DEFINE_ENTRY: sm_define_entry(); break;
+        case SM_DEFINE:       sm_define(); break;
         case SM_CALL_FN:      case SM_SUSPEND_VALUE: has_jump = sm_call_fn(); break;
         default: fprintf(out, "          ;; unhandled SM opcode %d\n", ins->op); break;
         }
@@ -1811,7 +1813,8 @@ static void emit_jvm_one_instr(SM_sequence_t * sm, int i, int n, const char ** f
     case SM_RETURN:   case SM_RETURN_S:  case SM_RETURN_F:  { sm_return();  break; }
     case SM_FRETURN:  case SM_FRETURN_S: case SM_FRETURN_F: { sm_freturn(); break; }
     case SM_NRETURN:  case SM_NRETURN_S: case SM_NRETURN_F: { sm_nreturn(); break; }
-    case SM_DEFINE_ENTRY: case SM_DEFINE: break;
+    case SM_DEFINE_ENTRY: sm_define_entry(); break;
+    case SM_DEFINE:       sm_define(); break;
     case SM_HALT: { sm_halt(); break; }
     case SM_PAT_LIT:             sm_pat_lit(); break;
     case SM_PAT_ANY:             sm_pat_any_i(); break;
@@ -1965,7 +1968,8 @@ static int emit_js_from_sm(SM_sequence_t * sm, FILE * out) {
         case SM_RETURN:   case SM_RETURN_S:  case SM_RETURN_F:  { has_continue |= sm_return();  break; }
         case SM_FRETURN:  case SM_FRETURN_S: case SM_FRETURN_F: { has_continue |= sm_freturn(); break; }
         case SM_NRETURN:  case SM_NRETURN_S: case SM_NRETURN_F: { has_continue |= sm_nreturn(); break; }
-        case SM_DEFINE_ENTRY: break;
+        case SM_DEFINE_ENTRY: sm_define_entry(); break;
+        case SM_DEFINE:       sm_define(); break;
         case SM_PUSH_EXPRESSION: fprintf(out, "rt.push_null(); "); break;
         case SM_PAT_LIT:             sm_pat_lit(); break;
         case SM_PAT_SPAN:            sm_pat_span(); break;
@@ -2100,7 +2104,9 @@ static int emit_net_from_sm(SM_sequence_t * sm, FILE * out) {
         case SM_RETURN:  case SM_RETURN_S:  case SM_RETURN_F:  { has_continue |= sm_return();  break; }
         case SM_FRETURN: case SM_FRETURN_S: case SM_FRETURN_F: { has_continue |= sm_freturn(); break; }
         case SM_NRETURN: case SM_NRETURN_S: case SM_NRETURN_F: { has_continue |= sm_nreturn(); break; }
-        case SM_DEFINE_ENTRY: case SM_DEFINE: case SM_EXEC_STMT: {
+        case SM_DEFINE_ENTRY: sm_define_entry(); break;
+        case SM_DEFINE:       sm_define();       break;
+        case SM_EXEC_STMT: {
             int has_repl = (int)instr->a[1].i; const char * subj_name = instr->a[0].s ? instr->a[0].s : "";
             if (has_repl) fprintf(out, "    pop\n");
             fprintf(out, "    pop\n    pop\n");
