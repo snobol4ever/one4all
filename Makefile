@@ -77,6 +77,7 @@ RT_PIC_SRCS := \
     $(SRC)/processor/bb_pool.c \
     $(SRC)/emitter/emit_core.c \
     $(SRC)/emitter/emit_globals.c \
+    $(SRC)/emitter/emit_io.c \
     $(SRC)/emitter/BB_templates/bb_lit.c \
     $(SRC)/emitter/BB_templates/bb_any.c \
     $(SRC)/emitter/BB_templates/bb_notany.c \
@@ -224,6 +225,7 @@ scrip:
 	$(CC) $(CRT)   -c $(SRC)/processor/bb_pool.c                    -o $(OBJ)/bb_pool.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/emit_core.c               -o $(OBJ)/emit_core.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/emit_globals.c            -o $(OBJ)/emit_globals.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/emit_io.c                 -o $(OBJ)/emit_io.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_lit.c      -o $(OBJ)/bb_lit.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_any.c      -o $(OBJ)/bb_any.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_notany.c   -o $(OBJ)/bb_notany.o
@@ -319,6 +321,14 @@ scrip:
 # backward-compat symlink
 scrip-interp: scrip
 	@ln -sf scrip scrip-interp
+
+# ── test_emit_io — EC-UNI-11 self-test for Layer-3 string-builder primitives ──
+# Standalone; no scrip dependency.  Runs in <100 ms.
+test_emit_io:
+	$(CC) -O0 -g -Wall -I$(SRC) -I$(SRC)/include -I$(SRC)/emitter \
+	    $(SRC)/emitter/emit_io.c $(SRC)/emitter/test_emit_io.c -o /tmp/test_emit_io
+	/tmp/test_emit_io
+	@echo "OK  test_emit_io"
 
 # ── scrip-monitor: scrip with CSNOBOL4 4th executor linked in (IM-15b) ───────
 # Build: make scrip-monitor CSN_A=/home/claude/csnobol4/libcsnobol4.a

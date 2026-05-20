@@ -1,5 +1,6 @@
 #include "emit_core.h"
 #include "emit_globals.h"
+#include "emit_io.h"
 #include "stage2.h"
 #include "BB_templates/bb_templates.h"
 #include "SM_templates/sm_templates.h"
@@ -2224,6 +2225,9 @@ int emit_program(const tree_t * ast_prog, FILE * out, bb_emit_mode_t mode) {
         fprintf(out, "  )\n");
         emit_epilogue(NULL, out);
         emit_mode_set(saved_mode, saved_out);
+        /* EC-UNI-11: flush Layer-3 buffers to `out`.  No-op today (no template uses emit_text*/
+        /* / emit_byte* yet); load-bearing once EC-UNI-12 sweeps fprintf→emit_textf etc. */
+        emit_io_flush(out);
         g_emit = saved_g_emit;
         /* g_stage2 is global; no free */
         return 0;
@@ -2247,6 +2251,8 @@ int emit_program(const tree_t * ast_prog, FILE * out, bb_emit_mode_t mode) {
     } else if (IS_NET) emit_net_from_sm(sm, out);
     emit_epilogue(NULL, out);
     emit_mode_set(saved_mode, saved_out);
+    /* EC-UNI-11: flush Layer-3 buffers to `out`.  See WASM exit above for rationale. */
+    emit_io_flush(out);
     g_emit = saved_g_emit;
     /* g_stage2 is global; no free */
     return 0;
