@@ -304,7 +304,7 @@ static void lower_opsyn(const tree_t *t)
     SM_emit_si(g_p, SM_CALL_FN, op, (int64_t)t->n);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-const char *sm_pat_capture_fn_arg_names(const tree_t *fnc)
+const char *SM_pat_capture_fn_arg_names(const tree_t *fnc)
 {
     if (!fnc || fnc->n <= 0) return NULL;
     size_t len = 0;
@@ -340,7 +340,7 @@ static void emit_pat_capture(const tree_t *var_node, int mode)
             && var_node->c[0]->t == TT_FNC
             && var_node->c[0]->v.sval) {
         const tree_t *fnc = var_node->c[0];
-        const char *names = sm_pat_capture_fn_arg_names(fnc);
+        const char *names = SM_pat_capture_fn_arg_names(fnc);
         if (names || fnc->n == 0) {
             int idx = SM_emit_s(g_p, SM_PAT_CAPTURE_FN, fnc->v.sval);
             g_p->instrs[idx].a[1].i = mode; g_p->instrs[idx].a[2].s = names;
