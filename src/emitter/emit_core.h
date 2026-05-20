@@ -20,39 +20,26 @@ typedef enum {
     EMIT_JVM              = 5,   /* JVM Jasmin text   */
     EMIT_JS               = 6,   /* JavaScript text   */
     EMIT_NET              = 7,   /* MSIL .NET text    */
-    EMIT_WASM             = 8,   /* WASM WAT text     */
-    EMIT_BIN_JVM          = 9,   /* (EC-UNI future) binary JVM .class bytes */
-    EMIT_BIN_NET          = 10,  /* (EC-UNI future) binary .NET IL bytes    */
-    EMIT_BIN_WASM         = 11   /* (EC-UNI future) binary WASM bytes       */
+    EMIT_WASM             = 8    /* WASM WAT text     */
 } bb_emit_mode_t;
 #define EMIT_BINARY     EMIT_BINARY_WIRED
 #define IS_TEXT     (bb_emit_mode != EMIT_BINARY_WIRED && bb_emit_mode != EMIT_BINARY_BROKERED)
 #define IS_BIN      (bb_emit_mode == EMIT_BINARY_WIRED || bb_emit_mode == EMIT_BINARY_BROKERED)
 #define IS_WIRED    (bb_emit_mode == EMIT_BINARY_WIRED)
 #define IS_BROKERED (bb_emit_mode == EMIT_BINARY_BROKERED)
+/* EC-UNI matrix: one IS_<BE> per backend (5 columns).  Text-vs-binary is
+ * a serializer choice INSIDE each backend's output layer, NOT a matrix
+ * column — see GOAL-HEADQUARTERS § AXIS CORRECTION.  Each template fn
+ * carries exactly one arm per macro below. */
+#define IS_X86      (bb_emit_mode == EMIT_TEXT \
+                  || bb_emit_mode == EMIT_TEXT_INLINE \
+                  || bb_emit_mode == EMIT_MACRO_DEF \
+                  || bb_emit_mode == EMIT_BINARY_WIRED \
+                  || bb_emit_mode == EMIT_BINARY_BROKERED)
 #define IS_JVM      (bb_emit_mode == EMIT_JVM)
 #define IS_JS       (bb_emit_mode == EMIT_JS)
 #define IS_NET      (bb_emit_mode == EMIT_NET)
 #define IS_WASM     (bb_emit_mode == EMIT_WASM)
-/* EC-UNI: x86 mode-cluster macros (refine the legacy IS_TEXT semantic) */
-#define IS_X86_TEXT  (bb_emit_mode == EMIT_TEXT || bb_emit_mode == EMIT_TEXT_INLINE || bb_emit_mode == EMIT_MACRO_DEF)
-#define IS_X86_BIN   (bb_emit_mode == EMIT_BINARY_WIRED || bb_emit_mode == EMIT_BINARY_BROKERED)
-#define IS_X86       (IS_X86_TEXT || IS_X86_BIN)
-/* EC-UNI: stubs — IS_BIN_JVM/NET/WASM dispatch to be added per template fn in later steps */
-#define IS_BIN_JVM   (bb_emit_mode == EMIT_BIN_JVM)
-#define IS_BIN_NET   (bb_emit_mode == EMIT_BIN_NET)
-#define IS_BIN_WASM  (bb_emit_mode == EMIT_BIN_WASM)
-/* EC-UNI-8.2: explicit per-backend × per-mode matrix. Every template fn carries either an
- * arm or an `n/a` comment for each cell. JS has no binary form: IS_JS_BIN is permanently
- * false and every IS_JS_BIN arm is a documented no-op. */
-#define IS_JVM_TEXT  (bb_emit_mode == EMIT_JVM)
-#define IS_JVM_BIN   (bb_emit_mode == EMIT_BIN_JVM)
-#define IS_JS_TEXT   (bb_emit_mode == EMIT_JS)
-#define IS_JS_BIN    (0)                              /* n/a — JS has no binary form */
-#define IS_NET_TEXT  (bb_emit_mode == EMIT_NET)
-#define IS_NET_BIN   (bb_emit_mode == EMIT_BIN_NET)
-#define IS_WASM_TEXT (bb_emit_mode == EMIT_WASM)
-#define IS_WASM_BIN  (bb_emit_mode == EMIT_BIN_WASM)
 /*--- label ---------------------------------------------------------------*/
 #define BB_LABEL_NAME_MAX   80
 #define BB_LABEL_UNRESOLVED (-1)

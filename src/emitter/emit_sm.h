@@ -68,7 +68,7 @@ void emit_sm_op_return_s     (void);         void emit_sm_op_return_f    (void);
 void emit_sm_op_freturn_s    (void);         void emit_sm_op_freturn_f   (void);
 void emit_sm_op_nreturn_s    (void);         void emit_sm_op_nreturn_f   (void);
 void emit_sm_op_unhandled    (int opc);
-/* EC-UNI-1: x86 GAS text dispatchers — exposed so SM_template fns can call them from IS_X86_TEXT arms. */
+/* EC-UNI-1: x86 GAS text dispatchers — exposed so SM_template fns can call them from IS_X86 arms. */
 int emit_push_lit_i_line       (FILE *out, const SM_Instr *ins, int pc);
 int emit_sm_push_lit_s_dispatch(FILE *out, const SM_Instr *ins, int pc);
 int emit_sm_push_lit_f_dispatch(FILE *out, const SM_Instr *ins, int pc);
@@ -129,7 +129,7 @@ int emit_sm_pat_usercall_template       (FILE *out, const SM_Instr *ins);
 int emit_sm_pat_usercall_args_template  (FILE *out, const SM_Instr *ins);
 int emit_sm_exec_stmt_template          (FILE *out, const SM_Instr *ins);
 /* EC-UNI-3: feature flag — when non-zero, emit_walk_codegen routes the 52 templated opcodes through
- * SM_template fns (which call the same dispatchers under IS_X86_TEXT). Byte-identical by construction. */
+ * SM_template fns (which call the same dispatchers under IS_X86). Byte-identical by construction. */
 extern int g_emit_use_unified_dispatch;
 /*---- compat macros -------------------------------------------------------*/
 #define sm_codegen_text(prog,out,src)  emit_walk_codegen(prog,out,src)

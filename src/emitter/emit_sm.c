@@ -2900,7 +2900,7 @@ int emit_sm_exec_stmt_template          (FILE *out, const SM_Instr *ins) { retur
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* EC-UNI-3: feature flag for unified-dispatch path. When 0 (default), emit_walk_codegen runs unchanged.
  * When 1, each opcode covered by an SM_template fn is routed through the template (which calls the same
- * dispatcher under IS_X86_TEXT) instead of going through the existing switch arm directly. Byte-identical
+ * dispatcher under IS_X86) instead of going through the existing switch arm directly. Byte-identical
  * by construction since both paths terminate at the same dispatcher fn. Used to gate the byte-identity check.
  * Honors SCRIP_UNIFIED_DISPATCH env var at constructor time for test scripting without a rebuild. */
 int g_emit_use_unified_dispatch = 0;
@@ -2914,7 +2914,7 @@ static void emit_sm_uni_env_init(void) {
  * opcode is not yet covered by templates (caller falls through to the legacy switch). Mode must be EMIT_TEXT.
  * Only the 52 opcodes across the 5 SM_template files are covered today. */
 static int dispatch_one_x86_text(FILE *out, const SM_Instr *ins, int pc) {
-    /* Templates dispatch on IS_X86_TEXT; make sure mode is set. Legacy path relies on individual
+    /* Templates dispatch on IS_X86; make sure mode is set. Legacy path relies on individual
      * dispatchers calling emitter_init_text — we have to ensure it for the very first opcode too. */
     emit_mode_set(TEXT_MODE(), out);
     sm_ctx_t ctx = { 0 }; ctx.i = pc;
