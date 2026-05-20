@@ -20,17 +20,19 @@ typedef struct Pl_PredEntry_t {
  * inside the active stage2_t (s2_pl_pred_table).  See reader shim below.    */
 typedef struct { const char *name; int slot; } PlScopeEnt;
 typedef struct { PlScopeEnt e[PL_SCOPE_SLOT_MAX]; int n; } PlScope;
-/* IR-CONSOLIDATE-DCG step 1: see icn_runtime.h for the parallel IcnProcEntry change. */
-typedef struct { const char *name; int arity; BB_graph_t *ir_body; int bb_idx; PlScope lower_sc; } Pl_PredEntry_BB;
+/* IR-CONSOLIDATE-DCG step 5: ir_body field deleted (2026-05-20).  The BB graph is reached
+ * via bb_idx into g_stage2.sm.bb_table.  Mode-4 standalone-binary path (rt_pl_b_end_register)
+ * lazy-inits g_stage2.sm and gets a real bb_idx, so there is no fallback. */
+typedef struct { const char *name; int arity; int bb_idx; PlScope lower_sc; } Pl_PredEntry_BB;
 extern Pl_PredEntry_BB g_pl_bb_table[PL_BB_TABLE_MAX];
 extern int             g_pl_bb_count;
-/* IR-CONSOLIDATE-DCG step 3: strangler helper, see icn_runtime.h bb_graph_of_proc. */
+/* IR-CONSOLIDATE-DCG step 5 (2026-05-20): single-structure lookup, no fallback. */
 static inline BB_graph_t *bb_graph_of_pred(const Pl_PredEntry_BB *e)
 {
     if (!e) return NULL;
     if (e->bb_idx >= 0 && e->bb_idx < g_stage2.sm.bb_count)
         return g_stage2.sm.bb_table[e->bb_idx];
-    return e->ir_body;
+    return NULL;
 }
 /* ST2-1 reader shim: g_pl_pred_table redirects to g_stage2.
  *   Deleted in ST2-1b once all readers take `stage2_t *s2` directly. */
@@ -62,7 +64,7 @@ DESCR_t pl_bb_dcg(void *zeta, int entry);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 Pl_PredEntry_BB *pl_bb_lookup(const char *name, int arity);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-Pl_PredEntry_BB *pl_bb_register(const char *name, int arity, BB_graph_t *ir_body);
+Pl_PredEntry_BB *pl_bb_register(const char *name, int arity, int bb_idx);
 bb_node_t pl_bb_once_proc_by_name(const char *name, int arity);
 void pl_bb_env_push(int nslots);
 void pl_bb_env_pop(Term **saved);

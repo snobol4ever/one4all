@@ -74,7 +74,6 @@ typedef struct IcnProcEntry {
     int                 entry_pc;
     int                 nparams;
     IcnScope            lower_sc;
-    struct BB_graph_t  *ir_body;
     int                 bb_idx;
     int                 is_generator;
 } IcnProcEntry;

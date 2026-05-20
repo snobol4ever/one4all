@@ -18,9 +18,8 @@
 struct GeneratorState;
 typedef struct { tree_t *node; long cur; const char *sval; } IcnGenEntry_d;
 /* IcnScopeEnt, IcnScope, IcnProcEntry are defined canonically in stage2.h.
- * IR-CONSOLIDATE-DCG step 1: bb_idx is the index into g_stage2.sm.bb_table[]
- * where this proc's BB graph lives.  Both ir_body and bb_idx are valid during
- * the migration (steps 2–4); ir_body will be deleted in step 5.            */
+ * IR-CONSOLIDATE-DCG step 5 (2026-05-20): the bb_idx into g_stage2.sm.bb_table[] is
+ * the only path to the proc's BB graph.  The legacy ir_body fallback was deleted. */
 typedef struct {
     DESCR_t       env[FRAME_SLOT_MAX];
     int           env_n;
@@ -41,16 +40,15 @@ typedef struct {
  *   Deleted in ST2-1b once all readers take `stage2_t *s2` directly. */
 #define proc_table  (g_stage2.proc_table)
 #define proc_count  (g_stage2.proc_count)
-/* IR-CONSOLIDATE-DCG step 3: strangler helper.  Prefers the SM_sequence_t's bb_table
- * (the consolidated path); falls back to ir_body when no SM_sequence_t is bound (e.g.
- * mode-4 standalone-binary runtime) or when bb_idx is unset.  Step 5 will retire the
- * fallback once all callers go through this and the ir_body field is deleted. */
+/* IR-CONSOLIDATE-DCG step 5 (2026-05-20): single-structure lookup — the BB graph for
+ * this proc lives at g_stage2.sm.bb_table[bb_idx].  Returns NULL when bb_idx is unset
+ * (proc body did not lower to BB) or out of range. */
 static inline BB_graph_t *bb_graph_of_proc(const IcnProcEntry *e)
 {
     if (!e) return NULL;
     if (e->bb_idx >= 0 && e->bb_idx < g_stage2.sm.bb_count)
         return g_stage2.sm.bb_table[e->bb_idx];
-    return e->ir_body;
+    return NULL;
 }
 extern int          g_lang;
 extern tree_t      *g_icn_root;

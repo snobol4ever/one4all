@@ -54,23 +54,25 @@ Pl_PredEntry_BB *pl_bb_lookup(const char *name, int arity) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* pl_bb_register — add or update an entry in the BB-land predicate registry.  Returns the   */
 /* entry pointer on success, NULL on capacity exhaustion.  Idempotent on (name, arity).        */
-Pl_PredEntry_BB *pl_bb_register(const char *name, int arity, BB_graph_t *ir_body) {
+/* IR-CONSOLIDATE-DCG step 5 (2026-05-20): signature now takes bb_idx directly (an index into  */
+/* g_stage2.sm.bb_table[] set by SM_seq_bb_add at the producer site).  Callers without a BB    */
+/* graph pass -1.  The ir_body field is gone. */
+Pl_PredEntry_BB *pl_bb_register(const char *name, int arity, int bb_idx) {
     if (!name) return NULL;
     Pl_PredEntry_BB *existing = pl_bb_lookup(name, arity);
-    if (existing) { existing->ir_body = ir_body; return existing; }
+    if (existing) { existing->bb_idx = bb_idx; return existing; }
     if (g_pl_bb_count >= PL_BB_TABLE_MAX) return NULL;
     Pl_PredEntry_BB *e = &g_pl_bb_table[g_pl_bb_count++];
     e->name = strdup(name);
     e->arity = arity;
-    e->ir_body = ir_body;
-    e->bb_idx = -1;        /* IR-CONSOLIDATE-DCG step 2: caller sets bb_idx when an SM_sequence_t exists (compile-time lowering); mode-4 rt.c registration leaves it -1. */
+    e->bb_idx = bb_idx;
     e->lower_sc.n = 0;
     return e;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* pl_bb_once_proc_by_name — build bb_node_t for a Prolog predicate call (bb_once mode).       */
 /* Mirrors icn_bb_pump_proc_by_name.  Returns {NULL,NULL,0} when predicate not in bb_table    */
-/* or ir_body is NULL (caller falls through to [NO-AST] stub until PJ-4 fills IR).             */
+/* or its BB graph is NULL (caller falls through to [NO-AST] stub until PJ-4 fills IR).         */
 bb_node_t pl_bb_once_proc_by_name(const char *name, int arity) {
     if (!name) return (bb_node_t){ NULL, NULL, 0 };
     const char *sl = strrchr(name, '/');

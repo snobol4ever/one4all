@@ -279,7 +279,12 @@ void rt_pl_b_end_register(const char *name, int arity)
         g_pl_b_cfg->entry = g_pl_b_nodes[g_pl_b_entry_i];
     else if (g_pl_b_node_n > 0)
         g_pl_b_cfg->entry = g_pl_b_nodes[0];
-    (void)pl_bb_register(name, arity, g_pl_b_cfg);
+    /* IR-CONSOLIDATE-DCG step 5 (2026-05-20): no more ir_body fallback.  Mode-4 standalone */
+    /* puts the BB graph into g_stage2.sm.bb_table[] just like scrip's lower() does, and    */
+    /* hands the resulting index to pl_bb_register.  SM_seq_bb_add lazy-allocates bb_table   */
+    /* when g_stage2 is still zero-initialized (standalone never calls lower()).             */
+    int bb_idx = SM_seq_bb_add(&g_stage2.sm, g_pl_b_cfg);
+    (void)pl_bb_register(name, arity, bb_idx);
     free(g_pl_b_nodes);
     g_pl_b_cfg     = NULL;
     g_pl_b_nodes   = NULL;

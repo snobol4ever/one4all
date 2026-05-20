@@ -313,6 +313,15 @@ void sm_seq_print(const SM_sequence_t *p, FILE *out)
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int SM_seq_bb_add(SM_sequence_t *p, struct BB_graph_t *cfg) {
     if (!cfg) return -1;
+    /* IR-CONSOLIDATE-DCG step 5 (2026-05-20): lazy-init for mode-4 standalone.  In scrip
+     * the embedded g_stage2.sm is initialized by stage2_reset() at the top of every lower()
+     * pass.  Standalone binaries link against the runtime but never call lower(), so
+     * g_stage2.sm is left zero-initialized.  Detect that case and allocate. */
+    if (p->bb_cap == 0) {
+        p->bb_cap   = 16;
+        p->bb_count = 0;
+        p->bb_table = calloc((size_t)p->bb_cap, sizeof(BB_graph_t *));
+    }
     if (p->bb_count >= p->bb_cap) {
         p->bb_cap *= 2;
         p->bb_table = realloc(p->bb_table, (size_t)p->bb_cap * sizeof(BB_graph_t *));
