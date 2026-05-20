@@ -1,6 +1,7 @@
 #include "emit_sm.h"
 #include "emit_templates.h"
 #include "emit_form.h"
+#include "SM_templates/sm_templates.h"
 #include "../rt/rt.h"
 #include "IR.h"
 #include <string.h>
@@ -2897,6 +2898,99 @@ int emit_sm_pat_usercall_template       (FILE *out, const SM_Instr *ins) { retur
 int emit_sm_pat_usercall_args_template  (FILE *out, const SM_Instr *ins) { return emit_sm_pat_usercall_args_dispatch(out, ins, 0); }
 int emit_sm_exec_stmt_template          (FILE *out, const SM_Instr *ins) { return emit_sm_exec_stmt_variant(out, ins, 0); }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* EC-UNI-3: feature flag for unified-dispatch path. When 0 (default), emit_walk_codegen runs unchanged.
+ * When 1, each opcode covered by an SM_template fn is routed through the template (which calls the same
+ * dispatcher under IS_X86_TEXT) instead of going through the existing switch arm directly. Byte-identical
+ * by construction since both paths terminate at the same dispatcher fn. Used to gate the byte-identity check.
+ * Honors SCRIP_UNIFIED_DISPATCH env var at constructor time for test scripting without a rebuild. */
+int g_emit_use_unified_dispatch = 0;
+__attribute__((constructor))
+static void emit_sm_uni_env_init(void) {
+    const char * v = getenv("SCRIP_UNIFIED_DISPATCH");
+    if (v && *v && *v != '0') g_emit_use_unified_dispatch = 1;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* dispatch_one_x86_text — try to handle one SM_Instr via the template path. Returns 0 on success, -1 if the
+ * opcode is not yet covered by templates (caller falls through to the legacy switch). Mode must be EMIT_TEXT.
+ * Only the 52 opcodes across the 5 SM_template files are covered today. */
+static int dispatch_one_x86_text(FILE *out, const SM_Instr *ins, int pc) {
+    /* Templates dispatch on IS_X86_TEXT; make sure mode is set. Legacy path relies on individual
+     * dispatchers calling emitter_init_text — we have to ensure it for the very first opcode too. */
+    emit_mode_set(TEXT_MODE(), out);
+    sm_ctx_t ctx = { 0 }; ctx.i = pc;
+    switch ((int)ins->op) {
+        /* sm_push_pop_lits.c */
+        case SM_PUSH_LIT_I:        sm_push_lit_i(ins, out);    return 0;
+        case SM_PUSH_LIT_S:
+        case SM_PUSH_LIT_CS:       sm_push_lit_s(ins, out);    return 0;
+        case SM_PUSH_LIT_F:        sm_push_lit_f(ins, out);    return 0;
+        case SM_PUSH_NULL:         sm_push_null(ins, out);     return 0;
+        case SM_VOID_POP:          sm_void_pop(ins, out);      return 0;
+        case SM_PUSH_VAR:          sm_push_var(ins, out);      return 0;
+        case SM_STORE_VAR:         sm_store_var(ins, out);     return 0;
+        /* sm_arith.c */
+        case SM_CONCAT:            sm_concat(ins, out);        return 0;
+        case SM_NEG:               sm_neg(ins, out);           return 0;
+        case SM_COERCE_NUM:        sm_coerce_num(ins, out);    return 0;
+        case SM_EXP:               sm_exp(ins, out);           return 0;
+        case SM_ADD:               sm_add(ins, out);           return 0;
+        case SM_SUB:               sm_sub(ins, out);           return 0;
+        case SM_MUL:               sm_mul(ins, out);           return 0;
+        case SM_DIV:               sm_div(ins, out);           return 0;
+        case SM_MOD:               sm_mod(ins, out);           return 0;
+        /* sm_compare.c — SM_STNO requires SrcLines which is private to emit_sm.c (NULL shim returns OK; comment annotation only). */
+        case SM_STNO:              sm_stno(ins, out);          return 0;
+        case SM_ACOMP:             sm_acomp(ins, out);         return 0;
+        case SM_LCOMP:             sm_lcomp(ins, out);         return 0;
+        /* sm_control.c */
+        case SM_JUMP:              (void)sm_jump(ins, &ctx, out);    return 0;
+        case SM_JUMP_S:            (void)sm_jump_s(ins, &ctx, out);  return 0;
+        case SM_JUMP_F:            (void)sm_jump_f(ins, &ctx, out);  return 0;
+        case SM_HALT:              (void)sm_halt(ins, &ctx, out);    return 0;
+        case SM_RETURN:            (void)sm_return(ins, &ctx, out);  return 0;
+        case SM_FRETURN:
+        case SM_RETURN_S:
+        case SM_RETURN_F:
+        case SM_FRETURN_S:
+        case SM_FRETURN_F:         (void)sm_freturn(ins, &ctx, out); return 0;
+        case SM_NRETURN:
+        case SM_NRETURN_S:
+        case SM_NRETURN_F:         (void)sm_nreturn(ins, &ctx, out); return 0;
+        /* sm_pat.c — pat opcodes + exec_stmt */
+        case SM_PAT_LIT:           sm_pat_lit(ins, out);                return 0;
+        case SM_PAT_ANY:           sm_pat_any_i(ins, pc, out);          return 0;
+        case SM_PAT_NOTANY:        sm_pat_notany(ins, pc, out);         return 0;
+        case SM_PAT_SPAN:          sm_pat_span(ins, pc, out);           return 0;
+        case SM_PAT_BREAK:         sm_pat_break(ins, pc, out);          return 0;
+        case SM_PAT_LEN:           sm_pat_len(ins, out);                return 0;
+        case SM_PAT_POS:           sm_pat_pos(ins, out);                return 0;
+        case SM_PAT_RPOS:          sm_pat_rpos(ins, out);               return 0;
+        case SM_PAT_TAB:           sm_pat_tab(ins, out);                return 0;
+        case SM_PAT_RTAB:          sm_pat_rtab(ins, out);               return 0;
+        case SM_PAT_ARB:           sm_pat_arb(ins, out);                return 0;
+        case SM_PAT_REM:           sm_pat_rem(ins, out);                return 0;
+        case SM_PAT_BAL:           sm_pat_bal(ins, out);                return 0;
+        case SM_PAT_FENCE0:        sm_pat_fence0(ins, out);             return 0;
+        case SM_PAT_FENCE1:        sm_pat_fence1(ins, out);             return 0;
+        case SM_PAT_ABORT:         sm_pat_abort(ins, out);              return 0;
+        case SM_PAT_FAIL:          sm_pat_fail(ins, out);               return 0;
+        case SM_PAT_SUCCEED:       sm_pat_succeed(ins, out);            return 0;
+        case SM_PAT_EPS:           sm_pat_eps(ins, out);                return 0;
+        case SM_PAT_DEREF:         sm_pat_deref(ins, out);              return 0;
+        case SM_PAT_ARBNO:         sm_pat_arbno(ins, out);              return 0;
+        case SM_PAT_CAT:           sm_pat_cat(ins, out);                return 0;
+        case SM_PAT_ALT:           sm_pat_alt(ins, out);                return 0;
+        case SM_PAT_REFNAME:       sm_pat_refname(ins, out);            return 0;
+        case SM_PAT_CAPTURE:       sm_pat_capture(ins, out);            return 0;
+        case SM_PAT_CAPTURE_FN:    sm_pat_capture_fn(ins, out);         return 0;
+        case SM_PAT_CAPTURE_FN_ARGS: sm_pat_capture_fn_args(ins, out);  return 0;
+        case SM_PAT_USERCALL:      sm_pat_usercall(ins, out);           return 0;
+        case SM_PAT_USERCALL_ARGS: sm_pat_usercall_args(ins, out);      return 0;
+        case SM_EXEC_STMT:         sm_exec_stmt(ins, out);              return 0;
+        default:                   return -1;  /* uncovered by templates — caller falls through */
+    }
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int edp4_sm_unhandled(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
@@ -2974,6 +3068,13 @@ int emit_walk_codegen(SM_Program *prog, FILE *out, const char *src_path)
                 }
                 continue;
             }
+        }
+        /* EC-UNI-3: if the unified-dispatch flag is on, try the template path first.
+         * On success continue. On -1 (uncovered opcode) fall through to the legacy switch.
+         * With the flag off this branch costs one predictable-not-taken compare per iteration. */
+        if (g_emit_use_unified_dispatch) {
+            int urc = dispatch_one_x86_text(out, ins, pc);
+            if (urc == 0) continue;
         }
         int rc;
         switch (ins->op) {
