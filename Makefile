@@ -79,6 +79,7 @@ RT_PIC_SRCS := \
     $(SRC)/emitter/emit_globals.c \
     $(SRC)/emitter/emit_io.c \
     $(SRC)/emitter/BB_templates/bb_pat.c \
+    $(SRC)/emitter/BB_templates/bb_pl.c \
     $(SRC)/emitter/SM_templates/sm_arith.c \
     $(SRC)/emitter/SM_templates/sm_bb_calls.c \
     $(SRC)/emitter/SM_templates/sm_calls.c \
@@ -215,6 +216,7 @@ scrip:
 	$(CC) $(CRT)   -c $(SRC)/emitter/emit_globals.c            -o $(OBJ)/emit_globals.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/emit_io.c                 -o $(OBJ)/emit_io.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_pat.c      -o $(OBJ)/bb_pat.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_pl.c       -o $(OBJ)/bb_pl.o
 	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_arith.c -o $(OBJ)/sm_arith.o
 	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_bb_calls.c -o $(OBJ)/sm_bb_calls.o
 	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_calls.c -o $(OBJ)/sm_calls.o

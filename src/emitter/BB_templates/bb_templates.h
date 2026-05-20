@@ -27,3 +27,7 @@ void bb_rem    (void);
 void bb_fence  (void);
 void bb_abort  (void);
 void bb_capture(int imm);
+void bb_pl_arith  (void);
+void bb_pl_atom   (void);
+void bb_pl_builtin(void);
+void bb_pl_call   (void);
