@@ -3,6 +3,7 @@
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int sm_jump(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
     if (IS_X86_TEXT) return emit_sm_jump_line(out, instr, 0);
+    if (IS_X86_BIN)  { /* EC-UNI-6 owed: wired binary path; legacy emit_walk_codegen handles today */ return 0; }
     int target = (int)instr->a[0].i;
     if (IS_JVM_TEXT) {
         const char * end_lbl = ctx->in_body ? "sm_pc_body_end" : "sm_pc_fn_end";
@@ -27,6 +28,7 @@ int sm_jump(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int sm_jump_s(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
     if (IS_X86_TEXT) return emit_sm_jump_s_line(out, instr, 0);
+    if (IS_X86_BIN)  { /* EC-UNI-6 owed: wired binary path; legacy emit_walk_codegen handles today */ return 0; }
     int target = (int)instr->a[0].i; int i = ctx->i;
     if (IS_JVM_TEXT) {
         if (target >= 0 && target < ctx->n && ctx->in_my_method && ctx->in_my_method[target]) {
@@ -55,6 +57,7 @@ int sm_jump_s(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int sm_jump_f(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
     if (IS_X86_TEXT) return emit_sm_jump_f_line(out, instr, 0);
+    if (IS_X86_BIN)  { /* EC-UNI-6 owed: wired binary path; legacy emit_walk_codegen handles today */ return 0; }
     int target = (int)instr->a[0].i; int i = ctx->i;
     if (IS_JVM_TEXT) {
         if (target >= 0 && target < ctx->n && ctx->in_my_method && ctx->in_my_method[target]) {

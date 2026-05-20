@@ -66,4 +66,6 @@ void bb_capture(IR_t * nd, FILE * out, int imm) {
         fprintf(out, "    newobj     instance void pat_%d_%d::.ctor(class [boxes]Snobol4.Runtime.Boxes.IByrdBox, string, bool)\n", sid, nid);
     }
     if (IS_NET_BIN)  { /* EC-UNI-7 owed: binary .NET IL bytes */ return; }
+    /* IS_WASM_TEXT: n/a — BB WASM never landed in original code */
+    /* IS_WASM_BIN: n/a — BB WASM never landed in original code */
 }

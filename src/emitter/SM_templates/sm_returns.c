@@ -3,6 +3,7 @@
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int sm_return(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
     if (IS_X86_TEXT) return emit_sm_return_template(out, instr);
+    if (IS_X86_BIN)  { /* EC-UNI-6 owed: wired binary path; legacy emit_walk_codegen handles today */ return 0; }
     int op = (int)instr->op, i = ctx->i;
     if (IS_JVM_TEXT) {
         jvm_ret_guard(SM_RETURN_S, SM_RETURN_F, op, i, "rs", out);
@@ -43,6 +44,7 @@ int sm_return(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int sm_freturn(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
     if (IS_X86_TEXT) return emit_sm_return_template(out, instr);
+    if (IS_X86_BIN)  { /* EC-UNI-6 owed: wired binary path; legacy emit_walk_codegen handles today */ return 0; }
     int op = (int)instr->op, i = ctx->i;
     if (IS_JVM_TEXT) {
         jvm_ret_guard(SM_FRETURN_S, SM_FRETURN_F, op, i, "fs", out);
@@ -79,6 +81,7 @@ int sm_freturn(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 int sm_nreturn(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
     if (IS_X86_TEXT) return emit_sm_return_template(out, instr);
+    if (IS_X86_BIN)  { /* EC-UNI-6 owed: wired binary path; legacy emit_walk_codegen handles today */ return 0; }
     int op = (int)instr->op, i = ctx->i;
     if (IS_JVM_TEXT) {
         jvm_ret_guard(SM_NRETURN_S, SM_NRETURN_F, op, i, "ns", out);

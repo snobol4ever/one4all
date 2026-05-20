@@ -42,4 +42,6 @@ void bb_any(IR_t * nd, FILE * out) {
         net_escape_ldstr(out, chars); fprintf(out, "    newobj     instance void pat_%d_%d::.ctor(string)\n", sid, nid);
     }
     if (IS_NET_BIN)  { /* EC-UNI-7 owed: binary .NET IL bytes */ return; }
+    /* IS_WASM_TEXT: n/a — BB WASM never landed in original code */
+    /* IS_WASM_BIN: n/a — BB WASM never landed in original code */
 }

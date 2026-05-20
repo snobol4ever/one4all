@@ -4,6 +4,7 @@
 int sm_halt(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
     (void)instr;
     if (IS_X86_TEXT) return emit_halt_line(out, 0);
+    if (IS_X86_BIN)  { /* EC-UNI-6 owed: wired binary path; legacy emit_walk_codegen handles today */ return 0; }
     if (IS_JVM_TEXT) {
         const char * end_lbl = ctx->in_body ? "sm_pc_body_end" : "sm_pc_fn_end";
         fprintf(out, "    invokestatic rt/SnoRt/halt_tos()V\n    goto_w %s\n", end_lbl);
