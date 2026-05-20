@@ -2033,7 +2033,8 @@ int emit_sm_stno_template(FILE *out, const SM_t *ins)
     return emit_sm_stno_dispatch(out, ins, 0, NULL);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_call_dispatch(FILE *out, const SM_t *ins, int pc)
+/* EC-UNI-13(b): exposed for SM_templates/sm_calls.c IS_X86 arm. */
+int emit_sm_call_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     const char *name  = ins->a[0].s ? ins->a[0].s : "";
@@ -2993,6 +2994,9 @@ static int dispatch_one_x86(FILE *out, const SM_t *ins, int pc) {
         case SM_PAT_USERCALL:      sm_pat_usercall();           return 0;
         case SM_PAT_USERCALL_ARGS: sm_pat_usercall_args();      return 0;
         case SM_EXEC_STMT:         sm_exec_stmt();              return 0;
+        /* sm_calls.c — EC-UNI-13(b) */
+        case SM_CALL_FN:           (void)sm_call_fn();          return 0;
+        case SM_SUSPEND_VALUE:     (void)sm_suspend_value();    return 0;
         default:                   return -1;  /* uncovered by templates — caller falls through */
     }
 }

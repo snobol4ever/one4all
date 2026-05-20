@@ -1451,7 +1451,8 @@ static int        g_wasm_userfns_n = 0;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void wasm_userfns_reset(void) { g_wasm_userfns_n = 0; }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static WasmUserFn * wasm_userfn_find(const char * name) {
+/* EC-UNI-13(b): exposed for SM_templates/sm_calls.c verbatim arm. */
+WasmUserFn * wasm_userfn_find(const char * name) {
     if (!name) return NULL;
     for (int i = 0; i < g_wasm_userfns_n; i++) if (strcmp(g_wasm_userfns[i].name, name) == 0) return &g_wasm_userfns[i];
     return NULL;
@@ -1505,7 +1506,7 @@ static int emit_wasm_from_sm(SM_sequence_t * sm, FILE * out) {
         int has_jump = 0;
         g_emit.i = i; g_emit.n = n; g_emit.instr = ins;
         g_emit.in_body = 0; g_emit.in_my_method = NULL;
-        g_emit.pc_to_fn = NULL; g_emit.fn_names = NULL; g_emit.fn_count = 0;
+        g_emit.pc_to_fn = NULL; g_emit.fn_names = NULL; g_emit.fn_pcs = NULL; g_emit.fn_count = 0;
         fprintf(out, "        (if (i32.eq (local.get $pc) (i32.const %d)) (then\n", i);
         switch (ins->op) {
         case SM_STNO:                                    sm_stno();                       break;
@@ -1567,31 +1568,7 @@ static int emit_wasm_from_sm(SM_sequence_t * sm, FILE * out) {
         case SM_PAT_USERCALL:                            sm_pat_usercall();               break;
         case SM_PAT_USERCALL_ARGS:                       sm_pat_usercall_args();          break;
         case SM_EXEC_STMT:    case SM_DEFINE_ENTRY: case SM_DEFINE: sm_exec_stmt();      break;
-        case SM_CALL_FN:      case SM_SUSPEND_VALUE: {
-            /* Call dispatch — inline WASM frame logic (user-fn table lookup). */
-            const char * cname = ins->a[0].s; int nargs = (int)ins->a[1].i;
-            if (cname && cname[0]) {
-                WasmUserFn * fn = wasm_userfn_find(cname);
-                if (fn) {
-                    int na = wasm_intern_name(fn->name); int nl = (int)strlen(fn->name);
-                    fprintf(out, "          (local.set $fr (call $sno_call_frame_push (i32.const %d) (i32.const 0x%x) (i32.const %d)))\n", i + 1, na, nl);
-                    fprintf(out, "          (call $sno_save_var (local.get $fr) (i32.const 0x%x) (i32.const %d))\n", na, nl);
-                    for (int k = 0; k < fn->nparams; k++) { int pa = wasm_intern_name(fn->params[k]); int pl = (int)strlen(fn->params[k]); fprintf(out, "          (call $sno_save_var (local.get $fr) (i32.const 0x%x) (i32.const %d))\n", pa, pl); }
-                    fprintf(out, "          (call $sno_clear_var (i32.const 0x%x) (i32.const %d))\n", na, nl);
-                    int nbind = (nargs < fn->nparams) ? nargs : fn->nparams;
-                    for (int k = nbind - 1; k >= 0; k--) { int pa = wasm_intern_name(fn->params[k]); int pl = (int)strlen(fn->params[k]); fprintf(out, "          (call $sno_set_var_from_tos (i32.const 0x%x) (i32.const %d))\n", pa, pl); }
-                    for (int k = fn->nparams; k < nargs; k++) fprintf(out, "          (call $sno_pop_to_null)\n");
-                    fprintf(out, "          (call $sno_call_frame_close)\n");
-                    fprintf(out, "          (i32.const %d) (local.set $pc) (br $lp)\n", fn->entry_pc); has_jump = 1; break;
-                }
-                int addr = wasm_intern_name(cname); int len = (int)strlen(cname);
-                fprintf(out, "          (call $sno_call (i32.const 0x%x) (i32.const %d) (i32.const %d))\n", addr, len, nargs);
-            } else {
-                fprintf(out, "          (local.set $tmp (call $sno_fn_return (i32.const 0) (i32.const 0)))\n");
-                fprintf(out, "          (if (i32.eq (local.get $tmp) (i32.const -2)) (then (br $done)) (else (local.set $pc (local.get $tmp)) (br $lp)))\n"); has_jump = 1;
-            }
-            break;
-        }
+        case SM_CALL_FN:      case SM_SUSPEND_VALUE: has_jump = sm_call_fn(); break;
         default: fprintf(out, "          ;; unhandled SM opcode %d\n", ins->op); break;
         }
         if (!has_jump) fprintf(out, "          (i32.const %d) (local.set $pc) (br $lp)\n", i + 1);
@@ -1725,7 +1702,8 @@ int emit_epilogue(BB_graph_t * cfg, FILE * out) {
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* EC-5: jvm_sanitize_name — moved from emit_jvm.c. */
-static void jvm_sanitize_name(char * dst, size_t dsz, const char * src) {
+/* EC-UNI-13(b): exposed for SM_templates/sm_calls.c verbatim arm. */
+void jvm_sanitize_name(char * dst, size_t dsz, const char * src) {
     size_t j = 0;
     for (size_t i = 0; src[i] && j + 1 < dsz; i++) {
         char c = src[i];
@@ -1804,7 +1782,7 @@ static void emit_jvm_one_instr(SM_sequence_t * sm, int i, int n, const char ** f
     SM_t * instr = &sm->instrs[i];
     g_emit.i = i; g_emit.n = n; g_emit.instr = instr;
     g_emit.in_body = in_body; g_emit.in_my_method = in_my_method;
-    g_emit.pc_to_fn = NULL; g_emit.fn_names = fn_names; g_emit.fn_count = fn_count;
+    g_emit.pc_to_fn = NULL; g_emit.fn_names = fn_names; g_emit.fn_pcs = fn_pcs; g_emit.fn_count = fn_count;
     switch (instr->op) {
     case SM_LABEL: break;
     case SM_STNO:  sm_stno(); break;
@@ -1829,26 +1807,7 @@ static void emit_jvm_one_instr(SM_sequence_t * sm, int i, int n, const char ** f
     case SM_JUMP:   { sm_jump();   break; }
     case SM_JUMP_S: { sm_jump_s(); break; }
     case SM_JUMP_F: { sm_jump_f(); break; }
-    case SM_CALL_FN: case SM_SUSPEND_VALUE: {
-        const char * cname = instr->a[0].s ? instr->a[0].s : "";
-        if (!cname[0]) {
-            jvm_push_int2(out, 0); jvm_push_int2(out, 1);
-            fprintf(out, "    invokestatic rt/SnoRt/do_return(II)I\n    pop\n");
-            fprintf(out, "    invokestatic rt/SnoRt/fn_return_push()V\n    return\n"); break;
-        }
-        int entry_pc = -1;
-        for (int k = 0; k < fn_count; k++) if (fn_names[k] && strcmp(fn_names[k], cname) == 0) { entry_pc = fn_pcs[k]; break; }
-        if (entry_pc >= 0) {
-            char mname[256]; jvm_sanitize_name(mname, sizeof mname, cname);
-            jvm_emit_ldc_string(out, cname); jvm_push_int2(out, (long)instr->a[1].i);
-            fprintf(out, "    invokestatic rt/SnoRt/bind_params(Ljava/lang/String;I)V\n");
-            fprintf(out, "    invokestatic Prog/sno_fn_%s()V\n", mname);
-        } else {
-            jvm_emit_ldc_string(out, cname); jvm_push_int2(out, (long)instr->a[1].i);
-            fprintf(out, "    invokestatic rt/SnoRt/call(Ljava/lang/String;I)V\n");
-        }
-        break;
-    }
+    case SM_CALL_FN: case SM_SUSPEND_VALUE: { sm_call_fn(); break; }
     case SM_RETURN:   case SM_RETURN_S:  case SM_RETURN_F:  { sm_return();  break; }
     case SM_FRETURN:  case SM_FRETURN_S: case SM_FRETURN_F: { sm_freturn(); break; }
     case SM_NRETURN:  case SM_NRETURN_S: case SM_NRETURN_F: { sm_nreturn(); break; }
@@ -1953,7 +1912,8 @@ static int emit_jvm_from_sm(SM_sequence_t * sm, FILE * out) {
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* EC-5: emit_js_from_sm — moved from emit_js.c. */
-static void js_escape_string(FILE * out, const char * s) {
+/* EC-UNI-13(b): exposed for SM_templates/sm_calls.c verbatim arm. */
+void js_escape_string(FILE * out, const char * s) {
     fprintf(out, "\"");
     for (; s && *s; s++) {
         unsigned char c = (unsigned char)*s;
@@ -1974,7 +1934,7 @@ static int emit_js_from_sm(SM_sequence_t * sm, FILE * out) {
         SM_t * instr = &sm->instrs[i];
         g_emit.i = i; g_emit.n = sm->count; g_emit.instr = instr;
         g_emit.in_body = 0; g_emit.in_my_method = NULL;
-        g_emit.pc_to_fn = NULL; g_emit.fn_names = NULL; g_emit.fn_count = 0;
+        g_emit.pc_to_fn = NULL; g_emit.fn_names = NULL; g_emit.fn_pcs = NULL; g_emit.fn_count = 0;
         fprintf(out, "case %d: ", i);
         int has_continue = 0;
         switch (instr->op) {
@@ -2000,13 +1960,8 @@ static int emit_js_from_sm(SM_sequence_t * sm, FILE * out) {
         case SM_JUMP:   { has_continue |= sm_jump();   break; }
         case SM_JUMP_S: { has_continue |= sm_jump_s(); break; }
         case SM_JUMP_F: { has_continue |= sm_jump_f(); break; }
-        case SM_SUSPEND_VALUE:
-            fprintf(out, "{ let _r = rt.call_or_jump("); js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
-            fprintf(out, ", %lld, %d); if (_r >= 0) { _pc = _r; continue; } } ", instr->a[1].i, i + 1);
-            fprintf(out, "rt.set_last_ok(!rt._is_fail(rt._peek())); "); break;
-        case SM_CALL_FN:
-            fprintf(out, "{ let _r = rt.call_or_jump("); js_escape_string(out, instr->a[0].s ? instr->a[0].s : "");
-            fprintf(out, ", %lld, %d); if (_r >= 0) { _pc = _r; continue; } } ", instr->a[1].i, i + 1); break;
+        case SM_SUSPEND_VALUE: has_continue |= sm_suspend_value(); break;
+        case SM_CALL_FN:       has_continue |= sm_call_fn(); break;
         case SM_RETURN:   case SM_RETURN_S:  case SM_RETURN_F:  { has_continue |= sm_return();  break; }
         case SM_FRETURN:  case SM_FRETURN_S: case SM_FRETURN_F: { has_continue |= sm_freturn(); break; }
         case SM_NRETURN:  case SM_NRETURN_S: case SM_NRETURN_F: { has_continue |= sm_nreturn(); break; }
@@ -2100,7 +2055,7 @@ static int emit_net_from_sm(SM_sequence_t * sm, FILE * out) {
         SM_t * instr = &sm->instrs[i];
         g_emit.i = i; g_emit.n = n; g_emit.instr = instr;
         g_emit.in_body = 0; g_emit.in_my_method = NULL;
-        g_emit.pc_to_fn = pc_to_fn; g_emit.fn_names = fn_names; g_emit.fn_count = fn_count;
+        g_emit.pc_to_fn = pc_to_fn; g_emit.fn_names = fn_names; g_emit.fn_pcs = fn_pcs; g_emit.fn_count = fn_count;
         fprintf(out, "  NET_L%d:\n", i);
         int has_continue = 0;
         switch (instr->op) {
@@ -2140,27 +2095,8 @@ static int emit_net_from_sm(SM_sequence_t * sm, FILE * out) {
         case SM_JUMP:   { has_continue |= sm_jump();   break; }
         case SM_JUMP_S: { has_continue |= sm_jump_s(); break; }
         case SM_JUMP_F: { has_continue |= sm_jump_f(); break; }
-        case SM_SUSPEND_VALUE: case SM_CALL_FN: {
-            const char * cname = instr->a[0].s ? instr->a[0].s : "";
-            int entry_pc = -1;
-            for (int k = 0; k < fn_count; k++) if (fn_names[k] && strcmp(fn_names[k], cname) == 0) { entry_pc = fn_pcs[k]; break; }
-            if (entry_pc >= 0) {
-                net_push_i4(out, i + 1); fprintf(out, "    call       void SnoRt::push_ret_pc(int32)\n");
-                net_push_i4(out, entry_pc); fprintf(out, "    stloc      _pc\n    br         NET_DISPATCH\n"); has_continue = 1;
-            } else if (cname[0] == '\0' && pc_to_fn && i >= 0 && i < n && pc_to_fn[i] >= 0) {
-                int fk = pc_to_fn[i]; const char * fname = (fk >= 0 && fk < fn_count) ? fn_names[fk] : NULL;
-                if (fname) { net_escape_ldstr(out, fname); fprintf(out, "    call       void SnoRt::push_var(string)\n"); }
-                else fprintf(out, "    call       void SnoRt::push_null()\n");
-                fprintf(out, "    call       void SnoRt::frame_exit()\n");
-                net_push_i4(out, 0); net_push_i4(out, 1);
-                fprintf(out, "    call       void SnoRt::do_return(int32, bool)\n");
-                fprintf(out, "    call       int32 SnoRt::pop_ret_pc()\n    stloc      _pc\n    br         NET_DISPATCH\n"); has_continue = 1;
-            } else {
-                net_escape_ldstr(out, cname); net_push_i4(out, (int)instr->a[1].i);
-                fprintf(out, "    call       void SnoRt::sno_call(string, int32)\n");
-            }
-            break;
-        }
+        case SM_SUSPEND_VALUE: has_continue |= sm_suspend_value(); break;
+        case SM_CALL_FN:       has_continue |= sm_call_fn();       break;
         case SM_RETURN:  case SM_RETURN_S:  case SM_RETURN_F:  { has_continue |= sm_return();  break; }
         case SM_FRETURN: case SM_FRETURN_S: case SM_FRETURN_F: { has_continue |= sm_freturn(); break; }
         case SM_NRETURN: case SM_NRETURN_S: case SM_NRETURN_F: { has_continue |= sm_nreturn(); break; }

@@ -21,6 +21,22 @@ void net_push_i4(FILE * out, int v);
 int wasm_intern_str(const char * s);
 int wasm_intern_name(const char * s);
 
+/* EC-UNI-13(b): WasmUserFn type + lookup, exposed for SM_templates/sm_calls.c.
+   Type defined here so the SM_CALL_FN/SM_SUSPEND_VALUE WASM arm (which performs
+   user-fn frame setup) can read fn->{name,entry_pc,nparams,params[]} verbatim. */
+#define WASM_USERFNS_MAX 256
+#define WASM_MAX_PARAMS  16
+typedef struct { char name[128]; int entry_pc; int nparams; char params[WASM_MAX_PARAMS][128]; } WasmUserFn;
+WasmUserFn * wasm_userfn_find(const char * name);
+
+/* EC-UNI-13(b): JVM identifier sanitiser, exposed for SM_templates/sm_calls.c. */
+void jvm_sanitize_name(char * dst, size_t dsz, const char * src);
+
+/* EC-UNI-13(b): JS string-literal escaper, exposed for SM_templates/sm_calls.c.
+   js_escape (declared above) escapes raw characters; js_escape_string wraps with
+   double-quotes and escapes the body. */
+void js_escape_string(FILE * out, const char * s);
+
 /* EC-UNI-8.1: shared inline helpers, moved from per-family-file `static` to
  * `static inline` so each per-opcode split TU can use them without an external
  * link symbol. Each helper takes its own copy in every TU that uses it (zero

@@ -80,6 +80,7 @@ RT_PIC_SRCS := \
     $(SRC)/emitter/emit_io.c \
     $(SRC)/emitter/BB_templates/bb_pat.c \
     $(SRC)/emitter/SM_templates/sm_arith.c \
+    $(SRC)/emitter/SM_templates/sm_calls.c \
     $(SRC)/emitter/SM_templates/sm_compare.c \
     $(SRC)/emitter/SM_templates/sm_halt.c \
     $(SRC)/emitter/SM_templates/sm_jumps.c \
@@ -213,6 +214,7 @@ scrip:
 	$(CC) $(CRT)   -c $(SRC)/emitter/emit_io.c                 -o $(OBJ)/emit_io.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_pat.c      -o $(OBJ)/bb_pat.o
 	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_arith.c -o $(OBJ)/sm_arith.o
+	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_calls.c -o $(OBJ)/sm_calls.o
 	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_compare.c -o $(OBJ)/sm_compare.o
 	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_halt.c -o $(OBJ)/sm_halt.o
 	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_jumps.c -o $(OBJ)/sm_jumps.o

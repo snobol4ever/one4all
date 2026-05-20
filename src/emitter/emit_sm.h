@@ -128,6 +128,9 @@ int emit_sm_pat_capture_fn_args_template(FILE *out, const SM_t *ins);
 int emit_sm_pat_usercall_template       (FILE *out, const SM_t *ins);
 int emit_sm_pat_usercall_args_template  (FILE *out, const SM_t *ins);
 int emit_sm_exec_stmt_template          (FILE *out, const SM_t *ins);
+/* EC-UNI-13(b): exposed for SM_templates/sm_calls.c IS_X86 arm.  SM_CALL_FN and
+ * SM_SUSPEND_VALUE both route through this (legacy x86 behavior). */
+int emit_sm_call_dispatch               (FILE *out, const SM_t *ins, int pc);
 /* EC-UNI-3: feature flag — when non-zero, emit_walk_codegen routes the 52 templated opcodes through
  * SM_template fns (which call the same dispatchers under IS_X86). Byte-identical by construction. */
 extern int g_emit_use_unified_dispatch;

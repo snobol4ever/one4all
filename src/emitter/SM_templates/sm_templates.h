@@ -73,3 +73,8 @@ void sm_pat_capture_fn_args(void);
 void sm_pat_usercall     (void);
 void sm_pat_usercall_args(void);
 void sm_exec_stmt        (void);
+/* group: calls — EC-UNI-13(b): SM_CALL_FN and SM_SUSPEND_VALUE.  Return value matches
+ * the sm_jump/sm_halt convention (1 = arm produced a terminal jump that consumes the
+ * silo walker's per-iteration fallthrough; 0 = walker should emit its own next-pc step). */
+int  sm_call_fn          (void);
+int  sm_suspend_value    (void);

@@ -8,7 +8,7 @@
  *
  * Layout: one flat struct, mirroring the eventual Snocone bootstrap shape
  *   DATA('Sm_emit(BACKEND, IS_BINARY, OUT, I, N, INSTR, NODE, SID, NID,
- *                 IN_BODY, IN_MY_METHOD, PC_TO_FN, FN_NAMES, FN_COUNT,
+ *                 IN_BODY, IN_MY_METHOD, PC_TO_FN, FN_NAMES, FN_PCS, FN_COUNT,
  *                 PROG, SRCLINES)')
  *
  * Re-entrancy: g_emit is NOT re-entrant.  Single-threaded by construction.  If a template ever
@@ -44,6 +44,7 @@ typedef struct {
     /* NET/JVM function table ------------------------------------------ */
     const int *                  pc_to_fn;      /* PC → fn index, -1 if none */
     const char **                fn_names;      /* fn index → name */
+    const int *                  fn_pcs;        /* fn index → entry PC (EC-UNI-13(b): added for SM_CALL_FN/SM_SUSPEND_VALUE NET arm) */
     int                          fn_count;      /* size of fn_names */
     /* Pending EC-UNI-3-beauty fields, now globals --------------------- */
     const struct SM_sequence_t * prog;          /* full SM sequence (NRETURN/STNO need it) */
