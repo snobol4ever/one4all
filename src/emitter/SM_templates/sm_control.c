@@ -5,7 +5,7 @@
 int sm_jump(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
     if (IS_X86_TEXT) return emit_sm_jump_line(out, instr, 0);
     int target = (int)instr->a[0].i;
-    if (IS_JVM) {
+    if (IS_JVM_TEXT) {
         const char * end_lbl = ctx->in_body ? "sm_pc_body_end" : "sm_pc_fn_end";
         if (target >= 0 && target < ctx->n && ctx->in_my_method && ctx->in_my_method[target])
             fprintf(out, "    goto_w sm_pc_%d\n", target);
@@ -16,9 +16,13 @@ int sm_jump(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
         } else fprintf(out, "    goto_w %s\n", end_lbl);
         return 0;
     }
-    if (IS_JS)   { fprintf(out, "_pc = %lld; continue; ", (long long)instr->a[0].i); return 1; }
-    if (IS_NET)  { fprintf(out, "    ldc.i4     %lld\n    stloc      _pc\n    br         NET_DISPATCH\n", (long long)instr->a[0].i); return 1; }
-    if (IS_WASM) { fprintf(out, "          (i32.const %lld) (local.set $pc) (br $lp)\n", (long long)instr->a[0].i); return 1; }
+    if (IS_JVM_BIN)  { /* EC-UNI-7 owed: binary .class bytes */ return; }
+    if (IS_JS_TEXT)   { fprintf(out, "_pc = %lld; continue; ", (long long)instr->a[0].i); return 1; }
+    /* IS_JS_BIN: n/a — JS has no binary form */
+    if (IS_NET_TEXT)  { fprintf(out, "    ldc.i4     %lld\n    stloc      _pc\n    br         NET_DISPATCH\n", (long long)instr->a[0].i); return 1; }
+    if (IS_NET_BIN)  { /* EC-UNI-7 owed: binary .NET IL bytes */ return; }
+    if (IS_WASM_TEXT) { fprintf(out, "          (i32.const %lld) (local.set $pc) (br $lp)\n", (long long)instr->a[0].i); return 1; }
+    if (IS_WASM_BIN) { /* EC-UNI-7 owed: binary WASM bytes */ return; }
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -26,7 +30,7 @@ int sm_jump(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
 int sm_jump_s(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
     if (IS_X86_TEXT) return emit_sm_jump_s_line(out, instr, 0);
     int target = (int)instr->a[0].i; int i = ctx->i;
-    if (IS_JVM) {
+    if (IS_JVM_TEXT) {
         if (target >= 0 && target < ctx->n && ctx->in_my_method && ctx->in_my_method[target]) {
             fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n");
             fprintf(out, "    ifeq sm_pc_%d_skip\n", i);
@@ -41,9 +45,13 @@ int sm_jump_s(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
         }
         return 0;
     }
-    if (IS_JS)   { fprintf(out, "if (rt.last_ok()) _pc = %lld; else _pc = %d; continue; ", (long long)instr->a[0].i, i + 1); return 1; }
-    if (IS_NET)  { fprintf(out, "    call       bool SnoRt::last_ok()\n    brfalse    NET_L%d\n    ldc.i4     %lld\n    stloc      _pc\n    br         NET_DISPATCH\n", i + 1, (long long)instr->a[0].i); return 1; }
-    if (IS_WASM) { fprintf(out, "          (if (call $sno_last_ok)\n            (then (i32.const %lld) (local.set $pc))\n            (else (i32.const %d)   (local.set $pc)))\n          (br $lp)\n", (long long)instr->a[0].i, i + 1); return 1; }
+    if (IS_JVM_BIN)  { /* EC-UNI-7 owed: binary .class bytes */ return; }
+    if (IS_JS_TEXT)   { fprintf(out, "if (rt.last_ok()) _pc = %lld; else _pc = %d; continue; ", (long long)instr->a[0].i, i + 1); return 1; }
+    /* IS_JS_BIN: n/a — JS has no binary form */
+    if (IS_NET_TEXT)  { fprintf(out, "    call       bool SnoRt::last_ok()\n    brfalse    NET_L%d\n    ldc.i4     %lld\n    stloc      _pc\n    br         NET_DISPATCH\n", i + 1, (long long)instr->a[0].i); return 1; }
+    if (IS_NET_BIN)  { /* EC-UNI-7 owed: binary .NET IL bytes */ return; }
+    if (IS_WASM_TEXT) { fprintf(out, "          (if (call $sno_last_ok)\n            (then (i32.const %lld) (local.set $pc))\n            (else (i32.const %d)   (local.set $pc)))\n          (br $lp)\n", (long long)instr->a[0].i, i + 1); return 1; }
+    if (IS_WASM_BIN) { /* EC-UNI-7 owed: binary WASM bytes */ return; }
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -51,7 +59,7 @@ int sm_jump_s(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
 int sm_jump_f(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
     if (IS_X86_TEXT) return emit_sm_jump_f_line(out, instr, 0);
     int target = (int)instr->a[0].i; int i = ctx->i;
-    if (IS_JVM) {
+    if (IS_JVM_TEXT) {
         if (target >= 0 && target < ctx->n && ctx->in_my_method && ctx->in_my_method[target]) {
             fprintf(out, "    invokestatic rt/SnoRt/last_ok()Z\n");
             fprintf(out, "    ifne sm_pc_%d_skip\n", i);
@@ -66,9 +74,13 @@ int sm_jump_f(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
         }
         return 0;
     }
-    if (IS_JS)   { fprintf(out, "if (!rt.last_ok()) _pc = %lld; else _pc = %d; continue; ", (long long)instr->a[0].i, i + 1); return 1; }
-    if (IS_NET)  { fprintf(out, "    call       bool SnoRt::last_ok()\n    brtrue     NET_L%d\n    ldc.i4     %lld\n    stloc      _pc\n    br         NET_DISPATCH\n", i + 1, (long long)instr->a[0].i); return 1; }
-    if (IS_WASM) { fprintf(out, "          (if (i32.eqz (call $sno_last_ok))\n            (then (i32.const %lld) (local.set $pc))\n            (else (i32.const %d)   (local.set $pc)))\n          (br $lp)\n", (long long)instr->a[0].i, i + 1); return 1; }
+    if (IS_JVM_BIN)  { /* EC-UNI-7 owed: binary .class bytes */ return; }
+    if (IS_JS_TEXT)   { fprintf(out, "if (!rt.last_ok()) _pc = %lld; else _pc = %d; continue; ", (long long)instr->a[0].i, i + 1); return 1; }
+    /* IS_JS_BIN: n/a — JS has no binary form */
+    if (IS_NET_TEXT)  { fprintf(out, "    call       bool SnoRt::last_ok()\n    brtrue     NET_L%d\n    ldc.i4     %lld\n    stloc      _pc\n    br         NET_DISPATCH\n", i + 1, (long long)instr->a[0].i); return 1; }
+    if (IS_NET_BIN)  { /* EC-UNI-7 owed: binary .NET IL bytes */ return; }
+    if (IS_WASM_TEXT) { fprintf(out, "          (if (i32.eqz (call $sno_last_ok))\n            (then (i32.const %lld) (local.set $pc))\n            (else (i32.const %d)   (local.set $pc)))\n          (br $lp)\n", (long long)instr->a[0].i, i + 1); return 1; }
+    if (IS_WASM_BIN) { /* EC-UNI-7 owed: binary WASM bytes */ return; }
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -76,14 +88,18 @@ int sm_jump_f(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
 int sm_halt(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
     (void)instr;
     if (IS_X86_TEXT) return emit_halt_line(out, 0);
-    if (IS_JVM) {
+    if (IS_JVM_TEXT) {
         const char * end_lbl = ctx->in_body ? "sm_pc_body_end" : "sm_pc_fn_end";
         fprintf(out, "    invokestatic rt/SnoRt/halt_tos()V\n    goto_w %s\n", end_lbl);
         return 0;
     }
-    if (IS_JS)   { fprintf(out, "break loop; "); return 1; }
-    if (IS_NET)  { fprintf(out, "    call       void SnoRt::halt_tos()\n    br         NET_DONE\n"); return 1; }
-    if (IS_WASM) { fprintf(out, "          (call $sno_halt_tos)\n          (br $done)\n"); return 1; }
+    if (IS_JVM_BIN)  { /* EC-UNI-7 owed: binary .class bytes */ return; }
+    if (IS_JS_TEXT)   { fprintf(out, "break loop; "); return 1; }
+    /* IS_JS_BIN: n/a — JS has no binary form */
+    if (IS_NET_TEXT)  { fprintf(out, "    call       void SnoRt::halt_tos()\n    br         NET_DONE\n"); return 1; }
+    if (IS_NET_BIN)  { /* EC-UNI-7 owed: binary .NET IL bytes */ return; }
+    if (IS_WASM_TEXT) { fprintf(out, "          (call $sno_halt_tos)\n          (br $done)\n"); return 1; }
+    if (IS_WASM_BIN) { /* EC-UNI-7 owed: binary WASM bytes */ return; }
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -103,7 +119,7 @@ static void net_ret_guard(int op_s, int op_f, int op, int i, FILE * out) {
 int sm_return(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
     if (IS_X86_TEXT) return emit_sm_return_template(out, instr);
     int op = (int)instr->op, i = ctx->i;
-    if (IS_JVM) {
+    if (IS_JVM_TEXT) {
         jvm_ret_guard(SM_RETURN_S, SM_RETURN_F, op, i, "rs", out);
         jvm_push_int2(out, 0); jvm_push_int2(out, 1);
         fprintf(out, "    invokestatic rt/SnoRt/do_return(II)I\n    pop\n");
@@ -112,12 +128,14 @@ int sm_return(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
         if (op == SM_RETURN_F) fprintf(out, "sm_pc_%d_rf_skip:\n", i);
         return 0;
     }
-    if (IS_JS) {
+    if (IS_JVM_BIN)  { /* EC-UNI-7 owed: binary .class bytes */ return; }
+    if (IS_JS_TEXT) {
         if (op == SM_RETURN)   { fprintf(out, "{ let _r = rt.fn_return(0, 0); if (_r === -2) { break loop; } _pc = _r; continue; } "); return 1; }
         if (op == SM_RETURN_S) { fprintf(out, "{ let _r = rt.fn_return(0, 1); if (_r === -1) { _pc = %d; continue; } if (_r === -2) { break loop; } _pc = _r; continue; } ", i + 1); return 1; }
         if (op == SM_RETURN_F) { fprintf(out, "{ let _r = rt.fn_return(0, 2); if (_r === -1) { _pc = %d; continue; } if (_r === -2) { break loop; } _pc = _r; continue; } ", i + 1); return 1; }
     }
-    if (IS_NET) {
+    /* IS_JS_BIN: n/a — JS has no binary form */
+    if (IS_NET_TEXT) {
         int fk = (i >= 0 && i < ctx->n && ctx->pc_to_fn) ? ctx->pc_to_fn[i] : -1;
         const char * fname = (fk >= 0 && ctx->fn_names) ? ctx->fn_names[fk] : NULL;
         net_ret_guard(SM_RETURN_S, SM_RETURN_F, op, i, out);
@@ -128,11 +146,13 @@ int sm_return(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
         fprintf(out, "    call       void SnoRt::do_return(int32, bool)\n    call       int32 SnoRt::pop_ret_pc()\n    stloc      _pc\n    br         NET_DISPATCH\n");
         return 1;
     }
-    if (IS_WASM) {
+    if (IS_NET_BIN)  { /* EC-UNI-7 owed: binary .NET IL bytes */ return; }
+    if (IS_WASM_TEXT) {
         if (op == SM_RETURN)   { fprintf(out, "          (local.set $tmp (call $sno_fn_return (i32.const 0) (i32.const 0)))\n          (if (i32.eq (local.get $tmp) (i32.const -2)) (then (br $done)) (else (local.set $pc (local.get $tmp)) (br $lp)))\n"); return 1; }
         if (op == SM_RETURN_S) { fprintf(out, "          (local.set $tmp (call $sno_fn_return (i32.const 0) (i32.const 1)))\n          (if (i32.eq (local.get $tmp) (i32.const -1)) (then (i32.const %d) (local.set $pc) (br $lp)) (else (if (i32.eq (local.get $tmp) (i32.const -2)) (then (br $done)) (else (local.set $pc (local.get $tmp)) (br $lp)))))\n", i + 1); return 1; }
         if (op == SM_RETURN_F) { fprintf(out, "          (local.set $tmp (call $sno_fn_return (i32.const 0) (i32.const 2)))\n          (if (i32.eq (local.get $tmp) (i32.const -1)) (then (i32.const %d) (local.set $pc) (br $lp)) (else (if (i32.eq (local.get $tmp) (i32.const -2)) (then (br $done)) (else (local.set $pc (local.get $tmp)) (br $lp)))))\n", i + 1); return 1; }
     }
+    if (IS_WASM_BIN) { /* EC-UNI-7 owed: binary WASM bytes */ return; }
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -140,7 +160,7 @@ int sm_return(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
 int sm_freturn(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
     if (IS_X86_TEXT) return emit_sm_return_template(out, instr);
     int op = (int)instr->op, i = ctx->i;
-    if (IS_JVM) {
+    if (IS_JVM_TEXT) {
         jvm_ret_guard(SM_FRETURN_S, SM_FRETURN_F, op, i, "fs", out);
         jvm_push_int2(out, 1); jvm_push_int2(out, 0);
         fprintf(out, "    invokestatic rt/SnoRt/do_return(II)I\n    pop\n");
@@ -149,23 +169,27 @@ int sm_freturn(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
         if (op == SM_FRETURN_F) fprintf(out, "sm_pc_%d_ff_skip:\n", i);
         return 0;
     }
-    if (IS_JS) {
+    if (IS_JVM_BIN)  { /* EC-UNI-7 owed: binary .class bytes */ return; }
+    if (IS_JS_TEXT) {
         if (op == SM_FRETURN)   { fprintf(out, "{ let _r = rt.fn_return(1, 0); if (_r === -2) { break loop; } _pc = _r; continue; } "); return 1; }
         if (op == SM_FRETURN_S) { fprintf(out, "{ let _r = rt.fn_return(1, 1); if (_r === -1) { _pc = %d; continue; } if (_r === -2) { break loop; } _pc = _r; continue; } ", i + 1); return 1; }
         if (op == SM_FRETURN_F) { fprintf(out, "{ let _r = rt.fn_return(1, 2); if (_r === -1) { _pc = %d; continue; } if (_r === -2) { break loop; } _pc = _r; continue; } ", i + 1); return 1; }
     }
-    if (IS_NET) {
+    /* IS_JS_BIN: n/a — JS has no binary form */
+    if (IS_NET_TEXT) {
         net_ret_guard(SM_FRETURN_S, SM_FRETURN_F, op, i, out);
         fprintf(out, "    call       void SnoRt::push_null()\n    call       void SnoRt::frame_exit()\n");
         net_push_i4(out, 1); net_push_i4(out, 0);
         fprintf(out, "    call       void SnoRt::do_return(int32, bool)\n    call       int32 SnoRt::pop_ret_pc()\n    stloc      _pc\n    br         NET_DISPATCH\n");
         return 1;
     }
-    if (IS_WASM) {
+    if (IS_NET_BIN)  { /* EC-UNI-7 owed: binary .NET IL bytes */ return; }
+    if (IS_WASM_TEXT) {
         if (op == SM_FRETURN)   { fprintf(out, "          (local.set $tmp (call $sno_fn_return (i32.const 1) (i32.const 0)))\n          (if (i32.eq (local.get $tmp) (i32.const -2)) (then (br $done)) (else (local.set $pc (local.get $tmp)) (br $lp)))\n"); return 1; }
         if (op == SM_FRETURN_S) { fprintf(out, "          (local.set $tmp (call $sno_fn_return (i32.const 1) (i32.const 1)))\n          (if (i32.eq (local.get $tmp) (i32.const -1)) (then (i32.const %d) (local.set $pc) (br $lp)) (else (if (i32.eq (local.get $tmp) (i32.const -2)) (then (br $done)) (else (local.set $pc (local.get $tmp)) (br $lp)))))\n", i + 1); return 1; }
         if (op == SM_FRETURN_F) { fprintf(out, "          (local.set $tmp (call $sno_fn_return (i32.const 1) (i32.const 2)))\n          (if (i32.eq (local.get $tmp) (i32.const -1)) (then (i32.const %d) (local.set $pc) (br $lp)) (else (if (i32.eq (local.get $tmp) (i32.const -2)) (then (br $done)) (else (local.set $pc (local.get $tmp)) (br $lp)))))\n", i + 1); return 1; }
     }
+    if (IS_WASM_BIN) { /* EC-UNI-7 owed: binary WASM bytes */ return; }
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -173,7 +197,7 @@ int sm_freturn(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
 int sm_nreturn(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
     if (IS_X86_TEXT) return emit_sm_return_template(out, instr);
     int op = (int)instr->op, i = ctx->i;
-    if (IS_JVM) {
+    if (IS_JVM_TEXT) {
         jvm_ret_guard(SM_NRETURN_S, SM_NRETURN_F, op, i, "ns", out);
         jvm_push_int2(out, 2); jvm_push_int2(out, 0);
         fprintf(out, "    invokestatic rt/SnoRt/do_return(II)I\n    pop\n");
@@ -182,12 +206,14 @@ int sm_nreturn(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
         if (op == SM_NRETURN_F) fprintf(out, "sm_pc_%d_nf_skip:\n", i);
         return 0;
     }
-    if (IS_JS) {
+    if (IS_JVM_BIN)  { /* EC-UNI-7 owed: binary .class bytes */ return; }
+    if (IS_JS_TEXT) {
         if (op == SM_NRETURN)   { fprintf(out, "{ let _r = rt.fn_return(2, 0); if (_r === -2) { break loop; } _pc = _r; continue; } "); return 1; }
         if (op == SM_NRETURN_S) { fprintf(out, "{ let _r = rt.fn_return(2, 1); if (_r === -1) { _pc = %d; continue; } if (_r === -2) { break loop; } _pc = _r; continue; } ", i + 1); return 1; }
         if (op == SM_NRETURN_F) { fprintf(out, "{ let _r = rt.fn_return(2, 2); if (_r === -1) { _pc = %d; continue; } if (_r === -2) { break loop; } _pc = _r; continue; } ", i + 1); return 1; }
     }
-    if (IS_NET) {
+    /* IS_JS_BIN: n/a — JS has no binary form */
+    if (IS_NET_TEXT) {
         int fk = (i >= 0 && i < ctx->n && ctx->pc_to_fn) ? ctx->pc_to_fn[i] : -1;
         const char * fname = (fk >= 0 && ctx->fn_names) ? ctx->fn_names[fk] : NULL;
         net_ret_guard(SM_NRETURN_S, SM_NRETURN_F, op, i, out);
@@ -198,10 +224,12 @@ int sm_nreturn(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
         fprintf(out, "    call       void SnoRt::do_return(int32, bool)\n    call       int32 SnoRt::pop_ret_pc()\n    stloc      _pc\n    br         NET_DISPATCH\n");
         return 1;
     }
-    if (IS_WASM) {
+    if (IS_NET_BIN)  { /* EC-UNI-7 owed: binary .NET IL bytes */ return; }
+    if (IS_WASM_TEXT) {
         if (op == SM_NRETURN)   { fprintf(out, "          (local.set $tmp (call $sno_fn_return (i32.const 2) (i32.const 0)))\n          (if (i32.eq (local.get $tmp) (i32.const -2)) (then (br $done)) (else (local.set $pc (local.get $tmp)) (br $lp)))\n"); return 1; }
         if (op == SM_NRETURN_S) { fprintf(out, "          (local.set $tmp (call $sno_fn_return (i32.const 2) (i32.const 1)))\n          (if (i32.eq (local.get $tmp) (i32.const -1)) (then (i32.const %d) (local.set $pc) (br $lp)) (else (if (i32.eq (local.get $tmp) (i32.const -2)) (then (br $done)) (else (local.set $pc (local.get $tmp)) (br $lp)))))\n", i + 1); return 1; }
         if (op == SM_NRETURN_F) { fprintf(out, "          (local.set $tmp (call $sno_fn_return (i32.const 2) (i32.const 2)))\n          (if (i32.eq (local.get $tmp) (i32.const -1)) (then (i32.const %d) (local.set $pc) (br $lp)) (else (if (i32.eq (local.get $tmp) (i32.const -2)) (then (br $done)) (else (local.set $pc (local.get $tmp)) (br $lp)))))\n", i + 1); return 1; }
     }
+    if (IS_WASM_BIN) { /* EC-UNI-7 owed: binary WASM bytes */ return; }
     return 0;
 }
