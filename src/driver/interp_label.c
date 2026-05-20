@@ -8,14 +8,14 @@ void label_table_build(stage2_t *s2, const tree_t *prog)
 {
     s2->label_count = 0;
     if (!prog) return;
-    for (int i = 0; i < prog->n && s2->label_count < LABEL_MAX; i++) {
+    for (int i = 0; i < prog->n; i++) {
         const tree_t *s = prog->c[i];
         if (!s || (s->t != TT_STMT && s->t != TT_END)) continue;
         const char *lbl = stmt_attr_str(stmt_attr_find(s, ":lbl"));
         if (lbl && *lbl) {
-            s2->label_table[s2->label_count].name = strdup(lbl);
-            s2->label_table[s2->label_count].stmt = s;
-            s2->label_count++;
+            int _li = stage2_label_grow(s2);
+            s2->label_table[_li].name = strdup(lbl);
+            s2->label_table[_li].stmt = s;
         }
     }
 }

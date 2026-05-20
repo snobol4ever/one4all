@@ -52,20 +52,58 @@ void SM_seq_free(SM_sequence_t *p)
  * lower() at the top of every pass.  Frees the previous build's dynamic SM
  * arrays (idempotent: NULL-safe inside sm_seq_deinit) and re-initializes
  * them; zeros every sidecar count and the pl_pred_table buckets; resets
- * the module_registry main_mod sentinel.                                    */
+ * the module_registry main_mod sentinel.
+ *
+ * ST2-1c (2026-05-20): label_table / proc_table are now dynamically-grown.
+ * On first call they're allocated; on subsequent calls the previous storage
+ * is freed and a fresh array of initial capacity is allocated.  Initial caps
+ * mirror the former hard limits (STAGE2_LABEL_MAX / STAGE2_PROC_TABLE_MAX)
+ * as starting hints — programs that exceed them now grow rather than
+ * silently truncating.                                                       */
 void stage2_reset(void)
 {
     sm_seq_deinit(&g_stage2.sm);
     sm_seq_init  (&g_stage2.sm);
+    free(g_stage2.label_table); g_stage2.label_table = NULL;
+    free(g_stage2.proc_table);  g_stage2.proc_table  = NULL;
+    g_stage2.label_cap   = STAGE2_LABEL_MAX;
     g_stage2.label_count = 0;
+    g_stage2.label_table = calloc((size_t)g_stage2.label_cap, sizeof(LabelEntry));
+    g_stage2.proc_cap    = STAGE2_PROC_TABLE_MAX;
     g_stage2.proc_count  = 0;
+    g_stage2.proc_table  = calloc((size_t)g_stage2.proc_cap,  sizeof(IcnProcEntry));
     memset(&g_stage2.pl_pred_table,   0, sizeof g_stage2.pl_pred_table);
     memset(&g_stage2.module_registry, 0, sizeof g_stage2.module_registry);
     g_stage2.module_registry.main_mod = -1;
     g_stage2.lang = 0;
-    /* label_table[] and proc_table[] are left as-is — their contents will
-     * be overwritten as the new pass walks them up to the new counts.
-     * (Avoids touching ~150KB of memory each call.)                          */
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* stage2_label_grow — reserve a fresh slot in the dynamic label_table.  If
+ * count == cap, doubles cap and reallocates.  Returns the slot index; the
+ * slot is zero-initialized.  Mirror of the `_grow` pattern in sm_prog.c.  */
+int stage2_label_grow(stage2_t *s2)
+{
+    if (s2->label_count >= s2->label_cap) {
+        s2->label_cap *= 2;
+        s2->label_table = realloc(s2->label_table, (size_t)s2->label_cap * sizeof(LabelEntry));
+    }
+    int idx = s2->label_count++;
+    memset(&s2->label_table[idx], 0, sizeof(LabelEntry));
+    return idx;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* stage2_proc_grow — reserve a fresh slot in the dynamic proc_table.  If
+ * count == cap, doubles cap and reallocates.  Returns the slot index; the
+ * slot is zero-initialized.                                                */
+int stage2_proc_grow(stage2_t *s2)
+{
+    if (s2->proc_count >= s2->proc_cap) {
+        s2->proc_cap *= 2;
+        s2->proc_table = realloc(s2->proc_table, (size_t)s2->proc_cap * sizeof(IcnProcEntry));
+    }
+    int idx = s2->proc_count++;
+    memset(&s2->proc_table[idx], 0, sizeof(IcnProcEntry));
+    return idx;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int _grow(SM_sequence_t *p)

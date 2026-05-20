@@ -107,21 +107,29 @@ typedef struct ScripModuleRegistry {
  * time (lower() is not reentrant; see SR-15c).
  *
  * Fields:
- *   sm                 — the SM_sequence_t (the opcode array + BB graphs)
- *   label_table/count  — SNO statement labels
- *   proc_table/count   — Icon/Raku procedures
- *   pl_pred_table      — Prolog predicate clauses (hash table)
- *   module_registry    — per-language module spans
- *   lang               — program-level primary language
+ *   sm                       — the SM_sequence_t (the opcode array + BB graphs)
+ *   label_table/count/cap    — SNO statement labels (dynamic, grows via _grow)
+ *   proc_table/count/cap     — Icon/Raku procedures (dynamic, grows via _grow)
+ *   pl_pred_table            — Prolog predicate clauses (hash table)
+ *   module_registry          — per-language module spans
+ *   lang                     — program-level primary language
  *
- * Storage is in .bss (zero-initialized at program start).  lower() resets
- * the fields it overwrites at the top of the pass.                          */
+ * ST2-1c (2026-05-20): label_table and proc_table are dynamically-grown.
+ * `STAGE2_LABEL_MAX` / `STAGE2_PROC_TABLE_MAX` are kept as initial-capacity
+ * hints (sm_seq_init / stage2_reset pattern) — no longer hard limits.  The
+ * `_grow` pattern mirrors `SM_sequence_t.instrs` (sm_prog.c:_grow).
+ *
+ * Reader sites all use `[i]` indexing, so the pointer-vs-array change is
+ * transparent at every call site.  Writer sites that previously checked
+ * `< LABEL_MAX` / `< PROC_TABLE_MAX` now call grow helpers instead.        */
 typedef struct stage2_t {
     SM_sequence_t        sm;                                            /* the SM opcode array (and what the array needs) */
-    LabelEntry           label_table     [STAGE2_LABEL_MAX];            /* SNO statement labels */
+    LabelEntry          *label_table;                                   /* SNO statement labels (dynamic; see ST2-1c) */
     int                  label_count;
-    IcnProcEntry         proc_table      [STAGE2_PROC_TABLE_MAX];       /* Icon/Raku procedures */
+    int                  label_cap;
+    IcnProcEntry        *proc_table;                                    /* Icon/Raku procedures (dynamic; see ST2-1c) */
     int                  proc_count;
+    int                  proc_cap;
     Pl_PredTable         pl_pred_table;                                 /* Prolog predicate clauses */
     ScripModuleRegistry  module_registry;                               /* per-language module spans */
     int                  lang;                                          /* program-level primary language */
@@ -137,5 +145,12 @@ extern stage2_t g_stage2;
  *   of the pass).  Clears the embedded SM_sequence_t's dynamic arrays and
  *   zeros all sidecar counts.                                               */
 void stage2_reset(void);
+
+/*── Grow helpers for the dynamic sidecar arrays.  Both return the index of
+ *   the newly-reserved slot; the slot is zero-initialized.  Callers fill in
+ *   the fields after the call.  ST2-1c: replaces the hard-capped append-
+ *   guards (`if (s2->proc_count < PROC_TABLE_MAX)` etc.) at writer sites.  */
+int  stage2_label_grow(stage2_t *s2);
+int  stage2_proc_grow (stage2_t *s2);
 
 #endif

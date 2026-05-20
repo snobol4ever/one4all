@@ -115,19 +115,17 @@ void polyglot_init(stage2_t *s2, const tree_t *prog, uint32_t lang_mask)
             }
             if ((proc->t == TT_FNC || proc->t == TT_PROC_DECL || proc->t == TT_SUB_DECL) && proc->v.sval && *proc->v.sval) {
                 const char *name = proc->v.sval;
-                if (s2->proc_count < PROC_TABLE_MAX) {
-                    s2->proc_table[s2->proc_count].name     = name;
-                    s2->proc_table[s2->proc_count].proc     = proc;
-                    s2->proc_table[s2->proc_count].entry_pc = -1;
-                    s2->proc_table[s2->proc_count].bb_idx  = -1;       /* IR-CONSOLIDATE-DCG step 2: set in lower.c when ir_body is built. */
-                    s2->proc_table[s2->proc_count].nparams  = (s_lang == LANG_ICN)
-                        ? (proc->t == TT_PROC_DECL && proc->n >= 2 ? proc->c[1]->n : 0)
-                        : (int)proc->v.ival;
-                    s2->proc_count++;
-                    if (mod_idx >= 0) s2->module_registry.mods[mod_idx].nprocs++;
-                    if (strcmp(name, "main") == 0 && s2->module_registry.main_mod < 0)
-                        s2->module_registry.main_mod = mod_idx;
-                }
+                int _pi = stage2_proc_grow(s2);
+                s2->proc_table[_pi].name     = name;
+                s2->proc_table[_pi].proc     = proc;
+                s2->proc_table[_pi].entry_pc = -1;
+                s2->proc_table[_pi].bb_idx   = -1;       /* IR-CONSOLIDATE-DCG step 2: set in lower.c when ir_body is built. */
+                s2->proc_table[_pi].nparams  = (s_lang == LANG_ICN)
+                    ? (proc->t == TT_PROC_DECL && proc->n >= 2 ? proc->c[1]->n : 0)
+                    : (int)proc->v.ival;
+                if (mod_idx >= 0) s2->module_registry.mods[mod_idx].nprocs++;
+                if (strcmp(name, "main") == 0 && s2->module_registry.main_mod < 0)
+                    s2->module_registry.main_mod = mod_idx;
             }
             if (proc->t == TT_RECORD) {
                 interp_eval(proc);
