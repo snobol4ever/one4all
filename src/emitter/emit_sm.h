@@ -82,6 +82,10 @@ int emit_sm_concat_dispatch    (FILE *out, int pc);
 int emit_sm_neg_dispatch       (FILE *out, int pc);
 int emit_sm_coerce_num_dispatch(FILE *out, int pc);
 int emit_sm_exp_dispatch       (FILE *out, int pc);
+/* EC-UNI-2: compare family x86 dispatchers */
+int emit_sm_stno_template      (FILE *out, const SM_Instr *ins);     /* shim — passes NULL SrcLines */
+int emit_sm_acomp_dispatch     (FILE *out, const SM_Instr *ins, int pc);
+int emit_sm_lcomp_dispatch     (FILE *out, const SM_Instr *ins, int pc);
 /*---- compat macros -------------------------------------------------------*/
 #define sm_codegen_text(prog,out,src)  emit_walk_codegen(prog,out,src)
 #define flat_is_eligible_node(nd)      emit_flat_eligible(nd)

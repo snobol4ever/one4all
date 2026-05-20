@@ -2005,7 +2005,7 @@ static int emit_sm_decr_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_acomp_dispatch(FILE *out, const SM_Instr *ins, int pc)
+int emit_sm_acomp_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     emit_mode_set(TEXT_MODE(), out);
@@ -2013,12 +2013,19 @@ static int emit_sm_acomp_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_lcomp_dispatch(FILE *out, const SM_Instr *ins, int pc)
+int emit_sm_lcomp_dispatch(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     emit_mode_set(TEXT_MODE(), out);
     emit_sm_lcomp((int)ins->a[0].i);
     return 0;
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* EC-UNI-2b: public shim for SM_template fn sm_stno — calls the static dispatcher with NULL SrcLines.
+ * EC-UNI-3 will route SrcLines through emit_sm_dispatch via a file-scope static (or sm_ctx_t extension). */
+int emit_sm_stno_template(FILE *out, const SM_Instr *ins)
+{
+    return emit_sm_stno_dispatch(out, ins, 0, NULL);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int emit_sm_call_dispatch(FILE *out, const SM_Instr *ins, int pc)
