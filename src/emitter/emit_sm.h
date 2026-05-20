@@ -86,6 +86,15 @@ int emit_sm_exp_dispatch       (FILE *out, int pc);
 int emit_sm_stno_template      (FILE *out, const SM_Instr *ins);     /* shim — passes NULL SrcLines */
 int emit_sm_acomp_dispatch     (FILE *out, const SM_Instr *ins, int pc);
 int emit_sm_lcomp_dispatch     (FILE *out, const SM_Instr *ins, int pc);
+/* EC-UNI-2: control family x86 dispatchers (jump/halt) */
+int emit_halt_line             (FILE *out, int pc);
+int emit_sm_jump_line          (FILE *out, const SM_Instr *ins, int pc);
+int emit_sm_jump_s_line        (FILE *out, const SM_Instr *ins, int pc);
+int emit_sm_jump_f_line        (FILE *out, const SM_Instr *ins, int pc);
+/* EC-UNI-2: return family x86 dispatchers + shim */
+int emit_sm_return_dispatch    (FILE *out, int pc);
+int emit_sm_return_variant_dispatch(FILE *out, sm_opcode_t op, int pc, const SM_Program *prog);
+int emit_sm_return_template    (FILE *out, const SM_Instr *ins);   /* shim — passes NULL SM_Program for NRETURN comment annotation */
 /*---- compat macros -------------------------------------------------------*/
 #define sm_codegen_text(prog,out,src)  emit_walk_codegen(prog,out,src)
 #define flat_is_eligible_node(nd)      emit_flat_eligible(nd)

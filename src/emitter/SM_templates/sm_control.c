@@ -1,7 +1,9 @@
 #include "sm_template_common.h"
+#include "emit_sm.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* sm_jump — SM_JUMP: unconditional branch to target PC. */
 int sm_jump(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
+    if (IS_X86_TEXT) return emit_sm_jump_line(out, instr, 0);
     int target = (int)instr->a[0].i;
     if (IS_JVM) {
         const char * end_lbl = ctx->in_body ? "sm_pc_body_end" : "sm_pc_fn_end";
@@ -22,6 +24,7 @@ int sm_jump(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* sm_jump_s — SM_JUMP_S: branch to target if last_ok==true, else fall through. */
 int sm_jump_s(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
+    if (IS_X86_TEXT) return emit_sm_jump_s_line(out, instr, 0);
     int target = (int)instr->a[0].i; int i = ctx->i;
     if (IS_JVM) {
         if (target >= 0 && target < ctx->n && ctx->in_my_method && ctx->in_my_method[target]) {
@@ -46,6 +49,7 @@ int sm_jump_s(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* sm_jump_f — SM_JUMP_F: branch to target if last_ok==false, else fall through. */
 int sm_jump_f(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
+    if (IS_X86_TEXT) return emit_sm_jump_f_line(out, instr, 0);
     int target = (int)instr->a[0].i; int i = ctx->i;
     if (IS_JVM) {
         if (target >= 0 && target < ctx->n && ctx->in_my_method && ctx->in_my_method[target]) {
@@ -71,6 +75,7 @@ int sm_jump_f(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
 /* sm_halt — SM_HALT: end execution. */
 int sm_halt(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
     (void)instr;
+    if (IS_X86_TEXT) return emit_halt_line(out, 0);
     if (IS_JVM) {
         const char * end_lbl = ctx->in_body ? "sm_pc_body_end" : "sm_pc_fn_end";
         fprintf(out, "    invokestatic rt/SnoRt/halt_tos()V\n    goto_w %s\n", end_lbl);
@@ -96,6 +101,7 @@ static void net_ret_guard(int op_s, int op_f, int op, int i, FILE * out) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* sm_return — SM_RETURN/S/F: successful return from user function. */
 int sm_return(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
+    if (IS_X86_TEXT) return emit_sm_return_template(out, instr);
     int op = (int)instr->op, i = ctx->i;
     if (IS_JVM) {
         jvm_ret_guard(SM_RETURN_S, SM_RETURN_F, op, i, "rs", out);
@@ -132,6 +138,7 @@ int sm_return(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* sm_freturn — SM_FRETURN/S/F: failure return from user function. */
 int sm_freturn(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
+    if (IS_X86_TEXT) return emit_sm_return_template(out, instr);
     int op = (int)instr->op, i = ctx->i;
     if (IS_JVM) {
         jvm_ret_guard(SM_FRETURN_S, SM_FRETURN_F, op, i, "fs", out);
@@ -164,6 +171,7 @@ int sm_freturn(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* sm_nreturn — SM_NRETURN/S/F: name-return from user function. */
 int sm_nreturn(const SM_Instr * instr, const sm_ctx_t * ctx, FILE * out) {
+    if (IS_X86_TEXT) return emit_sm_return_template(out, instr);
     int op = (int)instr->op, i = ctx->i;
     if (IS_JVM) {
         jvm_ret_guard(SM_NRETURN_S, SM_NRETURN_F, op, i, "ns", out);

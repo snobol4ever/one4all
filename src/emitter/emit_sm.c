@@ -1751,7 +1751,7 @@ static void render_str_preview(char *dst, size_t cap,
     dst[o] = '\0';
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_halt_line(FILE *out, int pc)
+int emit_halt_line(FILE *out, int pc)
 {
     (void)pc;
     return emit_sm_rtcall(out, sm_template_lookup(SM_HALT), NULL);
@@ -1825,7 +1825,7 @@ static int emit_sm_label_dispatch(FILE *out, const SM_Instr *ins, int pc)
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_jump_line(FILE *out, const SM_Instr *ins, int pc)
+int emit_sm_jump_line(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     const sm_op_template_t *t = sm_template_lookup(SM_JUMP);
@@ -1836,7 +1836,7 @@ static int emit_sm_jump_line(FILE *out, const SM_Instr *ins, int pc)
     return render_call_line(out, t, &a);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_jump_s_line(FILE *out, const SM_Instr *ins, int pc)
+int emit_sm_jump_s_line(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     const sm_op_template_t *t = sm_template_lookup(SM_JUMP_S);
@@ -1847,7 +1847,7 @@ static int emit_sm_jump_s_line(FILE *out, const SM_Instr *ins, int pc)
     return render_call_line(out, t, &a);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_jump_f_line(FILE *out, const SM_Instr *ins, int pc)
+int emit_sm_jump_f_line(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     const sm_op_template_t *t = sm_template_lookup(SM_JUMP_F);
@@ -1888,7 +1888,7 @@ static int emit_sm_call_expression_dispatch(FILE *out, const SM_Instr *ins, int 
                               (int)ins->a[0].i);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_return_dispatch(FILE *out, int pc)
+int emit_sm_return_dispatch(FILE *out, int pc)
 {
     (void)pc;
     if (g_in_define_body) { emit_mode_set(TEXT_MODE(), out); insn_pop_rbp(); }
@@ -2097,7 +2097,7 @@ static int emit_sm_bb_pump_proc_dispatch(FILE *out, const SM_Instr *ins, int pc)
 }
 __attribute__((unused))
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_return_variant_dispatch(FILE *out, sm_opcode_t op, int pc, const SM_Program *prog)
+int emit_sm_return_variant_dispatch(FILE *out, sm_opcode_t op, int pc, const SM_Program *prog)
 {
     int kind = 0;
     if (op == SM_FRETURN || op == SM_FRETURN_S || op == SM_FRETURN_F) kind = 1;
@@ -2121,6 +2121,17 @@ static int emit_sm_return_variant_dispatch(FILE *out, sm_opcode_t op, int pc, co
         }
     }
     return emit_sm_ret_var(out, kind, cond, pc, sm_opcode_name(op));
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* EC-UNI-2c: public shim for the sm_return / sm_freturn / sm_nreturn template fns.
+ * Dispatches plain SM_RETURN to emit_sm_return_dispatch (handles g_in_define_body); other 8 variants
+ * (FRETURN/NRETURN ± _S/_F) go to emit_sm_return_variant_dispatch. NRETURN's function-name comment
+ * annotation requires the SM_Program* — we pass NULL today (template ctx has no prog yet); the
+ * annotation gracefully degrades to a generic banner. Machine code is byte-identical. */
+int emit_sm_return_template(FILE *out, const SM_Instr *ins)
+{
+    if (ins->op == SM_RETURN) return emit_sm_return_dispatch(out, 0);
+    return emit_sm_return_variant_dispatch(out, ins->op, 0, NULL);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void edp4_label_then(FILE *out, void (*fn)(emitter_t *))
