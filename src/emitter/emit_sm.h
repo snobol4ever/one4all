@@ -76,6 +76,12 @@ int emit_sm_push_var_dispatch  (FILE *out, const SM_Instr *ins, int pc);
 int emit_sm_store_var_dispatch (FILE *out, const SM_Instr *ins, int pc);
 int emit_sm_push_null_dispatch (FILE *out, int pc);
 int emit_sm_pop                (FILE *out, int pc);
+/* EC-UNI-2: arith family x86 dispatchers */
+int edp4_sm_arith              (FILE *out, const SM_Instr *ins, int pc);  /* SM_ADD/SUB/MUL/DIV/MOD */
+int emit_sm_concat_dispatch    (FILE *out, int pc);
+int emit_sm_neg_dispatch       (FILE *out, int pc);
+int emit_sm_coerce_num_dispatch(FILE *out, int pc);
+int emit_sm_exp_dispatch       (FILE *out, int pc);
 /*---- compat macros -------------------------------------------------------*/
 #define sm_codegen_text(prog,out,src)  emit_walk_codegen(prog,out,src)
 #define flat_is_eligible_node(nd)      emit_flat_eligible(nd)
