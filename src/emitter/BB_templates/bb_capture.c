@@ -22,10 +22,10 @@ void bb_capture(int imm) {
         emit_textf("    aload_0\n    aload_3\n    putfield bb/bb_capture/varname Ljava/lang/String;\n");
         emit_textf("    aload_0\n    iload 4\n    putfield bb/bb_capture/immediate Z\n");
         emit_textf("    aload_0\n    aload 5\n    putfield bb/bb_capture/setter Lbb/bb_capture$VarSetter;\n    return\n.end method\n");
-        emit_textf(".method public \316\261()Lbb/bb_box$Spec;\n    .limit stack 3\n    .limit locals 2\n");
+        jvm_alpha_method_hdr(out, 3, 2);
         emit_textf("    aload_0\n    getfield bb/bb_capture/child Lbb/bb_box;\n    invokevirtual bb/bb_box/\316\261()Lbb/bb_box$Spec;\n    astore_1\n");
         emit_textf("    aload_0\n    aload_1\n    invokevirtual bb/bb_capture/runChild(Lbb/bb_box$Spec;)Lbb/bb_box$Spec;\n    areturn\n.end method\n");
-        emit_textf(".method public \316\262()Lbb/bb_box$Spec;\n    .limit stack 3\n    .limit locals 2\n");
+        jvm_beta_method_hdr(out, 3, 2);
         emit_textf("    aload_0\n    getfield bb/bb_capture/child Lbb/bb_box;\n    invokevirtual bb/bb_box/\316\262()Lbb/bb_box$Spec;\n    astore_1\n");
         emit_textf("    aload_0\n    aload_1\n    invokevirtual bb/bb_capture/runChild(Lbb/bb_box$Spec;)Lbb/bb_box$Spec;\n    areturn\n.end method\n");
         (void)sid; (void)nid; return;

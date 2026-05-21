@@ -12,8 +12,10 @@ void bb_abort(void) {
         jvm_class_hdr(out, "abort");
         emit_textf(".inner class public static final abort_exception inner bb/bb_abort$AbortException outer bb/bb_abort\n");
         jvm_init_ms_only(out, "abort");
-        emit_textf(".method public \316\261()Lbb/bb_box$Spec;\n    .limit stack 2\n    .limit locals 1\n    new bb/bb_abort$AbortException\n    dup\n    invokespecial bb/bb_abort$AbortException/<init>()V\n    athrow\n.end method\n");
-        emit_textf(".method public \316\262()Lbb/bb_box$Spec;\n    .limit stack 2\n    .limit locals 1\n    new bb/bb_abort$AbortException\n    dup\n    invokespecial bb/bb_abort$AbortException/<init>()V\n    athrow\n.end method\n");
+        jvm_alpha_method_hdr(out, 2, 1);
+        emit_textf("    new bb/bb_abort$AbortException\n    dup\n    invokespecial bb/bb_abort$AbortException/<init>()V\n    athrow\n.end method\n");
+        jvm_beta_method_hdr(out, 2, 1);
+        emit_textf("    new bb/bb_abort$AbortException\n    dup\n    invokespecial bb/bb_abort$AbortException/<init>()V\n    athrow\n.end method\n");
         (void)sid; (void)nid; return;
     }
     if (IS_JS) {

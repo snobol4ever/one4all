@@ -14,7 +14,7 @@ void bb_pos(void) {
         jvm_class_hdr(out, name);
         emit_textf(".field private final n I\n.field private final dyn Ljava/util/function/IntSupplier;\n");
         jvm_init_ms_int(out, name, "n"); jvm_val_helper(out, name);
-        emit_textf(".method public \316\261()Lbb/bb_box$Spec;\n    .limit stack 5\n    .limit locals 1\n");
+        jvm_alpha_method_hdr(out, 5, 1);
         if (rpos) {
             emit_textf("    aload_0\n    getfield bb/bb_rpos/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/delta I\n");
             emit_textf("    aload_0\n    getfield bb/bb_rpos/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/omega I\n    aload_0\n    invokevirtual bb/bb_rpos/val()I\n    isub\n");
@@ -24,7 +24,8 @@ void bb_pos(void) {
         }
         emit_textf("    new bb/bb_box$Spec\n    dup\n    aload_0\n    getfield bb/bb_%s/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/delta I\n    iconst_0\n    invokespecial bb/bb_box$Spec/<init>(II)V\n    areturn\n", name);
         emit_textf("%s_omega:\n    aconst_null\n    areturn\n.end method\n", tag);
-        emit_textf(".method public \316\262()Lbb/bb_box$Spec;\n    .limit stack 1\n    .limit locals 1\n    aconst_null\n    areturn\n.end method\n");
+        jvm_beta_method_hdr(out, 1, 1);
+        emit_textf("    aconst_null\n    areturn\n.end method\n");
         return;
     }
     if (IS_JS) {

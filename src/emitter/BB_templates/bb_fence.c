@@ -10,9 +10,10 @@ void bb_fence(void) {
     int nid = bb_node_id(nd); int sid = 0;
     if (IS_JVM) {
         jvm_class_hdr(out, "fence"); jvm_init_ms_only(out, "fence");
-        emit_textf(".method public \316\261()Lbb/bb_box$Spec;\n    .limit stack 5\n    .limit locals 1\n");
+        jvm_alpha_method_hdr(out, 5, 1);
         emit_textf("    new bb/bb_box$Spec\n    dup\n    aload_0\n    getfield bb/bb_fence/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/delta I\n    iconst_0\n    invokespecial bb/bb_box$Spec/<init>(II)V\n    areturn\n.end method\n");
-        emit_textf(".method public \316\262()Lbb/bb_box$Spec;\n    .limit stack 1\n    .limit locals 1\n    aconst_null\n    areturn\n.end method\n");
+        jvm_beta_method_hdr(out, 1, 1);
+        emit_textf("    aconst_null\n    areturn\n.end method\n");
         (void)sid; (void)nid; return;
     }
     if (IS_JS) {

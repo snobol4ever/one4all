@@ -16,6 +16,8 @@
 
 /* Shared helpers defined in emit_core.c — not static, linkable from template TUs. */
 void jvm_class_hdr(FILE *out, const char *name);
+void jvm_alpha_method_hdr(FILE *out, int stack, int locals);
+void jvm_beta_method_hdr(FILE *out, int stack, int locals);
 void jvm_init_ms_only(FILE *out, const char *name);
 void jvm_init_ms_int(FILE *out, const char *name, const char *field);
 void jvm_init_ms_str(FILE *out, const char *name, const char *field);

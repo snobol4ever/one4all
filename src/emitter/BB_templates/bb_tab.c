@@ -24,7 +24,7 @@ void bb_tab(void) {
             emit_textf("    aload_0\n    getfield bb/bb_rtab/ms Lbb/bb_box$MatchState;\n    iload_1\n    putfield bb/bb_box$MatchState/delta I\n");
             emit_textf("    new bb/bb_box$Spec\n    dup\n    iload_3\n    iload_2\n    invokespecial bb/bb_box$Spec/<init>(II)V\n    areturn\n");
             emit_textf("%s_omega:\n    aconst_null\n    areturn\n.end method\n", tag);
-            emit_textf(".method public \316\262()Lbb/bb_box$Spec;\n    .limit stack 4\n    .limit locals 1\n");
+            jvm_beta_method_hdr(out, 4, 1);
             emit_textf("    aload_0\n    getfield bb/bb_rtab/ms Lbb/bb_box$MatchState;\n    dup\n    getfield bb/bb_box$MatchState/delta I\n    aload_0\n    getfield bb/bb_rtab/advance I\n    isub\n    putfield bb/bb_box$MatchState/delta I\n");
             emit_textf("    aconst_null\n    areturn\n.end method\n");
         } else {
@@ -35,7 +35,7 @@ void bb_tab(void) {
             emit_textf("    aload_0\n    getfield bb/bb_tab/ms Lbb/bb_box$MatchState;\n    aload_0\n    invokevirtual bb/bb_tab/val()I\n    putfield bb/bb_box$MatchState/delta I\n");
             emit_textf("    new bb/bb_box$Spec\n    dup\n    iload_2\n    iload_1\n    invokespecial bb/bb_box$Spec/<init>(II)V\n    areturn\n");
             emit_textf("%s_omega:\n    aconst_null\n    areturn\n.end method\n", tag);
-            emit_textf(".method public \316\262()Lbb/bb_box$Spec;\n    .limit stack 4\n    .limit locals 1\n");
+            jvm_beta_method_hdr(out, 4, 1);
             emit_textf("    aload_0\n    getfield bb/bb_tab/ms Lbb/bb_box$MatchState;\n    dup\n    getfield bb/bb_box$MatchState/delta I\n    aload_0\n    getfield bb/bb_tab/advance I\n    isub\n    putfield bb/bb_box$MatchState/delta I\n");
             emit_textf("    aconst_null\n    areturn\n.end method\n");
         }
