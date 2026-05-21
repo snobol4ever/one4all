@@ -1954,7 +1954,7 @@ int emit_sm_coerce_num_dispatch(FILE *out, int pc)
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_push_null_noflip_dispatch(FILE *out, int pc)
+int emit_sm_push_null_noflip_dispatch(FILE *out, int pc)
 {
     (void)pc;
     emit_mode_set(TEXT_MODE(), out);
@@ -2934,24 +2934,20 @@ static void emit_sm_uni_env_init(void) {
  * its 0/-1 contract (legacy switch fallthrough on uncovered opcodes) by gating on
  * sm_op_is_dispatched(op); when 1, emit_sm_dispatch is called and returns 0; when 0, this returns -1.
  *
- * Two opcodes are dispatcher-covered in general but need x86-legacy treatment, so they're excluded
- * here and fall through to the legacy switch's specialized handlers:
+ * One opcode is dispatcher-covered in general but needs x86-legacy treatment, so it's excluded
+ * here and falls through to the legacy switch's specialized handler:
  *
  *   SM_LABEL              — shared dispatcher returns 0 (silent no-op, exploited by WASM/JS/NET
  *                            walkers that emit labels via per-PC postamble).  x86 needs
  *                            emit_sm_label_dispatch which writes a three-column `LABEL` annotation.
- *   SM_PUSH_NULL_NOFLIP   — shared dispatcher routes NULL and NULL_NOFLIP to the same sm_push_null()
- *                            template (other backends collapse them).  x86 needs distinct
- *                            emit_sm_push_null_noflip_dispatch which emits `PUSH_NULL_NOFLIP` (the
- *                            template's x86 arm would emit `PUSH_NULL`).
  *
  * The x86 walker (emit_walk_codegen) is the only caller; legacy switch handles the remaining ~30
  * opcodes not yet templated (PUSH_EXPR, PUSH_EXPRESSION, CALL_EXPRESSION, INCR, DECR, return
- * variants, baked-pattern blobs, etc.) plus the two exclusions above. */
+ * variants, baked-pattern blobs, etc.) plus the exclusion above. */
 static int dispatch_one_x86(FILE *out, const SM_t *ins, int pc,
                             const SM_sequence_t *prog, const SrcLines *sl) {
     if (!sm_op_is_dispatched(ins->op)) return -1;
-    if (ins->op == SM_LABEL || ins->op == SM_PUSH_NULL_NOFLIP) return -1;
+    if (ins->op == SM_LABEL) return -1;
     /* Templates dispatch on IS_X86; make sure mode is set. Legacy path relies on individual
      * dispatchers calling emitter_init_text — we have to ensure it for the very first opcode too. */
     emit_mode_set(TEXT_MODE(), out);

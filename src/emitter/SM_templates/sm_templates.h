@@ -16,6 +16,7 @@ void sm_push_lit_i(void);
 void sm_push_lit_s(void);
 void sm_push_lit_f(void);
 void sm_push_null (void);
+void sm_push_null_noflip(void);
 void sm_void_pop  (void);
 void sm_push_var  (void);
 void sm_store_var (void);

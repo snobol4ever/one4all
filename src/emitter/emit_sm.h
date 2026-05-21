@@ -75,6 +75,7 @@ int emit_sm_push_lit_f_dispatch(FILE *out, const SM_t *ins, int pc);
 int emit_sm_push_var_dispatch  (FILE *out, const SM_t *ins, int pc);
 int emit_sm_store_var_dispatch (FILE *out, const SM_t *ins, int pc);
 int emit_sm_push_null_dispatch (FILE *out, int pc);
+int emit_sm_push_null_noflip_dispatch(FILE *out, int pc);
 int emit_sm_pop                (FILE *out, int pc);
 /* EC-UNI-2: arith family x86 dispatchers */
 int edp4_sm_arith              (FILE *out, const SM_t *ins, int pc);  /* SM_ADD/SUB/MUL/DIV/MOD */

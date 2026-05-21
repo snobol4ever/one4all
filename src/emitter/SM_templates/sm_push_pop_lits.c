@@ -39,6 +39,20 @@ void sm_push_null(void) {
     if (IS_WASM){ emit_textf("          (call $sno_push_null)\n"); return; }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* SM_PUSH_NULL_NOFLIP — x86 emits the PUSH_NULL_NOFLIP mnemonic (the "no-flip" variant skips the
+ * wired-pre-push prologue's argument flip).  JVM/JS/NET/WASM collapse PUSH_NULL_NOFLIP and
+ * PUSH_NULL to the same call: their runtimes don't expose the distinction (no wired pre-push to
+ * un-flip), so emitting the same `push_null` rt call is observably correct. */
+void sm_push_null_noflip(void) {
+    const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
+    (void)instr;
+    if (IS_X86) { emit_sm_push_null_noflip_dispatch(out, 0); return; }
+    if (IS_JVM) { emit_textf("    invokestatic rt/SnoRt/push_null()V\n"); return; }
+    if (IS_JS)  { emit_textf("rt.push_null(); "); return; }
+    if (IS_NET) { emit_textf("    call       void SnoRt::push_null()\n"); return; }
+    if (IS_WASM){ emit_textf("          (call $sno_push_null)\n"); return; }
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void sm_void_pop(void) {
     const SM_t * instr = g_emit.instr; FILE * out = g_emit.out;
     (void)instr;

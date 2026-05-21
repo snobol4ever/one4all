@@ -1525,8 +1525,8 @@ int emit_sm_dispatch(void) {
         case SM_PUSH_LIT_S:
         case SM_PUSH_LIT_CS:          sm_push_lit_s();                                   return 0;
         case SM_PUSH_LIT_F:           sm_push_lit_f();                                   return 0;
-        case SM_PUSH_NULL:
-        case SM_PUSH_NULL_NOFLIP:     sm_push_null();                                    return 0;
+        case SM_PUSH_NULL:            sm_push_null();                                    return 0;
+        case SM_PUSH_NULL_NOFLIP:     sm_push_null_noflip();                             return 0;
         case SM_PUSH_VAR:             sm_push_var();                                     return 0;
         case SM_STORE_VAR:            sm_store_var();                                    return 0;
         case SM_VOID_POP:             sm_void_pop();                                     return 0;
