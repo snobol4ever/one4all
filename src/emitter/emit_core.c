@@ -1556,6 +1556,10 @@ int emit_sm_dispatch(void) {
         /* DEFINE bracket. */
         case SM_DEFINE_ENTRY:         sm_define_entry();                                 return 0;
         case SM_DEFINE:               sm_define();                                       return 0;
+        /* BB-call bracket (EC-UNI-13(d)).  x86 emits real dispatch; JVM/JS/NET/WASM
+         * templates are honest no-ops because no frontend lowers these for those backends yet. */
+        case SM_BB_ONCE_PROC:                                                  return sm_bb_once_proc();
+        case SM_BB_PUMP_PROC:                                                  return sm_bb_pump_proc();
         /* Patterns. */
         case SM_PAT_LIT:              sm_pat_lit();                                      return 0;
         case SM_PAT_ANY:              sm_pat_any_i();                                    return 0;
@@ -1609,6 +1613,7 @@ int sm_op_is_dispatched(SM_op_t op) {
         case SM_FRETURN: case SM_FRETURN_S: case SM_FRETURN_F:
         case SM_NRETURN: case SM_NRETURN_S: case SM_NRETURN_F:
         case SM_DEFINE_ENTRY: case SM_DEFINE:
+        case SM_BB_ONCE_PROC: case SM_BB_PUMP_PROC:
         case SM_PAT_LIT: case SM_PAT_ANY: case SM_PAT_NOTANY: case SM_PAT_SPAN:
         case SM_PAT_BREAK: case SM_PAT_LEN: case SM_PAT_POS: case SM_PAT_RPOS:
         case SM_PAT_TAB: case SM_PAT_RTAB: case SM_PAT_ARB: case SM_PAT_ARBNO:
