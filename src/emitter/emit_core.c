@@ -1570,7 +1570,8 @@ static int emit_wasm_from_sm(SM_sequence_t * sm, FILE * out) {
         case SM_EXEC_STMT:    sm_exec_stmt(); break;
         case SM_DEFINE_ENTRY: sm_define_entry(); break;
         case SM_DEFINE:       sm_define(); break;
-        case SM_CALL_FN:      case SM_SUSPEND_VALUE: has_jump = sm_call_fn(); break;
+        case SM_CALL_FN:                                 has_jump = sm_call_fn();                  break;
+        case SM_SUSPEND_VALUE:                           has_jump = sm_suspend_value();            break;
         default: fprintf(out, "          ;; unhandled SM opcode %d\n", ins->op); break;
         }
         if (!has_jump) fprintf(out, "          (i32.const %d) (local.set $pc) (br $lp)\n", i + 1);
@@ -1809,7 +1810,8 @@ static void emit_jvm_one_instr(SM_sequence_t * sm, int i, int n, const char ** f
     case SM_JUMP:   { sm_jump();   break; }
     case SM_JUMP_S: { sm_jump_s(); break; }
     case SM_JUMP_F: { sm_jump_f(); break; }
-    case SM_CALL_FN: case SM_SUSPEND_VALUE: { sm_call_fn(); break; }
+    case SM_CALL_FN:                                 { sm_call_fn();       break; }
+    case SM_SUSPEND_VALUE:                           { sm_suspend_value(); break; }
     case SM_RETURN:   case SM_RETURN_S:  case SM_RETURN_F:  { sm_return();  break; }
     case SM_FRETURN:  case SM_FRETURN_S: case SM_FRETURN_F: { sm_freturn(); break; }
     case SM_NRETURN:  case SM_NRETURN_S: case SM_NRETURN_F: { sm_nreturn(); break; }
