@@ -420,7 +420,7 @@ DESCR_t EXPVAL_fn(DESCR_t expr_d)
     if (expr_d.v == DT_E) {
         if (expr_d.slen == 1) {
             int entry_pc = (int)expr_d.i;
-            return sm_call_expression(entry_pc);
+            return sm_eval_subexpr(entry_pc);
         }
         if (expr_d.slen == 2) {
             typedef void (*expr_thunk_t)(void);

@@ -179,7 +179,7 @@ void icn_scope_patch(IcnScope *sc, tree_t *e) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs)
 {
-    extern DESCR_t sm_call_expression(int epc);
+    extern DESCR_t sm_eval_subexpr(int epc);
     if (entry_pc < 0) return FAILDESCR;
     if (frame_depth >= FRAME_STACK_MAX) return FAILDESCR;
     IcnFrame *f = &frame_stack[frame_depth++];
@@ -224,7 +224,7 @@ DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs)
             }
         }
     }
-    DESCR_t result = sm_call_expression(entry_pc);
+    DESCR_t result = sm_eval_subexpr(entry_pc);
     if (found_pi >= 0 && found_proc) {
         IcnScope *sc = &g_stage2.proc_table[found_pi].lower_sc;
         tree_t *body_nd2 = (found_proc->t == TT_PROC_DECL && found_proc->n >= 3) ? found_proc->c[2] : NULL;
@@ -344,7 +344,7 @@ bb_node_t icn_bb_pump_proc_by_name(const char *name, DESCR_t *args, int nargs) {
     for (int i = 0; i < g_stage2.proc_count; i++) {
         if (strcmp(g_stage2.proc_table[i].name, name) != 0) continue;
         /* AST → IR → BB path: when an BB_graph_t body exists, drive it via icn_bb_dcg.   */
-        /* This bypasses SM entirely: no proc_table_call, no sm_call_expression.            */
+        /* This bypasses SM entirely: no proc_table_call, no sm_eval_subexpr.            */
         BB_graph_t *_cfg_i = bb_graph_of_proc(&g_stage2.proc_table[i]);
         if (_cfg_i) {
             if (frame_depth < FRAME_STACK_MAX) {

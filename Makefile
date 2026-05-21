@@ -103,6 +103,7 @@ RT_PIC_SRCS := \
     $(SRC)/emitter/SM_templates/sm_calls.c \
     $(SRC)/emitter/SM_templates/sm_compare.c \
     $(SRC)/emitter/SM_templates/sm_defines.c \
+    $(SRC)/emitter/SM_templates/sm_expr_incr.c \
     $(SRC)/emitter/SM_templates/sm_halt.c \
     $(SRC)/emitter/SM_templates/sm_jumps.c \
     $(SRC)/emitter/SM_templates/sm_pat_anchors.c \
@@ -258,6 +259,7 @@ scrip:
 	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_calls.c -o $(OBJ)/sm_calls.o
 	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_compare.c -o $(OBJ)/sm_compare.o
 	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_defines.c -o $(OBJ)/sm_defines.o
+	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_expr_incr.c -o $(OBJ)/sm_expr_incr.o
 	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_halt.c -o $(OBJ)/sm_halt.o
 	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_jumps.c -o $(OBJ)/sm_jumps.o
 	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_pat_anchors.c -o $(OBJ)/sm_pat_anchors.o

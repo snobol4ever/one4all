@@ -704,12 +704,12 @@ int sm_interp_run_inner(SM_sequence_t *prog, SM_State *st)
             }
             DESCR_t topic_d = sm_pop(st);
             int topic_pc = (topic_d.v == DT_E && topic_d.slen == 1) ? (int)topic_d.i : -1;
-            DESCR_t topic = (topic_pc >= 0) ? sm_call_expression(topic_pc) : NULVCL;
+            DESCR_t topic = (topic_pc >= 0) ? sm_eval_subexpr(topic_pc) : NULVCL;
             DESCR_t result = NULVCL;
             int matched   = 0;
             for (int k = 0; k < ncases; k++) {
                 if (val_pcs[k] < 0 || body_pcs[k] < 0) continue;
-                DESCR_t wval = sm_call_expression(val_pcs[k]);
+                DESCR_t wval = sm_eval_subexpr(val_pcs[k]);
                 int match = 0;
                 if ((tree_e)cmp_kinds[k] == TT_LEQ) {
                     const char *ts = IS_STR_fn(topic) ? topic.s : VARVAL_fn(topic);
@@ -725,13 +725,13 @@ int sm_interp_run_inner(SM_sequence_t *prog, SM_State *st)
                     }
                 }
                 if (match) {
-                    result = sm_call_expression(body_pcs[k]);
+                    result = sm_eval_subexpr(body_pcs[k]);
                     matched = 1;
                     break;
                 }
             }
             if (!matched && default_pc >= 0) {
-                result = sm_call_expression(default_pc);
+                result = sm_eval_subexpr(default_pc);
                 matched = 1;
             }
             sm_push(st, result);
@@ -1663,11 +1663,11 @@ extern int         Ω;
 extern int         Δ;
 extern jmp_buf     g_sno_err_jmp;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t sm_call_expression(int entry_pc)
+DESCR_t sm_eval_subexpr(int entry_pc)
 {
     SM_sequence_t *prog = &g_stage2.sm;
     if (!prog || entry_pc < 0 || entry_pc >= prog->count) {
-        fprintf(stderr, "sm_call_expression: invalid entry_pc %d\n", entry_pc);
+        fprintf(stderr, "sm_eval_subexpr: invalid entry_pc %d\n", entry_pc);
         return FAILDESCR;
     }
     NAME_ctx_t chunk_ctx;

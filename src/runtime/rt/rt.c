@@ -1132,10 +1132,10 @@ int rt_do_nreturn(const char *fname, int cond)
 }
 #include "sm_interp.h"
 #include "SM.h"
-__attribute__((weak)) DESCR_t sm_call_expression(int entry_pc)
+__attribute__((weak)) DESCR_t sm_eval_subexpr(int entry_pc)
 {
     fprintf(stderr,
-        "libscrip_rt: sm_call_expression(%d) called — DT_E EVAL dispatch "
+        "libscrip_rt: sm_eval_subexpr(%d) called — DT_E EVAL dispatch "
         "not yet wired in EM-6.  Add to EM-10 scope.\n", entry_pc);
     abort();
 }

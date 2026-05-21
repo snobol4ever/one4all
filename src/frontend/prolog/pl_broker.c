@@ -362,12 +362,12 @@ bb_node_t pl_box_choice(tree_t *choice_node, Term **caller_args, int arity) {
 typedef struct { int entry_pc; int fired; } pl_expression_t;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static DESCR_t pl_chunk_fn(void *zeta, int entry) {
-    extern DESCR_t sm_call_expression(int);
+    extern DESCR_t sm_eval_subexpr(int);
     pl_expression_t *z = zeta;
     if (entry == β || z->fired) return FAILDESCR;
     z->fired = 1;
     if (0) return FAILDESCR;
-    DESCR_t r = sm_call_expression(z->entry_pc);
+    DESCR_t r = sm_eval_subexpr(z->entry_pc);
     return IS_FAIL_fn(r) ? FAILDESCR : NULVCL;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/

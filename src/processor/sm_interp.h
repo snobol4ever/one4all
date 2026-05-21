@@ -56,7 +56,7 @@ void sm_state_init        (SM_State * st);
 void sm_push              (SM_State * st, DESCR_t d);
 DESCR_t sm_pop            (SM_State * st);
 DESCR_t sm_peek           (SM_State * st);
-DESCR_t sm_call_expression(int entry_pc);
+DESCR_t sm_eval_subexpr(int entry_pc);
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern int     g_sm_step_limit;
 extern int     g_sm_steps_done;
