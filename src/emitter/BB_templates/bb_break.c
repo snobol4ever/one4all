@@ -12,8 +12,7 @@ void bb_break(void) {
     if (IS_JVM) {
         char tag[32]; snprintf(tag, sizeof tag, "brk_%d_%d", sid, nid);
         jvm_class_hdr(out, "brk"); emit_textf(".field private final chars Ljava/lang/String;\n.field private matched_len I\n"); jvm_init_ms_str(out, "brk", "chars");
-        jvm_alpha_method_hdr(out, 6, 3);
-        emit_textf("    aload_0\n    iconst_0\n    putfield bb/bb_brk/matched_len I\n%s_loop:\n", tag);
+        emit_textf(".method public \316\261()Lbb/bb_box$Spec;\n    .limit stack 6\n    .limit locals 3\n    aload_0\n    iconst_0\n    putfield bb/bb_brk/matched_len I\n%s_loop:\n", tag);
         emit_textf("    aload_0\n    getfield bb/bb_brk/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/delta I\n    aload_0\n    getfield bb/bb_brk/matched_len I\n    iadd\n    istore_1\n");
         emit_textf("    iload_1\n    aload_0\n    getfield bb/bb_brk/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/omega I\n    if_icmpge %s_omega\n", tag);
         emit_textf("    aload_0\n    getfield bb/bb_brk/chars Ljava/lang/String;\n    aload_0\n    getfield bb/bb_brk/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/sigma Ljava/lang/String;\n    iload_1\n    invokevirtual java/lang/String/charAt(I)C\n");
@@ -21,7 +20,7 @@ void bb_break(void) {
         emit_textf("    aload_0\n    getfield bb/bb_brk/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/delta I\n    istore_2\n");
         emit_textf("    aload_0\n    getfield bb/bb_brk/ms Lbb/bb_box$MatchState;\n    dup\n    getfield bb/bb_box$MatchState/delta I\n    aload_0\n    getfield bb/bb_brk/matched_len I\n    iadd\n    putfield bb/bb_box$MatchState/delta I\n");
         emit_textf("    new bb/bb_box$Spec\n    dup\n    iload_2\n    aload_0\n    getfield bb/bb_brk/matched_len I\n    invokespecial bb/bb_box$Spec/<init>(II)V\n    areturn\n%s_omega:\n    aconst_null\n    areturn\n.end method\n", tag);
-        jvm_beta_method_hdr(out, 4, 1);
+        emit_textf(".method public \316\262()Lbb/bb_box$Spec;\n    .limit stack 4\n    .limit locals 1\n");
         emit_textf("    aload_0\n    getfield bb/bb_brk/ms Lbb/bb_box$MatchState;\n    dup\n    getfield bb/bb_box$MatchState/delta I\n    aload_0\n    getfield bb/bb_brk/matched_len I\n    isub\n    putfield bb/bb_box$MatchState/delta I\n    aconst_null\n    areturn\n.end method\n");
         return;
     }

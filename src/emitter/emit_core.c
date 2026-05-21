@@ -1254,21 +1254,6 @@ void jvm_class_hdr(FILE * out, const char * name) {
     fprintf(out, ".inner class public static final spec inner bb/bb_box$Spec outer bb/bb_box\n");
     fprintf(out, ".inner class public static final matchstate inner bb/bb_box$MatchState outer bb/bb_box\n");
 }
-/* EC-UNI-16 slice 2: emit a BB template's JVM α-method header (the line
- * `.method public α()Lbb/bb_box$Spec;` followed by stack/locals limits).
- * Used by 14 BB templates with varying stack/locals values; the helper
- * carries the (stack, locals) conditional and de-duplicates ≥2 templates,
- * meeting the EC-UNI-16 justification rule.  Matches existing net_alpha_hdr
- * precedent (which has no params because its stack/locals are computed at
- * runtime in the .NET case). */
-void jvm_alpha_method_hdr(FILE * out, int stack, int locals) {
-    fprintf(out, ".method public \316\261()Lbb/bb_box$Spec;\n");
-    fprintf(out, "    .limit stack %d\n    .limit locals %d\n", stack, locals);
-}
-void jvm_beta_method_hdr(FILE * out, int stack, int locals) {
-    fprintf(out, ".method public \316\262()Lbb/bb_box$Spec;\n");
-    fprintf(out, "    .limit stack %d\n    .limit locals %d\n", stack, locals);
-}
 void net_escape_ldstr(FILE * out, const char * s) {
     fprintf(out, "    ldstr      \"");
     if (!s) { fprintf(out, "\"\n"); return; }

@@ -14,11 +14,11 @@ void bb_arb(void) {
         jvm_class_hdr(out, "arb");
         emit_textf(".field private arb_count I\n.field private arb_start I\n");
         jvm_init_ms_only(out, "arb");
-        jvm_alpha_method_hdr(out, 5, 1);
+        emit_textf(".method public \316\261()Lbb/bb_box$Spec;\n    .limit stack 5\n    .limit locals 1\n");
         emit_textf("    aload_0\n    iconst_0\n    putfield bb/bb_arb/arb_count I\n");
         emit_textf("    aload_0\n    aload_0\n    getfield bb/bb_arb/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/delta I\n    putfield bb/bb_arb/arb_start I\n");
         emit_textf("    new bb/bb_box$Spec\n    dup\n    aload_0\n    getfield bb/bb_arb/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/delta I\n    iconst_0\n    invokespecial bb/bb_box$Spec/<init>(II)V\n    areturn\n.end method\n");
-        jvm_beta_method_hdr(out, 5, 1);
+        emit_textf(".method public \316\262()Lbb/bb_box$Spec;\n    .limit stack 5\n    .limit locals 1\n");
         emit_textf("    aload_0\n    dup\n    getfield bb/bb_arb/arb_count I\n    iconst_1\n    iadd\n    putfield bb/bb_arb/arb_count I\n");
         emit_textf("    aload_0\n    getfield bb/bb_arb/arb_start I\n    aload_0\n    getfield bb/bb_arb/arb_count I\n    iadd\n");
         emit_textf("    aload_0\n    getfield bb/bb_arb/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/omega I\n    if_icmpgt %s_omega\n", tag);

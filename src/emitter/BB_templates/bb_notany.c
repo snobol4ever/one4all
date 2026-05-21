@@ -12,7 +12,7 @@ void bb_notany(void) {
     if (IS_JVM) {
         char tag[32]; snprintf(tag, sizeof tag, "notany_%d_%d", sid, nid);
         jvm_class_hdr(out, "notany"); emit_textf(".field private final chars Ljava/lang/String;\n"); jvm_init_ms_str(out, "notany", "chars");
-        jvm_alpha_method_hdr(out, 5, 2);
+        emit_textf(".method public \316\261()Lbb/bb_box$Spec;\n    .limit stack 5\n    .limit locals 2\n");
         emit_textf("    aload_0\n    getfield bb/bb_notany/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/delta I\n");
         emit_textf("    aload_0\n    getfield bb/bb_notany/ms Lbb/bb_box$MatchState;\n    getfield bb/bb_box$MatchState/omega I\n    if_icmpge %s_omega\n", tag);
         emit_textf("    aload_0\n    getfield bb/bb_notany/chars Ljava/lang/String;\n");
@@ -23,7 +23,7 @@ void bb_notany(void) {
         emit_textf("    aload_0\n    getfield bb/bb_notany/ms Lbb/bb_box$MatchState;\n    dup\n    getfield bb/bb_box$MatchState/delta I\n    iconst_1\n    iadd\n    putfield bb/bb_box$MatchState/delta I\n");
         emit_textf("    new bb/bb_box$Spec\n    dup\n    iload_1\n    iconst_1\n    invokespecial bb/bb_box$Spec/<init>(II)V\n    areturn\n");
         emit_textf("%s_omega:\n    aconst_null\n    areturn\n.end method\n", tag);
-        jvm_beta_method_hdr(out, 4, 1);
+        emit_textf(".method public \316\262()Lbb/bb_box$Spec;\n    .limit stack 4\n    .limit locals 1\n");
         emit_textf("    aload_0\n    getfield bb/bb_notany/ms Lbb/bb_box$MatchState;\n    dup\n    getfield bb/bb_box$MatchState/delta I\n    iconst_1\n    isub\n    putfield bb/bb_box$MatchState/delta I\n");
         emit_textf("    aconst_null\n    areturn\n.end method\n");
         return;

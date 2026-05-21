@@ -13,8 +13,8 @@ This audit reports two things:
       simply re-asserts its result.
 
   (b) Fn-size distribution — physical-line count per fn, sorted descending.
-      EC-UNI-15 wants "one screen per fn" — a soft guideline around 60 lines
-      at 200-col density.  Fns exceeding ~60 lines are EC-UNI-16 candidates for
+      EC-UNI-15 wants "one screen per fn" — a soft target around 50 lines at
+      200-col density.  Fns exceeding ~60 lines are EC-UNI-16 candidates for
       Layer-2 helper extraction.  This audit does NOT fail on size; it records
       the inventory so future EC-UNI-16 work has a target list.
 
@@ -72,7 +72,7 @@ def main(root):
     matrix_ok = r.returncode == 0
 
     # (b) Fn-size distribution
-    print("\n--- Fn-size distribution (one-screen guideline ~60 lines at 200-col) ---")
+    print("\n--- Fn-size distribution (one-screen aspiration ~50 lines) ---")
     all_results = []
     for d in ['SM_templates', 'BB_templates']:
         for p in sorted((root / 'src' / 'emitter' / d).glob('*.c')):
