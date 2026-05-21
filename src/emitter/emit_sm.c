@@ -2911,16 +2911,21 @@ int emit_sm_pat_usercall_template       (FILE *out, const SM_t *ins) { return em
 int emit_sm_pat_usercall_args_template  (FILE *out, const SM_t *ins) { return emit_sm_pat_usercall_args_dispatch(out, ins, 0); }
 int emit_sm_exec_stmt_template          (FILE *out, const SM_t *ins) { return emit_sm_exec_stmt_variant(out, ins, 0); }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* EC-UNI-3: feature flag for unified-dispatch path. When 0 (default), emit_walk_codegen runs unchanged.
- * When 1, each opcode covered by an SM_template fn is routed through the template (which calls the same
- * dispatcher under IS_X86) instead of going through the existing switch arm directly. Byte-identical
- * by construction since both paths terminate at the same dispatcher fn. Used to gate the byte-identity check.
- * Honors SCRIP_UNIFIED_DISPATCH env var at constructor time for test scripting without a rebuild. */
-int g_emit_use_unified_dispatch = 0;
+/* EC-UNI-3: feature flag for unified-dispatch path. When 1 (now default), each opcode covered by
+ * an SM_template fn is routed through the dispatcher (which calls the same template under IS_X86)
+ * instead of going through the existing switch arm directly. Byte-identical by construction since
+ * both paths terminate at the same dispatcher fn — proven across EC-UNI-10..14(b) by the matrix
+ * gate yielding identical beauty.s md5 under both flag states.
+ *
+ * EC-UNI-14 proper (this commit): default flipped 0 -> 1. The env var still overrides for
+ * emergency rollback during this rung; the flag is scheduled for deletion at the end of EC-UNI-14
+ * once all opcodes are covered and the legacy switch is removed. */
+int g_emit_use_unified_dispatch = 1;
 __attribute__((constructor))
 static void emit_sm_uni_env_init(void) {
     const char * v = getenv("SCRIP_UNIFIED_DISPATCH");
-    if (v && *v && *v != '0') g_emit_use_unified_dispatch = 1;
+    if (!v || !*v) return;                                                       /* unset: keep default */
+    g_emit_use_unified_dispatch = (*v != '0');                                   /* '0' forces legacy path */
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* dispatch_one_x86 — try to handle one SM_t via the template path. Returns 0 on success, -1 if the
