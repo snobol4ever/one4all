@@ -2925,9 +2925,28 @@ static void emit_sm_uni_env_init(void) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* dispatch_one_x86 — try to handle one SM_t via the template path. Returns 0 on success, -1 if the
  * opcode is not yet covered by templates (caller falls through to the legacy switch). Mode must be EMIT_TEXT.
- * Only the 52 opcodes across the 5 SM_template files are covered today. */
+ * EC-UNI-14(b)(3): body delegates to the shared emit_sm_dispatch in emit_core.c.  The wrapper retains
+ * its 0/-1 contract (legacy switch fallthrough on uncovered opcodes) by gating on
+ * sm_op_is_dispatched(op); when 1, emit_sm_dispatch is called and returns 0; when 0, this returns -1.
+ *
+ * Two opcodes are dispatcher-covered in general but need x86-legacy treatment, so they're excluded
+ * here and fall through to the legacy switch's specialized handlers:
+ *
+ *   SM_LABEL              — shared dispatcher returns 0 (silent no-op, exploited by WASM/JS/NET
+ *                            walkers that emit labels via per-PC postamble).  x86 needs
+ *                            emit_sm_label_dispatch which writes a three-column `LABEL` annotation.
+ *   SM_PUSH_NULL_NOFLIP   — shared dispatcher routes NULL and NULL_NOFLIP to the same sm_push_null()
+ *                            template (other backends collapse them).  x86 needs distinct
+ *                            emit_sm_push_null_noflip_dispatch which emits `PUSH_NULL_NOFLIP` (the
+ *                            template's x86 arm would emit `PUSH_NULL`).
+ *
+ * The x86 walker (emit_walk_codegen) is the only caller; legacy switch handles the remaining ~30
+ * opcodes not yet templated (PUSH_EXPR, PUSH_EXPRESSION, CALL_EXPRESSION, INCR, DECR, return
+ * variants, baked-pattern blobs, etc.) plus the two exclusions above. */
 static int dispatch_one_x86(FILE *out, const SM_t *ins, int pc,
                             const SM_sequence_t *prog, const SrcLines *sl) {
+    if (!sm_op_is_dispatched(ins->op)) return -1;
+    if (ins->op == SM_LABEL || ins->op == SM_PUSH_NULL_NOFLIP) return -1;
     /* Templates dispatch on IS_X86; make sure mode is set. Legacy path relies on individual
      * dispatchers calling emitter_init_text — we have to ensure it for the very first opcode too. */
     emit_mode_set(TEXT_MODE(), out);
@@ -2941,86 +2960,8 @@ static int dispatch_one_x86(FILE *out, const SM_t *ins, int pc,
     g_emit.i = pc; g_emit.instr = ins; g_emit.out = out;
     g_emit.prog = (const struct SM_sequence_t *)prog;
     g_emit.srclines = (const struct SrcLines *)sl;
-    switch ((int)ins->op) {
-        /* sm_push_pop_lits.c */
-        case SM_PUSH_LIT_I:        sm_push_lit_i();    return 0;
-        case SM_PUSH_LIT_S:
-        case SM_PUSH_LIT_CS:       sm_push_lit_s();    return 0;
-        case SM_PUSH_LIT_F:        sm_push_lit_f();    return 0;
-        case SM_PUSH_NULL:         sm_push_null();     return 0;
-        case SM_VOID_POP:          sm_void_pop();      return 0;
-        case SM_PUSH_VAR:          sm_push_var();      return 0;
-        case SM_STORE_VAR:         sm_store_var();     return 0;
-        /* sm_arith.c */
-        case SM_CONCAT:            sm_concat();        return 0;
-        case SM_NEG:               sm_neg();           return 0;
-        case SM_COERCE_NUM:        sm_coerce_num();    return 0;
-        case SM_EXP:               sm_exp();           return 0;
-        case SM_ADD:               sm_add();           return 0;
-        case SM_SUB:               sm_sub();           return 0;
-        case SM_MUL:               sm_mul();           return 0;
-        case SM_DIV:               sm_div();           return 0;
-        case SM_MOD:               sm_mod();           return 0;
-        /* sm_compare.c — SM_STNO requires SrcLines which is private to emit_sm.c (NULL shim returns OK; comment annotation only). */
-        case SM_STNO:              sm_stno();          return 0;
-        case SM_ACOMP:             sm_acomp();         return 0;
-        case SM_LCOMP:             sm_lcomp();         return 0;
-        /* sm_control.c — EC-UNI-10(b): parameterless, read g_emit */
-        case SM_JUMP:              (void)sm_jump();    return 0;
-        case SM_JUMP_S:            (void)sm_jump_s();  return 0;
-        case SM_JUMP_F:            (void)sm_jump_f();  return 0;
-        case SM_HALT:              (void)sm_halt();    return 0;
-        case SM_RETURN:            (void)sm_return();  return 0;
-        case SM_FRETURN:
-        case SM_RETURN_S:
-        case SM_RETURN_F:
-        case SM_FRETURN_S:
-        case SM_FRETURN_F:         (void)sm_freturn(); return 0;
-        case SM_NRETURN:
-        case SM_NRETURN_S:
-        case SM_NRETURN_F:         (void)sm_nreturn(); return 0;
-        /* sm_pat.c — pat opcodes + exec_stmt */
-        case SM_PAT_LIT:           sm_pat_lit();                return 0;
-        case SM_PAT_ANY:           sm_pat_any_i();          return 0;
-        case SM_PAT_NOTANY:        sm_pat_notany();         return 0;
-        case SM_PAT_SPAN:          sm_pat_span();           return 0;
-        case SM_PAT_BREAK:         sm_pat_break();          return 0;
-        case SM_PAT_LEN:           sm_pat_len();                return 0;
-        case SM_PAT_POS:           sm_pat_pos();                return 0;
-        case SM_PAT_RPOS:          sm_pat_rpos();               return 0;
-        case SM_PAT_TAB:           sm_pat_tab();                return 0;
-        case SM_PAT_RTAB:          sm_pat_rtab();               return 0;
-        case SM_PAT_ARB:           sm_pat_arb();                return 0;
-        case SM_PAT_REM:           sm_pat_rem();                return 0;
-        case SM_PAT_BAL:           sm_pat_bal();                return 0;
-        case SM_PAT_FENCE0:        sm_pat_fence0();             return 0;
-        case SM_PAT_FENCE1:        sm_pat_fence1();             return 0;
-        case SM_PAT_ABORT:         sm_pat_abort();              return 0;
-        case SM_PAT_FAIL:          sm_pat_fail();               return 0;
-        case SM_PAT_SUCCEED:       sm_pat_succeed();            return 0;
-        case SM_PAT_EPS:           sm_pat_eps();                return 0;
-        case SM_PAT_DEREF:         sm_pat_deref();              return 0;
-        case SM_PAT_ARBNO:         sm_pat_arbno();              return 0;
-        case SM_PAT_CAT:           sm_pat_cat();                return 0;
-        case SM_PAT_ALT:           sm_pat_alt();                return 0;
-        case SM_PAT_REFNAME:       sm_pat_refname();            return 0;
-        case SM_PAT_CAPTURE:       sm_pat_capture();            return 0;
-        case SM_PAT_CAPTURE_FN:    sm_pat_capture_fn();         return 0;
-        case SM_PAT_CAPTURE_FN_ARGS: sm_pat_capture_fn_args();  return 0;
-        case SM_PAT_USERCALL:      sm_pat_usercall();           return 0;
-        case SM_PAT_USERCALL_ARGS: sm_pat_usercall_args();      return 0;
-        case SM_EXEC_STMT:         sm_exec_stmt();              return 0;
-        /* sm_calls.c — EC-UNI-13(b) */
-        case SM_CALL_FN:           (void)sm_call_fn();          return 0;
-        case SM_SUSPEND_VALUE:     (void)sm_suspend_value();    return 0;
-        /* sm_defines.c — EC-UNI-13(c) */
-        case SM_DEFINE_ENTRY:      (void)sm_define_entry();     return 0;
-        case SM_DEFINE:            (void)sm_define();           return 0;
-        /* sm_bb_calls.c — EC-UNI-13(d) */
-        case SM_BB_ONCE_PROC:      (void)sm_bb_once_proc();     return 0;
-        case SM_BB_PUMP_PROC:      (void)sm_bb_pump_proc();     return 0;
-        default:                   return -1;  /* uncovered by templates — caller falls through */
-    }
+    (void)emit_sm_dispatch();
+    return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int edp4_sm_unhandled(FILE *out, const SM_t *ins, int pc)
