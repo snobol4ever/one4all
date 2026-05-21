@@ -108,7 +108,7 @@ static void emit_bb_jmp_pair(const char *banner, bb_label_t *lbl_succ, bb_label_
     else            { emit_jmp(lbl_fail, JMP_JMP); emit_label_define(lbl_beta); emit_jmp(lbl_fail, JMP_JMP); }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void emit_bb_ptr_slot(char *zlbl_out) {
+void emit_bb_ptr_slot(char *zlbl_out) {
     int id = g_flat_node_id++;
     snprintf(zlbl_out, 80, ".Lrtc%d_z", id);
     char zlbl_def[88]; snprintf(zlbl_def, sizeof(zlbl_def), "%s:", zlbl_out);
@@ -291,9 +291,9 @@ void emit_bb_xrtb(long long n, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
     emit_jmp(f, JMP_JMP);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void (*g_cap_fixup_cb)(void *cap_ptr, const char *child_α_label) = NULL;
+void (*g_cap_fixup_cb)(void *cap_ptr, const char *child_α_label) = NULL;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static const char *child_cache_get_lbl(bb_box_fn fn);
+const char *child_cache_get_lbl(bb_box_fn fn);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void  emit_bb_xarbn(bb_box_fn child_fn, bb_label_t *s, bb_label_t *f, bb_label_t *b) {
     void *z = rt_bb_arbno_new(child_fn, NULL);
@@ -608,7 +608,7 @@ static bb_box_fn child_cache_get(BB_t *p) {
     return NULL;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static const char *child_cache_get_lbl(bb_box_fn fn) {
+const char *child_cache_get_lbl(bb_box_fn fn) {
     for (int i = 0; i < g_child_cache_n; i++) if (g_child_cache[i].fn == fn && g_child_cache[i].text_lbl[0]) return g_child_cache[i].text_lbl;
     return NULL;
 }

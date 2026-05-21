@@ -8,6 +8,19 @@
 void bb_fence(void) {
     BB_t * nd = g_emit.node; FILE * out = g_emit.out;
     int nid = bb_node_id(nd); int sid = 0;
+    if (IS_X86) {
+        /* Lifted from emit_bb.c::emit_bb_xfnce.  Reads g_emit.lbl_* (name strings);
+           writes asm via emit_text_jmp / emit_text_label primitives. */
+        const char * lbl_succ = g_emit.lbl_succ;
+        const char * lbl_fail = g_emit.lbl_fail;
+        const char * lbl_back = g_emit.lbl_back;
+        emit_bb_box_banner("FENCE", "");
+        emit_text_jmp(lbl_succ, JMP_JMP);
+        emit_text_label(lbl_back);
+        emit_text_jmp(lbl_fail, JMP_JMP);
+        return;
+    }
+    if (IS_BIN) return;
     if (IS_JVM) {
         jvm_class_hdr(out, "fence"); jvm_init_ms_only(out, "fence");
         emit_textf(".method public \316\261()Lbb/bb_box$Spec;\n    .limit stack 5\n    .limit locals 1\n");

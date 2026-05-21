@@ -12,7 +12,7 @@ void bb_lit(void) {
     if (IS_X86) {
         /* Lifted from emit_bb.c::emit_bb_xchr.  Snocone discipline: read values
            from g_emit / nd (lit string, label-name strings) and write asm via the
-           name-taking primitives + scalar-only insn_*/emit_seq_*-non-pointer
+           name-taking primitives + scalar-only insn_x / emit_seq_x non-pointer
            helpers.  Pointer-laundering (emit_jmp / emit_label_define) replaced by
            emit_text_jmp / emit_text_label. */
         const char * lit = nd->sval ? nd->sval : "";

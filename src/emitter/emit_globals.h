@@ -51,6 +51,16 @@ typedef struct {
     const char *                 lbl_succ;      /* α: success continuation — name string */
     const char *                 lbl_fail;      /* γ: failure continuation — name string */
     const char *                 lbl_back;      /* β: backtrack target    — name string */
+    /* BB per-op template parameters — what the lifted emit_bb_x* fns took as args.
+       The dispatcher (emit_bb_node) fills these per node; templates read from here
+       instead of taking parameters.  All are values: scalars + strings + a single
+       function-pointer scalar (bb_box_fn, kept as void * here to avoid pulling
+       bb_box.h's bb_scan enum into emit_globals.h scope) for the capture/name cases.
+       Fields are union-style by convention — the active subset depends on the node kind. */
+    void *                       child_fn;      /* xcallcap/xfnme/xnme: child Byrd-box fn (bb_box_fn cast as void *) */
+    const char *                 op_name1;      /* fnc_name (CALLCAP), varname (CAP_x / DEREF / USERPAT), chars (SPAN/ANY/BREAK/NOTANY) */
+    const char *                 op_name2;      /* c_fn_name (charset) */
+    const char *                 op_kind;       /* kind_name (charset) — "SPAN"/"ANY"/"BREAK"/"NOTANY" */
     /* JVM body/method gate -------------------------------------------- */
     int                          in_body;       /* 1 if emitting function body method */
     const char *                 in_my_method;  /* byte[n]: 1 if PC i belongs to current method */

@@ -86,6 +86,9 @@ RT_PIC_SRCS := \
     $(SRC)/emitter/BB_templates/bb_break.c \
     $(SRC)/emitter/BB_templates/bb_capture.c \
     $(SRC)/emitter/BB_templates/bb_cat.c \
+    $(SRC)/emitter/BB_templates/bb_charset_helper.c \
+    $(SRC)/emitter/BB_templates/bb_dsar.c \
+    $(SRC)/emitter/BB_templates/bb_atp_template.c \
     $(SRC)/emitter/BB_templates/bb_fence.c \
     $(SRC)/emitter/BB_templates/bb_len.c \
     $(SRC)/emitter/BB_templates/bb_lit.c \
@@ -318,6 +321,9 @@ scrip:
 	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_break.c       -o $(OBJ)/bb_break.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_capture.c     -o $(OBJ)/bb_capture.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_cat.c         -o $(OBJ)/bb_cat.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_charset_helper.c -o $(OBJ)/bb_charset_helper.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_dsar.c        -o $(OBJ)/bb_dsar.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_atp_template.c         -o $(OBJ)/bb_atp_template.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_fence.c       -o $(OBJ)/bb_fence.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_len.c         -o $(OBJ)/bb_len.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_lit.c         -o $(OBJ)/bb_lit.o

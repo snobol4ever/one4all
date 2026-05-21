@@ -4,10 +4,100 @@
    that this file restores; separators and includes match the original per-file
    shape pre-EC-UNI-13(a). */
 #include "bb_template_common.h"
+#include "bb_box.h"
+#include "emit_bb.h"
+#include "../runtime/rt/rt.h"
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void bb_capture(int imm) {
     BB_t * nd = g_emit.node; FILE * out = g_emit.out;
     int nid = bb_node_id(nd); int sid = 0;
+    if (IS_X86) {
+        /* Lifted from emit_bb.c::emit_bb_xcallcap / emit_bb_xfnme / emit_bb_xnme.
+           Three siblings dispatched by g_emit.op_name1:
+             - non-NULL fnc_name + NULL varname  -> CALLCAP (emit_bb_xcallcap)
+             - imm=1 + non-NULL varname          -> CAP_IMM  (emit_bb_xfnme)
+             - imm=0 + non-NULL varname          -> CAP_COND (emit_bb_xnme)
+           Parameters corraled from g_emit: child_fn, op_name1 (fnc_name or
+           varname), lbl_succ/lbl_fail/lbl_back.  Live path still emit_bb.c. */
+        bb_box_fn   child_fn = (bb_box_fn)g_emit.child_fn;
+        const char *name     = g_emit.op_name1;
+        const char *lbl_succ = g_emit.lbl_succ;
+        const char *lbl_fail = g_emit.lbl_fail;
+        const char *lbl_back = g_emit.lbl_back;
+        bb_label_t  L_s = bb_label_from_name(lbl_succ);
+        bb_label_t  L_f = bb_label_from_name(lbl_fail);
+        bb_label_t  L_b = bb_label_from_name(lbl_back);
+        const char *banner_kind = (imm ? "CAP_IMM" : "CAP_COND");
+        int   cap_imm = imm;
+        void *z = NULL;
+        const char *combo_imm_flag, *combo_callcap_flag;
+        if (!name || name[0] == 0) {
+            /* fall through — nothing to do; live path covers it */
+            return;
+        }
+        /* Decide variant: emit_bb_xcallcap was called with fnc_name (and no
+           varname).  The dispatcher path for that is BB_PAT_ASSIGN_*_with_call.
+           For the lift, we model it by treating op_name1 as varname for
+           CAP_IMM/CAP_COND, and op_name2 as fnc_name for CALLCAP.  Today the
+           dispatcher does not fill either, so we go down the CAP_*  branches. */
+        if (g_emit.op_name2 && g_emit.op_name2[0]) {
+            /* xcallcap path */
+            const char *fnc_name = g_emit.op_name2;
+            banner_kind = "CALLCAP";
+            z = bb_cap_new_call(child_fn, NULL, fnc_name, NULL, 0, NULL, 0, 0);
+            emit_bb_box_banner(banner_kind, fnc_name);
+            combo_imm_flag = "0"; combo_callcap_flag = "1";
+            if (IS_TEXT) {
+                char zlbl[80]; emit_bb_ptr_slot(zlbl);
+                const char *clbl = child_fn ? child_cache_get_lbl(child_fn) : NULL;
+                if (clbl && g_cap_fixup_cb) {
+                    char combo[320];
+                    snprintf(combo, sizeof combo, "%s|%s|%s|%s|%s",
+                             zlbl, clbl, fnc_name, combo_imm_flag, combo_callcap_flag);
+                    g_cap_fixup_cb((void*)1, combo);
+                }
+                emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_cap",
+                                       (uint64_t)(uintptr_t)rt_bb_cap, 0, &L_s, &L_f);
+                emit_label_define(&L_b);
+                emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_cap",
+                                       (uint64_t)(uintptr_t)rt_bb_cap, 1, &L_s, &L_f);
+                return;
+            }
+            emit_seq_port_call((uint64_t)(uintptr_t)z, "rt_bb_cap",
+                               (uint64_t)(uintptr_t)rt_bb_cap, 0, &L_s, &L_f);
+            emit_label_define(&L_b);
+            emit_seq_port_call((uint64_t)(uintptr_t)z, "rt_bb_cap",
+                               (uint64_t)(uintptr_t)rt_bb_cap, 1, &L_s, &L_f);
+            return;
+        }
+        /* xfnme (imm=1) or xnme (imm=0) path */
+        z = bb_cap_new(child_fn, NULL, name, NULL, cap_imm);
+        emit_bb_box_banner(banner_kind, name);
+        combo_imm_flag     = cap_imm ? "1" : "0";
+        combo_callcap_flag = "0";
+        if (IS_TEXT) {
+            char zlbl[80]; emit_bb_ptr_slot(zlbl);
+            const char *clbl = child_fn ? child_cache_get_lbl(child_fn) : NULL;
+            if (clbl && g_cap_fixup_cb) {
+                char combo[320];
+                snprintf(combo, sizeof combo, "%s|%s|%s|%s|%s",
+                         zlbl, clbl, name, combo_imm_flag, combo_callcap_flag);
+                g_cap_fixup_cb((void*)1, combo);
+            }
+            emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_cap",
+                                   (uint64_t)(uintptr_t)rt_bb_cap, 0, &L_s, &L_f);
+            emit_label_define(&L_b);
+            emit_seq_port_call_rip((uint64_t)(uintptr_t)z, zlbl, "rt_bb_cap",
+                                   (uint64_t)(uintptr_t)rt_bb_cap, 1, &L_s, &L_f);
+            return;
+        }
+        emit_seq_port_call((uint64_t)(uintptr_t)z, "rt_bb_cap",
+                           (uint64_t)(uintptr_t)rt_bb_cap, 0, &L_s, &L_f);
+        emit_label_define(&L_b);
+        emit_seq_port_call((uint64_t)(uintptr_t)z, "rt_bb_cap",
+                           (uint64_t)(uintptr_t)rt_bb_cap, 1, &L_s, &L_f);
+        return;
+    }
     if (IS_BIN) return; /* x86 binary: emit_flat_body path, not emit_bb_node */
     if (IS_JVM) {
         (void)imm;

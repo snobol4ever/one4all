@@ -14,6 +14,19 @@
 
 /* Mode test macros (defined in emit_core.h): IS_TEXT, IS_BIN, IS_JVM, IS_JS, IS_NET */
 
+/* Template scaffolding — corral helper.  Some legacy emit_seq_* / emit_jmp /
+   emit_label_define helpers still take bb_label_t * directly.  Until they are
+   replaced with name-taking variants, templates wrap g_emit's name strings into
+   transient bb_label_t records on the stack so the legacy helpers can be called.
+   Side-effects on the bb_label_t (offset patching) survive only within text-mode
+   templates; binary-mode handling will need name-keyed primitives in a future
+   sweep.  In Snocone the bb_label_t conjuring vanishes — only the name remains. */
+static inline bb_label_t bb_label_from_name(const char *name) {
+    bb_label_t lbl = { {0}, -1 };
+    if (name) { strncpy(lbl.name, name, BB_LABEL_NAME_MAX - 1); lbl.name[BB_LABEL_NAME_MAX - 1] = '\0'; }
+    return lbl;
+}
+
 /* Shared helpers defined in emit_core.c — not static, linkable from template TUs. */
 void jvm_class_hdr(FILE *out, const char *name);
 void jvm_init_ms_only(FILE *out, const char *name);

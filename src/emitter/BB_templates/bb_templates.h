@@ -16,6 +16,8 @@ void bb_any    (void);
 void bb_notany (void);
 void bb_span   (void);
 void bb_break  (void);
+/* Shared helper for SPAN/ANY/BREAK/NOTANY x86 emission (lifted from emit_bb_charset). */
+void bb_charset_emit (void);
 void bb_arb    (void);
 void bb_arbno  (void);
 void bb_cat    (void);

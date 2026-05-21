@@ -8,6 +8,15 @@
 void bb_notany(void) {
     BB_t * nd = g_emit.node; FILE * out = g_emit.out;
     int nid = bb_node_id(nd); int sid = 0;
+    if (IS_X86) {
+        const char *save_n1 = g_emit.op_name1, *save_n2 = g_emit.op_name2, *save_k = g_emit.op_kind;
+        g_emit.op_name1 = nd->sval ? nd->sval : "";
+        g_emit.op_name2 = "bb_notany";
+        g_emit.op_kind  = "NOTANY";
+        bb_charset_emit();
+        g_emit.op_name1 = save_n1; g_emit.op_name2 = save_n2; g_emit.op_kind = save_k;
+        return;
+    }
     if (IS_BIN) return; /* x86 binary: emit_flat_body path, not emit_bb_node */
     if (IS_JVM) {
         char tag[32]; snprintf(tag, sizeof tag, "notany_%d_%d", sid, nid);

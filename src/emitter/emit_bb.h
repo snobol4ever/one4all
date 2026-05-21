@@ -18,6 +18,10 @@ void emit_flat_set_cap_fixup(void (*cb)(void * cap_ptr, const char * child_alpha
 void emit_bb_register_child_label(BB_t * nd, const char * alpha_label);
 void emit_flat_banner_rule  (char ch);
 extern int g_flat_node_id;
+/* Helpers used by lifted BB templates in BB_templates/ (corraled from emit_bb.c statics). */
+void         emit_bb_ptr_slot      (char *zlbl_out);
+const char * child_cache_get_lbl   (bb_box_fn fn);
+extern void (*g_cap_fixup_cb)      (void *cap_ptr, const char *child_alpha_label);
 /*---- section / data emitters ---------------------------------------------*/
 void emit_flat_label        (const char * name);
 void emit_flat_data_section (void);           void emit_flat_text_section (void);
