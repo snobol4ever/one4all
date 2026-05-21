@@ -38,6 +38,14 @@ typedef struct {
     BB_t *                       node;          /* current BB node */
     int                          sid;           /* statement id (today: 0) */
     int                          nid;           /* node id = bb_node_id(node) */
+    /* BB Byrd-box port labels (for x86 BB templates lifted from emit_bb.c).
+       Set by the dispatcher (emit_flat_ir / emit_bb_node) before calling the template;
+       read by the template's IS_X86 arm.  α (alpha-succ), β (beta-back), γ (gamma-fail),
+       ω-init label.  Today we expose three: succ, fail, back — matching the
+       (lbl_succ, lbl_fail, lbl_β) triple used by the emit_bb_x* fn family. */
+    bb_label_t *                 lbl_succ;      /* α: success continuation */
+    bb_label_t *                 lbl_fail;      /* γ: failure continuation */
+    bb_label_t *                 lbl_back;      /* β: backtrack target */
     /* JVM body/method gate -------------------------------------------- */
     int                          in_body;       /* 1 if emitting function body method */
     const char *                 in_my_method;  /* byte[n]: 1 if PC i belongs to current method */
