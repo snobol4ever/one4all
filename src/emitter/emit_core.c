@@ -1495,7 +1495,140 @@ static void wasm_pre_scan_userfns(SM_sequence_t * sm) {
     }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* EC-WASM-SM: emit_wasm_from_sm — now delegates to SM_template functions (one per opcode). */
+/* EC-UNI-14(a): emit_sm_dispatch — shared opcode→template dispatcher used by the WASM, JS, and
+ * NET silo walkers.  Reads g_emit.instr->op and calls the matching sm_<name>() template.  Returns
+ * 1 if the template emitted its own PC transfer (jump / return / suspend / call-with-jump),
+ * 0 otherwise (caller continues with per-PC postamble: WASM `(local.set $pc i+1) (br $lp)`,
+ * JS `_pc = i+1; continue;`, NET `stloc _pc; br NET_DISPATCH`).
+ *
+ * Backend-specific quirks NOT covered here — caller handles BEFORE invoking:
+ *   - SM_LABEL: WASM/JS no-op (drop into dispatch returns 0); NET inlines frame_push +
+ *     frame_save + param-bind for function-entry labels and must override.
+ *   - SM_EXEC_STMT: WASM/JS call sm_exec_stmt() (covered here); NET inlines a fixed
+ *     stack-cleanup + set_omega/set_sigma/set_delta/set_last_ok sequence and must override.
+ *   - SM_PUSH_EXPRESSION: JS emits literal `rt.push_null();` inline; WASM/NET don't
+ *     handle this opcode at all.
+ *   - SM_INCR / SM_DECR: WASM treats as aliases for SM_ADD / SM_SUB respectively; JS/NET
+ *     don't handle them.
+ *   - SM_PUSH_NULL_NOFLIP: shared across all three — bundled with SM_PUSH_NULL.
+ *
+ * Per-instruction g_emit fields (g_emit.i, g_emit.n, g_emit.instr, sidecars) must be set by
+ * the caller before invoking.  g_emit.prog and g_emit.srclines are set once at emit_program
+ * entry; the per-instruction fields turn over inside the silo walkers' loops. */
+int emit_sm_dispatch(void) {
+    const SM_t *instr = g_emit.instr;
+    switch (instr->op) {
+        /* No-effect cases — uniform default-handled by WASM/JS, overridden by NET upstream. */
+        case SM_LABEL:                                                                   return 0;
+        /* Push/pop literals and variables. */
+        case SM_PUSH_LIT_I:           sm_push_lit_i();                                   return 0;
+        case SM_PUSH_LIT_S:
+        case SM_PUSH_LIT_CS:          sm_push_lit_s();                                   return 0;
+        case SM_PUSH_LIT_F:           sm_push_lit_f();                                   return 0;
+        case SM_PUSH_NULL:
+        case SM_PUSH_NULL_NOFLIP:     sm_push_null();                                    return 0;
+        case SM_PUSH_VAR:             sm_push_var();                                     return 0;
+        case SM_STORE_VAR:            sm_store_var();                                    return 0;
+        case SM_VOID_POP:             sm_void_pop();                                     return 0;
+        /* Arithmetic / coercion. */
+        case SM_CONCAT:               sm_concat();                                       return 0;
+        case SM_NEG:                  sm_neg();                                          return 0;
+        case SM_COERCE_NUM:           sm_coerce_num();                                   return 0;
+        case SM_EXP:                  sm_exp();                                          return 0;
+        case SM_ADD:                  sm_add();                                          return 0;
+        case SM_SUB:                  sm_sub();                                          return 0;
+        case SM_MUL:                  sm_mul();                                          return 0;
+        case SM_DIV:                  sm_div();                                          return 0;
+        case SM_MOD:                  sm_mod();                                          return 0;
+        case SM_LCOMP:                sm_lcomp();                                        return 0;
+        case SM_ACOMP:                sm_acomp();                                        return 0;
+        case SM_STNO:                 sm_stno();                                         return 0;
+        /* Control flow — these CAN take control of PC; bubble template return value up. */
+        case SM_HALT:                                                          return sm_halt();
+        case SM_JUMP:                                                          return sm_jump();
+        case SM_JUMP_S:                                                        return sm_jump_s();
+        case SM_JUMP_F:                                                        return sm_jump_f();
+        case SM_CALL_FN:                                                       return sm_call_fn();
+        case SM_SUSPEND_VALUE:                                                 return sm_suspend_value();
+        case SM_RETURN: case SM_RETURN_S:  case SM_RETURN_F:                   return sm_return();
+        case SM_FRETURN: case SM_FRETURN_S: case SM_FRETURN_F:                 return sm_freturn();
+        case SM_NRETURN: case SM_NRETURN_S: case SM_NRETURN_F:                 return sm_nreturn();
+        /* DEFINE bracket. */
+        case SM_DEFINE_ENTRY:         sm_define_entry();                                 return 0;
+        case SM_DEFINE:               sm_define();                                       return 0;
+        /* Patterns. */
+        case SM_PAT_LIT:              sm_pat_lit();                                      return 0;
+        case SM_PAT_ANY:              sm_pat_any_i();                                    return 0;
+        case SM_PAT_NOTANY:           sm_pat_notany();                                   return 0;
+        case SM_PAT_SPAN:             sm_pat_span();                                     return 0;
+        case SM_PAT_BREAK:            sm_pat_break();                                    return 0;
+        case SM_PAT_LEN:              sm_pat_len();                                      return 0;
+        case SM_PAT_POS:              sm_pat_pos();                                      return 0;
+        case SM_PAT_RPOS:             sm_pat_rpos();                                     return 0;
+        case SM_PAT_TAB:              sm_pat_tab();                                      return 0;
+        case SM_PAT_RTAB:             sm_pat_rtab();                                     return 0;
+        case SM_PAT_ARB:              sm_pat_arb();                                      return 0;
+        case SM_PAT_ARBNO:            sm_pat_arbno();                                    return 0;
+        case SM_PAT_REM:              sm_pat_rem();                                      return 0;
+        case SM_PAT_BAL:              sm_pat_bal();                                      return 0;
+        case SM_PAT_FENCE0:           sm_pat_fence0();                                   return 0;
+        case SM_PAT_FENCE1:           sm_pat_fence1();                                   return 0;
+        case SM_PAT_FAIL:             sm_pat_fail();                                     return 0;
+        case SM_PAT_SUCCEED:          sm_pat_succeed();                                  return 0;
+        case SM_PAT_ABORT:            sm_pat_abort();                                    return 0;
+        case SM_PAT_EPS:              sm_pat_eps();                                      return 0;
+        case SM_PAT_CAT:              sm_pat_cat();                                      return 0;
+        case SM_PAT_ALT:              sm_pat_alt();                                      return 0;
+        case SM_PAT_DEREF:            sm_pat_deref();                                    return 0;
+        case SM_PAT_REFNAME:          sm_pat_refname();                                  return 0;
+        case SM_PAT_CAPTURE:          sm_pat_capture();                                  return 0;
+        case SM_PAT_CAPTURE_FN:       sm_pat_capture_fn();                               return 0;
+        case SM_PAT_CAPTURE_FN_ARGS:  sm_pat_capture_fn_args();                          return 0;
+        case SM_PAT_USERCALL:         sm_pat_usercall();                                 return 0;
+        case SM_PAT_USERCALL_ARGS:    sm_pat_usercall_args();                            return 0;
+        /* EXEC_STMT — WASM/JS via template; NET caller must override before reaching here. */
+        case SM_EXEC_STMT:            sm_exec_stmt();                                    return 0;
+        default:                                                                         return 0;
+    }
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* EC-UNI-14(a): sm_op_is_dispatched — returns 1 if emit_sm_dispatch covers this opcode, 0 if it
+ * silently falls through.  Used by silo walkers that want to annotate truly unhandled opcodes
+ * differently from the dispatcher's no-effect cases (e.g., SM_LABEL). */
+int sm_op_is_dispatched(SM_op_t op) {
+    switch (op) {
+        case SM_LABEL: case SM_PUSH_LIT_I: case SM_PUSH_LIT_S: case SM_PUSH_LIT_CS:
+        case SM_PUSH_LIT_F: case SM_PUSH_NULL: case SM_PUSH_NULL_NOFLIP:
+        case SM_PUSH_VAR: case SM_STORE_VAR: case SM_VOID_POP:
+        case SM_CONCAT: case SM_NEG: case SM_COERCE_NUM: case SM_EXP:
+        case SM_ADD: case SM_SUB: case SM_MUL: case SM_DIV: case SM_MOD:
+        case SM_LCOMP: case SM_ACOMP: case SM_STNO:
+        case SM_HALT: case SM_JUMP: case SM_JUMP_S: case SM_JUMP_F:
+        case SM_CALL_FN: case SM_SUSPEND_VALUE:
+        case SM_RETURN: case SM_RETURN_S: case SM_RETURN_F:
+        case SM_FRETURN: case SM_FRETURN_S: case SM_FRETURN_F:
+        case SM_NRETURN: case SM_NRETURN_S: case SM_NRETURN_F:
+        case SM_DEFINE_ENTRY: case SM_DEFINE:
+        case SM_PAT_LIT: case SM_PAT_ANY: case SM_PAT_NOTANY: case SM_PAT_SPAN:
+        case SM_PAT_BREAK: case SM_PAT_LEN: case SM_PAT_POS: case SM_PAT_RPOS:
+        case SM_PAT_TAB: case SM_PAT_RTAB: case SM_PAT_ARB: case SM_PAT_ARBNO:
+        case SM_PAT_REM: case SM_PAT_BAL: case SM_PAT_FENCE0: case SM_PAT_FENCE1:
+        case SM_PAT_FAIL: case SM_PAT_SUCCEED: case SM_PAT_ABORT: case SM_PAT_EPS:
+        case SM_PAT_CAT: case SM_PAT_ALT: case SM_PAT_DEREF: case SM_PAT_REFNAME:
+        case SM_PAT_CAPTURE: case SM_PAT_CAPTURE_FN: case SM_PAT_CAPTURE_FN_ARGS:
+        case SM_PAT_USERCALL: case SM_PAT_USERCALL_ARGS:
+        case SM_EXEC_STMT:
+            return 1;
+        default:
+            return 0;
+    }
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* EC-WASM-SM: emit_wasm_from_sm — per-PC `(if pc==N)` wrapper, body via emit_sm_dispatch.
+ * EC-UNI-14(a): the 50+ arm switch collapsed into emit_sm_dispatch.  WASM-only overrides
+ * stay here: SM_INCR / SM_DECR alias to sm_add / sm_sub (WASM treats INCR/DECR as ADD/SUB
+ * since the rt only exposes the two), and the `;; unhandled` annotation for unknown opcodes
+ * (where the dispatcher silently returns 0). */
 static int emit_wasm_from_sm(SM_sequence_t * sm, FILE * out) {
     if (!sm || !out || sm->count == 0) return 0;
     int n = sm->count;
@@ -1508,71 +1641,18 @@ static int emit_wasm_from_sm(SM_sequence_t * sm, FILE * out) {
         g_emit.in_body = 0; g_emit.in_my_method = NULL;
         g_emit.pc_to_fn = NULL; g_emit.fn_names = NULL; g_emit.fn_pcs = NULL; g_emit.fn_count = 0;
         fprintf(out, "        (if (i32.eq (local.get $pc) (i32.const %d)) (then\n", i);
-        switch (ins->op) {
-        case SM_STNO:                                    sm_stno();                       break;
-        case SM_LABEL:                                                                            break;
-        case SM_PUSH_LIT_I:                              sm_push_lit_i();                 break;
-        case SM_PUSH_LIT_S:   case SM_PUSH_LIT_CS:      sm_push_lit_s();                 break;
-        case SM_PUSH_LIT_F:                              sm_push_lit_f();                 break;
-        case SM_PUSH_NULL:    case SM_PUSH_NULL_NOFLIP: sm_push_null();                  break;
-        case SM_PUSH_VAR:                                sm_push_var();                   break;
-        case SM_STORE_VAR:                               sm_store_var();                  break;
-        case SM_VOID_POP:                                sm_void_pop();                   break;
-        case SM_CONCAT:                                  sm_concat();                     break;
-        case SM_NEG:                                     sm_neg();                        break;
-        case SM_COERCE_NUM:                              sm_coerce_num();                 break;
-        case SM_EXP:                                     sm_exp();                        break;
-        case SM_ADD:                                     sm_add();                        break;
-        case SM_SUB:                                     sm_sub();                        break;
-        case SM_MUL:                                     sm_mul();                        break;
-        case SM_DIV:                                     sm_div();                        break;
-        case SM_MOD:                                     sm_mod();                        break;
-        case SM_LCOMP:                                   sm_lcomp();                      break;
-        case SM_ACOMP:                                   sm_acomp();                      break;
-        case SM_INCR:                                    sm_add();                        break;
-        case SM_DECR:                                    sm_sub();                        break;
-        case SM_HALT:         has_jump = sm_halt();                                               break;
-        case SM_JUMP:         has_jump = sm_jump();                                               break;
-        case SM_JUMP_S:       has_jump = sm_jump_s();                                             break;
-        case SM_JUMP_F:       has_jump = sm_jump_f();                                             break;
-        case SM_RETURN:   case SM_RETURN_S:   case SM_RETURN_F:   has_jump = sm_return();    break;
-        case SM_FRETURN:  case SM_FRETURN_S:  case SM_FRETURN_F:  has_jump = sm_freturn();   break;
-        case SM_NRETURN:  case SM_NRETURN_S:  case SM_NRETURN_F:  has_jump = sm_nreturn();   break;
-        case SM_PAT_LIT:                                 sm_pat_lit();                    break;
-        case SM_PAT_ANY:                                 sm_pat_any_i();               break;
-        case SM_PAT_NOTANY:                              sm_pat_notany();               break;
-        case SM_PAT_SPAN:                                sm_pat_span();                break;
-        case SM_PAT_BREAK:                               sm_pat_break();               break;
-        case SM_PAT_LEN:                                 sm_pat_len();                    break;
-        case SM_PAT_POS:                                 sm_pat_pos();                    break;
-        case SM_PAT_RPOS:                                sm_pat_rpos();                   break;
-        case SM_PAT_TAB:                                 sm_pat_tab();                    break;
-        case SM_PAT_RTAB:                                sm_pat_rtab();                   break;
-        case SM_PAT_REM:                                 sm_pat_rem();                    break;
-        case SM_PAT_ARB:                                 sm_pat_arb();                    break;
-        case SM_PAT_ARBNO:                               sm_pat_arbno();                  break;
-        case SM_PAT_BAL:                                 sm_pat_bal();                    break;
-        case SM_PAT_FAIL:                                sm_pat_fail();                   break;
-        case SM_PAT_SUCCEED:                             sm_pat_succeed();                break;
-        case SM_PAT_ABORT:                               sm_pat_abort();                  break;
-        case SM_PAT_FENCE0:                              sm_pat_fence0();                 break;
-        case SM_PAT_FENCE1:                              sm_pat_fence1();                 break;
-        case SM_PAT_EPS:                                 sm_pat_eps();                    break;
-        case SM_PAT_CAT:                                 sm_pat_cat();                    break;
-        case SM_PAT_ALT:                                 sm_pat_alt();                    break;
-        case SM_PAT_DEREF:                               sm_pat_deref();                  break;
-        case SM_PAT_REFNAME:                             sm_pat_refname();                break;
-        case SM_PAT_CAPTURE:                             sm_pat_capture();                break;
-        case SM_PAT_CAPTURE_FN:                          sm_pat_capture_fn();             break;
-        case SM_PAT_CAPTURE_FN_ARGS:                     sm_pat_capture_fn_args();        break;
-        case SM_PAT_USERCALL:                            sm_pat_usercall();               break;
-        case SM_PAT_USERCALL_ARGS:                       sm_pat_usercall_args();          break;
-        case SM_EXEC_STMT:    sm_exec_stmt(); break;
-        case SM_DEFINE_ENTRY: sm_define_entry(); break;
-        case SM_DEFINE:       sm_define(); break;
-        case SM_CALL_FN:                                 has_jump = sm_call_fn();                  break;
-        case SM_SUSPEND_VALUE:                           has_jump = sm_suspend_value();            break;
-        default: fprintf(out, "          ;; unhandled SM opcode %d\n", ins->op); break;
+        /* WASM-only overrides: INCR/DECR alias to ADD/SUB.  Note: this is a runtime-fidelity
+         * gap (no SM_INCR/SM_DECR semantic — they'd be ADD/SUB with arg=1).  The legacy switch
+         * had this behavior; keep it bit-for-bit until WASM rt grows real INCR/DECR. */
+        if (ins->op == SM_INCR)        { sm_add(); }
+        else if (ins->op == SM_DECR)   { sm_sub(); }
+        else {
+            has_jump = emit_sm_dispatch();
+            /* Annotation for opcodes the dispatcher silently passes through with no template
+             * (currently: only the no-effect SM_LABEL path, plus any future opcode lacking a
+             * template).  Detect by checking the dispatcher's coverage explicitly. */
+            if (ins->op != SM_LABEL && !sm_op_is_dispatched(ins->op))
+                fprintf(out, "          ;; unhandled SM opcode %d\n", ins->op);
         }
         if (!has_jump) fprintf(out, "          (i32.const %d) (local.set $pc) (br $lp)\n", i + 1);
         fprintf(out, "        ))\n");
@@ -1942,68 +2022,15 @@ static int emit_js_from_sm(SM_sequence_t * sm, FILE * out) {
         g_emit.pc_to_fn = NULL; g_emit.fn_names = NULL; g_emit.fn_pcs = NULL; g_emit.fn_count = 0;
         fprintf(out, "case %d: ", i);
         int has_continue = 0;
-        switch (instr->op) {
-        case SM_STNO:              sm_stno(); break;
-        case SM_LABEL:             break;
-        case SM_PUSH_LIT_I:        sm_push_lit_i(); break;
-        case SM_PUSH_LIT_S:        sm_push_lit_s(); break;
-        case SM_PUSH_LIT_F:        sm_push_lit_f(); break;
-        case SM_PUSH_NULL: case SM_PUSH_NULL_NOFLIP: sm_push_null(); break;
-        case SM_PUSH_VAR:          sm_push_var(); break;
-        case SM_STORE_VAR:         sm_store_var(); break;
-        case SM_VOID_POP:          sm_void_pop(); break;
-        case SM_ADD:               sm_add(); break;
-        case SM_SUB:               sm_sub(); break;
-        case SM_MUL:               sm_mul(); break;
-        case SM_DIV:               sm_div(); break;
-        case SM_MOD:               sm_mod(); break;
-        case SM_CONCAT:            sm_concat(); break;
-        case SM_NEG:               sm_neg(); break;
-        case SM_COERCE_NUM:        sm_coerce_num(); break;
-        case SM_EXP:               sm_exp(); break;
-        case SM_HALT:   { has_continue |= sm_halt();   break; }
-        case SM_JUMP:   { has_continue |= sm_jump();   break; }
-        case SM_JUMP_S: { has_continue |= sm_jump_s(); break; }
-        case SM_JUMP_F: { has_continue |= sm_jump_f(); break; }
-        case SM_SUSPEND_VALUE: has_continue |= sm_suspend_value(); break;
-        case SM_CALL_FN:       has_continue |= sm_call_fn(); break;
-        case SM_RETURN:   case SM_RETURN_S:  case SM_RETURN_F:  { has_continue |= sm_return();  break; }
-        case SM_FRETURN:  case SM_FRETURN_S: case SM_FRETURN_F: { has_continue |= sm_freturn(); break; }
-        case SM_NRETURN:  case SM_NRETURN_S: case SM_NRETURN_F: { has_continue |= sm_nreturn(); break; }
-        case SM_DEFINE_ENTRY: sm_define_entry(); break;
-        case SM_DEFINE:       sm_define(); break;
-        case SM_PUSH_EXPRESSION: fprintf(out, "rt.push_null(); "); break;
-        case SM_PAT_LIT:             sm_pat_lit(); break;
-        case SM_PAT_SPAN:            sm_pat_span(); break;
-        case SM_PAT_BREAK:           sm_pat_break(); break;
-        case SM_PAT_ANY:             sm_pat_any_i(); break;
-        case SM_PAT_NOTANY:          sm_pat_notany(); break;
-        case SM_PAT_LEN:             sm_pat_len(); break;
-        case SM_PAT_POS:             sm_pat_pos(); break;
-        case SM_PAT_RPOS:            sm_pat_rpos(); break;
-        case SM_PAT_TAB:             sm_pat_tab(); break;
-        case SM_PAT_RTAB:            sm_pat_rtab(); break;
-        case SM_PAT_REM:             sm_pat_rem(); break;
-        case SM_PAT_ARB:             sm_pat_arb(); break;
-        case SM_PAT_ARBNO:           sm_pat_arbno(); break;
-        case SM_PAT_BAL:             sm_pat_bal(); break;
-        case SM_PAT_FAIL:            sm_pat_fail(); break;
-        case SM_PAT_SUCCEED:         sm_pat_succeed(); break;
-        case SM_PAT_ABORT:           sm_pat_abort(); break;
-        case SM_PAT_FENCE0:          sm_pat_fence0(); break;
-        case SM_PAT_EPS:             sm_pat_eps(); break;
-        case SM_PAT_CAT:             sm_pat_cat(); break;
-        case SM_PAT_ALT:             sm_pat_alt(); break;
-        case SM_PAT_DEREF:           sm_pat_deref(); break;
-        case SM_PAT_REFNAME:         sm_pat_refname(); break;
-        case SM_PAT_CAPTURE:         sm_pat_capture(); break;
-        case SM_PAT_CAPTURE_FN:      sm_pat_capture_fn(); break;
-        case SM_PAT_CAPTURE_FN_ARGS: sm_pat_capture_fn_args(); break;
-        case SM_PAT_USERCALL:        sm_pat_usercall(); break;
-        case SM_PAT_USERCALL_ARGS:   sm_pat_usercall_args(); break;
-        case SM_EXEC_STMT:           sm_exec_stmt(); break;
-        default: break;
-        }
+        /* EC-UNI-14(a): JS-only overrides come first.  SM_PUSH_EXPRESSION emits a literal
+         * `rt.push_null();` (no template handles this opcode in JS, since no JS frontend lowers
+         * SM_PUSH_EXPRESSION today; the legacy switch had this stub).  All other opcodes go
+         * through the shared dispatcher.
+         * Side note: the legacy JS switch lacked arms for SM_PUSH_LIT_CS and SM_PAT_FENCE1
+         * (others list them); the shared dispatcher now covers both.  No current JS-targeting
+         * frontend emits either opcode, so dispatcher widening is observably safe. */
+        if (instr->op == SM_PUSH_EXPRESSION) { fprintf(out, "rt.push_null(); "); }
+        else                                 { has_continue = emit_sm_dispatch(); }
         if (!has_continue) fprintf(out, "_pc = %d; continue; ", i + 1);
     }
     return 0;
@@ -2064,28 +2091,17 @@ static int emit_net_from_sm(SM_sequence_t * sm, FILE * out) {
         g_emit.pc_to_fn = pc_to_fn; g_emit.fn_names = fn_names; g_emit.fn_pcs = fn_pcs; g_emit.fn_count = fn_count;
         fprintf(out, "  NET_L%d:\n", i);
         int has_continue = 0;
-        switch (instr->op) {
-        case SM_STNO:  sm_stno(); break;
-        case SM_PUSH_LIT_I: sm_push_lit_i(); break;
-        case SM_PUSH_LIT_S: case SM_PUSH_LIT_CS: sm_push_lit_s(); break;
-        case SM_PUSH_LIT_F: sm_push_lit_f(); break;
-        case SM_PUSH_NULL: case SM_PUSH_NULL_NOFLIP: sm_push_null(); break;
-        case SM_PUSH_VAR:   sm_push_var(); break;
-        case SM_STORE_VAR:  sm_store_var(); break;
-        case SM_VOID_POP:   sm_void_pop(); break;
-        case SM_CONCAT:     sm_concat(); break;
-        case SM_NEG:        sm_neg(); break;
-        case SM_COERCE_NUM: sm_coerce_num(); break;
-        case SM_EXP:        sm_exp(); break;
-        case SM_ADD:        sm_add(); break;
-        case SM_SUB:        sm_sub(); break;
-        case SM_MUL:        sm_mul(); break;
-        case SM_DIV:        sm_div(); break;
-        case SM_MOD:        sm_mod(); break;
-        case SM_ACOMP:      sm_acomp(); break;
-        case SM_LCOMP:      sm_lcomp(); break;
-        case SM_HALT:   { has_continue |= sm_halt(); break; }
-        case SM_LABEL:
+        /* EC-UNI-14(a): NET-only overrides come first.  Two opcodes inline code that the shared
+         * dispatcher cannot emit:
+         *   SM_LABEL: needs walker-local fn_params/fn_nparams arrays (NET-specific param-binding
+         *     proto parsing happens upstream in emit_net_from_sm; g_emit doesn't carry them).
+         *   SM_EXEC_STMT: emits a fixed NET-specific stack-cleanup + set_omega/set_sigma/
+         *     set_delta/set_last_ok sequence — the sm_exec_stmt() template's NET arm is
+         *     equivalent in behavior but differs in detail (per HQ note: NET preserved
+         *     SM_EXEC_STMT unchanged across the EC-UNI-13(c) consolidation).
+         * Both stay inline at EC-UNI-14(a).  EC-UNI-14 proper folds NET SM_LABEL handling into
+         * sm_label() template (currently nonexistent) and reconciles SM_EXEC_STMT NET arm. */
+        if (instr->op == SM_LABEL) {
             if (instr->a[2].i && instr->a[0].s) {
                 int k = -1;
                 for (int q = 0; q < fn_count; q++) if (fn_pcs[q] == i) { k = q; break; }
@@ -2097,18 +2113,8 @@ static int emit_net_from_sm(SM_sequence_t * sm, FILE * out) {
                     for (int p = fn_nparams[k] - 1; p >= 0; p--) { net_escape_ldstr(out, fn_params[k][p]); fprintf(out, "    call       void SnoRt::store_var(string)\n"); }
                 }
             }
-            break;
-        case SM_JUMP:   { has_continue |= sm_jump();   break; }
-        case SM_JUMP_S: { has_continue |= sm_jump_s(); break; }
-        case SM_JUMP_F: { has_continue |= sm_jump_f(); break; }
-        case SM_SUSPEND_VALUE: has_continue |= sm_suspend_value(); break;
-        case SM_CALL_FN:       has_continue |= sm_call_fn();       break;
-        case SM_RETURN:  case SM_RETURN_S:  case SM_RETURN_F:  { has_continue |= sm_return();  break; }
-        case SM_FRETURN: case SM_FRETURN_S: case SM_FRETURN_F: { has_continue |= sm_freturn(); break; }
-        case SM_NRETURN: case SM_NRETURN_S: case SM_NRETURN_F: { has_continue |= sm_nreturn(); break; }
-        case SM_DEFINE_ENTRY: sm_define_entry(); break;
-        case SM_DEFINE:       sm_define();       break;
-        case SM_EXEC_STMT: {
+        }
+        else if (instr->op == SM_EXEC_STMT) {
             int has_repl = (int)instr->a[1].i; const char * subj_name = instr->a[0].s ? instr->a[0].s : "";
             if (has_repl) fprintf(out, "    pop\n");
             fprintf(out, "    pop\n    pop\n");
@@ -2117,9 +2123,10 @@ static int emit_net_from_sm(SM_sequence_t * sm, FILE * out) {
             fprintf(out, "    call       int32 [mscorlib]System.String::get_Length()\n");
             fprintf(out, "    call       void SnoRt::set_omega(int32)\n    call       void SnoRt::set_sigma(string)\n");
             fprintf(out, "    ldc.i4.0\n    call       void SnoRt::set_delta(int32)\n");
-            fprintf(out, "    ldc.i4.0\n    call       void SnoRt::set_last_ok(bool)\n"); break;
+            fprintf(out, "    ldc.i4.0\n    call       void SnoRt::set_last_ok(bool)\n");
         }
-        default: break;
+        else {
+            has_continue = emit_sm_dispatch();
         }
         if (!has_continue && i + 1 < n) { net_push_i4(out, i + 1); fprintf(out, "    stloc      _pc\n    br         NET_DISPATCH\n"); }
     }
@@ -2202,12 +2209,8 @@ int emit_program(const tree_t * ast_prog, FILE * out, bb_emit_mode_t mode) {
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* EC-UNI-0: emit_sm_dispatch — unified per-instruction walk that will replace
- *   emit_walk_codegen (x86), emit_jvm_from_sm, emit_js_from_sm, emit_net_from_sm, emit_wasm_from_sm.
- * Each SM opcode dispatches through its sm_<opcode> template function which carries arms for every backend.
- * EC-UNI-0 wires only the scaffold — every mode returns -1 (unsupported) until later steps fill in arms.
- * No call sites yet; safe by construction. */
-int emit_sm_dispatch(SM_sequence_t * sm, FILE * out, bb_emit_mode_t mode) {
-    (void)sm; (void)out; (void)mode;
-    return -1;
-}
+/* EC-UNI-14(a): the parameterless emit_sm_dispatch(void) defined above (just before
+ * emit_wasm_from_sm) supersedes the EC-UNI-0 scaffold stub that used to live here.  The new
+ * shape reads g_emit and is called from inside the WASM/JS/NET per-PC loops with the caller
+ * responsible for backend-specific overrides (SM_LABEL on NET, SM_EXEC_STMT on NET,
+ * SM_PUSH_EXPRESSION on JS, SM_INCR/SM_DECR on WASM). */

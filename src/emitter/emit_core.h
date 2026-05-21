@@ -264,12 +264,20 @@ int  emit_prologue(BB_graph_t * cfg, FILE * out);
 int  emit_epilogue(BB_graph_t * cfg, FILE * out);
 struct tree_t;
 int  emit_program(const struct tree_t * ast_prog, FILE * out, bb_emit_mode_t mode);
-/* EC-UNI-0: unified SM walk — scaffold. Walks SM_sequence_t and dispatches each instruction
- * through SM_template functions. Future EC-UNI steps wire backends progressively:
- *   EC-UNI-1..2: x86 GAS text arms                  → returns 0 for EMIT_TEXT*
- *   EC-UNI-5:   JVM/JS/NET inline switches removed  → returns 0 for EMIT_JVM/JS/NET
- *   EC-UNI-6:   x86 binary arms                     → returns 0 for EMIT_BINARY_*
- *   EC-UNI-7:   binary JVM/.NET/WASM future arms    → returns 0 for EMIT_BIN_*
- * Today (EC-UNI-0): returns -1 (unsupported) for every mode — scaffold only, no callers yet. */
-int  emit_sm_dispatch(SM_sequence_t * sm, FILE * out, bb_emit_mode_t mode);
+/* EC-UNI-14(a): emit_sm_dispatch — shared opcode→template dispatcher used by WASM/JS/NET
+ * silo walkers.  Reads g_emit.instr->op, calls the matching sm_<name>() template.  Returns
+ * 1 if the template emitted its own PC transfer, 0 otherwise.  Backend-specific overrides
+ * (NET's SM_LABEL/SM_EXEC_STMT, JS's SM_PUSH_EXPRESSION, WASM's SM_INCR/SM_DECR) must be
+ * handled by the caller BEFORE invoking.
+ *
+ * Supersedes the EC-UNI-0 scaffold (the old (SM_sequence_t *, FILE *, mode) signature that
+ * always returned -1).  The EC-UNI ladder (10..14) shifted to per-instruction g_emit context
+ * rather than passing the program around; the new signature matches that direction.
+ * EC-UNI-14 proper deletes the silo walkers entirely. */
+int  emit_sm_dispatch(void);
+/* EC-UNI-14(a): sm_op_is_dispatched — does emit_sm_dispatch handle this opcode?  Silo walkers
+ * use this to annotate truly unhandled opcodes differently from dispatcher-handled no-ops
+ * (e.g., SM_LABEL on WASM gets a clean fall-through; SM_PUSH_EXPRESSION on WASM gets an
+ * `;; unhandled` comment because WASM has no template for it). */
+int  sm_op_is_dispatched(SM_op_t op);
 #endif
