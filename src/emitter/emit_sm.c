@@ -2027,10 +2027,14 @@ int emit_sm_lcomp_dispatch(FILE *out, const SM_t *ins, int pc)
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* EC-UNI-2b: public shim for SM_template fn sm_stno — calls the static dispatcher with NULL SrcLines.
- * EC-UNI-3 will route SrcLines through emit_sm_dispatch via g_emit.srclines (EC-UNI-10(a) added that field). */
+ * EC-UNI-3 will route SrcLines through emit_sm_dispatch via g_emit.srclines (EC-UNI-10(a) added that field).
+ * EC-UNI-14-PREREQ (done): the shim now reads g_emit.srclines (set by dispatch_one_x86), so when the
+ * unified-dispatch flag is on, sm_stno produces the same source-line annotation as the legacy path.
+ * When emit_sm_stno_template is invoked via any other route, g_emit.srclines must already be set
+ * by the caller — today that means the unified-dispatch path is the only producer. */
 int emit_sm_stno_template(FILE *out, const SM_t *ins)
 {
-    return emit_sm_stno_dispatch(out, ins, 0, NULL);
+    return emit_sm_stno_dispatch(out, ins, 0, (const SrcLines *)g_emit.srclines);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* EC-UNI-13(b): exposed for SM_templates/sm_calls.c IS_X86 arm. */
@@ -2131,13 +2135,17 @@ int emit_sm_return_variant_dispatch(FILE *out, SM_op_t op, int pc, const SM_sequ
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /* EC-UNI-2c: public shim for the sm_return / sm_freturn / sm_nreturn template fns.
  * Dispatches plain SM_RETURN to emit_sm_return_dispatch (handles g_in_define_body); other 8 variants
- * (FRETURN/NRETURN ± _S/_F) go to emit_sm_return_variant_dispatch. NRETURN's function-name comment
- * annotation requires the SM_sequence_t* — we pass NULL today (template ctx has no prog yet); the
- * annotation gracefully degrades to a generic banner. Machine code is byte-identical. */
+ * (FRETURN/NRETURN ± _S/_F) go to emit_sm_return_variant_dispatch.
+ * EC-UNI-14-PREREQ (done): the shim now reads g_emit.{prog,i} (set by dispatch_one_x86), so the
+ * NRETURN function-name lookup walks the real instruction stream and the pc-argument to the
+ * macro is the real PC.  Previously hardcoded NULL/0 — the resulting machine code differed from
+ * the legacy path (NRETURN_VAR was emitted as generic RETURN_VARIANT and the pc-arg was zero).
+ * The earlier "Machine code is byte-identical" comment was incorrect for NRETURN. */
 int emit_sm_return_template(FILE *out, const SM_t *ins)
 {
-    if (ins->op == SM_RETURN) return emit_sm_return_dispatch(out, 0);
-    return emit_sm_return_variant_dispatch(out, ins->op, 0, NULL);
+    if (ins->op == SM_RETURN) return emit_sm_return_dispatch(out, g_emit.i);
+    return emit_sm_return_variant_dispatch(out, ins->op, g_emit.i,
+                                           (const SM_sequence_t *)g_emit.prog);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void edp4_label_then(FILE *out, void (*fn)(emitter_t *))
@@ -2918,13 +2926,21 @@ static void emit_sm_uni_env_init(void) {
 /* dispatch_one_x86 — try to handle one SM_t via the template path. Returns 0 on success, -1 if the
  * opcode is not yet covered by templates (caller falls through to the legacy switch). Mode must be EMIT_TEXT.
  * Only the 52 opcodes across the 5 SM_template files are covered today. */
-static int dispatch_one_x86(FILE *out, const SM_t *ins, int pc) {
+static int dispatch_one_x86(FILE *out, const SM_t *ins, int pc,
+                            const SM_sequence_t *prog, const SrcLines *sl) {
     /* Templates dispatch on IS_X86; make sure mode is set. Legacy path relies on individual
      * dispatchers calling emitter_init_text — we have to ensure it for the very first opcode too. */
     emit_mode_set(TEXT_MODE(), out);
     /* EC-UNI-10(b): set g_emit per-call.  Sidecars (in_my_method, pc_to_fn etc.) are unused by
-     * the x86 arms of the 7 ctx-bearing templates; only g_emit.i/instr/out matter for this path. */
+     * the x86 arms of the 7 ctx-bearing templates; only g_emit.i/instr/out matter for this path.
+     * EC-UNI-14-PREREQ: also plumb prog (SM_DEFINE_ENTRY reads prog->instrs[pc-1].a[0].s for the
+     * function name) and srclines (SM_STNO reads it for the source-line annotation in the GAS
+     * comment).  Without these the templated path was silently NULL on both — SM_DEFINE_ENTRY
+     * segfaulted on prog->instrs deref; SM_STNO dropped the source-text portion of its annotation
+     * (the "# stmt N (line M): SRC_TEXT" suffix collapsed to "# stmt N (line M)"). */
     g_emit.i = pc; g_emit.instr = ins; g_emit.out = out;
+    g_emit.prog = (const struct SM_sequence_t *)prog;
+    g_emit.srclines = (const struct SrcLines *)sl;
     switch ((int)ins->op) {
         /* sm_push_pop_lits.c */
         case SM_PUSH_LIT_I:        sm_push_lit_i();    return 0;
@@ -3087,9 +3103,12 @@ int emit_walk_codegen(SM_sequence_t *prog, FILE *out, const char *src_path)
         }
         /* EC-UNI-3: if the unified-dispatch flag is on, try the template path first.
          * On success continue. On -1 (uncovered opcode) fall through to the legacy switch.
-         * With the flag off this branch costs one predictable-not-taken compare per iteration. */
+         * With the flag off this branch costs one predictable-not-taken compare per iteration.
+         * EC-UNI-14-PREREQ: pass prog and sl through so g_emit.{prog,srclines} are non-NULL
+         * during the template call — required by SM_DEFINE_ENTRY (uses prog->instrs[pc-1]) and
+         * SM_STNO (uses srclines for the GAS-comment source-line annotation). */
         if (g_emit_use_unified_dispatch) {
-            int urc = dispatch_one_x86(out, ins, pc);
+            int urc = dispatch_one_x86(out, ins, pc, prog, sl_loaded ? &sl : NULL);
             if (urc == 0) continue;
         }
         int rc;
