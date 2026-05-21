@@ -1865,81 +1865,27 @@ void bb_walk(BB_graph_t * cfg, void (*visit)(BB_t *, void *), void * ctx) {
     bb_walk_rec(cfg->entry, visit, ctx);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* EC-5: emit_jvm_from_sm — moved from emit_jvm.c (method-split SM walk). */
+/* EC-UNI-14(b): emit_jvm_one_instr — body via emit_sm_dispatch.
+ * The 60+ arm switch collapsed into emit_sm_dispatch + one JVM-only override:
+ *   SM_EXEC_STMT: JVM inlines jvm_emit_ldc_string + invokestatic rt/SnoRt/sno_exec_stmt;
+ *                 the cross-backend sm_exec_stmt() template has no JVM arm.
+ * SM_LABEL stays a no-op (labels are emitted by emit_jvm_from_sm/emit_jvm_sm_range
+ * outside this function via `fprintf(out, "sm_pc_%d:\n", i)`).
+ * JVM-specific g_emit sidecars (in_body, in_my_method, fn_names/pcs/count) set
+ * here are read by sm_call_fn (EC-UNI-13(b)) for JVM cross-method `invokestatic`. */
 static void emit_jvm_one_instr(SM_sequence_t * sm, int i, int n, const char ** fn_names, const int * fn_pcs, int fn_count, int in_body, const char * in_my_method, FILE * out) {
     SM_t * instr = &sm->instrs[i];
     g_emit.i = i; g_emit.n = n; g_emit.instr = instr;
     g_emit.in_body = in_body; g_emit.in_my_method = in_my_method;
     g_emit.pc_to_fn = NULL; g_emit.fn_names = fn_names; g_emit.fn_pcs = fn_pcs; g_emit.fn_count = fn_count;
-    switch (instr->op) {
-    case SM_LABEL: break;
-    case SM_STNO:  sm_stno(); break;
-    case SM_PUSH_LIT_I: sm_push_lit_i(); break;
-    case SM_PUSH_LIT_S: sm_push_lit_s(); break;
-    case SM_PUSH_LIT_F: sm_push_lit_f(); break;
-    case SM_PUSH_NULL: case SM_PUSH_NULL_NOFLIP: sm_push_null(); break;
-    case SM_PUSH_VAR:  sm_push_var(); break;
-    case SM_STORE_VAR: sm_store_var(); break;
-    case SM_VOID_POP:  sm_void_pop(); break;
-    case SM_CONCAT:    sm_concat(); break;
-    case SM_NEG:       sm_neg(); break;
-    case SM_COERCE_NUM: sm_coerce_num(); break;
-    case SM_EXP:       sm_exp(); break;
-    case SM_ADD:       sm_add(); break;
-    case SM_SUB:       sm_sub(); break;
-    case SM_MUL:       sm_mul(); break;
-    case SM_DIV:       sm_div(); break;
-    case SM_MOD:       sm_mod(); break;
-    case SM_ACOMP:     sm_acomp(); break;
-    case SM_LCOMP:     sm_lcomp(); break;
-    case SM_JUMP:   { sm_jump();   break; }
-    case SM_JUMP_S: { sm_jump_s(); break; }
-    case SM_JUMP_F: { sm_jump_f(); break; }
-    case SM_CALL_FN:                                 { sm_call_fn();       break; }
-    case SM_SUSPEND_VALUE:                           { sm_suspend_value(); break; }
-    case SM_RETURN:   case SM_RETURN_S:  case SM_RETURN_F:  { sm_return();  break; }
-    case SM_FRETURN:  case SM_FRETURN_S: case SM_FRETURN_F: { sm_freturn(); break; }
-    case SM_NRETURN:  case SM_NRETURN_S: case SM_NRETURN_F: { sm_nreturn(); break; }
-    case SM_DEFINE_ENTRY: sm_define_entry(); break;
-    case SM_DEFINE:       sm_define(); break;
-    case SM_HALT: { sm_halt(); break; }
-    case SM_PAT_LIT:             sm_pat_lit(); break;
-    case SM_PAT_ANY:             sm_pat_any_i(); break;
-    case SM_PAT_NOTANY:          sm_pat_notany(); break;
-    case SM_PAT_SPAN:            sm_pat_span(); break;
-    case SM_PAT_BREAK:           sm_pat_break(); break;
-    case SM_PAT_LEN:             sm_pat_len(); break;
-    case SM_PAT_POS:             sm_pat_pos(); break;
-    case SM_PAT_RPOS:            sm_pat_rpos(); break;
-    case SM_PAT_TAB:             sm_pat_tab(); break;
-    case SM_PAT_RTAB:            sm_pat_rtab(); break;
-    case SM_PAT_ARB:             sm_pat_arb(); break;
-    case SM_PAT_ARBNO:           sm_pat_arbno(); break;
-    case SM_PAT_REM:             sm_pat_rem(); break;
-    case SM_PAT_BAL:             sm_pat_bal(); break;
-    case SM_PAT_FENCE0:          sm_pat_fence0(); break;
-    case SM_PAT_FENCE1:          sm_pat_fence1(); break;
-    case SM_PAT_ABORT:           sm_pat_abort(); break;
-    case SM_PAT_FAIL:            sm_pat_fail(); break;
-    case SM_PAT_SUCCEED:         sm_pat_succeed(); break;
-    case SM_PAT_EPS:             sm_pat_eps(); break;
-    case SM_PAT_CAT:             sm_pat_cat(); break;
-    case SM_PAT_ALT:             sm_pat_alt(); break;
-    case SM_PAT_DEREF:           sm_pat_deref(); break;
-    case SM_PAT_REFNAME:         sm_pat_refname(); break;
-    case SM_PAT_CAPTURE:         sm_pat_capture(); break;
-    case SM_PAT_CAPTURE_FN:      sm_pat_capture_fn(); break;
-    case SM_PAT_CAPTURE_FN_ARGS: sm_pat_capture_fn_args(); break;
-    case SM_PAT_USERCALL:        sm_pat_usercall(); break;
-    case SM_PAT_USERCALL_ARGS:   sm_pat_usercall_args(); break;
-    case SM_EXEC_STMT: {
+    if (instr->op == SM_EXEC_STMT) {
         const char * sname = instr->a[0].s ? instr->a[0].s : "";
         int has_repl = (int)instr->a[1].i;
         jvm_emit_ldc_string(out, sname); jvm_push_int2(out, has_repl);
-        fprintf(out, "    invokestatic rt/SnoRt/sno_exec_stmt(Ljava/lang/String;I)V\n"); break;
+        fprintf(out, "    invokestatic rt/SnoRt/sno_exec_stmt(Ljava/lang/String;I)V\n");
+        return;
     }
-    default: break;
-    }
+    (void)emit_sm_dispatch();
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_jvm_sm_range(SM_sequence_t * sm, int lo, int hi, int n, const char ** fn_names, const int * fn_pcs, int fn_count, FILE * out) {
