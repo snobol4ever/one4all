@@ -153,9 +153,6 @@ extern int g_in_define_body;
  * JVM/JS/NET/WASM arms are no-ops — those backends never emit these opcodes today. */
 int emit_sm_bb_once_proc_dispatch       (FILE *out, const SM_t *ins, int pc);
 int emit_sm_bb_pump_proc_dispatch       (FILE *out, const SM_t *ins, int pc);
-/* EC-UNI-3: feature flag — when non-zero, emit_walk_codegen routes the 52 templated opcodes through
- * SM_template fns (which call the same dispatchers under IS_X86). Byte-identical by construction. */
-extern int g_emit_use_unified_dispatch;
 /*---- compat macros -------------------------------------------------------*/
 #define sm_codegen_text(prog,out,src)  emit_walk_codegen(prog,out,src)
 #define flat_is_eligible_node(nd)      emit_flat_eligible(nd)

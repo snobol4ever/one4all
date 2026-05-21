@@ -2911,54 +2911,14 @@ int emit_sm_pat_usercall_template       (FILE *out, const SM_t *ins) { return em
 int emit_sm_pat_usercall_args_template  (FILE *out, const SM_t *ins) { return emit_sm_pat_usercall_args_dispatch(out, ins, 0); }
 int emit_sm_exec_stmt_template          (FILE *out, const SM_t *ins) { return emit_sm_exec_stmt_variant(out, ins, 0); }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* EC-UNI-3: feature flag for unified-dispatch path. When 1 (now default), each opcode covered by
- * an SM_template fn is routed through the dispatcher (which calls the same template under IS_X86)
- * instead of going through the existing switch arm directly. Byte-identical by construction since
- * both paths terminate at the same dispatcher fn — proven across EC-UNI-10..14(b) by the matrix
- * gate yielding identical beauty.s md5 under both flag states.
- *
- * EC-UNI-14 proper (this commit): default flipped 0 -> 1. The env var still overrides for
- * emergency rollback during this rung; the flag is scheduled for deletion at the end of EC-UNI-14
- * once all opcodes are covered and the legacy switch is removed. */
-int g_emit_use_unified_dispatch = 1;
-__attribute__((constructor))
-static void emit_sm_uni_env_init(void) {
-    const char * v = getenv("SCRIP_UNIFIED_DISPATCH");
-    if (!v || !*v) return;                                                       /* unset: keep default */
-    g_emit_use_unified_dispatch = (*v != '0');                                   /* '0' forces legacy path */
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/* dispatch_one_x86 — try to handle one SM_t via the template path. Returns 0 on success, -1 if the
- * opcode is not yet covered by templates (caller falls through to the legacy switch). Mode must be EMIT_TEXT.
- * EC-UNI-14(b)(3): body delegates to the shared emit_sm_dispatch in emit_core.c.  The wrapper retains
- * its 0/-1 contract (legacy switch fallthrough on uncovered opcodes) by gating on
- * sm_op_is_dispatched(op); when 1, emit_sm_dispatch is called and returns 0; when 0, this returns -1.
- *
- * The x86 walker (emit_walk_codegen) is the only caller; legacy switch handles the remaining ~30
- * opcodes not yet templated (PUSH_EXPR, PUSH_EXPRESSION, CALL_EXPRESSION, INCR, DECR, return
- * variants, baked-pattern blobs, etc.).  No exclusions remain: every dispatcher-covered opcode
- * now produces correct x86 output through sm_<op>() templates. */
-static int dispatch_one_x86(FILE *out, const SM_t *ins, int pc,
-                            const SM_sequence_t *prog, const SrcLines *sl) {
-    if (!sm_op_is_dispatched(ins->op)) return -1;
-    /* Templates dispatch on IS_X86; make sure mode is set. Legacy path relies on individual
-     * dispatchers calling emitter_init_text — we have to ensure it for the very first opcode too. */
-    emit_mode_set(TEXT_MODE(), out);
-    /* EC-UNI-10(b): set g_emit per-call.  Sidecars (in_my_method, pc_to_fn etc.) are unused by
-     * the x86 arms of the 7 ctx-bearing templates; only g_emit.i/instr/out matter for this path.
-     * EC-UNI-14-PREREQ: also plumb prog (SM_DEFINE_ENTRY reads prog->instrs[pc-1].a[0].s for the
-     * function name) and srclines (SM_STNO reads it for the source-line annotation in the GAS
-     * comment).  Without these the templated path was silently NULL on both — SM_DEFINE_ENTRY
-     * segfaulted on prog->instrs deref; SM_STNO dropped the source-text portion of its annotation
-     * (the "# stmt N (line M): SRC_TEXT" suffix collapsed to "# stmt N (line M)"). */
-    g_emit.i = pc; g_emit.instr = ins; g_emit.out = out;
-    g_emit.prog = (const struct SM_sequence_t *)prog;
-    g_emit.srclines = (const struct SrcLines *)sl;
-    (void)emit_sm_dispatch();
-    return 0;
-}
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int edp4_sm_unhandled(FILE *out, const SM_t *ins, int pc)
+/* EC-UNI-14(c)(5): edp4_sm_unhandled is the safety net for opcodes that exist in SM.h but are
+ * not covered by sm_op_is_dispatched (today: SM_BB_PUMP, SM_BB_EVAL, SM_BB_PUMP_EVERY — emitted
+ * by Icon's TT_ITERATE/TT_ALTERNATE/TT_LIMIT lowering, intentionally left to the legacy walker
+ * because their x86 lowering hasn't been written yet).  Without this, the walker would silently
+ * drop those opcodes; with it, the GAS output carries an UNHANDLED macro line that surfaces in
+ * smoke tests as a discoverable stub.  Stays not-static for tools that link against the
+ * emitter library and want to call it directly. */
+int edp4_sm_unhandled(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     char anno[64];
@@ -3036,95 +2996,26 @@ int emit_walk_codegen(SM_sequence_t *prog, FILE *out, const char *src_path)
                 continue;
             }
         }
-        /* EC-UNI-3: if the unified-dispatch flag is on, try the template path first.
-         * On success continue. On -1 (uncovered opcode) fall through to the legacy switch.
-         * With the flag off this branch costs one predictable-not-taken compare per iteration.
-         * EC-UNI-14-PREREQ: pass prog and sl through so g_emit.{prog,srclines} are non-NULL
-         * during the template call — required by SM_DEFINE_ENTRY (uses prog->instrs[pc-1]) and
-         * SM_STNO (uses srclines for the GAS-comment source-line annotation). */
-        if (g_emit_use_unified_dispatch) {
-            int urc = dispatch_one_x86(out, ins, pc, prog, sl_loaded ? &sl : NULL);
-            if (urc == 0) continue;
-        }
+        /* EC-UNI-14(c)(5): unified dispatch only.  The legacy switch + SCRIP_UNIFIED_DISPATCH
+         * flag + dispatch_one_x86 wrapper are all deleted.  Templates dispatch on IS_X86; mode
+         * must be EMIT_TEXT.  g_emit carries per-call state — the (prog, srclines) pair are
+         * needed by SM_DEFINE_ENTRY (uses prog->instrs[pc-1] for the function name) and SM_STNO
+         * (uses srclines for the GAS-comment source-line annotation).
+         *
+         * sm_op_is_dispatched gates between the dispatcher (every covered opcode) and
+         * edp4_sm_unhandled (safety net for SM_BB_PUMP / SM_BB_EVAL / SM_BB_PUMP_EVERY — Icon
+         * generator opcodes whose x86 lowering hasn't been written; without the annotation,
+         * the walker would silently drop them). */
+        emit_mode_set(TEXT_MODE(), out);
+        g_emit.i = pc; g_emit.instr = ins; g_emit.out = out;
+        g_emit.prog = (const struct SM_sequence_t *)prog;
+        g_emit.srclines = sl_loaded ? (const struct SrcLines *)&sl : NULL;
         int rc;
-        switch (ins->op) {
-            case SM_HALT:         rc = emit_halt_line(out, pc);          break;
-            case SM_PUSH_LIT_I:   rc = emit_push_lit_i_line(out, ins, pc); break;
-            case SM_PUSH_LIT_F:   rc = emit_sm_push_lit_f_dispatch(out, ins, pc);  break;
-            case SM_PUSH_EXPR:    rc = emit_sm_push_expr_dispatch(out, ins, pc);   break;
-            case SM_PUSH_LIT_S:   rc = emit_sm_push_lit_s_dispatch(out, ins, pc); break;
-            case SM_PUSH_LIT_CS:  rc = emit_sm_push_lit_s_dispatch(out, ins, pc); break;
-            case SM_PUSH_VAR:     rc = emit_sm_push_var_dispatch(out, ins, pc);   break;
-            case SM_STORE_VAR:    rc = emit_sm_store_var_dispatch(out, ins, pc);  break;
-            case SM_VOID_POP:          rc = emit_sm_pop(out, pc);             break;
-            case SM_ADD:
-            case SM_SUB:
-            case SM_MUL:
-            case SM_DIV:
-            case SM_MOD:          rc = edp4_sm_arith(out, ins, pc);      break;
-            case SM_LABEL:        rc = emit_sm_label_dispatch(out, ins, pc);      break;
-            case SM_JUMP:         rc = emit_sm_jump_line(out, ins, pc);   break;
-            case SM_JUMP_S:       rc = emit_sm_jump_s_line(out, ins, pc); break;
-            case SM_JUMP_F:       rc = emit_sm_jump_f_line(out, ins, pc); break;
-            case SM_PUSH_EXPRESSION:   rc = emit_sm_push_expression_dispatch(out, ins, pc); break;
-            case SM_CALL_EXPRESSION:   rc = emit_sm_call_expression_dispatch(out, ins, pc); break;
-            case SM_RETURN:       rc = emit_sm_return_dispatch(out, pc);          break;
-            case SM_DEFINE_ENTRY: rc = emit_sm_define_entry_dispatch(out, ins, pc, prog); break;
-            case SM_DEFINE:       rc = emit_sm_define_dispatch(out, ins, pc);              break;
-            case SM_CALL_FN:         rc = emit_sm_call_dispatch(out, ins, pc); break;
-            case SM_BB_ONCE_PROC:    rc = emit_sm_bb_once_proc_dispatch(out, ins, pc); break;
-            case SM_BB_PUMP_PROC:    rc = emit_sm_bb_pump_proc_dispatch(out, ins, pc); break;
-            case SM_CONCAT:       rc = emit_sm_concat_dispatch(out, pc);      break;
-            case SM_PUSH_NULL:    rc = emit_sm_push_null_dispatch(out, pc);   break;
-            case SM_PUSH_NULL_NOFLIP: rc = emit_sm_push_null_noflip_dispatch(out, pc); break;
-            case SM_COERCE_NUM:   rc = emit_sm_coerce_num_dispatch(out, pc);  break;
-            case SM_NEG:          rc = emit_sm_neg_dispatch(out, pc);         break;
-            case SM_EXP:          rc = emit_sm_exp_dispatch(out, pc);         break;
-            case SM_INCR:         rc = emit_sm_incr_dispatch(out, ins, pc);   break;
-            case SM_DECR:         rc = emit_sm_decr_dispatch(out, ins, pc);   break;
-            case SM_ACOMP:        rc = emit_sm_acomp_dispatch(out, ins, pc);  break;
-            case SM_LCOMP:        rc = emit_sm_lcomp_dispatch(out, ins, pc);  break;
-            case SM_FRETURN:
-            case SM_NRETURN:
-            case SM_RETURN_S:
-            case SM_RETURN_F:
-            case SM_FRETURN_S:
-            case SM_FRETURN_F:
-            case SM_NRETURN_S:
-            case SM_NRETURN_F:    rc = emit_sm_return_variant_dispatch(out, ins->op, pc, prog); break;
-            case SM_STNO:         rc = emit_sm_stno_dispatch(out, ins, pc,
-                                                    sl_loaded ? &sl : NULL); break;
-            case SM_PAT_LIT:      rc = emit_sm_pat_lit_dispatch(out, ins, pc);     break;
-            case SM_PAT_REFNAME:  rc = emit_sm_pat_refname_dispatch(out, ins, pc); break;
-            case SM_PAT_CAPTURE:      rc = emit_sm_pat_capture_dispatch(out, ins, pc); break;
-            case SM_PAT_CAPTURE_FN:   rc = emit_sm_pat_capture_fn_dispatch(out, ins, pc); break;
-            case SM_PAT_CAPTURE_FN_ARGS: rc = emit_sm_pat_capture_fn_args_dispatch(out, ins, pc); break;
-            case SM_PAT_USERCALL:     rc = emit_sm_pat_usercall_dispatch(out, ins, pc); break;
-            case SM_PAT_USERCALL_ARGS: rc = emit_sm_pat_usercall_args_dispatch(out, ins, pc); break;
-            case SM_PAT_SPAN:    rc = emit_sm_pat_span_dispatch(out, pc);    break;
-            case SM_PAT_BREAK:   rc = emit_sm_pat_break_dispatch(out, pc);   break;
-            case SM_PAT_ANY:     rc = emit_sm_pat_any_dispatch(out, pc);     break;
-            case SM_PAT_NOTANY:  rc = emit_sm_pat_notany_dispatch(out, pc);  break;
-            case SM_PAT_LEN:     rc = emit_sm_pat_len_dispatch(out, pc);     break;
-            case SM_PAT_POS:     rc = emit_sm_pat_pos_dispatch(out, pc);     break;
-            case SM_PAT_RPOS:    rc = emit_sm_pat_rpos_dispatch(out, pc);    break;
-            case SM_PAT_TAB:     rc = emit_sm_pat_tab_dispatch(out, pc);     break;
-            case SM_PAT_RTAB:    rc = emit_sm_pat_rtab_dispatch(out, pc);    break;
-            case SM_PAT_ARB:     rc = emit_sm_pat_arb_dispatch(out, pc);     break;
-            case SM_PAT_ARBNO:   rc = emit_sm_pat_arbno_dispatch(out, pc);   break;
-            case SM_PAT_REM:     rc = emit_sm_pat_rem_dispatch(out, pc);     break;
-            case SM_PAT_FENCE0:  rc = emit_sm_pat_fence0_dispatch(out, pc);  break;
-            case SM_PAT_FENCE1:  rc = emit_sm_pat_fence1_dispatch(out, pc);  break;
-            case SM_PAT_FAIL:    rc = emit_sm_pat_fail_dispatch(out, pc);    break;
-            case SM_PAT_ABORT:   rc = emit_sm_pat_abort_dispatch(out, pc);   break;
-            case SM_PAT_SUCCEED: rc = emit_sm_pat_succeed_dispatch(out, pc); break;
-            case SM_PAT_BAL:     rc = emit_sm_pat_bal_dispatch(out, pc);     break;
-            case SM_PAT_EPS:     rc = emit_sm_pat_eps_dispatch(out, pc);     break;
-            case SM_PAT_CAT:     rc = emit_sm_pat_cat_dispatch(out, pc);     break;
-            case SM_PAT_ALT:     rc = emit_sm_pat_alt_dispatch(out, pc);     break;
-            case SM_PAT_DEREF:   rc = emit_sm_pat_deref_dispatch(out, pc);   break;
-            case SM_EXEC_STMT:    rc = emit_sm_exec_stmt_variant(out, ins, pc); break;
-            default:              rc = edp4_sm_unhandled(out, ins, pc);  break;
+        if (sm_op_is_dispatched(ins->op)) {
+            (void)emit_sm_dispatch();
+            rc = 0;
+        } else {
+            rc = edp4_sm_unhandled(out, ins, pc);
         }
         if (rc != 0) {
             if (sl_loaded) srclines_free(&sl);
