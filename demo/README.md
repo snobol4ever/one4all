@@ -47,7 +47,7 @@ echo "12" | snobol4 -f -I$INC demo/roman.sno
 snobol4 -f -I$INC demo/wordcount.sno < demo/wordcount.input
 
 # beauty (self-beautify)
-snobol4 -f -I$INC demo/beauty.sno < demo/beauty.sno
+snobol4 -f -I/home/claude/corpus/programs/snobol4/demo/beauty /home/claude/corpus/programs/snobol4/demo/beauty/beauty.sno < /home/claude/corpus/programs/snobol4/demo/beauty/beauty.sno
 
 # treebank
 snobol4 -f -I$INC demo/treebank.sno < demo/treebank.ref

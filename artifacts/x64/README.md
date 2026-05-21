@@ -36,7 +36,7 @@ Short form: at end of every session touching the emitter --
 
 ## EM-7 beauty check
 
-    ./scrip --compile /home/claude/corpus/programs/snobol4/demo/beauty.sno \
+    ./scrip --compile /home/claude/corpus/programs/snobol4/demo/beauty/beauty.sno \
         > artifacts/x64/beauty_prog.s 2>/dev/null
     gcc -c artifacts/x64/beauty_prog.s -o /dev/null   # must be clean
     grep -c "UNHANDLED_OP" artifacts/x64/beauty_prog.s  # must be 0 at EM-7

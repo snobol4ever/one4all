@@ -158,7 +158,7 @@ printf "        OUTPUT = 'HELLO WORLD'\nEND\n" | ./scrip-cc -jvm -I$INC /dev/std
 # --- SNOBOL4 × ASM (touch emit_byrd_asm.c) ---
 ./scrip-cc -asm -I$INC demo/roman.sno     > artifacts/asm/samples/roman.s
 ./scrip-cc -asm -I$INC demo/wordcount.sno > artifacts/asm/samples/wordcount.s
-./scrip-cc -asm -I$INC demo/beauty.sno    > artifacts/asm/beauty_prog.s
+./scrip-cc -asm -I$INC demo/beauty/beauty.sno > artifacts/asm/beauty_prog.s
 
 # --- SNOBOL4 × NET (touch emit_byrd_net.c) ---
 ./scrip-cc -net -I$INC demo/roman.sno     > artifacts/net/samples/roman.il

@@ -9,8 +9,8 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
-BEAUTY="$REPO/demo/beauty.sno"
-INC="$REPO/demo/inc"
+BEAUTY="/home/claude/corpus/programs/snobol4/demo/beauty/beauty.sno"
+INC="/home/claude/corpus/programs/snobol4/demo/beauty"
 BIN="${1:-/tmp/beauty_full_bin}"
 
 echo "=== Milestone 0: self-beautify smoke test ==="

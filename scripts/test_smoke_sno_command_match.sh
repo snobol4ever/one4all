@@ -15,8 +15,8 @@
 #
 # Build beauty_full_bin first:
 #   SNOC=$REPO/src/snoc/snoc
-#   INC=$REPO/demo/inc
-#   BEAUTY=$REPO/demo/beauty.sno
+#   INC=/home/claude/corpus/programs/snobol4/demo/beauty
+#   BEAUTY=/home/claude/corpus/programs/snobol4/demo/beauty/beauty.sno
 #   R=$REPO/src/runtime/snobol4
 #   $SNOC $BEAUTY -I $INC > /tmp/beauty_full.c
 #   gcc -O0 -g /tmp/beauty_full.c $R/snobol4.c $R/mock_includes.c \
