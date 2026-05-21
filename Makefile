@@ -94,6 +94,82 @@ RT_PIC_SRCS := \
     $(SRC)/emitter/BB_templates/bb_pl_atom.c \
     $(SRC)/emitter/BB_templates/bb_pl_builtin.c \
     $(SRC)/emitter/BB_templates/bb_pl_call.c \
+    $(SRC)/emitter/BB_templates/bb_lit_i.c \
+    $(SRC)/emitter/BB_templates/bb_lit_s.c \
+    $(SRC)/emitter/BB_templates/bb_lit_f.c \
+    $(SRC)/emitter/BB_templates/bb_lit_nul.c \
+    $(SRC)/emitter/BB_templates/bb_var.c \
+    $(SRC)/emitter/BB_templates/bb_assign.c \
+    $(SRC)/emitter/BB_templates/bb_augop.c \
+    $(SRC)/emitter/BB_templates/bb_binop.c \
+    $(SRC)/emitter/BB_templates/bb_unop.c \
+    $(SRC)/emitter/BB_templates/bb_call.c \
+    $(SRC)/emitter/BB_templates/bb_seq.c \
+    $(SRC)/emitter/BB_templates/bb_fail.c \
+    $(SRC)/emitter/BB_templates/bb_succeed.c \
+    $(SRC)/emitter/BB_templates/bb_goto.c \
+    $(SRC)/emitter/BB_templates/bb_return.c \
+    $(SRC)/emitter/BB_templates/bb_if.c \
+    $(SRC)/emitter/BB_templates/bb_alternate.c \
+    $(SRC)/emitter/BB_templates/bb_to_by.c \
+    $(SRC)/emitter/BB_templates/bb_every.c \
+    $(SRC)/emitter/BB_templates/bb_while.c \
+    $(SRC)/emitter/BB_templates/bb_until.c \
+    $(SRC)/emitter/BB_templates/bb_repeat.c \
+    $(SRC)/emitter/BB_templates/bb_ctl_alt.c \
+    $(SRC)/emitter/BB_templates/bb_size.c \
+    $(SRC)/emitter/BB_templates/bb_case.c \
+    $(SRC)/emitter/BB_templates/bb_limit.c \
+    $(SRC)/emitter/BB_templates/bb_suspend.c \
+    $(SRC)/emitter/BB_templates/bb_proc.c \
+    $(SRC)/emitter/BB_templates/bb_scan.c \
+    $(SRC)/emitter/BB_templates/bb_nonnull.c \
+    $(SRC)/emitter/BB_templates/bb_interrogate.c \
+    $(SRC)/emitter/BB_templates/bb_not.c \
+    $(SRC)/emitter/BB_templates/bb_pat_callout.c \
+    $(SRC)/emitter/BB_templates/bb_pl_choice.c \
+    $(SRC)/emitter/BB_templates/bb_pl_unify.c \
+    $(SRC)/emitter/BB_templates/bb_pl_cut.c \
+    $(SRC)/emitter/BB_templates/bb_pl_var.c \
+    $(SRC)/emitter/BB_templates/bb_pl_alt.c \
+    $(SRC)/emitter/BB_templates/bb_pl_seq.c \
+    $(SRC)/emitter/BB_templates/bb_icn_to.c \
+    $(SRC)/emitter/BB_templates/bb_icn_upto.c \
+    $(SRC)/emitter/BB_templates/bb_icn_to_by.c \
+    $(SRC)/emitter/BB_templates/bb_icn_iterate.c \
+    $(SRC)/emitter/BB_templates/bb_icn_alternate.c \
+    $(SRC)/emitter/BB_templates/bb_icn_limit.c \
+    $(SRC)/emitter/BB_templates/bb_icn_binop.c \
+    $(SRC)/emitter/BB_templates/bb_icn_to_nested.c \
+    $(SRC)/emitter/BB_templates/bb_icn_proc_gen.c \
+    $(SRC)/emitter/BB_templates/bb_ctl_break.c \
+    $(SRC)/emitter/BB_templates/bb_next.c \
+    $(SRC)/emitter/BB_templates/bb_identical.c \
+    $(SRC)/emitter/BB_templates/bb_null_test.c \
+    $(SRC)/emitter/BB_templates/bb_random.c \
+    $(SRC)/emitter/BB_templates/bb_neg.c \
+    $(SRC)/emitter/BB_templates/bb_ctl_pos.c \
+    $(SRC)/emitter/BB_templates/bb_cset_compl.c \
+    $(SRC)/emitter/BB_templates/bb_cset_union.c \
+    $(SRC)/emitter/BB_templates/bb_cset_diff.c \
+    $(SRC)/emitter/BB_templates/bb_cset_inter.c \
+    $(SRC)/emitter/BB_templates/bb_icn_scan.c \
+    $(SRC)/emitter/BB_templates/bb_icn_keyword.c \
+    $(SRC)/emitter/BB_templates/bb_binop_gen.c \
+    $(SRC)/emitter/BB_templates/bb_icn_idx.c \
+    $(SRC)/emitter/BB_templates/bb_icn_section.c \
+    $(SRC)/emitter/BB_templates/bb_icn_list_bang.c \
+    $(SRC)/emitter/BB_templates/bb_icn_record_def.c \
+    $(SRC)/emitter/BB_templates/bb_icn_field_get.c \
+    $(SRC)/emitter/BB_templates/bb_icn_field_set.c \
+    $(SRC)/emitter/BB_templates/bb_icn_idx_set.c \
+    $(SRC)/emitter/BB_templates/bb_icn_key_gen.c \
+    $(SRC)/emitter/BB_templates/bb_swap.c \
+    $(SRC)/emitter/BB_templates/bb_seq_expr.c \
+    $(SRC)/emitter/BB_templates/bb_initial.c \
+    $(SRC)/emitter/BB_templates/bb_icn_lconcat.c \
+    $(SRC)/emitter/BB_templates/bb_icn_find_gen.c \
+    $(SRC)/emitter/BB_templates/bb_icn_seq_gen.c \
     $(SRC)/emitter/BB_templates/bb_pos.c \
     $(SRC)/emitter/BB_templates/bb_rem.c \
     $(SRC)/emitter/BB_templates/bb_span.c \
@@ -250,6 +326,82 @@ scrip:
 	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_pl_atom.c     -o $(OBJ)/bb_pl_atom.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_pl_builtin.c  -o $(OBJ)/bb_pl_builtin.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_pl_call.c     -o $(OBJ)/bb_pl_call.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_lit_i.c             -o $(OBJ)/bb_lit_i.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_lit_s.c             -o $(OBJ)/bb_lit_s.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_lit_f.c             -o $(OBJ)/bb_lit_f.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_lit_nul.c           -o $(OBJ)/bb_lit_nul.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_var.c               -o $(OBJ)/bb_var.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_assign.c            -o $(OBJ)/bb_assign.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_augop.c             -o $(OBJ)/bb_augop.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_binop.c             -o $(OBJ)/bb_binop.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_unop.c              -o $(OBJ)/bb_unop.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_call.c              -o $(OBJ)/bb_call.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_seq.c               -o $(OBJ)/bb_seq.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_fail.c              -o $(OBJ)/bb_fail.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_succeed.c           -o $(OBJ)/bb_succeed.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_goto.c              -o $(OBJ)/bb_goto.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_return.c            -o $(OBJ)/bb_return.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_if.c                -o $(OBJ)/bb_if.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_alternate.c         -o $(OBJ)/bb_alternate.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_to_by.c             -o $(OBJ)/bb_to_by.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_every.c             -o $(OBJ)/bb_every.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_while.c             -o $(OBJ)/bb_while.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_until.c             -o $(OBJ)/bb_until.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_repeat.c            -o $(OBJ)/bb_repeat.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_ctl_alt.c           -o $(OBJ)/bb_ctl_alt.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_size.c              -o $(OBJ)/bb_size.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_case.c              -o $(OBJ)/bb_case.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_limit.c             -o $(OBJ)/bb_limit.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_suspend.c           -o $(OBJ)/bb_suspend.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_proc.c              -o $(OBJ)/bb_proc.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_scan.c              -o $(OBJ)/bb_scan.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_nonnull.c           -o $(OBJ)/bb_nonnull.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_interrogate.c       -o $(OBJ)/bb_interrogate.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_not.c               -o $(OBJ)/bb_not.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_pat_callout.c       -o $(OBJ)/bb_pat_callout.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_pl_choice.c         -o $(OBJ)/bb_pl_choice.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_pl_unify.c          -o $(OBJ)/bb_pl_unify.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_pl_cut.c            -o $(OBJ)/bb_pl_cut.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_pl_var.c            -o $(OBJ)/bb_pl_var.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_pl_alt.c            -o $(OBJ)/bb_pl_alt.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_pl_seq.c            -o $(OBJ)/bb_pl_seq.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_icn_to.c            -o $(OBJ)/bb_icn_to.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_icn_upto.c          -o $(OBJ)/bb_icn_upto.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_icn_to_by.c         -o $(OBJ)/bb_icn_to_by.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_icn_iterate.c       -o $(OBJ)/bb_icn_iterate.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_icn_alternate.c     -o $(OBJ)/bb_icn_alternate.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_icn_limit.c         -o $(OBJ)/bb_icn_limit.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_icn_binop.c         -o $(OBJ)/bb_icn_binop.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_icn_to_nested.c     -o $(OBJ)/bb_icn_to_nested.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_icn_proc_gen.c      -o $(OBJ)/bb_icn_proc_gen.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_ctl_break.c         -o $(OBJ)/bb_ctl_break.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_next.c              -o $(OBJ)/bb_next.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_identical.c         -o $(OBJ)/bb_identical.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_null_test.c         -o $(OBJ)/bb_null_test.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_random.c            -o $(OBJ)/bb_random.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_neg.c               -o $(OBJ)/bb_neg.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_ctl_pos.c           -o $(OBJ)/bb_ctl_pos.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_cset_compl.c        -o $(OBJ)/bb_cset_compl.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_cset_union.c        -o $(OBJ)/bb_cset_union.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_cset_diff.c         -o $(OBJ)/bb_cset_diff.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_cset_inter.c        -o $(OBJ)/bb_cset_inter.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_icn_scan.c          -o $(OBJ)/bb_icn_scan.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_icn_keyword.c       -o $(OBJ)/bb_icn_keyword.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_binop_gen.c         -o $(OBJ)/bb_binop_gen.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_icn_idx.c           -o $(OBJ)/bb_icn_idx.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_icn_section.c       -o $(OBJ)/bb_icn_section.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_icn_list_bang.c     -o $(OBJ)/bb_icn_list_bang.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_icn_record_def.c    -o $(OBJ)/bb_icn_record_def.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_icn_field_get.c     -o $(OBJ)/bb_icn_field_get.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_icn_field_set.c     -o $(OBJ)/bb_icn_field_set.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_icn_idx_set.c       -o $(OBJ)/bb_icn_idx_set.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_icn_key_gen.c       -o $(OBJ)/bb_icn_key_gen.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_swap.c              -o $(OBJ)/bb_swap.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_seq_expr.c          -o $(OBJ)/bb_seq_expr.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_initial.c           -o $(OBJ)/bb_initial.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_icn_lconcat.c       -o $(OBJ)/bb_icn_lconcat.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_icn_find_gen.c      -o $(OBJ)/bb_icn_find_gen.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_icn_seq_gen.c       -o $(OBJ)/bb_icn_seq_gen.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_pos.c         -o $(OBJ)/bb_pos.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_rem.c         -o $(OBJ)/bb_rem.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_span.c        -o $(OBJ)/bb_span.o

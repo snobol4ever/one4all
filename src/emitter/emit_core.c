@@ -1372,6 +1372,88 @@ int emit_bb_node(BB_t * nd, FILE * out) {
     case BB_PL_ATOM:         bb_pl_atom();      return 0;
     case BB_PL_BUILTIN:      bb_pl_builtin();   return 0;
     case BB_PL_CALL:         bb_pl_call();      return 0;
+    /* EC-UNI BB layer total over BB_op_t: 76 stub kinds added in one pass.
+     * These are AST-level node kinds today consumed by src/lower/ir_exec.c and
+     * src/lower/lower_*.c; the slots here exist so the BB layer is total over
+     * BB_op_t, and future Phase B work has a place to land per-backend codegen.
+     * All arms are honest no-op stubs; frontends do not yet emit these as native
+     * code. */
+    case BB_LIT_I:                bb_lit_i();         return 0;
+    case BB_LIT_S:                bb_lit_s();         return 0;
+    case BB_LIT_F:                bb_lit_f();         return 0;
+    case BB_LIT_NUL:              bb_lit_nul();         return 0;
+    case BB_VAR:                  bb_var();         return 0;
+    case BB_ASSIGN:               bb_assign();         return 0;
+    case BB_AUGOP:                bb_augop();         return 0;
+    case BB_BINOP:                bb_binop();         return 0;
+    case BB_UNOP:                 bb_unop();         return 0;
+    case BB_CALL:                 bb_call();         return 0;
+    case BB_SEQ:                  bb_seq();         return 0;
+    case BB_FAIL:                 bb_fail();         return 0;
+    case BB_SUCCEED:              bb_succeed();         return 0;
+    case BB_GOTO:                 bb_goto();         return 0;
+    case BB_RETURN:               bb_return();         return 0;
+    case BB_IF:                   bb_if();         return 0;
+    case BB_ALTERNATE:            bb_alternate();         return 0;
+    case BB_TO_BY:                bb_to_by();         return 0;
+    case BB_EVERY:                bb_every();         return 0;
+    case BB_WHILE:                bb_while();         return 0;
+    case BB_UNTIL:                bb_until();         return 0;
+    case BB_REPEAT:               bb_repeat();         return 0;
+    case BB_ALT:                  bb_ctl_alt();         return 0;
+    case BB_SIZE:                 bb_size();         return 0;
+    case BB_CASE:                 bb_case();         return 0;
+    case BB_LIMIT:                bb_limit();         return 0;
+    case BB_SUSPEND:              bb_suspend();         return 0;
+    case BB_PROC:                 bb_proc();         return 0;
+    case BB_SCAN:                 bb_scan();         return 0;
+    case BB_NONNULL:              bb_nonnull();         return 0;
+    case BB_INTERROGATE:          bb_interrogate();         return 0;
+    case BB_NOT:                  bb_not();         return 0;
+    case BB_PAT_CALLOUT:          bb_pat_callout();         return 0;
+    case BB_PL_CHOICE:            bb_pl_choice();         return 0;
+    case BB_PL_UNIFY:             bb_pl_unify();         return 0;
+    case BB_PL_CUT:               bb_pl_cut();         return 0;
+    case BB_PL_VAR:               bb_pl_var();         return 0;
+    case BB_PL_ALT:               bb_pl_alt();         return 0;
+    case BB_PL_SEQ:               bb_pl_seq();         return 0;
+    case BB_ICN_TO:               bb_icn_to();         return 0;
+    case BB_ICN_UPTO:             bb_icn_upto();         return 0;
+    case BB_ICN_TO_BY:            bb_icn_to_by();         return 0;
+    case BB_ICN_ITERATE:          bb_icn_iterate();         return 0;
+    case BB_ICN_ALTERNATE:        bb_icn_alternate();         return 0;
+    case BB_ICN_LIMIT:            bb_icn_limit();         return 0;
+    case BB_ICN_BINOP:            bb_icn_binop();         return 0;
+    case BB_ICN_TO_NESTED:        bb_icn_to_nested();         return 0;
+    case BB_ICN_PROC_GEN:         bb_icn_proc_gen();         return 0;
+    case BB_BREAK:                bb_ctl_break();         return 0;
+    case BB_NEXT:                 bb_next();         return 0;
+    case BB_IDENTICAL:            bb_identical();         return 0;
+    case BB_NULL_TEST:            bb_null_test();         return 0;
+    case BB_RANDOM:               bb_random();         return 0;
+    case BB_NEG:                  bb_neg();         return 0;
+    case BB_POS:                  bb_ctl_pos();         return 0;
+    case BB_CSET_COMPL:           bb_cset_compl();         return 0;
+    case BB_CSET_UNION:           bb_cset_union();         return 0;
+    case BB_CSET_DIFF:            bb_cset_diff();         return 0;
+    case BB_CSET_INTER:           bb_cset_inter();         return 0;
+    case BB_ICN_SCAN:             bb_icn_scan();         return 0;
+    case BB_ICN_KEYWORD:          bb_icn_keyword();         return 0;
+    case BB_BINOP_GEN:            bb_binop_gen();         return 0;
+    case BB_ICN_IDX:              bb_icn_idx();         return 0;
+    case BB_ICN_SECTION:          bb_icn_section();         return 0;
+    case BB_ICN_LIST_BANG:        bb_icn_list_bang();         return 0;
+    case BB_ICN_RECORD_DEF:       bb_icn_record_def();         return 0;
+    case BB_ICN_FIELD_GET:        bb_icn_field_get();         return 0;
+    case BB_ICN_FIELD_SET:        bb_icn_field_set();         return 0;
+    case BB_ICN_IDX_SET:          bb_icn_idx_set();         return 0;
+    case BB_ICN_KEY_GEN:          bb_icn_key_gen();         return 0;
+    case BB_SWAP:                 bb_swap();         return 0;
+    case BB_SEQ_EXPR:             bb_seq_expr();         return 0;
+    case BB_INITIAL:              bb_initial();         return 0;
+    case BB_ICN_LCONCAT:          bb_icn_lconcat();         return 0;
+    case BB_ICN_FIND_GEN:         bb_icn_find_gen();         return 0;
+    case BB_ICN_SEQ_GEN:          bb_icn_seq_gen();         return 0;
     default:
         fprintf(out, "; [emit_bb_node: kind=%d unhandled]\n", (int)nd->t);
         return 1;
