@@ -78,8 +78,26 @@ RT_PIC_SRCS := \
     $(SRC)/emitter/emit_core.c \
     $(SRC)/emitter/emit_globals.c \
     $(SRC)/emitter/emit_io.c \
-    $(SRC)/emitter/BB_templates/bb_pat.c \
-    $(SRC)/emitter/BB_templates/bb_pl.c \
+    $(SRC)/emitter/BB_templates/bb_abort.c \
+    $(SRC)/emitter/BB_templates/bb_alt.c \
+    $(SRC)/emitter/BB_templates/bb_any.c \
+    $(SRC)/emitter/BB_templates/bb_arb.c \
+    $(SRC)/emitter/BB_templates/bb_arbno.c \
+    $(SRC)/emitter/BB_templates/bb_break.c \
+    $(SRC)/emitter/BB_templates/bb_capture.c \
+    $(SRC)/emitter/BB_templates/bb_cat.c \
+    $(SRC)/emitter/BB_templates/bb_fence.c \
+    $(SRC)/emitter/BB_templates/bb_len.c \
+    $(SRC)/emitter/BB_templates/bb_lit.c \
+    $(SRC)/emitter/BB_templates/bb_notany.c \
+    $(SRC)/emitter/BB_templates/bb_pl_arith.c \
+    $(SRC)/emitter/BB_templates/bb_pl_atom.c \
+    $(SRC)/emitter/BB_templates/bb_pl_builtin.c \
+    $(SRC)/emitter/BB_templates/bb_pl_call.c \
+    $(SRC)/emitter/BB_templates/bb_pos.c \
+    $(SRC)/emitter/BB_templates/bb_rem.c \
+    $(SRC)/emitter/BB_templates/bb_span.c \
+    $(SRC)/emitter/BB_templates/bb_tab.c \
     $(SRC)/emitter/SM_templates/sm_arith.c \
     $(SRC)/emitter/SM_templates/sm_bb_calls.c \
     $(SRC)/emitter/SM_templates/sm_calls.c \
@@ -215,8 +233,26 @@ scrip:
 	$(CC) $(CRT)   -c $(SRC)/emitter/emit_core.c               -o $(OBJ)/emit_core.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/emit_globals.c            -o $(OBJ)/emit_globals.o
 	$(CC) $(CRT)   -c $(SRC)/emitter/emit_io.c                 -o $(OBJ)/emit_io.o
-	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_pat.c      -o $(OBJ)/bb_pat.o
-	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_pl.c       -o $(OBJ)/bb_pl.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_abort.c       -o $(OBJ)/bb_abort.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_alt.c         -o $(OBJ)/bb_alt.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_any.c         -o $(OBJ)/bb_any.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_arb.c         -o $(OBJ)/bb_arb.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_arbno.c       -o $(OBJ)/bb_arbno.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_break.c       -o $(OBJ)/bb_break.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_capture.c     -o $(OBJ)/bb_capture.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_cat.c         -o $(OBJ)/bb_cat.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_fence.c       -o $(OBJ)/bb_fence.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_len.c         -o $(OBJ)/bb_len.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_lit.c         -o $(OBJ)/bb_lit.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_notany.c      -o $(OBJ)/bb_notany.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_pl_arith.c    -o $(OBJ)/bb_pl_arith.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_pl_atom.c     -o $(OBJ)/bb_pl_atom.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_pl_builtin.c  -o $(OBJ)/bb_pl_builtin.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_pl_call.c     -o $(OBJ)/bb_pl_call.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_pos.c         -o $(OBJ)/bb_pos.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_rem.c         -o $(OBJ)/bb_rem.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_span.c        -o $(OBJ)/bb_span.o
+	$(CC) $(CRT)   -c $(SRC)/emitter/BB_templates/bb_tab.c         -o $(OBJ)/bb_tab.o
 	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_arith.c -o $(OBJ)/sm_arith.o
 	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_bb_calls.c -o $(OBJ)/sm_bb_calls.o
 	$(CC) $(CRT)   -I$(SRC)/emitter/SM_templates -c $(SRC)/emitter/SM_templates/sm_calls.c -o $(OBJ)/sm_calls.o
