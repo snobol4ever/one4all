@@ -8,6 +8,42 @@
 void bb_pos(void) {
     BB_t * nd = g_emit.node; FILE * out = g_emit.out;
     int nid = bb_node_id(nd); int sid = 0; int rpos = (nd->ival2 != 0);
+    if (IS_X86) {
+        /* Lifted from emit_bb.c::emit_bb_xposi / emit_bb_xrpsi.  Snocone discipline:
+           read values from g_emit, write strings.  insn_* helpers take only scalars
+           (no bb_label_t pointers) so they're fine; jumps/label-defines go through
+           bb3c_format directly with label-name strings from g_emit. */
+        int n = (int)nd->ival;
+        const char * lbl_succ = g_emit.lbl_succ;
+        const char * lbl_fail = g_emit.lbl_fail;
+        const char * lbl_back = g_emit.lbl_back;
+        char args[32]; snprintf(args, sizeof args, "%d", n);
+        FILE * o = emit_outf();
+        if (rpos) {
+            emit_bb_box_banner("RPOS", args);
+            /* emit_seq_cmp_siglen_delta(n, &Σlen, succ, fail) inlined with strings */
+            if (IS_TEXT) emit_sym_lea_rcx("\xCE\xA3""len", TEMPLATE_ADDR_SIGLEN);
+            else         insn_mov_rcx_i64(TEMPLATE_ADDR_SIGLEN);
+            insn_mov_eax_rcxmem();
+            insn_sub_eax_i32((uint32_t)n);
+            insn_mov_ecx_eax();
+            insn_mov_eax_r10mem();
+            insn_cmp_eax_ecx();
+            bb3c_format(o, "", "jne", lbl_fail);
+            bb3c_format(o, "", "jmp", lbl_succ);
+        } else {
+            emit_bb_box_banner("POS", args);
+            /* emit_seq_cmp_delta_i(n, succ, fail) inlined with strings */
+            insn_mov_eax_r10mem();
+            insn_cmp_eax_i32((uint32_t)n);
+            bb3c_format(o, "", "jne", lbl_fail);
+            bb3c_format(o, "", "jmp", lbl_succ);
+        }
+        char back_def[BB_LABEL_NAME_MAX + 4]; snprintf(back_def, sizeof back_def, "%s:", lbl_back);
+        bb3c_format(o, back_def, "", "");
+        bb3c_format(o, "", "jmp", lbl_fail);
+        return;
+    }
     if (IS_BIN) return; /* x86 binary: emit_flat_body path, not emit_bb_node */
     if (IS_JVM) {
         const char * name = rpos ? "rpos" : "pos"; char tag[32]; snprintf(tag, sizeof tag, "%s_%d_%d", name, sid, nid);

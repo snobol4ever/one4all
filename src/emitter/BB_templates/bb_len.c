@@ -9,43 +9,33 @@ void bb_len(void) {
     BB_t * nd = g_emit.node; FILE * out = g_emit.out;
     int nid = bb_node_id(nd); int sid = 0;
     if (IS_X86) {
-        /* Lifted verbatim from emit_bb.c::emit_bb_xlnth.  Labels and n come from g_emit;
-           helpers stay in emit_bb.c / emit_form.c / etc. — 90% slated for deletion. */
-        long long n = (long long)nd->ival;
-        bb_label_t * s = g_emit.lbl_succ;
-        bb_label_t * f = g_emit.lbl_fail;
-        bb_label_t * b = g_emit.lbl_back;
-        char nbuf[32]; snprintf(nbuf, sizeof(nbuf), "%d", (int)n);
+        /* Lifted from emit_bb.c::emit_bb_xlnth.  Snocone discipline: read values (n,
+           label-name strings) from g_emit, write assembly strings via bb3c_format.
+           No pointer-laundering helpers (emit_jmp / emit_label_define / emit_seq_*). */
+        int n = (int)nd->ival;
+        const char * lbl_succ = g_emit.lbl_succ;
+        const char * lbl_fail = g_emit.lbl_fail;
+        const char * lbl_back = g_emit.lbl_back;
+        char nbuf[32]; snprintf(nbuf, sizeof nbuf, "%d", n);
         emit_bb_box_banner("LEN", nbuf);
-        if (IS_TEXT) {
-            FILE * o = emit_outf();
-            bb3c_format(o, "", ".intel_syntax", "noprefix");
-            char narg[64]; snprintf(narg, sizeof(narg), "eax, dword ptr [rax]");
-            bb3c_format(o, "", "lea", "rax, [rip + Δ]");
-            bb3c_format(o, "", "mov", narg);
-            char addarg[64]; snprintf(addarg, sizeof(addarg), "eax, %d", (int)n);
-            bb3c_format(o, "", "add", addarg);
-            bb3c_format(o, "", "lea", "rcx, [rip + Σlen]");
-            bb3c_format(o, "", "cmp", "eax, dword ptr [rcx]");
-            char jmp_fail[128]; snprintf(jmp_fail, sizeof(jmp_fail), "%s", f->name);
-            bb3c_format(o, "", "jg",  jmp_fail);
-            bb3c_format(o, "", "lea", "rax, [rip + Δ]");
-            bb3c_format(o, "", "mov", "ecx, dword ptr [rax]");
-            char addarg2[64]; snprintf(addarg2, sizeof(addarg2), "ecx, %d", (int)n);
-            bb3c_format(o, "", "add", addarg2);
-            bb3c_format(o, "", "mov", "dword ptr [rax], ecx");
-            char jmp_succ[128]; snprintf(jmp_succ, sizeof(jmp_succ), "%s", s->name);
-            bb3c_format(o, "", "jmp", jmp_succ);
-            emit_label_define(b);
-            bb3c_format(o, "", "jmp", jmp_fail);
-            return;
-        }
-        /* Binary path lifted verbatim from emit_bb.c::emit_bb_xlnth tail (lines 221-225). */
-        emit_seq_bounds_len((int)n, TEMPLATE_ADDR_SIGLEN, f);
-        emit_add_delta_imm((int)n);
-        emit_jmp(s, JMP_JMP);
-        emit_label_define(b);
-        emit_jmp(f, JMP_JMP);
+        FILE * o = emit_outf();
+        bb3c_format(o, "", ".intel_syntax", "noprefix");
+        bb3c_format(o, "", "lea", "rax, [rip + Δ]");
+        bb3c_format(o, "", "mov", "eax, dword ptr [rax]");
+        char addarg[64]; snprintf(addarg, sizeof addarg, "eax, %d", n);
+        bb3c_format(o, "", "add", addarg);
+        bb3c_format(o, "", "lea", "rcx, [rip + Σlen]");
+        bb3c_format(o, "", "cmp", "eax, dword ptr [rcx]");
+        bb3c_format(o, "", "jg",  lbl_fail);
+        bb3c_format(o, "", "lea", "rax, [rip + Δ]");
+        bb3c_format(o, "", "mov", "ecx, dword ptr [rax]");
+        char addarg2[64]; snprintf(addarg2, sizeof addarg2, "ecx, %d", n);
+        bb3c_format(o, "", "add", addarg2);
+        bb3c_format(o, "", "mov", "dword ptr [rax], ecx");
+        bb3c_format(o, "", "jmp", lbl_succ);
+        char back_def[BB_LABEL_NAME_MAX + 4]; snprintf(back_def, sizeof back_def, "%s:", lbl_back);
+        bb3c_format(o, back_def, "", "");
+        bb3c_format(o, "", "jmp", lbl_fail);
         return;
     }
     if (IS_BIN) return; /* x86 binary: emit_flat_body path, not emit_bb_node */

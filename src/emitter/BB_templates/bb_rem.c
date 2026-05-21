@@ -9,34 +9,25 @@ void bb_rem(void) {
     BB_t * nd = g_emit.node; FILE * out = g_emit.out;
     int nid = bb_node_id(nd); int sid = 0; (void)sid;
     if (IS_X86) {
-        /* Lifted verbatim from emit_bb.c::emit_bb_xstar.  Labels come from g_emit;
-           helpers (emit_bb_box_banner, bb3c_format, emit_outf, emit_label_define,
-           insn_*, emit_store_delta, emit_jmp) stay in emit_bb.c / emit_form.c / etc.
-           and are linked against — 90% slated for deletion in the next pass. */
-        bb_label_t * s = g_emit.lbl_succ;
-        bb_label_t * f = g_emit.lbl_fail;
-        bb_label_t * b = g_emit.lbl_back;
+        /* Lifted from emit_bb.c::emit_bb_xstar.  Snocone discipline: read values, write
+           strings.  g_emit carries label names (strings), not bb_label_t pointers.  We
+           emit assembly text directly via bb3c_format; we do not call pointer-laundering
+           helpers (emit_jmp / emit_label_define) — those take bb_label_t * and stash
+           offsets in the label struct, which has no Snocone translation. */
+        const char * lbl_succ = g_emit.lbl_succ;
+        const char * lbl_fail = g_emit.lbl_fail;
+        const char * lbl_back = g_emit.lbl_back;
         emit_bb_box_banner("REM", "");
-        if (IS_TEXT) {
-            FILE * o = emit_outf();
-            bb3c_format(o, "", ".intel_syntax", "noprefix");
-            bb3c_format(o, "", "lea", "rax, [rip + Σlen]");
-            bb3c_format(o, "", "mov", "ecx, dword ptr [rax]");
-            bb3c_format(o, "", "lea", "rax, [rip + Δ]");
-            bb3c_format(o, "", "mov", "dword ptr [rax], ecx");
-            char jmp_succ[128]; snprintf(jmp_succ, sizeof(jmp_succ), "%s", s->name);
-            bb3c_format(o, "", "jmp", jmp_succ);
-            emit_label_define(b);
-            char jmp_fail[128]; snprintf(jmp_fail, sizeof(jmp_fail), "%s", f->name);
-            bb3c_format(o, "", "jmp", jmp_fail);
-            return;
-        }
-        insn_mov_rcx_i64(TEMPLATE_ADDR_SIGLEN);
-        insn_mov_eax_rcxmem();
-        emit_store_delta();
-        emit_jmp(s, JMP_JMP);
-        emit_label_define(b);
-        emit_jmp(f, JMP_JMP);
+        FILE * o = emit_outf();
+        bb3c_format(o, "", ".intel_syntax", "noprefix");
+        bb3c_format(o, "", "lea", "rax, [rip + Σlen]");
+        bb3c_format(o, "", "mov", "ecx, dword ptr [rax]");
+        bb3c_format(o, "", "lea", "rax, [rip + Δ]");
+        bb3c_format(o, "", "mov", "dword ptr [rax], ecx");
+        bb3c_format(o, "", "jmp", lbl_succ);
+        char back_def[BB_LABEL_NAME_MAX + 4]; snprintf(back_def, sizeof back_def, "%s:", lbl_back);
+        bb3c_format(o, back_def, "", "");
+        bb3c_format(o, "", "jmp", lbl_fail);
         return;
     }
     if (IS_BIN) return; /* legacy guard; covered by IS_X86 branch above */

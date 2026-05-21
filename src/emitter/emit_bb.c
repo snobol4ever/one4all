@@ -1,6 +1,7 @@
 #include "emit_bb.h"
 #include "emit_form.h"
 #include "emit_templates.h"
+#include "emit_globals.h"
 #include "../runtime/interp/icon_gen.h"
 #include "BB.h"
 #include "../rt/rt.h"
@@ -99,8 +100,6 @@ extern atp_t    * bb_atp_new                (const char *varname);
 extern cap_t    * bb_cap_new_call           (bb_box_fn child_fn, void *child_state, const char *fnc_name, DESCR_t *fnc_args, int fnc_nargs, char **fnc_arg_names, int fnc_n_arg_names, int immediate);
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 extern void     * bb_dvar_bin_new           (const char *name);
-#define TEMPLATE_ADDR_SIGMA   ((uint64_t)(uintptr_t)&Σ)
-#define TEMPLATE_ADDR_SIGLEN  ((uint64_t)(uintptr_t)&Σlen)
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static void emit_bb_jmp_pair(const char *banner, bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_beta, int beta_first) {
     (void)lbl_succ;

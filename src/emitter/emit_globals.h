@@ -40,12 +40,17 @@ typedef struct {
     int                          nid;           /* node id = bb_node_id(node) */
     /* BB Byrd-box port labels (for x86 BB templates lifted from emit_bb.c).
        Set by the dispatcher (emit_flat_ir / emit_bb_node) before calling the template;
-       read by the template's IS_X86 arm.  α (alpha-succ), β (beta-back), γ (gamma-fail),
-       ω-init label.  Today we expose three: succ, fail, back — matching the
-       (lbl_succ, lbl_fail, lbl_β) triple used by the emit_bb_x* fn family. */
-    bb_label_t *                 lbl_succ;      /* α: success continuation */
-    bb_label_t *                 lbl_fail;      /* γ: failure continuation */
-    bb_label_t *                 lbl_back;      /* β: backtrack target */
+       read by the template's IS_X86 arm.  α (alpha-succ), β (beta-back), γ (gamma-fail).
+       These are LABEL-NAME STRINGS (not bb_label_t pointers): the label *name* is the
+       Snocone-translatable identity, since in Snocone a label is identified by a name
+       string and its offset is looked up in a name-keyed table.  C strings are the one
+       admitted pointer type here because Snocone strings transliterate to const char *.
+       Today these fields are not yet filled by emit_bb_node (the original emit_bb_x*
+       fns are the live path); the templates' IS_X86 arms exist in shape only, pending
+       rewire in the next sweep. */
+    const char *                 lbl_succ;      /* α: success continuation — name string */
+    const char *                 lbl_fail;      /* γ: failure continuation — name string */
+    const char *                 lbl_back;      /* β: backtrack target    — name string */
     /* JVM body/method gate -------------------------------------------- */
     int                          in_body;       /* 1 if emitting function body method */
     const char *                 in_my_method;  /* byte[n]: 1 if PC i belongs to current method */
@@ -59,6 +64,12 @@ typedef struct {
     const struct SrcLines *      srclines;      /* source-line annotations for x86 GAS */
 } sm_emit_t;
 extern sm_emit_t g_emit;
+/* TEMPLATE_ADDR_* macros — used by BB templates in BB_templates/ lifted from emit_bb.c.
+   Σ and Σlen are the runtime subject buffer / length, declared in bb_box.h. */
+extern const char *Σ;
+extern int         Σlen;
+#define TEMPLATE_ADDR_SIGMA   ((uint64_t)(uintptr_t)&Σ)
+#define TEMPLATE_ADDR_SIGLEN  ((uint64_t)(uintptr_t)&Σlen)
 /* g_emit lifecycle:
  *   - emit_program() sets g_emit.backend, g_emit.out, g_emit.is_binary at entry; templates not
  *     referencing g_emit yet at EC-UNI-10(a).
