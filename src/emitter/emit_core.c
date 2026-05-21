@@ -1363,6 +1363,15 @@ int emit_bb_node(BB_t * nd, FILE * out) {
     case BB_PAT_ABORT:       bb_abort();        return 0;
     case BB_PAT_ASSIGN_IMM:  bb_capture(1);     return 0;
     case BB_PAT_ASSIGN_COND: bb_capture(0);     return 0;
+    /* EC-UNI-14(c)(6): Prolog BB kinds.  Templates are honest no-op stubs across all five
+     * backends today — no frontend lowers Prolog BB graphs to native code yet (Prolog runtime
+     * execution lives in src/lower/ir_exec.c).  Wired here so the switch is total over the
+     * 21 BB kinds touched by walkers; per-backend arms grow in Phase B per
+     * GOAL-PROLOG-BB-JCON.md. */
+    case BB_PL_ARITH:        bb_pl_arith();     return 0;
+    case BB_PL_ATOM:         bb_pl_atom();      return 0;
+    case BB_PL_BUILTIN:      bb_pl_builtin();   return 0;
+    case BB_PL_CALL:         bb_pl_call();      return 0;
     default:
         fprintf(out, "; [emit_bb_node: kind=%d unhandled]\n", (int)nd->t);
         return 1;
