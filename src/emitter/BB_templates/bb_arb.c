@@ -4,10 +4,61 @@
    that this file restores; separators and includes match the original per-file
    shape pre-EC-UNI-13(a). */
 #include "bb_template_common.h"
+extern int g_flat_node_id;
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void bb_arb(void) {
     BB_t * nd = g_emit.node; FILE * out = g_emit.out;
     int nid = bb_node_id(nd); int sid = 0;
+    if (IS_X86) {
+        /* Lifted from emit_bb.c::emit_bb_xfarb.  Snocone discipline: read values
+           (label-name strings, integer id) from g_emit / scalars; write assembly
+           text via bb3c_format directly. */
+        const char * lbl_succ = g_emit.lbl_succ;
+        const char * lbl_fail = g_emit.lbl_fail;
+        const char * lbl_back = g_emit.lbl_back;
+        emit_bb_box_banner("ARB", "");
+        if (IS_TEXT) {
+            int id = g_flat_node_id++;
+            char zlbl[80], zlbl_def[88];
+            snprintf(zlbl,     sizeof zlbl,     ".Larb%d_z", id);
+            snprintf(zlbl_def, sizeof zlbl_def, "%s:", zlbl);
+            FILE * o = emit_outf();
+            bb3c_format(o, "",       ".section", ".data");
+            bb3c_format(o, zlbl_def, ".long",    "0");
+            bb3c_format(o, "",       ".long",    "0");
+            bb3c_format(o, "",       ".section", ".text");
+            bb3c_format(o, "",       ".intel_syntax", "noprefix");
+            char lcnt[80], lstart[80];
+            snprintf(lcnt,   sizeof lcnt,   "%s + 0", zlbl);
+            snprintf(lstart, sizeof lstart, "%s + 4", zlbl);
+            bb3c_format(o, "", "lea",  "rax, [rip + Δ]");
+            bb3c_format(o, "", "mov",  "ecx, dword ptr [rax]");
+            char cnt_store[160]; snprintf(cnt_store, sizeof cnt_store, "dword ptr [rip + %s], 0", lcnt);
+            bb3c_format(o, "", "mov",  cnt_store);
+            char start_store[160]; snprintf(start_store, sizeof start_store, "rax, [rip + %s]", lstart);
+            bb3c_format(o, "", "lea",  start_store);
+            bb3c_format(o, "", "mov",  "dword ptr [rax], ecx");
+            bb3c_format(o, "", "jmp",  lbl_succ);
+            char back_def[BB_LABEL_NAME_MAX + 4]; snprintf(back_def, sizeof back_def, "%s:", lbl_back);
+            bb3c_format(o, back_def, "", "");
+            char cnt_ref[160]; snprintf(cnt_ref, sizeof cnt_ref, "rax, [rip + %s]", lcnt);
+            bb3c_format(o, "", "lea",  cnt_ref);
+            bb3c_format(o, "", "mov",  "ecx, dword ptr [rax]");
+            bb3c_format(o, "", "inc",  "ecx");
+            bb3c_format(o, "", "mov",  "dword ptr [rax], ecx");
+            char sref[160]; snprintf(sref, sizeof sref, "rax, [rip + %s]", lstart);
+            bb3c_format(o, "", "lea",  sref);
+            bb3c_format(o, "", "mov",  "edx, dword ptr [rax]");
+            bb3c_format(o, "", "add",  "edx, ecx");
+            bb3c_format(o, "", "lea",  "rax, [rip + Σlen]");
+            bb3c_format(o, "", "cmp",  "edx, dword ptr [rax]");
+            bb3c_format(o, "", "jg",   lbl_fail);
+            bb3c_format(o, "", "lea",  "rax, [rip + Δ]");
+            bb3c_format(o, "", "mov",  "dword ptr [rax], edx");
+            bb3c_format(o, "", "jmp",  lbl_succ);
+        }
+        return;
+    }
     if (IS_BIN) return; /* x86 binary: emit_flat_body path, not emit_bb_node */
     if (IS_JVM) {
         char tag[32]; snprintf(tag, sizeof tag, "arb_%d_%d", sid, nid);
