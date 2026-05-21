@@ -90,3 +90,13 @@ int  sm_define           (void);
  * walkers' `default: break;` fallthrough.  Return 0 (no terminal jump). */
 int  sm_bb_once_proc     (void);
 int  sm_bb_pump_proc     (void);
+/* group: expr/incr family — EC-UNI-14(c)(4).  SM_PUSH_EXPR may be dead in practice (no live
+ * lowering path observed to emit it across icon/prolog/snobol4/snocone/rebus/raku gates) but the
+ * lower.c emit_push_expr fn still exists, so the template stays for completeness.  SM_INCR/DECR
+ * are emitted only by sm_interp_test.c — also vestigial.  PUSH_EXPRESSION/CALL_EXPRESSION are
+ * live (beauty.sno emits them).  Return void (no terminal jump). */
+void sm_push_expr        (void);
+void sm_push_expression  (void);
+void sm_call_expression  (void);
+void sm_incr             (void);
+void sm_decr             (void);

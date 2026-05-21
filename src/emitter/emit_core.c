@@ -1531,6 +1531,12 @@ int emit_sm_dispatch(void) {
         case SM_PUSH_VAR:             sm_push_var();                                     return 0;
         case SM_STORE_VAR:            sm_store_var();                                    return 0;
         case SM_VOID_POP:             sm_void_pop();                                     return 0;
+        /* SCRIP-expression family — EC-UNI-14(c)(4).  PUSH_EXPRESSION/CALL_EXPRESSION are live
+         * (emitted by beauty.sno via SCRIP fn calls); PUSH_EXPR appears dead in practice but
+         * lower.c still has emit_push_expr so the template stays. */
+        case SM_PUSH_EXPR:            sm_push_expr();                                    return 0;
+        case SM_PUSH_EXPRESSION:      sm_push_expression();                              return 0;
+        case SM_CALL_EXPRESSION:      sm_call_expression();                              return 0;
         /* Arithmetic / coercion. */
         case SM_CONCAT:               sm_concat();                                       return 0;
         case SM_NEG:                  sm_neg();                                          return 0;
@@ -1541,6 +1547,10 @@ int emit_sm_dispatch(void) {
         case SM_MUL:                  sm_mul();                                          return 0;
         case SM_DIV:                  sm_div();                                          return 0;
         case SM_MOD:                  sm_mod();                                          return 0;
+        /* SM_INCR / SM_DECR — EC-UNI-14(c)(4).  Vestigial (emitted only by sm_interp_test.c).
+         * WASM arm aliases to sm_add/sm_sub; x86 has dedicated dispatchers. */
+        case SM_INCR:                 sm_incr();                                         return 0;
+        case SM_DECR:                 sm_decr();                                         return 0;
         case SM_LCOMP:                sm_lcomp();                                        return 0;
         case SM_ACOMP:                sm_acomp();                                        return 0;
         case SM_STNO:                 sm_stno();                                         return 0;
@@ -1605,8 +1615,10 @@ int sm_op_is_dispatched(SM_op_t op) {
         case SM_LABEL: case SM_PUSH_LIT_I: case SM_PUSH_LIT_S: case SM_PUSH_LIT_CS:
         case SM_PUSH_LIT_F: case SM_PUSH_NULL: case SM_PUSH_NULL_NOFLIP:
         case SM_PUSH_VAR: case SM_STORE_VAR: case SM_VOID_POP:
+        case SM_PUSH_EXPR: case SM_PUSH_EXPRESSION: case SM_CALL_EXPRESSION:
         case SM_CONCAT: case SM_NEG: case SM_COERCE_NUM: case SM_EXP:
         case SM_ADD: case SM_SUB: case SM_MUL: case SM_DIV: case SM_MOD:
+        case SM_INCR: case SM_DECR:
         case SM_LCOMP: case SM_ACOMP: case SM_STNO:
         case SM_HALT: case SM_JUMP: case SM_JUMP_S: case SM_JUMP_F:
         case SM_CALL_FN: case SM_SUSPEND_VALUE:
@@ -1647,19 +1659,15 @@ static int emit_wasm_from_sm(SM_sequence_t * sm, FILE * out) {
         g_emit.in_body = 0; g_emit.in_my_method = NULL;
         g_emit.pc_to_fn = NULL; g_emit.fn_names = NULL; g_emit.fn_pcs = NULL; g_emit.fn_count = 0;
         fprintf(out, "        (if (i32.eq (local.get $pc) (i32.const %d)) (then\n", i);
-        /* WASM-only overrides: INCR/DECR alias to ADD/SUB.  Note: this is a runtime-fidelity
-         * gap (no SM_INCR/SM_DECR semantic — they'd be ADD/SUB with arg=1).  The legacy switch
-         * had this behavior; keep it bit-for-bit until WASM rt grows real INCR/DECR. */
-        if (ins->op == SM_INCR)        { sm_add(); }
-        else if (ins->op == SM_DECR)   { sm_sub(); }
-        else {
-            has_jump = emit_sm_dispatch();
-            /* Annotation for opcodes the dispatcher silently passes through with no template
-             * (currently: only the no-effect SM_LABEL path, plus any future opcode lacking a
-             * template).  Detect by checking the dispatcher's coverage explicitly. */
-            if (ins->op != SM_LABEL && !sm_op_is_dispatched(ins->op))
-                fprintf(out, "          ;; unhandled SM opcode %d\n", ins->op);
-        }
+        /* EC-UNI-14(c)(4): WASM-only SM_INCR/SM_DECR aliases removed; the sm_incr()/sm_decr()
+         * templates' IS_WASM arms now alias to sm_add()/sm_sub() via the unified dispatcher
+         * (same runtime-fidelity gap as before: WASM rt has no real SM_INCR/SM_DECR; both
+         * collapse to ADD/SUB).  The dispatcher now handles every opcode; the per-PC annotation
+         * for opcodes with no template was relied on by the LABEL case which now goes through
+         * sm_label(), so no further special-case is needed. */
+        has_jump = emit_sm_dispatch();
+        if (ins->op != SM_LABEL && !sm_op_is_dispatched(ins->op))
+            fprintf(out, "          ;; unhandled SM opcode %d\n", ins->op);
         if (!has_jump) fprintf(out, "          (i32.const %d) (local.set $pc) (br $lp)\n", i + 1);
         fprintf(out, "        ))\n");
     }
@@ -1974,15 +1982,13 @@ static int emit_js_from_sm(SM_sequence_t * sm, FILE * out) {
         g_emit.pc_to_fn = NULL; g_emit.fn_names = NULL; g_emit.fn_pcs = NULL; g_emit.fn_count = 0;
         fprintf(out, "case %d: ", i);
         int has_continue = 0;
-        /* EC-UNI-14(a): JS-only overrides come first.  SM_PUSH_EXPRESSION emits a literal
-         * `rt.push_null();` (no template handles this opcode in JS, since no JS frontend lowers
-         * SM_PUSH_EXPRESSION today; the legacy switch had this stub).  All other opcodes go
-         * through the shared dispatcher.
-         * Side note: the legacy JS switch lacked arms for SM_PUSH_LIT_CS and SM_PAT_FENCE1
-         * (others list them); the shared dispatcher now covers both.  No current JS-targeting
-         * frontend emits either opcode, so dispatcher widening is observably safe. */
-        if (instr->op == SM_PUSH_EXPRESSION) { fprintf(out, "rt.push_null(); "); }
-        else                                 { has_continue = emit_sm_dispatch(); }
+        /* EC-UNI-14(c)(4): JS-only SM_PUSH_EXPRESSION override removed; the sm_push_expression()
+         * template's IS_JS arm now emits the same `rt.push_null(); ` text via the unified
+         * dispatcher.  Side note from EC-UNI-14(a) still applies: the legacy JS switch lacked
+         * arms for SM_PUSH_LIT_CS and SM_PAT_FENCE1 (others list them); the shared dispatcher
+         * now covers both.  No current JS-targeting frontend emits either opcode, so dispatcher
+         * widening is observably safe. */
+        has_continue = emit_sm_dispatch();
         if (!has_continue) fprintf(out, "_pc = %d; continue; ", i + 1);
     }
     return 0;

@@ -1872,7 +1872,7 @@ int edp4_emit_push_expression(FILE *out, const sm_op_template_t *t,
     return emit_sm_template(out, t, &a);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_push_expression_dispatch(FILE *out, const SM_t *ins, int pc)
+int emit_sm_push_expression_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     return edp4_emit_push_expression(out, sm_template_lookup(SM_PUSH_EXPRESSION),
@@ -1886,7 +1886,7 @@ int edp4_emit_call_expression(FILE *out, const sm_op_template_t *t, int target_p
     return emit_sm_template(out, t, &a);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_call_expression_dispatch(FILE *out, const SM_t *ins, int pc)
+int emit_sm_call_expression_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     return edp4_emit_call_expression(out, sm_template_lookup(SM_CALL_EXPRESSION),
@@ -1986,7 +1986,7 @@ int emit_sm_push_lit_f_dispatch(FILE *out, const SM_t *ins, int pc)
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_push_expr_dispatch(FILE *out, const SM_t *ins, int pc)
+int emit_sm_push_expr_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     emit_mode_set(TEXT_MODE(), out);
@@ -1994,7 +1994,7 @@ static int emit_sm_push_expr_dispatch(FILE *out, const SM_t *ins, int pc)
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_incr_dispatch(FILE *out, const SM_t *ins, int pc)
+int emit_sm_incr_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     emit_mode_set(TEXT_MODE(), out);
@@ -2002,7 +2002,7 @@ static int emit_sm_incr_dispatch(FILE *out, const SM_t *ins, int pc)
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_decr_dispatch(FILE *out, const SM_t *ins, int pc)
+int emit_sm_decr_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)pc;
     emit_mode_set(TEXT_MODE(), out);
