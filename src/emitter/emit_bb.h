@@ -11,6 +11,7 @@ bb_box_fn bb_build_flat    (BB_t * nd);
 bb_box_fn bb_build_brokered(BB_t * nd);
 int  emit_flat_build        (BB_t * nd, FILE * out, const char * prefix);
 void emit_flat_set_intern_str(const char * (*fn)(const char *));
+const char * emit_flat_intern_str(const char * s);  /* accessor for templates — returns NULL if intern fn not set or not in text mode */
 void emit_flat_reset        (void);
 int  emit_bb_macro_library_to_path(const char * path);
 void emit_flat_set_cap_fixup(void (*cb)(void * cap_ptr, const char * child_alpha_label));

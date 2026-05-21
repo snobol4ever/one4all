@@ -28,9 +28,15 @@ int emit_bb_is_format_mode(void) {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static char g_fmt_label[BB_LABEL_NAME_MAX + 4];
 static char g_fmt_body[512];
-static void fmt_label_save(bb_label_t *lbl) {
-    if (lbl && lbl->name[0]) snprintf(g_fmt_label, sizeof(g_fmt_label), "%s:", lbl->name);
+/* Name-taking cores — the Snocone-translatable surface.  All these read scalars and
+   strings only.  The pointer-taking wrappers below adapt the legacy bb_label_t *
+   callers; they will fall away as those callers are rewritten. */
+static void fmt_label_save_by_name(const char *name) {
+    if (name && name[0]) snprintf(g_fmt_label, sizeof(g_fmt_label), "%s:", name);
     else g_fmt_label[0] = '\0';
+}
+static void fmt_label_save(bb_label_t *lbl) {
+    fmt_label_save_by_name(lbl ? lbl->name : NULL);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void fmt_body_append(const char *instr, const char *operands) {
@@ -41,16 +47,19 @@ void fmt_body_append(const char *instr, const char *operands) {
     strncat(g_fmt_body, frag, sizeof(g_fmt_body) - strlen(g_fmt_body) - 1);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static void fmt_flush_jmp(const char *mn, bb_label_t *target) {
+static void fmt_flush_jmp_by_name(const char *mn, const char *target_name) {
     FILE *f = bb_emit_out ? bb_emit_out : stdout;
     char jmp_part[BB_LABEL_NAME_MAX + 16];
-    snprintf(jmp_part, sizeof(jmp_part), "%s %s", mn, target->name);
+    snprintf(jmp_part, sizeof(jmp_part), "%s %s", mn, target_name ? target_name : "?");
     char col3[640];
     if (g_fmt_body[0]) snprintf(col3, sizeof(col3), "%s ; %s", g_fmt_body, jmp_part);
     else                snprintf(col3, sizeof(col3), "%s", jmp_part);
     bb3c_format(f, g_fmt_label, "", col3);
     g_fmt_label[0] = '\0';
     g_fmt_body[0]  = '\0';
+}
+static void fmt_flush_jmp(const char *mn, bb_label_t *target) {
+    fmt_flush_jmp_by_name(mn, target ? target->name : NULL);
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -153,6 +162,52 @@ void emit_label_define(bb_label_t *lbl)
         fmt_label_save(lbl);
     else
         bb_label_define(lbl);
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* Name-taking emit primitives for BB templates (BB_templates/*.c) — the Snocone-shape
+   surface for jumps and label-defines in text-mode IS_X86 arms.  Inputs are the label
+   NAME (string), nothing else; no bb_label_t pointer is needed because text mode
+   resolves labels by name at assemble time.
+   Binary mode is deliberately not handled here — binary patching requires the
+   bb_label_t offset back-pointer, which is the C-only piece slated for replacement
+   with a name-keyed offset table.  Templates' IS_X86 IS_BIN paths remain shape-only
+   until that lands. */
+void emit_text_jmp(const char *target_name, jmp_kind_t kind)
+{
+    static const char *const mn_tab[] = { "jmp", "je", "jne", "jl", "jge", "jg" };
+    const char *mn = ((unsigned)kind < 6) ? mn_tab[kind] : "jmp";
+    if (emit_bb_is_format_mode()) { fmt_flush_jmp_by_name(mn, target_name); return; }
+    switch (bb_emit_mode) {
+    case EMIT_TEXT_INLINE:
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF:
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        bb3c_emit_jmp(emit_outf(), mn, target_name ? target_name : "?");
+        return;
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:
+        /* shape-only — name-keyed binary patching not yet implemented */
+        return;
+    }
+}
+void emit_text_label(const char *lbl_name)
+{
+    if (emit_bb_is_format_mode()) { fmt_label_save_by_name(lbl_name); return; }
+    switch (bb_emit_mode) {
+    case EMIT_TEXT_INLINE:
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF: {
+        if (bb_emit_mode == EMIT_MACRO_DEF && !g_in_text_macro_body) return;
+        char label_col[BB_LABEL_NAME_MAX + 4];
+        snprintf(label_col, sizeof label_col, "%s:", lbl_name ? lbl_name : "?");
+        bb3c_format(emit_outf(), label_col, "", "");
+        return;
+    }
+    case EMIT_BINARY_WIRED:
+    case EMIT_BINARY_BROKERED:
+        /* shape-only — name-keyed binary offset recording not yet implemented */
+        return;
+    }
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/

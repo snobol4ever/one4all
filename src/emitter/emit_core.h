@@ -104,6 +104,11 @@ void     emit_jmp              (bb_label_t * target, jmp_kind_t kind);
 void     emit_label_define     (bb_label_t * lbl);
 void     emit_label_initf      (bb_label_t * lbl, const char * fmt, ...);
 void     bb_label_define       (bb_label_t * lbl);
+/*--- L2: name-taking label primitives (Snocone-shape, for BB_templates) --
+   Input is the label NAME (string).  Text-mode only; binary mode is
+   shape-only until a name-keyed offset table replaces bb_label_t.offset. */
+void     emit_text_jmp         (const char * target_name, jmp_kind_t kind);
+void     emit_text_label       (const char * lbl_name);
 /*--- L2: text-only helpers -----------------------------------------------*/
 void     emit_text_3col        (FILE * out, const char * label, const char * action, const char * goto_);
 void     emit_text_rawf        (const char * fmt, ...);

@@ -10,10 +10,9 @@ void bb_rem(void) {
     int nid = bb_node_id(nd); int sid = 0; (void)sid;
     if (IS_X86) {
         /* Lifted from emit_bb.c::emit_bb_xstar.  Snocone discipline: read values, write
-           strings.  g_emit carries label names (strings), not bb_label_t pointers.  We
-           emit assembly text directly via bb3c_format; we do not call pointer-laundering
-           helpers (emit_jmp / emit_label_define) — those take bb_label_t * and stash
-           offsets in the label struct, which has no Snocone translation. */
+           strings.  g_emit carries label names (strings).  Jumps and label-defines go
+           through name-taking primitives emit_text_jmp / emit_text_label so format-mode
+           details stay in one place. */
         const char * lbl_succ = g_emit.lbl_succ;
         const char * lbl_fail = g_emit.lbl_fail;
         const char * lbl_back = g_emit.lbl_back;
@@ -24,10 +23,9 @@ void bb_rem(void) {
         bb3c_format(o, "", "mov", "ecx, dword ptr [rax]");
         bb3c_format(o, "", "lea", "rax, [rip + Δ]");
         bb3c_format(o, "", "mov", "dword ptr [rax], ecx");
-        bb3c_format(o, "", "jmp", lbl_succ);
-        char back_def[BB_LABEL_NAME_MAX + 4]; snprintf(back_def, sizeof back_def, "%s:", lbl_back);
-        bb3c_format(o, back_def, "", "");
-        bb3c_format(o, "", "jmp", lbl_fail);
+        emit_text_jmp(lbl_succ, JMP_JMP);
+        emit_text_label(lbl_back);
+        emit_text_jmp(lbl_fail, JMP_JMP);
         return;
     }
     if (IS_BIN) return; /* legacy guard; covered by IS_X86 branch above */

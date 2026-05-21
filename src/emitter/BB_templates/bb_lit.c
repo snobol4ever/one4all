@@ -4,10 +4,58 @@
    that this file restores; separators and includes match the original per-file
    shape pre-EC-UNI-13(a). */
 #include "bb_template_common.h"
+#include "emit_bb.h"   /* for emit_flat_intern_str */
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void bb_lit(void) {
     BB_t * nd = g_emit.node; FILE * out = g_emit.out;
     int nid = bb_node_id(nd); int sid = 0;
+    if (IS_X86) {
+        /* Lifted from emit_bb.c::emit_bb_xchr.  Snocone discipline: read values
+           from g_emit / nd (lit string, label-name strings) and write asm via the
+           name-taking primitives + scalar-only insn_*/emit_seq_*-non-pointer
+           helpers.  Pointer-laundering (emit_jmp / emit_label_define) replaced by
+           emit_text_jmp / emit_text_label. */
+        const char * lit = nd->sval ? nd->sval : "";
+        const char * lit_label = emit_flat_intern_str(lit);
+        const char * lbl_succ = g_emit.lbl_succ;
+        const char * lbl_fail = g_emit.lbl_fail;
+        const char * lbl_back = g_emit.lbl_back;
+        int len = (int)strlen(lit);
+        char preview[40];
+        if (len > 24) snprintf(preview, sizeof preview, "'%.24s...'", lit);
+        else          snprintf(preview, sizeof preview, "'%s'", lit);
+        emit_bb_box_banner("LIT", preview);
+        /* emit_seq_bounds_len(len, Σlen, fail) inlined with name primitive for the jump */
+        insn_mov_eax_r10mem();
+        insn_add_eax_i32((uint32_t)len);
+        if (IS_TEXT) emit_sym_lea_rcx("\xCE\xA3""len", TEMPLATE_ADDR_SIGLEN);
+        else         insn_mov_rcx_i64(TEMPLATE_ADDR_SIGLEN);
+        insn_cmp_eax_rcxmem();
+        emit_text_jmp(lbl_fail, JMP_JG);
+        /* emit_seq_sigma_delta_rdi + emit_seq_lea_rsi_sym — already scalar/string only */
+        emit_seq_sigma_delta_rdi(TEMPLATE_ADDR_SIGMA, TEMPLATE_ADDR_SIGLEN);
+        emit_seq_lea_rsi_sym(lit_label, (uint64_t)(uintptr_t)lit);
+        /* mov rdx, len — mode-dispatched */
+        {   uint64_t val = (uint64_t)(uint32_t)len;
+            switch (bb_emit_mode) {
+            case EMIT_BINARY_WIRED: case EMIT_BINARY_BROKERED: insn_mov_rdx_i64(val); break;
+            default: { char a[32]; snprintf(a, sizeof a, "rdx, %d", len);
+                       if (emit_bb_is_format_mode()) fmt_body_append("mov", a);
+                       else bb3c_format(bb_emit_out ? bb_emit_out : stdout, "", "mov", a); break; }
+            }
+        }
+        emit_push_r10();
+        emit_call_sym_plt("memcmp", (uint64_t)(uintptr_t)memcmp);
+        emit_pop_r10();
+        emit_test_eax_eax();
+        emit_text_jmp(lbl_fail, JMP_JNE);
+        emit_add_delta_imm(len);
+        emit_text_jmp(lbl_succ, JMP_JMP);
+        emit_text_label(lbl_back);
+        emit_sub_delta_imm(len);
+        emit_text_jmp(lbl_fail, JMP_JMP);
+        return;
+    }
     if (IS_BIN) return; /* x86 binary: emit_flat_body path, not emit_bb_node */
     if (IS_JVM) {
         char tag[32]; snprintf(tag, sizeof tag, "lit_%d_%d", sid, nid);

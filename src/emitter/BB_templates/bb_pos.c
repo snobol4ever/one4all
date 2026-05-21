@@ -11,17 +11,16 @@ void bb_pos(void) {
     if (IS_X86) {
         /* Lifted from emit_bb.c::emit_bb_xposi / emit_bb_xrpsi.  Snocone discipline:
            read values from g_emit, write strings.  insn_* helpers take only scalars
-           (no bb_label_t pointers) so they're fine; jumps/label-defines go through
-           bb3c_format directly with label-name strings from g_emit. */
+           (no bb_label_t pointers).  Jumps and label-defines go through name-taking
+           primitives emit_text_jmp / emit_text_label. */
         int n = (int)nd->ival;
         const char * lbl_succ = g_emit.lbl_succ;
         const char * lbl_fail = g_emit.lbl_fail;
         const char * lbl_back = g_emit.lbl_back;
         char args[32]; snprintf(args, sizeof args, "%d", n);
-        FILE * o = emit_outf();
         if (rpos) {
             emit_bb_box_banner("RPOS", args);
-            /* emit_seq_cmp_siglen_delta(n, &Σlen, succ, fail) inlined with strings */
+            /* emit_seq_cmp_siglen_delta(n, &Σlen, succ, fail) inlined */
             if (IS_TEXT) emit_sym_lea_rcx("\xCE\xA3""len", TEMPLATE_ADDR_SIGLEN);
             else         insn_mov_rcx_i64(TEMPLATE_ADDR_SIGLEN);
             insn_mov_eax_rcxmem();
@@ -29,19 +28,16 @@ void bb_pos(void) {
             insn_mov_ecx_eax();
             insn_mov_eax_r10mem();
             insn_cmp_eax_ecx();
-            bb3c_format(o, "", "jne", lbl_fail);
-            bb3c_format(o, "", "jmp", lbl_succ);
         } else {
             emit_bb_box_banner("POS", args);
-            /* emit_seq_cmp_delta_i(n, succ, fail) inlined with strings */
+            /* emit_seq_cmp_delta_i(n, succ, fail) inlined */
             insn_mov_eax_r10mem();
             insn_cmp_eax_i32((uint32_t)n);
-            bb3c_format(o, "", "jne", lbl_fail);
-            bb3c_format(o, "", "jmp", lbl_succ);
         }
-        char back_def[BB_LABEL_NAME_MAX + 4]; snprintf(back_def, sizeof back_def, "%s:", lbl_back);
-        bb3c_format(o, back_def, "", "");
-        bb3c_format(o, "", "jmp", lbl_fail);
+        emit_text_jmp(lbl_fail, JMP_JNE);
+        emit_text_jmp(lbl_succ, JMP_JMP);
+        emit_text_label(lbl_back);
+        emit_text_jmp(lbl_fail, JMP_JMP);
         return;
     }
     if (IS_BIN) return; /* x86 binary: emit_flat_body path, not emit_bb_node */

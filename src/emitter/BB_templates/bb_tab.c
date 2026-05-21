@@ -27,22 +27,21 @@ void bb_tab(void) {
             bb3c_format(o, "", "sub", subarg);
             bb3c_format(o, "", "lea", "rax, [rip + Δ]");
             bb3c_format(o, "", "cmp", "ecx, dword ptr [rax]");
-            bb3c_format(o, "", "jl",  lbl_fail);
+            emit_text_jmp(lbl_fail, JMP_JL);
             bb3c_format(o, "", "mov", "dword ptr [rax], ecx");
-            bb3c_format(o, "", "jmp", lbl_succ);
+            emit_text_jmp(lbl_succ, JMP_JMP);
         } else {
             bb3c_format(o, "", "lea", "rax, [rip + Δ]");
             bb3c_format(o, "", "mov", "ecx, dword ptr [rax]");
             char cmparg[64]; snprintf(cmparg, sizeof cmparg, "ecx, %d", n);
             bb3c_format(o, "", "cmp", cmparg);
-            bb3c_format(o, "", "jg",  lbl_fail);
+            emit_text_jmp(lbl_fail, JMP_JG);
             char movarg[64]; snprintf(movarg, sizeof movarg, "dword ptr [rax], %d", n);
             bb3c_format(o, "", "mov", movarg);
-            bb3c_format(o, "", "jmp", lbl_succ);
+            emit_text_jmp(lbl_succ, JMP_JMP);
         }
-        char back_def[BB_LABEL_NAME_MAX + 4]; snprintf(back_def, sizeof back_def, "%s:", lbl_back);
-        bb3c_format(o, back_def, "", "");
-        bb3c_format(o, "", "jmp", lbl_fail);
+        emit_text_label(lbl_back);
+        emit_text_jmp(lbl_fail, JMP_JMP);
         return;
     }
     if (IS_BIN) return; /* x86 binary: emit_flat_body path, not emit_bb_node */

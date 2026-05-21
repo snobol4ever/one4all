@@ -38,9 +38,8 @@ void bb_arb(void) {
             char start_store[160]; snprintf(start_store, sizeof start_store, "rax, [rip + %s]", lstart);
             bb3c_format(o, "", "lea",  start_store);
             bb3c_format(o, "", "mov",  "dword ptr [rax], ecx");
-            bb3c_format(o, "", "jmp",  lbl_succ);
-            char back_def[BB_LABEL_NAME_MAX + 4]; snprintf(back_def, sizeof back_def, "%s:", lbl_back);
-            bb3c_format(o, back_def, "", "");
+            emit_text_jmp(lbl_succ, JMP_JMP);
+            emit_text_label(lbl_back);
             char cnt_ref[160]; snprintf(cnt_ref, sizeof cnt_ref, "rax, [rip + %s]", lcnt);
             bb3c_format(o, "", "lea",  cnt_ref);
             bb3c_format(o, "", "mov",  "ecx, dword ptr [rax]");
@@ -52,10 +51,10 @@ void bb_arb(void) {
             bb3c_format(o, "", "add",  "edx, ecx");
             bb3c_format(o, "", "lea",  "rax, [rip + Σlen]");
             bb3c_format(o, "", "cmp",  "edx, dword ptr [rax]");
-            bb3c_format(o, "", "jg",   lbl_fail);
+            emit_text_jmp(lbl_fail, JMP_JG);
             bb3c_format(o, "", "lea",  "rax, [rip + Δ]");
             bb3c_format(o, "", "mov",  "dword ptr [rax], edx");
-            bb3c_format(o, "", "jmp",  lbl_succ);
+            emit_text_jmp(lbl_succ, JMP_JMP);
         }
         return;
     }

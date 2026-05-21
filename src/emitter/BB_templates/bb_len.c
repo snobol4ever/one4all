@@ -26,16 +26,15 @@ void bb_len(void) {
         bb3c_format(o, "", "add", addarg);
         bb3c_format(o, "", "lea", "rcx, [rip + Σlen]");
         bb3c_format(o, "", "cmp", "eax, dword ptr [rcx]");
-        bb3c_format(o, "", "jg",  lbl_fail);
+        emit_text_jmp(lbl_fail, JMP_JG);
         bb3c_format(o, "", "lea", "rax, [rip + Δ]");
         bb3c_format(o, "", "mov", "ecx, dword ptr [rax]");
         char addarg2[64]; snprintf(addarg2, sizeof addarg2, "ecx, %d", n);
         bb3c_format(o, "", "add", addarg2);
         bb3c_format(o, "", "mov", "dword ptr [rax], ecx");
-        bb3c_format(o, "", "jmp", lbl_succ);
-        char back_def[BB_LABEL_NAME_MAX + 4]; snprintf(back_def, sizeof back_def, "%s:", lbl_back);
-        bb3c_format(o, back_def, "", "");
-        bb3c_format(o, "", "jmp", lbl_fail);
+        emit_text_jmp(lbl_succ, JMP_JMP);
+        emit_text_label(lbl_back);
+        emit_text_jmp(lbl_fail, JMP_JMP);
         return;
     }
     if (IS_BIN) return; /* x86 binary: emit_flat_body path, not emit_bb_node */
