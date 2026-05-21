@@ -1518,8 +1518,9 @@ static void wasm_pre_scan_userfns(SM_sequence_t * sm) {
 int emit_sm_dispatch(void) {
     const SM_t *instr = g_emit.instr;
     switch (instr->op) {
-        /* No-effect cases — uniform default-handled by WASM/JS, overridden by NET upstream. */
-        case SM_LABEL:                                                                   return 0;
+        /* SM_LABEL — x86 emits a LABEL macro annotation; other backends emit nothing
+         * (their walkers emit per-PC labels structurally before reaching the dispatcher). */
+        case SM_LABEL:                sm_label();                                        return 0;
         /* Push/pop literals and variables. */
         case SM_PUSH_LIT_I:           sm_push_lit_i();                                   return 0;
         case SM_PUSH_LIT_S:

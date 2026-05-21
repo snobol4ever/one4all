@@ -42,6 +42,7 @@ int  sm_halt      (void);
 int  sm_return    (void);
 int  sm_freturn   (void);
 int  sm_nreturn   (void);
+void sm_label     (void);
 /* group: SM_PAT_* + SM_EXEC_STMT — EC-UNI-10(c): parameterless, read from g_emit */
 void sm_pat_lit          (void);
 void sm_pat_any          (void);

@@ -92,6 +92,7 @@ int emit_halt_line             (FILE *out, int pc);
 int emit_sm_jump_line          (FILE *out, const SM_t *ins, int pc);
 int emit_sm_jump_s_line        (FILE *out, const SM_t *ins, int pc);
 int emit_sm_jump_f_line        (FILE *out, const SM_t *ins, int pc);
+int emit_sm_label_dispatch     (FILE *out, const SM_t *ins, int pc);
 /* EC-UNI-2: return family x86 dispatchers + shim */
 int emit_sm_return_dispatch    (FILE *out, int pc);
 int emit_sm_return_variant_dispatch(FILE *out, SM_op_t op, int pc, const SM_sequence_t *prog);

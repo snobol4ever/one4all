@@ -1822,7 +1822,7 @@ int edp4_sm_arith(FILE *out, const SM_t *ins, int pc)
     return 0;
 }
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int emit_sm_label_dispatch(FILE *out, const SM_t *ins, int pc)
+int emit_sm_label_dispatch(FILE *out, const SM_t *ins, int pc)
 {
     (void)ins; (void)pc;
     emit_mode_set(TEXT_MODE(), out);
@@ -2934,20 +2934,13 @@ static void emit_sm_uni_env_init(void) {
  * its 0/-1 contract (legacy switch fallthrough on uncovered opcodes) by gating on
  * sm_op_is_dispatched(op); when 1, emit_sm_dispatch is called and returns 0; when 0, this returns -1.
  *
- * One opcode is dispatcher-covered in general but needs x86-legacy treatment, so it's excluded
- * here and falls through to the legacy switch's specialized handler:
- *
- *   SM_LABEL              — shared dispatcher returns 0 (silent no-op, exploited by WASM/JS/NET
- *                            walkers that emit labels via per-PC postamble).  x86 needs
- *                            emit_sm_label_dispatch which writes a three-column `LABEL` annotation.
- *
  * The x86 walker (emit_walk_codegen) is the only caller; legacy switch handles the remaining ~30
  * opcodes not yet templated (PUSH_EXPR, PUSH_EXPRESSION, CALL_EXPRESSION, INCR, DECR, return
- * variants, baked-pattern blobs, etc.) plus the exclusion above. */
+ * variants, baked-pattern blobs, etc.).  No exclusions remain: every dispatcher-covered opcode
+ * now produces correct x86 output through sm_<op>() templates. */
 static int dispatch_one_x86(FILE *out, const SM_t *ins, int pc,
                             const SM_sequence_t *prog, const SrcLines *sl) {
     if (!sm_op_is_dispatched(ins->op)) return -1;
-    if (ins->op == SM_LABEL) return -1;
     /* Templates dispatch on IS_X86; make sure mode is set. Legacy path relies on individual
      * dispatchers calling emitter_init_text — we have to ensure it for the very first opcode too. */
     emit_mode_set(TEXT_MODE(), out);

@@ -76,3 +76,14 @@ int sm_jump_f(void) {
     if (IS_WASM) { emit_textf("          (if (i32.eqz (call $sno_last_ok))\n            (then (i32.const %lld) (local.set $pc))\n            (else (i32.const %d)   (local.set $pc)))\n          (br $lp)\n", (long long)instr->a[0].i, i + 1); return 1; }
     return 0;
 }
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/* SM_LABEL — x86 emits a `LABEL` macro line via emit_sm_label_dispatch (a three-column annotation
+ * carried by emit_sm_label -> emit_seq_noop_macro("LABEL")).  JVM/JS/NET/WASM emit nothing here:
+ * their walkers (emit_*_from_sm) emit per-PC labels structurally before the dispatcher is called,
+ * so SM_LABEL is a no-op for those backends.  This template lets dispatch_one_x86 stop excluding
+ * SM_LABEL — it can now route through the shared dispatcher like every other opcode. */
+void sm_label(void) {
+    FILE * out = g_emit.out;
+    if (IS_X86) { emit_sm_label_dispatch(out, NULL, 0); return; }
+    /* IS_JVM / IS_JS / IS_NET / IS_WASM: structural per-PC labels emitted by the walker. */
+}
